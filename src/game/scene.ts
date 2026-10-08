@@ -31,11 +31,13 @@ import {
 import {
   buildingFrontWallsCover,
   buildingInteriorGapSample,
+  deskTopFillColor,
   drawBuilding,
   drawCharacter,
   drawDiamond,
   drawPropDesk,
   drawPropTree,
+  treeCanopyTrunkOverlap,
 } from './draw';
 
 export type SceneEvents = {
@@ -386,6 +388,7 @@ export class IsoScene {
       this.updateFootAnchorProbe();
       this.updateBuildingSilhouetteProbe();
       this.updateBuildingInteriorProbe();
+      this.updateTreeDeskProbes();
     }
     if (persistHash) {
       writeCameraToHash({ x: this.cameraX, y: this.cameraY, zoom: this.zoom });
@@ -450,6 +453,16 @@ export class IsoScene {
     const sample = buildingInteriorGapSample();
     const covered = buildingFrontWallsCover(sample);
     this.canvasEl.dataset.buildingInteriorWallCover = covered ? '1' : '0';
+  }
+
+  private updateTreeDeskProbes(): void {
+    if (!this.canvasEl) return;
+    const tree = treeCanopyTrunkOverlap();
+    this.canvasEl.dataset.treeCanopyOverlap = tree.ok ? '1' : '0';
+    this.canvasEl.dataset.treeCanopyBottomY = String(Math.round(tree.canopyBottomY * 10) / 10);
+    this.canvasEl.dataset.trunkTopY = String(Math.round(tree.trunkTopY * 10) / 10);
+    const deskTop = deskTopFillColor(false);
+    this.canvasEl.dataset.deskTopColor = deskTop.toString(16).padStart(6, '0');
   }
 
   private shouldUseMobileFraming(): boolean {

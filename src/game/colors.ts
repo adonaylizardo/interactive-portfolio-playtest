@@ -7,7 +7,7 @@ export const C = {
   propHover: 0xaaaaaa,
   propLeft: 0x858585,
   propRight: 0x9a9a9a,
-  propTop: 0xaeaeae,
+  propTop: 0x929292,
   propLeftHover: 0x959595,
   propRightHover: 0xaaaaaa,
   propTopHover: 0xbcbcbc,

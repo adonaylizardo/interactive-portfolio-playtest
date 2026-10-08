@@ -11,6 +11,7 @@ const BASE = 'http://127.0.0.1:4173/interactive-portfolio-playtest/';
 const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 2;
 const MAP_VISIBLE_MIN = 0.28;
+const TILE_LIGHT_HEX = 'dddddd';
 
 function wait(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -124,6 +125,34 @@ async function readBuildingInteriorCover(page) {
 function assertBuildingInteriorClosed(name, cover, errors, label) {
   if (cover !== '1') {
     errors.push(`${name}: ${label} floor visible between front walls (buildingInteriorWallCover=${cover})`);
+  }
+}
+
+async function readTreeDeskProbes(page) {
+  return page.evaluate(() => {
+    const c = document.getElementById('game-canvas');
+    if (!c) return null;
+    return {
+      treeOverlap: c.dataset.treeCanopyOverlap ?? '',
+      canopyBottomY: Number(c.dataset.treeCanopyBottomY),
+      trunkTopY: Number(c.dataset.trunkTopY),
+      deskTopColor: c.dataset.deskTopColor ?? '',
+    };
+  });
+}
+
+function assertTreeCanopyOverlap(name, probes, errors, label) {
+  if (!probes) {
+    errors.push(`${name}: ${label} tree/desk probes missing`);
+    return;
+  }
+  if (probes.treeOverlap !== '1') {
+    errors.push(
+      `${name}: ${label} tree canopy gap (bottomY=${probes.canopyBottomY} trunkTopY=${probes.trunkTopY})`,
+    );
+  }
+  if (probes.deskTopColor === TILE_LIGHT_HEX) {
+    errors.push(`${name}: ${label} desk top matches plot tile color`);
   }
 }
 
@@ -620,6 +649,12 @@ async function main() {
     assertBuildingInteriorClosed(
       'desktop-interior',
       await readBuildingInteriorCover(desktop),
+      errors,
+      'default-zoom',
+    );
+    assertTreeCanopyOverlap(
+      'desktop-tree-desk',
+      await readTreeDeskProbes(desktop),
       errors,
       'default-zoom',
     );

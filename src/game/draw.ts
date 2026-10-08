@@ -73,6 +73,26 @@ type RoofStyle = 'flat' | 'hip';
 
 type WallCorners = { s: Pt; e: Pt; sT: Pt; eT: Pt };
 
+export const TREE_TRUNK_H = TILE_H * 0.5;
+export const TREE_CANOPY_OVERLAP = 16;
+export const TREE_CANOPY_LIFT = TREE_TRUNK_H - TREE_CANOPY_OVERLAP;
+export const TREE_CANOPY_H = TILE_H * 0.3;
+
+/** South-top trunk y vs south canopy ground y — overlap when canopyBottomY >= trunkTopY. */
+export function treeCanopyTrunkOverlap(): {
+  canopyBottomY: number;
+  trunkTopY: number;
+  ok: boolean;
+} {
+  const trunkTopY = -TREE_TRUNK_H;
+  const canopyBottomY = -TREE_CANOPY_LIFT;
+  return {
+    canopyBottomY,
+    trunkTopY,
+    ok: canopyBottomY >= trunkTopY,
+  };
+}
+
 /** Visible faces only: front-left w→s, front-right s→e, then roof. */
 function drawVisibleIsoBox(
   g: Graphics,
@@ -83,6 +103,7 @@ function drawVisibleIsoBox(
   roof: RoofStyle,
   roofPitch = 22,
   groundDy = 0,
+  drawFlatTop = true,
 ): WallCorners {
   const { s, e, n, w } = tileCorners(bw, bh);
   const S = off(s, 0, groundDy);
@@ -100,10 +121,10 @@ function drawVisibleIsoBox(
   quad(g, S, E, eT, sT);
   g.fill(colors.right);
 
-  if (roof === 'flat') {
+  if (roof === 'flat' && drawFlatTop) {
     quad(g, wT, sT, eT, nT);
     g.fill(colors.top);
-  } else {
+  } else if (roof === 'hip') {
     const pitch = Math.min(roofPitch, height * 0.28);
     const peak: Pt = { x: 0, y: (sT.y + nT.y) / 2 - pitch };
     const roofL = colors.roofLeft ?? colors.left;
@@ -182,9 +203,14 @@ export function drawBuilding(g: Graphics, hover: boolean): void {
   g.fill(C.door);
 }
 
+export function deskTopFillColor(hover: boolean): number {
+  return hover ? C.propTopHover : C.propTop;
+}
+
 export function drawPropDesk(g: Graphics, hover: boolean): void {
   const { bw, bh } = footprint(0.55);
   const height = TILE_H * 0.42;
+  const topColor = deskTopFillColor(hover);
   drawVisibleIsoBox(
     g,
     bw,
@@ -193,37 +219,45 @@ export function drawPropDesk(g: Graphics, hover: boolean): void {
     {
       left: hover ? C.propLeftHover : C.propLeft,
       right: hover ? C.propRightHover : C.propRight,
-      top: hover ? C.propTopHover : C.propTop,
+      top: topColor,
     },
     'flat',
   );
+  const { s, e, n, w } = tileCorners(bw, bh);
+  const sT = lift(s, height);
+  const eT = lift(e, height);
+  const wT = lift(w, height);
+  const nT = lift(n, height);
+  quad(g, wT, sT, eT, nT);
+  g.fill(topColor);
+  g.stroke({ width: 1, color: 0x707070, alpha: 0.35 });
 }
 
 export function drawPropTree(g: Graphics, hover: boolean): void {
-  const trunkBw = 10;
-  const trunkBh = 5;
-  const trunkH = TILE_H * 0.38;
+  const trunkBw = 12;
+  const trunkBh = 6;
   drawVisibleIsoBox(
     g,
     trunkBw,
     trunkBh,
-    trunkH,
+    TREE_TRUNK_H,
     {
       left: hover ? C.propLeftHover : C.propLeft,
       right: hover ? C.propRightHover : C.propRight,
       top: hover ? C.propTopHover : C.propTop,
     },
     'flat',
+    0,
+    0,
+    false,
   );
 
-  const { bw, bh } = footprint(0.62);
-  const canopyBase = TILE_H * 0.52;
-  const canopyH = TILE_H * 0.38;
+  const { bw, bh } = footprint(0.5);
   drawVisibleIsoBox(
     g,
     bw,
     bh,
-    canopyH,
+    TREE_CANOPY_H,
     {
       left: hover ? C.buildingLeftHover : C.buildingLeft,
       right: hover ? C.buildingRightHover : C.buildingRight,
@@ -232,8 +266,8 @@ export function drawPropTree(g: Graphics, hover: boolean): void {
       roofRight: hover ? C.buildingRoofPeakHover : C.buildingRoofPeak,
     },
     'hip',
-    14,
-    -canopyBase,
+    7,
+    -TREE_CANOPY_LIFT,
   );
 }
 
