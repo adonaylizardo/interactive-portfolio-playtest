@@ -3,7 +3,6 @@ import {
   cells,
   getBuildingAt,
   getBuildingAtDoor,
-  getBuildingAtDoorOrAdjacent,
   MAP_HEIGHT,
   MAP_WIDTH,
   objects,
@@ -285,10 +284,11 @@ export class IsoScene {
 
   requestWalk(tx: number, ty: number, sprint: boolean): void {
     const target = resolveWalkTarget(tx, ty);
-    const building =
-      getBuildingAtDoor(target.x, target.y) ?? getBuildingAt(tx, ty);
-    if (building?.panelTitle && building.door) {
-      this.pendingBuildingEntry = { panelTitle: building.panelTitle, door: building.door };
+    const intent = getBuildingAtDoor(tx, ty) ?? getBuildingAt(tx, ty);
+    if (intent?.panelTitle && intent.door) {
+      this.pendingBuildingEntry = { panelTitle: intent.panelTitle, door: intent.door };
+    } else {
+      this.pendingBuildingEntry = null;
     }
     this.walkToTile(target.x, target.y, sprint);
   }
@@ -967,10 +967,10 @@ export class IsoScene {
     if (this.doorCooldown > 0) return;
     const tx = Math.round(this.charTx);
     const ty = Math.round(this.charTy);
-    let building = getBuildingAtDoorOrAdjacent(tx, ty);
+    let building = getBuildingAtDoor(tx, ty);
     if (!building?.panelTitle && this.pendingBuildingEntry) {
       const d = this.pendingBuildingEntry.door;
-      if (Math.max(Math.abs(d.x - tx), Math.abs(d.y - ty)) <= 1) {
+      if (tx === d.x && ty === d.y) {
         building = objects.find((o) => o.panelTitle === this.pendingBuildingEntry!.panelTitle);
       }
     }

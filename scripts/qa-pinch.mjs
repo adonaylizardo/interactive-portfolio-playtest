@@ -550,6 +550,70 @@ async function tileToScreen(page, tx, ty) {
   );
 }
 
+async function cdpClickTile(page, tx, ty) {
+  const pt = await tileToScreen(page, tx, ty);
+  if (!pt) return false;
+  await page.evaluate(() => {
+    const ui = document.getElementById('ui-root');
+    if (ui) ui.style.pointerEvents = 'none';
+  });
+  const client = await page.context().newCDPSession(page);
+  await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: pt.x, y: pt.y });
+  await client.send('Input.dispatchMouseEvent', {
+    type: 'mousePressed',
+    x: pt.x,
+    y: pt.y,
+    button: 'left',
+    clickCount: 1,
+  });
+  await client.send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased',
+    x: pt.x,
+    y: pt.y,
+    button: 'left',
+    clickCount: 1,
+  });
+  await page.evaluate(() => {
+    const ui = document.getElementById('ui-root');
+    if (ui) ui.style.pointerEvents = '';
+  });
+  return true;
+}
+
+/** After entering caso-1, a ground walk past caso-2 must not open caso-2's panel. */
+async function testNoSpuriousDoorPanelAfterGroundWalk(page, errors) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
+  await page.reload({ waitUntil: 'networkidle' });
+  await wait(1200);
+
+  if (!(await cdpClickTile(page, 3, 4))) {
+    errors.push('spurious-panel: could not click caso-1');
+    return;
+  }
+  for (let i = 0; i < 36; i++) {
+    if ((await page.locator('.building-panel--open').count()) > 0) break;
+    await wait(250);
+  }
+  if ((await page.locator('.building-panel--open').count()) === 0) {
+    errors.push('spurious-panel: caso-1 panel did not open');
+    return;
+  }
+  await page.locator('.building-panel__close').click();
+  await wait(500);
+
+  if (!(await cdpClickTile(page, 10, 9))) {
+    errors.push('spurious-panel: could not ground-click walk tile');
+    return;
+  }
+  await wait(4500);
+
+  if ((await page.locator('.building-panel--open').count()) > 0) {
+    const title = await page.locator('.building-panel__title').textContent();
+    errors.push(`spurious-panel: panel opened after ground walk (${title ?? 'unknown'})`);
+  }
+}
+
 async function testEnterBuildingChecklist(page, errors) {
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
@@ -674,6 +738,7 @@ async function main() {
 
     await testUnreachableClick(desktop, errors);
     await testEnterBuildingChecklist(desktop, errors);
+    await testNoSpuriousDoorPanelAfterGroundWalk(desktop, errors);
     await testSkipRingDesktop(desktop, errors);
 
     const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
