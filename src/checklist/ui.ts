@@ -148,6 +148,11 @@ export class ChecklistUI {
       this.render();
     });
 
+    window.matchMedia('(hover: none) and (pointer: coarse)').addEventListener('change', () => {
+      this.touch = isTouchPrimary();
+      this.render();
+    });
+
     this.render();
   }
 
@@ -183,9 +188,6 @@ export class ChecklistUI {
     this.root.classList.toggle('checklist--panel-open', this.mobile && this.panelOpen);
     this.root.classList.toggle('checklist--complete', done >= total);
     this.root.classList.toggle('checklist--skipped', this.state.skipped);
-    if (this.state.skipped && !this.mobile) {
-      this.root.classList.add('checklist--collapsed');
-    }
   }
 
   complete(step: ChecklistStepId): void {

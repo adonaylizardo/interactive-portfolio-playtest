@@ -16,6 +16,11 @@ import { tileToWorld, worldToTile, sortKey } from '../iso/math';
 import { findPathOrNearest } from '../iso/pathfinding';
 import { C } from './colors';
 import {
+  cameraFromPinchSession,
+  centerMapInView,
+  clampZoom,
+  hardKeepMapPartiallyVisible,
+  mapVisibleFractions,
   softClampMapInView,
   ZOOM_MAX,
   ZOOM_MIN,
@@ -72,13 +77,26 @@ export class IsoScene {
   private pinchSession: {
     startDist: number;
     startZoom: number;
+    startCamX: number;
+    startCamY: number;
     startMid: { x: number; y: number };
-    lastMid: { x: number; y: number };
+  } | null = null;
+  private webkitGestureSession: {
+    startScale: number;
+    startZoom: number;
+    startCamX: number;
+    startCamY: number;
+    anchor: { x: number; y: number };
   } | null = null;
   private pinchGestureActive = false;
   private suppressTapUntil = 0;
   private hadMultiPointerGesture = false;
   private gestureActive = false;
+  /** Exactly one zoom driver per gesture: pointer pinch, WebKit gesture*, or wheel. */
+  private zoomSource: 'none' | 'pointer' | 'gesture' | 'wheel' = 'none';
+  private pinchFrameSerial = 0;
+  /** CDP / legacy touch paths that do not emit PointerEvents for each finger. */
+  private touchOnlyPinch = false;
 
   constructor(events: SceneEvents) {
     this.events = events;
@@ -108,6 +126,7 @@ export class IsoScene {
     this.characterLayer.addChild(this.charGfx);
 
     this.buildTiles();
+    this.buildVoidClickLayer();
     this.buildObjects();
     this.syncCharacterGraphic();
 
@@ -135,6 +154,26 @@ export class IsoScene {
         this.applyCamera();
       }
     });
+  }
+
+  private buildVoidClickLayer(): void {
+    const g = new Graphics();
+    g.rect(-12000, -12000, 24000, 24000);
+    g.fill({ color: 0xffffff, alpha: 0.001 });
+    g.eventMode = 'static';
+    g.zIndex = -1000;
+    g.on('pointertap', (e) => {
+      if (this.shouldBlockTap()) return;
+      const pos = e.getLocalPosition(this.world);
+      const tile = worldToTile(pos.x, pos.y);
+      if (!tile) {
+        this.events.onUnreachable?.();
+        return;
+      }
+      const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
+      this.requestWalk(tile.x, tile.y, sprint);
+    });
+    this.world.addChildAt(g, 0);
   }
 
   private buildTiles(): void {
@@ -218,10 +257,18 @@ export class IsoScene {
   }
 
   walkToTile(tx: number, ty: number, sprint: boolean): void {
+    if (tx < 0 || ty < 0 || tx >= MAP_WIDTH || ty >= MAP_HEIGHT) {
+      this.events.onUnreachable?.();
+      return;
+    }
+    if (!cells[ty][tx].walkable) {
+      this.events.onUnreachable?.();
+      return;
+    }
     const sx = Math.round(this.charTx);
     const sy = Math.round(this.charTy);
     const result = findPathOrNearest(sx, sy, tx, ty);
-    if (!result) {
+    if (!result?.direct) {
       this.events.onUnreachable?.();
       return;
     }
@@ -266,15 +313,36 @@ export class IsoScene {
   applyCamera(persistHash = true): void {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
+    this.zoom = clampZoom(this.zoom);
+    if (this.gestureActive) {
+      const hardened = hardKeepMapPartiallyVisible(
+        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+        sw,
+        sh,
+      );
+      this.cameraX = hardened.cameraX;
+      this.cameraY = hardened.cameraY;
+      this.zoom = hardened.zoom;
+    }
     this.camera.position.set(sw / 2 + this.cameraX * this.zoom, sh / 2 + this.cameraY * this.zoom);
     this.camera.scale.set(this.zoom);
     this.refreshObjectVisuals();
     if (this.canvasEl) {
+      const vis = mapVisibleFractions(
+        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+        sw,
+        sh,
+      );
       this.canvasEl.dataset.camX = String(this.cameraX);
       this.canvasEl.dataset.camY = String(this.cameraY);
       this.canvasEl.dataset.zoom = String(this.zoom);
       this.canvasEl.dataset.camPx = String(this.camera.position.x);
       this.canvasEl.dataset.camPy = String(this.camera.position.y);
+      this.canvasEl.dataset.mapFracW = String(vis.fracW);
+      this.canvasEl.dataset.mapFracH = String(vis.fracH);
+      this.canvasEl.dataset.mapIntersects = vis.intersects ? '1' : '0';
+      this.canvasEl.dataset.pinchFrame = String(this.pinchFrameSerial);
+      this.canvasEl.dataset.zoomSource = this.zoomSource;
       this.canvasEl.dataset.charTile = JSON.stringify({
         x: Math.round(this.charTx),
         y: Math.round(this.charTy),
@@ -284,13 +352,13 @@ export class IsoScene {
       writeCameraToHash({ x: this.cameraX, y: this.cameraY, zoom: this.zoom });
     }
     if (!this.gestureActive && this.zoom <= ZOOM_MIN + 0.02) {
-      const softened = softClampMapInView(
+      const centered = centerMapInView(
         { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
         sw,
         sh,
       );
-      this.cameraX = softened.cameraX;
-      this.cameraY = softened.cameraY;
+      this.cameraX = centered.cameraX;
+      this.cameraY = centered.cameraY;
       this.camera.position.set(sw / 2 + this.cameraX * this.zoom, sh / 2 + this.cameraY * this.zoom);
       if (this.canvasEl) {
         this.canvasEl.dataset.camPx = String(this.camera.position.x);
@@ -332,6 +400,14 @@ export class IsoScene {
     const cy = (minY + maxY) / 2;
     this.cameraX = -cx;
     this.cameraY = -cy + 24;
+    const hardened = hardKeepMapPartiallyVisible(
+      { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+      sw,
+      sh,
+    );
+    this.cameraX = hardened.cameraX;
+    this.cameraY = hardened.cameraY;
+    this.zoom = hardened.zoom;
   }
 
   private setZoom(next: number, anchorScreen?: { x: number; y: number }): void {
@@ -353,10 +429,50 @@ export class IsoScene {
       this.cameraY = nextCam.cameraY;
       this.zoom = nextCam.zoom;
     } else {
-      this.zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+      this.zoom = clampZoom(next);
+    }
+    if (Math.abs(this.zoom - ZOOM_MIN) < 0.001) {
+      const centered = centerMapInView(
+        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+        sw,
+        sh,
+      );
+      this.cameraX = centered.cameraX;
+      this.cameraY = centered.cameraY;
+      this.zoom = centered.zoom;
+    } else {
+      const softened = softClampMapInView(
+        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+        sw,
+        sh,
+      );
+      this.cameraX = softened.cameraX;
+      this.cameraY = softened.cameraY;
+      this.zoom = softened.zoom;
     }
     this.zoomChanged = true;
     this.applyCamera();
+  }
+
+  private endZoomGesture(): void {
+    this.pinchSession = null;
+    this.webkitGestureSession = null;
+    this.pinchGestureActive = false;
+    this.gestureActive = false;
+    this.zoomSource = 'none';
+    this.suppressTapUntil = performance.now() + 400;
+    this.panMoved = true;
+    document.body.classList.remove('is-canvas-dragging');
+  }
+
+  private applyPinchCamera(next: { cameraX: number; cameraY: number; zoom: number }): void {
+    this.cameraX = next.cameraX;
+    this.cameraY = next.cameraY;
+    this.zoom = clampZoom(next.zoom);
+    this.pinchFrameSerial += 1;
+    this.zoomChanged = true;
+    this.cameraPanned = true;
+    this.applyCamera(false);
   }
 
   private shouldBlockTap(): boolean {
@@ -383,15 +499,48 @@ export class IsoScene {
     return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
   }
 
+  private touchPairMidpoint(t0: Touch, t1: Touch): { x: number; y: number } {
+    return { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
+  }
+
+  private touchPairDistance(t0: Touch, t1: Touch): number {
+    return Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+  }
+
+  private beginPinchAtMid(mid: { x: number; y: number }, dist: number): void {
+    if (this.zoomSource === 'gesture') return;
+    this.zoomSource = 'pointer';
+    this.pinchGestureActive = true;
+    this.gestureActive = true;
+    this.hadMultiPointerGesture = true;
+    this.panMoved = true;
+    this.webkitGestureSession = null;
+    if (dist >= 10 && Number.isFinite(dist)) {
+      this.pinchSession = {
+        startDist: dist,
+        startZoom: this.zoom,
+        startCamX: this.cameraX,
+        startCamY: this.cameraY,
+        startMid: mid,
+      };
+    } else {
+      this.pinchSession = null;
+    }
+  }
+
+  private applyActivePinch(mid: { x: number; y: number }, dist: number): void {
+    if (this.zoomSource !== 'pointer' || !this.pinchSession) return;
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const next = cameraFromPinchSession(this.pinchSession, dist, mid, sw, sh);
+    if (next) this.applyPinchCamera(next);
+  }
+
   private bindInput(): void {
     const canvas = this.canvasEl!;
     const appRoot = document.getElementById('app');
     canvas.style.touchAction = 'none';
     if (appRoot) appRoot.style.touchAction = 'none';
-
-    for (const type of ['gesturestart', 'gesturechange', 'gestureend'] as const) {
-      document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
-    }
 
     document.addEventListener(
       'wheel',
@@ -400,6 +549,63 @@ export class IsoScene {
       },
       { passive: false },
     );
+
+    const onGestureStart = (e: Event) => {
+      e.preventDefault();
+      if (this.zoomSource === 'pointer') return;
+      const ge = e as unknown as { scale: number; clientX: number; clientY: number };
+      this.zoomSource = 'gesture';
+      this.pinchGestureActive = true;
+      this.gestureActive = true;
+      this.hadMultiPointerGesture = true;
+      this.panMoved = true;
+      this.pinchSession = null;
+      this.webkitGestureSession = {
+        startScale: ge.scale || 1,
+        startZoom: this.zoom,
+        startCamX: this.cameraX,
+        startCamY: this.cameraY,
+        anchor: { x: ge.clientX, y: ge.clientY },
+      };
+    };
+
+    const onGestureChange = (e: Event) => {
+      e.preventDefault();
+      if (this.zoomSource !== 'gesture' || !this.webkitGestureSession) return;
+      const ge = e as unknown as { scale: number; clientX: number; clientY: number };
+      const s = this.webkitGestureSession;
+      const ratio = (ge.scale || 1) / (s.startScale || 1);
+      if (!Number.isFinite(ratio)) return;
+      const sw = this.app.screen.width;
+      const sh = this.app.screen.height;
+      const startCamPx = sw / 2 + s.startCamX * s.startZoom;
+      const startCamPy = sh / 2 + s.startCamY * s.startZoom;
+      const anchor = { x: ge.clientX, y: ge.clientY };
+      let next = zoomAtScreenAnchor(
+        { cameraX: s.startCamX, cameraY: s.startCamY, zoom: s.startZoom },
+        sw,
+        sh,
+        startCamPx,
+        startCamPy,
+        s.startZoom * ratio,
+        anchor,
+      );
+      next = hardKeepMapPartiallyVisible(next, sw, sh);
+      this.applyPinchCamera(next);
+    };
+
+    const onGestureEnd = (e: Event) => {
+      e.preventDefault();
+      if (this.zoomSource === 'gesture') this.endZoomGesture();
+    };
+
+    for (const [type, fn] of [
+      ['gesturestart', onGestureStart],
+      ['gesturechange', onGestureChange],
+      ['gestureend', onGestureEnd],
+    ] as const) {
+      canvas.addEventListener(type, fn, { passive: false });
+    }
 
     window.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
@@ -419,25 +625,62 @@ export class IsoScene {
       'wheel',
       (e) => {
         e.preventDefault();
+        if (this.pinchGestureActive || this.zoomSource === 'pointer' || this.zoomSource === 'gesture') {
+          return;
+        }
+        this.zoomSource = 'wheel';
         let dy = e.deltaY;
         if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) dy *= 24;
         else if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) dy *= 480;
         const factor = e.ctrlKey ? 0.004 : 0.002;
         const delta = -dy * factor;
         this.setZoom(this.zoom * (1 + delta), { x: e.clientX, y: e.clientY });
+        this.zoomSource = 'none';
       },
       { passive: false },
     );
 
-    canvas.addEventListener(
-      'touchmove',
+    const onTouchPinchStart = (e: TouchEvent) => {
+      if (this.zoomSource === 'gesture') return;
+      if (!e.touches || e.touches.length < 2) return;
+      const t0 = e.touches[0];
+      const t1 = e.touches[1];
+      if (this.pinchGestureActive && !this.touchOnlyPinch) return;
+      this.touchOnlyPinch = true;
+      this.beginPinchAtMid(this.touchPairMidpoint(t0, t1), this.touchPairDistance(t0, t1));
+    };
+
+    const onTouchPinchMove = (e: TouchEvent) => {
+      if (e.touches.length >= 2) {
+        e.preventDefault();
+        if (this.touchOnlyPinch && this.zoomSource === 'pointer') {
+          const t0 = e.touches[0];
+          const t1 = e.touches[1];
+          this.applyActivePinch(this.touchPairMidpoint(t0, t1), this.touchPairDistance(t0, t1));
+        }
+      }
+    };
+
+    const endTouchPinch = () => {
+      if (!this.touchOnlyPinch) return;
+      this.touchOnlyPinch = false;
+      this.endZoomGesture();
+    };
+
+    document.addEventListener('touchstart', onTouchPinchStart, { passive: false, capture: true });
+    document.addEventListener('touchmove', onTouchPinchMove, { passive: false, capture: true });
+    document.addEventListener(
+      'touchend',
       (e) => {
-        if (e.touches.length >= 2) e.preventDefault();
+        if (e.touches.length < 2) endTouchPinch();
       },
-      { passive: false },
+      { capture: true },
     );
 
     const onPointerDown = (e: PointerEvent) => {
+      if (e.pointerType === 'touch') {
+        this.touchOnlyPinch = false;
+      }
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this.pointers.size === 1) {
         this.panMoved = false;
@@ -445,19 +688,9 @@ export class IsoScene {
         this.lastPanPos = { x: e.clientX, y: e.clientY };
         this.tapStart = { x: e.clientX, y: e.clientY, t: performance.now() };
       }
-      if (this.pointers.size === 2) {
-        this.pinchGestureActive = true;
-        this.gestureActive = true;
-        this.hadMultiPointerGesture = true;
-        this.panMoved = true;
+      if (this.pointers.size === 2 && this.zoomSource !== 'gesture') {
         const mid = this.pointerMidpoint()!;
-        const dist = this.pointerDistance();
-        this.pinchSession = {
-          startDist: Math.max(dist, 24),
-          startZoom: this.zoom,
-          startMid: mid,
-          lastMid: mid,
-        };
+        this.beginPinchAtMid(mid, this.pointerDistance());
       }
       try {
         canvas.setPointerCapture(e.pointerId);
@@ -470,32 +703,18 @@ export class IsoScene {
       if (!this.pointers.has(e.pointerId)) return;
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-      if (this.pointers.size >= 2 && this.pinchSession) {
+      if (
+        this.zoomSource === 'pointer' &&
+        this.pointers.size >= 2 &&
+        this.pinchSession
+      ) {
         e.preventDefault();
         const mid = this.pointerMidpoint()!;
-        const dist = Math.max(this.pointerDistance(), 8);
-        const scale = dist / this.pinchSession.startDist;
-        const nextZoom = this.pinchSession.startZoom * scale;
+        const dist = this.pointerDistance();
         const sw = this.app.screen.width;
         const sh = this.app.screen.height;
-        const anchored = zoomAtScreenAnchor(
-          { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
-          sw,
-          sh,
-          this.camera.position.x,
-          this.camera.position.y,
-          nextZoom,
-          mid,
-        );
-        this.cameraX =
-          anchored.cameraX + (mid.x - this.pinchSession.lastMid.x) / anchored.zoom;
-        this.cameraY =
-          anchored.cameraY + (mid.y - this.pinchSession.lastMid.y) / anchored.zoom;
-        this.zoom = anchored.zoom;
-        this.pinchSession.lastMid = mid;
-        this.zoomChanged = true;
-        this.cameraPanned = true;
-        this.applyCamera();
+        const next = cameraFromPinchSession(this.pinchSession, dist, mid, sw, sh);
+        if (next) this.applyPinchCamera(next);
         return;
       }
 
@@ -514,16 +733,17 @@ export class IsoScene {
       }
     };
 
-    const onPointerUp = (e: PointerEvent) => {
+    const endPointerGesture = (e: PointerEvent) => {
       const wasPinch = this.pinchGestureActive;
       this.pointers.delete(e.pointerId);
 
-      if (this.pointers.size === 1 && wasPinch) {
+      if (this.pointers.size === 1 && wasPinch && this.zoomSource === 'pointer') {
         const remaining = [...this.pointers.values()][0];
         this.lastPanPos = { x: remaining.x, y: remaining.y };
         this.pinchSession = null;
         this.pinchGestureActive = false;
         this.gestureActive = false;
+        this.zoomSource = 'none';
         this.suppressTapUntil = performance.now() + 400;
         this.panMoved = true;
       }
@@ -531,6 +751,9 @@ export class IsoScene {
       if (this.pointers.size === 0) {
         if (wasPinch || this.hadMultiPointerGesture) {
           this.suppressTapUntil = performance.now() + 400;
+        }
+        if (this.zoomSource === 'pointer') {
+          this.endZoomGesture();
         }
 
         if (
@@ -557,9 +780,12 @@ export class IsoScene {
 
         this.lastPanPos = null;
         this.tapStart = null;
-        this.pinchSession = null;
-        this.pinchGestureActive = false;
-        this.gestureActive = false;
+        if (this.zoomSource === 'pointer') {
+          this.pinchSession = null;
+          this.pinchGestureActive = false;
+          this.gestureActive = false;
+          this.zoomSource = 'none';
+        }
         document.body.classList.remove('is-canvas-dragging');
       }
 
@@ -572,8 +798,20 @@ export class IsoScene {
 
     canvas.addEventListener('pointerdown', onPointerDown);
     canvas.addEventListener('pointermove', onPointerMove);
-    canvas.addEventListener('pointerup', onPointerUp);
-    canvas.addEventListener('pointercancel', onPointerUp);
+    canvas.addEventListener('pointerup', endPointerGesture);
+    canvas.addEventListener('pointercancel', endPointerGesture);
+    canvas.addEventListener('lostpointercapture', endPointerGesture);
+    canvas.addEventListener(
+      'touchcancel',
+      () => {
+        this.touchOnlyPinch = false;
+        if (this.zoomSource === 'pointer' || this.pinchGestureActive) {
+          this.pointers.clear();
+          this.endZoomGesture();
+        }
+      },
+      { passive: true },
+    );
   }
 
   private update(): void {

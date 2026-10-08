@@ -21,6 +21,7 @@ async function main(): Promise<void> {
       lastBuilding = title;
       checklist.setBuildingPanelOpen(true);
       panel.show(title);
+      checklist.complete('enter-building');
     },
     onUnreachable: () => showToast('No se puede llegar'),
   });

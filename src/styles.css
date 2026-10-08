@@ -86,7 +86,9 @@ body.is-canvas-dragging * {
 }
 
 .checklist--collapsed {
-  width: auto;
+  right: auto;
+  width: fit-content;
+  max-width: min(360px, calc(100vw - 24px));
   padding: 8px;
 }
 
@@ -358,10 +360,6 @@ body.is-canvas-dragging * {
   }
 }
 
-.checklist--skipped .checklist__skip {
-  display: none;
-}
-
 @media (min-width: 768px) {
   .checklist__counter--label {
     font-size: 14px;
@@ -384,6 +382,26 @@ body.is-canvas-dragging * {
 
   .checklist--collapsed .checklist__counter--label {
     display: none;
+  }
+
+  .checklist--collapsed .checklist__counter--in-ring {
+    display: block;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 11px;
+    pointer-events: none;
+  }
+
+  .checklist--collapsed .checklist__header {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .checklist--collapsed .checklist__progress-wrap {
+    margin: 0;
   }
 }
 
