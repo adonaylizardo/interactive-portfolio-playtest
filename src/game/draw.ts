@@ -2,11 +2,12 @@ import { Graphics } from 'pixi.js';
 import { TILE_H, TILE_W } from '../data/map';
 import { C } from './colors';
 
+/** South vertex at local (0, 0); diamond extends upward (negative y). */
 export function drawDiamond(g: Graphics, fill: number, stroke?: number): void {
-  g.moveTo(0, -TILE_H / 2);
-  g.lineTo(TILE_W / 2, 0);
-  g.lineTo(0, TILE_H / 2);
-  g.lineTo(-TILE_W / 2, 0);
+  g.moveTo(0, 0);
+  g.lineTo(TILE_W / 2, -TILE_H / 2);
+  g.lineTo(0, -TILE_H);
+  g.lineTo(-TILE_W / 2, -TILE_H / 2);
   g.closePath();
   g.fill(fill);
   if (stroke !== undefined) {

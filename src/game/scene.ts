@@ -1,4 +1,4 @@
-import { Application, Container, Graphics } from 'pixi.js';
+import { Application, Container, Graphics, Point } from 'pixi.js';
 import {
   cells,
   getBuildingAt,
@@ -14,7 +14,7 @@ import {
 } from '../data/map';
 import { parseCameraFromHash, writeCameraToHash } from '../camera/hash';
 import { isTouchPrimary, type ChecklistStepId } from '../checklist/storage';
-import { tileToWorld, worldToTile, sortKey } from '../iso/math';
+import { sortKey, tileFootWorld, tileToWorld, worldToTile } from '../iso/math';
 import { findPathOrNearest } from '../iso/pathfinding';
 import { C } from './colors';
 import {
@@ -31,6 +31,8 @@ import {
 import { drawBuilding, drawCharacter, drawDiamond, drawPropDesk, drawPropTree } from './draw';
 
 const LOD_ZOOM = 0.35;
+
+/** Keep object LOD stable between zoom frames (avoid Graphics rebatch drift). */
 
 export type SceneEvents = {
   onChecklist: (step: ChecklistStepId) => void;
@@ -101,6 +103,7 @@ export class IsoScene {
   private touchOnlyPinch = false;
   private pendingBuildingEntry: { panelTitle: string; door: { x: number; y: number } } | null =
     null;
+  private lastObjectFarLod: boolean | null = null;
 
   constructor(events: SceneEvents) {
     this.events = events;
@@ -184,7 +187,7 @@ export class IsoScene {
     for (let ty = 0; ty < MAP_HEIGHT; ty++) {
       for (let tx = 0; tx < MAP_WIDTH; tx++) {
         const cell = cells[ty][tx];
-        const pos = tileToWorld(tx, ty);
+        const pos = tileFootWorld(tx, ty);
         const g = new Graphics();
         g.position.set(pos.x, pos.y);
         const fill =
@@ -209,7 +212,7 @@ export class IsoScene {
   private buildObjects(): void {
     const sorted = [...objects].sort((a, b) => sortKey(a.x, a.y) - sortKey(b.x, b.y));
     for (const obj of sorted) {
-      const pos = tileToWorld(obj.x, obj.y);
+      const pos = tileFootWorld(obj.x, obj.y);
       const g = new Graphics();
       g.position.set(pos.x, pos.y);
       g.eventMode = 'static';
@@ -240,6 +243,35 @@ export class IsoScene {
       this.objectGraphics.set(obj.id, g);
       this.objectsLayer.addChild(g);
     }
+    this.lastObjectFarLod = this.zoom <= LOD_ZOOM;
+    this.refreshObjectVisuals();
+  }
+
+  /** Screen coords (canvas pixels) ↔ world coords with world scaled under a fixed camera pivot. */
+  private screenToWorld(sx: number, sy: number): { x: number; y: number } {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const z = this.zoom;
+    return {
+      x: (sx - sw / 2) / z - this.cameraX,
+      y: (sy - sh / 2) / z - this.cameraY,
+    };
+  }
+
+  private worldToScreen(wx: number, wy: number): { x: number; y: number } {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const z = this.zoom;
+    return {
+      x: sw / 2 + (this.cameraX + wx) * z,
+      y: sh / 2 + (this.cameraY + wy) * z,
+    };
+  }
+
+  private refreshObjectVisualsIfNeeded(): void {
+    const far = this.zoom <= LOD_ZOOM;
+    if (far === this.lastObjectFarLod) return;
+    this.lastObjectFarLod = far;
     this.refreshObjectVisuals();
   }
 
@@ -308,7 +340,7 @@ export class IsoScene {
   private syncCharacterGraphic(): void {
     this.charGfx.clear();
     drawCharacter(this.charGfx, this.charState);
-    const pos = tileToWorld(this.charTx, this.charTy);
+    const pos = tileFootWorld(this.charTx, this.charTy);
     this.charGfx.position.set(pos.x, pos.y);
     this.charGfx.zIndex = sortKey(this.charTx, this.charTy, 500);
   }
@@ -334,9 +366,11 @@ export class IsoScene {
       this.cameraY = hardened.cameraY;
       this.zoom = hardened.zoom;
     }
-    this.camera.position.set(sw / 2 + this.cameraX * this.zoom, sh / 2 + this.cameraY * this.zoom);
-    this.camera.scale.set(this.zoom);
-    this.refreshObjectVisuals();
+    this.camera.position.set(sw / 2, sh / 2);
+    this.camera.scale.set(1);
+    this.world.position.set(this.cameraX * this.zoom, this.cameraY * this.zoom);
+    this.world.scale.set(this.zoom);
+    this.refreshObjectVisualsIfNeeded();
     if (this.canvasEl) {
       const vis = mapVisibleFractions(
         { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
@@ -346,8 +380,8 @@ export class IsoScene {
       this.canvasEl.dataset.camX = String(this.cameraX);
       this.canvasEl.dataset.camY = String(this.cameraY);
       this.canvasEl.dataset.zoom = String(this.zoom);
-      this.canvasEl.dataset.camPx = String(this.camera.position.x);
-      this.canvasEl.dataset.camPy = String(this.camera.position.y);
+      this.canvasEl.dataset.camPx = String(sw / 2 + this.world.position.x);
+      this.canvasEl.dataset.camPy = String(sh / 2 + this.world.position.y);
       this.canvasEl.dataset.mapFracW = String(vis.fracW);
       this.canvasEl.dataset.mapFracH = String(vis.fracH);
       this.canvasEl.dataset.mapIntersects = vis.intersects ? '1' : '0';
@@ -357,6 +391,7 @@ export class IsoScene {
         x: Math.round(this.charTx),
         y: Math.round(this.charTy),
       });
+      this.updateFootAnchorProbe();
     }
     if (persistHash) {
       writeCameraToHash({ x: this.cameraX, y: this.cameraY, zoom: this.zoom });
@@ -369,10 +404,10 @@ export class IsoScene {
       );
       this.cameraX = centered.cameraX;
       this.cameraY = centered.cameraY;
-      this.camera.position.set(sw / 2 + this.cameraX * this.zoom, sh / 2 + this.cameraY * this.zoom);
+      this.world.position.set(this.cameraX * this.zoom, this.cameraY * this.zoom);
       if (this.canvasEl) {
-        this.canvasEl.dataset.camPx = String(this.camera.position.x);
-        this.canvasEl.dataset.camPy = String(this.camera.position.y);
+        this.canvasEl.dataset.camPx = String(sw / 2 + this.world.position.x);
+        this.canvasEl.dataset.camPy = String(sh / 2 + this.world.position.y);
       }
     }
 
@@ -384,6 +419,22 @@ export class IsoScene {
       this.events.onChecklist('move-camera');
       this.cameraPanned = false;
     }
+  }
+
+  /** QA: tile vs building foot global positions must match at every zoom. */
+  private updateFootAnchorProbe(): void {
+    if (!this.canvasEl) return;
+    const tileIdx = 4 * MAP_WIDTH + 3;
+    const tileG = this.tilesLayer.children[tileIdx] as Container | undefined;
+    const buildG = this.objectGraphics.get('building/caso-1/default');
+    if (!tileG || !buildG) return;
+    const foot = tileFootWorld(3, 4);
+    const expected = this.worldToScreen(foot.x, foot.y);
+    const tileGlobal = tileG.getGlobalPosition(new Point());
+    const buildGlobal = buildG.getGlobalPosition(new Point());
+    const driftTileBuild = Math.hypot(tileGlobal.x - buildGlobal.x, tileGlobal.y - buildGlobal.y);
+    const driftTileFormula = Math.hypot(tileGlobal.x - expected.x, tileGlobal.y - expected.y);
+    this.canvasEl.dataset.footDriftPx = String(Math.max(driftTileBuild, driftTileFormula));
   }
 
   private shouldUseMobileFraming(): boolean {
@@ -423,8 +474,8 @@ export class IsoScene {
   private setZoom(next: number, anchorScreen?: { x: number; y: number }): void {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
-    const camPx = this.camera.position.x;
-    const camPy = this.camera.position.y;
+    const camPx = sw / 2 + this.cameraX * this.zoom;
+    const camPy = sh / 2 + this.cameraY * this.zoom;
     if (anchorScreen) {
       const nextCam = zoomAtScreenAnchor(
         { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
@@ -780,8 +831,7 @@ export class IsoScene {
             const rect = canvas.getBoundingClientRect();
             const sx = e.clientX - rect.left;
             const sy = e.clientY - rect.top;
-            const wx = (sx - this.camera.position.x) / this.zoom;
-            const wy = (sy - this.camera.position.y) / this.zoom;
+            const { x: wx, y: wy } = this.screenToWorld(sx, sy);
             const tile = worldToTile(wx, wy);
             if (tile) this.requestWalk(tile.x, tile.y, double);
             else this.events.onUnreachable?.();

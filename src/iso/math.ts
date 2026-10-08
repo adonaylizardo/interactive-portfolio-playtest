@@ -1,9 +1,16 @@
 import { MAP_HEIGHT, MAP_WIDTH, TILE_H, TILE_W } from '../data/map';
 
+/** Center of the isometric diamond for a tile. */
 export function tileToWorld(tx: number, ty: number): { x: number; y: number } {
   const x = (tx - ty) * (TILE_W / 2);
   const y = (tx + ty) * (TILE_H / 2);
   return { x, y };
+}
+
+/** South vertex of the tile diamond — shared anchor for tiles, props, and character. */
+export function tileFootWorld(tx: number, ty: number): { x: number; y: number } {
+  const c = tileToWorld(tx, ty);
+  return { x: c.x, y: c.y + TILE_H / 2 };
 }
 
 export function worldToTile(wx: number, wy: number): { x: number; y: number } | null {

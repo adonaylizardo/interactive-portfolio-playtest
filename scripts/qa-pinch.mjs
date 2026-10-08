@@ -41,6 +41,24 @@ async function readCharTile(page) {
   });
 }
 
+async function readFootDriftPx(page) {
+  return page.evaluate(() => {
+    const raw = document.getElementById('game-canvas')?.dataset.footDriftPx;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  });
+}
+
+function assertFootAnchor(name, driftPx, errors, label) {
+  if (driftPx === null) {
+    errors.push(`${name}: ${label} footDriftPx missing`);
+    return;
+  }
+  if (driftPx > 0.75) {
+    errors.push(`${name}: ${label} tile/building foot drift ${driftPx.toFixed(2)}px`);
+  }
+}
+
 function assertFrameMetrics(name, m, errors, label) {
   if (!m) {
     errors.push(`${name}: ${label} missing canvas metrics`);
@@ -313,6 +331,7 @@ async function wheelSweep(page, name, errors) {
 
   let prev = await readCanvasMetrics(page);
   assertFrameMetrics(name, prev, errors, 'wheel-start');
+  assertFootAnchor(name, await readFootDriftPx(page), errors, 'wheel-start');
 
   for (let i = 0; i < 28; i++) {
     await page.mouse.wheel(0, -80);
@@ -320,6 +339,9 @@ async function wheelSweep(page, name, errors) {
     const next = await readCanvasMetrics(page);
     assertFrameMetrics(name, next, errors, `wheel-in-${i}`);
     assertNoSignJump(name, prev, next, errors, `wheel-in-${i}`);
+    if (i === 0 || i === 14 || i === 27) {
+      assertFootAnchor(name, await readFootDriftPx(page), errors, `wheel-in-${i}`);
+    }
     prev = next;
   }
 
@@ -329,6 +351,9 @@ async function wheelSweep(page, name, errors) {
     const next = await readCanvasMetrics(page);
     assertFrameMetrics(name, next, errors, `wheel-out-${i}`);
     assertNoSignJump(name, prev, next, errors, `wheel-out-${i}`);
+    if (i === 0 || i === 20 || i === 39) {
+      assertFootAnchor(name, await readFootDriftPx(page), errors, `wheel-out-${i}`);
+    }
     prev = next;
   }
 
