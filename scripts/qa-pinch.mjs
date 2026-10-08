@@ -49,6 +49,64 @@ async function readFootDriftPx(page) {
   });
 }
 
+async function readBuildingSilhouette(page) {
+  return page.evaluate(() => {
+    const raw = document.getElementById('game-canvas')?.dataset.buildingSilhouette;
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  });
+}
+
+function buildingSilhouettesMatch(a, b) {
+  if (!a || !b) return false;
+  for (const k of ['w', 'h', 'x', 'y']) {
+    if (Math.abs(Number(a[k]) - Number(b[k])) > 0.5) return false;
+  }
+  return true;
+}
+
+async function testBuildingSilhouetteStable(page, name, errors) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await wait(800);
+  const cam = await page.evaluate(() => {
+    const c = document.getElementById('game-canvas');
+    return { x: c?.dataset.camX ?? '0', y: c?.dataset.camY ?? '0' };
+  });
+
+  const zoomLevels = [ZOOM_MIN, 0.85, ZOOM_MAX];
+  const samples = [];
+
+  for (const z of zoomLevels) {
+    const hash = `#view=x=${cam.x}&y=${cam.y}&z=${z.toFixed(3)}`;
+    await page.goto(`${BASE}${hash}`, { waitUntil: 'networkidle' });
+    await wait(900);
+    const sil = await readBuildingSilhouette(page);
+    const metrics = await readCanvasMetrics(page);
+    if (!sil) {
+      errors.push(`${name}: buildingSilhouette missing at target z=${z}`);
+      continue;
+    }
+    if (metrics && Math.abs(metrics.zoom - z) > 0.06) {
+      errors.push(`${name}: zoom ${metrics.zoom.toFixed(3)} != target ${z} during silhouette test`);
+    }
+    samples.push({ z, sil });
+  }
+
+  if (samples.length < 2) return;
+  const ref = samples[0].sil;
+  for (let i = 1; i < samples.length; i++) {
+    if (!buildingSilhouettesMatch(ref, samples[i].sil)) {
+      errors.push(
+        `${name}: building LOD/silhouette changed at z=${samples[0].z} vs z=${samples[i].z} (${JSON.stringify(ref)} vs ${JSON.stringify(samples[i].sil)})`,
+      );
+    }
+  }
+}
+
 function assertFootAnchor(name, driftPx, errors, label) {
   if (driftPx === null) {
     errors.push(`${name}: ${label} footDriftPx missing`);
@@ -546,6 +604,7 @@ async function main() {
   try {
     const desktop = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     await wheelSweep(desktop, 'desktop-wheel', errors);
+    await testBuildingSilhouetteStable(desktop, 'desktop-silhouette', errors);
 
     await desktop.goto(BASE, { waitUntil: 'networkidle' });
     const canvas = await desktop.locator('#game-canvas').boundingBox();

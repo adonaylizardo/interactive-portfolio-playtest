@@ -15,13 +15,8 @@ export function drawDiamond(g: Graphics, fill: number, stroke?: number): void {
   }
 }
 
-export function drawBuilding(g: Graphics, far: boolean, hover: boolean): void {
+export function drawBuilding(g: Graphics, hover: boolean): void {
   const base = hover ? C.buildingHover : C.building;
-  if (far) {
-    g.rect(-20, -48, 40, 48);
-    g.fill(base);
-    return;
-  }
   g.moveTo(-36, -8);
   g.lineTo(0, -28);
   g.lineTo(36, -8);
@@ -35,26 +30,16 @@ export function drawBuilding(g: Graphics, far: boolean, hover: boolean): void {
   g.fill(C.door);
 }
 
-export function drawPropDesk(g: Graphics, far: boolean, hover: boolean): void {
+export function drawPropDesk(g: Graphics, hover: boolean): void {
   const c = hover ? C.propHover : C.prop;
-  if (far) {
-    g.rect(-12, -24, 24, 24);
-    g.fill(c);
-    return;
-  }
   g.rect(-28, -20, 56, 8);
   g.fill(c);
   g.rect(-6, -36, 12, 16);
   g.fill(c);
 }
 
-export function drawPropTree(g: Graphics, far: boolean, hover: boolean): void {
+export function drawPropTree(g: Graphics, hover: boolean): void {
   const c = hover ? C.propHover : C.prop;
-  if (far) {
-    g.circle(0, -20, 10);
-    g.fill(c);
-    return;
-  }
   g.rect(-4, -32, 8, 32);
   g.fill(c);
   g.circle(0, -40, 18);

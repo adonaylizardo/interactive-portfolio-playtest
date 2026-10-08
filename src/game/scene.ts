@@ -30,10 +30,6 @@ import {
 } from './cameraControl';
 import { drawBuilding, drawCharacter, drawDiamond, drawPropDesk, drawPropTree } from './draw';
 
-const LOD_ZOOM = 0.35;
-
-/** Keep object LOD stable between zoom frames (avoid Graphics rebatch drift). */
-
 export type SceneEvents = {
   onChecklist: (step: ChecklistStepId) => void;
   onEnterBuilding: (title: string) => void;
@@ -103,8 +99,6 @@ export class IsoScene {
   private touchOnlyPinch = false;
   private pendingBuildingEntry: { panelTitle: string; door: { x: number; y: number } } | null =
     null;
-  private lastObjectFarLod: boolean | null = null;
-
   constructor(events: SceneEvents) {
     this.events = events;
   }
@@ -243,7 +237,6 @@ export class IsoScene {
       this.objectGraphics.set(obj.id, g);
       this.objectsLayer.addChild(g);
     }
-    this.lastObjectFarLod = this.zoom <= LOD_ZOOM;
     this.refreshObjectVisuals();
   }
 
@@ -268,23 +261,15 @@ export class IsoScene {
     };
   }
 
-  private refreshObjectVisualsIfNeeded(): void {
-    const far = this.zoom <= LOD_ZOOM;
-    if (far === this.lastObjectFarLod) return;
-    this.lastObjectFarLod = far;
-    this.refreshObjectVisuals();
-  }
-
   private refreshObjectVisuals(): void {
-    const far = this.zoom <= LOD_ZOOM;
     for (const obj of objects) {
       const g = this.objectGraphics.get(obj.id);
       if (!g) continue;
       g.clear();
       const hover = this.hoveredObject?.id === obj.id;
-      if (obj.name === 'escritorio') drawPropDesk(g, far, hover);
-      else if (obj.name === 'arbol') drawPropTree(g, far, hover);
-      else drawBuilding(g, far, hover);
+      if (obj.name === 'escritorio') drawPropDesk(g, hover);
+      else if (obj.name === 'arbol') drawPropTree(g, hover);
+      else drawBuilding(g, hover);
     }
   }
 
@@ -370,7 +355,6 @@ export class IsoScene {
     this.camera.scale.set(1);
     this.world.position.set(this.cameraX * this.zoom, this.cameraY * this.zoom);
     this.world.scale.set(this.zoom);
-    this.refreshObjectVisualsIfNeeded();
     if (this.canvasEl) {
       const vis = mapVisibleFractions(
         { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
@@ -392,6 +376,7 @@ export class IsoScene {
         y: Math.round(this.charTy),
       });
       this.updateFootAnchorProbe();
+      this.updateBuildingSilhouetteProbe();
     }
     if (persistHash) {
       writeCameraToHash({ x: this.cameraX, y: this.cameraY, zoom: this.zoom });
@@ -435,6 +420,20 @@ export class IsoScene {
     const driftTileBuild = Math.hypot(tileGlobal.x - buildGlobal.x, tileGlobal.y - buildGlobal.y);
     const driftTileFormula = Math.hypot(tileGlobal.x - expected.x, tileGlobal.y - expected.y);
     this.canvasEl.dataset.footDriftPx = String(Math.max(driftTileBuild, driftTileFormula));
+  }
+
+  /** QA: local bounds of caso-1 must not change with zoom (no LOD geometry swap). */
+  private updateBuildingSilhouetteProbe(): void {
+    if (!this.canvasEl) return;
+    const buildG = this.objectGraphics.get('building/caso-1/default');
+    if (!buildG) return;
+    const b = buildG.getLocalBounds();
+    this.canvasEl.dataset.buildingSilhouette = JSON.stringify({
+      w: Math.round(b.width * 10) / 10,
+      h: Math.round(b.height * 10) / 10,
+      x: Math.round(b.x * 10) / 10,
+      y: Math.round(b.y * 10) / 10,
+    });
   }
 
   private shouldUseMobileFraming(): boolean {
@@ -965,10 +964,6 @@ export class IsoScene {
 
   getZoom(): number {
     return this.zoom;
-  }
-
-  isFarLod(): boolean {
-    return this.zoom <= LOD_ZOOM;
   }
 
   setZoomLevel(level: number, anchorScreen?: { x: number; y: number }): void {
