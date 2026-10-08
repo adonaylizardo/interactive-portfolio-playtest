@@ -41,4 +41,12 @@ Después de cambiar el mapa, recarga la app; no hace falta tocar el renderer sal
 
 ## Checklist y estado
 
-El progreso del tutorial se guarda en `localStorage` (`playtest-checklist-v1`). La cámara (pan + zoom) se sincroniza con el hash de la URL (`#view=x=…&y=…&z=…`).
+El progreso del tutorial se guarda en `localStorage` (`playtest-checklist-v2`). En **touch**, el paso 2 es **Corre** (doble toque); en **escritorio**, **Camina con las teclas** (WASD). La cámara (pan + zoom) se sincroniza con el hash de la URL (`#view=x=…&y=…&z=…`).
+
+## Vista previa en rama `gh-pages` (sin merge a main)
+
+```bash
+npm run deploy:gh-pages
+```
+
+Publica `dist/` en la rama huérfana `gh-pages` (con `.nojekyll`) para apuntar GitHub Pages ahí mientras tanto.
