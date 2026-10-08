@@ -1,0 +1,16 @@
+export const C = {
+  bg: 0xf0f0f0,
+  tileLight: 0xdddddd,
+  tileMid: 0xc8c8c8,
+  tileDark: 0xb0b0b0,
+  prop: 0x9a9a9a,
+  propHover: 0x888888,
+  building: 0x7a7a7a,
+  buildingRoof: 0x666666,
+  buildingHover: 0x6e6e6e,
+  character: 0x555555,
+  characterWalk: 0x4a4a4a,
+  characterSprint: 0x404040,
+  path: 0x6b8cae,
+  door: 0x909090,
+} as const;

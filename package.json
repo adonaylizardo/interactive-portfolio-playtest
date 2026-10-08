@@ -1,0 +1,20 @@
+{
+  "name": "interactive-portfolio-playtest",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "qa": "npm run build && node scripts/qa.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.7"
+  },
+  "dependencies": {
+    "pixi.js": "^8.14.0"
+  }
+}
