@@ -41,7 +41,7 @@ Después de cambiar el mapa, recarga la app; no hace falta tocar el renderer sal
 
 ## Checklist y estado
 
-El progreso del tutorial se guarda en `localStorage` (`playtest-checklist-v2`). En **touch**, el paso 2 es **Corre** (doble toque); en **escritorio**, **Camina con las teclas** (WASD). La cámara (pan + zoom) se sincroniza con el hash de la URL (`#view=x=…&y=…&z=…`).
+El progreso del tutorial se guarda en `localStorage` (`playtest-checklist-v3`). En **touch** son **4 pasos** (0/4→4/4): caminar (toca; doble toque para correr), cámara, zoom, edificio — sin paso de teclado. En **escritorio**, **5 pasos** incluyen WASD/flechas. En móvil la checklist llega **cerrada** (anillo + contador abajo); toca el anillo para abrir. La cámara (pan + zoom) se sincroniza con el hash de la URL (`#view=x=…&y=…&z=…`).
 
 ## Vista previa en rama `gh-pages` (sin merge a main)
 

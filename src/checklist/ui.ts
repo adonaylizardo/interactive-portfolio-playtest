@@ -5,7 +5,7 @@ import {
   markAllComplete,
   saveChecklist,
   stepsForPlatform,
-  TOTAL_STEPS,
+  totalStepsForPlatform,
   type ChecklistState,
   type ChecklistStepId,
 } from './storage';
@@ -15,58 +15,38 @@ type StepCopy = {
   title: string;
   detailDesktop: string;
   detailTouch: string;
-  hintDesktop: string;
-  hintTouch: string;
 };
 
 const STEP_COPY: Record<ChecklistStepId, StepCopy> = {
   'walk-around': {
     id: 'walk-around',
     title: 'Camina por ahí',
-    detailDesktop: 'Haz clic en un tile para ir allí.',
-    detailTouch: 'Toca un tile para ir allí.',
-    hintDesktop: 'Clic en un tile para caminar.',
-    hintTouch: 'Toca un tile para caminar.',
+    detailDesktop: 'Haz clic en un tile para ir allí. Doble clic o Shift para correr.',
+    detailTouch: 'Toca un tile para ir allí. Doble toque en un tile para correr.',
   },
   'walk-keys': {
     id: 'walk-keys',
     title: 'Camina con las teclas',
     detailDesktop: 'Usa WASD o las flechas para mover al personaje.',
     detailTouch: 'Usa WASD o las flechas para mover al personaje.',
-    hintDesktop: 'WASD o flechas del teclado.',
-    hintTouch: 'WASD o flechas del teclado.',
-  },
-  'sprint-touch': {
-    id: 'sprint-touch',
-    title: 'Corre',
-    detailDesktop: 'Doble clic o Shift al caminar (solo referencia en touch).',
-    detailTouch: 'Haz doble toque en un tile para correr hasta allí.',
-    hintDesktop: 'Doble toque en tile (touch).',
-    hintTouch: 'Doble toque en un tile para correr.',
   },
   'move-camera': {
     id: 'move-camera',
     title: 'Mueve la cámara',
     detailDesktop: 'Arrastra con el mouse para desplazar la vista.',
     detailTouch: 'Arrastra con un dedo para desplazar la vista.',
-    hintDesktop: 'Arrastra el canvas para desplazar.',
-    hintTouch: 'Arrastra con un dedo.',
   },
   zoom: {
     id: 'zoom',
     title: 'Acerca y aleja',
     detailDesktop: 'Usa la rueda del mouse o pellizco en trackpad.',
     detailTouch: 'Pellizca con dos dedos para acercar o alejar.',
-    hintDesktop: 'Rueda del mouse o trackpad.',
-    hintTouch: 'Pellizco con dos dedos.',
   },
   'enter-building': {
     id: 'enter-building',
     title: 'Entra a un edificio',
     detailDesktop: 'Camina hasta la puerta de un edificio para abrir el panel.',
     detailTouch: 'Camina hasta la puerta de un edificio para abrir el panel.',
-    hintDesktop: 'Camina hasta una puerta.',
-    hintTouch: 'Camina hasta una puerta.',
   },
 };
 
@@ -83,12 +63,13 @@ export class ChecklistUI {
   private root: HTMLElement;
   private listEl: HTMLElement;
   private counterEl: HTMLElement;
+  private counterInRing: HTMLElement;
   private ringEl: SVGCircleElement;
   private headerTitle: HTMLElement;
-  private compactHint: HTMLElement;
-  private headerEl: HTMLElement;
+  private ringBtn: HTMLButtonElement;
   private touch = isTouchPrimary();
   private mobile = isMobileLayout();
+  private panelOpen = false;
 
   constructor(container: HTMLElement, callbacks: ChecklistCallbacks) {
     this.state = loadChecklist();
@@ -96,26 +77,21 @@ export class ChecklistUI {
     this.root.className = 'checklist';
     this.applyLayoutClasses();
 
-    if (countCompleted(this.state) >= TOTAL_STEPS) {
-      this.root.classList.add('checklist--complete');
-    }
-    if (this.state.skipped) this.root.classList.add('checklist--skipped');
-
     this.root.innerHTML = `
       <header class="checklist__header">
         <div class="checklist__header-text">
           <span class="checklist__label">Primeros pasos</span>
           <h2 class="checklist__active-title"></h2>
-          <p class="checklist__compact-hint"></p>
         </div>
         <div class="checklist__progress-wrap">
-          <span class="checklist__counter"></span>
-          <button type="button" class="checklist__ring-btn" aria-label="Expandir o contraer lista">
-            <svg class="checklist__ring" viewBox="0 0 36 36" width="36" height="36">
-              <circle class="checklist__ring-bg" cx="18" cy="18" r="15.5" fill="none" stroke-width="2"/>
-              <circle class="checklist__ring-fg" cx="18" cy="18" r="15.5" fill="none" stroke-width="2.5"
-                stroke-dasharray="97.4" stroke-dashoffset="97.4" transform="rotate(-90 18 18)"/>
+          <span class="checklist__counter checklist__counter--label"></span>
+          <button type="button" class="checklist__ring-btn" aria-label="Abrir o cerrar lista de pasos">
+            <svg class="checklist__ring" viewBox="0 0 56 56" width="56" height="56" aria-hidden="true">
+              <circle class="checklist__ring-bg" cx="28" cy="28" r="24" fill="none" stroke-width="2.5"/>
+              <circle class="checklist__ring-fg" cx="28" cy="28" r="24" fill="none" stroke-width="3"
+                stroke-dasharray="150.8" stroke-dashoffset="150.8" transform="rotate(-90 28 28)"/>
             </svg>
+            <span class="checklist__counter checklist__counter--in-ring"></span>
           </button>
         </div>
       </header>
@@ -127,30 +103,28 @@ export class ChecklistUI {
 
     container.appendChild(this.root);
     this.listEl = this.root.querySelector('.checklist__list')!;
-    this.counterEl = this.root.querySelector('.checklist__counter')!;
+    this.counterEl = this.root.querySelector('.checklist__counter--label')!;
+    this.counterInRing = this.root.querySelector('.checklist__counter--in-ring')!;
     this.ringEl = this.root.querySelector('.checklist__ring-fg')!;
     this.headerTitle = this.root.querySelector('.checklist__active-title')!;
-    this.compactHint = this.root.querySelector('.checklist__compact-hint')!;
-    this.headerEl = this.root.querySelector('.checklist__header')!;
+    this.ringBtn = this.root.querySelector('.checklist__ring-btn')!;
 
-    const toggleExpand = () => {
-      if (this.mobile) {
-        this.state.mobileExpanded = !this.state.mobileExpanded;
-        this.applyLayoutClasses();
-      } else {
-        this.state.collapsed = !this.state.collapsed;
-        this.root.classList.toggle('checklist--collapsed', this.state.collapsed);
-      }
+    const toggleMobileList = () => {
+      if (!this.mobile) return;
+      this.state.mobileExpanded = !this.state.mobileExpanded;
+      this.applyLayoutClasses();
       saveChecklist(this.state);
     };
 
-    this.root.querySelector('.checklist__ring-btn')!.addEventListener('click', (e) => {
+    this.ringBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      toggleExpand();
-    });
-
-    this.headerEl.addEventListener('click', () => {
-      if (this.mobile && !this.state.mobileExpanded) toggleExpand();
+      if (this.mobile) {
+        toggleMobileList();
+        return;
+      }
+      this.state.collapsed = !this.state.collapsed;
+      this.root.classList.toggle('checklist--collapsed', this.state.collapsed);
+      saveChecklist(this.state);
     });
 
     this.root.querySelector('.checklist__skip')!.addEventListener('click', () => {
@@ -170,14 +144,29 @@ export class ChecklistUI {
     this.render();
   }
 
+  setBuildingPanelOpen(open: boolean): void {
+    this.panelOpen = open;
+    if (open && this.mobile) {
+      this.state.mobileExpanded = false;
+      saveChecklist(this.state);
+    }
+    this.applyLayoutClasses();
+  }
+
   private applyLayoutClasses(): void {
     this.mobile = isMobileLayout();
+    const total = totalStepsForPlatform(this.touch);
+    const done = countCompleted(this.state);
+
     this.root.classList.toggle('checklist--mobile', this.mobile);
     this.root.classList.toggle(
-      'checklist--mobile-compact',
+      'checklist--mobile-closed',
       this.mobile && !this.state.mobileExpanded,
     );
     this.root.classList.toggle('checklist--collapsed', !this.mobile && this.state.collapsed);
+    this.root.classList.toggle('checklist--panel-open', this.mobile && this.panelOpen);
+    this.root.classList.toggle('checklist--complete', done >= total);
+    this.root.classList.toggle('checklist--skipped', this.state.skipped);
   }
 
   complete(step: ChecklistStepId): void {
@@ -189,19 +178,23 @@ export class ChecklistUI {
   }
 
   isSkippedOrDone(): boolean {
-    return this.state.skipped || countCompleted(this.state) >= TOTAL_STEPS;
+    return (
+      this.state.skipped ||
+      countCompleted(this.state) >= totalStepsForPlatform(this.touch)
+    );
   }
 
   private render(): void {
+    const total = totalStepsForPlatform(this.touch);
     const done = countCompleted(this.state);
-    this.counterEl.textContent = `${done} / ${TOTAL_STEPS}`;
-    const circumference = 97.4;
-    const offset = circumference * (1 - done / TOTAL_STEPS);
+    const counterText = `${done} / ${total}`;
+    this.counterEl.textContent = counterText;
+    this.counterInRing.textContent = counterText;
+    const circumference = 150.8;
+    const offset = circumference * (1 - done / total);
     this.ringEl.style.strokeDashoffset = String(offset);
 
-    if (done >= TOTAL_STEPS) {
-      this.root.classList.add('checklist--complete');
-    }
+    this.applyLayoutClasses();
 
     const platformSteps = stepsForPlatform(this.touch);
     this.listEl.replaceChildren();
@@ -229,11 +222,5 @@ export class ChecklistUI {
     }
 
     this.headerTitle.textContent = activeStep?.title ?? '¡Listo!';
-    const hint = activeStep
-      ? this.touch
-        ? activeStep.hintTouch
-        : activeStep.hintDesktop
-      : 'Completaste el tutorial.';
-    this.compactHint.textContent = hint;
   }
 }

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
 const outDir = '/opt/cursor/artifacts/screenshots';
+const STORAGE_KEY = 'playtest-checklist-v3';
 
 const BASE = 'http://127.0.0.1:4173/interactive-portfolio-playtest/';
 
@@ -88,7 +89,7 @@ async function main() {
     desktop.on('pageerror', (e) => errors.push(`desktop pageerror: ${e.message}`));
 
     await desktop.goto(BASE, { waitUntil: 'networkidle', timeout: 30000 });
-    await desktop.evaluate(() => localStorage.removeItem('playtest-checklist-v2'));
+    await desktop.evaluate((key) => localStorage.removeItem(key), STORAGE_KEY);
     await desktop.reload({ waitUntil: 'networkidle' });
     await wait(1500);
 
@@ -128,10 +129,10 @@ async function main() {
     if (afterWheelZoom >= beforeZoom - 0.02) {
       errors.push(`desktop: wheel did not zoom out (before ${beforeZoom}, after ${afterWheelZoom})`);
     }
-    const counterAfterZoom = await desktop.evaluate(() => {
-      const raw = localStorage.getItem('playtest-checklist-v2');
+    const counterAfterZoom = await desktop.evaluate((key) => {
+      const raw = localStorage.getItem(key);
       return raw ? JSON.parse(raw).completed.zoom : false;
-    });
+    }, STORAGE_KEY);
     if (!counterAfterZoom) {
       errors.push('desktop: wheel zoom did not tick Acerca y aleja');
     }
@@ -183,13 +184,17 @@ async function main() {
     mobile.on('pageerror', (e) => errors.push(`mobile pageerror: ${e.message}`));
 
     await mobile.goto(BASE, { waitUntil: 'networkidle', timeout: 30000 });
-    await mobile.evaluate(() => localStorage.removeItem('playtest-checklist-v2'));
+    await mobile.evaluate((key) => localStorage.removeItem(key), STORAGE_KEY);
     await mobile.reload({ waitUntil: 'networkidle' });
     await wait(1500);
 
-    const compact = await mobile.locator('.checklist--mobile-compact').count();
-    if (compact === 0) {
-      errors.push('mobile: checklist not in compact mode on load');
+    const closedRing = await mobile.locator('.checklist--mobile-closed .checklist__ring-btn').count();
+    if (closedRing === 0) {
+      errors.push('mobile: bottom progress ring not shown closed on load');
+    }
+    const counterText = await mobile.locator('.checklist__counter--in-ring').textContent();
+    if (counterText !== '0 / 4') {
+      errors.push(`mobile: expected 0/4 counter on touch, got ${counterText}`);
     }
     await mobile.screenshot({ path: path.join(outDir, 'mobile-375x812.png') });
 
@@ -197,21 +202,6 @@ async function main() {
     if (mCanvas) {
       await mobile.touchscreen.tap(mCanvas.x + mCanvas.width * 0.55, mCanvas.y + mCanvas.height * 0.48);
       await wait(900);
-      const t1x = mCanvas.x + mCanvas.width * 0.62;
-      const t1y = mCanvas.y + mCanvas.height * 0.42;
-      await mobile.touchscreen.tap(t1x, t1y);
-      await wait(80);
-      await mobile.touchscreen.tap(t1x, t1y);
-      await wait(900);
-      const sprintDone = await mobile.evaluate(() => {
-        const raw = localStorage.getItem('playtest-checklist-v2');
-        return raw ? JSON.parse(raw).completed['sprint-touch'] : false;
-      });
-      if (!sprintDone) {
-        notes.push('mobile: double-tap sprint not detected in headless; simulating second touch path via walkToTile(sprint)');
-        await mobile.evaluate(() => window.__playtest?.walkToTile(9, 7, true));
-        await wait(800);
-      }
 
       await mobile.mouse.move(mCanvas.x + 120, mCanvas.y + 280);
       await mobile.mouse.down();
@@ -234,20 +224,27 @@ async function main() {
     }
 
     if ((await mobile.locator('.building-panel--open').count()) > 0) {
+      const ringHidden = await mobile.locator('.checklist--panel-open.checklist--mobile').count();
+      if (ringHidden === 0) {
+        errors.push('mobile: checklist ring still visible over building sheet');
+      }
       await mobile.screenshot({ path: path.join(outDir, 'mobile-building-panel.png') });
     } else {
       errors.push('mobile: building panel did not open');
     }
 
-    const mobileCounter = await mobile.locator('.checklist__counter').textContent();
-    const missingTouch = [];
-    if (!mobileCounter?.startsWith('5')) {
-      missingTouch.push(`counter=${mobileCounter}`);
-    }
-    if (missingTouch.length) {
-      errors.push(`mobile: touch-only 5/5 not reached (${missingTouch.join(', ')})`);
+    const touchStepsDone = await mobile.evaluate((key) => {
+      const raw = localStorage.getItem(key);
+      if (!raw) return 0;
+      const c = JSON.parse(raw).completed;
+      return ['walk-around', 'move-camera', 'zoom', 'enter-building'].filter((s) => c[s]).length;
+    }, STORAGE_KEY);
+    if (touchStepsDone !== 4) {
+      errors.push(`mobile: touch-only 4/4 not reached (steps=${touchStepsDone}/4)`);
     } else {
-      await mobile.screenshot({ path: path.join(outDir, 'mobile-5-5-touch.png') });
+      await mobile.locator('.building-panel__close').click();
+      await wait(400);
+      await mobile.screenshot({ path: path.join(outDir, 'mobile-4-4-touch.png') });
     }
 
     await desktop.close();

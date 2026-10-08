@@ -199,15 +199,8 @@ export class IsoScene {
     this.path = path;
     this.sprint = sprint;
     this.charState = sprint ? 'sprint' : 'walk';
-    this.notifyWalkChecklist(sprint);
-    this.drawPathPreview();
-  }
-
-  private notifyWalkChecklist(sprint: boolean): void {
     this.events.onChecklist('walk-around');
-    if (sprint && isTouchPrimary()) {
-      this.events.onChecklist('sprint-touch');
-    }
+    this.drawPathPreview();
   }
 
   private drawPathPreview(): void {

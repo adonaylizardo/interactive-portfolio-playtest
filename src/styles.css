@@ -120,15 +120,19 @@ body.is-canvas-dragging * {
 
 .checklist__counter {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1;
 }
 
 .checklist__ring-btn {
+  position: relative;
   border: none;
-  background: transparent;
+  background: #fff;
   padding: 0;
   cursor: pointer;
   line-height: 0;
+  border-radius: 50%;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 10%);
 }
 
 .checklist__ring-bg {
@@ -237,51 +241,90 @@ body.is-canvas-dragging * {
   color: #1a1a1a;
 }
 
-.checklist__compact-hint {
-  display: none;
-  margin: 4px 0 0;
-  font-size: 13px;
-  line-height: 1.35;
-  color: #666;
-}
-
 @media (max-width: 767px) {
   .checklist--mobile {
+    top: auto;
+    left: 50%;
+    right: auto;
+    bottom: max(20px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    width: min(360px, calc(100vw - 32px));
+    max-height: min(55vh, 480px);
+    overflow: auto;
+    padding: 14px 16px 12px;
+    z-index: 12;
+  }
+
+  .checklist--mobile-closed {
     width: auto;
-    max-width: calc(100vw - 24px);
-    max-height: 25vh;
-    overflow: hidden;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+    max-height: none;
   }
 
-  .checklist--mobile-compact {
-    padding: 10px 12px;
-    max-height: min(25vh, 200px);
-  }
-
-  .checklist--mobile-compact .checklist__header {
-    border-bottom: none;
-    margin-bottom: 0;
-    padding-bottom: 0;
-    cursor: pointer;
-  }
-
-  .checklist--mobile-compact .checklist__list,
-  .checklist--mobile-compact .checklist__footer,
-  .checklist--mobile-compact .checklist__label {
+  .checklist--mobile-closed .checklist__header-text,
+  .checklist--mobile-closed .checklist__list,
+  .checklist--mobile-closed .checklist__footer {
     display: none;
   }
 
-  .checklist--mobile-compact .checklist__compact-hint {
-    display: block;
+  .checklist--mobile-closed .checklist__header {
+    border: none;
+    margin: 0;
+    padding: 0;
   }
 
-  .checklist--mobile-compact .checklist__active-title {
-    font-size: 16px;
+  .checklist--mobile-closed .checklist__progress-wrap {
+    margin: 0;
   }
 
-  .checklist--mobile:not(.checklist--mobile-compact) {
-    max-height: min(50vh, 420px);
-    overflow: auto;
+  .checklist--mobile-closed .checklist__counter--label {
+    display: none;
+  }
+
+  .checklist--mobile-closed .checklist__counter--in-ring {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 11px;
+    pointer-events: none;
+  }
+
+  .checklist--panel-open.checklist--mobile {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .checklist--mobile:not(.checklist--mobile-closed) {
+    bottom: max(20px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (min-width: 768px) {
+  .checklist__counter--label {
+    font-size: 14px;
+  }
+
+  .checklist__counter--in-ring {
+    display: none;
+  }
+
+  .checklist__ring-btn {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .checklist--collapsed .checklist__header-text,
+  .checklist--collapsed .checklist__list,
+  .checklist--collapsed .checklist__footer {
+    display: none;
+  }
+
+  .checklist--collapsed .checklist__counter--label {
+    display: none;
   }
 }
 

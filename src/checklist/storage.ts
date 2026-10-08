@@ -1,7 +1,6 @@
 export type ChecklistStepId =
   | 'walk-around'
   | 'walk-keys'
-  | 'sprint-touch'
   | 'move-camera'
   | 'zoom'
   | 'enter-building';
@@ -9,18 +8,17 @@ export type ChecklistStepId =
 export type ChecklistState = {
   completed: Record<ChecklistStepId, boolean>;
   skipped: boolean;
-  /** Desktop: collapsed to progress ring only */
+  /** Desktop: collapsed to progress ring only (top-left) */
   collapsed: boolean;
-  /** Mobile: full list expanded (default compact on phone) */
+  /** Mobile: full list expanded from bottom ring */
   mobileExpanded: boolean;
 };
 
-const STORAGE_KEY = 'playtest-checklist-v2';
+const STORAGE_KEY = 'playtest-checklist-v3';
 
 const ALL_STEP_IDS: ChecklistStepId[] = [
   'walk-around',
   'walk-keys',
-  'sprint-touch',
   'move-camera',
   'zoom',
   'enter-building',
@@ -30,7 +28,6 @@ const defaultState = (): ChecklistState => ({
   completed: {
     'walk-around': false,
     'walk-keys': false,
-    'sprint-touch': false,
     'move-camera': false,
     zoom: false,
     'enter-building': false,
@@ -46,9 +43,13 @@ export function isTouchPrimary(): boolean {
 
 export function stepsForPlatform(touch = isTouchPrimary()): ChecklistStepId[] {
   if (touch) {
-    return ['walk-around', 'sprint-touch', 'move-camera', 'zoom', 'enter-building'];
+    return ['walk-around', 'move-camera', 'zoom', 'enter-building'];
   }
   return ['walk-around', 'walk-keys', 'move-camera', 'zoom', 'enter-building'];
+}
+
+export function totalStepsForPlatform(touch = isTouchPrimary()): number {
+  return stepsForPlatform(touch).length;
 }
 
 export function loadChecklist(): ChecklistState {
@@ -79,5 +80,3 @@ export function markAllComplete(state: ChecklistState): void {
     state.completed[id] = true;
   }
 }
-
-export const TOTAL_STEPS = 5;

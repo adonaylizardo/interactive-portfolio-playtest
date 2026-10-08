@@ -8,7 +8,9 @@ async function main(): Promise<void> {
 
   const checklist = new ChecklistUI(uiRoot, { onSkip: () => {} });
 
-  const panel = new BuildingPanel(uiRoot, () => {});
+  const panel = new BuildingPanel(uiRoot, () => {
+    checklist.setBuildingPanelOpen(false);
+  });
 
   let lastBuilding = '';
   const scene = new IsoScene({
@@ -16,6 +18,7 @@ async function main(): Promise<void> {
     onEnterBuilding: (title) => {
       if (panel.isOpen() && lastBuilding === title) return;
       lastBuilding = title;
+      checklist.setBuildingPanelOpen(true);
       panel.show(title);
     },
   });
