@@ -5,6 +5,8 @@ import { C } from './colors';
 type Pt = { x: number; y: number };
 
 const FOOT_INSET = 0.84;
+const BUILDING_WALL_H = TILE_H * 1.12;
+const BUILDING_RIDGE_RISE = 28;
 
 export function footprint(bwScale = 1): { bw: number; bh: number } {
   const bw = (TILE_W / 2) * FOOT_INSET * bwScale;
@@ -41,9 +43,17 @@ function quad(g: Graphics, a: Pt, b: Pt, c: Pt, d: Pt): void {
   g.closePath();
 }
 
-/** Point on the front-right wall (u along ground s→e, v from ground to top). */
-export function facePoint(s: Pt, e: Pt, sT: Pt, eT: Pt, u: number, v: number): Pt {
-  return lerp(lerp(s, e, u), lerp(sT, eT, u), v);
+function tri(g: Graphics, a: Pt, b: Pt, c: Pt, fill: number): void {
+  g.moveTo(a.x, a.y);
+  g.lineTo(b.x, b.y);
+  g.lineTo(c.x, c.y);
+  g.closePath();
+  g.fill(fill);
+}
+
+/** Point on wall parallelogram (u along ground a→b, v from ground to top). */
+export function facePoint(a: Pt, b: Pt, aT: Pt, bT: Pt, u: number, v: number): Pt {
+  return lerp(lerp(a, b, u), lerp(aT, bT, u), v);
 }
 
 function pointInTri(p: Pt, a: Pt, b: Pt, c: Pt): boolean {
@@ -61,22 +71,14 @@ function pointInQuad(p: Pt, a: Pt, b: Pt, c: Pt, d: Pt): boolean {
   return pointInTri(p, a, b, c) || pointInTri(p, a, c, d);
 }
 
-type IsoFaceColors = {
-  left: number;
-  right: number;
-  top: number;
-  roofLeft?: number;
-  roofRight?: number;
-};
-
-type RoofStyle = 'flat' | 'hip';
-
-type WallCorners = { s: Pt; e: Pt; sT: Pt; eT: Pt };
+type WallColors = { left: number; right: number; top: number };
 
 export const TREE_TRUNK_H = TILE_H * 0.5;
+export const TREE_TRUNK_BW = 11;
 export const TREE_CANOPY_OVERLAP = 16;
 export const TREE_CANOPY_LIFT = TREE_TRUNK_H - TREE_CANOPY_OVERLAP;
-export const TREE_CANOPY_H = TILE_H * 0.3;
+export const TREE_TIER1_H = TILE_H * 0.14;
+export const TREE_TIER2_H = TILE_H * 0.17;
 
 /** South-top trunk y vs south canopy ground y — overlap when canopyBottomY >= trunkTopY. */
 export function treeCanopyTrunkOverlap(): {
@@ -93,66 +95,57 @@ export function treeCanopyTrunkOverlap(): {
   };
 }
 
-/** Visible faces only: front-left w→s, front-right s→e, then roof. */
-function drawVisibleIsoBox(
-  g: Graphics,
-  bw: number,
-  bh: number,
-  height: number,
-  colors: IsoFaceColors,
-  roof: RoofStyle,
-  roofPitch = 22,
-  groundDy = 0,
-  drawFlatTop = true,
-): WallCorners {
+/** Front-left + front-right walls only (no back faces). */
+function drawFrontWalls(g: Graphics, bw: number, bh: number, height: number, colors: WallColors, groundDy = 0): WallCorners {
   const { s, e, n, w } = tileCorners(bw, bh);
   const S = off(s, 0, groundDy);
   const E = off(e, 0, groundDy);
   const W = off(w, 0, groundDy);
-  const N = off(n, 0, groundDy);
   const sT = lift(S, height);
   const eT = lift(E, height);
   const wT = lift(W, height);
-  const nT = lift(N, height);
+  const nT = lift(off(n, 0, groundDy), height);
 
   quad(g, W, S, sT, wT);
   g.fill(colors.left);
-
   quad(g, S, E, eT, sT);
   g.fill(colors.right);
 
-  if (roof === 'flat' && drawFlatTop) {
-    quad(g, wT, sT, eT, nT);
-    g.fill(colors.top);
-  } else if (roof === 'hip') {
-    const pitch = Math.min(roofPitch, height * 0.28);
-    const peak: Pt = { x: 0, y: (sT.y + nT.y) / 2 - pitch };
-    const roofL = colors.roofLeft ?? colors.left;
-    const roofR = colors.roofRight ?? colors.right;
-    g.moveTo(wT.x, wT.y);
-    g.lineTo(sT.x, sT.y);
-    g.lineTo(peak.x, peak.y);
-    g.closePath();
-    g.fill(roofL);
-    g.moveTo(sT.x, sT.y);
-    g.lineTo(eT.x, eT.y);
-    g.lineTo(peak.x, peak.y);
-    g.closePath();
-    g.fill(roofR);
-  }
+  return { s: S, e: E, n: off(n, 0, groundDy), w: W, sT, eT, wT, nT };
+}
 
-  return { s: S, e: E, sT, eT };
+type WallCorners = { s: Pt; e: Pt; n: Pt; w: Pt; sT: Pt; eT: Pt; wT: Pt; nT: Pt };
+
+/** Hip roof: eaves at wall tops, ridge `ridgeRise` px above eave center — no flat lid. */
+function drawFrontHipRoof(
+  g: Graphics,
+  wT: Pt,
+  sT: Pt,
+  eT: Pt,
+  nT: Pt,
+  leftTone: number,
+  rightTone: number,
+  ridgeRise: number,
+): void {
+  const peak: Pt = { x: 0, y: (sT.y + nT.y) / 2 - ridgeRise };
+  tri(g, wT, sT, peak, leftTone);
+  tri(g, sT, eT, peak, rightTone);
+}
+
+function drawFlatTop(g: Graphics, wT: Pt, sT: Pt, eT: Pt, nT: Pt, fill: number): void {
+  quad(g, wT, sT, eT, nT);
+  g.fill(fill);
 }
 
 /** Sample between front walls near the ground — must hit wall fill, not open tile. */
-export function buildingInteriorGapSample(_height = TILE_H * 1.12): Pt {
+export function buildingInteriorGapSample(_height = BUILDING_WALL_H): Pt {
   const { bw, bh } = footprint(1);
   const { s, w } = tileCorners(bw, bh);
   const mid = lerp(w, s, 0.5);
   return { x: mid.x * 0.92, y: mid.y * 0.92 - 5 };
 }
 
-export function buildingFrontWallsCover(p: Pt, height = TILE_H * 1.12): boolean {
+export function buildingFrontWallsCover(p: Pt, height = BUILDING_WALL_H): boolean {
   const { bw, bh } = footprint(1);
   const { s, e, w } = tileCorners(bw, bh);
   const sT = lift(s, height);
@@ -176,29 +169,21 @@ export function drawDiamond(g: Graphics, fill: number, stroke?: number): void {
 
 export function drawBuilding(g: Graphics, hover: boolean): void {
   const { bw, bh } = footprint(1);
-  const height = TILE_H * 1.12;
-  const { s, e, sT, eT } = drawVisibleIsoBox(
-    g,
-    bw,
-    bh,
-    height,
-    {
-      left: hover ? C.buildingLeftHover : C.buildingLeft,
-      right: hover ? C.buildingRightHover : C.buildingRight,
-      top: hover ? C.buildingTopHover : C.buildingTop,
-      roofLeft: hover ? C.buildingRoofHover : C.buildingRoof,
-      roofRight: hover ? C.buildingRoofPeakHover : C.buildingRoofPeak,
-    },
-    'hip',
-  );
+  const left = hover ? C.buildingLeftHover : C.buildingLeft;
+  const right = hover ? C.buildingRightHover : C.buildingRight;
+  const roofL = hover ? C.buildingRoofHover : C.buildingRoof;
+  const roofR = hover ? C.buildingRoofPeakHover : C.buildingRoofPeak;
+
+  const walls = drawFrontWalls(g, bw, bh, BUILDING_WALL_H, { left, right, top: 0 });
+  drawFrontHipRoof(g, walls.wT, walls.sT, walls.eT, walls.nT, roofL, roofR, BUILDING_RIDGE_RISE);
 
   const doorH = 0.52;
   quad(
     g,
-    facePoint(s, e, sT, eT, 0.55, 0),
-    facePoint(s, e, sT, eT, 0.78, 0),
-    facePoint(s, e, sT, eT, 0.78, doorH),
-    facePoint(s, e, sT, eT, 0.55, doorH),
+    facePoint(walls.s, walls.e, walls.sT, walls.eT, 0.55, 0),
+    facePoint(walls.s, walls.e, walls.sT, walls.eT, 0.78, 0),
+    facePoint(walls.s, walls.e, walls.sT, walls.eT, 0.78, doorH),
+    facePoint(walls.s, walls.e, walls.sT, walls.eT, 0.55, doorH),
   );
   g.fill(C.door);
 }
@@ -208,67 +193,76 @@ export function deskTopFillColor(hover: boolean): number {
 }
 
 export function drawPropDesk(g: Graphics, hover: boolean): void {
-  const { bw, bh } = footprint(0.55);
-  const height = TILE_H * 0.42;
+  const { bw, bh } = footprint(0.52);
+  const legH = TILE_H * 0.3;
+  const slabT = 7;
+  const left = hover ? C.propLeftHover : C.propLeft;
+  const right = hover ? C.propRightHover : C.propRight;
   const topColor = deskTopFillColor(hover);
-  drawVisibleIsoBox(
-    g,
-    bw,
-    bh,
-    height,
-    {
-      left: hover ? C.propLeftHover : C.propLeft,
-      right: hover ? C.propRightHover : C.propRight,
-      top: topColor,
-    },
-    'flat',
-  );
   const { s, e, n, w } = tileCorners(bw, bh);
-  const sT = lift(s, height);
-  const eT = lift(e, height);
-  const wT = lift(w, height);
-  const nT = lift(n, height);
-  quad(g, wT, sT, eT, nT);
-  g.fill(topColor);
-  g.stroke({ width: 1, color: 0x707070, alpha: 0.35 });
+
+  const legAt = (corner: Pt, toward: Pt, color: number) => {
+    const inset = lerp(corner, toward, 0.14);
+    const c2 = lerp(corner, toward, 0.02);
+    const iT = lift(inset, legH);
+    const cT = lift(c2, legH);
+    quad(g, corner, c2, cT, iT);
+    g.fill(color);
+  };
+
+  legAt(s, e, right);
+  legAt(s, w, left);
+  legAt(e, n, right);
+  legAt(w, n, left);
+
+  const sT = lift(s, legH);
+  const eT = lift(e, legH);
+  const wT = lift(w, legH);
+  const sTop = lift(s, legH + slabT);
+  const eTop = lift(e, legH + slabT);
+  const wTop = lift(w, legH + slabT);
+  const nTop = lift(n, legH + slabT);
+
+  quad(g, wT, sT, sTop, wTop);
+  g.fill(left);
+  quad(g, sT, eT, eTop, sTop);
+  g.fill(right);
+
+  drawFlatTop(g, wTop, sTop, eTop, nTop, topColor);
+}
+
+function drawTreeCanopyTier(
+  g: Graphics,
+  bwScale: number,
+  tierH: number,
+  groundDy: number,
+  colors: WallColors,
+  withTop: boolean,
+): number {
+  const { bw, bh } = footprint(bwScale);
+  const tier = drawFrontWalls(g, bw, bh, tierH, colors, groundDy);
+  if (withTop) {
+    drawFlatTop(g, tier.wT, tier.sT, tier.eT, tier.nT, colors.top);
+  }
+  return tierH;
 }
 
 export function drawPropTree(g: Graphics, hover: boolean): void {
-  const trunkBw = 12;
-  const trunkBh = 6;
-  drawVisibleIsoBox(
-    g,
-    trunkBw,
-    trunkBh,
-    TREE_TRUNK_H,
-    {
-      left: hover ? C.propLeftHover : C.propLeft,
-      right: hover ? C.propRightHover : C.propRight,
-      top: hover ? C.propTopHover : C.propTop,
-    },
-    'flat',
-    0,
-    0,
-    false,
-  );
+  const left = hover ? C.propLeftHover : C.propLeft;
+  const right = hover ? C.propRightHover : C.propRight;
+  const top = hover ? C.buildingTopHover : C.buildingTop;
 
-  const { bw, bh } = footprint(0.5);
-  drawVisibleIsoBox(
-    g,
-    bw,
-    bh,
-    TREE_CANOPY_H,
-    {
-      left: hover ? C.buildingLeftHover : C.buildingLeft,
-      right: hover ? C.buildingRightHover : C.buildingRight,
-      top: hover ? C.buildingTopHover : C.buildingTop,
-      roofLeft: hover ? C.buildingRoofHover : C.buildingRoof,
-      roofRight: hover ? C.buildingRoofPeakHover : C.buildingRoofPeak,
-    },
-    'hip',
-    7,
-    -TREE_CANOPY_LIFT,
-  );
+  g.ellipse(0, -5, 38, 12);
+  g.fill({ color: 0x888888, alpha: 0.14 });
+
+  const trunkBh = 5;
+  drawFrontWalls(g, TREE_TRUNK_BW, trunkBh, TREE_TRUNK_H, { left, right, top });
+
+  const tierColors = { left, right, top };
+  const lift1 = -TREE_CANOPY_LIFT;
+  drawTreeCanopyTier(g, 0.46, TREE_TIER1_H, lift1, tierColors, false);
+  const lift2 = lift1 - TREE_TIER1_H;
+  drawTreeCanopyTier(g, 0.32, TREE_TIER2_H, lift2, tierColors, true);
 }
 
 export function drawCharacter(
