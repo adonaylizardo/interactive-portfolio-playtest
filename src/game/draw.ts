@@ -105,6 +105,32 @@ export function buildingFrontWallsCover(p: Pt): boolean {
   return pointInQuad(p, S, W, Wp, Sp);
 }
 
+/** Roof, gable, walls, and door — used for tap hit testing on buildings. */
+export function buildingPickHit(localP: Pt): boolean {
+  const S = ht({ x: 0, y: 0 });
+  const E = ht({ x: 48, y: -24 });
+  const Sp = ht({ x: 0, y: -56 });
+  const Ep = ht({ x: 48, y: -80 });
+  const Wp = ht({ x: -48, y: -80 });
+  const R1 = ht({ x: 24, y: -104 });
+  const R2 = ht({ x: -24, y: -128 });
+  if (buildingFrontWallsCover(localP)) return true;
+  if (pointInQuad(localP, S, E, Ep, R1) || pointInQuad(localP, S, E, R1, Sp)) return true;
+  if (pointInQuad(localP, Sp, R1, R2, Wp)) return true;
+  if (
+    pointInQuad(
+      localP,
+      ht({ x: 18, y: -9 }),
+      ht({ x: 30, y: -15 }),
+      ht({ x: 30, y: -39 }),
+      ht({ x: 18, y: -33 }),
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export function footprint(bwScale = 1): { bw: number; bh: number } {
   const bw = (TILE_W / 2) * 0.84 * bwScale;
   const bh = (TILE_H / 2) * 0.84 * bwScale;

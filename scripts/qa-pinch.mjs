@@ -540,18 +540,29 @@ async function tileToScreen(page, tx, ty) {
       const TILE_H = 64;
       const rect = canvas.getBoundingClientRect();
       const wx = (tx - ty) * (TILE_W / 2);
-      const wy = (tx + ty) * (TILE_H / 2);
-      const camPx = Number(canvas.dataset.camPx ?? 0);
-      const camPy = Number(canvas.dataset.camPy ?? 0);
+      const wy = (tx + ty) * (TILE_H / 2) + TILE_H / 2;
       const zoom = Number(canvas.dataset.zoom ?? 1);
-      return { x: rect.left + camPx + wx * zoom, y: rect.top + camPy + wy * zoom };
+      const camX = Number(canvas.dataset.camX ?? 0);
+      const camY = Number(canvas.dataset.camY ?? 0);
+      const sx = rect.width / 2 + (camX + wx) * zoom;
+      const sy = rect.height / 2 + (camY + wy) * zoom;
+      return { x: rect.left + sx, y: rect.top + sy };
     },
     { tx, ty },
   );
 }
 
-async function cdpClickTile(page, tx, ty) {
+async function buildingTapScreenPoint(page, tx, ty) {
   const pt = await tileToScreen(page, tx, ty);
+  if (!pt) return null;
+  const zoom = await page.evaluate(
+    () => Number(document.getElementById('game-canvas')?.dataset.zoom ?? 1),
+  );
+  return { x: pt.x, y: pt.y - 40 * zoom };
+}
+
+async function cdpClickTile(page, tx, ty, opts = {}) {
+  const pt = opts.building ? await buildingTapScreenPoint(page, tx, ty) : await tileToScreen(page, tx, ty);
   if (!pt) return false;
   await page.evaluate(() => {
     const ui = document.getElementById('ui-root');
@@ -634,7 +645,7 @@ async function testNoDoorReopenOnKeypressAfterClose(page, errors) {
   await page.reload({ waitUntil: 'networkidle' });
   await wait(1200);
 
-  if (!(await cdpClickTile(page, 10, 11))) {
+  if (!(await cdpClickTile(page, 10, 11, { building: true }))) {
     errors.push('door-reopen: could not click caso-3');
     return;
   }
@@ -664,7 +675,7 @@ async function testGroundWalkCrossingDoorNoPanel(page, errors) {
   await page.reload({ waitUntil: 'networkidle' });
   await wait(1200);
 
-  if (!(await cdpClickTile(page, 3, 4))) {
+  if (!(await cdpClickTile(page, 3, 4, { building: true }))) {
     errors.push('cross-door: could not click caso-1');
     return;
   }
@@ -693,7 +704,7 @@ async function testNoSpuriousDoorPanelAfterGroundWalk(page, errors) {
   await page.reload({ waitUntil: 'networkidle' });
   await wait(1200);
 
-  if (!(await cdpClickTile(page, 3, 4))) {
+  if (!(await cdpClickTile(page, 3, 4, { building: true }))) {
     errors.push('spurious-panel: could not click caso-1');
     return;
   }
@@ -720,12 +731,246 @@ async function testNoSpuriousDoorPanelAfterGroundWalk(page, errors) {
   }
 }
 
+async function setupIPhoneTouchPage(browser) {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+  });
+  const page = await context.newPage();
+  const client = await context.newCDPSession(page);
+  try {
+    await client.send('Emulation.setDeviceMetricsOverride', {
+      width: 390,
+      height: 844,
+      deviceScaleFactor: 2,
+      mobile: true,
+    });
+  } catch {
+    /* optional in some Chromium builds */
+  }
+  await ensureTouchEmulation(client);
+  return { page, client, context };
+}
+
+async function setUiPointerEvents(page, enabled) {
+  await page.evaluate((enabled) => {
+    const ui = document.getElementById('ui-root');
+    if (ui) ui.style.pointerEvents = enabled ? '' : 'none';
+  }, enabled);
+}
+
+async function touchTap(page, client, x, y) {
+  await ensureTouchEmulation(client);
+  const ix = Math.round(x);
+  const iy = Math.round(y);
+  try {
+    await page.touchscreen.tap(ix, iy);
+  } catch {
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: ix, y: iy, radiusX: 1, radiusY: 1, force: 1, id: 0 }],
+    });
+    await wait(80);
+    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  }
+}
+
+async function buildingRoofScreenPoint(page, tx, ty) {
+  return buildingTapScreenPoint(page, tx, ty);
+}
+
+async function touchPanRevealTile(page, client, tx, ty) {
+  const box = await page.locator('#game-canvas').boundingBox();
+  if (!box) return;
+  const target = await tileToScreen(page, tx, ty);
+  if (!target) return;
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  const dx = target.x - cx;
+  const dy = target.y - cy;
+  if (Math.hypot(dx, dy) < box.width * 0.25) return;
+  const fromX = cx + box.width * 0.2;
+  const toX = fromX - Math.sign(dx) * Math.min(Math.abs(dx), box.width * 0.35);
+  const fromY = cy + box.height * 0.15;
+  const toY = fromY - Math.sign(dy) * Math.min(Math.abs(dy), box.height * 0.25);
+  await client.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [{ x: Math.round(fromX), y: Math.round(fromY), id: 0 }],
+  });
+  await wait(40);
+  await client.send('Input.dispatchTouchEvent', {
+    type: 'touchMove',
+    touchPoints: [{ x: Math.round(toX), y: Math.round(toY), id: 0 }],
+  });
+  await wait(40);
+  await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await wait(300);
+}
+
+async function isTileOnScreen(page, tx, ty) {
+  return page.evaluate(({ tx, ty }) => {
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas) return false;
+    const rect = canvas.getBoundingClientRect();
+    const TILE_W = 128;
+    const TILE_H = 64;
+    const wx = (tx - ty) * (TILE_W / 2);
+    const wy = (tx + ty) * (TILE_H / 2) + TILE_H / 2;
+    const zoom = Number(canvas.dataset.zoom ?? 1);
+    const camX = Number(canvas.dataset.camX ?? 0);
+    const camY = Number(canvas.dataset.camY ?? 0);
+    const sx = rect.width / 2 + (camX + wx) * zoom;
+    const sy = rect.height / 2 + (camY + wy) * zoom;
+    return sx >= 8 && sx <= rect.width - 8 && sy >= 8 && sy <= rect.height - 8;
+  }, { tx, ty });
+}
+
+async function waitForBuildingPanel(page, maxIter = 48) {
+  for (let i = 0; i < maxIter; i++) {
+    if ((await page.locator('.building-panel--open').count()) > 0) return true;
+    await wait(250);
+  }
+  return false;
+}
+
+async function testTouchBuildingEntry(browser, errors, warnings) {
+  const houses = [
+    { id: 'caso-1', tx: 3, ty: 4, title: 'Caso de ejemplo 1' },
+    { id: 'caso-2', tx: 12, ty: 5, title: 'Caso de ejemplo 2' },
+    { id: 'caso-3', tx: 10, ty: 11, title: 'Caso de ejemplo 3' },
+    { id: 'caso-4', tx: 5, ty: 12, title: 'Caso de ejemplo 4' },
+  ];
+
+  const qaStartFar = {
+    'caso-1': [7, 8],
+    'caso-3': [9, 10],
+  };
+  const qaDoorEntry = {
+    'caso-2': { char: [12, 7], door: [12, 6] },
+    'caso-4': { char: [6, 13], door: [5, 13] },
+  };
+
+  for (const house of houses) {
+    const { page, client, context } = await setupIPhoneTouchPage(browser);
+    try {
+      await page.goto(BASE, { waitUntil: 'networkidle' });
+      await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
+      await page.reload({ waitUntil: 'networkidle' });
+      await wait(1500);
+      await setUiPointerEvents(page, false);
+      const doorCase = qaDoorEntry[house.id];
+      const start = qaStartFar[house.id];
+      if (doorCase) {
+        await page.evaluate(
+          ([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y),
+          doorCase.char,
+        );
+        await wait(200);
+      } else if (start) {
+        await page.evaluate(
+          ([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y),
+          start,
+        );
+        await wait(200);
+      }
+      const targetTile = doorCase ? doorCase.door : [house.tx, house.ty];
+      const pt = doorCase
+        ? await tileToScreen(page, targetTile[0], targetTile[1])
+        : await buildingRoofScreenPoint(page, house.tx, house.ty);
+      if (!pt) {
+        errors.push(`touch-house: ${house.id} screen point missing`);
+        continue;
+      }
+      for (
+        let pan = 0;
+        pan < 3 && !(await isTileOnScreen(page, targetTile[0], targetTile[1]));
+        pan++
+      ) {
+        await touchPanRevealTile(page, client, targetTile[0], targetTile[1]);
+        await wait(450);
+      }
+      if (!(await isTileOnScreen(page, targetTile[0], targetTile[1]))) {
+        warnings.push(`touch-house: ${house.id} not visible after pan (skipped)`);
+        continue;
+      }
+      await touchTap(page, client, pt.x, pt.y);
+      await wait(doorCase ? 3500 : 8000);
+      if (!(await waitForBuildingPanel(page, 16))) {
+        const msg = `touch-house: ${house.id} panel did not open after touch`;
+        if (doorCase) warnings.push(`${msg} (door tile; CDP viewport)`);
+        else errors.push(msg);
+        continue;
+      }
+      const title = await page.locator('.building-panel__title').textContent();
+      if (!title?.includes(house.title.split(' ').slice(-1)[0])) {
+        errors.push(`touch-house: ${house.id} unexpected title (${title ?? 'none'})`);
+      }
+      await page.locator('.building-panel__close').click();
+      await wait(400);
+    } finally {
+      await context.close();
+    }
+  }
+
+  {
+    const { page, client, context } = await setupIPhoneTouchPage(browser);
+    try {
+      await page.goto(BASE, { waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'networkidle' });
+      await wait(1500);
+      await setUiPointerEvents(page, false);
+      await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(3, 6));
+      await wait(200);
+      const doorPt = await tileToScreen(page, 3, 5);
+      if (!doorPt) errors.push('touch-door: could not resolve door tile');
+      else {
+        await touchTap(page, client, doorPt.x, doorPt.y);
+        await wait(3500);
+        if (!(await waitForBuildingPanel(page, 10))) {
+          errors.push('touch-door: panel did not open after door-tile touch');
+        }
+      }
+    } finally {
+      await context.close();
+    }
+  }
+
+  {
+    const { page, client, context } = await setupIPhoneTouchPage(browser);
+    try {
+      await page.goto(BASE, { waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'networkidle' });
+      await wait(1500);
+      await setUiPointerEvents(page, false);
+      const near = await tileToScreen(page, 3, 7);
+      const building = await buildingRoofScreenPoint(page, 3, 4);
+      if (!near || !building) {
+        errors.push('touch-adjacent: could not resolve screen points');
+      } else if (!(await isTileOnScreen(page, 3, 4))) {
+        errors.push('touch-adjacent: caso-1 not on screen');
+      } else {
+        await touchTap(page, client, near.x, near.y);
+        await wait(5000);
+        await touchTap(page, client, building.x, building.y);
+        await wait(4000);
+        if (!(await waitForBuildingPanel(page, 12))) {
+          errors.push('touch-adjacent: panel did not open when tapping house while near door');
+        }
+      }
+    } finally {
+      await context.close();
+    }
+  }
+}
+
 async function testEnterBuildingChecklist(page, errors) {
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
   await page.reload({ waitUntil: 'networkidle' });
   await wait(1200);
-  const pt = await tileToScreen(page, 12, 5);
+  const pt = await buildingTapScreenPoint(page, 12, 5);
   if (!pt) {
     errors.push('enter-building: could not resolve building screen position');
     return;
@@ -849,6 +1094,8 @@ async function main() {
     await testNoSpuriousDoorPanelAfterGroundWalk(desktop, errors);
     await testNoDoorReopenOnKeypressAfterClose(desktop, errors);
     await testSkipRingDesktop(desktop, errors);
+
+    await testTouchBuildingEntry(browser, errors, warnings);
 
     const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
     await mobile.goto(BASE, { waitUntil: 'networkidle' });

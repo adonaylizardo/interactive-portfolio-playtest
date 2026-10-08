@@ -266,6 +266,33 @@ export function getBuildingAt(tx: number, ty: number): MapObject | undefined {
   });
 }
 
+/** Entry intent for taps on the door tile, footprint, or ground one step in front when already near. */
+export function resolveBuildingEntryFromTile(
+  tx: number,
+  ty: number,
+  from?: { x: number; y: number },
+): { panelTitle: string; door: { x: number; y: number } } | null {
+  const onDoor = getBuildingAtDoor(tx, ty);
+  if (onDoor?.panelTitle && onDoor.door) {
+    return { panelTitle: onDoor.panelTitle, door: onDoor.door };
+  }
+  const onFootprint = getBuildingAt(tx, ty);
+  if (onFootprint?.panelTitle && onFootprint.door) {
+    return { panelTitle: onFootprint.panelTitle, door: onFootprint.door };
+  }
+  if (!from || !cells[ty]?.[tx]?.walkable || getBuildingAt(tx, ty)) return null;
+  for (const o of objects) {
+    if (o.type !== 'building' || !o.door || !o.panelTitle) continue;
+    const d = o.door;
+    if (tx === d.x && ty === d.y) continue;
+    const tapNearDoor = Math.max(Math.abs(tx - d.x), Math.abs(ty - d.y)) === 1;
+    if (!tapNearDoor) continue;
+    const charNearDoor = Math.max(Math.abs(from.x - d.x), Math.abs(from.y - d.y)) <= 2;
+    if (charNearDoor) return { panelTitle: o.panelTitle, door: o.door };
+  }
+  return null;
+}
+
 export function resolveWalkTarget(tx: number, ty: number): { x: number; y: number } {
   const onDoor = getBuildingAtDoor(tx, ty);
   if (onDoor?.door) return onDoor.door;

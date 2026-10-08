@@ -5,6 +5,7 @@ import {
   MAP_HEIGHT,
   MAP_WIDTH,
   objects,
+  resolveBuildingEntryFromTile,
   resolveWalkTarget,
   TILE_H,
   TILE_W,
@@ -15,6 +16,7 @@ import { isTouchPrimary, type ChecklistStepId } from '../checklist/storage';
 import { sortKey, tileFootWorld, tileToWorld, worldToTile } from '../iso/math';
 import { findPathOrNearest } from '../iso/pathfinding';
 import { C } from './colors';
+import { buildingPickHit } from './draw';
 import {
   cameraFromPinchSession,
   centerMapInView,
@@ -108,6 +110,8 @@ export class IsoScene {
   private pendingBuildingEntry: { panelTitle: string; door: { x: number; y: number } } | null =
     null;
   private lastRoundedTile = { x: 8, y: 8 };
+  private pointerGestureSerial = 0;
+  private pixiTapGestureSerial = -1;
   constructor(events: SceneEvents) {
     this.events = events;
   }
@@ -174,6 +178,7 @@ export class IsoScene {
     g.zIndex = -1000;
     g.on('pointertap', (e) => {
       if (this.shouldBlockTap()) return;
+      this.pixiTapGestureSerial = this.pointerGestureSerial;
       const pos = e.getLocalPosition(this.world);
       const tile = worldToTile(pos.x, pos.y);
       if (!tile) {
@@ -204,6 +209,7 @@ export class IsoScene {
         g.cursor = cell.walkable ? 'pointer' : 'default';
         g.on('pointertap', (e) => {
           if (this.shouldBlockTap()) return;
+          this.pixiTapGestureSerial = this.pointerGestureSerial;
           const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
           this.requestWalk(tx, ty, sprint);
         });
@@ -235,6 +241,7 @@ export class IsoScene {
       g.on('pointertap', (e) => {
         if (this.shouldBlockTap()) return;
         e.stopPropagation();
+        this.pixiTapGestureSerial = this.pointerGestureSerial;
         const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
         if (obj.type === 'building' && obj.door && obj.panelTitle) {
           this.requestWalk(obj.door.x, obj.door.y, sprint, {
@@ -289,8 +296,10 @@ export class IsoScene {
     sprint: boolean,
     opts?: { buildingEntry?: { panelTitle: string; door: { x: number; y: number } } },
   ): void {
+    const from = { x: Math.round(this.charTx), y: Math.round(this.charTy) };
+    this.pendingBuildingEntry =
+      opts?.buildingEntry ?? resolveBuildingEntryFromTile(tx, ty, from);
     const target = resolveWalkTarget(tx, ty);
-    this.pendingBuildingEntry = opts?.buildingEntry ?? null;
     this.walkToTile(target.x, target.y, sprint);
   }
 
@@ -315,6 +324,42 @@ export class IsoScene {
     this.charState = sprint ? 'sprint' : 'walk';
     this.events.onChecklist('walk-around');
     this.drawPathPreview();
+    if (this.path.length === 0) {
+      this.charState = 'idle';
+      this.sprint = false;
+      this.syncCharacterGraphic();
+      const rtx = Math.round(this.charTx);
+      const rty = Math.round(this.charTy);
+      this.lastRoundedTile = { x: rtx, y: rty };
+      this.tryCompletePendingBuildingEntry();
+    }
+  }
+
+  private pickBuildingAtScreen(sx: number, sy: number): MapObject | undefined {
+    const { x: wx, y: wy } = this.screenToWorld(sx, sy);
+    const buildings = objects
+      .filter((o) => o.type === 'building')
+      .sort((a, b) => sortKey(b.x, b.y) - sortKey(a.x, a.y));
+    for (const obj of buildings) {
+      const foot = tileFootWorld(obj.x, obj.y);
+      const local = { x: wx - foot.x, y: wy - foot.y };
+      if (buildingPickHit(local)) return obj;
+    }
+    return undefined;
+  }
+
+  private handleScreenTap(sx: number, sy: number, sprint: boolean): void {
+    const building = this.pickBuildingAtScreen(sx, sy);
+    if (building?.door && building.panelTitle) {
+      this.requestWalk(building.door.x, building.door.y, sprint, {
+        buildingEntry: { panelTitle: building.panelTitle, door: building.door },
+      });
+      return;
+    }
+    const { x: wx, y: wy } = this.screenToWorld(sx, sy);
+    const tile = worldToTile(wx, wy);
+    if (tile) this.requestWalk(tile.x, tile.y, sprint);
+    else this.events.onUnreachable?.();
   }
 
   private drawPathPreview(): void {
@@ -773,6 +818,8 @@ export class IsoScene {
       }
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this.pointers.size === 1) {
+        this.pointerGestureSerial += 1;
+        this.pixiTapGestureSerial = -1;
         this.panMoved = false;
         this.hadMultiPointerGesture = false;
         this.lastPanPos = { x: e.clientX, y: e.clientY };
@@ -782,10 +829,12 @@ export class IsoScene {
         const mid = this.pointerMidpoint()!;
         this.beginPinchAtMid(mid, this.pointerDistance());
       }
-      try {
-        canvas.setPointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
+      if (e.pointerType !== 'touch') {
+        try {
+          canvas.setPointerCapture(e.pointerId);
+        } catch {
+          /* ignore */
+        }
       }
     };
 
@@ -808,10 +857,15 @@ export class IsoScene {
         return;
       }
 
-      if (this.pointers.size === 1 && this.lastPanPos && !this.pinchGestureActive) {
+      if (this.pointers.size === 1 && this.lastPanPos && !this.pinchGestureActive && this.tapStart) {
         const dx = e.clientX - this.lastPanPos.x;
         const dy = e.clientY - this.lastPanPos.y;
-        if (Math.abs(dx) + Math.abs(dy) > 4) {
+        const panThreshold = e.pointerType === 'touch' ? 14 : 4;
+        const totalFromTap = Math.hypot(
+          e.clientX - this.tapStart.x,
+          e.clientY - this.tapStart.y,
+        );
+        if (totalFromTap > panThreshold) {
           this.panMoved = true;
           document.body.classList.add('is-canvas-dragging');
           this.cameraX += dx / this.zoom;
@@ -849,21 +903,20 @@ export class IsoScene {
         if (
           this.tapStart &&
           !this.shouldBlockTap() &&
-          e.pointerType === 'touch'
+          e.pointerType === 'touch' &&
+          this.pixiTapGestureSerial !== this.pointerGestureSerial
         ) {
           const dt = performance.now() - this.tapStart.t;
           const dist = Math.hypot(e.clientX - this.tapStart.x, e.clientY - this.tapStart.y);
-          if (dt < 350 && dist < 12) {
+          const tapSlop = 14;
+          if (dt < 350 && dist < tapSlop) {
             const now = performance.now();
             const double = now - this.lastTapTime < 320;
             this.lastTapTime = now;
             const rect = canvas.getBoundingClientRect();
             const sx = e.clientX - rect.left;
             const sy = e.clientY - rect.top;
-            const { x: wx, y: wy } = this.screenToWorld(sx, sy);
-            const tile = worldToTile(wx, wy);
-            if (tile) this.requestWalk(tile.x, tile.y, double);
-            else this.events.onUnreachable?.();
+            this.handleScreenTap(sx, sy, double);
           }
         }
 
@@ -1008,6 +1061,17 @@ export class IsoScene {
   /** For QA — programmatic walk */
   getCharacterTile(): { x: number; y: number } {
     return { x: Math.round(this.charTx), y: Math.round(this.charTy) };
+  }
+
+  /** For QA — place character on a walkable tile without opening doors. */
+  setCharacterTileForQa(tx: number, ty: number): void {
+    if (!cells[ty]?.[tx]?.walkable) return;
+    this.path = [];
+    this.charTx = tx;
+    this.charTy = ty;
+    this.lastRoundedTile = { x: tx, y: ty };
+    this.syncCharacterGraphic();
+    this.drawPathPreview();
   }
 
   getObjectIds(): string[] {

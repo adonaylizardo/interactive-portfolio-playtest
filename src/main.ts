@@ -34,6 +34,7 @@ async function main(): Promise<void> {
     validateWalkGridFootprint,
     findPath,
     getCharacterTile: () => scene.getCharacterTile(),
+    setCharacterTile: (x: number, y: number) => scene.setCharacterTileForQa(x, y),
   };
 }
 
