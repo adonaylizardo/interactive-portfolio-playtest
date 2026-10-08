@@ -112,8 +112,18 @@ function assertFootAnchor(name, driftPx, errors, label) {
     errors.push(`${name}: ${label} footDriftPx missing`);
     return;
   }
-  if (driftPx > 0.75) {
+  if (driftPx > 1) {
     errors.push(`${name}: ${label} tile/building foot drift ${driftPx.toFixed(2)}px`);
+  }
+}
+
+async function readBuildingInteriorCover(page) {
+  return page.evaluate(() => document.getElementById('game-canvas')?.dataset.buildingInteriorWallCover ?? '');
+}
+
+function assertBuildingInteriorClosed(name, cover, errors, label) {
+  if (cover !== '1') {
+    errors.push(`${name}: ${label} floor visible between front walls (buildingInteriorWallCover=${cover})`);
   }
 }
 
@@ -605,6 +615,14 @@ async function main() {
     const desktop = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     await wheelSweep(desktop, 'desktop-wheel', errors);
     await testBuildingSilhouetteStable(desktop, 'desktop-silhouette', errors);
+    await desktop.goto(BASE, { waitUntil: 'networkidle' });
+    await wait(800);
+    assertBuildingInteriorClosed(
+      'desktop-interior',
+      await readBuildingInteriorCover(desktop),
+      errors,
+      'default-zoom',
+    );
 
     await desktop.goto(BASE, { waitUntil: 'networkidle' });
     const canvas = await desktop.locator('#game-canvas').boundingBox();

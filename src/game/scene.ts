@@ -28,7 +28,15 @@ import {
   ZOOM_MIN,
   zoomAtScreenAnchor,
 } from './cameraControl';
-import { drawBuilding, drawCharacter, drawDiamond, drawPropDesk, drawPropTree } from './draw';
+import {
+  buildingFrontWallsCover,
+  buildingInteriorGapSample,
+  drawBuilding,
+  drawCharacter,
+  drawDiamond,
+  drawPropDesk,
+  drawPropTree,
+} from './draw';
 
 export type SceneEvents = {
   onChecklist: (step: ChecklistStepId) => void;
@@ -377,6 +385,7 @@ export class IsoScene {
       });
       this.updateFootAnchorProbe();
       this.updateBuildingSilhouetteProbe();
+      this.updateBuildingInteriorProbe();
     }
     if (persistHash) {
       writeCameraToHash({ x: this.cameraX, y: this.cameraY, zoom: this.zoom });
@@ -434,6 +443,13 @@ export class IsoScene {
       x: Math.round(b.x * 10) / 10,
       y: Math.round(b.y * 10) / 10,
     });
+  }
+
+  private updateBuildingInteriorProbe(): void {
+    if (!this.canvasEl) return;
+    const sample = buildingInteriorGapSample();
+    const covered = buildingFrontWallsCover(sample);
+    this.canvasEl.dataset.buildingInteriorWallCover = covered ? '1' : '0';
   }
 
   private shouldUseMobileFraming(): boolean {
