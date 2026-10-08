@@ -199,6 +199,16 @@ export function getBuildingAtDoor(tx: number, ty: number): MapObject | undefined
   );
 }
 
+/** Door tile or any tile adjacent (including diagonal) within 1 step. */
+export function getBuildingAtDoorOrAdjacent(tx: number, ty: number): MapObject | undefined {
+  return objects.find((o) => {
+    if (o.type !== 'building' || !o.door) return false;
+    const dx = Math.abs(o.door.x - tx);
+    const dy = Math.abs(o.door.y - ty);
+    return Math.max(dx, dy) <= 1;
+  });
+}
+
 export function getBuildingAt(tx: number, ty: number): MapObject | undefined {
   return objects.find((o) => {
     if (o.type !== 'building') return false;

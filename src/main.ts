@@ -17,11 +17,11 @@ async function main(): Promise<void> {
   const scene = new IsoScene({
     onChecklist: (step) => checklist.complete(step),
     onEnterBuilding: (title) => {
+      checklist.complete('enter-building');
       if (panel.isOpen() && lastBuilding === title) return;
       lastBuilding = title;
       checklist.setBuildingPanelOpen(true);
       panel.show(title);
-      checklist.complete('enter-building');
     },
     onUnreachable: () => showToast('No se puede llegar'),
   });

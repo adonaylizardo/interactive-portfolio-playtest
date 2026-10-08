@@ -409,6 +409,74 @@ async function testUnreachableClick(page, errors) {
   if (!toastVisible) errors.push('unreachable: toast not shown for off-map CDP click');
 }
 
+async function tileToScreen(page, tx, ty) {
+  return page.evaluate(
+    ({ tx, ty }) => {
+      const canvas = document.getElementById('game-canvas');
+      if (!canvas) return null;
+      const TILE_W = 128;
+      const TILE_H = 64;
+      const rect = canvas.getBoundingClientRect();
+      const wx = (tx - ty) * (TILE_W / 2);
+      const wy = (tx + ty) * (TILE_H / 2);
+      const camPx = Number(canvas.dataset.camPx ?? 0);
+      const camPy = Number(canvas.dataset.camPy ?? 0);
+      const zoom = Number(canvas.dataset.zoom ?? 1);
+      return { x: rect.left + camPx + wx * zoom, y: rect.top + camPy + wy * zoom };
+    },
+    { tx, ty },
+  );
+}
+
+async function testEnterBuildingChecklist(page, errors) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
+  await page.reload({ waitUntil: 'networkidle' });
+  await wait(1200);
+  const pt = await tileToScreen(page, 12, 5);
+  if (!pt) {
+    errors.push('enter-building: could not resolve building screen position');
+    return;
+  }
+  await page.evaluate(() => {
+    const ui = document.getElementById('ui-root');
+    if (ui) ui.style.pointerEvents = 'none';
+  });
+  const client = await page.context().newCDPSession(page);
+  await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: pt.x, y: pt.y });
+  await client.send('Input.dispatchMouseEvent', {
+    type: 'mousePressed',
+    x: pt.x,
+    y: pt.y,
+    button: 'left',
+    clickCount: 1,
+  });
+  await client.send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased',
+    x: pt.x,
+    y: pt.y,
+    button: 'left',
+    clickCount: 1,
+  });
+  await page.evaluate(() => {
+    const ui = document.getElementById('ui-root');
+    if (ui) ui.style.pointerEvents = '';
+  });
+  for (let i = 0; i < 40; i++) {
+    if ((await page.locator('.building-panel--open').count()) > 0) break;
+    await wait(250);
+  }
+  if ((await page.locator('.building-panel--open').count()) === 0) {
+    errors.push('enter-building: panel did not open after CDP building click');
+    return;
+  }
+  const checked = await page.evaluate(() => {
+    const raw = localStorage.getItem('playtest-checklist-v3');
+    return raw ? JSON.parse(raw).completed?.['enter-building'] === true : false;
+  });
+  if (!checked) errors.push('enter-building: checklist step not checked after panel open');
+}
+
 async function testSkipRingDesktop(page, errors) {
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
@@ -468,6 +536,7 @@ async function main() {
     assertFrameMetrics('desktop-ctrl-wheel', m, errors, 'after-ctrl-wheel');
 
     await testUnreachableClick(desktop, errors);
+    await testEnterBuildingChecklist(desktop, errors);
     await testSkipRingDesktop(desktop, errors);
 
     const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });

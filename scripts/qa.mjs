@@ -196,7 +196,21 @@ async function main() {
     } else {
       const opened = await waitForBuildingPanel(desktop);
       if (!opened) errors.push('desktop: building panel did not open after real click on caso-2');
-      else await desktop.screenshot({ path: path.join(outDir, 'desktop-building-panel.png') });
+      else {
+        await desktop.screenshot({ path: path.join(outDir, 'desktop-building-panel.png') });
+        const enterChecked = await desktop.evaluate((key) => {
+          const raw = localStorage.getItem(key);
+          if (!raw) return false;
+          return Boolean(JSON.parse(raw).completed?.['enter-building']);
+        }, STORAGE_KEY);
+        if (!enterChecked) {
+          errors.push('desktop: enter-building checklist step not checked after building panel opened');
+        }
+        const stepDom = await desktop.locator('.checklist__item--done').filter({ hasText: 'Entra a un edificio' }).count();
+        if (stepDom < 1) {
+          errors.push('desktop: enter-building step not marked done in checklist UI');
+        }
+      }
     }
 
     const desktopDone = await desktop.evaluate((key) => {

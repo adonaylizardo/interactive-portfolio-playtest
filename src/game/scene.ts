@@ -1,7 +1,9 @@
 import { Application, Container, Graphics } from 'pixi.js';
 import {
   cells,
+  getBuildingAt,
   getBuildingAtDoor,
+  getBuildingAtDoorOrAdjacent,
   MAP_HEIGHT,
   MAP_WIDTH,
   objects,
@@ -97,6 +99,8 @@ export class IsoScene {
   private pinchFrameSerial = 0;
   /** CDP / legacy touch paths that do not emit PointerEvents for each finger. */
   private touchOnlyPinch = false;
+  private pendingBuildingEntry: { panelTitle: string; door: { x: number; y: number } } | null =
+    null;
 
   constructor(events: SceneEvents) {
     this.events = events;
@@ -226,7 +230,8 @@ export class IsoScene {
         if (this.shouldBlockTap()) return;
         e.stopPropagation();
         const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
-        if (obj.type === 'building' && obj.door) {
+        if (obj.type === 'building' && obj.door && obj.panelTitle) {
+          this.pendingBuildingEntry = { panelTitle: obj.panelTitle, door: obj.door };
           this.requestWalk(obj.door.x, obj.door.y, sprint);
           return;
         }
@@ -253,6 +258,11 @@ export class IsoScene {
 
   requestWalk(tx: number, ty: number, sprint: boolean): void {
     const target = resolveWalkTarget(tx, ty);
+    const building =
+      getBuildingAtDoor(target.x, target.y) ?? getBuildingAt(tx, ty);
+    if (building?.panelTitle && building.door) {
+      this.pendingBuildingEntry = { panelTitle: building.panelTitle, door: building.door };
+    }
     this.walkToTile(target.x, target.y, sprint);
   }
 
@@ -879,9 +889,16 @@ export class IsoScene {
     if (this.doorCooldown > 0) return;
     const tx = Math.round(this.charTx);
     const ty = Math.round(this.charTy);
-    const building = getBuildingAtDoor(tx, ty);
+    let building = getBuildingAtDoorOrAdjacent(tx, ty);
+    if (!building?.panelTitle && this.pendingBuildingEntry) {
+      const d = this.pendingBuildingEntry.door;
+      if (Math.max(Math.abs(d.x - tx), Math.abs(d.y - ty)) <= 1) {
+        building = objects.find((o) => o.panelTitle === this.pendingBuildingEntry!.panelTitle);
+      }
+    }
     if (building?.panelTitle) {
       this.doorCooldown = 120;
+      this.pendingBuildingEntry = null;
       this.events.onEnterBuilding(building.panelTitle);
       this.events.onChecklist('enter-building');
     }
