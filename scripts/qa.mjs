@@ -224,12 +224,13 @@ async function main() {
     await wait(1200);
     await desktop.locator('.checklist__skip').click();
     await wait(300);
-    const skipHidden = await desktop.locator('.checklist').isHidden();
     const skipState = await desktop.evaluate((key) => {
       const raw = localStorage.getItem(key);
       return raw ? JSON.parse(raw) : null;
     }, STORAGE_KEY);
-    if (!skipHidden) errors.push('desktop: checklist still visible after skip');
+    const ringVisible = await desktop.locator('.checklist__ring-btn').isVisible();
+    if (!ringVisible) errors.push('desktop: skip should keep ring visible to reopen');
+    if (!skipState?.skipped) errors.push('desktop: skip flag not set');
     if (skipState?.completed?.['enter-building']) {
       errors.push('desktop: skip marked enter-building complete');
     }

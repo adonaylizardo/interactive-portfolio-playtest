@@ -96,7 +96,7 @@ export function findPathOrNearest(
   }
 
   const candidates: { x: number; y: number; dist: number }[] = [];
-  const maxRadius = 8;
+  const maxRadius = 12;
   for (let dy = -maxRadius; dy <= maxRadius; dy++) {
     for (let dx = -maxRadius; dx <= maxRadius; dx++) {
       const x = gx + dx;

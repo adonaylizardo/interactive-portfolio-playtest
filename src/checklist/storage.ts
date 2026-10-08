@@ -67,6 +67,7 @@ export function countCompleted(state: ChecklistState, touch = isTouchPrimary()):
   return stepsForPlatform(touch).filter((id) => state.completed[id]).length;
 }
 
+/** Fully hidden (user closed after finish or explicit dismiss). Skip keeps the ring. */
 export function isChecklistHidden(state: ChecklistState): boolean {
-  return state.skipped || state.dismissed;
+  return state.dismissed;
 }

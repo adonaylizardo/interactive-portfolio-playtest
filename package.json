@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "qa": "npm run build && node scripts/qa.mjs",
+    "qa:pinch": "npm run build && node scripts/qa-pinch.mjs",
     "deploy:gh-pages": "node scripts/deploy-gh-pages.mjs"
   },
   "devDependencies": {

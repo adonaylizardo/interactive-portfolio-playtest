@@ -131,6 +131,8 @@ export class ChecklistUI {
 
     this.root.querySelector('.checklist__skip')!.addEventListener('click', () => {
       this.state.skipped = true;
+      if (!this.mobile) this.state.collapsed = true;
+      this.state.mobileExpanded = false;
       saveChecklist(this.state);
       this.applyLayoutClasses();
       callbacks.onSkip();
@@ -181,6 +183,9 @@ export class ChecklistUI {
     this.root.classList.toggle('checklist--panel-open', this.mobile && this.panelOpen);
     this.root.classList.toggle('checklist--complete', done >= total);
     this.root.classList.toggle('checklist--skipped', this.state.skipped);
+    if (this.state.skipped && !this.mobile) {
+      this.root.classList.add('checklist--collapsed');
+    }
   }
 
   complete(step: ChecklistStepId): void {

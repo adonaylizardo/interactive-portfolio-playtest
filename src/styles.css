@@ -27,6 +27,7 @@ body {
 #app {
   position: fixed;
   inset: 0;
+  touch-action: none;
 }
 
 #game-canvas {
@@ -347,6 +348,18 @@ body.is-canvas-dragging * {
   .checklist--mobile:not(.checklist--mobile-closed) {
     bottom: max(20px, env(safe-area-inset-bottom));
   }
+
+  .checklist--mobile:not(.checklist--mobile-closed) .checklist__counter--in-ring {
+    display: none;
+  }
+
+  .checklist--mobile:not(.checklist--mobile-closed) .checklist__counter--label {
+    display: inline;
+  }
+}
+
+.checklist--skipped .checklist__skip {
+  display: none;
 }
 
 @media (min-width: 768px) {
