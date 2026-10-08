@@ -4,12 +4,8 @@ import { C } from './colors';
 
 type Pt = { x: number; y: number };
 
-/** House footprint ~96×48 @ 1 tile (128×64 diamond). */
-export const BUILDING_BW = 48;
-export const BUILDING_BH = 24;
-export const BUILDING_WALL_H = 56;
-export const BUILDING_RIDGE_RISE = 36;
-export const BUILDING_OVERHANG = 6;
+/** Tile center from south-vertex anchor (foot-local). */
+const TILE_CENTER: Pt = { x: 0, y: -TILE_H / 2 };
 
 export const TREE_TRUNK_BW = 5;
 export const TREE_TRUNK_H = 20;
@@ -18,59 +14,53 @@ export const TREE_CANOPY_RY = 22;
 export const TREE_CANOPY_CY = -34;
 export const TREE_CANOPY_OVERLAP = 8;
 
-export const DESK_BW = 28;
-export const DESK_BH = 14;
-export const DESK_PANEL_H = 16;
-export const DESK_SLAB_T = 6;
+const TREE_CANOPY_DARK = 0x5f5f5f;
+const TREE_CANOPY_MID = 0x777777;
+const TREE_CANOPY_LIGHT = 0x8e8e8e;
 
-export function footprint(bwScale = 1): { bw: number; bh: number } {
-  const bw = (TILE_W / 2) * 0.84 * bwScale;
-  const bh = (TILE_H / 2) * 0.84 * bwScale;
-  return { bw, bh };
+/** Shift footprint so its centroid sits on the tile center (south vertex stays anchor). */
+function centeringOffset(footprintCorners: Pt[]): Pt {
+  const cx = footprintCorners.reduce((s, p) => s + p.x, 0) / footprintCorners.length;
+  const cy = footprintCorners.reduce((s, p) => s + p.y, 0) / footprintCorners.length;
+  return { x: TILE_CENTER.x - cx, y: TILE_CENTER.y - cy };
 }
 
-export function tileCorners(bw: number, bh: number): { s: Pt; e: Pt; n: Pt; w: Pt } {
-  return {
-    s: { x: 0, y: 0 },
-    e: { x: bw, y: -bh },
-    n: { x: 0, y: -2 * bh },
-    w: { x: -bw, y: -bh },
-  };
+const HOUSE_FOOT: Pt[] = [
+  { x: 0, y: 0 },
+  { x: 48, y: -24 },
+  { x: 0, y: -48 },
+  { x: -48, y: -24 },
+];
+const HOUSE_OFFSET = centeringOffset(HOUSE_FOOT);
+
+const DESK_FOOT: Pt[] = [
+  { x: 0, y: 0 },
+  { x: 24, y: -12 },
+  { x: -16, y: -32 },
+  { x: -40, y: -20 },
+];
+const DESK_OFFSET = centeringOffset(DESK_FOOT);
+
+function ht(p: Pt): Pt {
+  return { x: p.x + HOUSE_OFFSET.x, y: p.y + HOUSE_OFFSET.y };
 }
 
-export function lift(p: Pt, h: number): Pt {
-  return { x: p.x, y: p.y - h };
+function dt(p: Pt): Pt {
+  return { x: p.x + DESK_OFFSET.x, y: p.y + DESK_OFFSET.y };
 }
 
-function lerp(a: Pt, b: Pt, t: number): Pt {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-}
-
-function quad(g: Graphics, a: Pt, b: Pt, c: Pt, d: Pt): void {
-  g.moveTo(a.x, a.y);
-  g.lineTo(b.x, b.y);
-  g.lineTo(c.x, c.y);
-  g.lineTo(d.x, d.y);
-  g.closePath();
-}
-
-function tri(g: Graphics, a: Pt, b: Pt, c: Pt, fill: number): void {
-  g.moveTo(a.x, a.y);
-  g.lineTo(b.x, b.y);
-  g.lineTo(c.x, c.y);
+function poly(g: Graphics, pts: Pt[], fill: number | { color: number; alpha: number }): void {
+  if (pts.length < 3) return;
+  g.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
   g.closePath();
   g.fill(fill);
 }
 
-function line(g: Graphics, a: Pt, b: Pt, color: number, width = 1): void {
+function strokeSeg(g: Graphics, a: Pt, b: Pt, width: number, color: number): void {
   g.moveTo(a.x, a.y);
   g.lineTo(b.x, b.y);
   g.stroke({ width, color });
-}
-
-/** Point on wall parallelogram (u along ground a→b, v from ground to top). */
-export function facePoint(a: Pt, b: Pt, aT: Pt, bT: Pt, u: number, v: number): Pt {
-  return lerp(lerp(a, b, u), lerp(aT, bT, u), v);
 }
 
 function pointInTri(p: Pt, a: Pt, b: Pt, c: Pt): boolean {
@@ -86,13 +76,6 @@ function pointInTri(p: Pt, a: Pt, b: Pt, c: Pt): boolean {
 
 function pointInQuad(p: Pt, a: Pt, b: Pt, c: Pt, d: Pt): boolean {
   return pointInTri(p, a, b, c) || pointInTri(p, a, c, d);
-}
-
-function pushOut(p: Pt, origin: Pt, dist: number): Pt {
-  const dx = p.x - origin.x;
-  const dy = p.y - origin.y;
-  const len = Math.hypot(dx, dy) || 1;
-  return { x: p.x + (dx / len) * dist, y: p.y + (dy / len) * dist };
 }
 
 /** South-top trunk y vs canopy ellipse bottom — overlap when bottomY >= trunkTopY. */
@@ -111,17 +94,39 @@ export function treeCanopyTrunkOverlap(): {
 }
 
 export function buildingInteriorGapSample(): Pt {
-  const { s, w } = tileCorners(BUILDING_BW, BUILDING_BH);
-  const mid = lerp(w, s, 0.5);
-  return { x: mid.x * 0.92, y: mid.y * 0.92 - 5 };
+  return ht({ x: -18, y: -22 });
 }
 
 export function buildingFrontWallsCover(p: Pt): boolean {
-  const { s, e, w } = tileCorners(BUILDING_BW, BUILDING_BH);
-  const sT = lift(s, BUILDING_WALL_H);
-  const eT = lift(e, BUILDING_WALL_H);
-  const wT = lift(w, BUILDING_WALL_H);
-  return pointInQuad(p, w, s, sT, wT) || pointInQuad(p, s, e, eT, sT);
+  const S = ht({ x: 0, y: 0 });
+  const W = ht({ x: -48, y: -24 });
+  const Wp = ht({ x: -48, y: -80 });
+  const Sp = ht({ x: 0, y: -56 });
+  return pointInQuad(p, S, W, Wp, Sp);
+}
+
+export function footprint(bwScale = 1): { bw: number; bh: number } {
+  const bw = (TILE_W / 2) * 0.84 * bwScale;
+  const bh = (TILE_H / 2) * 0.84 * bwScale;
+  return { bw, bh };
+}
+
+export function tileCorners(bw: number, bh: number): { s: Pt; e: Pt; n: Pt; w: Pt } {
+  return {
+    s: { x: 0, y: 0 },
+    e: { x: bw, y: -bh },
+    n: { x: 0, y: -2 * bh },
+    w: { x: -bw, y: -bh },
+  };
+}
+
+/** Point on wall parallelogram (legacy QA helpers). */
+export function facePoint(a: Pt, b: Pt, aT: Pt, bT: Pt, u: number, v: number): Pt {
+  const lerp = (p: Pt, q: Pt, t: number) => ({
+    x: p.x + (q.x - p.x) * t,
+    y: p.y + (q.y - p.y) * t,
+  });
+  return lerp(lerp(a, b, u), lerp(aT, bT, u), v);
 }
 
 /** South vertex at local (0, 0); diamond extends upward (negative y). */
@@ -138,59 +143,35 @@ export function drawDiamond(g: Graphics, fill: number, stroke?: number): void {
 }
 
 export function drawBuilding(g: Graphics, hover: boolean): void {
-  const bw = BUILDING_BW;
-  const bh = BUILDING_BH;
-  const wallH = BUILDING_WALL_H;
-  const { s, e, n, w } = tileCorners(bw, bh);
   const left = hover ? C.buildingLeftHover : C.buildingLeft;
-  const right = hover ? C.buildingRightHover : C.buildingRight;
-  const roofNear = hover ? C.buildingRoofNearHover : C.buildingRoofNear;
-  const roofFar = hover ? C.buildingRoofFarHover : C.buildingRoofFar;
-  const fascia = C.buildingFascia;
+  const gable = hover ? C.buildingRightHover : C.buildingRight;
+  const roof = hover ? C.buildingRoofNearHover : C.buildingRoofNear;
+  const line = C.buildingFascia;
+  const door = C.door;
 
-  const sT = lift(s, wallH);
-  const eT = lift(e, wallH);
-  const wT = lift(w, wallH);
-  const nT = lift(n, wallH);
+  const S = ht({ x: 0, y: 0 });
+  const E = ht({ x: 48, y: -24 });
+  const W = ht({ x: -48, y: -24 });
+  const Sp = ht({ x: 0, y: -56 });
+  const Ep = ht({ x: 48, y: -80 });
+  const Wp = ht({ x: -48, y: -80 });
+  const R1 = ht({ x: 24, y: -104 });
+  const R2 = ht({ x: -24, y: -128 });
 
-  quad(g, w, s, sT, wT);
-  g.fill(left);
-  quad(g, s, e, eT, sT);
-  g.fill(right);
+  poly(g, [S, W, Wp, Sp], left);
+  poly(g, [S, E, Ep, R1, Sp], gable);
+  poly(g, [Sp, R1, R2, Wp], roof);
 
-  const peak: Pt = { x: 0, y: sT.y - BUILDING_RIDGE_RISE };
+  strokeSeg(g, Sp, Wp, 1.5, line);
+  strokeSeg(g, Sp, R1, 1.5, line);
+  strokeSeg(g, R1, Ep, 1.5, line);
+  strokeSeg(g, R1, R2, 1.5, line);
 
-  tri(g, sT, eT, peak, right);
-  line(g, sT, peak, 0x606060, 1);
-  line(g, eT, peak, 0x606060, 1);
-
-  const center: Pt = { x: 0, y: (sT.y + nT.y) / 2 };
-  const wE = pushOut(wT, center, BUILDING_OVERHANG);
-  const sE = pushOut(sT, center, BUILDING_OVERHANG);
-  const eE = pushOut(eT, center, BUILDING_OVERHANG);
-  const nE = pushOut(nT, center, BUILDING_OVERHANG);
-  const peakE: Pt = { x: 0, y: peak.y };
-
-  tri(g, wE, sE, peakE, roofNear);
-  tri(g, eE, nE, peakE, roofFar);
-
-  line(g, wE, sE, fascia, 2);
-  line(g, sE, eE, fascia, 2);
-
-  const faceLen = Math.hypot(e.x - s.x, e.y - s.y);
-  const doorW = 14;
-  const doorH = 24;
-  const u0 = 0.5 - doorW / (2 * faceLen);
-  const u1 = 0.5 + doorW / (2 * faceLen);
-  const v1 = doorH / wallH;
-  quad(
+  poly(
     g,
-    facePoint(s, e, sT, eT, u0, 0),
-    facePoint(s, e, sT, eT, u1, 0),
-    facePoint(s, e, sT, eT, u1, v1),
-    facePoint(s, e, sT, eT, u0, v1),
+    [ht({ x: 18, y: -9 }), ht({ x: 30, y: -15 }), ht({ x: 30, y: -39 }), ht({ x: 18, y: -33 })],
+    door,
   );
-  g.fill(C.door);
 }
 
 export function deskTopFillColor(hover: boolean): number {
@@ -198,94 +179,30 @@ export function deskTopFillColor(hover: boolean): number {
 }
 
 export function drawPropDesk(g: Graphics, hover: boolean): void {
-  const bw = DESK_BW;
-  const bh = DESK_BH;
-  const { s, e, n, w } = tileCorners(bw, bh);
-  const left = hover ? C.propLeftHover : C.propLeft;
   const right = hover ? C.propRightHover : C.propRight;
-  const back = hover ? C.propBackHover : C.propBack;
+  const rightDark = hover ? 0x8a8a8a : 0x8b8b8b;
+  const left = hover ? C.propLeftHover : C.propLeft;
   const topColor = deskTopFillColor(hover);
-  const panelH = DESK_PANEL_H;
-  const thick = 4;
-  const oh = 3;
 
-  const endPanel = (tip: Pt, legA: Pt, legB: Pt, color: number) => {
-    const a = lerp(tip, legA, 0.06);
-    const b = lerp(tip, legB, 0.06);
-    const ai = lerp(tip, a, thick / Math.hypot(a.x - tip.x, a.y - tip.y));
-    const bi = lerp(tip, b, thick / Math.hypot(b.x - tip.x, b.y - tip.y));
-    const aiT = lift(ai, panelH);
-    const biT = lift(bi, panelH);
-    quad(g, ai, bi, biT, aiT);
-    g.fill(color);
-  };
+  poly(g, [dt({ x: 0, y: 0 }), dt({ x: 24, y: -12 }), dt({ x: -16, y: -32 }), dt({ x: -40, y: -20 })], {
+    color: 0x000000,
+    alpha: 0.15,
+  });
 
-  endPanel(s, w, e, right);
-  endPanel(n, w, e, left);
-
-  const backMid = lerp(n, { x: 0, y: n.y + 4 }, 0.5);
-  const backL = lerp(w, n, 0.5);
-  const backR = lerp(e, n, 0.5);
-  const backLi = lerp(backL, backMid, 0.15);
-  const backRi = lerp(backR, backMid, 0.15);
-  const backLiT = lift(backLi, panelH * 0.85);
-  const backMiT = lift(backMid, panelH * 0.85);
-  tri(g, backLi, backRi, backMiT, back);
-  tri(g, backLi, backLiT, backMiT, back);
-
-  const bwTop = bw + oh * 0.55;
-  const bhTop = bh + oh * 0.55;
-  const { s: ts, e: te, n: tn, w: tw } = tileCorners(bwTop, bhTop);
-  const baseY = panelH;
-  const sT = lift(ts, baseY);
-  const eT = lift(te, baseY);
-  const wT = lift(tw, baseY);
-  const sTop = lift(ts, baseY + DESK_SLAB_T);
-  const eTop = lift(te, baseY + DESK_SLAB_T);
-  const wTop = lift(tw, baseY + DESK_SLAB_T);
-  const nTop = lift(tn, baseY + DESK_SLAB_T);
-
-  quad(g, wT, sT, sTop, wTop);
-  g.fill(left);
-  quad(g, sT, eT, eTop, sTop);
-  g.fill(right);
-  quad(g, wTop, sTop, eTop, nTop);
-  g.fill(topColor);
-}
-
-export function drawPropTree(g: Graphics, hover: boolean): void {
-  const dark = hover ? C.treeCanopyDarkHover : C.treeCanopyDark;
-  const mid = hover ? C.treeCanopyMidHover : C.treeCanopyMid;
-  const light = hover ? C.treeCanopyLightHover : C.treeCanopyLight;
-  const left = hover ? C.propLeftHover : C.propLeft;
-  const right = hover ? C.propRightHover : C.propRight;
-
-  g.ellipse(0, -2, 20, 8);
-  g.fill({ color: 0x888888, alpha: 0.2 });
-
-  const trunkBh = 2.5;
-  drawFrontTrunk(g, TREE_TRUNK_BW, trunkBh, TREE_TRUNK_H, left, right);
-
-  const cx = 0;
-  const cy = TREE_CANOPY_CY;
-  const rx = TREE_CANOPY_RX;
-  const ry = TREE_CANOPY_RY;
-
-  g.ellipse(cx - 6, cy, 14, 13);
-  g.fill({ color: dark, alpha: 0.95 });
-  g.ellipse(cx + 5, cy + 2, 16, 14);
-  g.fill({ color: mid, alpha: 0.92 });
-  g.ellipse(cx + 10, cy - 8, 12, 11);
-  g.fill({ color: light, alpha: 0.88 });
-
-  g.ellipse(cx, cy, rx, ry);
-  g.fill({ color: mid, alpha: 0.08 });
-  g.ellipse(cx - 8, cy + 1, 14, 14);
-  g.fill({ color: dark, alpha: 0.55 });
-  g.ellipse(cx + 6, cy + 3, 16, 15);
-  g.fill({ color: mid, alpha: 0.5 });
-  g.ellipse(cx + 12, cy - 6, 11, 10);
-  g.fill({ color: light, alpha: 0.45 });
+  poly(
+    g,
+    [dt({ x: -36, y: -18 }), dt({ x: -12, y: -30 }), dt({ x: -12, y: -46 }), dt({ x: -36, y: -34 })],
+    rightDark,
+  );
+  poly(g, [dt({ x: 0, y: 0 }), dt({ x: 24, y: -12 }), dt({ x: 24, y: -28 }), dt({ x: 0, y: -16 })], right);
+  poly(g, [dt({ x: 0, y: 0 }), dt({ x: -4, y: -2 }), dt({ x: -4, y: -18 }), dt({ x: 0, y: -16 })], left);
+  poly(g, [dt({ x: 0, y: -16 }), dt({ x: -40, y: -36 }), dt({ x: -40, y: -42 }), dt({ x: 0, y: -22 })], left);
+  poly(g, [dt({ x: 0, y: -16 }), dt({ x: 24, y: -28 }), dt({ x: 24, y: -34 }), dt({ x: 0, y: -22 })], right);
+  poly(
+    g,
+    [dt({ x: 0, y: -22 }), dt({ x: 24, y: -34 }), dt({ x: -16, y: -54 }), dt({ x: -40, y: -42 })],
+    topColor,
+  );
 }
 
 function drawFrontTrunk(
@@ -297,13 +214,41 @@ function drawFrontTrunk(
   right: number,
 ): void {
   const { s, e, w } = tileCorners(bw, bh);
-  const sT = lift(s, height);
-  const eT = lift(e, height);
-  const wT = lift(w, height);
-  quad(g, w, s, sT, wT);
-  g.fill(left);
-  quad(g, s, e, eT, sT);
-  g.fill(right);
+  const sT = { x: s.x, y: s.y - height };
+  const eT = { x: e.x, y: e.y - height };
+  const wT = { x: w.x, y: w.y - height };
+  poly(g, [w, s, sT, wT], left);
+  poly(g, [s, e, eT, sT], right);
+}
+
+export function drawPropTree(g: Graphics, hover: boolean): void {
+  const left = hover ? C.propLeftHover : C.propLeft;
+  const right = hover ? C.propRightHover : C.propRight;
+  const dark = hover ? 0x676767 : TREE_CANOPY_DARK;
+  const mid = hover ? 0x858585 : TREE_CANOPY_MID;
+  const light = hover ? 0x9c9c9c : TREE_CANOPY_LIGHT;
+
+  g.ellipse(0, -2, 20, 8);
+  g.fill({ color: 0x888888, alpha: 0.2 });
+
+  drawFrontTrunk(g, TREE_TRUNK_BW, 2.5, TREE_TRUNK_H, left, right);
+
+  const cx = 0;
+  const cy = TREE_CANOPY_CY;
+
+  g.ellipse(cx - 6, cy, 14, 13);
+  g.fill(dark);
+  g.ellipse(cx + 5, cy + 2, 16, 14);
+  g.fill(mid);
+  g.ellipse(cx + 10, cy - 8, 12, 11);
+  g.fill(light);
+
+  g.ellipse(cx - 8, cy + 1, 14, 14);
+  g.fill(dark);
+  g.ellipse(cx + 6, cy + 3, 16, 15);
+  g.fill(mid);
+  g.ellipse(cx + 12, cy - 6, 11, 10);
+  g.fill(light);
 }
 
 export function drawCharacter(
