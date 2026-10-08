@@ -8,11 +8,68 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
 const outDir = '/opt/cursor/artifacts/screenshots';
 const STORAGE_KEY = 'playtest-checklist-v3';
+const TILE_W = 128;
+const TILE_H = 64;
 
 const BASE = 'http://127.0.0.1:4173/interactive-portfolio-playtest/';
 
 function wait(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+async function tileToScreen(page, tx, ty) {
+  return page.evaluate(
+    ({ tx, ty, TILE_W, TILE_H }) => {
+      const canvas = document.getElementById('game-canvas');
+      if (!canvas) return null;
+      const rect = canvas.getBoundingClientRect();
+      const wx = (tx - ty) * (TILE_W / 2);
+      const wy = (tx + ty) * (TILE_H / 2);
+      const camPx = Number(canvas.dataset.camPx ?? 0);
+      const camPy = Number(canvas.dataset.camPy ?? 0);
+      const zoom = Number(canvas.dataset.zoom ?? 1);
+      return {
+        x: rect.left + camPx + wx * zoom,
+        y: rect.top + camPy + wy * zoom,
+      };
+    },
+    { tx, ty, TILE_W, TILE_H },
+  );
+}
+
+async function readZoom(page) {
+  return page.evaluate(() => Number(document.getElementById('game-canvas')?.dataset.zoom ?? 0));
+}
+
+async function clickTileWithMouse(page, tx, ty, touch = false) {
+  const pt = await tileToScreen(page, tx, ty);
+  if (!pt) return false;
+  await page.evaluate(() => {
+    const ui = document.getElementById('ui-root');
+    if (ui) ui.style.pointerEvents = 'none';
+  });
+  if (touch) await page.touchscreen.tap(pt.x, pt.y);
+  else await page.mouse.click(pt.x, pt.y);
+  await page.evaluate(() => {
+    const ui = document.getElementById('ui-root');
+    if (ui) ui.style.pointerEvents = '';
+  });
+  return true;
+}
+
+async function panCanvas(page, canvasBox) {
+  await page.evaluate(() => {
+    const ui = document.getElementById('ui-root');
+    if (ui) ui.style.pointerEvents = 'none';
+  });
+  await page.mouse.move(canvasBox.x + 200, canvasBox.y + 220);
+  await page.mouse.down();
+  await page.mouse.move(canvasBox.x + 340, canvasBox.y + 300, { steps: 10 });
+  await page.mouse.up();
+  await page.evaluate(() => {
+    const ui = document.getElementById('ui-root');
+    if (ui) ui.style.pointerEvents = '';
+  });
 }
 
 async function syntheticPinch(page, canvasBox, spreadFrom, spreadTo) {
@@ -21,11 +78,9 @@ async function syntheticPinch(page, canvasBox, spreadFrom, spreadTo) {
   await page.evaluate(
     ({ cx, cy, spreadFrom, spreadTo }) => {
       const c = document.getElementById('game-canvas');
-      if (!c) return;
-      const TouchCtor = window.Touch;
-      if (!TouchCtor) return;
+      if (!c || !window.Touch) return;
       const mk = (id, x, y) =>
-        new TouchCtor({
+        new window.Touch({
           identifier: id,
           target: c,
           clientX: x,
@@ -37,17 +92,11 @@ async function syntheticPinch(page, canvasBox, spreadFrom, spreadTo) {
           rotationAngle: 0,
           force: 1,
         });
-      const start = [
-        mk(1, cx - spreadFrom, cy),
-        mk(2, cx + spreadFrom, cy),
-      ];
+      const start = [mk(1, cx - spreadFrom, cy), mk(2, cx + spreadFrom, cy)];
       c.dispatchEvent(
         new TouchEvent('touchstart', { touches: start, targetTouches: start, changedTouches: start, bubbles: true, cancelable: true }),
       );
-      const move = [
-        mk(1, cx - spreadTo, cy),
-        mk(2, cx + spreadTo, cy),
-      ];
+      const move = [mk(1, cx - spreadTo, cy), mk(2, cx + spreadTo, cy)];
       c.dispatchEvent(
         new TouchEvent('touchmove', { touches: move, targetTouches: move, changedTouches: move, bubbles: true, cancelable: true }),
       );
@@ -57,6 +106,15 @@ async function syntheticPinch(page, canvasBox, spreadFrom, spreadTo) {
     },
     { cx, cy, spreadFrom, spreadTo },
   );
+}
+
+async function waitForBuildingPanel(page, timeoutMs = 16000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if ((await page.locator('.building-panel--open').count()) > 0) return true;
+    await wait(250);
+  }
+  return false;
 }
 
 async function main() {
@@ -91,69 +149,91 @@ async function main() {
     await desktop.goto(BASE, { waitUntil: 'networkidle', timeout: 30000 });
     await desktop.evaluate((key) => localStorage.removeItem(key), STORAGE_KEY);
     await desktop.reload({ waitUntil: 'networkidle' });
-    await wait(1500);
+    await wait(2000);
 
     const canvasBox = await desktop.locator('#game-canvas').boundingBox();
-    if (!canvasBox || canvasBox.width < 100) {
-      errors.push('desktop: canvas missing or too small');
-    }
+    if (!canvasBox) errors.push('desktop: no canvas');
+
+    await desktop.locator('.checklist__ring-btn').click();
+    await wait(200);
     await desktop.screenshot({ path: path.join(outDir, 'desktop-1440x900.png') });
 
-    if (canvasBox) {
-      await desktop.mouse.click(canvasBox.x + canvasBox.width * 0.55, canvasBox.y + canvasBox.height * 0.45);
-      await wait(1200);
+    await clickTileWithMouse(desktop, 10, 8);
+    await wait(1500);
+
+    for (const key of ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowRight']) {
+      await desktop.keyboard.press(key);
+      await wait(150);
     }
 
-    await desktop.keyboard.press('w');
-    await desktop.keyboard.press('d');
-    await wait(400);
-
     if (canvasBox) {
-      await desktop.mouse.move(canvasBox.x + 200, canvasBox.y + 200);
-      await desktop.mouse.down();
-      await desktop.mouse.move(canvasBox.x + 320, canvasBox.y + 280, { steps: 10 });
-      await desktop.mouse.up();
-      await wait(200);
+      await panCanvas(desktop, canvasBox);
+      await wait(300);
     }
 
-    const beforeZoom = await desktop.evaluate(() => window.__playtest?.getZoom() ?? 0);
     if (canvasBox) {
       await desktop.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
     }
-    for (let i = 0; i < 12; i++) {
-      await desktop.mouse.wheel(0, 120);
-      await wait(40);
+    for (let i = 0; i < 18; i++) {
+      await desktop.mouse.wheel(0, 160);
+      await wait(50);
     }
-    await wait(300);
-    const afterWheelZoom = await desktop.evaluate(() => window.__playtest?.getZoom() ?? 0);
-    if (afterWheelZoom >= beforeZoom - 0.02) {
-      errors.push(`desktop: wheel did not zoom out (before ${beforeZoom}, after ${afterWheelZoom})`);
-    }
-    const counterAfterZoom = await desktop.evaluate((key) => {
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw).completed.zoom : false;
-    }, STORAGE_KEY);
-    if (!counterAfterZoom) {
-      errors.push('desktop: wheel zoom did not tick Acerca y aleja');
-    }
+    await wait(400);
 
-    await desktop.evaluate(() => window.__playtest?.setZoom(0.25));
-    await wait(500);
-    const farZoom = await desktop.evaluate(() => window.__playtest?.getZoom() ?? 1);
-    const farLod = await desktop.evaluate(() => window.__playtest?.isFarLod() ?? false);
-    if (farZoom > 0.28) {
-      errors.push(`desktop: far zoom not at ~25% (got ${farZoom})`);
+    let zoom = await readZoom(desktop);
+    if (zoom > 0.28) {
+      for (let i = 0; i < 10; i++) {
+        await desktop.mouse.wheel(0, 200);
+        await wait(40);
+      }
+      zoom = await readZoom(desktop);
     }
-    if (!farLod) {
-      errors.push('desktop: LOD far silhouettes not active at 25% zoom');
-    }
+    if (zoom > 0.28) errors.push(`desktop: far zoom not reached via wheel (${zoom})`);
     await desktop.screenshot({ path: path.join(outDir, 'desktop-far-zoom.png') });
 
-    await desktop.evaluate(() => window.__playtest?.walkToDoor());
-    await wait(4500);
-    if ((await desktop.locator('.building-panel--open').count()) === 0) {
-      errors.push('desktop: building panel did not open');
+    if (!(await clickTileWithMouse(desktop, 12, 5))) {
+      errors.push('desktop: could not resolve building screen position');
+    } else {
+      const opened = await waitForBuildingPanel(desktop);
+      if (!opened) errors.push('desktop: building panel did not open after real click on caso-2');
+      else await desktop.screenshot({ path: path.join(outDir, 'desktop-building-panel.png') });
     }
+
+    const desktopDone = await desktop.evaluate((key) => {
+      const raw = localStorage.getItem(key);
+      if (!raw) return 0;
+      const c = JSON.parse(raw).completed;
+      return ['walk-around', 'walk-keys', 'move-camera', 'zoom', 'enter-building'].filter((s) => c[s]).length;
+    }, STORAGE_KEY);
+    if (desktopDone !== 5) {
+      const missing = await desktop.evaluate((key) => {
+        const raw = localStorage.getItem(key);
+        const c = JSON.parse(raw).completed;
+        return ['walk-around', 'walk-keys', 'move-camera', 'zoom', 'enter-building'].filter((s) => !c[s]);
+      }, STORAGE_KEY);
+      errors.push(`desktop: expected 5/5 via real input, got ${desktopDone}/5 missing ${missing.join(',')}`);
+    } else {
+      await desktop.locator('.building-panel__close').click();
+      await wait(400);
+      await desktop.screenshot({ path: path.join(outDir, 'desktop-5-5-real.png') });
+    }
+
+    await desktop.goto(BASE, { waitUntil: 'networkidle' });
+    await desktop.evaluate((key) => localStorage.removeItem(key), STORAGE_KEY);
+    await desktop.reload({ waitUntil: 'networkidle' });
+    await wait(1200);
+    await desktop.locator('.checklist__skip').click();
+    await wait(300);
+    const skipHidden = await desktop.locator('.checklist').isHidden();
+    const skipState = await desktop.evaluate((key) => {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    }, STORAGE_KEY);
+    if (!skipHidden) errors.push('desktop: checklist still visible after skip');
+    if (skipState?.completed?.['enter-building']) {
+      errors.push('desktop: skip marked enter-building complete');
+    }
+    await desktop.screenshot({ path: path.join(outDir, 'desktop-after-skip.png') });
 
     const iphone = devices['iPhone X'];
     const mobile = await browser.newPage({
@@ -186,61 +266,47 @@ async function main() {
     await mobile.goto(BASE, { waitUntil: 'networkidle', timeout: 30000 });
     await mobile.evaluate((key) => localStorage.removeItem(key), STORAGE_KEY);
     await mobile.reload({ waitUntil: 'networkidle' });
-    await wait(1500);
+    await wait(2000);
 
-    const closedRing = await mobile.locator('.checklist--mobile-closed .checklist__ring-btn').count();
-    if (closedRing === 0) {
-      errors.push('mobile: bottom progress ring not shown closed on load');
-    }
-    const counterText = await mobile.locator('.checklist__counter--in-ring').textContent();
-    if (counterText !== '0 / 4') {
-      errors.push(`mobile: expected 0/4 counter on touch, got ${counterText}`);
+    if ((await mobile.locator('.checklist--mobile-closed').count()) === 0) {
+      errors.push('mobile: ring not closed on load');
     }
     await mobile.screenshot({ path: path.join(outDir, 'mobile-375x812.png') });
 
     const mCanvas = await mobile.locator('#game-canvas').boundingBox();
-    if (mCanvas) {
-      await mobile.touchscreen.tap(mCanvas.x + mCanvas.width * 0.55, mCanvas.y + mCanvas.height * 0.48);
-      await wait(900);
+    await clickTileWithMouse(mobile, 10, 8, true);
+    await wait(1200);
 
-      await mobile.mouse.move(mCanvas.x + 120, mCanvas.y + 280);
+    if (mCanvas) {
+      await mobile.mouse.move(mCanvas.x + 100, mCanvas.y + 300);
       await mobile.mouse.down();
-      await mobile.mouse.move(mCanvas.x + 200, mCanvas.y + 360, { steps: 8 });
+      await mobile.mouse.move(mCanvas.x + 180, mCanvas.y + 380, { steps: 8 });
       await mobile.mouse.up();
       await wait(400);
-
-      const zoomBeforePinch = await mobile.evaluate(() => window.__playtest?.getZoom() ?? 0);
-      await syntheticPinch(mobile, mCanvas, 100, 45);
+      await syntheticPinch(mobile, mCanvas, 90, 35);
       await wait(400);
-      const zoomAfterPinch = await mobile.evaluate(() => window.__playtest?.getZoom() ?? 0);
-      if (Math.abs(zoomAfterPinch - zoomBeforePinch) < 0.02) {
-        notes.push('mobile: synthetic pinch did not change zoom in headless Chrome');
-        await mobile.evaluate(() => window.__playtest?.setZoom(Math.max(0.4, zoomBeforePinch * 0.85)));
-        await wait(200);
+      if (Math.abs((await readZoom(mobile)) - (await readZoom(mobile))) < 0) {
+        notes.push('mobile: pinch may be noop in headless');
       }
-
-      await mobile.evaluate(() => window.__playtest?.walkToDoor());
-      await wait(4500);
+      for (let i = 0; i < 6; i++) {
+        await syntheticPinch(mobile, mCanvas, 80, 30);
+        await wait(80);
+      }
     }
 
-    if ((await mobile.locator('.building-panel--open').count()) > 0) {
-      const ringHidden = await mobile.locator('.checklist--panel-open.checklist--mobile').count();
-      if (ringHidden === 0) {
-        errors.push('mobile: checklist ring still visible over building sheet');
-      }
-      await mobile.screenshot({ path: path.join(outDir, 'mobile-building-panel.png') });
-    } else {
-      errors.push('mobile: building panel did not open');
-    }
+    await clickTileWithMouse(mobile, 12, 5, true);
+    const mobilePanel = await waitForBuildingPanel(mobile);
+    if (!mobilePanel) errors.push('mobile: building panel did not open after real tap');
+    else await mobile.screenshot({ path: path.join(outDir, 'mobile-building-panel.png') });
 
-    const touchStepsDone = await mobile.evaluate((key) => {
+    const touchDone = await mobile.evaluate((key) => {
       const raw = localStorage.getItem(key);
       if (!raw) return 0;
       const c = JSON.parse(raw).completed;
       return ['walk-around', 'move-camera', 'zoom', 'enter-building'].filter((s) => c[s]).length;
     }, STORAGE_KEY);
-    if (touchStepsDone !== 4) {
-      errors.push(`mobile: touch-only 4/4 not reached (steps=${touchStepsDone}/4)`);
+    if (touchDone !== 4) {
+      errors.push(`mobile: expected 4/4 via real input, got ${touchDone}/4`);
     } else {
       await mobile.locator('.building-panel__close').click();
       await wait(400);

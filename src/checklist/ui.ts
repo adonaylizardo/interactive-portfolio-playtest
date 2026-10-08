@@ -1,8 +1,8 @@
 import {
   countCompleted,
+  isChecklistHidden,
   isTouchPrimary,
   loadChecklist,
-  markAllComplete,
   saveChecklist,
   stepsForPlatform,
   totalStepsForPlatform,
@@ -45,8 +45,8 @@ const STEP_COPY: Record<ChecklistStepId, StepCopy> = {
   'enter-building': {
     id: 'enter-building',
     title: 'Entra a un edificio',
-    detailDesktop: 'Camina hasta la puerta de un edificio para abrir el panel.',
-    detailTouch: 'Camina hasta la puerta de un edificio para abrir el panel.',
+    detailDesktop: 'Haz clic en un edificio para ir a su puerta y abrir el panel.',
+    detailTouch: 'Toca un edificio para ir a su puerta y abrir el panel.',
   },
 };
 
@@ -56,6 +56,7 @@ export function isMobileLayout(): boolean {
 
 export type ChecklistCallbacks = {
   onSkip: () => void;
+  onDismiss: () => void;
 };
 
 export class ChecklistUI {
@@ -98,6 +99,7 @@ export class ChecklistUI {
       <ul class="checklist__list"></ul>
       <footer class="checklist__footer">
         <button type="button" class="checklist__skip">Saltar tutorial</button>
+        <button type="button" class="checklist__dismiss" hidden>Cerrar</button>
       </footer>
     `;
 
@@ -108,18 +110,18 @@ export class ChecklistUI {
     this.ringEl = this.root.querySelector('.checklist__ring-fg')!;
     this.headerTitle = this.root.querySelector('.checklist__active-title')!;
     this.ringBtn = this.root.querySelector('.checklist__ring-btn')!;
-
-    const toggleMobileList = () => {
-      if (!this.mobile) return;
-      this.state.mobileExpanded = !this.state.mobileExpanded;
-      this.applyLayoutClasses();
-      saveChecklist(this.state);
-    };
-
     this.ringBtn.addEventListener('click', (e) => {
       e.stopPropagation();
+      const total = totalStepsForPlatform(this.touch);
+      const done = countCompleted(this.state);
+      if (done >= total && !this.mobile) {
+        this.dismiss(callbacks);
+        return;
+      }
       if (this.mobile) {
-        toggleMobileList();
+        this.state.mobileExpanded = !this.state.mobileExpanded;
+        this.applyLayoutClasses();
+        saveChecklist(this.state);
         return;
       }
       this.state.collapsed = !this.state.collapsed;
@@ -129,10 +131,13 @@ export class ChecklistUI {
 
     this.root.querySelector('.checklist__skip')!.addEventListener('click', () => {
       this.state.skipped = true;
-      markAllComplete(this.state);
       saveChecklist(this.state);
-      this.render();
+      this.applyLayoutClasses();
       callbacks.onSkip();
+    });
+
+    this.root.querySelector('.checklist__dismiss')!.addEventListener('click', () => {
+      this.dismiss(callbacks);
     });
 
     window.matchMedia('(max-width: 767px)').addEventListener('change', () => {
@@ -142,6 +147,13 @@ export class ChecklistUI {
     });
 
     this.render();
+  }
+
+  private dismiss(callbacks: ChecklistCallbacks): void {
+    this.state.dismissed = true;
+    saveChecklist(this.state);
+    this.applyLayoutClasses();
+    callbacks.onDismiss();
   }
 
   setBuildingPanelOpen(open: boolean): void {
@@ -157,7 +169,9 @@ export class ChecklistUI {
     this.mobile = isMobileLayout();
     const total = totalStepsForPlatform(this.touch);
     const done = countCompleted(this.state);
+    const hidden = isChecklistHidden(this.state);
 
+    this.root.hidden = hidden;
     this.root.classList.toggle('checklist--mobile', this.mobile);
     this.root.classList.toggle(
       'checklist--mobile-closed',
@@ -170,7 +184,7 @@ export class ChecklistUI {
   }
 
   complete(step: ChecklistStepId): void {
-    if (this.state.skipped) return;
+    if (this.state.skipped || this.state.dismissed) return;
     if (this.state.completed[step]) return;
     this.state.completed[step] = true;
     saveChecklist(this.state);
@@ -179,7 +193,7 @@ export class ChecklistUI {
 
   isSkippedOrDone(): boolean {
     return (
-      this.state.skipped ||
+      isChecklistHidden(this.state) ||
       countCompleted(this.state) >= totalStepsForPlatform(this.touch)
     );
   }
@@ -193,6 +207,12 @@ export class ChecklistUI {
     const circumference = 150.8;
     const offset = circumference * (1 - done / total);
     this.ringEl.style.strokeDashoffset = String(offset);
+
+    const dismissBtn = this.root.querySelector('.checklist__dismiss') as HTMLButtonElement;
+    const skipBtn = this.root.querySelector('.checklist__skip') as HTMLButtonElement;
+    const allDone = done >= total;
+    dismissBtn.hidden = !allDone;
+    skipBtn.hidden = allDone;
 
     this.applyLayoutClasses();
 

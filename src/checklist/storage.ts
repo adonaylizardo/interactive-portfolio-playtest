@@ -8,21 +8,12 @@ export type ChecklistStepId =
 export type ChecklistState = {
   completed: Record<ChecklistStepId, boolean>;
   skipped: boolean;
-  /** Desktop: collapsed to progress ring only (top-left) */
+  dismissed: boolean;
   collapsed: boolean;
-  /** Mobile: full list expanded from bottom ring */
   mobileExpanded: boolean;
 };
 
 const STORAGE_KEY = 'playtest-checklist-v3';
-
-const ALL_STEP_IDS: ChecklistStepId[] = [
-  'walk-around',
-  'walk-keys',
-  'move-camera',
-  'zoom',
-  'enter-building',
-];
 
 const defaultState = (): ChecklistState => ({
   completed: {
@@ -33,6 +24,7 @@ const defaultState = (): ChecklistState => ({
     'enter-building': false,
   },
   skipped: false,
+  dismissed: false,
   collapsed: false,
   mobileExpanded: false,
 });
@@ -75,8 +67,6 @@ export function countCompleted(state: ChecklistState, touch = isTouchPrimary()):
   return stepsForPlatform(touch).filter((id) => state.completed[id]).length;
 }
 
-export function markAllComplete(state: ChecklistState): void {
-  for (const id of ALL_STEP_IDS) {
-    state.completed[id] = true;
-  }
+export function isChecklistHidden(state: ChecklistState): boolean {
+  return state.skipped || state.dismissed;
 }

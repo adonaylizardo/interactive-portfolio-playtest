@@ -13,11 +13,9 @@ export type MapObject = {
   state: string;
   x: number;
   y: number;
-  /** Footprint in tiles (width × height from anchor bottom-center). */
   w?: number;
   h?: number;
   walkable?: boolean;
-  /** Door tile for buildings — character entering triggers panel. */
   door?: { x: number; y: number };
   panelTitle?: string;
 };
@@ -40,8 +38,7 @@ function emptyGrid(): MapCell[][] {
 
 export const cells = emptyGrid();
 
-/** Place non-walkable rects (bottom-center anchor at tile x,y). */
-function blockRect(tx: number, ty: number, w: number, h: number, ground = 'tile/path/default') {
+function blockRect(tx: number, ty: number, w: number, h: number, ground = 'tile/concrete/default') {
   for (let dy = 0; dy < h; dy++) {
     for (let dx = 0; dx < w; dx++) {
       const x = tx + dx - Math.floor(w / 2);
@@ -54,17 +51,19 @@ function blockRect(tx: number, ty: number, w: number, h: number, ground = 'tile/
   }
 }
 
-// Paths and blocked areas
-for (let x = 2; x < 14; x++) {
-  cells[8][x].groundId = 'tile/path/default';
-}
-for (let y = 4; y < 12; y++) {
-  cells[y][7].groundId = 'tile/path/default';
+function carvePath(tx: number, ty: number) {
+  if (tx < 0 || ty < 0 || tx >= MAP_WIDTH || ty >= MAP_HEIGHT) return;
+  cells[ty][tx].walkable = true;
+  cells[ty][tx].groundId = 'tile/path/default';
 }
 
-blockRect(4, 5, 2, 2, 'tile/concrete/default');
+// Main walk network
+for (let x = 2; x < 14; x++) carvePath(x, 8);
+for (let y = 4; y < 13; y++) carvePath(7, y);
+
+// Decorative blocked pads (away from doors)
 blockRect(11, 10, 2, 1, 'tile/concrete/default');
-blockRect(6, 11, 3, 1, 'tile/concrete/default');
+blockRect(14, 6, 1, 1, 'tile/concrete/default');
 
 export const objects: MapObject[] = [
   {
@@ -154,12 +153,11 @@ export const objects: MapObject[] = [
   },
 ];
 
-// Sync building footprints to grid
 for (const obj of objects) {
   if (obj.walkable === false && obj.w && obj.h) {
     blockRect(obj.x, obj.y, obj.w, obj.h);
     if (obj.door) {
-      cells[obj.door.y][obj.door.x].walkable = true;
+      carvePath(obj.door.x, obj.door.y);
     }
   } else if (obj.type === 'prop') {
     const px = obj.x;
@@ -170,10 +168,59 @@ for (const obj of objects) {
   }
 }
 
+// Corridors from each door to the main path network
+const doorCorridors: [number, number][] = [
+  [2, 5],
+  [3, 5],
+  [3, 6],
+  [3, 7],
+  [3, 8],
+  [12, 6],
+  [12, 7],
+  [12, 8],
+  [10, 12],
+  [10, 11],
+  [10, 10],
+  [10, 9],
+  [10, 8],
+  [7, 12],
+  [5, 13],
+  [5, 12],
+  [5, 11],
+  [5, 10],
+  [5, 9],
+  [5, 8],
+];
+for (const [x, y] of doorCorridors) carvePath(x, y);
+
 export function getBuildingAtDoor(tx: number, ty: number): MapObject | undefined {
   return objects.find(
     (o) => o.type === 'building' && o.door && o.door.x === tx && o.door.y === ty,
   );
+}
+
+export function getBuildingAt(tx: number, ty: number): MapObject | undefined {
+  return objects.find((o) => {
+    if (o.type !== 'building') return false;
+    const w = o.w ?? 1;
+    const h = o.h ?? 1;
+    for (let dy = 0; dy < h; dy++) {
+      for (let dx = 0; dx < w; dx++) {
+        const ox = o.x + dx - Math.floor(w / 2);
+        const oy = o.y - dy;
+        if (ox === tx && oy === ty) return true;
+      }
+    }
+    return false;
+  });
+}
+
+export function resolveWalkTarget(tx: number, ty: number): { x: number; y: number } {
+  const onDoor = getBuildingAtDoor(tx, ty);
+  if (onDoor?.door) return onDoor.door;
+  const building = getBuildingAt(tx, ty);
+  if (building?.door) return building.door;
+  return { x: tx, y: ty };
 }
 
 export function getObjectAt(tx: number, ty: number): MapObject | undefined {

@@ -5,14 +5,15 @@ import {
   MAP_HEIGHT,
   MAP_WIDTH,
   objects,
+  resolveWalkTarget,
   TILE_H,
   TILE_W,
   type MapObject,
 } from '../data/map';
 import { parseCameraFromHash, writeCameraToHash } from '../camera/hash';
 import { isTouchPrimary, type ChecklistStepId } from '../checklist/storage';
-import { tileToWorld, worldToTile, sortKey } from '../iso/math';
-import { findPath } from '../iso/pathfinding';
+import { mapWorldBounds, tileToWorld, worldToTile, sortKey } from '../iso/math';
+import { findPathOrNearest } from '../iso/pathfinding';
 import { C } from './colors';
 import { drawBuilding, drawCharacter, drawDiamond, drawPropDesk, drawPropTree } from './draw';
 
@@ -23,6 +24,7 @@ const LOD_ZOOM = 0.35;
 export type SceneEvents = {
   onChecklist: (step: ChecklistStepId) => void;
   onEnterBuilding: (title: string) => void;
+  onUnreachable?: () => void;
 };
 
 export class IsoScene {
@@ -141,7 +143,7 @@ export class IsoScene {
         g.on('pointertap', (e) => {
           if (this.panMoved) return;
           const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
-          this.walkToTile(tx, ty, sprint);
+          this.requestWalk(tx, ty, sprint);
         });
         this.tilesLayer.addChild(g);
       }
@@ -168,6 +170,18 @@ export class IsoScene {
           this.refreshObjectVisuals();
         }
       });
+      g.on('pointertap', (e) => {
+        if (this.panMoved) return;
+        e.stopPropagation();
+        const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
+        if (obj.type === 'building' && obj.door) {
+          this.requestWalk(obj.door.x, obj.door.y, sprint);
+          return;
+        }
+        const anchor = tileToWorld(obj.x, obj.y);
+        const tile = worldToTile(anchor.x, anchor.y);
+        if (tile) this.requestWalk(tile.x, tile.y, sprint);
+      });
       this.objectGraphics.set(obj.id, g);
       this.objectsLayer.addChild(g);
     }
@@ -187,16 +201,20 @@ export class IsoScene {
     }
   }
 
+  requestWalk(tx: number, ty: number, sprint: boolean): void {
+    const target = resolveWalkTarget(tx, ty);
+    this.walkToTile(target.x, target.y, sprint);
+  }
+
   walkToTile(tx: number, ty: number, sprint: boolean): void {
-    if (!cells[ty]?.[tx]?.walkable) return;
-    const path = findPath(
-      Math.round(this.charTx),
-      Math.round(this.charTy),
-      tx,
-      ty,
-    );
-    if (!path) return;
-    this.path = path;
+    const sx = Math.round(this.charTx);
+    const sy = Math.round(this.charTy);
+    const result = findPathOrNearest(sx, sy, tx, ty);
+    if (!result) {
+      this.events.onUnreachable?.();
+      return;
+    }
+    this.path = result.path;
     this.sprint = sprint;
     this.charState = sprint ? 'sprint' : 'walk';
     this.events.onChecklist('walk-around');
@@ -240,6 +258,13 @@ export class IsoScene {
     this.camera.position.set(sw / 2 + this.cameraX * this.zoom, sh / 2 + this.cameraY * this.zoom);
     this.camera.scale.set(this.zoom);
     this.refreshObjectVisuals();
+    if (this.canvasEl) {
+      this.canvasEl.dataset.camX = String(this.cameraX);
+      this.canvasEl.dataset.camY = String(this.cameraY);
+      this.canvasEl.dataset.zoom = String(this.zoom);
+      this.canvasEl.dataset.camPx = String(this.camera.position.x);
+      this.canvasEl.dataset.camPy = String(this.camera.position.y);
+    }
     if (persistHash) {
       writeCameraToHash({ x: this.cameraX, y: this.cameraY, zoom: this.zoom });
     }
@@ -294,7 +319,19 @@ export class IsoScene {
       this.zoom = clamped;
     }
     this.zoomChanged = true;
+    if (this.zoom <= ZOOM_MIN + 0.02) {
+      this.centerMapInViewport();
+    }
     this.applyCamera();
+  }
+
+  /** Keep full map visible when zoomed far out. */
+  centerMapInViewport(): void {
+    const bounds = mapWorldBounds();
+    const cx = (bounds.minX + bounds.maxX) / 2;
+    const cy = (bounds.minY + bounds.maxY) / 2;
+    this.cameraX = -cx;
+    this.cameraY = -cy + TILE_H * 0.75;
   }
 
   private bindInput(): void {
@@ -368,7 +405,7 @@ export class IsoScene {
           const wx = (sx - this.camera.position.x) / this.zoom;
           const wy = (sy - this.camera.position.y) / this.zoom;
           const tile = worldToTile(wx, wy);
-          if (tile) this.walkToTile(tile.x, tile.y, double);
+          if (tile) this.requestWalk(tile.x, tile.y, double);
         }
       }
       this.pointerDownOnCanvas = false;

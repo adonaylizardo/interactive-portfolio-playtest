@@ -241,6 +241,52 @@ body.is-canvas-dragging * {
   color: #1a1a1a;
 }
 
+.checklist__dismiss {
+  background: #1a1a1a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  margin-left: 8px;
+}
+
+.checklist__footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.playtest-toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(88px, calc(env(safe-area-inset-bottom) + 72px));
+  transform: translateX(-50%) translateY(8px);
+  background: rgb(26 26 26 / 92%);
+  color: #fff;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 30;
+}
+
+.playtest-toast--visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+@media (min-width: 768px) {
+  .playtest-toast {
+    bottom: auto;
+    top: max(16px, env(safe-area-inset-top));
+  }
+}
+
 @media (max-width: 767px) {
   .checklist--mobile {
     top: auto;

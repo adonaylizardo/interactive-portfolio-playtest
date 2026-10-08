@@ -1,12 +1,13 @@
 import { ChecklistUI } from './checklist/ui';
 import { IsoScene } from './game/scene';
 import { BuildingPanel } from './ui/buildingPanel';
+import { showToast } from './ui/toast';
 
 async function main(): Promise<void> {
   const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
   const uiRoot = document.getElementById('ui-root')!;
 
-  const checklist = new ChecklistUI(uiRoot, { onSkip: () => {} });
+  const checklist = new ChecklistUI(uiRoot, { onSkip: () => {}, onDismiss: () => {} });
 
   const panel = new BuildingPanel(uiRoot, () => {
     checklist.setBuildingPanelOpen(false);
@@ -21,29 +22,10 @@ async function main(): Promise<void> {
       checklist.setBuildingPanelOpen(true);
       panel.show(title);
     },
+    onUnreachable: () => showToast('No se puede llegar'),
   });
 
   await scene.init(canvas);
-
-  window.__playtest = {
-    walkToDoor: () => scene.walkToTile(3, 5, false),
-    setZoom: (z: number) => scene.setZoomLevel(z, { x: window.innerWidth / 2, y: window.innerHeight / 2 }),
-    getZoom: () => scene.getZoom(),
-    isFarLod: () => scene.isFarLod(),
-    walkToTile: (x: number, y: number, sprint: boolean) => scene.walkToTile(x, y, sprint),
-  };
-}
-
-declare global {
-  interface Window {
-    __playtest?: {
-      walkToDoor: () => void;
-      setZoom: (z: number) => void;
-      getZoom: () => number;
-      isFarLod: () => boolean;
-      walkToTile: (x: number, y: number, sprint: boolean) => void;
-    };
-  }
 }
 
 main().catch((err) => {
