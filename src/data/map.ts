@@ -191,7 +191,48 @@ const doorCorridors: [number, number][] = [
   [5, 9],
   [5, 8],
 ];
-for (const [x, y] of doorCorridors) carvePath(x, y);
+function isBuildingFootprintTile(tx: number, ty: number, allowDoor = false): boolean {
+  for (const o of objects) {
+    if (o.type !== 'building' || !o.w || !o.h) continue;
+    if (allowDoor && o.door && o.door.x === tx && o.door.y === ty) continue;
+    const w = o.w;
+    const h = o.h;
+    for (let dy = 0; dy < h; dy++) {
+      for (let dx = 0; dx < w; dx++) {
+        const ox = o.x + dx - Math.floor(w / 2);
+        const oy = o.y - dy;
+        if (ox === tx && oy === ty) return true;
+      }
+    }
+  }
+  return false;
+}
+
+for (const [x, y] of doorCorridors) {
+  if (!isBuildingFootprintTile(x, y, true)) carvePath(x, y);
+}
+
+/** QA: footprint tiles (except doors) must stay blocked. */
+export function validateWalkGridFootprint(): string[] {
+  const errors: string[] = [];
+  for (const o of objects) {
+    if (o.type !== 'building' || !o.w || !o.h) continue;
+    const w = o.w;
+    const h = o.h;
+    for (let dy = 0; dy < h; dy++) {
+      for (let dx = 0; dx < w; dx++) {
+        const ox = o.x + dx - Math.floor(w / 2);
+        const oy = o.y - dy;
+        const isDoor = o.door && o.door.x === ox && o.door.y === oy;
+        if (isDoor) continue;
+        if (cells[oy]?.[ox]?.walkable) {
+          errors.push(`footprint tile (${ox},${oy}) walkable for ${o.name}`);
+        }
+      }
+    }
+  }
+  return errors;
+}
 
 export function getBuildingAtDoor(tx: number, ty: number): MapObject | undefined {
   return objects.find(

@@ -1,5 +1,7 @@
 import { ChecklistUI } from './checklist/ui';
+import { validateWalkGridFootprint } from './data/map';
 import { IsoScene } from './game/scene';
+import { findPath } from './iso/pathfinding';
 import { BuildingPanel } from './ui/buildingPanel';
 import { showToast } from './ui/toast';
 
@@ -27,6 +29,12 @@ async function main(): Promise<void> {
   });
 
   await scene.init(canvas);
+
+  (window as unknown as { __playtestQa?: Record<string, unknown> }).__playtestQa = {
+    validateWalkGridFootprint,
+    findPath,
+    getCharacterTile: () => scene.getCharacterTile(),
+  };
 }
 
 main().catch((err) => {

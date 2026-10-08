@@ -580,6 +580,112 @@ async function cdpClickTile(page, tx, ty) {
   return true;
 }
 
+async function testWalkGridFootprintRules(page, errors) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  const gridErrors = await page.evaluate(() => window.__playtestQa?.validateWalkGridFootprint?.() ?? []);
+  for (const msg of gridErrors) errors.push(`footprint-walk: ${msg}`);
+
+  const pathErrors = await page.evaluate(() => {
+    const findPath = window.__playtestQa?.findPath;
+    if (!findPath) return ['findPath hook missing'];
+    const footprint = (x, y) => {
+      const buildings = [
+        { x: 3, y: 4, w: 2, h: 2, door: [3, 5] },
+        { x: 12, y: 5, w: 2, h: 2, door: [12, 6] },
+        { x: 10, y: 11, w: 2, h: 2, door: [10, 12] },
+        { x: 5, y: 12, w: 2, h: 2, door: [5, 13] },
+      ];
+      for (const b of buildings) {
+        for (let dy = 0; dy < b.h; dy++) {
+          for (let dx = 0; dx < b.w; dx++) {
+            const ox = b.x + dx - Math.floor(b.w / 2);
+            const oy = b.y - dy;
+            const isDoor = b.door[0] === ox && b.door[1] === oy;
+            if (!isDoor && ox === x && oy === y) return b;
+          }
+        }
+      }
+      return null;
+    };
+    const cases = [
+      [3, 5, 12, 7],
+      [3, 5, 11, 6],
+      [3, 5, 10, 13],
+      [8, 8, 10, 9],
+    ];
+    const out = [];
+    for (const [sx, sy, ex, ey] of cases) {
+      const path = findPath(sx, sy, ex, ey);
+      if (!path) continue;
+      for (const step of path) {
+        const hit = footprint(step.x, step.y);
+        if (hit) out.push(`path (${sx},${sy})→(${ex},${ey}) crosses footprint ${hit.x},${hit.y} at (${step.x},${step.y})`);
+      }
+    }
+    return out;
+  });
+  for (const msg of pathErrors) errors.push(`footprint-walk: ${msg}`);
+}
+
+/** Close panel on a door tile, then move away — panel must not reopen. */
+async function testNoDoorReopenOnKeypressAfterClose(page, errors) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
+  await page.reload({ waitUntil: 'networkidle' });
+  await wait(1200);
+
+  if (!(await cdpClickTile(page, 10, 11))) {
+    errors.push('door-reopen: could not click caso-3');
+    return;
+  }
+  for (let i = 0; i < 40; i++) {
+    if ((await page.locator('.building-panel--open').count()) > 0) break;
+    await wait(250);
+  }
+  if ((await page.locator('.building-panel--open').count()) === 0) {
+    errors.push('door-reopen: caso-3 panel did not open');
+    return;
+  }
+  await page.locator('.building-panel__close').click();
+  await wait(400);
+  await page.keyboard.press('w');
+  await wait(400);
+  await page.keyboard.press('ArrowUp');
+  await wait(400);
+  if ((await page.locator('.building-panel--open').count()) > 0) {
+    errors.push('door-reopen: panel reopened after movement key while leaving door');
+  }
+}
+
+/** Ground click whose route crosses another building door must not open that panel. */
+async function testGroundWalkCrossingDoorNoPanel(page, errors) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
+  await page.reload({ waitUntil: 'networkidle' });
+  await wait(1200);
+
+  if (!(await cdpClickTile(page, 3, 4))) {
+    errors.push('cross-door: could not click caso-1');
+    return;
+  }
+  for (let i = 0; i < 36; i++) {
+    if ((await page.locator('.building-panel--open').count()) > 0) break;
+    await wait(250);
+  }
+  await page.locator('.building-panel__close').click();
+  await wait(500);
+
+  if (!(await cdpClickTile(page, 12, 7))) {
+    errors.push('cross-door: could not click ground (12,7)');
+    return;
+  }
+  await wait(5000);
+  if ((await page.locator('.building-panel--open').count()) > 0) {
+    const title = await page.locator('.building-panel__title').textContent();
+    errors.push(`cross-door: panel opened after walk crossing door (${title ?? 'unknown'})`);
+  }
+}
+
 /** After entering caso-1, a ground walk past caso-2 must not open caso-2's panel. */
 async function testNoSpuriousDoorPanelAfterGroundWalk(page, errors) {
   await page.goto(BASE, { waitUntil: 'networkidle' });
@@ -737,8 +843,11 @@ async function main() {
     assertFrameMetrics('desktop-ctrl-wheel', m, errors, 'after-ctrl-wheel');
 
     await testUnreachableClick(desktop, errors);
+    await testWalkGridFootprintRules(desktop, errors);
     await testEnterBuildingChecklist(desktop, errors);
+    await testGroundWalkCrossingDoorNoPanel(desktop, errors);
     await testNoSpuriousDoorPanelAfterGroundWalk(desktop, errors);
+    await testNoDoorReopenOnKeypressAfterClose(desktop, errors);
     await testSkipRingDesktop(desktop, errors);
 
     const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });

@@ -1,7 +1,6 @@
 import { Application, Container, Graphics, Point } from 'pixi.js';
 import {
   cells,
-  getBuildingAt,
   getBuildingAtDoor,
   MAP_HEIGHT,
   MAP_WIDTH,
@@ -108,6 +107,7 @@ export class IsoScene {
   private touchOnlyPinch = false;
   private pendingBuildingEntry: { panelTitle: string; door: { x: number; y: number } } | null =
     null;
+  private lastRoundedTile = { x: 8, y: 8 };
   constructor(events: SceneEvents) {
     this.events = events;
   }
@@ -237,8 +237,9 @@ export class IsoScene {
         e.stopPropagation();
         const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
         if (obj.type === 'building' && obj.door && obj.panelTitle) {
-          this.pendingBuildingEntry = { panelTitle: obj.panelTitle, door: obj.door };
-          this.requestWalk(obj.door.x, obj.door.y, sprint);
+          this.requestWalk(obj.door.x, obj.door.y, sprint, {
+            buildingEntry: { panelTitle: obj.panelTitle, door: obj.door },
+          });
           return;
         }
         this.requestWalk(obj.x, obj.y, sprint);
@@ -282,14 +283,14 @@ export class IsoScene {
     }
   }
 
-  requestWalk(tx: number, ty: number, sprint: boolean): void {
+  requestWalk(
+    tx: number,
+    ty: number,
+    sprint: boolean,
+    opts?: { buildingEntry?: { panelTitle: string; door: { x: number; y: number } } },
+  ): void {
     const target = resolveWalkTarget(tx, ty);
-    const intent = getBuildingAtDoor(tx, ty) ?? getBuildingAt(tx, ty);
-    if (intent?.panelTitle && intent.door) {
-      this.pendingBuildingEntry = { panelTitle: intent.panelTitle, door: intent.door };
-    } else {
-      this.pendingBuildingEntry = null;
-    }
+    this.pendingBuildingEntry = opts?.buildingEntry ?? null;
     this.walkToTile(target.x, target.y, sprint);
   }
 
@@ -929,7 +930,7 @@ export class IsoScene {
           this.charTy = nty;
         }
         this.syncCharacterGraphic();
-        this.checkDoor();
+        this.syncDoorOnTileChange(true);
       } else if (this.path.length === 0) {
         this.charState = 'idle';
         this.syncCharacterGraphic();
@@ -947,10 +948,13 @@ export class IsoScene {
         this.charTy = target.y;
         this.path.shift();
         this.drawPathPreview();
-        this.checkDoor();
+        const tx = Math.round(this.charTx);
+        const ty = Math.round(this.charTy);
+        this.lastRoundedTile = { x: tx, y: ty };
         if (this.path.length === 0) {
           this.charState = 'idle';
           this.sprint = false;
+          this.tryCompletePendingBuildingEntry();
         }
       } else {
         this.charTx += (dx / dist) * speed;
@@ -963,23 +967,42 @@ export class IsoScene {
 
   private doorCooldown = 0;
 
-  private checkDoor(): void {
-    if (this.doorCooldown > 0) return;
+  /** Keyboard: open only when the rounded tile changes onto a door. */
+  private syncDoorOnTileChange(fromKeyboard: boolean): void {
     const tx = Math.round(this.charTx);
     const ty = Math.round(this.charTy);
-    let building = getBuildingAtDoor(tx, ty);
-    if (!building?.panelTitle && this.pendingBuildingEntry) {
-      const d = this.pendingBuildingEntry.door;
-      if (tx === d.x && ty === d.y) {
-        building = objects.find((o) => o.panelTitle === this.pendingBuildingEntry!.panelTitle);
-      }
-    }
-    if (building?.panelTitle) {
-      this.doorCooldown = 120;
+    if (tx === this.lastRoundedTile.x && ty === this.lastRoundedTile.y) return;
+    this.lastRoundedTile = { x: tx, y: ty };
+    if (fromKeyboard) this.openDoorIfOnTile(tx, ty);
+  }
+
+  private openDoorIfOnTile(tx: number, ty: number): void {
+    if (this.doorCooldown > 0) return;
+    const building = getBuildingAtDoor(tx, ty);
+    if (!building?.panelTitle) return;
+    this.doorCooldown = 120;
+    this.pendingBuildingEntry = null;
+    this.events.onEnterBuilding(building.panelTitle);
+    this.events.onChecklist('enter-building');
+  }
+
+  /** Mouse/tap path end: only when this walk was started from a building click. */
+  private tryCompletePendingBuildingEntry(): void {
+    if (this.doorCooldown > 0 || !this.pendingBuildingEntry) return;
+    const tx = Math.round(this.charTx);
+    const ty = Math.round(this.charTy);
+    const d = this.pendingBuildingEntry.door;
+    const chebyshev = Math.max(Math.abs(tx - d.x), Math.abs(ty - d.y));
+    if (chebyshev > 1) {
       this.pendingBuildingEntry = null;
-      this.events.onEnterBuilding(building.panelTitle);
-      this.events.onChecklist('enter-building');
+      return;
     }
+    const building = objects.find((o) => o.panelTitle === this.pendingBuildingEntry!.panelTitle);
+    this.pendingBuildingEntry = null;
+    if (!building?.panelTitle) return;
+    this.doorCooldown = 120;
+    this.events.onEnterBuilding(building.panelTitle);
+    this.events.onChecklist('enter-building');
   }
 
   /** For QA — programmatic walk */
