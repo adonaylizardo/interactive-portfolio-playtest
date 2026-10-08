@@ -5,10 +5,12 @@ import {
   MAP_HEIGHT,
   MAP_WIDTH,
   objects,
+  TILE_H,
+  TILE_W,
   type MapObject,
 } from '../data/map';
 import { parseCameraFromHash, writeCameraToHash } from '../camera/hash';
-import type { ChecklistStepId } from '../checklist/storage';
+import { isTouchPrimary, type ChecklistStepId } from '../checklist/storage';
 import { tileToWorld, worldToTile, sortKey } from '../iso/math';
 import { findPath } from '../iso/pathfinding';
 import { C } from './colors';
@@ -99,10 +101,12 @@ export class IsoScene {
       this.cameraX = fromHash.x;
       this.cameraY = fromHash.y;
       this.zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, fromHash.zoom));
+    } else if (this.shouldUseMobileFraming()) {
+      this.frameMobileDefaultView();
     } else {
       this.centerOnCharacter(false);
     }
-    this.applyCamera();
+    this.applyCamera(true);
 
     this.bindInput();
     this.app.ticker.add(() => this.update());
@@ -136,7 +140,7 @@ export class IsoScene {
         g.cursor = cell.walkable ? 'pointer' : 'default';
         g.on('pointertap', (e) => {
           if (this.panMoved) return;
-          const sprint = e.detail >= 2 || this.shiftHeld;
+          const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
           this.walkToTile(tx, ty, sprint);
         });
         this.tilesLayer.addChild(g);
@@ -195,8 +199,15 @@ export class IsoScene {
     this.path = path;
     this.sprint = sprint;
     this.charState = sprint ? 'sprint' : 'walk';
-    this.events.onChecklist('walk-around');
+    this.notifyWalkChecklist(sprint);
     this.drawPathPreview();
+  }
+
+  private notifyWalkChecklist(sprint: boolean): void {
+    this.events.onChecklist('walk-around');
+    if (sprint && isTouchPrimary()) {
+      this.events.onChecklist('sprint-touch');
+    }
   }
 
   private drawPathPreview(): void {
@@ -230,13 +241,15 @@ export class IsoScene {
     if (!animate || this.reducedMotion) this.applyCamera();
   }
 
-  applyCamera(): void {
+  applyCamera(persistHash = true): void {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     this.camera.position.set(sw / 2 + this.cameraX * this.zoom, sh / 2 + this.cameraY * this.zoom);
     this.camera.scale.set(this.zoom);
     this.refreshObjectVisuals();
-    writeCameraToHash({ x: this.cameraX, y: this.cameraY, zoom: this.zoom });
+    if (persistHash) {
+      writeCameraToHash({ x: this.cameraX, y: this.cameraY, zoom: this.zoom });
+    }
     if (this.zoomChanged) {
       this.events.onChecklist('zoom');
       this.zoomChanged = false;
@@ -245,6 +258,32 @@ export class IsoScene {
       this.events.onChecklist('move-camera');
       this.cameraPanned = false;
     }
+  }
+
+  private shouldUseMobileFraming(): boolean {
+    return window.matchMedia('(max-width: 767px)').matches;
+  }
+
+  /** Frame character (8,8) and building caso-1 (3,4) on narrow viewports. */
+  private frameMobileDefaultView(): void {
+    const char = tileToWorld(this.charTx, this.charTy);
+    const building = tileToWorld(3, 4);
+    const minX = Math.min(char.x, building.x) - TILE_W;
+    const maxX = Math.max(char.x, building.x) + TILE_W;
+    const minY = Math.min(char.y, building.y) - TILE_H * 4;
+    const maxY = Math.max(char.y, building.y) + TILE_H * 2;
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const worldW = maxX - minX;
+    const worldH = maxY - minY;
+    const padding = 1.12;
+    const zoomX = sw / (worldW * padding);
+    const zoomY = sh / (worldH * padding);
+    this.zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.min(zoomX, zoomY) * 0.92));
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    this.cameraX = -cx;
+    this.cameraY = -cy + 24;
   }
 
   private setZoom(next: number, anchorScreen?: { x: number; y: number }): void {
@@ -287,7 +326,10 @@ export class IsoScene {
       'wheel',
       (e) => {
         e.preventDefault();
-        const delta = -e.deltaY * 0.001;
+        let dy = e.deltaY;
+        if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) dy *= 24;
+        else if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) dy *= 480;
+        const delta = -dy * 0.002;
         this.setZoom(this.zoom * (1 + delta), { x: e.clientX, y: e.clientY });
       },
       { passive: false },
@@ -310,6 +352,7 @@ export class IsoScene {
       const dy = e.clientY - this.lastPanPos.y;
       if (Math.abs(dx) + Math.abs(dy) > 4) {
         this.panMoved = true;
+        document.body.classList.add('is-canvas-dragging');
         this.cameraX += dx / this.zoom;
         this.cameraY += dy / this.zoom;
         this.lastPanPos = { x: e.clientX, y: e.clientY };
@@ -338,6 +381,7 @@ export class IsoScene {
       this.pointerDownOnCanvas = false;
       this.lastPanPos = null;
       this.tapStart = null;
+      document.body.classList.remove('is-canvas-dragging');
     };
 
     canvas.addEventListener('pointerup', endPointer);
@@ -458,5 +502,17 @@ export class IsoScene {
 
   getObjectIds(): string[] {
     return objects.map((o) => o.id);
+  }
+
+  getZoom(): number {
+    return this.zoom;
+  }
+
+  isFarLod(): boolean {
+    return this.zoom <= LOD_ZOOM;
+  }
+
+  setZoomLevel(level: number, anchorScreen?: { x: number; y: number }): void {
+    this.setZoom(level, anchorScreen);
   }
 }

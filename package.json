@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "qa": "npm run build && node scripts/qa.mjs"
+    "qa": "npm run build && node scripts/qa.mjs",
+    "deploy:gh-pages": "node scripts/deploy-gh-pages.mjs"
   },
   "devDependencies": {
     "playwright": "^1.64.0",

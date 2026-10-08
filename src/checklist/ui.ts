@@ -1,7 +1,10 @@
 import {
   countCompleted,
+  isTouchPrimary,
   loadChecklist,
+  markAllComplete,
   saveChecklist,
+  stepsForPlatform,
   TOTAL_STEPS,
   type ChecklistState,
   type ChecklistStepId,
@@ -12,44 +15,63 @@ type StepCopy = {
   title: string;
   detailDesktop: string;
   detailTouch: string;
+  hintDesktop: string;
+  hintTouch: string;
 };
 
-const STEPS: StepCopy[] = [
-  {
+const STEP_COPY: Record<ChecklistStepId, StepCopy> = {
+  'walk-around': {
     id: 'walk-around',
     title: 'Camina por ahí',
-    detailDesktop:
-      'Haz clic en un tile para ir allí. Doble clic o mantén Shift para correr.',
-    detailTouch: 'Toca un tile para ir allí. Doble toque para correr.',
+    detailDesktop: 'Haz clic en un tile para ir allí.',
+    detailTouch: 'Toca un tile para ir allí.',
+    hintDesktop: 'Clic en un tile para caminar.',
+    hintTouch: 'Toca un tile para caminar.',
   },
-  {
+  'walk-keys': {
     id: 'walk-keys',
     title: 'Camina con las teclas',
     detailDesktop: 'Usa WASD o las flechas para mover al personaje.',
-    detailTouch: 'En escritorio: WASD o flechas.',
+    detailTouch: 'Usa WASD o las flechas para mover al personaje.',
+    hintDesktop: 'WASD o flechas del teclado.',
+    hintTouch: 'WASD o flechas del teclado.',
   },
-  {
+  'sprint-touch': {
+    id: 'sprint-touch',
+    title: 'Corre',
+    detailDesktop: 'Doble clic o Shift al caminar (solo referencia en touch).',
+    detailTouch: 'Haz doble toque en un tile para correr hasta allí.',
+    hintDesktop: 'Doble toque en tile (touch).',
+    hintTouch: 'Doble toque en un tile para correr.',
+  },
+  'move-camera': {
     id: 'move-camera',
     title: 'Mueve la cámara',
     detailDesktop: 'Arrastra con el mouse para desplazar la vista.',
     detailTouch: 'Arrastra con un dedo para desplazar la vista.',
+    hintDesktop: 'Arrastra el canvas para desplazar.',
+    hintTouch: 'Arrastra con un dedo.',
   },
-  {
+  zoom: {
     id: 'zoom',
     title: 'Acerca y aleja',
     detailDesktop: 'Usa la rueda del mouse o pellizco en trackpad.',
     detailTouch: 'Pellizca con dos dedos para acercar o alejar.',
+    hintDesktop: 'Rueda del mouse o trackpad.',
+    hintTouch: 'Pellizco con dos dedos.',
   },
-  {
+  'enter-building': {
     id: 'enter-building',
     title: 'Entra a un edificio',
     detailDesktop: 'Camina hasta la puerta de un edificio para abrir el panel.',
     detailTouch: 'Camina hasta la puerta de un edificio para abrir el panel.',
+    hintDesktop: 'Camina hasta una puerta.',
+    hintTouch: 'Camina hasta una puerta.',
   },
-];
+};
 
-function isTouchPrimary(): boolean {
-  return matchMedia('(hover: none) and (pointer: coarse)').matches;
+export function isMobileLayout(): boolean {
+  return window.matchMedia('(max-width: 767px)').matches;
 }
 
 export type ChecklistCallbacks = {
@@ -63,13 +85,17 @@ export class ChecklistUI {
   private counterEl: HTMLElement;
   private ringEl: SVGCircleElement;
   private headerTitle: HTMLElement;
+  private compactHint: HTMLElement;
+  private headerEl: HTMLElement;
   private touch = isTouchPrimary();
+  private mobile = isMobileLayout();
 
   constructor(container: HTMLElement, callbacks: ChecklistCallbacks) {
     this.state = loadChecklist();
     this.root = document.createElement('aside');
     this.root.className = 'checklist';
-    if (this.state.collapsed) this.root.classList.add('checklist--collapsed');
+    this.applyLayoutClasses();
+
     if (countCompleted(this.state) >= TOTAL_STEPS) {
       this.root.classList.add('checklist--complete');
     }
@@ -80,6 +106,7 @@ export class ChecklistUI {
         <div class="checklist__header-text">
           <span class="checklist__label">Primeros pasos</span>
           <h2 class="checklist__active-title"></h2>
+          <p class="checklist__compact-hint"></p>
         </div>
         <div class="checklist__progress-wrap">
           <span class="checklist__counter"></span>
@@ -103,24 +130,54 @@ export class ChecklistUI {
     this.counterEl = this.root.querySelector('.checklist__counter')!;
     this.ringEl = this.root.querySelector('.checklist__ring-fg')!;
     this.headerTitle = this.root.querySelector('.checklist__active-title')!;
+    this.compactHint = this.root.querySelector('.checklist__compact-hint')!;
+    this.headerEl = this.root.querySelector('.checklist__header')!;
 
-    this.root.querySelector('.checklist__ring-btn')!.addEventListener('click', () => {
-      this.state.collapsed = !this.state.collapsed;
-      this.root.classList.toggle('checklist--collapsed', this.state.collapsed);
+    const toggleExpand = () => {
+      if (this.mobile) {
+        this.state.mobileExpanded = !this.state.mobileExpanded;
+        this.applyLayoutClasses();
+      } else {
+        this.state.collapsed = !this.state.collapsed;
+        this.root.classList.toggle('checklist--collapsed', this.state.collapsed);
+      }
       saveChecklist(this.state);
+    };
+
+    this.root.querySelector('.checklist__ring-btn')!.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleExpand();
+    });
+
+    this.headerEl.addEventListener('click', () => {
+      if (this.mobile && !this.state.mobileExpanded) toggleExpand();
     });
 
     this.root.querySelector('.checklist__skip')!.addEventListener('click', () => {
       this.state.skipped = true;
-      for (const step of STEPS) {
-        this.state.completed[step.id] = true;
-      }
+      markAllComplete(this.state);
       saveChecklist(this.state);
       this.render();
       callbacks.onSkip();
     });
 
+    window.matchMedia('(max-width: 767px)').addEventListener('change', () => {
+      this.mobile = isMobileLayout();
+      this.applyLayoutClasses();
+      this.render();
+    });
+
     this.render();
+  }
+
+  private applyLayoutClasses(): void {
+    this.mobile = isMobileLayout();
+    this.root.classList.toggle('checklist--mobile', this.mobile);
+    this.root.classList.toggle(
+      'checklist--mobile-compact',
+      this.mobile && !this.state.mobileExpanded,
+    );
+    this.root.classList.toggle('checklist--collapsed', !this.mobile && this.state.collapsed);
   }
 
   complete(step: ChecklistStepId): void {
@@ -146,10 +203,12 @@ export class ChecklistUI {
       this.root.classList.add('checklist--complete');
     }
 
+    const platformSteps = stepsForPlatform(this.touch);
     this.listEl.replaceChildren();
     let activeStep: StepCopy | null = null;
 
-    for (const step of STEPS) {
+    for (const stepId of platformSteps) {
+      const step = STEP_COPY[stepId];
       const completed = this.state.completed[step.id];
       if (!completed && !activeStep) activeStep = step;
 
@@ -170,5 +229,11 @@ export class ChecklistUI {
     }
 
     this.headerTitle.textContent = activeStep?.title ?? '¡Listo!';
+    const hint = activeStep
+      ? this.touch
+        ? activeStep.hintTouch
+        : activeStep.hintDesktop
+      : 'Completaste el tutorial.';
+    this.compactHint.textContent = hint;
   }
 }

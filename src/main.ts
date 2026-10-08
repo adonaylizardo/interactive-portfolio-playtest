@@ -24,12 +24,22 @@ async function main(): Promise<void> {
 
   window.__playtest = {
     walkToDoor: () => scene.walkToTile(3, 5, false),
+    setZoom: (z: number) => scene.setZoomLevel(z, { x: window.innerWidth / 2, y: window.innerHeight / 2 }),
+    getZoom: () => scene.getZoom(),
+    isFarLod: () => scene.isFarLod(),
+    walkToTile: (x: number, y: number, sprint: boolean) => scene.walkToTile(x, y, sprint),
   };
 }
 
 declare global {
   interface Window {
-    __playtest?: { walkToDoor: () => void };
+    __playtest?: {
+      walkToDoor: () => void;
+      setZoom: (z: number) => void;
+      getZoom: () => number;
+      isFarLod: () => boolean;
+      walkToTile: (x: number, y: number, sprint: boolean) => void;
+    };
   }
 }
 
