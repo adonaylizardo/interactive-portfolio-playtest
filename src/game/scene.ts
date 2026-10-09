@@ -151,6 +151,7 @@ export class IsoScene {
     this.buildVoidClickLayer();
     this.buildObjects();
     this.syncCharacterGraphic();
+    this.syncRoundedTileFromCharacter();
 
     const fromHash = parseCameraFromHash();
     if (fromHash) {
@@ -1027,6 +1028,7 @@ export class IsoScene {
         this.sprint = sprint;
         this.charState = sprint ? 'sprint' : 'walk';
         const speed = (sprint ? 0.12 : 0.07) * (this.app.ticker.deltaMS / 16);
+        const tileBefore = this.roundedCharTile();
         const ntx = this.charTx + dx * speed;
         const nty = this.charTy + dy * speed;
         const tx = Math.round(ntx);
@@ -1035,8 +1037,18 @@ export class IsoScene {
           this.charTx = ntx;
           this.charTy = nty;
         }
+        const tileAfter = this.roundedCharTile();
+        if (tileBefore.x !== tileAfter.x || tileBefore.y !== tileAfter.y) {
+          this.events.onChecklist('walk-keys');
+          if (
+            tileAfter.x !== this.lastRoundedTile.x ||
+            tileAfter.y !== this.lastRoundedTile.y
+          ) {
+            this.lastRoundedTile = { x: tileAfter.x, y: tileAfter.y };
+            this.openDoorIfOnTile(tileAfter.x, tileAfter.y);
+          }
+        }
         this.syncCharacterGraphic();
-        this.syncDoorOnTileChange(true);
       } else if (this.path.length === 0) {
         this.charState = 'idle';
         this.syncCharacterGraphic();
@@ -1073,16 +1085,12 @@ export class IsoScene {
 
   private doorCooldown = 0;
 
-  /** Keyboard: open only when the rounded tile changes onto a door. */
-  private syncDoorOnTileChange(fromKeyboard: boolean): void {
-    const tx = Math.round(this.charTx);
-    const ty = Math.round(this.charTy);
-    if (tx === this.lastRoundedTile.x && ty === this.lastRoundedTile.y) return;
-    this.lastRoundedTile = { x: tx, y: ty };
-    if (fromKeyboard) {
-      this.events.onChecklist('walk-keys');
-      this.openDoorIfOnTile(tx, ty);
-    }
+  private roundedCharTile(): { x: number; y: number } {
+    return { x: Math.round(this.charTx), y: Math.round(this.charTy) };
+  }
+
+  private syncRoundedTileFromCharacter(): void {
+    this.lastRoundedTile = this.roundedCharTile();
   }
 
   private openDoorIfOnTile(tx: number, ty: number): void {
@@ -1124,7 +1132,7 @@ export class IsoScene {
     this.path = [];
     this.charTx = tx;
     this.charTy = ty;
-    this.lastRoundedTile = { x: tx, y: ty };
+    this.syncRoundedTileFromCharacter();
     this.syncCharacterGraphic();
     this.drawPathPreview();
   }

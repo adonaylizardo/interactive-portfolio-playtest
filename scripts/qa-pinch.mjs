@@ -1204,6 +1204,63 @@ async function testBuildingWalkEndsOnDoorTile(page, errors) {
   }
 }
 
+async function testWalkKeysFirstPress(page, errors) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
+  await page.reload({ waitUntil: 'networkidle' });
+  await wait(800);
+  const startTile = await readCharTile(page);
+  if (!startTile) {
+    errors.push('walk-keys-once: missing start char tile');
+    return;
+  }
+  const already = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('playtest-checklist-v3') || '{}').completed?.['walk-keys'],
+  );
+  if (already) errors.push('walk-keys-once: already checked at start');
+
+  await page.keyboard.down('w');
+  await wait(450);
+  await page.keyboard.up('w');
+  await wait(350);
+
+  const afterTile = await readCharTile(page);
+  const checked = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('playtest-checklist-v3') || '{}').completed?.['walk-keys'] === true,
+  );
+  if (!afterTile || afterTile.y >= startTile.y) {
+    errors.push('walk-keys-once: expected character to move north on W');
+  } else if (!checked) {
+    errors.push('walk-keys-once: checklist not ticked on first tile-changing key press');
+  }
+
+  await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('playtest-checklist-v3') || '{}');
+    s.completed = { ...s.completed, 'walk-keys': false };
+    localStorage.setItem('playtest-checklist-v3', JSON.stringify(s));
+  });
+  await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(11, 5));
+  await wait(200);
+  const blockedStart = await readCharTile(page);
+  await page.keyboard.down('w');
+  await wait(500);
+  await page.keyboard.up('w');
+  await wait(200);
+  const blockedEnd = await readCharTile(page);
+  const checkedBlocked = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('playtest-checklist-v3') || '{}').completed?.['walk-keys'] === true,
+  );
+  if (
+    blockedStart &&
+    blockedEnd &&
+    blockedStart.x === blockedEnd.x &&
+    blockedStart.y === blockedEnd.y &&
+    checkedBlocked
+  ) {
+    errors.push('walk-keys-once: ticked without tile change (blocked edge)');
+  }
+}
+
 async function testChecklistCollapsedPill(page, errors) {
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.evaluate(() => {
@@ -1340,6 +1397,7 @@ async function main() {
     await testPanelDragKeepsOpen(desktop, errors);
     await testPanelClickInside(desktop, errors);
     await testBuildingWalkEndsOnDoorTile(desktop, errors);
+    await testWalkKeysFirstPress(desktop, errors);
     await testChecklistCollapsedPill(desktop, errors);
     await testSkipRingDesktop(desktop, errors);
 
