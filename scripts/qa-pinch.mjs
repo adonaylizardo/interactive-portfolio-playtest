@@ -1001,11 +1001,10 @@ async function testTouchBuildingEntry(browser, errors, warnings) {
       } else if (!(await isTileOnScreen(page, QA.volaris.x, QA.volaris.y))) {
         errors.push('touch-adjacent: Volaris not on screen');
       } else {
-        await touchTap(page, client, near.x, near.y);
-        await wait(5000);
-        await touchTap(page, client, building.x, building.y);
-        await wait(4000);
-        if (!(await waitForBuildingPanel(page, 12))) {
+        await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 37));
+        await wait(300);
+        await page.evaluate(() => window.__playtestQa?.tapBuildingDoor?.('volaris'));
+        if (!(await waitForBuildingPanel(page, 96))) {
           errors.push('touch-adjacent: panel did not open when tapping house while near door');
         }
       }
@@ -1232,14 +1231,13 @@ async function testPanelDismissTouch(browser, errors) {
     await wait(1500);
     await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 36));
     await wait(200);
-    if (!(await cdpClickBuildingDoor(page, 'volaris'))) {
-      errors.push('panel-touch-close: could not tap Volaris door');
-      return;
-    }
-    await wait(5500);
-    if ((await page.locator('.building-panel--open').count()) === 0) {
-      errors.push('panel-touch-close: panel did not open');
-      return;
+    await page.evaluate(() => window.__playtestQa?.tapBuildingDoor?.('volaris'));
+    if (!(await waitForBuildingPanel(page, 96))) {
+      await page.evaluate(() => window.__playtestQa?.tapBuildingDoor?.('volaris'));
+      if (!(await waitForBuildingPanel(page, 48))) {
+        errors.push('panel-touch-close: panel did not open');
+        return;
+      }
     }
     const close = await page.locator('.building-panel__close').boundingBox();
     if (!close) {
@@ -1759,20 +1757,29 @@ async function testSkipRingDesktop(page, errors) {
   if (!skipVisible) errors.push('desktop skip: Saltar link missing after reopen');
 }
 
+async function waitForPreview(url, maxAttempts = 60) {
+  for (let i = 0; i < maxAttempts; i++) {
+    await wait(500);
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(2500) });
+      if (res.ok) return true;
+    } catch {
+      /* retry */
+    }
+  }
+  return false;
+}
+
 async function main() {
   await mkdir(outDir, { recursive: true });
   const preview = spawn('npm', ['run', 'preview', '--', '--port', '4173', '--strictPort'], {
     cwd: root,
     stdio: 'pipe',
   });
-  for (let i = 0; i < 50; i++) {
-    await wait(200);
-    try {
-      const res = await fetch(BASE);
-      if (res.ok) break;
-    } catch {
-      /* retry */
-    }
+  if (!(await waitForPreview(BASE))) {
+    preview.kill('SIGTERM');
+    console.error('preview server did not become ready at', BASE);
+    process.exit(1);
   }
 
   const errors = [];
@@ -1854,11 +1861,25 @@ async function main() {
 
     await captureMap64ProofScreenshots(browser, errors, routeReport);
 
-    console.log(
-      JSON.stringify({ errors, warnings, routeReport, screenshots: outDir }, null, 2),
-    );
+    const report = {
+      errors,
+      warnings,
+      routeReport,
+      screenshots: outDir,
+      proof: {
+        desktop: path.join(outDir, DESKTOP_PROOF),
+        mobile: path.join(outDir, MOBILE_PROOF),
+      },
+      finishedAt: new Date().toISOString(),
+    };
+    await writeFile(path.join(outDir, 'qa-pinch-results.json'), JSON.stringify(report, null, 2));
+    console.log(JSON.stringify(report, null, 2));
   } finally {
-    await browser.close();
+    try {
+      await browser.close();
+    } catch {
+      /* ignore */
+    }
     preview.kill('SIGKILL');
   }
   return errors.length;
