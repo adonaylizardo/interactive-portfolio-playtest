@@ -26,14 +26,6 @@ function centeringOffset(footprintCorners: Pt[]): Pt {
   return { x: TILE_CENTER.x - cx, y: TILE_CENTER.y - cy };
 }
 
-const HOUSE_FOOT: Pt[] = [
-  { x: 0, y: 0 },
-  { x: 48, y: -24 },
-  { x: 0, y: -48 },
-  { x: -48, y: -24 },
-];
-const HOUSE_OFFSET = centeringOffset(HOUSE_FOOT);
-
 const DESK_FOOT: Pt[] = [
   { x: 0, y: 0 },
   { x: 24, y: -12 },
@@ -41,10 +33,6 @@ const DESK_FOOT: Pt[] = [
   { x: -40, y: -20 },
 ];
 const DESK_OFFSET = centeringOffset(DESK_FOOT);
-
-function ht(p: Pt, scale = 1): Pt {
-  return { x: p.x * scale + HOUSE_OFFSET.x * scale, y: p.y * scale + HOUSE_OFFSET.y * scale };
-}
 
 function dt(p: Pt): Pt {
   return { x: p.x + DESK_OFFSET.x, y: p.y + DESK_OFFSET.y };
@@ -201,20 +189,13 @@ export function buildingPickHit(localP: Pt, spec: FootprintDrawSpec): boolean {
   }
   const dc = doorCenterLocal(spec);
   if (Math.abs(localP.x - dc.x) < 14 && Math.abs(localP.y - dc.y) < 22) return true;
-  if (spec.kind === 'catedral') {
-    for (const corner of [nw, ne]) {
-      const th = 112;
-      const tw = 22;
-      const box: Pt[] = [
-        corner,
-        { x: corner.x + tw, y: corner.y - tw * 0.5 },
-        { x: corner.x + tw, y: corner.y - th },
-        { x: corner.x, y: corner.y - th + tw * 0.5 },
-      ];
-      if (pointInQuad(localP, box[0], box[1], box[2], box[3])) return true;
-    }
-  }
   return false;
+}
+
+/** Door-only hit — checked before roof/walls so low-zoom taps stay deterministic. */
+export function buildingDoorPickHit(localP: Pt, spec: FootprintDrawSpec): boolean {
+  const dc = doorCenterLocal(spec);
+  return Math.abs(localP.x - dc.x) < 20 && Math.abs(localP.y - dc.y) < 32;
 }
 
 export function footprint(bwScale = 1): { bw: number; bh: number } {
@@ -307,21 +288,36 @@ export function drawFootprintBuilding(g: Graphics, hover: boolean, spec: Footpri
   }
 
   if (spec.kind === 'catedral') {
-    const towerH = 112;
-    const tw = 20;
-    for (const corner of [nw, ne]) {
-      poly(
-        g,
-        [
-          corner,
-          { x: corner.x + tw, y: corner.y - tw * 0.5 },
-          { x: corner.x + tw, y: corner.y - towerH },
-          { x: corner.x, y: corner.y - towerH + tw * 0.5 },
-        ],
-        left,
-      );
-    }
+    drawGroundTower(g, sw, left, gable, 112);
+    drawGroundTower(g, se, gable, left, 112);
   }
+}
+
+function drawGroundTower(
+  g: Graphics,
+  southFoot: Pt,
+  faceLeft: number,
+  faceRight: number,
+  height: number,
+): void {
+  const tw = (TILE_W / 2) * 0.4;
+  const depth = (TILE_H / 2) * 0.4;
+  const se = { x: southFoot.x + tw, y: southFoot.y - tw * 0.5 };
+  const nw = { x: southFoot.x - tw * 0.5, y: southFoot.y - depth };
+  const ne = { x: southFoot.x + tw * 0.5, y: southFoot.y - depth };
+  poly(g, [southFoot, se, raise(se, height), raise(southFoot, height)], faceRight);
+  poly(g, [southFoot, nw, raise(nw, height), raise(southFoot, height)], faceLeft);
+  poly(g, [raise(southFoot, height), raise(se, height), raise(ne, height), raise(nw, height)], faceLeft);
+  poly(
+    g,
+    [
+      raise(se, height),
+      raise(ne, height),
+      { x: ne.x, y: raise(ne, height).y - 5 },
+      { x: se.x, y: raise(se, height).y - 5 },
+    ],
+    faceRight,
+  );
 }
 
 /** Tallest landmark — thin slab ~1.1×0.3 tiles, wide face toward +y. */
@@ -335,63 +331,130 @@ export function drawObelisco(
   ax = 15,
   ay = 37,
 ): void {
-  const slab = hover ? 0x707070 : 0x626262;
-  const base = hover ? 0x585858 : 0x4a4a4a;
+  const faceLeft = hover ? C.buildingLeftHover : C.buildingLeft;
+  const faceRight = hover ? C.buildingRightHover : C.buildingRight;
+  const cap = hover ? 0x757575 : 0x686868;
   const cx = localFoot(ax, ay, fx + Math.floor(w / 2), fy + Math.floor(h / 2));
-  const halfW = TILE_W * 0.55;
-  const depth = TILE_H * 0.3;
+  const halfW = (TILE_W / 2) * 0.55;
+  const depth = (TILE_H / 2) * 0.55;
   const height = 138;
+  const taper = 0.88;
   const sw = { x: cx.x - halfW * 0.5, y: cx.y + depth * 0.5 };
   const se = { x: cx.x + halfW * 0.5, y: cx.y + depth * 0.5 };
   const ne = { x: cx.x + halfW * 0.5, y: cx.y - depth * 0.5 };
   const nw = { x: cx.x - halfW * 0.5, y: cx.y - depth * 0.5 };
-  poly(g, [sw, se, raise(se, height), raise(sw, height)], base);
-  poly(g, [se, ne, raise(ne, height), raise(se, height)], slab);
-  poly(g, [raise(sw, height), raise(se, height), raise(ne, height), raise(nw, height)], slab);
+  const midH = height * 0.72;
+  const topH = height;
+  const swT = lerpPt(sw, cx, 1 - taper);
+  const seT = lerpPt(se, cx, 1 - taper);
+  const neT = lerpPt(ne, cx, 1 - taper);
+  const nwT = lerpPt(nw, cx, 1 - taper);
+  poly(g, [sw, se, raise(se, midH), raise(sw, midH)], faceRight);
+  poly(g, [se, ne, raise(ne, midH), raise(se, midH)], faceRight);
+  poly(g, [sw, nw, raise(nw, midH), raise(sw, midH)], faceLeft);
+  poly(g, [raise(sw, midH), raise(se, midH), raise(seT, topH), raise(swT, topH)], faceRight);
+  poly(g, [raise(se, midH), raise(ne, midH), raise(neT, topH), raise(seT, topH)], faceRight);
+  poly(g, [raise(sw, midH), raise(nw, midH), raise(nwT, topH), raise(swT, topH)], faceLeft);
+  poly(g, [raise(swT, topH), raise(seT, topH), raise(neT, topH), raise(nwT, topH)], cap);
+  poly(
+    g,
+    [
+      raise(swT, topH),
+      raise(seT, topH),
+      { x: cx.x, y: raise(swT, topH).y - 10 },
+    ],
+    cap,
+  );
 }
 
-/** Climbing wall (muro): L-shaped plank walls, open top with beams, hold dots on +y face. */
-export function drawMuro(g: Graphics, hover: boolean): void {
+/** Thin iso L wall (Chroma frame 320×224, anchor south +32px front extent). */
+export function drawMuro(
+  g: Graphics,
+  hover: boolean,
+  fx = 35,
+  fy = 40,
+  w = 3,
+  h = 2,
+  ax = 36,
+  ay = 41,
+): void {
   const plank = hover ? 0x7a7a7a : 0x6e6e6e;
   const plankDark = hover ? 0x656565 : 0x585858;
-  const beam = hover ? 0x848484 : 0x757575;
   const hold = hover ? 0x959595 : 0x888888;
+  const wallH = 40;
+  const inset = 0.14;
 
+  const backInnerL = lerpPt(northTop(ax, ay, fx, fy), localFoot(ax, ay, fx, fy), inset);
+  const backInnerR = lerpPt(
+    northTop(ax, ay, fx + w - 1, fy),
+    localFoot(ax, ay, fx + w - 1, fy),
+    inset,
+  );
+  poly(g, [backInnerL, backInnerR, raise(backInnerR, wallH), raise(backInnerL, wallH)], plank);
   poly(
     g,
-    [ht({ x: -20, y: 0 }), ht({ x: 20, y: 0 }), ht({ x: 20, y: -52 }), ht({ x: -20, y: -52 })],
+    [raise(backInnerL, wallH), raise(backInnerR, wallH), raise(backInnerR, wallH + 1), raise(backInnerL, wallH + 1)],
+    plankDark,
+  );
+
+  const leftInnerA = lerpPt(northTop(ax, ay, fx, fy), localFoot(ax, ay, fx, fy), inset);
+  const leftInnerB = lerpPt(
+    northTop(ax, ay, fx, fy + h - 1),
+    localFoot(ax, ay, fx, fy + h - 1),
+    inset,
+  );
+  const leftOuterA = localFoot(ax, ay, fx, fy);
+  const leftOuterB = localFoot(ax, ay, fx, fy + h - 1);
+  poly(
+    g,
+    [leftOuterA, leftOuterB, raise(leftInnerB, wallH), raise(leftInnerA, wallH)],
     plankDark,
   );
   poly(
     g,
-    [ht({ x: -18, y: -2 }), ht({ x: 18, y: -2 }), ht({ x: 18, y: -48 }), ht({ x: -18, y: -48 })],
+    [leftInnerA, leftInnerB, raise(leftInnerB, wallH), raise(leftInnerA, wallH)],
     plank,
   );
-
   poly(
     g,
-    [ht({ x: -48, y: 0 }), ht({ x: -20, y: 0 }), ht({ x: -20, y: -40 }), ht({ x: -48, y: -40 })],
+    [raise(leftInnerA, wallH), raise(leftInnerB, wallH), raise(leftInnerB, wallH + 1), raise(leftInnerA, wallH + 1)],
     plankDark,
   );
+
+  const corner = lerpPt(leftInnerA, backInnerL, 0.5);
   poly(
     g,
-    [ht({ x: -46, y: -2 }), ht({ x: -22, y: -2 }), ht({ x: -22, y: -36 }), ht({ x: -46, y: -36 })],
-    plank,
+    [corner, backInnerL, raise(backInnerL, wallH), raise(corner, wallH * 0.85)],
+    plankDark,
   );
 
-  strokeSeg(g, ht({ x: -18, y: -48 }), ht({ x: 18, y: -48 }), 3, beam);
-  strokeSeg(g, ht({ x: -22, y: -36 }), ht({ x: -18, y: -48 }), 3, beam);
-
-  for (const pt of [
-    { x: -6, y: -14 },
-    { x: 4, y: -22 },
-    { x: -2, y: -32 },
-    { x: 8, y: -38 },
-  ]) {
-    const p = ht(pt);
+  for (const [u, v] of [
+    [0.25, 0.35],
+    [0.55, 0.5],
+    [0.8, 0.28],
+  ] as const) {
+    const p = {
+      x: backInnerL.x + (backInnerR.x - backInnerL.x) * u,
+      y: backInnerL.y + (backInnerR.y - backInnerL.y) * u - wallH * v,
+    };
     g.circle(p.x, p.y, 3);
     g.fill(hold);
   }
+  for (const [u, v] of [
+    [0.35, 0.4],
+    [0.65, 0.55],
+  ] as const) {
+    const p = {
+      x: leftInnerA.x + (leftInnerB.x - leftInnerA.x) * u,
+      y: leftInnerA.y + (leftInnerB.y - leftInnerA.y) * u - wallH * v,
+    };
+    g.circle(p.x, p.y, 3);
+    g.fill(hold);
+  }
+
+  g.moveTo(-8, 32);
+  g.lineTo(8, 32);
+  g.stroke({ width: 1, color: 0x666666, alpha: 0.25 });
 }
 
 export function drawRedoma(
@@ -407,19 +470,21 @@ export function drawRedoma(
   const island = hover ? 0x6a6a6a : 0x5c5c5c;
   const ring = hover ? 0x787878 : 0x686868;
   const cx = localFoot(ax, ay, fx + Math.floor(w / 2), fy + Math.floor(h / 2));
-  g.ellipse(cx.x, cx.y - 8, 36, 18);
+  const discRx = (TILE_W / 2) * 0.6;
+  const discRy = (TILE_H / 2) * 0.6;
+  g.ellipse(cx.x, cx.y - TILE_H / 2, discRx, discRy);
   g.fill(ring);
-  g.ellipse(cx.x, cx.y - 10, 10, 6);
+  g.ellipse(cx.x, cx.y - TILE_H / 2, discRx * 0.22, discRy * 0.22);
   g.fill(0x4a4a4a);
   for (let i = 0; i < 32; i++) {
     const a = (i / 32) * Math.PI * 2;
-    const x1 = cx.x + Math.cos(a) * 12;
-    const y1 = cx.y - 10 + Math.sin(a) * 6;
-    const x2 = cx.x + Math.cos(a) * 30;
-    const y2 = cx.y - 8 + Math.sin(a) * 11;
+    const x1 = cx.x + Math.cos(a) * discRx * 0.35;
+    const y1 = cx.y - TILE_H / 2 + Math.sin(a) * discRy * 0.35;
+    const x2 = cx.x + Math.cos(a) * discRx * 0.92;
+    const y2 = cx.y - TILE_H / 2 + Math.sin(a) * discRy * 0.92;
     strokeSeg(g, { x: x1, y: y1 }, { x: x2, y: y2 }, 2, island);
   }
-  g.ellipse(cx.x, cx.y - 10, 22, 12);
+  g.ellipse(cx.x, cx.y - TILE_H / 2, discRx * 0.55, discRy * 0.55);
   g.fill({ color: island, alpha: 0.35 });
 }
 

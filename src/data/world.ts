@@ -20,6 +20,7 @@ export type MapObject = {
   door?: { x: number; y: number };
   doorFace?: '+y' | '+x';
   panelTitle?: string;
+  acceso?: { x: number; y: number };
 };
 
 export const MAP_WIDTH = 64;
@@ -72,6 +73,11 @@ export function anchorForBuilding(x: number, y: number, w: number, h: number): {
 /** Front-edge frame only: x=63 (se), y=63 (sw), corner (63,63). Back edges x=0/y=0 have no frame tile. */
 const MURO_FOOTPRINT = { x: 35, y: 40, w: 3, h: 2 };
 const MURO_APPROACH: [number, number] = [38, 41];
+
+/** Muro collision tiles — thin L walls only; interior stays walkable. */
+export function muroWallTiles(): Set<string> {
+  return new Set(['35,40', '36,40', '37,40', '35,41']);
+}
 
 function nearMuroClearance(tx: number, ty: number): boolean {
   if (tx === MURO_APPROACH[0] && ty === MURO_APPROACH[1]) return false;
@@ -182,16 +188,17 @@ export function buildWorld(): { cells: MapCell[][]; objects: MapObject[] } {
   for (const [id, raw] of Object.entries(mapData.edificios) as [string, EdificioJson][]) {
     const ed = raw;
     const anchor = anchorForBuilding(ed.x, ed.y, ed.w, ed.h);
-    for (const { x: fx, y: fy } of footprintTiles(ed.x, ed.y, ed.w, ed.h)) {
-      if (fx < 0 || fy < 0 || fx >= MAP_WIDTH || fy >= MAP_HEIGHT) continue;
-      if (borderKind(fx, fy)) continue;
-      cells[fy][fx].walkable = false;
-      cells[fy][fx].groundId = 'tile/building/footprint';
-    }
-
     if (ed.paisaje) {
       const kind =
         id === 'obelisco' ? 'obelisco' : id === 'redoma' ? 'redoma' : id === 'muro' ? 'muro' : 'paisaje';
+      const muroWalls = id === 'muro' ? muroWallTiles() : null;
+      for (const { x: fx, y: fy } of footprintTiles(ed.x, ed.y, ed.w, ed.h)) {
+        if (fx < 0 || fy < 0 || fx >= MAP_WIDTH || fy >= MAP_HEIGHT) continue;
+        if (borderKind(fx, fy)) continue;
+        const isWall = muroWalls?.has(`${fx},${fy}`) ?? true;
+        cells[fy][fx].walkable = !isWall;
+        cells[fy][fx].groundId = isWall ? 'tile/building/footprint' : 'tile/ground/default';
+      }
       objects.push({
         id: `paisaje/${id}`,
         type: 'prop',
@@ -204,6 +211,7 @@ export function buildWorld(): { cells: MapCell[][]; objects: MapObject[] } {
         w: ed.w,
         h: ed.h,
         walkable: false,
+        acceso: { x: ed.acceso[0], y: ed.acceso[1] },
       });
       if (Array.isArray(ed.acceso) && ed.acceso.length >= 2) {
         const [ax, ay] = ed.acceso as [number, number];
@@ -212,6 +220,13 @@ export function buildWorld(): { cells: MapCell[][]; objects: MapObject[] } {
         }
       }
       continue;
+    }
+
+    for (const { x: fx, y: fy } of footprintTiles(ed.x, ed.y, ed.w, ed.h)) {
+      if (fx < 0 || fy < 0 || fx >= MAP_WIDTH || fy >= MAP_HEIGHT) continue;
+      if (borderKind(fx, fy)) continue;
+      cells[fy][fx].walkable = false;
+      cells[fy][fx].groundId = 'tile/building/footprint';
     }
 
     const [ax, ay] = ed.acceso;

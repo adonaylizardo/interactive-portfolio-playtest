@@ -1478,6 +1478,68 @@ async function testWalkKeysFirstPress(page, errors) {
   }
 }
 
+async function testHashCameraChecklistRebaseline(page, errors) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
+  await page.reload({ waitUntil: 'networkidle' });
+  await wait(600);
+  await page.evaluate(() => {
+    location.hash = '#view=x=120&y=-420&z=1.500';
+  });
+  await wait(500);
+  const canvas = await page.locator('#game-canvas').boundingBox();
+  if (!canvas) {
+    errors.push('hash-rebaseline: no canvas');
+    return;
+  }
+  const cx = canvas.x + canvas.width / 2;
+  const cy = canvas.y + canvas.height / 2;
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  await page.mouse.move(cx + 4, cy + 4);
+  await page.mouse.up();
+  await wait(250);
+  const spurious = await page.evaluate(() => {
+    const c = JSON.parse(localStorage.getItem('playtest-checklist-v3') || '{}').completed ?? {};
+    return c['move-camera'] === true || c.zoom === true;
+  });
+  if (spurious) {
+    errors.push('hash-rebaseline: move-camera or zoom ticked after hash change without real gesture');
+  }
+}
+
+async function testBainDoorLowZoomDeterministic(page, errors) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), [39, 36]);
+  await wait(200);
+  await page.goto(`${BASE}#view=x=920&y=-2180&z=0.370`, { waitUntil: 'networkidle' });
+  await wait(900);
+  for (let i = 0; i < 7; i++) {
+    await page.locator('.building-panel__close').click().catch(() => {});
+    await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
+    await wait(150);
+    if (!(await cdpClickBuildingDoor(page, 'bain'))) {
+      errors.push('bain-door-lowzoom: tapBuildingDoor failed');
+      return;
+    }
+    for (let w = 0; w < 40; w++) {
+      const char = await readCharTile(page);
+      const panel = (await page.locator('.building-panel--open').count()) > 0;
+      if (char?.x === 39 && char?.y === 29 && !panel) {
+        errors.push(`bain-door-lowzoom: run ${i + 1}/7 stopped at (39,29) without panel`);
+        return;
+      }
+      if (char?.x === 39 && char?.y === 26 && panel) break;
+      if (char?.x === 39 && char?.y === 26 && w > 30) break;
+      await wait(250);
+    }
+    await page.evaluate(() => {
+      window.__playtestQa?.setCharacterTile?.(39, 36);
+    });
+    await wait(200);
+  }
+}
+
 async function testChecklistCollapsedPill(page, errors) {
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.evaluate(() => {
@@ -1652,6 +1714,28 @@ async function testMap64PaisajeNoPanel(page, errors) {
     if ((await page.locator('.building-panel--open').count()) > 0) {
       errors.push(`map64-paisaje: ${spot.name} opened a panel`);
     }
+  }
+}
+
+async function captureRun25Closeups(browser) {
+  const run25Dir = path.join(root, 'artifacts', 'run25');
+  await mkdir(run25Dir, { recursive: true });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  try {
+    for (const v of [
+      { file: 'muro-close.png', hash: '#view=x=320&y=-2424&z=0.95' },
+      { file: 'obelisco-close.png', hash: '#view=x=1420&y=-1580&z=0.95' },
+      { file: 'redoma-close.png', hash: '#view=x=920&y=-1580&z=0.95' },
+      { file: 'catedral-close.png', hash: '#view=x=-920&y=-920&z=0.95' },
+      { file: 'pg-door-close.png', hash: '#view=x=-280&y=-2180&z=0.95' },
+      { file: 'bain-door-close.png', hash: '#view=x=920&y=-2180&z=0.95' },
+    ]) {
+      await page.goto(`${BASE}${v.hash}`, { waitUntil: 'networkidle' });
+      await wait(700);
+      await page.screenshot({ path: path.join(run25Dir, v.file) });
+    }
+  } finally {
+    await page.close();
   }
 }
 
@@ -1832,6 +1916,8 @@ async function main() {
     await testBuildingWalkEndsOnDoorTile(desktop, errors);
     await testWalkKeysFirstPress(desktop, errors);
     await testChecklistCollapsedPill(desktop, errors);
+    await testHashCameraChecklistRebaseline(desktop, errors);
+    await testBainDoorLowZoomDeterministic(desktop, errors);
     await testSkipRingDesktop(desktop, errors);
 
     await testMap64RouteLengths(desktop, errors, routeReport);
@@ -1860,6 +1946,7 @@ async function main() {
     }
 
     await captureMap64ProofScreenshots(browser, errors, routeReport);
+    await captureRun25Closeups(browser);
 
     const report = {
       errors,

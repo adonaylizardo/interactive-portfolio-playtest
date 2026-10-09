@@ -3,6 +3,7 @@ import {
   cells,
   getBuildingAt,
   getBuildingAtDoor,
+  getSceneryAt,
   INICIO,
   MAP_HEIGHT,
   MAP_WIDTH,
@@ -19,6 +20,7 @@ import { sortKey, tileFootWorld, tileToWorld, worldToTile } from '../iso/math';
 import { findPathOrNearest } from '../iso/pathfinding';
 import { C } from './colors';
 import {
+  buildingDoorPickHit,
   buildingFrontWallsCover,
   buildingInteriorGapSample,
   buildingPickHit,
@@ -199,9 +201,21 @@ export class IsoScene {
         this.cameraX = v.x;
         this.cameraY = v.y;
         this.zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, v.zoom));
-        this.applyCamera();
+        this.applyCamera(false);
+        this.rebaselineChecklistFromCamera();
       }
     });
+  }
+
+  /** After programmatic #view hash updates, do not treat the next gesture as user zoom/pan. */
+  private rebaselineChecklistFromCamera(): void {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    this.lastChecklistZoom = this.zoom;
+    this.lastChecklistCamPx = sw / 2 + this.cameraX * this.zoom;
+    this.lastChecklistCamPy = sh / 2 + this.cameraY * this.zoom;
+    this.zoomChanged = false;
+    this.cameraPanned = false;
   }
 
   private buildVoidClickLayer(): void {
@@ -295,8 +309,10 @@ export class IsoScene {
         }
         this.pendingBuildingEntry = null;
         if (obj.name === 'obelisco' || obj.name === 'redoma' || obj.name === 'muro') {
-          const gx = obj.x;
-          const gy = obj.y;
+          const pos = e.getLocalPosition(this.world);
+          const tile = worldToTile(pos.x, pos.y);
+          const gx = tile?.x ?? obj.x;
+          const gy = tile?.y ?? obj.y;
           this.requestWalk(gx, gy, sprint);
           return;
         }
@@ -343,7 +359,8 @@ export class IsoScene {
         drawObelisco(g, hover, obj.footprintX, obj.footprintY, obj.w, obj.h, obj.x, obj.y);
       else if (obj.name === 'redoma')
         drawRedoma(g, hover, obj.footprintX, obj.footprintY, obj.w, obj.h, obj.x, obj.y);
-      else if (obj.name === 'muro') drawMuro(g, hover);
+      else if (obj.name === 'muro')
+        drawMuro(g, hover, obj.footprintX, obj.footprintY, obj.w, obj.h, obj.x, obj.y);
       else if (obj.type === 'building') {
         const spec: FootprintDrawSpec = {
           fx: obj.footprintX ?? obj.x,
@@ -409,7 +426,59 @@ export class IsoScene {
     }
   }
 
+  private footprintSpec(obj: MapObject): FootprintDrawSpec {
+    return {
+      fx: obj.footprintX ?? obj.x,
+      fy: obj.footprintY ?? obj.y,
+      w: obj.w ?? 3,
+      h: obj.h ?? 3,
+      ax: obj.x,
+      ay: obj.y,
+      doorFace: obj.doorFace ?? '+y',
+      door: obj.door ?? { x: obj.x, y: obj.y + 1 },
+      kind: obj.name,
+    };
+  }
+
+  private pickBuildingDoorAtScreen(sx: number, sy: number): MapObject | undefined {
+    const threshold = Math.max(36, 28 / Math.max(this.zoom, 0.3));
+    const buildings = objects
+      .filter((o) => o.type === 'building' && o.door && o.panelTitle)
+      .sort((a, b) => sortKey(b.x, b.y) - sortKey(a.x, a.y));
+    for (const obj of buildings) {
+      const foot = tileFootWorld(obj.x, obj.y);
+      const local = doorCenterLocal(this.footprintSpec(obj));
+      const screen = this.worldToScreen(foot.x + local.x, foot.y + local.y);
+      if (Math.hypot(sx - screen.x, sy - screen.y) <= threshold) return obj;
+    }
+    return undefined;
+  }
+
+  private pickSceneryAtScreen(sx: number, sy: number): { tx: number; ty: number } | undefined {
+    const { x: wx, y: wy } = this.screenToWorld(sx, sy);
+    const tile = worldToTile(wx, wy);
+    if (tile && getSceneryAt(tile.x, tile.y)) return { tx: tile.x, ty: tile.y };
+    const scenery = objects
+      .filter((o) => o.name === 'obelisco' || o.name === 'redoma' || o.name === 'muro')
+      .sort((a, b) => sortKey(b.x, b.y) - sortKey(a.x, b.y));
+    for (const obj of scenery) {
+      const foot = tileFootWorld(obj.x, obj.y);
+      const local = { x: wx - foot.x, y: wy - foot.y };
+      const w = obj.w ?? 3;
+      const h = obj.h ?? 2;
+      const hitW = 36 + w * 14;
+      const hitH = 52 + h * 18;
+      if (Math.abs(local.x) < hitW && local.y > -hitH && local.y < 28) {
+        const t = worldToTile(wx, wy);
+        return t ? { tx: t.x, ty: t.y } : { tx: obj.x, ty: obj.y };
+      }
+    }
+    return undefined;
+  }
+
   private pickBuildingAtScreen(sx: number, sy: number): MapObject | undefined {
+    const doorHit = this.pickBuildingDoorAtScreen(sx, sy);
+    if (doorHit) return doorHit;
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
     const buildings = objects
       .filter((o) => o.type === 'building')
@@ -417,26 +486,9 @@ export class IsoScene {
     for (const obj of buildings) {
       const foot = tileFootWorld(obj.x, obj.y);
       const local = { x: wx - foot.x, y: wy - foot.y };
-      if (obj.name === 'obelisco' || obj.name === 'redoma' || obj.name === 'muro') {
-        const w = obj.w ?? 3;
-        const h = obj.h ?? 2;
-        const hitW = 40 + w * 16;
-        const hitH = 60 + h * 20;
-        if (Math.abs(local.x) < hitW && local.y > -hitH && local.y < 24) return obj;
-      } else if (obj.type === 'building') {
-        const spec: FootprintDrawSpec = {
-          fx: obj.footprintX ?? obj.x,
-          fy: obj.footprintY ?? obj.y,
-          w: obj.w ?? 3,
-          h: obj.h ?? 3,
-          ax: obj.x,
-          ay: obj.y,
-          doorFace: obj.doorFace ?? '+y',
-          door: obj.door ?? { x: obj.x, y: obj.y + 1 },
-          kind: obj.name,
-        };
-        if (buildingPickHit(local, spec)) return obj;
-      }
+      const spec = this.footprintSpec(obj);
+      if (buildingDoorPickHit(local, spec)) return obj;
+      if (buildingPickHit(local, spec)) return obj;
     }
     return undefined;
   }
@@ -465,6 +517,20 @@ export class IsoScene {
   }
 
   private handleScreenTap(sx: number, sy: number, sprint: boolean): void {
+    const doorFirst = this.pickBuildingDoorAtScreen(sx, sy);
+    if (doorFirst?.door && doorFirst.panelTitle) {
+      if (!this.prepareMapTap(doorFirst)) return;
+      this.requestWalk(doorFirst.door.x, doorFirst.door.y, sprint, {
+        buildingEntry: { panelTitle: doorFirst.panelTitle, door: doorFirst.door },
+      });
+      return;
+    }
+    const sceneryTile = this.pickSceneryAtScreen(sx, sy);
+    if (sceneryTile) {
+      if (!this.prepareMapTap(undefined, sceneryTile.tx, sceneryTile.ty)) return;
+      this.requestWalk(sceneryTile.tx, sceneryTile.ty, sprint);
+      return;
+    }
     const building = this.pickBuildingAtScreen(sx, sy);
     if (building?.door && building.panelTitle) {
       if (!this.prepareMapTap(building)) return;

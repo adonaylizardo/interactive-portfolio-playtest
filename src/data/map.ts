@@ -6,6 +6,7 @@ import {
   MAP_HEIGHT,
   MAP_TRAMOS,
   MAP_WIDTH,
+  muroWallTiles,
   REDOMA_ANILLO,
   TILE_H,
   TILE_W,
@@ -45,15 +46,33 @@ function footprintCells(o: MapObject): { x: number; y: number }[] {
   return tiles;
 }
 
-/** QA: footprint tiles (except doors) must stay blocked. */
+const SCENERY_NAMES = new Set(['obelisco', 'redoma', 'muro']);
+
+export function isSceneryObject(o: MapObject): boolean {
+  return SCENERY_NAMES.has(o.name);
+}
+
+export function getSceneryAt(tx: number, ty: number): MapObject | undefined {
+  for (const o of objects) {
+    if (!isSceneryObject(o)) continue;
+    for (const { x: ox, y: oy } of footprintCells(o)) {
+      if (ox === tx && oy === ty) return o;
+    }
+  }
+  return undefined;
+}
+
+/** QA: footprint tiles (except doors / muro interior) must stay blocked. */
 export function validateWalkGridFootprint(): string[] {
   const errors: string[] = [];
+  const muroWalls = muroWallTiles();
   for (const o of objects) {
-    if (o.type !== 'building' && o.name !== 'obelisco' && o.name !== 'redoma' && o.name !== 'muro') continue;
+    if (o.type !== 'building' && !isSceneryObject(o)) continue;
     if (!o.w || !o.h) continue;
     for (const { x: ox, y: oy } of footprintCells(o)) {
       const isDoor = o.door && o.door.x === ox && o.door.y === oy;
       if (isDoor) continue;
+      if (o.name === 'muro' && !muroWalls.has(`${ox},${oy}`)) continue;
       if (cells[oy]?.[ox]?.walkable) {
         errors.push(`footprint tile (${ox},${oy}) walkable for ${o.name}`);
       }
@@ -116,6 +135,7 @@ export function resolveBuildingEntryFromTile(
 export function resolveWalkTarget(tx: number, ty: number): { x: number; y: number } {
   const onDoor = getBuildingAtDoor(tx, ty);
   if (onDoor?.door) return onDoor.door;
+  if (getSceneryAt(tx, ty)) return { x: tx, y: ty };
   const building = getBuildingAt(tx, ty);
   if (building?.door) return building.door;
   return { x: tx, y: ty };
