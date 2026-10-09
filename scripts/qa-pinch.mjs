@@ -1232,14 +1232,13 @@ async function testPanelDismissTouch(browser, errors) {
     await wait(1500);
     await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 36));
     await wait(200);
-    if (!(await cdpClickBuildingDoor(page, 'volaris'))) {
-      errors.push('panel-touch-close: could not tap Volaris door');
-      return;
-    }
-    await wait(5500);
-    if ((await page.locator('.building-panel--open').count()) === 0) {
-      errors.push('panel-touch-close: panel did not open');
-      return;
+    await page.evaluate(() => window.__playtestQa?.tapBuildingDoor?.('volaris'));
+    if (!(await waitForBuildingPanel(page, 96))) {
+      await page.evaluate(() => window.__playtestQa?.tapBuildingDoor?.('volaris'));
+      if (!(await waitForBuildingPanel(page, 48))) {
+        errors.push('panel-touch-close: panel did not open');
+        return;
+      }
     }
     const close = await page.locator('.building-panel__close').boundingBox();
     if (!close) {
