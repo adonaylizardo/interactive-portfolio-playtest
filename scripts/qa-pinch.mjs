@@ -11,9 +11,32 @@ const DESKTOP_PROOF = 'desktop-1280x800.png';
 const MOBILE_PROOF = 'mobile-375x812.png';
 const BASE = 'http://127.0.0.1:4173/interactive-portfolio-playtest/';
 
-const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 1.5;
 const MAP_VISIBLE_MIN = 0.3;
+const MAP_FIT_MARGIN_PX = 16;
+const MAP64_TILE_W = 128;
+const MAP64_TILE_H = 64;
+const MAP64_SIZE = 64;
+
+/** Match `zoomMinForViewport` in cameraControl.ts (64×64 iso bounds). */
+function zoomMinForViewportJs(screenW, screenH, margin = MAP_FIT_MARGIN_PX) {
+  const halfW = MAP64_TILE_W / 2;
+  const halfH = MAP64_TILE_H / 2;
+  const c0 = { x: 0, y: 0 };
+  const c1 = { x: (MAP64_SIZE - 1) * halfW, y: (MAP64_SIZE - 1) * halfH };
+  const c2 = { x: -(MAP64_SIZE - 1) * halfW, y: (MAP64_SIZE - 1) * halfH };
+  const c3 = { x: 0, y: (MAP64_SIZE - 1) * halfH * 2 };
+  const minX = Math.min(c0.x, c1.x, c2.x, c3.x) - MAP64_TILE_W;
+  const maxX = Math.max(c0.x, c1.x, c2.x, c3.x) + MAP64_TILE_W;
+  const minY = Math.min(c0.y, c1.y, c2.y, c3.y);
+  const maxY = Math.max(c0.y, c1.y, c2.y, c3.y) + MAP64_TILE_H * 2;
+  const mapW = maxX - minX;
+  const mapH = maxY - minY;
+  const innerW = Math.max(1, screenW - margin * 2);
+  const innerH = Math.max(1, screenH - margin * 2);
+  const fit = Math.min(innerW / mapW, innerH / mapH);
+  return Math.min(ZOOM_MAX, Math.max(0.04, fit));
+}
 const TILE_LIGHT_HEX = 'dddddd';
 
 /** Map64 building anchor tiles (draw pick / QA clicks). */
@@ -61,6 +84,8 @@ async function readCanvasMetrics(page) {
       mapIntersects: c.dataset.mapIntersects === '1',
       pinchFrame: Number(c.dataset.pinchFrame ?? 0),
       zoomSource: c.dataset.zoomSource ?? 'none',
+      zoomMin: Number(c.dataset.zoomMin),
+      mapFullyVisible: c.dataset.mapFullyVisible === '1',
     };
   });
 }
@@ -108,7 +133,8 @@ async function testBuildingSilhouetteStable(page, name, errors) {
     return { x: c?.dataset.camX ?? '0', y: c?.dataset.camY ?? '0' };
   });
 
-  const zoomLevels = [ZOOM_MIN, 0.85, ZOOM_MAX];
+  const zMinDesktop = zoomMinForViewportJs(1280, 800);
+  const zoomLevels = [zMinDesktop, 0.85, ZOOM_MAX];
   const samples = [];
 
   for (const z of zoomLevels) {
@@ -194,8 +220,9 @@ function assertFrameMetrics(name, m, errors, label) {
   if (!Number.isFinite(m.zoom)) {
     errors.push(`${name}: ${label} zoom not finite (${m.zoom})`);
   }
-  if (m.zoom < ZOOM_MIN - 0.001 || m.zoom > ZOOM_MAX + 0.001) {
-    errors.push(`${name}: ${label} zoom out of range (${m.zoom})`);
+  const zMin = Number.isFinite(m.zoomMin) ? m.zoomMin : zoomMinForViewportJs(1280, 800);
+  if (m.zoom < zMin - 0.001 || m.zoom > ZOOM_MAX + 0.001) {
+    errors.push(`${name}: ${label} zoom out of range (${m.zoom}, min=${zMin.toFixed(4)})`);
   }
   if (!m.mapIntersects) {
     errors.push(`${name}: ${label} map does not intersect viewport`);
@@ -517,8 +544,68 @@ async function wheelSweep(page, name, errors) {
     prev = next;
   }
 
-  if (prev && Math.abs(prev.zoom - ZOOM_MIN) > 0.02) {
-    errors.push(`${name}: wheel-out did not reach min zoom (${prev.zoom})`);
+  const zMin = Number.isFinite(prev?.zoomMin) ? prev.zoomMin : zoomMinForViewportJs(canvas.width, canvas.height);
+  if (prev && Math.abs(prev.zoom - zMin) > 0.02) {
+    errors.push(`${name}: wheel-out did not reach min zoom (${prev.zoom} vs ${zMin})`);
+  }
+}
+
+async function wheelOutToMinZoom(page, canvas) {
+  const cx = canvas.x + canvas.width / 2;
+  const cy = canvas.y + canvas.height / 2;
+  await page.mouse.move(cx, cy);
+  for (let i = 0; i < 48; i++) {
+    await page.mouse.wheel(0, 120);
+    await wait(25);
+  }
+  await wait(200);
+}
+
+async function testMinZoomFullMapVisible(browser, errors) {
+  for (const { label, width, height } of [
+    { label: 'mobile375', width: 375, height: 812 },
+    { label: 'ipad820', width: 820, height: 1180 },
+    { label: 'desktop1280', width: 1280, height: 800 },
+  ]) {
+    const page = await browser.newPage({ viewport: { width, height } });
+    try {
+      await page.goto(BASE, { waitUntil: 'networkidle' });
+      await wait(900);
+      const canvas = await page.locator('#game-canvas').boundingBox();
+      if (!canvas) {
+        errors.push(`${label}-fullmap: no canvas`);
+        continue;
+      }
+      const expectedMin = zoomMinForViewportJs(width, height);
+      await wheelOutToMinZoom(page, canvas);
+      const m = await readCanvasMetrics(page);
+      if (!m) {
+        errors.push(`${label}-fullmap: metrics missing`);
+        continue;
+      }
+      if (Math.abs(m.zoom - expectedMin) > 0.025) {
+        errors.push(
+          `${label}-fullmap: zoom ${m.zoom.toFixed(4)} not at fit min ${expectedMin.toFixed(4)}`,
+        );
+      }
+      if (!m.mapFullyVisible) {
+        errors.push(`${label}-fullmap: map bounds not fully inside viewport at min zoom`);
+      }
+      const vis = await page.evaluate(() => {
+        const c = document.getElementById('game-canvas');
+        return {
+          fracW: Number(c?.dataset.mapFracW),
+          fracH: Number(c?.dataset.mapFracH),
+        };
+      });
+      if (vis.fracW < 0.995 || vis.fracH < 0.995) {
+        errors.push(
+          `${label}-fullmap: map visible fraction ${vis.fracW?.toFixed(3)}, ${vis.fracH?.toFixed(3)} (need ≥0.995)`,
+        );
+      }
+    } finally {
+      await page.close();
+    }
   }
 }
 
@@ -1292,7 +1379,8 @@ async function testMobile375PinchAndUi(browser, errors) {
     }
     await wait(200);
 
-    await page.goto(`${BASE}#view=x=200&y=-500&z=${ZOOM_MIN}`, { waitUntil: 'networkidle' });
+    const zMin375 = zoomMinForViewportJs(375, 812);
+    await page.goto(`${BASE}#view=x=200&y=-500&z=${zMin375.toFixed(3)}`, { waitUntil: 'networkidle' });
     await wait(800);
     const camBefore = await page.evaluate(() => {
       const c = document.getElementById('game-canvas');
@@ -1301,14 +1389,14 @@ async function testMobile375PinchAndUi(browser, errors) {
         y: Number(c?.dataset.camY ?? 0),
       };
     });
-    const fromX = canvas.x + canvas.width * 0.25;
-    const toX = canvas.x + canvas.width * 0.82;
-    const panY = canvas.y + canvas.height * 0.55;
-    await page.mouse.move(fromX, panY);
+    const panX = canvas.x + canvas.width * 0.5;
+    const fromY = canvas.y + canvas.height * 0.22;
+    const toY = canvas.y + canvas.height * 0.78;
+    await page.mouse.move(panX, fromY);
     await page.mouse.down();
     for (let i = 0; i < 12; i++) {
-      const x = fromX + ((toX - fromX) * (i + 1)) / 12;
-      await page.mouse.move(x, panY);
+      const y = fromY + ((toY - fromY) * (i + 1)) / 12;
+      await page.mouse.move(panX, y);
       await wait(35);
     }
     await page.mouse.up();
@@ -1321,11 +1409,17 @@ async function testMobile375PinchAndUi(browser, errors) {
       };
     });
     const panPx = Math.hypot(
-      (camAfter.x - camBefore.x) * ZOOM_MIN,
-      (camAfter.y - camBefore.y) * ZOOM_MIN,
+      (camAfter.x - camBefore.x) * zMin375,
+      (camAfter.y - camBefore.y) * zMin375,
+    );
+    const stillFull = await page.evaluate(
+      () => document.getElementById('game-canvas')?.dataset.mapFullyVisible === '1',
     );
     if (panPx < 100) {
       errors.push(`mobile375: one-finger pan at min zoom moved ${panPx.toFixed(0)}px (need >100)`);
+    }
+    if (!stillFull) {
+      errors.push('mobile375: map no longer fully visible after pan at min zoom');
     }
 
     await page.evaluate(() => {
@@ -1776,8 +1870,9 @@ async function captureMap64ProofScreenshots(browser, errors, routeReport) {
     await wait(700);
     await desktop.screenshot({ path: path.join(outDir, 'map64-muro-view.png') });
 
+    const zMinDesktop = zoomMinForViewportJs(1280, 800);
     for (const [zLabel, z] of [
-      ['min', ZOOM_MIN],
+      ['min', zMinDesktop],
       ['mid', 1],
       ['max', ZOOM_MAX],
     ]) {
@@ -1924,6 +2019,7 @@ async function main() {
     await testMap64EnterablePanels(desktop, errors);
     await testMap64PaisajeNoPanel(desktop, errors);
     await testStaggeredPinchNoJump(desktop, errors);
+    await testMinZoomFullMapVisible(browser, errors);
 
     await testTouchBuildingEntry(browser, errors, warnings);
     await testPanelDismissTouch(browser, errors);

@@ -43,11 +43,12 @@ import {
 import {
   cameraFromPinchSession,
   clampZoom,
-  hardKeepMapPartiallyVisible,
+  isMapFullyVisibleOnScreen,
   mapVisibleFractions,
+  setCameraViewportSize,
+  stabilizeCameraAfterGesture,
   viewportMapCoverage,
-  ZOOM_MAX,
-  ZOOM_MIN,
+  zoomMinForViewport,
   zoomAtScreenAnchor,
 } from './cameraControl';
 
@@ -175,7 +176,7 @@ export class IsoScene {
     if (fromHash) {
       this.cameraX = fromHash.x;
       this.cameraY = fromHash.y;
-      this.zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, fromHash.zoom));
+      this.zoom = clampZoom(fromHash.zoom);
     } else if (this.shouldUseMobileFraming()) {
       this.frameMobileDefaultView();
     } else {
@@ -200,7 +201,7 @@ export class IsoScene {
       if (v) {
         this.cameraX = v.x;
         this.cameraY = v.y;
-        this.zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, v.zoom));
+        this.zoom = clampZoom(v.zoom);
         this.applyCamera(false);
         this.rebaselineChecklistFromCamera();
       }
@@ -590,8 +591,9 @@ export class IsoScene {
   applyCamera(persistHash = true): void {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
-    this.zoom = clampZoom(this.zoom);
-    const hardened = hardKeepMapPartiallyVisible(
+    setCameraViewportSize(sw, sh);
+    this.zoom = clampZoom(this.zoom, sw, sh);
+    const hardened = stabilizeCameraAfterGesture(
       { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
       sw,
       sh,
@@ -617,6 +619,14 @@ export class IsoScene {
       this.canvasEl.dataset.camX = String(this.cameraX);
       this.canvasEl.dataset.camY = String(this.cameraY);
       this.canvasEl.dataset.zoom = String(this.zoom);
+      this.canvasEl.dataset.zoomMin = String(zoomMinForViewport(sw, sh));
+      this.canvasEl.dataset.mapFullyVisible = isMapFullyVisibleOnScreen(
+        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+        sw,
+        sh,
+      )
+        ? '1'
+        : '0';
       const camPxDrawn = sw / 2 + this.cameraX * this.zoom;
       const camPyDrawn = sh / 2 + this.cameraY * this.zoom;
       this.canvasEl.dataset.camPx = String(camPxDrawn);
@@ -767,12 +777,12 @@ export class IsoScene {
     const padding = 1.12;
     const zoomX = sw / (worldW * padding);
     const zoomY = sh / (worldH * padding);
-    this.zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.min(zoomX, zoomY) * 0.92));
+    this.zoom = clampZoom(Math.min(zoomX, zoomY) * 0.92, sw, sh);
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
     this.cameraX = -cx;
     this.cameraY = -cy + 24;
-    const hardened = hardKeepMapPartiallyVisible(
+    const hardened = stabilizeCameraAfterGesture(
       { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
       sw,
       sh,
@@ -801,9 +811,9 @@ export class IsoScene {
       this.cameraY = nextCam.cameraY;
       this.zoom = nextCam.zoom;
     } else {
-      this.zoom = clampZoom(next);
+      this.zoom = clampZoom(next, sw, sh);
     }
-    const softened = hardKeepMapPartiallyVisible(
+    const softened = stabilizeCameraAfterGesture(
       { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
       sw,
       sh,
@@ -859,9 +869,11 @@ export class IsoScene {
   }
 
   private applyPinchCamera(next: { cameraX: number; cameraY: number; zoom: number }): void {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
     this.cameraX = next.cameraX;
     this.cameraY = next.cameraY;
-    this.zoom = clampZoom(next.zoom);
+    this.zoom = clampZoom(next.zoom, sw, sh);
     this.pinchFrameSerial += 1;
     this.zoomChanged = true;
     this.cameraPanned = true;
@@ -1092,7 +1104,7 @@ export class IsoScene {
         s.startZoom * ratio,
         anchor,
       );
-      next = hardKeepMapPartiallyVisible(next, sw, sh);
+      next = stabilizeCameraAfterGesture(next, sw, sh);
       this.applyPinchCamera(next);
     };
 

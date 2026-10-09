@@ -1,10 +1,23 @@
 import { mapWorldBounds } from '../iso/math';
 
-export const ZOOM_MIN = 0.25;
 export const ZOOM_MAX = 1.5;
 
-/** Minimum fraction of map bbox (width & height) that must remain inside the viewport. */
+/** Legacy constant — prefer `zoomMinForViewport()` (dynamic per screen size). */
+export const ZOOM_MIN = 0.25;
+
+/** Minimum fraction of map bbox (width & height) that must remain inside the viewport when zoomed in. */
 export const MAP_VISIBLE_MIN_FRAC = 0.3;
+
+/** Screen-pixel margin when fitting the full map at minimum zoom. */
+export const MAP_FIT_MARGIN_PX = 16;
+
+let viewportScreenW = 1280;
+let viewportScreenH = 800;
+
+export function setCameraViewportSize(screenW: number, screenH: number): void {
+  if (Number.isFinite(screenW) && screenW > 0) viewportScreenW = screenW;
+  if (Number.isFinite(screenH) && screenH > 0) viewportScreenH = screenH;
+}
 
 export type CameraState = {
   cameraX: number;
@@ -12,9 +25,26 @@ export type CameraState = {
   zoom: number;
 };
 
-export function clampZoom(zoom: number): number {
-  if (!Number.isFinite(zoom)) return ZOOM_MIN;
-  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
+/** Smallest zoom (most zoomed out) so the full 64×64 map bbox fits in the viewport with margin. */
+export function zoomMinForViewport(screenW: number, screenH: number, margin = MAP_FIT_MARGIN_PX): number {
+  const bounds = mapWorldBounds();
+  const mapW = bounds.maxX - bounds.minX;
+  const mapH = bounds.maxY - bounds.minY;
+  if (mapW <= 0 || mapH <= 0 || screenW <= 0 || screenH <= 0) return ZOOM_MIN;
+  const innerW = Math.max(1, screenW - margin * 2);
+  const innerH = Math.max(1, screenH - margin * 2);
+  const fit = Math.min(innerW / mapW, innerH / mapH);
+  return Math.min(ZOOM_MAX, Math.max(0.04, fit));
+}
+
+export function clampZoom(
+  zoom: number,
+  screenW: number = viewportScreenW,
+  screenH: number = viewportScreenH,
+): number {
+  const zMin = zoomMinForViewport(screenW, screenH);
+  if (!Number.isFinite(zoom)) return zMin;
+  return Math.min(ZOOM_MAX, Math.max(zMin, zoom));
 }
 
 /** Zoom while keeping the world point under `anchorScreen` fixed on screen. */
@@ -27,7 +57,7 @@ export function zoomAtScreenAnchor(
   nextZoom: number,
   anchorScreen: { x: number; y: number },
 ): CameraState {
-  const clamped = clampZoom(nextZoom);
+  const clamped = clampZoom(nextZoom, screenW, screenH);
   if (Math.abs(clamped - cam.zoom) < 0.0001) return { ...cam, zoom: clamped };
 
   const invDelta = 1 / clamped - 1 / cam.zoom;
@@ -66,6 +96,21 @@ export function mapBoundsOnScreen(
     width: right - left,
     height: bottom - top,
   };
+}
+
+export function isMapFullyVisibleOnScreen(
+  cam: CameraState,
+  screenW: number,
+  screenH: number,
+  margin = MAP_FIT_MARGIN_PX,
+): boolean {
+  const m = mapBoundsOnScreen(cam, screenW, screenH);
+  return (
+    m.left >= margin - 0.5 &&
+    m.right <= screenW - margin + 0.5 &&
+    m.top >= margin - 0.5 &&
+    m.bottom <= screenH - margin + 0.5
+  );
 }
 
 /** Fraction of map bbox width/height visible inside the viewport. */
@@ -111,6 +156,55 @@ export function viewportMapCoverage(
   };
 }
 
+/** Keep entire map bbox inside the viewport (used at minimum zoom). */
+export function clampPanMapFullyInView(
+  cam: CameraState,
+  screenW: number,
+  screenH: number,
+  margin = MAP_FIT_MARGIN_PX,
+): CameraState {
+  let { cameraX, cameraY, zoom } = cam;
+  zoom = clampZoom(zoom, screenW, screenH);
+
+  for (let i = 0; i < 10; i++) {
+    const m = mapBoundsOnScreen({ cameraX, cameraY, zoom }, screenW, screenH);
+    let changed = false;
+    if (m.left > margin) {
+      cameraX -= (m.left - margin) / zoom;
+      changed = true;
+    }
+    if (m.right < screenW - margin) {
+      cameraX += (screenW - margin - m.right) / zoom;
+      changed = true;
+    }
+    if (m.top > margin) {
+      cameraY -= (m.top - margin) / zoom;
+      changed = true;
+    }
+    if (m.bottom < screenH - margin) {
+      cameraY += (screenH - margin - m.bottom) / zoom;
+      changed = true;
+    }
+    if (!changed) break;
+  }
+
+  return { cameraX, cameraY, zoom };
+}
+
+/** After pan/zoom/pinch: partial visibility when zoomed in; full-map pan clamp at min zoom. */
+export function stabilizeCameraAfterGesture(
+  cam: CameraState,
+  screenW: number,
+  screenH: number,
+): CameraState {
+  const zMin = zoomMinForViewport(screenW, screenH);
+  let next = { ...cam, zoom: clampZoom(cam.zoom, screenW, screenH) };
+  if (next.zoom <= zMin + 0.0005) {
+    return clampPanMapFullyInView(next, screenW, screenH);
+  }
+  return hardKeepMapPartiallyVisible(next, screenW, screenH);
+}
+
 /** Keep at least MAP_VISIBLE_MIN_FRAC of the viewport over the map (camera position only; never caps zoom). */
 export function hardKeepMapPartiallyVisible(
   cam: CameraState,
@@ -118,7 +212,7 @@ export function hardKeepMapPartiallyVisible(
   screenH: number,
 ): CameraState {
   let { cameraX, cameraY, zoom } = cam;
-  zoom = clampZoom(zoom);
+  zoom = clampZoom(zoom, screenW, screenH);
   const minF = MAP_VISIBLE_MIN_FRAC;
 
   for (let i = 0; i < 12; i++) {
@@ -182,7 +276,7 @@ export function cameraFromPinchSession(
   const ratio = currentDist / session.startDist;
   if (!Number.isFinite(ratio)) return null;
 
-  const nextZoom = clampZoom(session.startZoom * ratio);
+  const nextZoom = clampZoom(session.startZoom * ratio, screenW, screenH);
   const startCamPx = screenW / 2 + session.startCamX * session.startZoom;
   const startCamPy = screenH / 2 + session.startCamY * session.startZoom;
 
@@ -202,10 +296,9 @@ export function cameraFromPinchSession(
     zoom: next.zoom,
   };
 
-  return hardKeepMapPartiallyVisible(next, screenW, screenH);
+  return stabilizeCameraAfterGesture(next, screenW, screenH);
 }
 
-/** Nudge camera only if map bounds fall outside the viewport (no hard recenter). */
 /** Center the map in the viewport (used at min zoom). */
 export function centerMapInView(
   cam: CameraState,
@@ -215,7 +308,7 @@ export function centerMapInView(
   const bounds = mapWorldBounds();
   const worldCx = (bounds.minX + bounds.maxX) / 2;
   const worldCy = (bounds.minY + bounds.maxY) / 2;
-  const zoom = clampZoom(cam.zoom);
+  const zoom = clampZoom(cam.zoom, _screenW, _screenH);
   return {
     cameraX: -worldCx,
     cameraY: -worldCy,
@@ -228,22 +321,5 @@ export function softClampMapInView(
   screenW: number,
   screenH: number,
 ): CameraState {
-  const bounds = mapWorldBounds();
-  const camPx = screenW / 2 + cam.cameraX * cam.zoom;
-  const camPy = screenH / 2 + cam.cameraY * cam.zoom;
-
-  const left = camPx + bounds.minX * cam.zoom;
-  const right = camPx + bounds.maxX * cam.zoom;
-  const top = camPy + bounds.minY * cam.zoom;
-  const bottom = camPy + bounds.maxY * cam.zoom;
-
-  let { cameraX, cameraY } = cam;
-  const margin = 24;
-
-  if (right < margin) cameraX += (margin - right) / cam.zoom;
-  if (left > screenW - margin) cameraX -= (left - (screenW - margin)) / cam.zoom;
-  if (bottom < margin) cameraY += (margin - bottom) / cam.zoom;
-  if (top > screenH - margin) cameraY -= (top - (screenH - margin)) / cam.zoom;
-
-  return { cameraX, cameraY, zoom: clampZoom(cam.zoom) };
+  return clampPanMapFullyInView(cam, screenW, screenH);
 }
