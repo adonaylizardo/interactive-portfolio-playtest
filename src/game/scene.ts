@@ -1,6 +1,7 @@
 import { Application, Container, Graphics, Point } from 'pixi.js';
 import {
   cells,
+  getBuildingAt,
   getBuildingAtDoor,
   MAP_HEIGHT,
   MAP_WIDTH,
@@ -40,10 +41,17 @@ import {
   treeCanopyTrunkOverlap,
 } from './draw';
 
+export type BuildingPanelBridge = {
+  isOpen: () => boolean;
+  openTitle: () => string;
+  dismiss: () => void;
+};
+
 export type SceneEvents = {
   onChecklist: (step: ChecklistStepId) => void;
   onEnterBuilding: (title: string) => void;
   onUnreachable?: () => void;
+  buildingPanel?: BuildingPanelBridge;
 };
 
 export class IsoScene {
@@ -185,6 +193,7 @@ export class IsoScene {
         this.events.onUnreachable?.();
         return;
       }
+      if (!this.prepareMapTap(undefined, tile.x, tile.y)) return;
       const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
       this.requestWalk(tile.x, tile.y, sprint);
     });
@@ -210,6 +219,7 @@ export class IsoScene {
         g.on('pointertap', (e) => {
           if (this.shouldBlockTap()) return;
           this.pixiTapGestureSerial = this.pointerGestureSerial;
+          if (!this.prepareMapTap(undefined, tx, ty)) return;
           const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
           this.requestWalk(tx, ty, sprint);
         });
@@ -242,6 +252,7 @@ export class IsoScene {
         if (this.shouldBlockTap()) return;
         e.stopPropagation();
         this.pixiTapGestureSerial = this.pointerGestureSerial;
+        if (obj.type === 'building' && obj.panelTitle && !this.prepareMapTap(obj)) return;
         const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
         if (obj.type === 'building' && obj.door && obj.panelTitle) {
           this.requestWalk(obj.door.x, obj.door.y, sprint, {
@@ -303,12 +314,19 @@ export class IsoScene {
     this.walkToTile(target.x, target.y, sprint);
   }
 
+  clearWalkPreview(): void {
+    this.path = [];
+    this.drawPathPreview();
+  }
+
   walkToTile(tx: number, ty: number, sprint: boolean): void {
     if (tx < 0 || ty < 0 || tx >= MAP_WIDTH || ty >= MAP_HEIGHT) {
+      this.clearWalkPreview();
       this.events.onUnreachable?.();
       return;
     }
     if (!cells[ty][tx].walkable) {
+      this.clearWalkPreview();
       this.events.onUnreachable?.();
       return;
     }
@@ -316,6 +334,7 @@ export class IsoScene {
     const sy = Math.round(this.charTy);
     const result = findPathOrNearest(sx, sy, tx, ty);
     if (!result?.direct) {
+      this.clearWalkPreview();
       this.events.onUnreachable?.();
       return;
     }
@@ -348,9 +367,33 @@ export class IsoScene {
     return undefined;
   }
 
+  /**
+   * When the building panel is open: dismiss it and continue the map action, unless the
+   * tap is on the same building (keep panel). Returns false to abort the tap entirely.
+   */
+  private prepareMapTap(building?: MapObject, tx?: number, ty?: number): boolean {
+    const bridge = this.events.buildingPanel;
+    if (!bridge?.isOpen()) return true;
+    const openTitle = bridge.openTitle();
+    if (building?.panelTitle === openTitle) return false;
+    if (tx !== undefined && ty !== undefined) {
+      if (getBuildingAtDoor(tx, ty)?.panelTitle === openTitle) return false;
+      if (getBuildingAt(tx, ty)?.panelTitle === openTitle) return false;
+    }
+    bridge.dismiss();
+    this.clearWalkPreview();
+    const ctx = Math.round(this.charTx);
+    const cty = Math.round(this.charTy);
+    if (getBuildingAtDoor(ctx, cty)) {
+      this.doorCooldown = 200;
+    }
+    return true;
+  }
+
   private handleScreenTap(sx: number, sy: number, sprint: boolean): void {
     const building = this.pickBuildingAtScreen(sx, sy);
     if (building?.door && building.panelTitle) {
+      if (!this.prepareMapTap(building)) return;
       this.requestWalk(building.door.x, building.door.y, sprint, {
         buildingEntry: { panelTitle: building.panelTitle, door: building.door },
       });
@@ -358,16 +401,22 @@ export class IsoScene {
     }
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
     const tile = worldToTile(wx, wy);
-    if (tile) this.requestWalk(tile.x, tile.y, sprint);
-    else this.events.onUnreachable?.();
+    if (tile) {
+      if (!this.prepareMapTap(undefined, tile.x, tile.y)) return;
+      this.requestWalk(tile.x, tile.y, sprint);
+    } else this.events.onUnreachable?.();
   }
 
   private drawPathPreview(): void {
     this.pathGfx.clear();
     if (this.path.length === 0) return;
+    if (this.events.buildingPanel?.isOpen()) return;
+    if (this.pendingBuildingEntry) return;
     const points = [{ x: this.charTx, y: this.charTy }, ...this.path];
-    for (const p of points) {
-      const w = tileToWorld(p.x, p.y);
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      const foot = tileFootWorld(p.x, p.y);
+      const w = { x: foot.x, y: foot.y - TILE_H / 2 };
       this.pathGfx.moveTo(w.x, w.y - 8);
       this.pathGfx.lineTo(w.x + 6, w.y);
       this.pathGfx.lineTo(w.x, w.y + 8);
@@ -384,6 +433,12 @@ export class IsoScene {
     const pos = tileFootWorld(this.charTx, this.charTy);
     this.charGfx.position.set(pos.x, pos.y);
     this.charGfx.zIndex = sortKey(this.charTx, this.charTy, 500);
+    if (this.canvasEl) {
+      this.canvasEl.dataset.charTile = JSON.stringify({
+        x: Math.round(this.charTx),
+        y: Math.round(this.charTy),
+      });
+    }
   }
 
   private centerOnCharacter(animate: boolean): void {

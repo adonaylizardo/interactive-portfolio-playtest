@@ -11,21 +11,28 @@ async function main(): Promise<void> {
 
   const checklist = new ChecklistUI(uiRoot, { onSkip: () => {}, onDismiss: () => {} });
 
+  let scene!: IsoScene;
   const panel = new BuildingPanel(uiRoot, () => {
     checklist.setBuildingPanelOpen(false);
   });
 
   let lastBuilding = '';
-  const scene = new IsoScene({
+  scene = new IsoScene({
     onChecklist: (step) => checklist.complete(step),
     onEnterBuilding: (title) => {
       checklist.complete('enter-building');
       if (panel.isOpen() && lastBuilding === title) return;
       lastBuilding = title;
       checklist.setBuildingPanelOpen(true);
+      scene.clearWalkPreview();
       panel.show(title);
     },
     onUnreachable: () => showToast('No se puede llegar'),
+    buildingPanel: {
+      isOpen: () => panel.isOpen(),
+      openTitle: () => lastBuilding,
+      dismiss: () => panel.hide(),
+    },
   });
 
   await scene.init(canvas);

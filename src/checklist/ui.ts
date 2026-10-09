@@ -248,6 +248,12 @@ export class ChecklistUI {
       this.listEl.appendChild(li);
     }
 
-    this.headerTitle.textContent = activeStep?.title ?? '¡Listo!';
+    if (allDone) {
+      this.headerTitle.textContent = '¡Listo!';
+      this.headerTitle.classList.add('checklist__active-title--done');
+    } else {
+      this.headerTitle.textContent = activeStep?.title ?? '';
+      this.headerTitle.classList.remove('checklist__active-title--done');
+    }
   }
 }

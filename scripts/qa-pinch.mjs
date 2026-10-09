@@ -965,6 +965,144 @@ async function testTouchBuildingEntry(browser, errors, warnings) {
   }
 }
 
+async function readCamX(page) {
+  return page.evaluate(() => Number(document.getElementById('game-canvas')?.dataset.camX ?? 0));
+}
+
+async function openCaso1Panel(page) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
+  await page.reload({ waitUntil: 'networkidle' });
+  await wait(1200);
+  await setUiPointerEvents(page, false);
+  if (!(await cdpClickTile(page, 3, 4, { building: true }))) return false;
+  for (let i = 0; i < 36; i++) {
+    if ((await page.locator('.building-panel--open').count()) > 0) return true;
+    await wait(250);
+  }
+  return false;
+}
+
+async function testPanelDismissDesktop(page, errors) {
+  if (!(await openCaso1Panel(page))) {
+    errors.push('panel-dismiss: could not open caso-1');
+    return;
+  }
+  const charBefore = await readCharTile(page);
+  if (!(await cdpClickTile(page, 10, 8))) {
+    errors.push('panel-dismiss: ground click failed');
+    return;
+  }
+  await wait(5000);
+  if ((await page.locator('.building-panel--open').count()) > 0) {
+    errors.push('panel-dismiss: panel still open after outside ground click');
+  }
+  const charAfter = await readCharTile(page);
+  if (charBefore && charAfter && charBefore.x === charAfter.x && charBefore.y === charAfter.y) {
+    errors.push('panel-dismiss: character did not walk after dismiss click');
+  }
+}
+
+async function testPanelSwitchBuilding(page, errors) {
+  if (!(await openCaso1Panel(page))) {
+    errors.push('panel-switch: could not open caso-1');
+    return;
+  }
+  if (!(await cdpClickTile(page, 10, 11, { building: true }))) {
+    errors.push('panel-switch: could not click caso-3');
+    return;
+  }
+  try {
+    await page.waitForFunction(
+      () =>
+        document.querySelector('.building-panel--open') &&
+        document.querySelector('.building-panel__title')?.textContent?.includes('3'),
+      { timeout: 16000 },
+    );
+  } catch {
+    const title = await page.locator('.building-panel__title').textContent();
+    errors.push(`panel-switch: expected caso-3 panel (${title ?? 'none'})`);
+  }
+}
+
+async function testPanelDragKeepsOpen(page, errors) {
+  if (!(await openCaso1Panel(page))) {
+    errors.push('panel-drag: could not open panel');
+    return;
+  }
+  const camBefore = await readCamX(page);
+  const box = await page.locator('#game-canvas').boundingBox();
+  if (!box) {
+    errors.push('panel-drag: no canvas box');
+    return;
+  }
+  await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.55);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.65, box.y + box.height * 0.55, { steps: 10 });
+  await page.mouse.up();
+  await wait(400);
+  if ((await page.locator('.building-panel--open').count()) === 0) {
+    errors.push('panel-drag: panel closed during drag (should stay open)');
+  }
+  const camAfter = await readCamX(page);
+  if (Math.abs(camAfter - camBefore) < 1.5) {
+    errors.push('panel-drag: camera did not pan');
+  }
+}
+
+async function testPanelClickInside(page, errors) {
+  if (!(await openCaso1Panel(page))) {
+    errors.push('panel-inside: could not open panel');
+    return;
+  }
+  await setUiPointerEvents(page, true);
+  await page.locator('.building-panel__title').click();
+  await wait(300);
+  if ((await page.locator('.building-panel--open').count()) === 0) {
+    errors.push('panel-inside: panel closed on click inside sheet');
+  }
+}
+
+async function testPanelDismissTouch(browser, errors) {
+  const { page, client, context } = await setupIPhoneTouchPage(browser);
+  try {
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'networkidle' });
+    await wait(1500);
+    await setUiPointerEvents(page, false);
+    await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(7, 8));
+    await wait(200);
+    const pt = await buildingRoofScreenPoint(page, 3, 4);
+    if (!pt) {
+      errors.push('panel-touch: roof point missing');
+      return;
+    }
+    await touchTap(page, client, pt.x, pt.y);
+    await wait(5500);
+    if ((await page.locator('.building-panel--open').count()) === 0) {
+      errors.push('panel-touch: panel did not open');
+      return;
+    }
+    const charBefore = await readCharTile(page);
+    const ground = await tileToScreen(page, 10, 8);
+    if (!ground) {
+      errors.push('panel-touch: ground point missing');
+      return;
+    }
+    await touchTap(page, client, ground.x, ground.y);
+    await wait(5000);
+    if ((await page.locator('.building-panel--open').count()) > 0) {
+      errors.push('panel-touch: panel still open after outside tap');
+    }
+    const charAfter = await readCharTile(page);
+    if (charBefore && charAfter && charBefore.x === charAfter.x && charBefore.y === charAfter.y) {
+      errors.push('panel-touch: character did not walk after outside tap');
+    }
+  } finally {
+    await context.close();
+  }
+}
+
 async function testEnterBuildingChecklist(page, errors) {
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
@@ -1093,9 +1231,14 @@ async function main() {
     await testGroundWalkCrossingDoorNoPanel(desktop, errors);
     await testNoSpuriousDoorPanelAfterGroundWalk(desktop, errors);
     await testNoDoorReopenOnKeypressAfterClose(desktop, errors);
+    await testPanelDismissDesktop(desktop, errors);
+    await testPanelSwitchBuilding(desktop, errors);
+    await testPanelDragKeepsOpen(desktop, errors);
+    await testPanelClickInside(desktop, errors);
     await testSkipRingDesktop(desktop, errors);
 
     await testTouchBuildingEntry(browser, errors, warnings);
+    await testPanelDismissTouch(browser, errors);
 
     const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
     await mobile.goto(BASE, { waitUntil: 'networkidle' });

@@ -21,7 +21,16 @@ export class BuildingPanel {
     this.titleEl = this.el.querySelector('.building-panel__title')!;
 
     this.el.querySelector('.building-panel__close')!.addEventListener('click', () => this.hide());
-    this.el.querySelector('[data-close]')!.addEventListener('click', () => this.hide());
+    const sheet = this.el.querySelector('.building-panel__sheet')!;
+    sheet.addEventListener('click', (e) => e.stopPropagation());
+    sheet.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.isOpen()) {
+        e.preventDefault();
+        this.hide();
+      }
+    });
   }
 
   show(title: string): void {
@@ -39,7 +48,7 @@ export class BuildingPanel {
   }
 
   isOpen(): boolean {
-    return !this.el.hidden;
+    return this.el.classList.contains('building-panel--open');
   }
 
   private reducedMotion(): boolean {
