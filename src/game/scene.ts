@@ -18,27 +18,17 @@ import { isTouchPrimary, type ChecklistStepId } from '../checklist/storage';
 import { sortKey, tileFootWorld, tileToWorld, worldToTile } from '../iso/math';
 import { findPathOrNearest } from '../iso/pathfinding';
 import { C } from './colors';
-import { buildingPickHit } from './draw';
-import {
-  cameraFromPinchSession,
-  centerMapInView,
-  clampZoom,
-  hardKeepMapPartiallyVisible,
-  mapVisibleFractions,
-  softClampMapInView,
-  ZOOM_MAX,
-  ZOOM_MIN,
-  zoomAtScreenAnchor,
-} from './cameraControl';
 import {
   buildingFrontWallsCover,
   buildingInteriorGapSample,
+  buildingPickHit,
   deskTopFillColor,
+  doorCenterLocal,
   drawBench,
   drawBorderTile,
-  drawBuilding,
   drawCharacter,
   drawDiamond,
+  drawFootprintBuilding,
   drawLamp,
   drawMuro,
   drawObelisco,
@@ -46,7 +36,17 @@ import {
   drawPropTree,
   drawRedoma,
   treeCanopyTrunkOverlap,
+  type FootprintDrawSpec,
 } from './draw';
+import {
+  cameraFromPinchSession,
+  clampZoom,
+  hardKeepMapPartiallyVisible,
+  mapVisibleFractions,
+  ZOOM_MAX,
+  ZOOM_MIN,
+  zoomAtScreenAnchor,
+} from './cameraControl';
 
 export type BuildingPanelBridge = {
   isOpen: () => boolean;
@@ -97,6 +97,9 @@ export class IsoScene {
   private panMoved = false;
   private cameraPanned = false;
   private zoomChanged = false;
+  private lastChecklistZoom = 0;
+  private lastChecklistCamPx = 0;
+  private lastChecklistCamPy = 0;
   private canvasEl: HTMLCanvasElement | null = null;
   private pointers = new Map<number, { x: number; y: number }>();
   private pinchSession: {
@@ -176,6 +179,11 @@ export class IsoScene {
       this.centerOnCharacter(false);
     }
     this.applyCamera(true);
+    const sw0 = this.app.screen.width;
+    const sh0 = this.app.screen.height;
+    this.lastChecklistZoom = this.zoom;
+    this.lastChecklistCamPx = sw0 / 2 + this.cameraX * this.zoom;
+    this.lastChecklistCamPy = sh0 / 2 + this.cameraY * this.zoom;
 
     this.bindInput();
     this.app.ticker.add(() => this.update());
@@ -224,7 +232,7 @@ export class IsoScene {
         const pos = tileFootWorld(tx, ty);
         const g = new Graphics();
         const isFrame = cell.groundId.includes('borde');
-        g.position.set(pos.x, pos.y + (isFrame ? 24 : 0));
+        g.position.set(pos.x, pos.y);
         if (isFrame) {
           drawBorderTile(g, cell.groundId);
         } else {
@@ -284,6 +292,13 @@ export class IsoScene {
           });
           return;
         }
+        this.pendingBuildingEntry = null;
+        if (obj.name === 'obelisco' || obj.name === 'redoma' || obj.name === 'muro') {
+          const gx = obj.x;
+          const gy = obj.y;
+          this.requestWalk(gx, gy, sprint);
+          return;
+        }
         this.requestWalk(obj.x, obj.y, sprint);
       });
       this.objectGraphics.set(obj.id, g);
@@ -323,12 +338,24 @@ export class IsoScene {
       else if (obj.name === 'arbol' || obj.name === 'tree') drawPropTree(g, hover);
       else if (obj.name === 'bench') drawBench(g, hover);
       else if (obj.name === 'lamp') drawLamp(g, hover);
-      else if (obj.name === 'obelisco') drawObelisco(g, hover);
-      else if (obj.name === 'redoma') drawRedoma(g, hover);
+      else if (obj.name === 'obelisco')
+        drawObelisco(g, hover, obj.footprintX, obj.footprintY, obj.w, obj.h, obj.x, obj.y);
+      else if (obj.name === 'redoma')
+        drawRedoma(g, hover, obj.footprintX, obj.footprintY, obj.w, obj.h, obj.x, obj.y);
       else if (obj.name === 'muro') drawMuro(g, hover);
       else if (obj.type === 'building') {
-        const scale = Math.max(1, (obj.w ?? 3) / 3);
-        drawBuilding(g, hover, scale, obj.doorFace ?? '+y');
+        const spec: FootprintDrawSpec = {
+          fx: obj.footprintX ?? obj.x,
+          fy: obj.footprintY ?? obj.y,
+          w: obj.w ?? 3,
+          h: obj.h ?? 3,
+          ax: obj.x,
+          ay: obj.y,
+          doorFace: obj.doorFace ?? '+y',
+          door: obj.door ?? { x: obj.x, y: obj.y + 1 },
+          kind: obj.name,
+        };
+        drawFootprintBuilding(g, hover, spec);
       }
     }
   }
@@ -389,14 +416,26 @@ export class IsoScene {
     for (const obj of buildings) {
       const foot = tileFootWorld(obj.x, obj.y);
       const local = { x: wx - foot.x, y: wy - foot.y };
-      const scale = obj.type === 'building' ? Math.max(1, (obj.w ?? 3) / 3) : 1;
       if (obj.name === 'obelisco' || obj.name === 'redoma' || obj.name === 'muro') {
         const w = obj.w ?? 3;
         const h = obj.h ?? 2;
         const hitW = 40 + w * 16;
         const hitH = 60 + h * 20;
         if (Math.abs(local.x) < hitW && local.y > -hitH && local.y < 24) return obj;
-      } else if (obj.type === 'building' && buildingPickHit(local, scale)) return obj;
+      } else if (obj.type === 'building') {
+        const spec: FootprintDrawSpec = {
+          fx: obj.footprintX ?? obj.x,
+          fy: obj.footprintY ?? obj.y,
+          w: obj.w ?? 3,
+          h: obj.h ?? 3,
+          ax: obj.x,
+          ay: obj.y,
+          doorFace: obj.doorFace ?? '+y',
+          door: obj.door ?? { x: obj.x, y: obj.y + 1 },
+          kind: obj.name,
+        };
+        if (buildingPickHit(local, spec)) return obj;
+      }
     }
     return undefined;
   }
@@ -485,16 +524,14 @@ export class IsoScene {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     this.zoom = clampZoom(this.zoom);
-    if (this.gestureActive) {
-      const hardened = hardKeepMapPartiallyVisible(
-        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
-        sw,
-        sh,
-      );
-      this.cameraX = hardened.cameraX;
-      this.cameraY = hardened.cameraY;
-      this.zoom = hardened.zoom;
-    }
+    const hardened = hardKeepMapPartiallyVisible(
+      { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+      sw,
+      sh,
+    );
+    this.cameraX = hardened.cameraX;
+    this.cameraY = hardened.cameraY;
+    this.zoom = hardened.zoom;
     this.camera.position.set(sw / 2, sh / 2);
     this.camera.scale.set(1);
     this.world.position.set(this.cameraX * this.zoom, this.cameraY * this.zoom);
@@ -508,8 +545,10 @@ export class IsoScene {
       this.canvasEl.dataset.camX = String(this.cameraX);
       this.canvasEl.dataset.camY = String(this.cameraY);
       this.canvasEl.dataset.zoom = String(this.zoom);
-      this.canvasEl.dataset.camPx = String(sw / 2 + this.world.position.x);
-      this.canvasEl.dataset.camPy = String(sh / 2 + this.world.position.y);
+      const camPxDrawn = sw / 2 + this.cameraX * this.zoom;
+      const camPyDrawn = sh / 2 + this.cameraY * this.zoom;
+      this.canvasEl.dataset.camPx = String(camPxDrawn);
+      this.canvasEl.dataset.camPy = String(camPyDrawn);
       this.canvasEl.dataset.mapFracW = String(vis.fracW);
       this.canvasEl.dataset.mapFracH = String(vis.fracH);
       this.canvasEl.dataset.mapIntersects = vis.intersects ? '1' : '0';
@@ -529,27 +568,27 @@ export class IsoScene {
     if (persistHash) {
       writeCameraToHash({ x: this.cameraX, y: this.cameraY, zoom: this.zoom });
     }
-    if (!this.gestureActive && this.zoom <= ZOOM_MIN + 0.02) {
-      const centered = centerMapInView(
-        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
-        sw,
-        sh,
-      );
-      this.cameraX = centered.cameraX;
-      this.cameraY = centered.cameraY;
-      this.world.position.set(this.cameraX * this.zoom, this.cameraY * this.zoom);
-      if (this.canvasEl) {
-        this.canvasEl.dataset.camPx = String(sw / 2 + this.world.position.x);
-        this.canvasEl.dataset.camPy = String(sh / 2 + this.world.position.y);
-      }
-    }
-
-    if (this.zoomChanged) {
+    const camPxDrawn = sw / 2 + this.cameraX * this.zoom;
+    const camPyDrawn = sh / 2 + this.cameraY * this.zoom;
+    if (
+      this.zoomChanged &&
+      Math.abs(this.zoom - this.lastChecklistZoom) / Math.max(this.lastChecklistZoom, 0.05) > 0.02
+    ) {
       this.events.onChecklist('zoom');
+      this.lastChecklistZoom = this.zoom;
+      this.zoomChanged = false;
+    } else if (this.zoomChanged) {
       this.zoomChanged = false;
     }
-    if (this.cameraPanned) {
+    if (
+      this.cameraPanned &&
+      Math.hypot(camPxDrawn - this.lastChecklistCamPx, camPyDrawn - this.lastChecklistCamPy) > 8
+    ) {
       this.events.onChecklist('move-camera');
+      this.lastChecklistCamPx = camPxDrawn;
+      this.lastChecklistCamPy = camPyDrawn;
+      this.cameraPanned = false;
+    } else if (this.cameraPanned) {
       this.cameraPanned = false;
     }
     this.cullVisibleTiles();
@@ -597,15 +636,11 @@ export class IsoScene {
     const tileG = this.tilesLayer.children[tileIdx] as Container | undefined;
     const buildG = this.objectGraphics.get('building/estudio');
     if (!tileG || !buildG) return;
-    const estudio = objects.find((o) => o.name === 'estudio');
-    if (!estudio) return;
-    const foot = tileFootWorld(estudio.x, estudio.y);
+    const foot = tileFootWorld(INICIO[0], INICIO[1]);
     const expected = this.worldToScreen(foot.x, foot.y);
     const tileGlobal = tileG.getGlobalPosition(new Point());
-    const buildGlobal = buildG.getGlobalPosition(new Point());
-    const driftTileBuild = Math.hypot(tileGlobal.x - buildGlobal.x, tileGlobal.y - buildGlobal.y);
     const driftTileFormula = Math.hypot(tileGlobal.x - expected.x, tileGlobal.y - expected.y);
-    this.canvasEl.dataset.footDriftPx = String(Math.max(driftTileBuild, driftTileFormula));
+    this.canvasEl.dataset.footDriftPx = String(driftTileFormula);
   }
 
   /** QA: local bounds of caso-1 must not change with zoom (no LOD geometry swap). */
@@ -694,25 +729,14 @@ export class IsoScene {
     } else {
       this.zoom = clampZoom(next);
     }
-    if (Math.abs(this.zoom - ZOOM_MIN) < 0.001) {
-      const centered = centerMapInView(
-        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
-        sw,
-        sh,
-      );
-      this.cameraX = centered.cameraX;
-      this.cameraY = centered.cameraY;
-      this.zoom = centered.zoom;
-    } else {
-      const softened = softClampMapInView(
-        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
-        sw,
-        sh,
-      );
-      this.cameraX = softened.cameraX;
-      this.cameraY = softened.cameraY;
-      this.zoom = softened.zoom;
-    }
+    const softened = hardKeepMapPartiallyVisible(
+      { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+      sw,
+      sh,
+    );
+    this.cameraX = softened.cameraX;
+    this.cameraY = softened.cameraY;
+    this.zoom = softened.zoom;
     this.zoomChanged = true;
     this.applyCamera();
   }
@@ -941,19 +965,18 @@ export class IsoScene {
       { passive: false },
     );
 
+    const uiRoot = document.getElementById('ui-root');
+    const isGameTouchTarget = (target: EventTarget | null) => {
+      if (!target || !(target instanceof Node)) return false;
+      if (uiRoot?.contains(target)) return false;
+      return canvas.contains(target) || target === canvas || appRoot?.contains(target);
+    };
     const preventNativeGesture = (e: Event) => {
       e.preventDefault();
     };
     document.addEventListener('gesturestart', preventNativeGesture, { passive: false, capture: true });
     document.addEventListener('gesturechange', preventNativeGesture, { passive: false, capture: true });
     document.addEventListener('gestureend', preventNativeGesture, { passive: false, capture: true });
-    document.addEventListener(
-      'touchmove',
-      (e) => {
-        if (e.touches.length >= 1) e.preventDefault();
-      },
-      { passive: false, capture: true },
-    );
 
     const onGestureStart = (e: Event) => {
       e.preventDefault();
@@ -1047,6 +1070,7 @@ export class IsoScene {
     let lastTouchCount = 0;
 
     const onTouchPinchStart = (e: TouchEvent) => {
+      if (!isGameTouchTarget(e.target)) return;
       if (this.zoomSource === 'gesture') return;
       const n = e.touches.length;
       if (n >= 1) e.preventDefault();
@@ -1072,6 +1096,7 @@ export class IsoScene {
     };
 
     const onTouchPinchMove = (e: TouchEvent) => {
+      if (!isGameTouchTarget(e.target)) return;
       if (e.touches.length >= 1) e.preventDefault();
       if (e.touches.length >= 2) {
         if (this.pointers.size >= 2) return;
@@ -1094,15 +1119,15 @@ export class IsoScene {
       this.endZoomGesture();
     };
 
-    document.addEventListener('touchstart', onTouchPinchStart, { passive: false, capture: true });
-    document.addEventListener('touchmove', onTouchPinchMove, { passive: false, capture: true });
-    document.addEventListener(
+    canvas.addEventListener('touchstart', onTouchPinchStart, { passive: false });
+    canvas.addEventListener('touchmove', onTouchPinchMove, { passive: false });
+    canvas.addEventListener(
       'touchend',
       (e) => {
         lastTouchCount = e.touches.length;
         if (e.touches.length < 2) endTouchPinch();
       },
-      { capture: true, passive: true },
+      { passive: true },
     );
 
     const onPointerDown = (e: PointerEvent) => {
@@ -1332,6 +1357,30 @@ export class IsoScene {
   /** For QA — programmatic walk */
   getCharacterTile(): { x: number; y: number } {
     return { x: Math.round(this.charTx), y: Math.round(this.charTy) };
+  }
+
+  /** Client coordinates for tapping the drawn door of a building (QA). */
+  getDoorScreenClientPoint(name: string): { x: number; y: number } | null {
+    const obj = objects.find((o) => o.type === 'building' && o.name === name);
+    if (!obj?.door || !this.canvasEl) return null;
+    const spec: FootprintDrawSpec = {
+      fx: obj.footprintX ?? obj.x,
+      fy: obj.footprintY ?? obj.y,
+      w: obj.w ?? 3,
+      h: obj.h ?? 3,
+      ax: obj.x,
+      ay: obj.y,
+      doorFace: obj.doorFace ?? '+y',
+      door: obj.door,
+      kind: obj.name,
+    };
+    const foot = tileFootWorld(obj.x, obj.y);
+    const local = doorCenterLocal(spec);
+    const wx = foot.x + local.x;
+    const wy = foot.y + local.y;
+    const screen = this.worldToScreen(wx, wy);
+    const rect = this.canvasEl.getBoundingClientRect();
+    return { x: rect.left + screen.x, y: rect.top + screen.y };
   }
 
   /** For QA — place character on a walkable tile without opening doors. */

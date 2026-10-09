@@ -1,7 +1,7 @@
 import { mapWorldBounds } from '../iso/math';
 
 export const ZOOM_MIN = 0.25;
-export const ZOOM_MAX = 2;
+export const ZOOM_MAX = 1.5;
 
 /** Minimum fraction of map bbox (width & height) that must remain inside the viewport. */
 export const MAP_VISIBLE_MIN_FRAC = 0.3;
@@ -91,7 +91,7 @@ export function mapVisibleFractions(
   };
 }
 
-/** Hard clamp so at least MAP_VISIBLE_MIN_FRAC of map bbox stays on screen. */
+/** Keep at least MAP_VISIBLE_MIN_FRAC of the map on screen by moving the camera only (never caps zoom). */
 export function hardKeepMapPartiallyVisible(
   cam: CameraState,
   screenW: number,
@@ -100,13 +100,6 @@ export function hardKeepMapPartiallyVisible(
   let { cameraX, cameraY, zoom } = cam;
   zoom = clampZoom(zoom);
   const minF = MAP_VISIBLE_MIN_FRAC;
-  const bounds = mapWorldBounds();
-  const worldW = bounds.maxX - bounds.minX;
-  const worldH = bounds.maxY - bounds.minY;
-  const maxZoomForVisibility =
-    worldW > 0 && worldH > 0
-      ? Math.min(screenW / (worldW * minF), screenH / (worldH * minF))
-      : ZOOM_MAX;
 
   for (let i = 0; i < 10; i++) {
     const state = { cameraX, cameraY, zoom };
@@ -115,15 +108,6 @@ export function hardKeepMapPartiallyVisible(
 
     if (intersects && fracW >= minF && fracH >= minF) {
       return { cameraX, cameraY, zoom };
-    }
-
-    if (
-      Number.isFinite(maxZoomForVisibility) &&
-      zoom > maxZoomForVisibility &&
-      (!intersects || fracW < minF || fracH < minF)
-    ) {
-      zoom = clampZoom(maxZoomForVisibility);
-      continue;
     }
 
     if (!intersects || fracW < minF) {

@@ -12,9 +12,8 @@ const MOBILE_PROOF = 'mobile-375x812.png';
 const BASE = 'http://127.0.0.1:4173/interactive-portfolio-playtest/';
 
 const ZOOM_MIN = 0.25;
-const ZOOM_MAX = 2;
-/** 64×64 map at min zoom shows a smaller viewport fraction than the old 16×16 pilot. */
-const MAP_VISIBLE_MIN = 0.08;
+const ZOOM_MAX = 1.5;
+const MAP_VISIBLE_MIN = 0.3;
 const TILE_LIGHT_HEX = 'dddddd';
 
 /** Map64 building anchor tiles (draw pick / QA clicks). */
@@ -142,8 +141,8 @@ function assertFootAnchor(name, driftPx, errors, label) {
     errors.push(`${name}: ${label} footDriftPx missing`);
     return;
   }
-  if (driftPx > 160) {
-    errors.push(`${name}: ${label} tile/building foot drift ${driftPx.toFixed(2)}px`);
+  if (driftPx > 1) {
+    errors.push(`${name}: ${label} tile foot drift ${driftPx.toFixed(2)}px (max 1px)`);
   }
 }
 
@@ -594,33 +593,40 @@ async function buildingTapScreenPoint(page, tx, ty) {
   return { x: pt.x, y: pt.y - 40 * zoom };
 }
 
-async function cdpClickTile(page, tx, ty, opts = {}) {
-  const pt = opts.building ? await buildingTapScreenPoint(page, tx, ty) : await tileToScreen(page, tx, ty);
-  if (!pt) return false;
-  await page.evaluate(() => {
-    const ui = document.getElementById('ui-root');
-    if (ui) ui.style.pointerEvents = 'none';
-  });
+async function cdpClickClient(page, x, y) {
   const client = await page.context().newCDPSession(page);
-  await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: pt.x, y: pt.y });
+  await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
   await client.send('Input.dispatchMouseEvent', {
     type: 'mousePressed',
-    x: pt.x,
-    y: pt.y,
+    x,
+    y,
     button: 'left',
     clickCount: 1,
   });
   await client.send('Input.dispatchMouseEvent', {
     type: 'mouseReleased',
-    x: pt.x,
-    y: pt.y,
+    x,
+    y,
     button: 'left',
     clickCount: 1,
   });
-  await page.evaluate(() => {
-    const ui = document.getElementById('ui-root');
-    if (ui) ui.style.pointerEvents = '';
-  });
+  return true;
+}
+
+async function cdpClickTile(page, tx, ty, opts = {}) {
+  const pt = opts.building ? await buildingTapScreenPoint(page, tx, ty) : await tileToScreen(page, tx, ty);
+  if (!pt) return false;
+  await cdpClickClient(page, pt.x, pt.y);
+  return true;
+}
+
+async function cdpClickBuildingDoor(page, buildingName) {
+  const pt = await page.evaluate(
+    (name) => window.__playtestQa?.doorScreenPoint?.(name) ?? null,
+    buildingName,
+  );
+  if (!pt) return false;
+  await cdpClickClient(page, pt.x, pt.y);
   return true;
 }
 
@@ -748,7 +754,7 @@ async function testNoSpuriousDoorPanelAfterGroundWalk(page, errors) {
 
 async function setupIPhoneTouchPage(browser) {
   const context = await browser.newContext({
-    viewport: { width: 390, height: 844 },
+    viewport: { width: 375, height: 812 },
     deviceScaleFactor: 2,
     isMobile: true,
     hasTouch: true,
@@ -757,8 +763,8 @@ async function setupIPhoneTouchPage(browser) {
   const client = await context.newCDPSession(page);
   try {
     await client.send('Emulation.setDeviceMetricsOverride', {
-      width: 390,
-      height: 844,
+      width: 375,
+      height: 812,
       deviceScaleFactor: 2,
       mobile: true,
     });
@@ -776,13 +782,6 @@ async function dismissBuildingPanel(page) {
     await page.locator('.building-panel__close').click({ force: true }).catch(() => {});
     await wait(250);
   }
-}
-
-async function setUiPointerEvents(page, enabled) {
-  await page.evaluate((enabled) => {
-    const ui = document.getElementById('ui-root');
-    if (ui) ui.style.pointerEvents = enabled ? '' : 'none';
-  }, enabled);
 }
 
 async function touchTap(page, client, x, y) {
@@ -881,7 +880,6 @@ async function testTouchBuildingEntry(browser, errors, warnings) {
       await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
       await page.reload({ waitUntil: 'networkidle' });
       await wait(1500);
-      await setUiPointerEvents(page, false);
       const doorCase = qaDoorEntry[house.id];
       const start = qaStartFar[house.id];
       if (doorCase) {
@@ -942,7 +940,6 @@ async function testTouchBuildingEntry(browser, errors, warnings) {
       await page.goto(BASE, { waitUntil: 'networkidle' });
       await page.reload({ waitUntil: 'networkidle' });
       await wait(1500);
-      await setUiPointerEvents(page, false);
       await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 36));
       await wait(200);
       const doorPt = await tileToScreen(page, 39, 36);
@@ -965,7 +962,6 @@ async function testTouchBuildingEntry(browser, errors, warnings) {
       await page.goto(BASE, { waitUntil: 'networkidle' });
       await page.reload({ waitUntil: 'networkidle' });
       await wait(1500);
-      await setUiPointerEvents(page, false);
       const near = await tileToScreen(page, 31, 37);
       const building = await buildingRoofScreenPoint(page, QA.volaris.x, QA.volaris.y);
       if (!near || !building) {
@@ -996,7 +992,6 @@ async function openVolarisPanel(page) {
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
   await page.reload({ waitUntil: 'networkidle' });
   await wait(1200);
-  await setUiPointerEvents(page, false);
   if (!(await cdpClickTile(page, QA.volaris.x, QA.volaris.y, { building: true }))) return false;
   for (let i = 0; i < 36; i++) {
     if ((await page.locator('.building-panel--open').count()) > 0) return true;
@@ -1060,7 +1055,6 @@ async function testStaggeredPinchNoJump(page, errors) {
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
   await page.reload({ waitUntil: 'networkidle' });
   await wait(900);
-  await setUiPointerEvents(page, false);
   await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(35, 39));
   await wait(200);
 
@@ -1148,11 +1142,8 @@ async function testPanelSwitchBuilding(page, errors) {
     errors.push('panel-switch: could not open Volaris');
     return;
   }
-  const switched = await page.evaluate(
-    () => window.__playtestQa?.walkToBuilding?.('bain') === true,
-  );
-  if (!switched) {
-    errors.push('panel-switch: could not start walk to Bain');
+  if (!(await cdpClickBuildingDoor(page, 'bain'))) {
+    errors.push('panel-switch: could not click Bain door');
     return;
   }
   try {
@@ -1198,7 +1189,6 @@ async function testPanelClickInside(page, errors) {
     errors.push('panel-inside: could not open panel');
     return;
   }
-  await setUiPointerEvents(page, true);
   await page.locator('.building-panel__title').click();
   await wait(300);
   if ((await page.locator('.building-panel--open').count()) === 0) {
@@ -1212,35 +1202,158 @@ async function testPanelDismissTouch(browser, errors) {
     await page.goto(BASE, { waitUntil: 'networkidle' });
     await page.reload({ waitUntil: 'networkidle' });
     await wait(1500);
-    await setUiPointerEvents(page, false);
     await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 36));
     await wait(200);
-    const pt = await buildingRoofScreenPoint(page, QA.volaris.x, QA.volaris.y);
-    if (!pt) {
-      errors.push('panel-touch: roof point missing');
+    if (!(await cdpClickBuildingDoor(page, 'volaris'))) {
+      errors.push('panel-touch-close: could not tap Volaris door');
       return;
     }
-    await touchTap(page, client, pt.x, pt.y);
     await wait(5500);
     if ((await page.locator('.building-panel--open').count()) === 0) {
-      errors.push('panel-touch: panel did not open');
+      errors.push('panel-touch-close: panel did not open');
       return;
     }
-    const charBefore = await readCharTile(page);
-    const ground = await tileToScreen(page, 33, 38);
-    if (!ground) {
-      errors.push('panel-touch: ground point missing');
+    const close = await page.locator('.building-panel__close').boundingBox();
+    if (!close) {
+      errors.push('panel-touch-close: close button missing');
       return;
     }
-    await touchTap(page, client, ground.x, ground.y);
-    await wait(5000);
+    await touchTap(page, client, close.x + close.width / 2, close.y + close.height / 2);
+    await wait(500);
     if ((await page.locator('.building-panel--open').count()) > 0) {
-      errors.push('panel-touch: panel still open after outside tap');
+      errors.push('panel-touch-close: panel still open after ✕ touch tap');
     }
-    const charAfter = await readCharTile(page);
-    if (charBefore && charAfter && charBefore.x === charAfter.x && charBefore.y === charAfter.y) {
-      errors.push('panel-touch: character did not walk after outside tap');
+  } finally {
+    await context.close();
+  }
+}
+
+async function testMobile375PinchAndUi(browser, errors) {
+  const { page, client, context } = await setupIPhoneTouchPage(browser);
+  try {
+    await page.goto(`${BASE}#view=x=120&y=-420&z=0.500`, { waitUntil: 'networkidle' });
+    await wait(1200);
+    const canvas = await page.locator('#game-canvas').boundingBox();
+    if (!canvas) {
+      errors.push('mobile375: no canvas');
+      return;
     }
+    const cx = canvas.x + canvas.width / 2;
+    const cy = canvas.y + canvas.height / 2;
+    const z0 = (await readCanvasMetrics(page))?.zoom ?? 0;
+    const base = await readAnchorBaseline(page);
+
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: Math.round(cx - 60), y: Math.round(cy), id: 1, radiusX: 1, radiusY: 1, force: 1 }],
+    });
+    await wait(60);
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [
+        { x: Math.round(cx - 60), y: Math.round(cy), id: 1, radiusX: 1, radiusY: 1, force: 1 },
+        { x: Math.round(cx + 60), y: Math.round(cy), id: 2, radiusX: 1, radiusY: 1, force: 1 },
+      ],
+    });
+    await wait(80);
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [
+        { x: Math.round(cx - 110), y: Math.round(cy), id: 1, radiusX: 1, radiusY: 1, force: 1 },
+        { x: Math.round(cx + 110), y: Math.round(cy), id: 2, radiusX: 1, radiusY: 1, force: 1 },
+      ],
+    });
+    await wait(120);
+    const driftOut = await anchorScreenDriftPx(page, base);
+    if (!Number.isFinite(driftOut) || driftOut > 2) {
+      errors.push(`mobile375: pinch-out midpoint drift ${driftOut?.toFixed?.(2) ?? 'nan'}px`);
+    }
+    const zOut = (await readCanvasMetrics(page))?.zoom ?? 0;
+    if (zOut < z0 * 1.4) {
+      errors.push(`mobile375: pinch-out from z=${z0.toFixed(3)} to ${zOut.toFixed(3)} (<40% increase)`);
+    }
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [
+        { x: Math.round(cx - 50), y: Math.round(cy), id: 1, radiusX: 1, radiusY: 1, force: 1 },
+        { x: Math.round(cx + 50), y: Math.round(cy), id: 2, radiusX: 1, radiusY: 1, force: 1 },
+      ],
+    });
+    await wait(100);
+    const zIn = (await readCanvasMetrics(page))?.zoom ?? 0;
+    if (zIn >= zOut - 0.01) {
+      errors.push(`mobile375: pinch-in did not decrease zoom (${zOut.toFixed(3)} -> ${zIn.toFixed(3)})`);
+    }
+    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await wait(200);
+
+    await page.goto(`${BASE}#view=x=200&y=-500&z=${ZOOM_MIN}`, { waitUntil: 'networkidle' });
+    await wait(800);
+    const camBefore = await page.evaluate(() => {
+      const c = document.getElementById('game-canvas');
+      return {
+        x: Number(c?.dataset.camX ?? 0),
+        y: Number(c?.dataset.camY ?? 0),
+      };
+    });
+    const fromX = canvas.x + canvas.width * 0.3;
+    const toX = canvas.x + canvas.width * 0.75;
+    const panY = canvas.y + canvas.height * 0.5;
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: Math.round(fromX), y: Math.round(panY), id: 0, radiusX: 1, radiusY: 1, force: 1 }],
+    });
+    for (let i = 0; i < 8; i++) {
+      const x = fromX + ((toX - fromX) * (i + 1)) / 8;
+      await client.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ x: Math.round(x), y: Math.round(panY), id: 0, radiusX: 1, radiusY: 1, force: 1 }],
+      });
+      await wait(40);
+    }
+    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await wait(300);
+    const camAfter = await page.evaluate(() => {
+      const c = document.getElementById('game-canvas');
+      return {
+        x: Number(c?.dataset.camX ?? 0),
+        y: Number(c?.dataset.camY ?? 0),
+      };
+    });
+    const panPx = Math.hypot(
+      (camAfter.x - camBefore.x) * ZOOM_MIN,
+      (camAfter.y - camBefore.y) * ZOOM_MIN,
+    );
+    if (panPx < 100) {
+      errors.push(`mobile375: one-finger pan at min zoom moved ${panPx.toFixed(0)}px (need >100)`);
+    }
+
+    await page.evaluate(() => {
+      localStorage.setItem(
+        'playtest-checklist-v3',
+        JSON.stringify({
+          completed: {},
+          skipped: false,
+          dismissed: true,
+          collapsed: true,
+          mobileExpanded: false,
+        }),
+      );
+    });
+    await page.reload({ waitUntil: 'networkidle' });
+    await wait(600);
+    const ring = await page.locator('.checklist__ring-btn').boundingBox();
+    if (!ring) {
+      errors.push('mobile375: checklist pill missing');
+    } else {
+      await touchTap(page, client, ring.x + ring.width / 2, ring.y + ring.height / 2);
+      await wait(300);
+      if (!(await page.locator('.checklist__list').isVisible())) {
+        errors.push('mobile375: checklist pill touch did not expand list');
+      }
+    }
+
+    await page.screenshot({ path: path.join(outDir, 'mobile-375-pinch-after.png') });
   } finally {
     await context.close();
   }
@@ -1251,35 +1364,10 @@ async function testEnterBuildingChecklist(page, errors) {
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
   await page.reload({ waitUntil: 'networkidle' });
   await wait(1200);
-  const pt = await buildingTapScreenPoint(page, QA.volaris.x, QA.volaris.y);
-  if (!pt) {
-    errors.push('enter-building: could not resolve building screen position');
+  if (!(await cdpClickBuildingDoor(page, 'volaris'))) {
+    errors.push('enter-building: could not click Volaris door');
     return;
   }
-  await page.evaluate(() => {
-    const ui = document.getElementById('ui-root');
-    if (ui) ui.style.pointerEvents = 'none';
-  });
-  const client = await page.context().newCDPSession(page);
-  await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: pt.x, y: pt.y });
-  await client.send('Input.dispatchMouseEvent', {
-    type: 'mousePressed',
-    x: pt.x,
-    y: pt.y,
-    button: 'left',
-    clickCount: 1,
-  });
-  await client.send('Input.dispatchMouseEvent', {
-    type: 'mouseReleased',
-    x: pt.x,
-    y: pt.y,
-    button: 'left',
-    clickCount: 1,
-  });
-  await page.evaluate(() => {
-    const ui = document.getElementById('ui-root');
-    if (ui) ui.style.pointerEvents = '';
-  });
   for (let i = 0; i < 40; i++) {
     if ((await page.locator('.building-panel--open').count()) > 0) break;
     await wait(250);
@@ -1306,21 +1394,11 @@ async function testBuildingWalkEndsOnDoorTile(page, errors) {
     await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
     await page.reload({ waitUntil: 'networkidle' });
     await wait(800);
-    await setUiPointerEvents(page, false);
     const start = QA_WALK_START[b.name] ?? [31, 36];
     await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), start);
     await wait(200);
-    const pt = await buildingRoofScreenPoint(page, b.x, b.y);
-    if (!pt) {
-      errors.push(`door-arrival: ${b.name} screen point missing`);
-      continue;
-    }
-    const walked = await page.evaluate(
-      (name) => window.__playtestQa?.walkToBuilding?.(name) === true,
-      b.name,
-    );
-    if (!walked) {
-      errors.push(`door-arrival: walkToBuilding failed for ${b.name}`);
+    if (!(await cdpClickBuildingDoor(page, b.name))) {
+      errors.push(`door-arrival: door click failed for ${b.name}`);
       continue;
     }
     for (let i = 0; i < 120; i++) {
@@ -1524,16 +1602,11 @@ async function testMap64EnterablePanels(page, errors) {
     await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
     await page.reload({ waitUntil: 'networkidle' });
     await wait(600);
-    await setUiPointerEvents(page, false);
     const start = QA_WALK_START[b.name] ?? [31, 36];
     await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), start);
     await wait(200);
-    const walked = await page.evaluate(
-      (name) => window.__playtestQa?.walkToBuilding?.(name) === true,
-      b.name,
-    );
-    if (!walked) {
-      errors.push(`map64-panels: walkToBuilding failed for ${b.name}`);
+    if (!(await cdpClickBuildingDoor(page, b.name))) {
+      errors.push(`map64-panels: door click failed for ${b.name}`);
       continue;
     }
     for (let i = 0; i < 80; i++) {
@@ -1571,7 +1644,6 @@ async function testMap64PaisajeNoPanel(page, errors) {
   ]) {
     await page.goto(BASE, { waitUntil: 'networkidle' });
     await wait(700);
-    await setUiPointerEvents(page, false);
     if (!(await cdpClickTile(page, spot.tx, spot.ty))) {
       errors.push(`map64-paisaje: could not click ${spot.name}`);
       continue;
@@ -1598,7 +1670,6 @@ async function captureMap64ProofScreenshots(browser, errors, routeReport) {
     await wait(400);
     await desktop.screenshot({ path: path.join(outDir, 'map64-full-map-zoomout.png') });
 
-    await setUiPointerEvents(desktop, false);
     if (await cdpClickTile(desktop, QA.volaris.x, QA.volaris.y, { building: true })) {
       for (let i = 0; i < 48; i++) {
         if ((await desktop.locator('.building-panel--open').count()) > 0) break;
@@ -1621,9 +1692,30 @@ async function captureMap64ProofScreenshots(browser, errors, routeReport) {
     await wait(700);
     await desktop.screenshot({ path: path.join(outDir, 'map64-muro-view.png') });
 
-    await desktop.goto(`${BASE}#view=x=2100&y=-3800&z=0.32`, { waitUntil: 'networkidle' });
-    await wait(700);
-    await desktop.screenshot({ path: path.join(outDir, 'map64-edge-corner-sw.png') });
+    for (const [zLabel, z] of [
+      ['min', ZOOM_MIN],
+      ['mid', 1],
+      ['max', ZOOM_MAX],
+    ]) {
+      await desktop.goto(`${BASE}#view=x=2480&y=-4080&z=${z}`, { waitUntil: 'networkidle' });
+      await wait(600);
+      await desktop.screenshot({ path: path.join(outDir, `map64-edge-corner-63-63-${zLabel}.png`) });
+    }
+
+    const buildingViews = [
+      { file: 'map64-volaris-door-y.png', hash: '#view=x=920&y=-2180&z=0.95' },
+      { file: 'map64-pg-door-x.png', hash: '#view=x=-280&y=-2180&z=0.95' },
+      { file: 'map64-sambil-door.png', hash: '#view=x=1680&y=-920&z=0.85' },
+      { file: 'map64-catedral-door.png', hash: '#view=x=-920&y=-920&z=0.85' },
+      { file: 'map64-flor-door-x.png', hash: '#view=x=1520&y=-3180&z=0.9' },
+      { file: 'map64-estudio-door.png', hash: '#view=x=320&y=-2180&z=0.88' },
+      { file: 'map64-obelisco-vs-catedral.png', hash: '#view=x=-520&y=-2380&z=0.55' },
+    ];
+    for (const v of buildingViews) {
+      await desktop.goto(`${BASE}${v.hash}`, { waitUntil: 'networkidle' });
+      await wait(650);
+      await desktop.screenshot({ path: path.join(outDir, v.file) });
+    }
   } catch (e) {
     errors.push(`map64-screenshots: ${String(e)}`);
   } finally {
@@ -1740,6 +1832,7 @@ async function main() {
 
     await testTouchBuildingEntry(browser, errors, warnings);
     await testPanelDismissTouch(browser, errors);
+    await testMobile375PinchAndUi(browser, errors);
 
     const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
     await mobile.goto(BASE, { waitUntil: 'networkidle' });

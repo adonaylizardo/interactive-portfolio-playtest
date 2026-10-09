@@ -60,6 +60,7 @@ async function main(): Promise<void> {
     getCharacterTile: () => scene.getCharacterTile(),
     setCharacterTile: (x: number, y: number) => scene.setCharacterTileForQa(x, y),
     walkToBuilding: (name: string) => scene.walkToBuildingForQa(name),
+    doorScreenPoint: (name: string) => scene.getDoorScreenClientPoint(name),
   };
 }
 

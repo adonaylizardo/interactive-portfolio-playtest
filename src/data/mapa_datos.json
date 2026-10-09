@@ -361,6 +361,21 @@
    "tipo": "paisaje (sin interior)",
    "huella": "3×3 (isla) + anillo de calle = 5×5",
    "hueco_min_a_edificio": 4
+  },
+  {
+   "id": "muro",
+   "casillas": "x 35–37, y 40–41",
+   "acceso": [
+    38,
+    41
+   ],
+   "desde_inicio": 10,
+   "s": 2.08,
+   "casa_mas_cercana": "estudio",
+   "desde_casa": 6,
+   "tipo": "paisaje (sin interior)",
+   "huella": "3×2",
+   "hueco_min_a_edificio": 4
   }
  ],
  "cruce": {

@@ -1,5 +1,6 @@
 import { Graphics } from 'pixi.js';
 import { TILE_H, TILE_W } from '../data/map';
+import { tileFootWorld } from '../iso/math';
 import { C } from './colors';
 
 type Pt = { x: number; y: number };
@@ -93,50 +94,127 @@ export function treeCanopyTrunkOverlap(): {
   };
 }
 
+export type FootprintDrawSpec = {
+  fx: number;
+  fy: number;
+  w: number;
+  h: number;
+  ax: number;
+  ay: number;
+  doorFace: '+y' | '+x';
+  door: { x: number; y: number };
+  kind: string;
+};
+
+function localFoot(ax: number, ay: number, tx: number, ty: number): Pt {
+  const a = tileFootWorld(ax, ay);
+  const f = tileFootWorld(tx, ty);
+  return { x: f.x - a.x, y: f.y - a.y };
+}
+
+function northTop(ax: number, ay: number, tx: number, ty: number): Pt {
+  const f = localFoot(ax, ay, tx, ty);
+  return { x: f.x, y: f.y - TILE_H };
+}
+
+function raise(p: Pt, h: number): Pt {
+  return { x: p.x, y: p.y - h };
+}
+
+function lerpPt(a: Pt, b: Pt, t: number): Pt {
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+}
+
+function wallHeightForKind(kind: string, w: number, h: number): number {
+  if (kind === 'estudio') return 46;
+  if (kind === 'sambil') return 58;
+  if (kind === 'catedral') return 88;
+  if (kind === 'flor') return 50;
+  if (w >= 6 || h >= 6) return 46;
+  return 72;
+}
+
+function footprintCorners(spec: FootprintDrawSpec): { sw: Pt; se: Pt; nw: Pt; ne: Pt } {
+  const { fx, fy, w, h, ax, ay } = spec;
+  return {
+    sw: localFoot(ax, ay, fx, fy + h - 1),
+    se: localFoot(ax, ay, fx + w - 1, fy + h - 1),
+    nw: northTop(ax, ay, fx, fy),
+    ne: northTop(ax, ay, fx + w - 1, fy),
+  };
+}
+
+export function doorCenterLocal(spec: FootprintDrawSpec): Pt {
+  const { sw, se, ne } = footprintCorners(spec);
+  const wallH = wallHeightForKind(spec.kind, spec.w, spec.h);
+  const doorH = Math.min(34, wallH * 0.45);
+  if (spec.doorFace === '+y') {
+    const u = spec.w <= 1 ? 0.5 : (spec.door.x - spec.fx) / (spec.w - 1);
+    const base = lerpPt(sw, se, Math.min(1, Math.max(0, u)));
+    return { x: base.x, y: base.y - doorH * 0.55 };
+  }
+  const v = spec.h <= 1 ? 0.5 : (spec.door.y - spec.fy) / (spec.h - 1);
+  const base = lerpPt(se, ne, Math.min(1, Math.max(0, v)));
+  return { x: base.x, y: base.y - doorH * 0.55 };
+}
+
+const ESTUDIO_SPEC: FootprintDrawSpec = {
+  fx: 28,
+  fy: 30,
+  w: 6,
+  h: 6,
+  ax: 31,
+  ay: 35,
+  doorFace: '+y',
+  door: { x: 31, y: 36 },
+  kind: 'estudio',
+};
+
 export function buildingInteriorGapSample(): Pt {
-  return ht({ x: -18, y: -22 });
+  const { sw, se } = footprintCorners(ESTUDIO_SPEC);
+  const wallH = wallHeightForKind('estudio', 6, 6);
+  const mid = lerpPt(sw, se, 0.38);
+  return { x: mid.x - 10, y: mid.y - wallH * 0.38 };
 }
 
 export function buildingFrontWallsCover(p: Pt): boolean {
-  const S = ht({ x: 0, y: 0 });
-  const W = ht({ x: -48, y: -24 });
-  const Wp = ht({ x: -48, y: -80 });
-  const Sp = ht({ x: 0, y: -56 });
-  return pointInQuad(p, S, W, Wp, Sp);
+  const { sw, se, nw } = footprintCorners(ESTUDIO_SPEC);
+  const wallH = wallHeightForKind('estudio', 6, 6);
+  return (
+    pointInQuad(p, sw, nw, raise(nw, wallH), raise(sw, wallH)) ||
+    pointInQuad(p, sw, se, raise(se, wallH), raise(sw, wallH))
+  );
 }
 
-/** Roof, gable, walls, and door — used for tap hit testing on buildings. */
-export function buildingPickHit(localP: Pt, scale = 1): boolean {
-  const S = ht({ x: 0, y: 0 }, scale);
-  const E = ht({ x: 48, y: -24 }, scale);
-  const Sp = ht({ x: 0, y: -56 }, scale);
-  const Ep = ht({ x: 48, y: -80 }, scale);
-  const Wp = ht({ x: -48, y: -80 }, scale);
-  const R1 = ht({ x: 24, y: -104 }, scale);
-  const R2 = ht({ x: -24, y: -128 }, scale);
-  if (buildingFrontWallsCoverScaled(localP, scale)) return true;
-  if (pointInQuad(localP, S, E, Ep, R1) || pointInQuad(localP, S, E, R1, Sp)) return true;
-  if (pointInQuad(localP, Sp, R1, R2, Wp)) return true;
-  if (
-    pointInQuad(
-      localP,
-      ht({ x: 18, y: -9 }, scale),
-      ht({ x: 30, y: -15 }, scale),
-      ht({ x: 30, y: -39 }, scale),
-      ht({ x: 18, y: -33 }, scale),
-    )
-  ) {
-    return true;
+/** Walls, roof, and door — tap hit testing on footprint buildings. */
+export function buildingPickHit(localP: Pt, spec: FootprintDrawSpec): boolean {
+  const { sw, se, nw, ne } = footprintCorners(spec);
+  const wallH = wallHeightForKind(spec.kind, spec.w, spec.h);
+  const faces = [
+    [sw, nw, raise(nw, wallH), raise(sw, wallH)],
+    [sw, se, raise(se, wallH), raise(sw, wallH)],
+    [se, ne, raise(ne, wallH), raise(se, wallH)],
+    [raise(sw, wallH), raise(se, wallH), raise(ne, wallH), raise(nw, wallH)],
+  ] as Pt[][];
+  for (const f of faces) {
+    if (pointInQuad(localP, f[0], f[1], f[2], f[3])) return true;
+  }
+  const dc = doorCenterLocal(spec);
+  if (Math.abs(localP.x - dc.x) < 14 && Math.abs(localP.y - dc.y) < 22) return true;
+  if (spec.kind === 'catedral') {
+    for (const corner of [nw, ne]) {
+      const th = 112;
+      const tw = 22;
+      const box: Pt[] = [
+        corner,
+        { x: corner.x + tw, y: corner.y - tw * 0.5 },
+        { x: corner.x + tw, y: corner.y - th },
+        { x: corner.x, y: corner.y - th + tw * 0.5 },
+      ];
+      if (pointInQuad(localP, box[0], box[1], box[2], box[3])) return true;
+    }
   }
   return false;
-}
-
-function buildingFrontWallsCoverScaled(p: Pt, scale: number): boolean {
-  const S = ht({ x: 0, y: 0 }, scale);
-  const W = ht({ x: -48, y: -24 }, scale);
-  const Wp = ht({ x: -48, y: -80 }, scale);
-  const Sp = ht({ x: 0, y: -56 }, scale);
-  return pointInQuad(p, S, W, Wp, Sp);
 }
 
 export function footprint(bwScale = 1): { bw: number; bh: number } {
@@ -176,55 +254,100 @@ export function drawDiamond(g: Graphics, fill: number, stroke?: number): void {
   }
 }
 
-export function drawBuilding(
+function drawDoorOnFace(
   g: Graphics,
-  hover: boolean,
-  scale = 1,
-  _doorFace: '+y' | '+x' = '+y',
+  a: Pt,
+  b: Pt,
+  aTop: Pt,
+  bTop: Pt,
+  u: number,
+  fill: number,
 ): void {
+  const w = 14;
+  const h = 28;
+  const c = lerpPt(lerpPt(a, b, u), lerpPt(aTop, bTop, u), 0.5);
+  poly(
+    g,
+    [
+      { x: c.x - w / 2, y: c.y - h / 2 },
+      { x: c.x + w / 2, y: c.y - h / 2 - 4 },
+      { x: c.x + w / 2, y: c.y + h / 2 - 4 },
+      { x: c.x - w / 2, y: c.y + h / 2 },
+    ],
+    fill,
+  );
+}
+
+export function drawFootprintBuilding(g: Graphics, hover: boolean, spec: FootprintDrawSpec): void {
   const left = hover ? C.buildingLeftHover : C.buildingLeft;
   const gable = hover ? C.buildingRightHover : C.buildingRight;
   const roof = hover ? C.buildingRoofNearHover : C.buildingRoofNear;
   const line = C.buildingFascia;
   const door = C.door;
 
-  const S = ht({ x: 0, y: 0 }, scale);
-  const E = ht({ x: 48, y: -24 }, scale);
-  const W = ht({ x: -48, y: -24 }, scale);
-  const Sp = ht({ x: 0, y: -56 }, scale);
-  const Ep = ht({ x: 48, y: -80 }, scale);
-  const Wp = ht({ x: -48, y: -80 }, scale);
-  const R1 = ht({ x: 24, y: -104 }, scale);
-  const R2 = ht({ x: -24, y: -128 }, scale);
+  const { sw, se, nw, ne } = footprintCorners(spec);
+  const wallH = wallHeightForKind(spec.kind, spec.w, spec.h);
 
-  poly(g, [S, W, Wp, Sp], left);
-  poly(g, [S, E, Ep, R1, Sp], gable);
-  poly(g, [Sp, R1, R2, Wp], roof);
+  poly(g, [sw, nw, raise(nw, wallH), raise(sw, wallH)], left);
+  poly(g, [sw, se, raise(se, wallH), raise(sw, wallH)], gable);
+  poly(g, [se, ne, raise(ne, wallH), raise(se, wallH)], gable);
+  poly(g, [raise(sw, wallH), raise(se, wallH), raise(ne, wallH), raise(nw, wallH)], roof);
 
-  strokeSeg(g, Sp, Wp, 1.5, line);
-  strokeSeg(g, Sp, R1, 1.5, line);
-  strokeSeg(g, R1, Ep, 1.5, line);
-  strokeSeg(g, R1, R2, 1.5, line);
+  strokeSeg(g, raise(sw, wallH), raise(se, wallH), 1.5, line);
+  strokeSeg(g, raise(se, wallH), raise(ne, wallH), 1.5, line);
+  strokeSeg(g, raise(ne, wallH), raise(nw, wallH), 1.5, line);
+  strokeSeg(g, raise(nw, wallH), raise(sw, wallH), 1.5, line);
 
-  poly(
-    g,
-    [
-      ht({ x: 18, y: -9 }, scale),
-      ht({ x: 30, y: -15 }, scale),
-      ht({ x: 30, y: -39 }, scale),
-      ht({ x: 18, y: -33 }, scale),
-    ],
-    door,
-  );
+  if (spec.doorFace === '+y') {
+    const u = spec.w <= 1 ? 0.5 : (spec.door.x - spec.fx) / (spec.w - 1);
+    drawDoorOnFace(g, sw, se, raise(sw, wallH), raise(se, wallH), u, door);
+  } else {
+    const v = spec.h <= 1 ? 0.5 : (spec.door.y - spec.fy) / (spec.h - 1);
+    drawDoorOnFace(g, se, ne, raise(se, wallH), raise(ne, wallH), v, door);
+  }
+
+  if (spec.kind === 'catedral') {
+    const towerH = 112;
+    const tw = 20;
+    for (const corner of [nw, ne]) {
+      poly(
+        g,
+        [
+          corner,
+          { x: corner.x + tw, y: corner.y - tw * 0.5 },
+          { x: corner.x + tw, y: corner.y - towerH },
+          { x: corner.x, y: corner.y - towerH + tw * 0.5 },
+        ],
+        left,
+      );
+    }
+  }
 }
 
-export function drawObelisco(g: Graphics, hover: boolean): void {
+/** Tallest landmark — thin slab ~1.1×0.3 tiles, wide face toward +y. */
+export function drawObelisco(
+  g: Graphics,
+  hover: boolean,
+  fx = 14,
+  fy = 35,
+  w = 3,
+  h = 3,
+  ax = 15,
+  ay = 37,
+): void {
   const slab = hover ? 0x707070 : 0x626262;
   const base = hover ? 0x585858 : 0x4a4a4a;
-  poly(g, [ht({ x: -8, y: 0 }), ht({ x: 8, y: 0 }), ht({ x: 8, y: -120 }), ht({ x: -8, y: -120 })], base);
-  poly(g, [ht({ x: -6, y: -8 }), ht({ x: 6, y: -8 }), ht({ x: 6, y: -112 }), ht({ x: -6, y: -112 })], slab);
-  g.circle(ht({ x: 0, y: -100 }).x, ht({ x: 0, y: -100 }).y, 5);
-  g.fill(0x888888);
+  const cx = localFoot(ax, ay, fx + Math.floor(w / 2), fy + Math.floor(h / 2));
+  const halfW = TILE_W * 0.55;
+  const depth = TILE_H * 0.3;
+  const height = 138;
+  const sw = { x: cx.x - halfW * 0.5, y: cx.y + depth * 0.5 };
+  const se = { x: cx.x + halfW * 0.5, y: cx.y + depth * 0.5 };
+  const ne = { x: cx.x + halfW * 0.5, y: cx.y - depth * 0.5 };
+  const nw = { x: cx.x - halfW * 0.5, y: cx.y - depth * 0.5 };
+  poly(g, [sw, se, raise(se, height), raise(sw, height)], base);
+  poly(g, [se, ne, raise(ne, height), raise(se, height)], slab);
+  poly(g, [raise(sw, height), raise(se, height), raise(ne, height), raise(nw, height)], slab);
 }
 
 /** Climbing wall (muro): L-shaped plank walls, open top with beams, hold dots on +y face. */
@@ -271,21 +394,33 @@ export function drawMuro(g: Graphics, hover: boolean): void {
   }
 }
 
-export function drawRedoma(g: Graphics, hover: boolean): void {
+export function drawRedoma(
+  g: Graphics,
+  hover: boolean,
+  fx = 45,
+  fy = 35,
+  w = 3,
+  h = 3,
+  ax = 46,
+  ay = 37,
+): void {
   const island = hover ? 0x6a6a6a : 0x5c5c5c;
   const ring = hover ? 0x787878 : 0x686868;
-  g.ellipse(0, -8, 36, 18);
+  const cx = localFoot(ax, ay, fx + Math.floor(w / 2), fy + Math.floor(h / 2));
+  g.ellipse(cx.x, cx.y - 8, 36, 18);
   g.fill(ring);
-  g.ellipse(0, -10, 22, 12);
-  g.fill(island);
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2;
-    const x1 = Math.cos(a) * 14;
-    const y1 = -10 + Math.sin(a) * 7;
-    const x2 = Math.cos(a) * 28;
-    const y2 = -8 + Math.sin(a) * 10;
-    strokeSeg(g, { x: x1, y: y1 }, { x: x2, y: y2 }, 2, 0x808080);
+  g.ellipse(cx.x, cx.y - 10, 10, 6);
+  g.fill(0x4a4a4a);
+  for (let i = 0; i < 32; i++) {
+    const a = (i / 32) * Math.PI * 2;
+    const x1 = cx.x + Math.cos(a) * 12;
+    const y1 = cx.y - 10 + Math.sin(a) * 6;
+    const x2 = cx.x + Math.cos(a) * 30;
+    const y2 = cx.y - 8 + Math.sin(a) * 11;
+    strokeSeg(g, { x: x1, y: y1 }, { x: x2, y: y2 }, 2, island);
   }
+  g.ellipse(cx.x, cx.y - 10, 22, 12);
+  g.fill({ color: island, alpha: 0.35 });
 }
 
 export function drawBench(g: Graphics, hover: boolean): void {
