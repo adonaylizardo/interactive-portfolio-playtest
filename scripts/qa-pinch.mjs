@@ -1200,20 +1200,29 @@ async function captureUiProofScreenshots(browser, errors) {
   }
 }
 
+async function waitForPreview(url, maxAttempts = 60) {
+  for (let i = 0; i < maxAttempts; i++) {
+    await wait(500);
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(2500) });
+      if (res.ok) return true;
+    } catch {
+      /* retry */
+    }
+  }
+  return false;
+}
+
 async function main() {
   await mkdir(outDir, { recursive: true });
   const preview = spawn('npm', ['run', 'preview', '--', '--port', '4173', '--strictPort'], {
     cwd: root,
     stdio: 'pipe',
   });
-  for (let i = 0; i < 50; i++) {
-    await wait(200);
-    try {
-      const res = await fetch(BASE);
-      if (res.ok) break;
-    } catch {
-      /* retry */
-    }
+  if (!(await waitForPreview(BASE))) {
+    preview.kill('SIGTERM');
+    console.error('preview server did not become ready at', BASE);
+    process.exit(1);
   }
 
   const errors = [];
