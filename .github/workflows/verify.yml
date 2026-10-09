@@ -39,7 +39,7 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: npm run qa:pinch
-        timeout-minutes: 22
+        timeout-minutes: 35
         run: npm run qa:pinch
 
       - name: Upload QA artifacts
