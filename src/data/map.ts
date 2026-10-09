@@ -1,5 +1,7 @@
 /** Map dimensions and tile/object definitions. Edit this file to change the world layout. */
 
+import { tileFootWorld, worldToTile } from '../iso/math';
+
 export const MAP_WIDTH = 16;
 export const MAP_HEIGHT = 16;
 
@@ -24,6 +26,23 @@ export type MapCell = {
   walkable: boolean;
   groundId: string;
 };
+
+/** Matches drawBuilding east-face door — ground tile in front of the drawn door. */
+function buildingDoorApproachTile(anchorTx: number, anchorTy: number): { x: number; y: number } | null {
+  const foot = tileFootWorld(anchorTx, anchorTy);
+  const tileCenterY = -TILE_H / 2;
+  const houseFoot = [
+    { x: 0, y: 0 },
+    { x: 48, y: -24 },
+    { x: 0, y: -48 },
+    { x: -48, y: -24 },
+  ];
+  const cx = houseFoot.reduce((s, p) => s + p.x, 0) / houseFoot.length;
+  const cy = houseFoot.reduce((s, p) => s + p.y, 0) / houseFoot.length;
+  const off = { x: -cx, y: tileCenterY - cy };
+  const probe = { x: 40 + off.x, y: -4 + off.y };
+  return worldToTile(foot.x + probe.x, foot.y + probe.y);
+}
 
 function emptyGrid(): MapCell[][] {
   const grid: MapCell[][] = [];
@@ -76,7 +95,7 @@ export const objects: MapObject[] = [
     w: 2,
     h: 2,
     walkable: false,
-    door: { x: 3, y: 5 },
+    door: { x: 4, y: 4 },
     panelTitle: 'Caso de ejemplo 1',
   },
   {
@@ -89,7 +108,7 @@ export const objects: MapObject[] = [
     w: 2,
     h: 2,
     walkable: false,
-    door: { x: 12, y: 6 },
+    door: { x: 13, y: 5 },
     panelTitle: 'Caso de ejemplo 2',
   },
   {
@@ -102,7 +121,7 @@ export const objects: MapObject[] = [
     w: 2,
     h: 2,
     walkable: false,
-    door: { x: 10, y: 12 },
+    door: { x: 11, y: 11 },
     panelTitle: 'Caso de ejemplo 3',
   },
   {
@@ -115,7 +134,7 @@ export const objects: MapObject[] = [
     w: 2,
     h: 2,
     walkable: false,
-    door: { x: 5, y: 13 },
+    door: { x: 6, y: 12 },
     panelTitle: 'Caso de ejemplo 4',
   },
   {
@@ -154,6 +173,13 @@ export const objects: MapObject[] = [
 ];
 
 for (const obj of objects) {
+  if (obj.type === 'building' && obj.w && obj.h) {
+    const approach = buildingDoorApproachTile(obj.x, obj.y);
+    if (approach) obj.door = approach;
+  }
+}
+
+for (const obj of objects) {
   if (obj.walkable === false && obj.w && obj.h) {
     blockRect(obj.x, obj.y, obj.w, obj.h);
     if (obj.door) {
@@ -170,26 +196,27 @@ for (const obj of objects) {
 
 // Corridors from each door to the main path network
 const doorCorridors: [number, number][] = [
-  [2, 5],
-  [3, 5],
-  [3, 6],
-  [3, 7],
-  [3, 8],
-  [12, 6],
-  [12, 7],
-  [12, 8],
-  [10, 12],
-  [10, 11],
-  [10, 10],
-  [10, 9],
+  [3, 4],
+  [4, 4],
+  [4, 5],
+  [4, 6],
+  [4, 7],
+  [4, 8],
+  [13, 5],
+  [13, 6],
+  [13, 7],
+  [13, 8],
+  [11, 11],
+  [11, 10],
+  [11, 9],
+  [11, 8],
   [10, 8],
-  [7, 12],
-  [5, 13],
-  [5, 12],
-  [5, 11],
-  [5, 10],
-  [5, 9],
-  [5, 8],
+  [6, 12],
+  [6, 11],
+  [6, 10],
+  [6, 9],
+  [6, 8],
+  [7, 8],
 ];
 function isBuildingFootprintTile(tx: number, ty: number, allowDoor = false): boolean {
   for (const o of objects) {
@@ -299,6 +326,12 @@ export function resolveWalkTarget(tx: number, ty: number): { x: number; y: numbe
   const building = getBuildingAt(tx, ty);
   if (building?.door) return building.door;
   return { x: tx, y: ty };
+}
+
+export function getBuildingDoorTiles(): { name: string; x: number; y: number; door: { x: number; y: number } }[] {
+  return objects
+    .filter((o) => o.type === 'building' && o.door)
+    .map((o) => ({ name: o.name, x: o.x, y: o.y, door: o.door! }));
 }
 
 export function getObjectAt(tx: number, ty: number): MapObject | undefined {

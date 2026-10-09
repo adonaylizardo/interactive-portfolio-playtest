@@ -411,7 +411,6 @@ export class IsoScene {
     this.pathGfx.clear();
     if (this.path.length === 0) return;
     if (this.events.buildingPanel?.isOpen()) return;
-    if (this.pendingBuildingEntry) return;
     const points = [{ x: this.charTx, y: this.charTy }, ...this.path];
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
@@ -801,7 +800,6 @@ export class IsoScene {
       const k = e.key.toLowerCase();
       if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
         this.keys.add(k);
-        this.events.onChecklist('walk-keys');
         e.preventDefault();
       }
       if (e.key === 'Shift') this.shiftHeld = true;
@@ -1081,7 +1079,10 @@ export class IsoScene {
     const ty = Math.round(this.charTy);
     if (tx === this.lastRoundedTile.x && ty === this.lastRoundedTile.y) return;
     this.lastRoundedTile = { x: tx, y: ty };
-    if (fromKeyboard) this.openDoorIfOnTile(tx, ty);
+    if (fromKeyboard) {
+      this.events.onChecklist('walk-keys');
+      this.openDoorIfOnTile(tx, ty);
+    }
   }
 
   private openDoorIfOnTile(tx: number, ty: number): void {
@@ -1100,8 +1101,7 @@ export class IsoScene {
     const tx = Math.round(this.charTx);
     const ty = Math.round(this.charTy);
     const d = this.pendingBuildingEntry.door;
-    const chebyshev = Math.max(Math.abs(tx - d.x), Math.abs(ty - d.y));
-    if (chebyshev > 1) {
+    if (tx !== d.x || ty !== d.y) {
       this.pendingBuildingEntry = null;
       return;
     }

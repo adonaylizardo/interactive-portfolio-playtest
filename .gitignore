@@ -3,3 +3,5 @@ dist
 .DS_Store
 *.local
 .env
+artifacts/qa-screenshots/*
+!artifacts/qa-screenshots/.gitkeep

@@ -1,5 +1,5 @@
 import { ChecklistUI } from './checklist/ui';
-import { validateWalkGridFootprint } from './data/map';
+import { getBuildingDoorTiles, validateWalkGridFootprint } from './data/map';
 import { IsoScene } from './game/scene';
 import { findPath } from './iso/pathfinding';
 import { BuildingPanel } from './ui/buildingPanel';
@@ -39,6 +39,7 @@ async function main(): Promise<void> {
 
   (window as unknown as { __playtestQa?: Record<string, unknown> }).__playtestQa = {
     validateWalkGridFootprint,
+    getBuildingDoorTiles,
     findPath,
     getCharacterTile: () => scene.getCharacterTile(),
     setCharacterTile: (x: number, y: number) => scene.setCharacterTileForQa(x, y),

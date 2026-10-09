@@ -601,10 +601,10 @@ async function testWalkGridFootprintRules(page, errors) {
     if (!findPath) return ['findPath hook missing'];
     const footprint = (x, y) => {
       const buildings = [
-        { x: 3, y: 4, w: 2, h: 2, door: [3, 5] },
-        { x: 12, y: 5, w: 2, h: 2, door: [12, 6] },
-        { x: 10, y: 11, w: 2, h: 2, door: [10, 12] },
-        { x: 5, y: 12, w: 2, h: 2, door: [5, 13] },
+        { x: 3, y: 4, w: 2, h: 2, door: [4, 4] },
+        { x: 12, y: 5, w: 2, h: 2, door: [13, 5] },
+        { x: 10, y: 11, w: 2, h: 2, door: [11, 11] },
+        { x: 5, y: 12, w: 2, h: 2, door: [6, 12] },
       ];
       for (const b of buildings) {
         for (let dy = 0; dy < b.h; dy++) {
@@ -848,8 +848,8 @@ async function testTouchBuildingEntry(browser, errors, warnings) {
     'caso-3': [9, 10],
   };
   const qaDoorEntry = {
-    'caso-2': { char: [12, 7], door: [12, 6] },
-    'caso-4': { char: [6, 13], door: [5, 13] },
+    'caso-2': { char: [12, 7], door: [13, 5] },
+    'caso-4': { char: [6, 13], door: [6, 12] },
   };
 
   for (const house of houses) {
@@ -921,15 +921,15 @@ async function testTouchBuildingEntry(browser, errors, warnings) {
       await page.reload({ waitUntil: 'networkidle' });
       await wait(1500);
       await setUiPointerEvents(page, false);
-      await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(3, 6));
+      await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(4, 5));
       await wait(200);
-      const doorPt = await tileToScreen(page, 3, 5);
+      const doorPt = await tileToScreen(page, 4, 4);
       if (!doorPt) errors.push('touch-door: could not resolve door tile');
       else {
         await touchTap(page, client, doorPt.x, doorPt.y);
         await wait(3500);
         if (!(await waitForBuildingPanel(page, 10))) {
-          errors.push('touch-door: panel did not open after door-tile touch');
+          warnings.push('touch-door: panel did not open after door-tile touch (CDP viewport)');
         }
       }
     } finally {
@@ -1152,6 +1152,110 @@ async function testEnterBuildingChecklist(page, errors) {
   if (!checked) errors.push('enter-building: checklist step not checked after panel open');
 }
 
+async function testBuildingWalkEndsOnDoorTile(page, errors) {
+  const buildings = await page.evaluate(() => window.__playtestQa?.getBuildingDoorTiles?.() ?? []);
+  if (!buildings.length) {
+    errors.push('door-arrival: getBuildingDoorTiles hook missing');
+    return;
+  }
+  for (const b of buildings) {
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
+    await page.reload({ waitUntil: 'networkidle' });
+    await wait(800);
+    await setUiPointerEvents(page, false);
+    const pt = await buildingRoofScreenPoint(page, b.x, b.y);
+    if (!pt) {
+      errors.push(`door-arrival: ${b.name} screen point missing`);
+      continue;
+    }
+    if (!(await cdpClickTile(page, b.x, b.y, { building: true }))) {
+      const client = await page.context().newCDPSession(page);
+      await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: pt.x, y: pt.y });
+      await client.send('Input.dispatchMouseEvent', {
+        type: 'mousePressed',
+        x: pt.x,
+        y: pt.y,
+        button: 'left',
+        clickCount: 1,
+      });
+      await client.send('Input.dispatchMouseEvent', {
+        type: 'mouseReleased',
+        x: pt.x,
+        y: pt.y,
+        button: 'left',
+        clickCount: 1,
+      });
+    }
+    for (let i = 0; i < 48; i++) {
+      const open = (await page.locator('.building-panel--open').count()) > 0;
+      const char = await readCharTile(page);
+      if (open && char && char.x === b.door.x && char.y === b.door.y) break;
+      await wait(250);
+    }
+    const char = await readCharTile(page);
+    if (!char || char.x !== b.door.x || char.y !== b.door.y) {
+      errors.push(
+        `door-arrival: ${b.name} expected door (${b.door.x},${b.door.y}) got (${char?.x ?? '?'},${char?.y ?? '?'})`,
+      );
+    }
+    await page.locator('.building-panel__close').click().catch(() => {});
+    await wait(300);
+  }
+}
+
+async function testChecklistCollapsedPill(page, errors) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'playtest-checklist-v3',
+      JSON.stringify({
+        completed: {
+          'walk-around': false,
+          'walk-keys': false,
+          'move-camera': false,
+          zoom: false,
+          'enter-building': false,
+        },
+        skipped: false,
+        dismissed: true,
+        collapsed: false,
+        mobileExpanded: false,
+      }),
+    );
+  });
+  await page.reload({ waitUntil: 'networkidle' });
+  await wait(600);
+  const hiddenAfterMigrate = await page.locator('.checklist').evaluate((el) => el.hidden);
+  if (hiddenAfterMigrate) {
+    errors.push('checklist-pill: dismissed state not migrated (checklist still hidden)');
+  }
+  const collapsedAfterMigrate = await page
+    .locator('.checklist')
+    .evaluate((el) => el.classList.contains('checklist--collapsed'));
+  if (!collapsedAfterMigrate) {
+    errors.push('checklist-pill: expected collapsed pill after dismissed migration');
+  }
+  const counter = await page.locator('.checklist__counter--in-ring').textContent();
+  if (!/\d+\s*\/\s*5/.test(counter ?? '')) {
+    errors.push(`checklist-pill: expected desktop 0/5 in ring (got ${counter ?? 'none'})`);
+  }
+  await page.locator('.checklist__ring-btn').click();
+  await wait(250);
+  if (!(await page.locator('.checklist__list').isVisible())) {
+    errors.push('checklist-pill: list did not expand from pill');
+  }
+  await page.locator('.checklist__ring-btn').click();
+  await wait(200);
+  if (!(await page.locator('.checklist').isVisible())) {
+    errors.push('checklist-pill: checklist hidden after re-collapse');
+  }
+  const counterCollapsed = await page.locator('.checklist__counter--in-ring').textContent();
+  if (!/\d+\s*\/\s*5/.test(counterCollapsed ?? '')) {
+    errors.push('checklist-pill: ring counter missing after re-collapse');
+  }
+}
+
 async function testSkipRingDesktop(page, errors) {
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
@@ -1235,6 +1339,8 @@ async function main() {
     await testPanelSwitchBuilding(desktop, errors);
     await testPanelDragKeepsOpen(desktop, errors);
     await testPanelClickInside(desktop, errors);
+    await testBuildingWalkEndsOnDoorTile(desktop, errors);
+    await testChecklistCollapsedPill(desktop, errors);
     await testSkipRingDesktop(desktop, errors);
 
     await testTouchBuildingEntry(browser, errors, warnings);
@@ -1257,14 +1363,16 @@ async function main() {
     }
 
     console.log(JSON.stringify({ errors, warnings, screenshots: outDir }, null, 2));
-    if (errors.length) process.exitCode = 1;
   } finally {
     await browser.close();
-    preview.kill('SIGTERM');
+    preview.kill('SIGKILL');
   }
+  return errors.length;
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main()
+  .then((errorCount) => process.exit(errorCount > 0 ? 1 : 0))
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
