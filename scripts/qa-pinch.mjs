@@ -1759,30 +1759,6 @@ async function testSkipRingDesktop(page, errors) {
   if (!skipVisible) errors.push('desktop skip: Saltar link missing after reopen');
 }
 
-async function captureUiProofScreenshots(browser, errors) {
-  const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-  try {
-    await desktop.goto(BASE, { waitUntil: 'networkidle' });
-    await wait(800);
-    await desktop.screenshot({ path: path.join(outDir, DESKTOP_PROOF), fullPage: false });
-  } catch (e) {
-    errors.push(`ui-proof: desktop screenshot failed (${String(e)})`);
-  } finally {
-    await desktop.close();
-  }
-
-  const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
-  try {
-    await mobile.goto(BASE, { waitUntil: 'networkidle' });
-    await wait(800);
-    await mobile.screenshot({ path: path.join(outDir, MOBILE_PROOF), fullPage: false });
-  } catch (e) {
-    errors.push(`ui-proof: mobile screenshot failed (${String(e)})`);
-  } finally {
-    await mobile.close();
-  }
-}
-
 async function waitForPreview(url, maxAttempts = 60) {
   for (let i = 0; i < maxAttempts; i++) {
     await wait(500);
