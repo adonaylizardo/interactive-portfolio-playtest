@@ -1,11 +1,14 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const outDir = '/opt/cursor/artifacts/screenshots';
+const outDir =
+  process.env.QA_SCREENSHOT_DIR ?? path.join(root, 'artifacts', 'qa-screenshots');
+const DESKTOP_PROOF = 'desktop-1280x800.png';
+const MOBILE_PROOF = 'mobile-375x812.png';
 const BASE = 'http://127.0.0.1:4173/interactive-portfolio-playtest/';
 
 const ZOOM_MIN = 0.25;
@@ -1173,6 +1176,30 @@ async function testSkipRingDesktop(page, errors) {
   if (!skipVisible) errors.push('desktop skip: Saltar link missing after reopen');
 }
 
+async function captureUiProofScreenshots(browser, errors) {
+  const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  try {
+    await desktop.goto(BASE, { waitUntil: 'networkidle' });
+    await wait(800);
+    await desktop.screenshot({ path: path.join(outDir, DESKTOP_PROOF), fullPage: false });
+  } catch (e) {
+    errors.push(`ui-proof: desktop screenshot failed (${String(e)})`);
+  } finally {
+    await desktop.close();
+  }
+
+  const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
+  try {
+    await mobile.goto(BASE, { waitUntil: 'networkidle' });
+    await wait(800);
+    await mobile.screenshot({ path: path.join(outDir, MOBILE_PROOF), fullPage: false });
+  } catch (e) {
+    errors.push(`ui-proof: mobile screenshot failed (${String(e)})`);
+  } finally {
+    await mobile.close();
+  }
+}
+
 async function main() {
   await mkdir(outDir, { recursive: true });
   const preview = spawn('npm', ['run', 'preview', '--', '--port', '4173', '--strictPort'], {
@@ -1256,7 +1283,20 @@ async function main() {
       else errors.push(msg);
     }
 
-    console.log(JSON.stringify({ errors, warnings, screenshots: outDir }, null, 2));
+    await captureUiProofScreenshots(browser, errors);
+
+    const report = {
+      errors,
+      warnings,
+      screenshots: outDir,
+      proof: {
+        desktop: path.join(outDir, DESKTOP_PROOF),
+        mobile: path.join(outDir, MOBILE_PROOF),
+      },
+      finishedAt: new Date().toISOString(),
+    };
+    await writeFile(path.join(outDir, 'qa-pinch-results.json'), JSON.stringify(report, null, 2));
+    console.log(JSON.stringify(report, null, 2));
     if (errors.length) process.exitCode = 1;
   } finally {
     await browser.close();
