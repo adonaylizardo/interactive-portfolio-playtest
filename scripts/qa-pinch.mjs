@@ -86,8 +86,55 @@ async function readCanvasMetrics(page) {
       zoomSource: c.dataset.zoomSource ?? 'none',
       zoomMin: Number(c.dataset.zoomMin),
       mapFullyVisible: c.dataset.mapFullyVisible === '1',
+      mapTop: Number(c.dataset.mapTop),
+      mapBottom: Number(c.dataset.mapBottom),
+      fitTop: Number(c.dataset.fitTop),
+      fitBottom: Number(c.dataset.fitBottom),
     };
   });
+}
+
+async function testMinZoomPhoneFraming(browser, errors) {
+  for (const { label, width, height } of [
+    { label: 'phone375', width: 375, height: 812 },
+    { label: 'phone390', width: 390, height: 844 },
+  ]) {
+    const page = await browser.newPage({ viewport: { width, height } });
+    try {
+      await page.goto(BASE, { waitUntil: 'networkidle' });
+      await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
+      await page.reload({ waitUntil: 'networkidle' });
+      await wait(800);
+      const canvas = await page.locator('#game-canvas').boundingBox();
+      if (!canvas) {
+        errors.push(`${label}-frame: no canvas`);
+        continue;
+      }
+      await wheelOutToMinZoom(page, canvas);
+      const m = await readCanvasMetrics(page);
+      if (!m) {
+        errors.push(`${label}-frame: metrics missing`);
+        continue;
+      }
+      if (m.mapBottom > m.fitBottom - 6) {
+        errors.push(
+          `${label}-frame: map bottom ${m.mapBottom.toFixed(0)} overlaps pill (fit bottom ${m.fitBottom.toFixed(0)})`,
+        );
+      }
+      const freeCy = (m.fitTop + m.fitBottom) / 2;
+      const mapCy = (m.mapTop + m.mapBottom) / 2;
+      if (Math.abs(mapCy - freeCy) > 48) {
+        errors.push(
+          `${label}-frame: map not centered in free rect (Δy=${Math.abs(mapCy - freeCy).toFixed(0)}px)`,
+        );
+      }
+      await page.screenshot({
+        path: path.join(outDir, `${label}-min-zoom-default-pill.png`),
+      });
+    } finally {
+      await page.close();
+    }
+  }
 }
 
 async function readCharTile(page) {
@@ -574,22 +621,6 @@ async function testMinZoomFullMapVisible(browser, errors) {
     try {
       await page.goto(BASE, { waitUntil: 'networkidle' });
       await wait(900);
-      if (label === 'mobile375') {
-        await page.evaluate(() =>
-          localStorage.setItem(
-            'playtest-checklist-v3',
-            JSON.stringify({
-              completed: {},
-              skipped: false,
-              dismissed: true,
-              collapsed: true,
-              mobileExpanded: false,
-            }),
-          ),
-        );
-        await page.reload({ waitUntil: 'networkidle' });
-        await wait(700);
-      }
       if (desktopChecklist) {
         await page.evaluate(() =>
           localStorage.setItem(
@@ -636,6 +667,21 @@ async function testMinZoomFullMapVisible(browser, errors) {
           fracH: Number(c?.dataset.mapFracH),
         };
       });
+      if (label === 'ipad820') {
+        const frame = await readCanvasMetrics(page);
+        if (frame) {
+          const freeCy = (frame.fitTop + frame.fitBottom) / 2;
+          const mapCy = (frame.mapTop + frame.mapBottom) / 2;
+          if (Math.abs(mapCy - freeCy) > 40) {
+            errors.push(
+              `ipad820-fullmap: map not vertically centered in free rect (Δy=${Math.abs(mapCy - freeCy).toFixed(0)}px)`,
+            );
+          }
+        }
+        await page.screenshot({
+          path: path.join(outDir, 'ipad-820-min-zoom-default-pill.png'),
+        });
+      }
       if (vis.fracW < 0.995 || vis.fracH < 0.995) {
         errors.push(
           `${label}-fullmap: map visible fraction ${vis.fracW?.toFixed(3)}, ${vis.fracH?.toFixed(3)} (need ≥0.995)`,
@@ -2077,6 +2123,43 @@ async function captureRun25Closeups(browser) {
   }
 }
 
+async function captureRun28Closeups(browser) {
+  const dir = path.join(root, 'artifacts', 'run28');
+  await mkdir(dir, { recursive: true });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  try {
+    for (const v of [
+      { file: 'muro-z1.2.png', hash: '#view=x=320&y=-2424&z=1.2' },
+      { file: 'redoma-z1.2.png', hash: '#view=x=920&y=-1580&z=1.2' },
+      { file: 'estudio-door-z1.2.png', hash: '#view=x=-520&y=-2180&z=1.2' },
+    ]) {
+      await page.goto(`${BASE}${v.hash}`, { waitUntil: 'networkidle' });
+      await wait(700);
+      await page.screenshot({ path: path.join(dir, v.file) });
+    }
+  } finally {
+    await page.close();
+  }
+  for (const { file, width, height } of [
+    { file: 'min-zoom-375-default-pill.png', width: 375, height: 812 },
+    { file: 'min-zoom-820-default-pill.png', width: 820, height: 1180 },
+  ]) {
+    const p = await browser.newPage({ viewport: { width, height } });
+    try {
+      await p.goto(BASE, { waitUntil: 'networkidle' });
+      await p.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
+      await p.reload({ waitUntil: 'networkidle' });
+      await wait(800);
+      const canvas = await p.locator('#game-canvas').boundingBox();
+      if (canvas) await wheelOutToMinZoom(p, canvas);
+      await wait(300);
+      await p.screenshot({ path: path.join(dir, file) });
+    } finally {
+      await p.close();
+    }
+  }
+}
+
 async function captureRun27Closeups(browser) {
   const run27Dir = path.join(root, 'artifacts', 'run27');
   await mkdir(run27Dir, { recursive: true });
@@ -2312,6 +2395,7 @@ async function main() {
     await testMinZoomPanThenPinchOutNoSnap(desktop, errors);
     await testStaggeredPinchNoJump(desktop, errors);
     await testMinZoomFullMapVisible(browser, errors);
+    await testMinZoomPhoneFraming(browser, errors);
 
     await testTouchBuildingEntry(browser, errors, warnings);
     await testPanelDismissTouch(browser, errors);
@@ -2337,6 +2421,7 @@ async function main() {
     await captureRun25Closeups(browser);
     await captureRun26Closeups(browser);
     await captureRun27Closeups(browser);
+    await captureRun28Closeups(browser);
 
     const report = {
       errors,

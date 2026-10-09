@@ -235,6 +235,40 @@ export function clampPanMapFullyInView(
     if (!changed) break;
   }
 
+  const freeW = screenW - ml - mr;
+  const freeH = screenH - mt - mb;
+  const freeCx = ml + freeW / 2;
+  const freeCy = mt + freeH / 2;
+  let m = mapBoundsOnScreen({ cameraX, cameraY, zoom }, screenW, screenH);
+  if (m.width <= freeW + 1) {
+    cameraX += (freeCx - (m.left + m.right) / 2) / zoom;
+  }
+  if (m.height <= freeH + 1) {
+    cameraY += (freeCy - (m.top + m.bottom) / 2) / zoom;
+  }
+
+  for (let i = 0; i < 6; i++) {
+    m = mapBoundsOnScreen({ cameraX, cameraY, zoom }, screenW, screenH);
+    let changed = false;
+    if (m.left > ml) {
+      cameraX -= (m.left - ml) / zoom;
+      changed = true;
+    }
+    if (m.right < screenW - mr) {
+      cameraX += (screenW - mr - m.right) / zoom;
+      changed = true;
+    }
+    if (m.top > mt) {
+      cameraY -= (m.top - mt) / zoom;
+      changed = true;
+    }
+    if (m.bottom < screenH - mb) {
+      cameraY += (screenH - mb - m.bottom) / zoom;
+      changed = true;
+    }
+    if (!changed) break;
+  }
+
   return { cameraX, cameraY, zoom };
 }
 

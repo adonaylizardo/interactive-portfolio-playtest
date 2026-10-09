@@ -43,10 +43,12 @@ import {
   type FootprintDrawSpec,
 } from './draw';
 import {
+  cameraFitMargins,
   cameraFromPinchSession,
   clampPanMapFullyInView,
   clampZoom,
   isMapFullyVisibleOnScreen,
+  mapBoundsOnScreen,
   mapVisibleFractions,
   setCameraFitMargins,
   setCameraViewportSize,
@@ -249,10 +251,7 @@ export class IsoScene {
         if (isFrame) {
           drawBorderTile(g, cell.groundId);
         } else {
-          const isBuildingDoorTile = !!getBuildingAtDoor(tx, ty);
-          const fill = isBuildingDoorTile
-            ? C.tileLight
-            : cell.groundId.includes('path')
+          const fill = cell.groundId.includes('path')
             ? C.tileMid
             : cell.groundId.includes('park')
               ? 0xd0d4cc
@@ -628,17 +627,29 @@ export class IsoScene {
     let left = 16;
     let top = 16;
     const right = 16;
-    const bottom = 16;
+    let bottom = 16;
+    const pad = 10;
     const checklist = document.querySelector('.checklist');
-    if (checklist && !checklist.classList.contains('checklist--collapsed')) {
+    if (checklist) {
       const box = checklist.getBoundingClientRect();
-      if (box.width > 40 && box.height > 40) {
-        const sidebarObstruction =
-          sw > 900 && (box.bottom > sh * 0.5 || box.height > sh * 0.42);
-        if (sidebarObstruction) {
-          left = Math.max(left, Math.ceil(box.right + 10));
-        } else {
-          top = Math.max(top, Math.ceil(box.bottom + 10));
+      if (box.width > 8 && box.height > 8) {
+        const centerY = (box.top + box.bottom) / 2;
+        const bottomAnchored =
+          checklist.classList.contains('checklist--mobile') ||
+          box.bottom >= sh - 96 ||
+          centerY > sh * 0.58;
+        if (bottomAnchored) {
+          bottom = Math.max(bottom, Math.ceil(sh - box.top + pad));
+        } else if (box.top <= sh * 0.5) {
+          const tallSidebar =
+            sw > 900 &&
+            !checklist.classList.contains('checklist--collapsed') &&
+            box.height > sh * 0.42;
+          if (tallSidebar) {
+            left = Math.max(left, Math.ceil(box.right + pad));
+          } else {
+            top = Math.max(top, Math.ceil(box.bottom + pad));
+          }
         }
       }
     }
@@ -702,6 +713,16 @@ export class IsoScene {
       this.canvasEl.dataset.camPy = String(camPyDrawn);
       this.canvasEl.dataset.mapFracW = String(vis.fracW);
       this.canvasEl.dataset.mapFracH = String(vis.fracH);
+      const mapRect = mapBoundsOnScreen(
+        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+        sw,
+        sh,
+      );
+      const margins = cameraFitMargins();
+      this.canvasEl.dataset.mapTop = String(mapRect.top);
+      this.canvasEl.dataset.mapBottom = String(mapRect.bottom);
+      this.canvasEl.dataset.fitTop = String(margins.top);
+      this.canvasEl.dataset.fitBottom = String(sh - margins.bottom);
       this.canvasEl.dataset.mapCovW = String(cov.covW);
       this.canvasEl.dataset.mapCovH = String(cov.covH);
       this.canvasEl.dataset.mapIntersects = cov.intersects ? '1' : '0';
@@ -949,6 +970,19 @@ export class IsoScene {
     this.pinchFrameSerial += 1;
     this.zoomChanged = true;
     this.applyCamera(false);
+    const zMin = zoomMinForViewport(sw, sh);
+    if (this.pinchSession && this.zoom <= zMin + 0.0005) {
+      const mid = this.pointerMidpoint() ?? this.pinchSession.startMid;
+      const dist = this.pointerDistance();
+      this.pinchSession = {
+        ...this.pinchSession,
+        startDist: dist >= 10 ? dist : this.pinchSession.startDist,
+        startZoom: this.zoom,
+        startCamX: this.cameraX,
+        startCamY: this.cameraY,
+        startMid: mid,
+      };
+    }
   }
 
   /** Pinch baseline uses post-clamp camera so the first pinch frame does not snap. */

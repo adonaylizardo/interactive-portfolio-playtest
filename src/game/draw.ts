@@ -429,6 +429,12 @@ export function drawObelisco(
   poly(g, [wTop, sTop, apex], cap);
 }
 
+/** Grid corner (gx, gy) — iso lattice vertex used for scenery walls (matches map grid points). */
+export function gridCornerLocal(ax: number, ay: number, gx: number, gy: number): Pt {
+  const f = localFoot(ax, ay, gx, gy);
+  return { x: f.x, y: f.y - TILE_H };
+}
+
 /** Thin iso L wall (Chroma frame 320×224, anchor south +32px front extent). */
 export function drawMuro(
   g: Graphics,
@@ -446,36 +452,30 @@ export function drawMuro(
   const wallH = 40;
   const thick = 0.15;
 
-  const tileWest = (tx: number, ty: number): Pt => {
-    const f = localFoot(ax, ay, tx, ty);
-    return { x: f.x - TILE_W / 2, y: f.y - TILE_H / 2 };
-  };
-  const tileEast = (tx: number, ty: number): Pt => {
-    const f = localFoot(ax, ay, tx, ty);
-    return { x: f.x + TILE_W / 2, y: f.y - TILE_H / 2 };
-  };
+  const meet = gridCornerLocal(ax, ay, fx, fy);
+  const backEnd = gridCornerLocal(ax, ay, fx + w, fy);
+  const leftEnd = gridCornerLocal(ax, ay, fx, fy + h);
+  const backInRef = localFoot(ax, ay, fx + Math.floor(w / 2), fy + 1);
+  const leftInRef = localFoot(ax, ay, fx + 1, fy + Math.floor(h / 2));
 
-  const backA = tileWest(fx, fy);
-  const backB = tileEast(fx + w - 1, fy);
-  const backInnerA = lerpPt(backA, localFoot(ax, ay, fx, fy), thick);
-  const backInnerB = lerpPt(backB, localFoot(ax, ay, fx + w - 1, fy), thick);
-  const backOuterA = lerpPt(backA, localFoot(ax, ay, fx, fy), thick * 0.35);
-  const backOuterB = lerpPt(backB, localFoot(ax, ay, fx + w - 1, fy), thick * 0.35);
+  const backOuterA = meet;
+  const backOuterB = backEnd;
+  const backInnerA = lerpPt(backOuterA, backInRef, thick);
+  const backInnerB = lerpPt(backOuterB, backInRef, thick);
+
+  const leftOuterA = meet;
+  const leftOuterB = leftEnd;
+  const leftInnerA = lerpPt(leftOuterA, leftInRef, thick);
+  const leftInnerB = lerpPt(leftOuterB, leftInRef, thick);
+
   poly(g, [backOuterA, backOuterB, backInnerB, backInnerA], { color: 0x000000, alpha: 0.12 });
+  poly(g, [leftOuterA, leftOuterB, leftInnerB, leftInnerA], { color: 0x000000, alpha: 0.12 });
   poly(g, [backInnerA, backInnerB, raise(backInnerB, wallH), raise(backInnerA, wallH)], plank);
   poly(
     g,
     [raise(backInnerA, wallH), raise(backInnerB, wallH), raise(backInnerB, wallH + 2), raise(backInnerA, wallH + 2)],
     plankDark,
   );
-
-  const leftA = northTop(ax, ay, fx, fy);
-  const leftB = localFoot(ax, ay, fx, fy + h - 1);
-  const leftInnerA = lerpPt(leftA, tileWest(fx, fy), thick);
-  const leftInnerB = lerpPt(leftB, tileWest(fx, fy + h - 1), thick);
-  const leftOuterA = lerpPt(leftA, tileWest(fx, fy), thick * 0.35);
-  const leftOuterB = lerpPt(leftB, tileWest(fx, fy + h - 1), thick * 0.35);
-  poly(g, [leftOuterA, leftOuterB, leftInnerB, leftInnerA], { color: 0x000000, alpha: 0.12 });
   poly(g, [leftInnerA, leftInnerB, raise(leftInnerB, wallH), raise(leftInnerA, wallH)], plank);
   poly(
     g,
@@ -523,18 +523,15 @@ export function drawRedoma(
 ): void {
   const island = hover ? 0x6a6a6a : 0x5c5c5c;
   const ring = hover ? 0x787878 : 0x686868;
-  const swI = localFoot(ax, ay, fx, fy + h - 1);
-  const seI = localFoot(ax, ay, fx + w - 1, fy + h - 1);
-  const nwI = northTop(ax, ay, fx, fy);
-  const neI = northTop(ax, ay, fx + w - 1, fy);
-  const islandSpan = Math.max(
-    Math.hypot(seI.x - swI.x, seI.y - swI.y),
-    Math.hypot(neI.x - nwI.x, neI.y - nwI.y),
-  );
+  const swFoot = localFoot(ax, ay, fx, fy + h - 1);
+  const seFoot = localFoot(ax, ay, fx + w - 1, fy + h - 1);
+  const west = { x: swFoot.x - TILE_W / 2, y: swFoot.y - TILE_H / 2 };
+  const east = { x: seFoot.x + TILE_W / 2, y: seFoot.y - TILE_H / 2 };
+  const islandWidth = Math.hypot(east.x - west.x, east.y - west.y);
   const centerTile = { x: fx + Math.floor(w / 2), y: fy + Math.floor(h / 2) };
   const cx = localFoot(ax, ay, centerTile.x, centerTile.y);
   cx.y -= TILE_H / 2;
-  const discRx = islandSpan * 0.3;
+  const discRx = islandWidth * 0.3;
   const discRy = discRx / 2;
   g.ellipse(cx.x, cx.y, discRx, discRy);
   g.fill(ring);
