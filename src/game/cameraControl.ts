@@ -13,10 +13,41 @@ export const MAP_FIT_MARGIN_PX = 16;
 
 let viewportScreenW = 1280;
 let viewportScreenH = 800;
+let fitMarginLeft = MAP_FIT_MARGIN_PX;
+let fitMarginTop = MAP_FIT_MARGIN_PX;
+let fitMarginRight = MAP_FIT_MARGIN_PX;
+let fitMarginBottom = MAP_FIT_MARGIN_PX;
 
 export function setCameraViewportSize(screenW: number, screenH: number): void {
   if (Number.isFinite(screenW) && screenW > 0) viewportScreenW = screenW;
   if (Number.isFinite(screenH) && screenH > 0) viewportScreenH = screenH;
+}
+
+/** Extra inset (e.g. desktop checklist) applied when computing min zoom fit. */
+export function setCameraFitMargins(margins: {
+  left?: number;
+  top?: number;
+  right?: number;
+  bottom?: number;
+}): void {
+  fitMarginLeft = margins.left ?? MAP_FIT_MARGIN_PX;
+  fitMarginTop = margins.top ?? MAP_FIT_MARGIN_PX;
+  fitMarginRight = margins.right ?? MAP_FIT_MARGIN_PX;
+  fitMarginBottom = margins.bottom ?? MAP_FIT_MARGIN_PX;
+}
+
+export function cameraFitMargins(): {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+} {
+  return {
+    left: fitMarginLeft,
+    top: fitMarginTop,
+    right: fitMarginRight,
+    bottom: fitMarginBottom,
+  };
 }
 
 export type CameraState = {
@@ -26,13 +57,21 @@ export type CameraState = {
 };
 
 /** Smallest zoom (most zoomed out) so the full 64×64 map bbox fits in the viewport with margin. */
-export function zoomMinForViewport(screenW: number, screenH: number, margin = MAP_FIT_MARGIN_PX): number {
+export function zoomMinForViewport(
+  screenW: number,
+  screenH: number,
+  margin = MAP_FIT_MARGIN_PX,
+): number {
   const bounds = mapWorldBounds();
   const mapW = bounds.maxX - bounds.minX;
   const mapH = bounds.maxY - bounds.minY;
   if (mapW <= 0 || mapH <= 0 || screenW <= 0 || screenH <= 0) return ZOOM_MIN;
-  const innerW = Math.max(1, screenW - margin * 2);
-  const innerH = Math.max(1, screenH - margin * 2);
+  const ml = Math.max(margin, fitMarginLeft);
+  const mr = Math.max(margin, fitMarginRight);
+  const mt = Math.max(margin, fitMarginTop);
+  const mb = Math.max(margin, fitMarginBottom);
+  const innerW = Math.max(1, screenW - ml - mr);
+  const innerH = Math.max(1, screenH - mt - mb);
   const fit = Math.min(innerW / mapW, innerH / mapH);
   return Math.min(ZOOM_MAX, Math.max(0.04, fit));
 }
@@ -104,12 +143,16 @@ export function isMapFullyVisibleOnScreen(
   screenH: number,
   margin = MAP_FIT_MARGIN_PX,
 ): boolean {
+  const ml = Math.max(margin, fitMarginLeft);
+  const mr = Math.max(margin, fitMarginRight);
+  const mt = Math.max(margin, fitMarginTop);
+  const mb = Math.max(margin, fitMarginBottom);
   const m = mapBoundsOnScreen(cam, screenW, screenH);
   return (
-    m.left >= margin - 0.5 &&
-    m.right <= screenW - margin + 0.5 &&
-    m.top >= margin - 0.5 &&
-    m.bottom <= screenH - margin + 0.5
+    m.left >= ml - 0.5 &&
+    m.right <= screenW - mr + 0.5 &&
+    m.top >= mt - 0.5 &&
+    m.bottom <= screenH - mb + 0.5
   );
 }
 
@@ -163,26 +206,30 @@ export function clampPanMapFullyInView(
   screenH: number,
   margin = MAP_FIT_MARGIN_PX,
 ): CameraState {
+  const ml = Math.max(margin, fitMarginLeft);
+  const mr = Math.max(margin, fitMarginRight);
+  const mt = Math.max(margin, fitMarginTop);
+  const mb = Math.max(margin, fitMarginBottom);
   let { cameraX, cameraY, zoom } = cam;
   zoom = clampZoom(zoom, screenW, screenH);
 
   for (let i = 0; i < 10; i++) {
     const m = mapBoundsOnScreen({ cameraX, cameraY, zoom }, screenW, screenH);
     let changed = false;
-    if (m.left > margin) {
-      cameraX -= (m.left - margin) / zoom;
+    if (m.left > ml) {
+      cameraX -= (m.left - ml) / zoom;
       changed = true;
     }
-    if (m.right < screenW - margin) {
-      cameraX += (screenW - margin - m.right) / zoom;
+    if (m.right < screenW - mr) {
+      cameraX += (screenW - mr - m.right) / zoom;
       changed = true;
     }
-    if (m.top > margin) {
-      cameraY -= (m.top - margin) / zoom;
+    if (m.top > mt) {
+      cameraY -= (m.top - mt) / zoom;
       changed = true;
     }
-    if (m.bottom < screenH - margin) {
-      cameraY += (screenH - margin - m.bottom) / zoom;
+    if (m.bottom < screenH - mb) {
+      cameraY += (screenH - mb - m.bottom) / zoom;
       changed = true;
     }
     if (!changed) break;

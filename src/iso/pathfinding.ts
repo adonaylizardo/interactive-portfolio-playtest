@@ -112,7 +112,15 @@ export function findPathOrNearest(
   for (const c of candidates) {
     const path = findPath(sx, sy, c.x, c.y);
     if (!path) continue;
-    if (!best || path.length < best.path.length) {
+    if (!best) {
+      best = { path, target: { x: c.x, y: c.y }, direct: false };
+      continue;
+    }
+    const bestGoalDist = heuristic(best.target.x, best.target.y, gx, gy);
+    if (
+      c.dist < bestGoalDist ||
+      (c.dist === bestGoalDist && path.length < best.path.length)
+    ) {
       best = { path, target: { x: c.x, y: c.y }, direct: false };
     }
   }

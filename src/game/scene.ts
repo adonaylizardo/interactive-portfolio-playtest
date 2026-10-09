@@ -22,6 +22,7 @@ import { C } from './colors';
 import {
   buildingDoorOpeningPickHit,
   buildingDoorPickHit,
+  buildingFootprintBodyPickHit,
   doorTapLocalPoint,
   buildingFrontWallsCover,
   buildingInteriorGapSample,
@@ -46,6 +47,7 @@ import {
   clampZoom,
   isMapFullyVisibleOnScreen,
   mapVisibleFractions,
+  setCameraFitMargins,
   setCameraViewportSize,
   stabilizeCameraAfterGesture,
   viewportMapCoverage,
@@ -100,11 +102,10 @@ export class IsoScene {
   private tapStart: { x: number; y: number; t: number } | null = null;
   private lastTapTime = 0;
   private panMoved = false;
-  private cameraPanned = false;
+  /** Screen pixels dragged during an active single-finger pan (pinch does not increment). */
+  private panDragScreenPx = 0;
   private zoomChanged = false;
   private lastChecklistZoom = 0;
-  private lastChecklistCamPx = 0;
-  private lastChecklistCamPy = 0;
   private canvasEl: HTMLCanvasElement | null = null;
   private pointers = new Map<number, { x: number; y: number }>();
   private pinchSession: {
@@ -186,11 +187,7 @@ export class IsoScene {
       this.centerOnCharacter(false);
     }
     this.applyCamera(true);
-    const sw0 = this.app.screen.width;
-    const sh0 = this.app.screen.height;
     this.lastChecklistZoom = this.zoom;
-    this.lastChecklistCamPx = sw0 / 2 + this.cameraX * this.zoom;
-    this.lastChecklistCamPy = sh0 / 2 + this.cameraY * this.zoom;
 
     this.bindInput();
     this.app.ticker.add(() => this.update());
@@ -213,13 +210,9 @@ export class IsoScene {
 
   /** After programmatic #view hash updates, do not treat the next gesture as user zoom/pan. */
   private rebaselineChecklistFromCamera(): void {
-    const sw = this.app.screen.width;
-    const sh = this.app.screen.height;
     this.lastChecklistZoom = this.zoom;
-    this.lastChecklistCamPx = sw / 2 + this.cameraX * this.zoom;
-    this.lastChecklistCamPy = sh / 2 + this.cameraY * this.zoom;
     this.zoomChanged = false;
-    this.cameraPanned = false;
+    this.panDragScreenPx = 0;
   }
 
   private buildVoidClickLayer(): void {
@@ -511,12 +504,21 @@ export class IsoScene {
     const buildings = objects
       .filter((o) => o.type === 'building')
       .sort((a, b) => sortKey(b.x, b.y) - sortKey(a.x, a.y));
+    const fatFinger = this.zoom <= 0.11;
     for (const obj of buildings) {
       const foot = tileFootWorld(obj.x, obj.y);
       const local = { x: wx - foot.x, y: wy - foot.y };
       const spec = this.footprintSpec(obj);
       if (buildingDoorPickHit(local, spec)) return obj;
+      if (fatFinger && buildingFootprintBodyPickHit(local, spec)) return obj;
       if (buildingPickHit(local, spec)) return obj;
+    }
+    if (fatFinger) {
+      const tile = worldToTile(wx, wy);
+      if (tile) {
+        const onBuilding = getBuildingAt(tile.x, tile.y);
+        if (onBuilding?.door) return onBuilding;
+      }
     }
     return undefined;
   }
@@ -616,10 +618,29 @@ export class IsoScene {
     if (!animate || this.reducedMotion) this.applyCamera();
   }
 
+  private updateCameraFitMargins(): void {
+    const sw = this.app.screen.width;
+    let left = 16;
+    const top = 16;
+    const right = 16;
+    const bottom = 16;
+    if (window.matchMedia('(min-width: 768px)').matches) {
+      const checklist = document.querySelector('.checklist');
+      if (checklist && !checklist.classList.contains('checklist--collapsed')) {
+        const box = checklist.getBoundingClientRect();
+        if (box.width > 40 && box.height > 40) {
+          left = Math.max(left, Math.ceil(box.right + 10));
+        }
+      }
+    }
+    setCameraFitMargins({ left, top, right, bottom });
+    setCameraViewportSize(sw, this.app.screen.height);
+  }
+
   applyCamera(persistHash = true): void {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
-    setCameraViewportSize(sw, sh);
+    this.updateCameraFitMargins();
     this.zoom = clampZoom(this.zoom, sw, sh);
     const hardened = stabilizeCameraAfterGesture(
       { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
@@ -680,8 +701,6 @@ export class IsoScene {
     if (persistHash) {
       writeCameraToHash({ x: this.cameraX, y: this.cameraY, zoom: this.zoom });
     }
-    const camPxDrawn = sw / 2 + this.cameraX * this.zoom;
-    const camPyDrawn = sh / 2 + this.cameraY * this.zoom;
     if (
       this.zoomChanged &&
       Math.abs(this.zoom - this.lastChecklistZoom) / Math.max(this.lastChecklistZoom, 0.05) > 0.02
@@ -692,16 +711,9 @@ export class IsoScene {
     } else if (this.zoomChanged) {
       this.zoomChanged = false;
     }
-    if (
-      this.cameraPanned &&
-      Math.hypot(camPxDrawn - this.lastChecklistCamPx, camPyDrawn - this.lastChecklistCamPy) > 8
-    ) {
+    if (this.panDragScreenPx >= 8) {
       this.events.onChecklist('move-camera');
-      this.lastChecklistCamPx = camPxDrawn;
-      this.lastChecklistCamPy = camPyDrawn;
-      this.cameraPanned = false;
-    } else if (this.cameraPanned) {
-      this.cameraPanned = false;
+      this.panDragScreenPx = 0;
     }
     this.cullVisibleTiles();
   }
@@ -865,7 +877,19 @@ export class IsoScene {
     this.drawPathPreview();
     this.suppressTapUntil = performance.now() + 250;
     this.panMoved = true;
+    this.panDragScreenPx = 0;
     document.body.classList.remove('is-canvas-dragging');
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const stable = stabilizeCameraAfterGesture(
+      { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+      sw,
+      sh,
+    );
+    this.cameraX = stable.cameraX;
+    this.cameraY = stable.cameraY;
+    this.zoom = stable.zoom;
+    this.applyCamera(false);
     this.flushPendingViewport();
   }
 
@@ -904,8 +928,32 @@ export class IsoScene {
     this.zoom = clampZoom(next.zoom, sw, sh);
     this.pinchFrameSerial += 1;
     this.zoomChanged = true;
-    this.cameraPanned = true;
     this.applyCamera(false);
+  }
+
+  /** Pinch baseline uses post-clamp camera so the first pinch frame does not snap. */
+  private syncPinchSessionBaseline(mid: { x: number; y: number }, dist: number): void {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const stable = stabilizeCameraAfterGesture(
+      { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+      sw,
+      sh,
+    );
+    this.cameraX = stable.cameraX;
+    this.cameraY = stable.cameraY;
+    this.zoom = stable.zoom;
+    if (dist >= 10 && Number.isFinite(dist)) {
+      this.pinchSession = {
+        startDist: dist,
+        startZoom: this.zoom,
+        startCamX: this.cameraX,
+        startCamY: this.cameraY,
+        startMid: mid,
+      };
+    } else {
+      this.pinchSession = null;
+    }
   }
 
   private shouldBlockTap(): boolean {
@@ -955,19 +1003,10 @@ export class IsoScene {
     this.gestureActive = true;
     this.hadMultiPointerGesture = true;
     this.panMoved = true;
+    this.panDragScreenPx = 0;
     this.webkitGestureSession = null;
     this.clearDeferredTap();
-    if (dist >= 10 && Number.isFinite(dist)) {
-      this.pinchSession = {
-        startDist: dist,
-        startZoom: this.zoom,
-        startCamX: this.cameraX,
-        startCamY: this.cameraY,
-        startMid: mid,
-      };
-    } else {
-      this.pinchSession = null;
-    }
+    this.syncPinchSessionBaseline(mid, dist);
   }
 
   private beginPinchAtMid(mid: { x: number; y: number }, dist: number): void {
@@ -980,19 +1019,10 @@ export class IsoScene {
     this.gestureActive = true;
     this.hadMultiPointerGesture = true;
     this.panMoved = true;
+    this.panDragScreenPx = 0;
     this.webkitGestureSession = null;
     this.clearDeferredTap();
-    if (dist >= 10 && Number.isFinite(dist)) {
-      this.pinchSession = {
-        startDist: dist,
-        startZoom: this.zoom,
-        startCamX: this.cameraX,
-        startCamY: this.cameraY,
-        startMid: mid,
-      };
-    } else {
-      this.pinchSession = null;
-    }
+    this.syncPinchSessionBaseline(mid, dist);
   }
 
   private transitionToSingleFingerPan(remaining: { x: number; y: number }): void {
@@ -1003,6 +1033,7 @@ export class IsoScene {
     this.touchOnlyPinch = false;
     this.hadMultiPointerGesture = true;
     this.panMoved = true;
+    this.panDragScreenPx = 0;
     this.suppressTapUntil = performance.now() + 250;
     this.clearDeferredTap();
     this.lastPanPos = { x: remaining.x, y: remaining.y };
@@ -1257,6 +1288,7 @@ export class IsoScene {
         this.secondFingerArrived = false;
         if (!this.hadMultiPointerGesture) {
           this.panMoved = false;
+          this.panDragScreenPx = 0;
         }
         this.lastPanPos = { x: e.clientX, y: e.clientY };
         this.tapStart = { x: e.clientX, y: e.clientY, t: performance.now() };
@@ -1305,7 +1337,7 @@ export class IsoScene {
           this.cameraX += dx / this.zoom;
           this.cameraY += dy / this.zoom;
           this.lastPanPos = { x: e.clientX, y: e.clientY };
-          this.cameraPanned = true;
+          this.panDragScreenPx += Math.hypot(dx, dy);
           this.applyCamera();
         }
       }
@@ -1541,5 +1573,12 @@ export class IsoScene {
 
   setZoomLevel(level: number, anchorScreen?: { x: number; y: number }): void {
     this.setZoom(level, anchorScreen);
+  }
+
+  /** QA: synthetic map tap (scenery / ground) matching player pointer routing. */
+  tapMapTileForQa(tx: number, ty: number): void {
+    const foot = tileFootWorld(tx, ty);
+    const scr = this.worldToScreen(foot.x, foot.y);
+    this.handleScreenTap(scr.x, scr.y, false);
   }
 }

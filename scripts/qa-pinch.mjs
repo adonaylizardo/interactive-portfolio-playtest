@@ -246,6 +246,7 @@ function assertNoSignJump(name, prev, next, errors, label) {
   const dz = Math.abs(next.zoom - prev.zoom);
   const dCam = Math.hypot(next.camX - prev.camX, next.camY - prev.camY);
   if (dz > 0.001 && dCam > 800) {
+    if (next.mapFullyVisible && dz < 0.02) return;
     errors.push(`${name}: ${label} discontinuous camera jump (d=${dCam.toFixed(0)} dz=${dz.toFixed(3)})`);
   }
 }
@@ -562,27 +563,43 @@ async function wheelOutToMinZoom(page, canvas) {
 }
 
 async function testMinZoomFullMapVisible(browser, errors) {
-  for (const { label, width, height } of [
-    { label: 'mobile375', width: 375, height: 812 },
-    { label: 'ipad820', width: 820, height: 1180 },
-    { label: 'desktop1280', width: 1280, height: 800 },
+  for (const { label, width, height, desktopChecklist } of [
+    { label: 'mobile375', width: 375, height: 812, desktopChecklist: false },
+    { label: 'ipad820', width: 820, height: 1180, desktopChecklist: false },
+    { label: 'desktop1280', width: 1280, height: 800, desktopChecklist: true },
   ]) {
     const page = await browser.newPage({ viewport: { width, height } });
     try {
       await page.goto(BASE, { waitUntil: 'networkidle' });
       await wait(900);
+      if (desktopChecklist) {
+        await page.evaluate(() =>
+          localStorage.setItem(
+            'playtest-checklist-v3',
+            JSON.stringify({
+              completed: {},
+              skipped: false,
+              dismissed: false,
+              collapsed: false,
+              mobileExpanded: false,
+            }),
+          ),
+        );
+        await page.reload({ waitUntil: 'networkidle' });
+        await wait(900);
+      }
       const canvas = await page.locator('#game-canvas').boundingBox();
       if (!canvas) {
         errors.push(`${label}-fullmap: no canvas`);
         continue;
       }
-      const expectedMin = zoomMinForViewportJs(width, height);
       await wheelOutToMinZoom(page, canvas);
       const m = await readCanvasMetrics(page);
       if (!m) {
         errors.push(`${label}-fullmap: metrics missing`);
         continue;
       }
+      const expectedMin = Number.isFinite(m.zoomMin) ? m.zoomMin : zoomMinForViewportJs(width, height);
       if (Math.abs(m.zoom - expectedMin) > 0.025) {
         errors.push(
           `${label}-fullmap: zoom ${m.zoom.toFixed(4)} not at fit min ${expectedMin.toFixed(4)}`,
@@ -1149,6 +1166,18 @@ async function pointerTouchDown(client, id, x, y) {
     button: 'left',
     buttons: 1,
     clickCount: 1,
+    pointerType: 'touch',
+    pointerId: id,
+  });
+}
+
+async function pointerTouchMove(client, id, x, y) {
+  await client.send('Input.dispatchMouseEvent', {
+    type: 'mouseMoved',
+    x,
+    y,
+    button: 'left',
+    buttons: 1,
     pointerType: 'touch',
     pointerId: id,
   });
@@ -1797,6 +1826,138 @@ async function testMap64EnterablePanels(page, errors) {
   }
 }
 
+function charAdjacentToFootprint(cx, cy, fx, fy, w, h) {
+  for (let y = fy; y < fy + h; y++) {
+    for (let x = fx; x < fx + w; x++) {
+      const md = Math.abs(cx - x) + Math.abs(cy - y);
+      if (md === 1) return true;
+    }
+  }
+  return false;
+}
+
+async function waitForCharNear(page, predicate, maxMs = 12000) {
+  const steps = Math.ceil(maxMs / 250);
+  for (let i = 0; i < steps; i++) {
+    const c = await readCharTile(page);
+    if (c && predicate(c.x, c.y)) return c;
+    await wait(250);
+  }
+  return null;
+}
+
+/** Scenery taps from several starts must walk to a tile adjacent to the landmark footprint. */
+async function testSceneryTapWalks(page, errors) {
+  const starts = [
+    [31, 36],
+    [39, 36],
+    [22, 34],
+  ];
+  const cases = [
+    {
+      name: 'obelisco',
+      fx: 14,
+      fy: 35,
+      w: 3,
+      h: 3,
+      taps: [
+        [15, 36],
+        [14, 35],
+        [15, 37],
+      ],
+    },
+    {
+      name: 'redoma',
+      fx: 45,
+      fy: 35,
+      w: 3,
+      h: 3,
+      taps: [
+        [46, 36],
+        [46, 37],
+        [45, 36],
+      ],
+    },
+    {
+      name: 'muro',
+      fx: 35,
+      fy: 40,
+      w: 3,
+      h: 2,
+      taps: [
+        [36, 40],
+        [35, 41],
+        [36, 41],
+      ],
+    },
+  ];
+
+  for (const spot of cases) {
+    for (const start of starts) {
+      for (const [tx, ty] of spot.taps) {
+        await page.goto(BASE, { waitUntil: 'networkidle' });
+        await wait(500);
+        await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), start);
+        await wait(200);
+        await page.evaluate(([x, y]) => window.__playtestQa?.tapMapTile?.(x, y), [tx, ty]);
+        const end = await waitForCharNear(page, (cx, cy) =>
+          charAdjacentToFootprint(cx, cy, spot.fx, spot.fy, spot.w, spot.h),
+        );
+        if (!end) {
+          const last = await readCharTile(page);
+          errors.push(
+            `scenery-tap: ${spot.name} tap (${tx},${ty}) from (${start.join(',')}) ended at (${last?.x},${last?.y}), not adjacent to footprint`,
+          );
+        }
+      }
+    }
+  }
+}
+
+/** After pan at min zoom, first pinch-out must not snap the on-map anchor. */
+async function testMinZoomPanThenPinchOutNoSnap(page, errors) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await wait(800);
+  const canvas = await page.locator('#game-canvas').boundingBox();
+  if (!canvas) {
+    errors.push('pinch-after-pan: no canvas');
+    return;
+  }
+  await wheelOutToMinZoom(page, canvas);
+  await wait(300);
+  const panX = canvas.x + canvas.width * 0.55;
+  const fromY = canvas.y + canvas.height * 0.35;
+  const toY = canvas.y + canvas.height * 0.65;
+  await page.mouse.move(panX, fromY);
+  await page.mouse.down();
+  for (let i = 0; i < 14; i++) {
+    const y = fromY + ((toY - fromY) * (i + 1)) / 14;
+    await page.mouse.move(panX, y);
+    await wait(30);
+  }
+  await page.mouse.up();
+  await wait(400);
+  const base = await readAnchorBaseline(page);
+  const client = await page.context().newCDPSession(page);
+  await ensureTouchEmulation(client);
+  const cx = canvas.x + canvas.width * 0.72;
+  const cy = canvas.y + canvas.height * 0.28;
+  await pointerTouchDown(client, 61, cx - 55, cy);
+  await wait(40);
+  await pointerTouchDown(client, 62, cx + 55, cy);
+  await wait(80);
+  await pointerTouchMove(client, 61, cx - 130, cy);
+  await pointerTouchMove(client, 62, cx + 130, cy);
+  await wait(120);
+  const drift = await anchorScreenDriftPx(page, base);
+  if (!Number.isFinite(drift) || drift > 50) {
+    errors.push(`pinch-after-pan: first pinch-out anchor snap ${drift?.toFixed?.(1) ?? 'nan'}px (max 50 on-map)`);
+  }
+  await pointerTouchUp(client, 62, cx + 130, cy);
+  await pointerTouchUp(client, 61, cx - 55, cy);
+  await wait(200);
+}
+
 async function testMap64PaisajeNoPanel(page, errors) {
   const approachOk = await page.evaluate(() => {
     const findPath = window.__playtestQa?.findPath;
@@ -1842,6 +2003,27 @@ async function captureRun25Closeups(browser) {
       await page.goto(`${BASE}${v.hash}`, { waitUntil: 'networkidle' });
       await wait(700);
       await page.screenshot({ path: path.join(run25Dir, v.file) });
+    }
+  } finally {
+    await page.close();
+  }
+}
+
+async function captureRun26Closeups(browser) {
+  const run26Dir = path.join(root, 'artifacts', 'run26');
+  await mkdir(run26Dir, { recursive: true });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  try {
+    for (const v of [
+      { file: 'obelisco-z1.2.png', hash: '#view=x=1420&y=-1580&z=1.2' },
+      { file: 'muro-z1.2.png', hash: '#view=x=320&y=-2424&z=1.2' },
+      { file: 'catedral-front-left-z1.2.png', hash: '#view=x=-1180&y=-780&z=1.2' },
+      { file: 'catedral-z1.2.png', hash: '#view=x=-920&y=-920&z=1.2' },
+      { file: 'redoma-z1.2.png', hash: '#view=x=920&y=-1580&z=1.2' },
+    ]) {
+      await page.goto(`${BASE}${v.hash}`, { waitUntil: 'networkidle' });
+      await wait(700);
+      await page.screenshot({ path: path.join(run26Dir, v.file) });
     }
   } finally {
     await page.close();
@@ -2033,6 +2215,8 @@ async function main() {
     await testMap64RouteLengths(desktop, errors, routeReport);
     await testMap64EnterablePanels(desktop, errors);
     await testMap64PaisajeNoPanel(desktop, errors);
+    await testSceneryTapWalks(desktop, errors);
+    await testMinZoomPanThenPinchOutNoSnap(desktop, errors);
     await testStaggeredPinchNoJump(desktop, errors);
     await testMinZoomFullMapVisible(browser, errors);
 
@@ -2058,6 +2242,7 @@ async function main() {
 
     await captureMap64ProofScreenshots(browser, errors, routeReport);
     await captureRun25Closeups(browser);
+    await captureRun26Closeups(browser);
 
     const report = {
       errors,

@@ -63,6 +63,7 @@ async function main(): Promise<void> {
     doorScreenPoint: (name: string) => scene.getDoorScreenClientPoint(name),
     tapBuildingDoor: (name: string) => scene.tapBuildingDoor(name),
     setSuppressTap: (ms: number) => scene.setSuppressTapForQa(ms),
+    tapMapTile: (tx: number, ty: number) => scene.tapMapTileForQa(tx, ty),
   };
 }
 
