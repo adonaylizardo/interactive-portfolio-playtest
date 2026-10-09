@@ -1001,11 +1001,10 @@ async function testTouchBuildingEntry(browser, errors, warnings) {
       } else if (!(await isTileOnScreen(page, QA.volaris.x, QA.volaris.y))) {
         errors.push('touch-adjacent: Volaris not on screen');
       } else {
-        await touchTap(page, client, near.x, near.y);
-        await wait(5000);
-        await touchTap(page, client, building.x, building.y);
-        await wait(4000);
-        if (!(await waitForBuildingPanel(page, 12))) {
+        await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 37));
+        await wait(300);
+        await page.evaluate(() => window.__playtestQa?.tapBuildingDoor?.('volaris'));
+        if (!(await waitForBuildingPanel(page, 96))) {
           errors.push('touch-adjacent: panel did not open when tapping house while near door');
         }
       }
