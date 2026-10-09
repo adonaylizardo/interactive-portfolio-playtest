@@ -1619,7 +1619,22 @@ async function testBainDoorLowZoomDeterministic(page, errors) {
     for (let w = 0; w < 40; w++) {
       const char = await readCharTile(page);
       const panel = (await page.locator('.building-panel--open').count()) > 0;
-      if (char?.x === 39 && char?.y === 29 && !panel) {
+      const goal = await page.evaluate(() => {
+        const raw = document.getElementById('game-canvas')?.dataset.walkGoal;
+        if (!raw) return null;
+        try {
+          return JSON.parse(raw);
+        } catch {
+          return null;
+        }
+      });
+      if (
+        char?.x === 39 &&
+        char?.y === 29 &&
+        !panel &&
+        goal?.x === 39 &&
+        goal?.y === 29
+      ) {
         errors.push(`bain-door-lowzoom: run ${i + 1}/7 stopped at (39,29) without panel`);
         return;
       }

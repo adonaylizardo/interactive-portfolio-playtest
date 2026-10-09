@@ -194,8 +194,60 @@ export function buildingPickHit(localP: Pt, spec: FootprintDrawSpec): boolean {
 
 /** Door-only hit — checked before roof/walls so low-zoom taps stay deterministic. */
 export function buildingDoorPickHit(localP: Pt, spec: FootprintDrawSpec): boolean {
+  if (buildingDoorOpeningPickHit(localP, spec)) return true;
   const dc = doorCenterLocal(spec);
   return Math.abs(localP.x - dc.x) < 20 && Math.abs(localP.y - dc.y) < 32;
+}
+
+/** Drawn door opening on the front face (+y or +x) — zoom-invariant (foot-local coords). */
+export function buildingDoorOpeningPickHit(localP: Pt, spec: FootprintDrawSpec): boolean {
+  const { sw, se, ne } = footprintCorners(spec);
+  const wallH = wallHeightForKind(spec.kind, spec.w, spec.h);
+  const doorH = Math.min(34, wallH * 0.45);
+  const doorFoot = localFoot(spec.ax, spec.ay, spec.door.x, spec.door.y);
+  const doorGround = { x: doorFoot.x, y: doorFoot.y - TILE_H / 2 };
+  if (Math.hypot(localP.x - doorGround.x, localP.y - doorGround.y) < TILE_W * 0.52) {
+    return true;
+  }
+
+  if (spec.doorFace === '+y') {
+    const u = spec.w <= 1 ? 0.5 : (spec.door.x - spec.fx) / (spec.w - 1);
+    const u0 = Math.max(0, u - 0.22);
+    const u1 = Math.min(1, u + 0.22);
+    const a = lerpPt(sw, se, u0);
+    const b = lerpPt(sw, se, u1);
+    const aTop = raise(a, wallH);
+    const bTop = raise(b, wallH);
+    const aMid = lerpPt(a, aTop, doorH / wallH);
+    const bMid = lerpPt(b, bTop, doorH / wallH);
+    if (pointInQuad(localP, a, b, bMid, aMid)) return true;
+    if (pointInQuad(localP, aMid, bMid, bTop, aTop)) return true;
+  } else {
+    const v = spec.h <= 1 ? 0.5 : (spec.door.y - spec.fy) / (spec.h - 1);
+    const v0 = Math.max(0, v - 0.22);
+    const v1 = Math.min(1, v + 0.22);
+    const a = lerpPt(se, ne, v0);
+    const b = lerpPt(se, ne, v1);
+    const aTop = raise(a, wallH);
+    const bTop = raise(b, wallH);
+    const aMid = lerpPt(a, aTop, doorH / wallH);
+    const bMid = lerpPt(b, bTop, doorH / wallH);
+    if (pointInQuad(localP, a, b, bMid, aMid)) return true;
+    if (pointInQuad(localP, aMid, bMid, bTop, aTop)) return true;
+  }
+  return false;
+}
+
+/** World-local point used for QA / synthetic door taps (ground in front of opening). */
+export function doorTapLocalPoint(spec: FootprintDrawSpec): Pt {
+  const doorFoot = localFoot(spec.ax, spec.ay, spec.door.x, spec.door.y);
+  const { sw, se } = footprintCorners(spec);
+  const u = spec.w <= 1 ? 0.5 : (spec.door.x - spec.fx) / (spec.w - 1);
+  const mouth = lerpPt(sw, se, u);
+  return {
+    x: (doorFoot.x + mouth.x) / 2,
+    y: Math.min(doorFoot.y - TILE_H / 2, mouth.y + 6),
+  };
 }
 
 export function footprint(bwScale = 1): { bw: number; bh: number } {

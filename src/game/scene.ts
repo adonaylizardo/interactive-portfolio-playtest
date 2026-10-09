@@ -20,12 +20,13 @@ import { sortKey, tileFootWorld, tileToWorld, worldToTile } from '../iso/math';
 import { findPathOrNearest } from '../iso/pathfinding';
 import { C } from './colors';
 import {
+  buildingDoorOpeningPickHit,
   buildingDoorPickHit,
+  doorTapLocalPoint,
   buildingFrontWallsCover,
   buildingInteriorGapSample,
   buildingPickHit,
   deskTopFillColor,
-  doorCenterLocal,
   drawBench,
   drawBorderTile,
   drawCharacter,
@@ -139,6 +140,8 @@ export class IsoScene {
   private secondFingerArrived = false;
   private deferredTapTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingViewportApply = false;
+  /** Last map tap in canvas pixels — used to re-resolve door intent for walk targets. */
+  private lastMapTapScreen: { x: number; y: number } | null = null;
   constructor(events: SceneEvents) {
     this.events = events;
   }
@@ -385,21 +388,39 @@ export class IsoScene {
     sprint: boolean,
     opts?: { buildingEntry?: { panelTitle: string; door: { x: number; y: number } } },
   ): void {
+    let walkTx = tx;
+    let walkTy = ty;
+    let entry = opts?.buildingEntry;
+    if (!entry && this.lastMapTapScreen) {
+      const doorBuilding = this.pickBuildingDoorAtScreen(
+        this.lastMapTapScreen.x,
+        this.lastMapTapScreen.y,
+      );
+      if (doorBuilding?.door && doorBuilding.panelTitle) {
+        walkTx = doorBuilding.door.x;
+        walkTy = doorBuilding.door.y;
+        entry = { panelTitle: doorBuilding.panelTitle, door: doorBuilding.door };
+      }
+    }
     const from = { x: Math.round(this.charTx), y: Math.round(this.charTy) };
-    this.pendingBuildingEntry =
-      opts?.buildingEntry ?? resolveBuildingEntryFromTile(tx, ty, from);
-    const target = resolveWalkTarget(tx, ty);
+    this.pendingBuildingEntry = entry ?? resolveBuildingEntryFromTile(walkTx, walkTy, from);
+    const target = resolveWalkTarget(walkTx, walkTy);
     this.walkToTile(target.x, target.y, sprint);
   }
 
   clearWalkPreview(): void {
     this.path = [];
     this.drawPathPreview();
+    if (this.canvasEl) this.canvasEl.dataset.walkGoal = '';
   }
 
   walkToTile(tx: number, ty: number, sprint: boolean): void {
+    if (this.canvasEl) {
+      this.canvasEl.dataset.walkGoal = JSON.stringify({ x: tx, y: ty });
+    }
     if (tx < 0 || ty < 0 || tx >= MAP_WIDTH || ty >= MAP_HEIGHT) {
       this.clearWalkPreview();
+      if (this.canvasEl) this.canvasEl.dataset.walkGoal = '';
       this.events.onUnreachable?.();
       return;
     }
@@ -441,18 +462,26 @@ export class IsoScene {
     };
   }
 
+  /** Door pick in world space (stable at min zoom ~0.04–0.15); closest opening wins. */
   private pickBuildingDoorAtScreen(sx: number, sy: number): MapObject | undefined {
-    const threshold = Math.max(36, 28 / Math.max(this.zoom, 0.3));
-    const buildings = objects
-      .filter((o) => o.type === 'building' && o.door && o.panelTitle)
-      .sort((a, b) => sortKey(b.x, b.y) - sortKey(a.x, a.y));
+    const { x: wx, y: wy } = this.screenToWorld(sx, sy);
+    const buildings = objects.filter((o) => o.type === 'building' && o.door && o.panelTitle);
+    let best: { obj: MapObject; dist: number; depth: number } | null = null;
     for (const obj of buildings) {
+      const spec = this.footprintSpec(obj);
       const foot = tileFootWorld(obj.x, obj.y);
-      const local = doorCenterLocal(this.footprintSpec(obj));
-      const screen = this.worldToScreen(foot.x + local.x, foot.y + local.y);
-      if (Math.hypot(sx - screen.x, sy - screen.y) <= threshold) return obj;
+      const local = { x: wx - foot.x, y: wy - foot.y };
+      if (!buildingDoorOpeningPickHit(local, spec) && !buildingDoorPickHit(local, spec)) {
+        continue;
+      }
+      const tap = doorTapLocalPoint(spec);
+      const dist = Math.hypot(local.x - tap.x, local.y - tap.y);
+      const depth = sortKey(obj.x, obj.y);
+      if (!best || dist < best.dist - 0.5 || (Math.abs(dist - best.dist) < 0.5 && depth > best.depth)) {
+        best = { obj, dist, depth };
+      }
     }
-    return undefined;
+    return best?.obj;
   }
 
   private pickSceneryAtScreen(sx: number, sy: number): { tx: number; ty: number } | undefined {
@@ -478,8 +507,6 @@ export class IsoScene {
   }
 
   private pickBuildingAtScreen(sx: number, sy: number): MapObject | undefined {
-    const doorHit = this.pickBuildingDoorAtScreen(sx, sy);
-    if (doorHit) return doorHit;
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
     const buildings = objects
       .filter((o) => o.type === 'building')
@@ -518,6 +545,7 @@ export class IsoScene {
   }
 
   private handleScreenTap(sx: number, sy: number, sprint: boolean): void {
+    this.lastMapTapScreen = { x: sx, y: sy };
     const doorFirst = this.pickBuildingDoorAtScreen(sx, sy);
     if (doorFirst?.door && doorFirst.panelTitle) {
       if (!this.prepareMapTap(doorFirst)) return;
@@ -1470,9 +1498,9 @@ export class IsoScene {
       kind: obj.name,
     };
     const foot = tileFootWorld(obj.x, obj.y);
-    const local = doorCenterLocal(spec);
-    const wx = foot.x + local.x;
-    const wy = foot.y + local.y;
+    const tap = doorTapLocalPoint(spec);
+    const wx = foot.x + tap.x;
+    const wy = foot.y + tap.y;
     const screen = this.worldToScreen(wx, wy);
     const rect = this.canvasEl.getBoundingClientRect();
     return { x: rect.left + screen.x, y: rect.top + screen.y };
