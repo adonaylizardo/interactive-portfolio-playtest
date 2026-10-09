@@ -53,6 +53,7 @@ async function main(): Promise<void> {
         y: o.y,
         panelTitle: o.panelTitle ?? '',
         door: o.door,
+        doorFace: o.doorFace ?? '+y',
       })),
     inicio: INICIO,
     mapTramos: MAP_TRAMOS,

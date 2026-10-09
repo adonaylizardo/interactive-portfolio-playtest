@@ -44,6 +44,7 @@ import {
 } from './draw';
 import {
   cameraFromPinchSession,
+  clampPanMapFullyInView,
   clampZoom,
   isMapFullyVisibleOnScreen,
   mapVisibleFractions,
@@ -248,7 +249,10 @@ export class IsoScene {
         if (isFrame) {
           drawBorderTile(g, cell.groundId);
         } else {
-          const fill = cell.groundId.includes('path')
+          const isBuildingDoorTile = !!getBuildingAtDoor(tx, ty);
+          const fill = isBuildingDoorTile
+            ? C.tileLight
+            : cell.groundId.includes('path')
             ? C.tileMid
             : cell.groundId.includes('park')
               ? 0xd0d4cc
@@ -620,21 +624,26 @@ export class IsoScene {
 
   private updateCameraFitMargins(): void {
     const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
     let left = 16;
-    const top = 16;
+    let top = 16;
     const right = 16;
     const bottom = 16;
-    if (window.matchMedia('(min-width: 768px)').matches) {
-      const checklist = document.querySelector('.checklist');
-      if (checklist && !checklist.classList.contains('checklist--collapsed')) {
-        const box = checklist.getBoundingClientRect();
-        if (box.width > 40 && box.height > 40) {
+    const checklist = document.querySelector('.checklist');
+    if (checklist && !checklist.classList.contains('checklist--collapsed')) {
+      const box = checklist.getBoundingClientRect();
+      if (box.width > 40 && box.height > 40) {
+        const sidebarObstruction =
+          sw > 900 && (box.bottom > sh * 0.5 || box.height > sh * 0.42);
+        if (sidebarObstruction) {
           left = Math.max(left, Math.ceil(box.right + 10));
+        } else {
+          top = Math.max(top, Math.ceil(box.bottom + 10));
         }
       }
     }
     setCameraFitMargins({ left, top, right, bottom });
-    setCameraViewportSize(sw, this.app.screen.height);
+    setCameraViewportSize(sw, sh);
   }
 
   applyCamera(persistHash = true): void {
@@ -650,6 +659,17 @@ export class IsoScene {
     this.cameraX = hardened.cameraX;
     this.cameraY = hardened.cameraY;
     this.zoom = hardened.zoom;
+    const zMin = zoomMinForViewport(sw, sh);
+    if (this.zoom <= zMin + 0.001) {
+      const fitted = clampPanMapFullyInView(
+        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: zMin },
+        sw,
+        sh,
+      );
+      this.cameraX = fitted.cameraX;
+      this.cameraY = fitted.cameraY;
+      this.zoom = fitted.zoom;
+    }
     this.camera.position.set(sw / 2, sh / 2);
     this.camera.scale.set(1);
     this.world.position.set(this.cameraX * this.zoom, this.cameraY * this.zoom);
@@ -1092,6 +1112,23 @@ export class IsoScene {
     if (this.zoomSource !== 'pointer' || !this.pinchSession) return;
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
+    const zMin = zoomMinForViewport(sw, sh);
+    if (this.zoom <= zMin + 0.0005) {
+      const stable = stabilizeCameraAfterGesture(
+        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+        sw,
+        sh,
+      );
+      this.cameraX = stable.cameraX;
+      this.cameraY = stable.cameraY;
+      this.zoom = stable.zoom;
+      this.pinchSession = {
+        ...this.pinchSession,
+        startCamX: this.cameraX,
+        startCamY: this.cameraY,
+        startMid: mid,
+      };
+    }
     const next = cameraFromPinchSession(this.pinchSession, dist, mid, sw, sh);
     if (next) this.applyPinchCamera(next);
   }
@@ -1355,6 +1392,8 @@ export class IsoScene {
         }
         if (this.zoomSource === 'pointer') {
           this.endZoomGesture();
+        } else if (!wasPinch) {
+          this.applyCamera(true);
         }
         this.tryScheduleDeferredTap(e);
         this.lastPanPos = null;

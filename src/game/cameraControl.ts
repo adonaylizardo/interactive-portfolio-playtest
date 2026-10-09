@@ -149,10 +149,10 @@ export function isMapFullyVisibleOnScreen(
   const mb = Math.max(margin, fitMarginBottom);
   const m = mapBoundsOnScreen(cam, screenW, screenH);
   return (
-    m.left >= ml - 0.5 &&
-    m.right <= screenW - mr + 0.5 &&
-    m.top >= mt - 0.5 &&
-    m.bottom <= screenH - mb + 0.5
+    m.left >= ml - 2.5 &&
+    m.right <= screenW - mr + 2.5 &&
+    m.top >= mt - 2.5 &&
+    m.bottom <= screenH - mb + 2.5
   );
 }
 

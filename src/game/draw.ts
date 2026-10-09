@@ -252,6 +252,15 @@ export function buildingDoorOpeningPickHit(localP: Pt, spec: FootprintDrawSpec):
 /** World-local point used for QA / synthetic door taps (ground in front of opening). */
 export function doorTapLocalPoint(spec: FootprintDrawSpec): Pt {
   const doorFoot = localFoot(spec.ax, spec.ay, spec.door.x, spec.door.y);
+  if (spec.doorFace === '+x') {
+    const { se, ne } = footprintCorners(spec);
+    const v = spec.h <= 1 ? 0.5 : (spec.door.y - spec.fy) / (spec.h - 1);
+    const mouth = lerpPt(se, ne, v);
+    return {
+      x: mouth.x + 10,
+      y: mouth.y - 8,
+    };
+  }
   const { sw, se } = footprintCorners(spec);
   const u = spec.w <= 1 ? 0.5 : (spec.door.x - spec.fx) / (spec.w - 1);
   const mouth = lerpPt(sw, se, u);
@@ -393,7 +402,7 @@ export function drawObelisco(
   const bw = (TILE_W / 2) * 0.55;
   const bh = (TILE_H / 2) * 0.55;
   const height = 138;
-  const taper = 0.9;
+  const taper = 0.7;
   const s = { x: cx.x, y: cx.y };
   const e = { x: cx.x + bw, y: cx.y - bh };
   const n = { x: cx.x, y: cx.y - 2 * bh };
@@ -403,12 +412,21 @@ export function drawObelisco(
   const sT = lerpPt(s, n, 1 - taper);
   const eT = lerpPt(e, n, 1 - taper);
   const wT = lerpPt(west, n, 1 - taper);
+  const nT = lerpPt(n, cx, 1 - taper);
+  const sTop = raise(sT, topH);
+  const eTop = raise(eT, topH);
+  const wTop = raise(wT, topH);
+  const nTop = raise(nT, topH);
   poly(g, [s, e, raise(e, midH), raise(s, midH)], faceRight);
   poly(g, [s, west, raise(west, midH), raise(s, midH)], faceLeft);
-  poly(g, [raise(s, midH), raise(e, midH), raise(eT, topH), raise(sT, topH)], faceRight);
-  poly(g, [raise(s, midH), raise(west, midH), raise(wT, topH), raise(sT, topH)], faceLeft);
-  poly(g, [raise(sT, topH), raise(eT, topH), n, wT], cap);
-  poly(g, [raise(sT, topH), raise(eT, topH), { x: cx.x, y: raise(sT, topH).y - 8 }], cap);
+  poly(g, [raise(s, midH), raise(e, midH), eTop, sTop], faceRight);
+  poly(g, [raise(s, midH), raise(west, midH), wTop, sTop], faceLeft);
+  poly(g, [eTop, nTop, wTop, sTop], faceRight);
+  const apex = { x: cx.x, y: nTop.y - 12 };
+  poly(g, [sTop, eTop, apex], cap);
+  poly(g, [eTop, nTop, apex], cap);
+  poly(g, [nTop, wTop, apex], cap);
+  poly(g, [wTop, sTop, apex], cap);
 }
 
 /** Thin iso L wall (Chroma frame 320×224, anchor south +32px front extent). */
@@ -425,11 +443,20 @@ export function drawMuro(
   const plank = hover ? 0x7a7a7a : 0x6e6e6e;
   const plankDark = hover ? 0x656565 : 0x585858;
   const hold = hover ? 0x959595 : 0x888888;
-  const wallH = 56;
+  const wallH = 40;
   const thick = 0.15;
 
-  const backA = northTop(ax, ay, fx, fy);
-  const backB = northTop(ax, ay, fx + w - 1, fy);
+  const tileWest = (tx: number, ty: number): Pt => {
+    const f = localFoot(ax, ay, tx, ty);
+    return { x: f.x - TILE_W / 2, y: f.y - TILE_H / 2 };
+  };
+  const tileEast = (tx: number, ty: number): Pt => {
+    const f = localFoot(ax, ay, tx, ty);
+    return { x: f.x + TILE_W / 2, y: f.y - TILE_H / 2 };
+  };
+
+  const backA = tileWest(fx, fy);
+  const backB = tileEast(fx + w - 1, fy);
   const backInnerA = lerpPt(backA, localFoot(ax, ay, fx, fy), thick);
   const backInnerB = lerpPt(backB, localFoot(ax, ay, fx + w - 1, fy), thick);
   const backOuterA = lerpPt(backA, localFoot(ax, ay, fx, fy), thick * 0.35);
@@ -442,14 +469,12 @@ export function drawMuro(
     plankDark,
   );
 
-  const leftA = localFoot(ax, ay, fx, fy);
+  const leftA = northTop(ax, ay, fx, fy);
   const leftB = localFoot(ax, ay, fx, fy + h - 1);
-  const leftTopA = northTop(ax, ay, fx, fy);
-  const leftTopB = northTop(ax, ay, fx, fy + h - 1);
-  const leftInnerA = lerpPt(leftTopA, leftA, thick);
-  const leftInnerB = lerpPt(leftTopB, leftB, thick);
-  const leftOuterA = lerpPt(leftTopA, leftA, thick * 0.35);
-  const leftOuterB = lerpPt(leftTopB, leftB, thick * 0.35);
+  const leftInnerA = lerpPt(leftA, tileWest(fx, fy), thick);
+  const leftInnerB = lerpPt(leftB, tileWest(fx, fy + h - 1), thick);
+  const leftOuterA = lerpPt(leftA, tileWest(fx, fy), thick * 0.35);
+  const leftOuterB = lerpPt(leftB, tileWest(fx, fy + h - 1), thick * 0.35);
   poly(g, [leftOuterA, leftOuterB, leftInnerB, leftInnerA], { color: 0x000000, alpha: 0.12 });
   poly(g, [leftInnerA, leftInnerB, raise(leftInnerB, wallH), raise(leftInnerA, wallH)], plank);
   poly(
@@ -498,19 +523,19 @@ export function drawRedoma(
 ): void {
   const island = hover ? 0x6a6a6a : 0x5c5c5c;
   const ring = hover ? 0x787878 : 0x686868;
-  const swI = localFoot(ax, ay, fx + w - 1, fy + h - 1);
-  const seI = localFoot(ax, ay, fx + w - 1, fy);
+  const swI = localFoot(ax, ay, fx, fy + h - 1);
+  const seI = localFoot(ax, ay, fx + w - 1, fy + h - 1);
   const nwI = northTop(ax, ay, fx, fy);
   const neI = northTop(ax, ay, fx + w - 1, fy);
-  const cx = {
-    x: (swI.x + seI.x + nwI.x + neI.x) / 4,
-    y: (swI.y + seI.y + nwI.y + neI.y) / 4 - TILE_H / 2,
-  };
-  const islandRx =
-    (Math.hypot(seI.x - swI.x, seI.y - swI.y) + Math.hypot(neI.x - nwI.x, neI.y - nwI.y)) * 0.25;
-  const islandRy = Math.hypot(nwI.x - swI.x, nwI.y - swI.y) * 0.38;
-  const discRx = islandRx * 0.6;
-  const discRy = islandRy * 0.6;
+  const islandSpan = Math.max(
+    Math.hypot(seI.x - swI.x, seI.y - swI.y),
+    Math.hypot(neI.x - nwI.x, neI.y - nwI.y),
+  );
+  const centerTile = { x: fx + Math.floor(w / 2), y: fy + Math.floor(h / 2) };
+  const cx = localFoot(ax, ay, centerTile.x, centerTile.y);
+  cx.y -= TILE_H / 2;
+  const discRx = islandSpan * 0.3;
+  const discRy = discRx / 2;
   g.ellipse(cx.x, cx.y, discRx, discRy);
   g.fill(ring);
   g.ellipse(cx.x, cx.y, discRx * 0.22, discRy * 0.22);
