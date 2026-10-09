@@ -68,7 +68,7 @@ export function mapBoundsOnScreen(
   };
 }
 
-/** Fraction of map bbox width/height visible inside [0, screenW] x [0, screenH]. */
+/** Fraction of map bbox width/height visible inside the viewport. */
 export function mapVisibleFractions(
   cam: CameraState,
   screenW: number,
@@ -91,7 +91,27 @@ export function mapVisibleFractions(
   };
 }
 
-/** Keep at least MAP_VISIBLE_MIN_FRAC of the map on screen by moving the camera only (never caps zoom). */
+/** Fraction of viewport width/height covered by the map (keep-visible uses this, not map bbox %). */
+export function viewportMapCoverage(
+  cam: CameraState,
+  screenW: number,
+  screenH: number,
+): { covW: number; covH: number; intersects: boolean } {
+  const m = mapBoundsOnScreen(cam, screenW, screenH);
+  const visLeft = Math.max(0, m.left);
+  const visRight = Math.min(screenW, m.right);
+  const visTop = Math.max(0, m.top);
+  const visBottom = Math.min(screenH, m.bottom);
+  const iw = Math.max(0, visRight - visLeft);
+  const ih = Math.max(0, visBottom - visTop);
+  return {
+    covW: screenW > 0 ? iw / screenW : 0,
+    covH: screenH > 0 ? ih / screenH : 0,
+    intersects: iw > 0 && ih > 0,
+  };
+}
+
+/** Keep at least MAP_VISIBLE_MIN_FRAC of the viewport over the map (camera position only; never caps zoom). */
 export function hardKeepMapPartiallyVisible(
   cam: CameraState,
   screenW: number,
@@ -101,46 +121,40 @@ export function hardKeepMapPartiallyVisible(
   zoom = clampZoom(zoom);
   const minF = MAP_VISIBLE_MIN_FRAC;
 
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 12; i++) {
     const state = { cameraX, cameraY, zoom };
     const m = mapBoundsOnScreen(state, screenW, screenH);
-    let { fracW, fracH, intersects } = mapVisibleFractions(state, screenW, screenH);
+    let { covW, covH, intersects } = viewportMapCoverage(state, screenW, screenH);
 
-    if (intersects && fracW >= minF && fracH >= minF) {
+    if (intersects && covW >= minF && covH >= minF) {
       return { cameraX, cameraY, zoom };
     }
 
-    if (!intersects || fracW < minF) {
-      const needW = m.width * minF;
+    if (!intersects || covW < minF) {
+      const needW = screenW * minF;
       if (m.right < needW) {
         cameraX += (needW - m.right) / zoom;
       } else if (m.left > screenW - needW) {
         cameraX -= (m.left - (screenW - needW)) / zoom;
-      } else if (m.width > screenW) {
-        const cx = (m.left + m.right) / 2;
-        cameraX += (screenW / 2 - cx) / zoom;
       } else if (!intersects) {
         const cx = (m.left + m.right) / 2;
         cameraX += (screenW / 2 - cx) / zoom;
       }
     }
-    if (!intersects || fracH < minF) {
-      const needH = m.height * minF;
+    if (!intersects || covH < minF) {
+      const needH = screenH * minF;
       if (m.bottom < needH) {
         cameraY += (needH - m.bottom) / zoom;
       } else if (m.top > screenH - needH) {
         cameraY -= (m.top - (screenH - needH)) / zoom;
-      } else if (m.height > screenH) {
-        const cy = (m.top + m.bottom) / 2;
-        cameraY += (screenH / 2 - cy) / zoom;
       } else if (!intersects) {
         const cy = (m.top + m.bottom) / 2;
         cameraY += (screenH / 2 - cy) / zoom;
       }
     }
 
-    ({ fracW, fracH, intersects } = mapVisibleFractions({ cameraX, cameraY, zoom }, screenW, screenH));
-    if (intersects && fracW >= minF - 0.002 && fracH >= minF - 0.002) {
+    ({ covW, covH, intersects } = viewportMapCoverage({ cameraX, cameraY, zoom }, screenW, screenH));
+    if (intersects && covW >= minF - 0.002 && covH >= minF - 0.002) {
       return { cameraX, cameraY, zoom };
     }
   }

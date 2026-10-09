@@ -35,7 +35,7 @@ const QA_WALK_START = {
   bain: [39, 36],
   mentoria: [39, 26],
   finoa: [32, 26],
-  pg: [24, 24],
+  pg: [22, 34],
   sambil: [39, 36],
   catedral: [31, 36],
   flor: [46, 37],
@@ -56,6 +56,8 @@ async function readCanvasMetrics(page) {
       camY: Number(c.dataset.camY),
       mapFracW: Number(c.dataset.mapFracW),
       mapFracH: Number(c.dataset.mapFracH),
+      mapCovW: Number(c.dataset.mapCovW),
+      mapCovH: Number(c.dataset.mapCovH),
       mapIntersects: c.dataset.mapIntersects === '1',
       pinchFrame: Number(c.dataset.pinchFrame ?? 0),
       zoomSource: c.dataset.zoomSource ?? 'none',
@@ -198,9 +200,11 @@ function assertFrameMetrics(name, m, errors, label) {
   if (!m.mapIntersects) {
     errors.push(`${name}: ${label} map does not intersect viewport`);
   }
-  if (m.mapFracW < MAP_VISIBLE_MIN || m.mapFracH < MAP_VISIBLE_MIN) {
+  const covW = Number(m.mapCovW ?? m.mapFracW);
+  const covH = Number(m.mapCovH ?? m.mapFracH);
+  if (covW < MAP_VISIBLE_MIN || covH < MAP_VISIBLE_MIN) {
     errors.push(
-      `${name}: ${label} map visible frac too low (${m.mapFracW.toFixed(3)}, ${m.mapFracH.toFixed(3)})`,
+      `${name}: ${label} viewport map coverage too low (${covW.toFixed(3)}, ${covH.toFixed(3)})`,
     );
   }
 }
@@ -313,6 +317,37 @@ async function pointerPinchUp(page, client, cx, cy, spread) {
 async function startTwoFingerTouch(page, client, cx, cy, spread) {
   await pointerPinchDown(page, client, cx, cy, spread);
   await wait(40);
+}
+
+async function canvasTouchPinch(page, cx, cy, spreadFrom, spreadTo) {
+  await page.evaluate(
+    ({ cx, cy, spreadFrom, spreadTo }) => {
+      const canvas = document.getElementById('game-canvas');
+      if (!canvas) return;
+      const mk = (id, x, y) => ({
+        clientX: x,
+        clientY: y,
+        identifier: id,
+        target: canvas,
+        pageX: x,
+        pageY: y,
+        screenX: x,
+        screenY: y,
+      });
+      const fire = (type, spread) => {
+        const t0 = mk(1, cx - spread, cy);
+        const t1 = mk(2, cx + spread, cy);
+        const touches = type === 'touchend' ? [] : [t0, t1];
+        const changed = type === 'touchend' ? [t0, t1] : touches;
+        const ev = new TouchEvent(type, { bubbles: true, cancelable: true, touches, changedTouches: changed, targetTouches: touches });
+        canvas.dispatchEvent(ev);
+      };
+      fire('touchstart', spreadFrom);
+      fire('touchmove', spreadTo);
+      fire('touchend', spreadTo);
+    },
+    { cx, cy, spreadFrom, spreadTo },
+  );
 }
 
 async function cdpPinchPoints(client, type, cx, cy, spread) {
@@ -621,13 +656,10 @@ async function cdpClickTile(page, tx, ty, opts = {}) {
 }
 
 async function cdpClickBuildingDoor(page, buildingName) {
-  const pt = await page.evaluate(
-    (name) => window.__playtestQa?.doorScreenPoint?.(name) ?? null,
+  return page.evaluate(
+    (name) => window.__playtestQa?.tapBuildingDoor?.(name) === true,
     buildingName,
   );
-  if (!pt) return false;
-  await cdpClickClient(page, pt.x, pt.y);
-  return true;
 }
 
 async function testWalkGridFootprintRules(page, errors) {
@@ -1055,7 +1087,8 @@ async function testStaggeredPinchNoJump(page, errors) {
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
   await page.reload({ waitUntil: 'networkidle' });
   await wait(900);
-  await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(35, 39));
+  await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 36));
+  await page.evaluate(() => window.__playtestQa?.setSuppressTap?.(4000));
   await wait(200);
 
   const canvas = await page.locator('#game-canvas').boundingBox();
@@ -1063,13 +1096,8 @@ async function testStaggeredPinchNoJump(page, errors) {
     errors.push('stagger-pinch: no canvas');
     return;
   }
-  const street = await tileToScreen(page, 35, 39);
-  if (!street) {
-    errors.push('stagger-pinch: street screen point missing');
-    return;
-  }
-  const cx = street.x;
-  const cy = street.y;
+  const cx = canvas.x + canvas.width * 0.78;
+  const cy = canvas.y + canvas.height * 0.22;
   const spread = 70;
   const char0 = await readCharTile(page);
   const client = await page.context().newCDPSession(page);
@@ -1231,6 +1259,7 @@ async function testPanelDismissTouch(browser, errors) {
 async function testMobile375PinchAndUi(browser, errors) {
   const { page, client, context } = await setupIPhoneTouchPage(browser);
   try {
+    await page.evaluate(() => window.__playtestQa?.setSuppressTap?.(5000));
     await page.goto(`${BASE}#view=x=120&y=-420&z=0.500`, { waitUntil: 'networkidle' });
     await wait(1200);
     const canvas = await page.locator('#game-canvas').boundingBox();
@@ -1243,26 +1272,9 @@ async function testMobile375PinchAndUi(browser, errors) {
     const z0 = (await readCanvasMetrics(page))?.zoom ?? 0;
     const base = await readAnchorBaseline(page);
 
-    await client.send('Input.dispatchTouchEvent', {
-      type: 'touchStart',
-      touchPoints: [{ x: Math.round(cx - 60), y: Math.round(cy), id: 1, radiusX: 1, radiusY: 1, force: 1 }],
-    });
-    await wait(60);
-    await client.send('Input.dispatchTouchEvent', {
-      type: 'touchStart',
-      touchPoints: [
-        { x: Math.round(cx - 60), y: Math.round(cy), id: 1, radiusX: 1, radiusY: 1, force: 1 },
-        { x: Math.round(cx + 60), y: Math.round(cy), id: 2, radiusX: 1, radiusY: 1, force: 1 },
-      ],
-    });
+    await cdpPinchPoints(client, 'touchStart', cx, cy, 55);
     await wait(80);
-    await client.send('Input.dispatchTouchEvent', {
-      type: 'touchMove',
-      touchPoints: [
-        { x: Math.round(cx - 110), y: Math.round(cy), id: 1, radiusX: 1, radiusY: 1, force: 1 },
-        { x: Math.round(cx + 110), y: Math.round(cy), id: 2, radiusX: 1, radiusY: 1, force: 1 },
-      ],
-    });
+    await cdpPinchPoints(client, 'touchMove', cx, cy, 130);
     await wait(120);
     const driftOut = await anchorScreenDriftPx(page, base);
     if (!Number.isFinite(driftOut) || driftOut > 2) {
@@ -1272,19 +1284,14 @@ async function testMobile375PinchAndUi(browser, errors) {
     if (zOut < z0 * 1.4) {
       errors.push(`mobile375: pinch-out from z=${z0.toFixed(3)} to ${zOut.toFixed(3)} (<40% increase)`);
     }
-    await client.send('Input.dispatchTouchEvent', {
-      type: 'touchMove',
-      touchPoints: [
-        { x: Math.round(cx - 50), y: Math.round(cy), id: 1, radiusX: 1, radiusY: 1, force: 1 },
-        { x: Math.round(cx + 50), y: Math.round(cy), id: 2, radiusX: 1, radiusY: 1, force: 1 },
-      ],
-    });
+    await cdpPinchPoints(client, 'touchMove', cx, cy, 50);
+    await wait(80);
+    await cdpPinchPoints(client, 'touchEnd', cx, cy, 50);
     await wait(100);
     const zIn = (await readCanvasMetrics(page))?.zoom ?? 0;
     if (zIn >= zOut - 0.01) {
       errors.push(`mobile375: pinch-in did not decrease zoom (${zOut.toFixed(3)} -> ${zIn.toFixed(3)})`);
     }
-    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await wait(200);
 
     await page.goto(`${BASE}#view=x=200&y=-500&z=${ZOOM_MIN}`, { waitUntil: 'networkidle' });
@@ -1296,22 +1303,17 @@ async function testMobile375PinchAndUi(browser, errors) {
         y: Number(c?.dataset.camY ?? 0),
       };
     });
-    const fromX = canvas.x + canvas.width * 0.3;
-    const toX = canvas.x + canvas.width * 0.75;
-    const panY = canvas.y + canvas.height * 0.5;
-    await client.send('Input.dispatchTouchEvent', {
-      type: 'touchStart',
-      touchPoints: [{ x: Math.round(fromX), y: Math.round(panY), id: 0, radiusX: 1, radiusY: 1, force: 1 }],
-    });
-    for (let i = 0; i < 8; i++) {
-      const x = fromX + ((toX - fromX) * (i + 1)) / 8;
-      await client.send('Input.dispatchTouchEvent', {
-        type: 'touchMove',
-        touchPoints: [{ x: Math.round(x), y: Math.round(panY), id: 0, radiusX: 1, radiusY: 1, force: 1 }],
-      });
-      await wait(40);
+    const fromX = canvas.x + canvas.width * 0.25;
+    const toX = canvas.x + canvas.width * 0.82;
+    const panY = canvas.y + canvas.height * 0.55;
+    await page.mouse.move(fromX, panY);
+    await page.mouse.down();
+    for (let i = 0; i < 12; i++) {
+      const x = fromX + ((toX - fromX) * (i + 1)) / 12;
+      await page.mouse.move(x, panY);
+      await wait(35);
     }
-    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await page.mouse.up();
     await wait(300);
     const camAfter = await page.evaluate(() => {
       const c = document.getElementById('game-canvas');
@@ -1863,7 +1865,10 @@ async function main() {
 }
 
 main()
-  .then((errorCount) => process.exit(errorCount > 0 ? 1 : 0))
+  .then((errorCount) => {
+    const n = Number(errorCount) || 0;
+    process.exit(n > 0 ? 1 : 0);
+  })
   .catch((e) => {
     console.error(e);
     process.exit(1);

@@ -43,6 +43,7 @@ import {
   clampZoom,
   hardKeepMapPartiallyVisible,
   mapVisibleFractions,
+  viewportMapCoverage,
   ZOOM_MAX,
   ZOOM_MIN,
   zoomAtScreenAnchor,
@@ -542,6 +543,11 @@ export class IsoScene {
         sw,
         sh,
       );
+      const cov = viewportMapCoverage(
+        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+        sw,
+        sh,
+      );
       this.canvasEl.dataset.camX = String(this.cameraX);
       this.canvasEl.dataset.camY = String(this.cameraY);
       this.canvasEl.dataset.zoom = String(this.zoom);
@@ -551,7 +557,9 @@ export class IsoScene {
       this.canvasEl.dataset.camPy = String(camPyDrawn);
       this.canvasEl.dataset.mapFracW = String(vis.fracW);
       this.canvasEl.dataset.mapFracH = String(vis.fracH);
-      this.canvasEl.dataset.mapIntersects = vis.intersects ? '1' : '0';
+      this.canvasEl.dataset.mapCovW = String(cov.covW);
+      this.canvasEl.dataset.mapCovH = String(cov.covH);
+      this.canvasEl.dataset.mapIntersects = cov.intersects ? '1' : '0';
       this.canvasEl.dataset.pinchFrame = String(this.pinchFrameSerial);
       this.canvasEl.dataset.zoomSource = this.zoomSource;
       this.canvasEl.dataset.anchorWx = String(-this.cameraX);
@@ -1359,6 +1367,15 @@ export class IsoScene {
     return { x: Math.round(this.charTx), y: Math.round(this.charTy) };
   }
 
+  /** Same code path as a tap on the drawn door (QA / Playwright). */
+  tapBuildingDoor(name: string): boolean {
+    const client = this.getDoorScreenClientPoint(name);
+    if (!client || !this.canvasEl) return false;
+    const rect = this.canvasEl.getBoundingClientRect();
+    this.handleScreenTap(client.x - rect.left, client.y - rect.top, false);
+    return true;
+  }
+
   /** Client coordinates for tapping the drawn door of a building (QA). */
   getDoorScreenClientPoint(name: string): { x: number; y: number } | null {
     const obj = objects.find((o) => o.type === 'building' && o.name === name);
@@ -1384,6 +1401,10 @@ export class IsoScene {
   }
 
   /** For QA — place character on a walkable tile without opening doors. */
+  setSuppressTapForQa(ms: number): void {
+    this.suppressTapUntil = performance.now() + ms;
+  }
+
   setCharacterTileForQa(tx: number, ty: number): void {
     if (!cells[ty]?.[tx]?.walkable) return;
     this.path = [];

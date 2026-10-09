@@ -240,6 +240,7 @@ export function buildWorld(): { cells: MapCell[][]; objects: MapObject[] } {
     if (f.x < 0 || f.y < 0 || f.x >= MAP_WIDTH || f.y >= MAP_HEIGHT) continue;
     if (nearMuroClearance(f.x, f.y)) continue;
     if (!cells[f.y][f.x].walkable) continue;
+    if (cells[f.y][f.x].groundId.includes('path/street')) continue;
     if (doorTiles.has(`${f.x},${f.y}`)) continue;
     if (f.kind === 'plaza') {
       cells[f.y][f.x].groundId = 'tile/ground/park';

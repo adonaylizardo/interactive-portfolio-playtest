@@ -61,6 +61,8 @@ async function main(): Promise<void> {
     setCharacterTile: (x: number, y: number) => scene.setCharacterTileForQa(x, y),
     walkToBuilding: (name: string) => scene.walkToBuildingForQa(name),
     doorScreenPoint: (name: string) => scene.getDoorScreenClientPoint(name),
+    tapBuildingDoor: (name: string) => scene.tapBuildingDoor(name),
+    setSuppressTap: (ms: number) => scene.setSuppressTapForQa(ms),
   };
 }
 
