@@ -1306,14 +1306,21 @@ async function main() {
     };
     await writeFile(path.join(outDir, 'qa-pinch-results.json'), JSON.stringify(report, null, 2));
     console.log(JSON.stringify(report, null, 2));
-    if (errors.length) process.exitCode = 1;
   } finally {
-    await browser.close();
-    preview.kill('SIGTERM');
+    try {
+      await browser.close();
+    } catch {
+      /* ignore */
+    }
+    preview.kill('SIGKILL');
   }
+
+  return errors.length;
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main()
+  .then((errorCount) => process.exit(errorCount > 0 ? 1 : 0))
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
