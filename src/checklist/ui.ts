@@ -1,6 +1,7 @@
 import {
   countCompleted,
   isChecklistHidden,
+  isMobileOrCoarsePointer,
   isTouchPrimary,
   loadChecklist,
   saveChecklist,
@@ -69,6 +70,7 @@ export class ChecklistUI {
   private headerTitle: HTMLElement;
   private ringBtn: HTMLButtonElement;
   private touch = isTouchPrimary();
+  private compactSteps = isMobileOrCoarsePointer();
   private mobile = isMobileLayout();
   private panelOpen = false;
 
@@ -112,12 +114,6 @@ export class ChecklistUI {
     this.ringBtn = this.root.querySelector('.checklist__ring-btn')!;
     this.ringBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const total = totalStepsForPlatform(this.touch);
-      const done = countCompleted(this.state);
-      if (done >= total && !this.mobile) {
-        this.dismiss(callbacks);
-        return;
-      }
       if (this.mobile) {
         this.state.mobileExpanded = !this.state.mobileExpanded;
         this.applyLayoutClasses();
@@ -144,12 +140,14 @@ export class ChecklistUI {
 
     window.matchMedia('(max-width: 767px)').addEventListener('change', () => {
       this.mobile = isMobileLayout();
+      this.compactSteps = isMobileOrCoarsePointer();
       this.applyLayoutClasses();
       this.render();
     });
 
     window.matchMedia('(hover: none) and (pointer: coarse)').addEventListener('change', () => {
       this.touch = isTouchPrimary();
+      this.compactSteps = isMobileOrCoarsePointer();
       this.render();
     });
 
@@ -174,8 +172,8 @@ export class ChecklistUI {
 
   private applyLayoutClasses(): void {
     this.mobile = isMobileLayout();
-    const total = totalStepsForPlatform(this.touch);
-    const done = countCompleted(this.state);
+    const total = totalStepsForPlatform(this.compactSteps);
+    const done = countCompleted(this.state, this.compactSteps);
     const hidden = isChecklistHidden(this.state);
 
     this.root.hidden = hidden;
@@ -201,13 +199,14 @@ export class ChecklistUI {
   isSkippedOrDone(): boolean {
     return (
       isChecklistHidden(this.state) ||
-      countCompleted(this.state) >= totalStepsForPlatform(this.touch)
+      countCompleted(this.state, this.compactSteps) >= totalStepsForPlatform(this.compactSteps)
     );
   }
 
   private render(): void {
-    const total = totalStepsForPlatform(this.touch);
-    const done = countCompleted(this.state);
+    this.compactSteps = isMobileOrCoarsePointer();
+    const total = totalStepsForPlatform(this.compactSteps);
+    const done = countCompleted(this.state, this.compactSteps);
     const counterText = `${done} / ${total}`;
     this.counterEl.textContent = counterText;
     this.counterInRing.textContent = counterText;
@@ -223,7 +222,7 @@ export class ChecklistUI {
 
     this.applyLayoutClasses();
 
-    const platformSteps = stepsForPlatform(this.touch);
+    const platformSteps = stepsForPlatform(this.compactSteps);
     this.listEl.replaceChildren();
     let activeStep: StepCopy | null = null;
 

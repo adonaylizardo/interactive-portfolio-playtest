@@ -1,5 +1,11 @@
 import { ChecklistUI } from './checklist/ui';
-import { validateWalkGridFootprint } from './data/map';
+import {
+  getBuildingDoorTiles,
+  getEnterableBuildings,
+  INICIO,
+  MAP_TRAMOS,
+  validateWalkGridFootprint,
+} from './data/map';
 import { IsoScene } from './game/scene';
 import { findPath } from './iso/pathfinding';
 import { BuildingPanel } from './ui/buildingPanel';
@@ -39,9 +45,24 @@ async function main(): Promise<void> {
 
   (window as unknown as { __playtestQa?: Record<string, unknown> }).__playtestQa = {
     validateWalkGridFootprint,
+    getBuildingDoorTiles,
+    getEnterableBuildings: () =>
+      getEnterableBuildings().map((o) => ({
+        name: o.name,
+        x: o.x,
+        y: o.y,
+        panelTitle: o.panelTitle ?? '',
+        door: o.door,
+      })),
+    inicio: INICIO,
+    mapTramos: MAP_TRAMOS,
     findPath,
     getCharacterTile: () => scene.getCharacterTile(),
     setCharacterTile: (x: number, y: number) => scene.setCharacterTileForQa(x, y),
+    walkToBuilding: (name: string) => scene.walkToBuildingForQa(name),
+    doorScreenPoint: (name: string) => scene.getDoorScreenClientPoint(name),
+    tapBuildingDoor: (name: string) => scene.tapBuildingDoor(name),
+    setSuppressTap: (ms: number) => scene.setSuppressTapForQa(ms),
   };
 }
 

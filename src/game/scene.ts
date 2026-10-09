@@ -3,6 +3,7 @@ import {
   cells,
   getBuildingAt,
   getBuildingAtDoor,
+  INICIO,
   MAP_HEIGHT,
   MAP_WIDTH,
   objects,
@@ -17,29 +18,36 @@ import { isTouchPrimary, type ChecklistStepId } from '../checklist/storage';
 import { sortKey, tileFootWorld, tileToWorld, worldToTile } from '../iso/math';
 import { findPathOrNearest } from '../iso/pathfinding';
 import { C } from './colors';
-import { buildingPickHit } from './draw';
+import {
+  buildingFrontWallsCover,
+  buildingInteriorGapSample,
+  buildingPickHit,
+  deskTopFillColor,
+  doorCenterLocal,
+  drawBench,
+  drawBorderTile,
+  drawCharacter,
+  drawDiamond,
+  drawFootprintBuilding,
+  drawLamp,
+  drawMuro,
+  drawObelisco,
+  drawPropDesk,
+  drawPropTree,
+  drawRedoma,
+  treeCanopyTrunkOverlap,
+  type FootprintDrawSpec,
+} from './draw';
 import {
   cameraFromPinchSession,
-  centerMapInView,
   clampZoom,
   hardKeepMapPartiallyVisible,
   mapVisibleFractions,
-  softClampMapInView,
+  viewportMapCoverage,
   ZOOM_MAX,
   ZOOM_MIN,
   zoomAtScreenAnchor,
 } from './cameraControl';
-import {
-  buildingFrontWallsCover,
-  buildingInteriorGapSample,
-  deskTopFillColor,
-  drawBuilding,
-  drawCharacter,
-  drawDiamond,
-  drawPropDesk,
-  drawPropTree,
-  treeCanopyTrunkOverlap,
-} from './draw';
 
 export type BuildingPanelBridge = {
   isOpen: () => boolean;
@@ -64,8 +72,8 @@ export class IsoScene {
   characterLayer = new Container();
   highlightLayer = new Container();
 
-  charTx = 8;
-  charTy = 8;
+  charTx = INICIO[0];
+  charTy = INICIO[1];
   path: { x: number; y: number }[] = [];
   moveSpeed = 4;
   sprint = false;
@@ -90,6 +98,9 @@ export class IsoScene {
   private panMoved = false;
   private cameraPanned = false;
   private zoomChanged = false;
+  private lastChecklistZoom = 0;
+  private lastChecklistCamPx = 0;
+  private lastChecklistCamPy = 0;
   private canvasEl: HTMLCanvasElement | null = null;
   private pointers = new Map<number, { x: number; y: number }>();
   private pinchSession: {
@@ -117,9 +128,14 @@ export class IsoScene {
   private touchOnlyPinch = false;
   private pendingBuildingEntry: { panelTitle: string; door: { x: number; y: number } } | null =
     null;
-  private lastRoundedTile = { x: 8, y: 8 };
+  private lastRoundedTile = { x: INICIO[0], y: INICIO[1] };
+  private tileCullEntries: { g: Graphics; tx: number; ty: number }[] = [];
   private pointerGestureSerial = 0;
   private pixiTapGestureSerial = -1;
+  private firstPointerDownAt = 0;
+  private secondFingerArrived = false;
+  private deferredTapTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingViewportApply = false;
   constructor(events: SceneEvents) {
     this.events = events;
   }
@@ -151,6 +167,7 @@ export class IsoScene {
     this.buildVoidClickLayer();
     this.buildObjects();
     this.syncCharacterGraphic();
+    this.syncRoundedTileFromCharacter();
 
     const fromHash = parseCameraFromHash();
     if (fromHash) {
@@ -163,10 +180,19 @@ export class IsoScene {
       this.centerOnCharacter(false);
     }
     this.applyCamera(true);
+    const sw0 = this.app.screen.width;
+    const sh0 = this.app.screen.height;
+    this.lastChecklistZoom = this.zoom;
+    this.lastChecklistCamPx = sw0 / 2 + this.cameraX * this.zoom;
+    this.lastChecklistCamPy = sh0 / 2 + this.cameraY * this.zoom;
 
     this.bindInput();
     this.app.ticker.add(() => this.update());
-    window.addEventListener('resize', () => this.applyCamera());
+    window.addEventListener('resize', () => this.onWindowViewportChange());
+    window.visualViewport?.addEventListener('resize', () => this.onWindowViewportChange());
+    window.visualViewport?.addEventListener('scroll', () => {
+      window.scrollTo(0, 0);
+    });
     window.addEventListener('hashchange', () => {
       const v = parseCameraFromHash();
       if (v) {
@@ -206,14 +232,20 @@ export class IsoScene {
         const cell = cells[ty][tx];
         const pos = tileFootWorld(tx, ty);
         const g = new Graphics();
+        const isFrame = cell.groundId.includes('borde');
         g.position.set(pos.x, pos.y);
-        const fill =
-          cell.groundId.includes('path')
+        if (isFrame) {
+          drawBorderTile(g, cell.groundId);
+        } else {
+          const fill = cell.groundId.includes('path')
             ? C.tileMid
-            : cell.groundId.includes('concrete')
-              ? C.tileDark
-              : C.tileLight;
-        drawDiamond(g, fill);
+            : cell.groundId.includes('park')
+              ? 0xd0d4cc
+              : cell.groundId.includes('footprint') || cell.groundId.includes('building')
+                ? C.tileDark
+                : C.tileLight;
+          drawDiamond(g, fill);
+        }
         g.eventMode = 'static';
         g.cursor = cell.walkable ? 'pointer' : 'default';
         g.on('pointertap', (e) => {
@@ -224,6 +256,7 @@ export class IsoScene {
           this.requestWalk(tx, ty, sprint);
         });
         this.tilesLayer.addChild(g);
+        this.tileCullEntries.push({ g, tx, ty });
       }
     }
   }
@@ -258,6 +291,13 @@ export class IsoScene {
           this.requestWalk(obj.door.x, obj.door.y, sprint, {
             buildingEntry: { panelTitle: obj.panelTitle, door: obj.door },
           });
+          return;
+        }
+        this.pendingBuildingEntry = null;
+        if (obj.name === 'obelisco' || obj.name === 'redoma' || obj.name === 'muro') {
+          const gx = obj.x;
+          const gy = obj.y;
+          this.requestWalk(gx, gy, sprint);
           return;
         }
         this.requestWalk(obj.x, obj.y, sprint);
@@ -296,8 +336,28 @@ export class IsoScene {
       g.clear();
       const hover = this.hoveredObject?.id === obj.id;
       if (obj.name === 'escritorio') drawPropDesk(g, hover);
-      else if (obj.name === 'arbol') drawPropTree(g, hover);
-      else drawBuilding(g, hover);
+      else if (obj.name === 'arbol' || obj.name === 'tree') drawPropTree(g, hover);
+      else if (obj.name === 'bench') drawBench(g, hover);
+      else if (obj.name === 'lamp') drawLamp(g, hover);
+      else if (obj.name === 'obelisco')
+        drawObelisco(g, hover, obj.footprintX, obj.footprintY, obj.w, obj.h, obj.x, obj.y);
+      else if (obj.name === 'redoma')
+        drawRedoma(g, hover, obj.footprintX, obj.footprintY, obj.w, obj.h, obj.x, obj.y);
+      else if (obj.name === 'muro') drawMuro(g, hover);
+      else if (obj.type === 'building') {
+        const spec: FootprintDrawSpec = {
+          fx: obj.footprintX ?? obj.x,
+          fy: obj.footprintY ?? obj.y,
+          w: obj.w ?? 3,
+          h: obj.h ?? 3,
+          ax: obj.x,
+          ay: obj.y,
+          doorFace: obj.doorFace ?? '+y',
+          door: obj.door ?? { x: obj.x, y: obj.y + 1 },
+          kind: obj.name,
+        };
+        drawFootprintBuilding(g, hover, spec);
+      }
     }
   }
 
@@ -325,15 +385,10 @@ export class IsoScene {
       this.events.onUnreachable?.();
       return;
     }
-    if (!cells[ty][tx].walkable) {
-      this.clearWalkPreview();
-      this.events.onUnreachable?.();
-      return;
-    }
     const sx = Math.round(this.charTx);
     const sy = Math.round(this.charTy);
     const result = findPathOrNearest(sx, sy, tx, ty);
-    if (!result?.direct) {
+    if (!result) {
       this.clearWalkPreview();
       this.events.onUnreachable?.();
       return;
@@ -362,7 +417,26 @@ export class IsoScene {
     for (const obj of buildings) {
       const foot = tileFootWorld(obj.x, obj.y);
       const local = { x: wx - foot.x, y: wy - foot.y };
-      if (buildingPickHit(local)) return obj;
+      if (obj.name === 'obelisco' || obj.name === 'redoma' || obj.name === 'muro') {
+        const w = obj.w ?? 3;
+        const h = obj.h ?? 2;
+        const hitW = 40 + w * 16;
+        const hitH = 60 + h * 20;
+        if (Math.abs(local.x) < hitW && local.y > -hitH && local.y < 24) return obj;
+      } else if (obj.type === 'building') {
+        const spec: FootprintDrawSpec = {
+          fx: obj.footprintX ?? obj.x,
+          fy: obj.footprintY ?? obj.y,
+          w: obj.w ?? 3,
+          h: obj.h ?? 3,
+          ax: obj.x,
+          ay: obj.y,
+          doorFace: obj.doorFace ?? '+y',
+          door: obj.door ?? { x: obj.x, y: obj.y + 1 },
+          kind: obj.name,
+        };
+        if (buildingPickHit(local, spec)) return obj;
+      }
     }
     return undefined;
   }
@@ -411,7 +485,6 @@ export class IsoScene {
     this.pathGfx.clear();
     if (this.path.length === 0) return;
     if (this.events.buildingPanel?.isOpen()) return;
-    if (this.pendingBuildingEntry) return;
     const points = [{ x: this.charTx, y: this.charTy }, ...this.path];
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
@@ -452,16 +525,14 @@ export class IsoScene {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     this.zoom = clampZoom(this.zoom);
-    if (this.gestureActive) {
-      const hardened = hardKeepMapPartiallyVisible(
-        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
-        sw,
-        sh,
-      );
-      this.cameraX = hardened.cameraX;
-      this.cameraY = hardened.cameraY;
-      this.zoom = hardened.zoom;
-    }
+    const hardened = hardKeepMapPartiallyVisible(
+      { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+      sw,
+      sh,
+    );
+    this.cameraX = hardened.cameraX;
+    this.cameraY = hardened.cameraY;
+    this.zoom = hardened.zoom;
     this.camera.position.set(sw / 2, sh / 2);
     this.camera.scale.set(1);
     this.world.position.set(this.cameraX * this.zoom, this.cameraY * this.zoom);
@@ -472,16 +543,27 @@ export class IsoScene {
         sw,
         sh,
       );
+      const cov = viewportMapCoverage(
+        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+        sw,
+        sh,
+      );
       this.canvasEl.dataset.camX = String(this.cameraX);
       this.canvasEl.dataset.camY = String(this.cameraY);
       this.canvasEl.dataset.zoom = String(this.zoom);
-      this.canvasEl.dataset.camPx = String(sw / 2 + this.world.position.x);
-      this.canvasEl.dataset.camPy = String(sh / 2 + this.world.position.y);
+      const camPxDrawn = sw / 2 + this.cameraX * this.zoom;
+      const camPyDrawn = sh / 2 + this.cameraY * this.zoom;
+      this.canvasEl.dataset.camPx = String(camPxDrawn);
+      this.canvasEl.dataset.camPy = String(camPyDrawn);
       this.canvasEl.dataset.mapFracW = String(vis.fracW);
       this.canvasEl.dataset.mapFracH = String(vis.fracH);
-      this.canvasEl.dataset.mapIntersects = vis.intersects ? '1' : '0';
+      this.canvasEl.dataset.mapCovW = String(cov.covW);
+      this.canvasEl.dataset.mapCovH = String(cov.covH);
+      this.canvasEl.dataset.mapIntersects = cov.intersects ? '1' : '0';
       this.canvasEl.dataset.pinchFrame = String(this.pinchFrameSerial);
       this.canvasEl.dataset.zoomSource = this.zoomSource;
+      this.canvasEl.dataset.anchorWx = String(-this.cameraX);
+      this.canvasEl.dataset.anchorWy = String(-this.cameraY);
       this.canvasEl.dataset.charTile = JSON.stringify({
         x: Math.round(this.charTx),
         y: Math.round(this.charTy),
@@ -494,51 +576,85 @@ export class IsoScene {
     if (persistHash) {
       writeCameraToHash({ x: this.cameraX, y: this.cameraY, zoom: this.zoom });
     }
-    if (!this.gestureActive && this.zoom <= ZOOM_MIN + 0.02) {
-      const centered = centerMapInView(
-        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
-        sw,
-        sh,
-      );
-      this.cameraX = centered.cameraX;
-      this.cameraY = centered.cameraY;
-      this.world.position.set(this.cameraX * this.zoom, this.cameraY * this.zoom);
-      if (this.canvasEl) {
-        this.canvasEl.dataset.camPx = String(sw / 2 + this.world.position.x);
-        this.canvasEl.dataset.camPy = String(sh / 2 + this.world.position.y);
-      }
-    }
-
-    if (this.zoomChanged) {
+    const camPxDrawn = sw / 2 + this.cameraX * this.zoom;
+    const camPyDrawn = sh / 2 + this.cameraY * this.zoom;
+    if (
+      this.zoomChanged &&
+      Math.abs(this.zoom - this.lastChecklistZoom) / Math.max(this.lastChecklistZoom, 0.05) > 0.02
+    ) {
       this.events.onChecklist('zoom');
+      this.lastChecklistZoom = this.zoom;
+      this.zoomChanged = false;
+    } else if (this.zoomChanged) {
       this.zoomChanged = false;
     }
-    if (this.cameraPanned) {
+    if (
+      this.cameraPanned &&
+      Math.hypot(camPxDrawn - this.lastChecklistCamPx, camPyDrawn - this.lastChecklistCamPy) > 8
+    ) {
       this.events.onChecklist('move-camera');
+      this.lastChecklistCamPx = camPxDrawn;
+      this.lastChecklistCamPy = camPyDrawn;
       this.cameraPanned = false;
+    } else if (this.cameraPanned) {
+      this.cameraPanned = false;
+    }
+    this.cullVisibleTiles();
+  }
+
+  private cullVisibleTiles(): void {
+    if (!this.app?.screen) return;
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const pad = TILE_W * 1.5;
+    const corners = [
+      this.screenToWorld(-pad, -pad),
+      this.screenToWorld(sw + pad, -pad),
+      this.screenToWorld(-pad, sh + pad),
+      this.screenToWorld(sw + pad, sh + pad),
+    ];
+    const minX = Math.min(...corners.map((c) => c.x));
+    const maxX = Math.max(...corners.map((c) => c.x));
+    const minY = Math.min(...corners.map((c) => c.y));
+    const maxY = Math.max(...corners.map((c) => c.y));
+    for (const { g, tx, ty } of this.tileCullEntries) {
+      const foot = tileFootWorld(tx, ty);
+      g.visible =
+        foot.x >= minX - TILE_W &&
+        foot.x <= maxX + TILE_W &&
+        foot.y >= minY - TILE_H &&
+        foot.y <= maxY + TILE_H;
+    }
+    for (const obj of objects) {
+      const g = this.objectGraphics.get(obj.id);
+      if (!g) continue;
+      const foot = tileFootWorld(obj.x, obj.y);
+      g.visible =
+        foot.x >= minX - TILE_W * 3 &&
+        foot.x <= maxX + TILE_W * 3 &&
+        foot.y >= minY - TILE_H * 6 &&
+        foot.y <= maxY + TILE_H * 2;
     }
   }
 
   /** QA: tile vs building foot global positions must match at every zoom. */
   private updateFootAnchorProbe(): void {
     if (!this.canvasEl) return;
-    const tileIdx = 4 * MAP_WIDTH + 3;
+    const tileIdx = INICIO[1] * MAP_WIDTH + INICIO[0];
     const tileG = this.tilesLayer.children[tileIdx] as Container | undefined;
-    const buildG = this.objectGraphics.get('building/caso-1/default');
+    const buildG = this.objectGraphics.get('building/estudio');
     if (!tileG || !buildG) return;
-    const foot = tileFootWorld(3, 4);
+    const foot = tileFootWorld(INICIO[0], INICIO[1]);
     const expected = this.worldToScreen(foot.x, foot.y);
     const tileGlobal = tileG.getGlobalPosition(new Point());
-    const buildGlobal = buildG.getGlobalPosition(new Point());
-    const driftTileBuild = Math.hypot(tileGlobal.x - buildGlobal.x, tileGlobal.y - buildGlobal.y);
     const driftTileFormula = Math.hypot(tileGlobal.x - expected.x, tileGlobal.y - expected.y);
-    this.canvasEl.dataset.footDriftPx = String(Math.max(driftTileBuild, driftTileFormula));
+    this.canvasEl.dataset.footDriftPx = String(driftTileFormula);
   }
 
   /** QA: local bounds of caso-1 must not change with zoom (no LOD geometry swap). */
   private updateBuildingSilhouetteProbe(): void {
     if (!this.canvasEl) return;
-    const buildG = this.objectGraphics.get('building/caso-1/default');
+    const buildG = this.objectGraphics.get('building/estudio');
     if (!buildG) return;
     const b = buildG.getLocalBounds();
     this.canvasEl.dataset.buildingSilhouette = JSON.stringify({
@@ -573,7 +689,7 @@ export class IsoScene {
   /** Frame character (8,8) and building caso-1 (3,4) on narrow viewports. */
   private frameMobileDefaultView(): void {
     const char = tileToWorld(this.charTx, this.charTy);
-    const building = tileToWorld(3, 4);
+    const building = tileToWorld(39, 35);
     const minX = Math.min(char.x, building.x) - TILE_W;
     const maxX = Math.max(char.x, building.x) + TILE_W;
     const minY = Math.min(char.y, building.y) - TILE_H * 4;
@@ -621,25 +737,14 @@ export class IsoScene {
     } else {
       this.zoom = clampZoom(next);
     }
-    if (Math.abs(this.zoom - ZOOM_MIN) < 0.001) {
-      const centered = centerMapInView(
-        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
-        sw,
-        sh,
-      );
-      this.cameraX = centered.cameraX;
-      this.cameraY = centered.cameraY;
-      this.zoom = centered.zoom;
-    } else {
-      const softened = softClampMapInView(
-        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
-        sw,
-        sh,
-      );
-      this.cameraX = softened.cameraX;
-      this.cameraY = softened.cameraY;
-      this.zoom = softened.zoom;
-    }
+    const softened = hardKeepMapPartiallyVisible(
+      { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+      sw,
+      sh,
+    );
+    this.cameraX = softened.cameraX;
+    this.cameraY = softened.cameraY;
+    this.zoom = softened.zoom;
     this.zoomChanged = true;
     this.applyCamera();
   }
@@ -650,9 +755,41 @@ export class IsoScene {
     this.pinchGestureActive = false;
     this.gestureActive = false;
     this.zoomSource = 'none';
-    this.suppressTapUntil = performance.now() + 400;
+    this.touchOnlyPinch = false;
+    this.path = [];
+    this.pendingBuildingEntry = null;
+    this.drawPathPreview();
+    this.suppressTapUntil = performance.now() + 250;
     this.panMoved = true;
     document.body.classList.remove('is-canvas-dragging');
+    this.flushPendingViewport();
+  }
+
+  private clearDeferredTap(): void {
+    if (this.deferredTapTimer !== null) {
+      clearTimeout(this.deferredTapTimer);
+      this.deferredTapTimer = null;
+    }
+  }
+
+  private onWindowViewportChange(): void {
+    if (
+      this.pointers.size > 0 ||
+      this.pinchGestureActive ||
+      this.gestureActive ||
+      this.zoomSource !== 'none'
+    ) {
+      this.pendingViewportApply = true;
+      return;
+    }
+    this.applyCamera(false);
+  }
+
+  private flushPendingViewport(): void {
+    if (!this.pendingViewportApply) return;
+    this.pendingViewportApply = false;
+    if (this.pointers.size > 0 || this.pinchGestureActive || this.gestureActive) return;
+    this.applyCamera(false);
   }
 
   private applyPinchCamera(next: { cameraX: number; cameraY: number; zoom: number }): void {
@@ -670,6 +807,8 @@ export class IsoScene {
       this.panMoved ||
       this.pinchGestureActive ||
       this.hadMultiPointerGesture ||
+      this.secondFingerArrived ||
+      this.pointers.size >= 2 ||
       performance.now() < this.suppressTapUntil
     );
   }
@@ -697,14 +836,21 @@ export class IsoScene {
     return Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
   }
 
-  private beginPinchAtMid(mid: { x: number; y: number }, dist: number): void {
+  private rebaselinePinchSession(): void {
     if (this.zoomSource === 'gesture') return;
+    const mid = this.pointerMidpoint();
+    if (!mid) return;
+    const dist = this.pointerDistance();
+    this.path = [];
+    this.drawPathPreview();
+    this.pendingBuildingEntry = null;
     this.zoomSource = 'pointer';
     this.pinchGestureActive = true;
     this.gestureActive = true;
     this.hadMultiPointerGesture = true;
     this.panMoved = true;
     this.webkitGestureSession = null;
+    this.clearDeferredTap();
     if (dist >= 10 && Number.isFinite(dist)) {
       this.pinchSession = {
         startDist: dist,
@@ -715,6 +861,93 @@ export class IsoScene {
       };
     } else {
       this.pinchSession = null;
+    }
+  }
+
+  private beginPinchAtMid(mid: { x: number; y: number }, dist: number): void {
+    if (this.zoomSource === 'gesture') return;
+    this.path = [];
+    this.drawPathPreview();
+    this.pendingBuildingEntry = null;
+    this.zoomSource = 'pointer';
+    this.pinchGestureActive = true;
+    this.gestureActive = true;
+    this.hadMultiPointerGesture = true;
+    this.panMoved = true;
+    this.webkitGestureSession = null;
+    this.clearDeferredTap();
+    if (dist >= 10 && Number.isFinite(dist)) {
+      this.pinchSession = {
+        startDist: dist,
+        startZoom: this.zoom,
+        startCamX: this.cameraX,
+        startCamY: this.cameraY,
+        startMid: mid,
+      };
+    } else {
+      this.pinchSession = null;
+    }
+  }
+
+  private transitionToSingleFingerPan(remaining: { x: number; y: number }): void {
+    this.pinchSession = null;
+    this.pinchGestureActive = false;
+    this.gestureActive = false;
+    this.zoomSource = 'none';
+    this.touchOnlyPinch = false;
+    this.hadMultiPointerGesture = true;
+    this.panMoved = true;
+    this.suppressTapUntil = performance.now() + 250;
+    this.clearDeferredTap();
+    this.lastPanPos = { x: remaining.x, y: remaining.y };
+    this.tapStart = { x: remaining.x, y: remaining.y, t: performance.now() };
+  }
+
+  private onPointerCountChanged(prevCount: number, newCount: number): void {
+    if (newCount >= 2 && this.zoomSource !== 'gesture') {
+      this.rebaselinePinchSession();
+    } else if (prevCount >= 2 && newCount === 1) {
+      const remaining = [...this.pointers.values()][0];
+      this.transitionToSingleFingerPan(remaining);
+    }
+  }
+
+  private tryScheduleDeferredTap(e: PointerEvent): void {
+    this.clearDeferredTap();
+    if (!this.tapStart) return;
+    if (this.pixiTapGestureSerial === this.pointerGestureSerial) return;
+    if (e.pointerType !== 'touch') return;
+
+    const hadMulti = this.hadMultiPointerGesture;
+    const hadSecond = this.secondFingerArrived;
+    if (hadMulti || hadSecond || this.panMoved) return;
+
+    const dist = Math.hypot(e.clientX - this.tapStart.x, e.clientY - this.tapStart.y);
+    if (dist >= 10) return;
+
+    const fire = () => {
+      this.deferredTapTimer = null;
+      if (this.pointers.size > 0) return;
+      if (performance.now() < this.suppressTapUntil) return;
+      if (!this.tapStart) return;
+      const now = performance.now();
+      const dt = now - this.tapStart.t;
+      if (dt > 450) return;
+      const canvas = this.canvasEl;
+      if (!canvas) return;
+      const nowDist = Math.hypot(e.clientX - this.tapStart.x, e.clientY - this.tapStart.y);
+      if (nowDist >= 10) return;
+      const double = now - this.lastTapTime < 320;
+      this.lastTapTime = now;
+      const rect = canvas.getBoundingClientRect();
+      this.handleScreenTap(e.clientX - rect.left, e.clientY - rect.top, double);
+    };
+
+    const waitMs = Math.max(0, this.firstPointerDownAt + 120 - performance.now());
+    if (waitMs > 0) {
+      this.deferredTapTimer = setTimeout(fire, waitMs);
+    } else {
+      fire();
     }
   }
 
@@ -739,6 +972,19 @@ export class IsoScene {
       },
       { passive: false },
     );
+
+    const uiRoot = document.getElementById('ui-root');
+    const isGameTouchTarget = (target: EventTarget | null) => {
+      if (!target || !(target instanceof Node)) return false;
+      if (uiRoot?.contains(target)) return false;
+      return canvas.contains(target) || target === canvas || appRoot?.contains(target);
+    };
+    const preventNativeGesture = (e: Event) => {
+      e.preventDefault();
+    };
+    document.addEventListener('gesturestart', preventNativeGesture, { passive: false, capture: true });
+    document.addEventListener('gesturechange', preventNativeGesture, { passive: false, capture: true });
+    document.addEventListener('gestureend', preventNativeGesture, { passive: false, capture: true });
 
     const onGestureStart = (e: Event) => {
       e.preventDefault();
@@ -801,7 +1047,6 @@ export class IsoScene {
       const k = e.key.toLowerCase();
       if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
         this.keys.add(k);
-        this.events.onChecklist('walk-keys');
         e.preventDefault();
       }
       if (e.key === 'Shift') this.shiftHeld = true;
@@ -830,60 +1075,91 @@ export class IsoScene {
       { passive: false },
     );
 
+    let lastTouchCount = 0;
+
     const onTouchPinchStart = (e: TouchEvent) => {
+      if (!isGameTouchTarget(e.target)) return;
       if (this.zoomSource === 'gesture') return;
-      if (!e.touches || e.touches.length < 2) return;
+      const n = e.touches.length;
+      if (n >= 1) e.preventDefault();
+      if (n < 2) {
+        lastTouchCount = n;
+        return;
+      }
       const t0 = e.touches[0];
       const t1 = e.touches[1];
-      if (this.pinchGestureActive && !this.touchOnlyPinch) return;
+      const mid = this.touchPairMidpoint(t0, t1);
+      const dist = this.touchPairDistance(t0, t1);
+      if (this.pointers.size >= 2) {
+        lastTouchCount = n;
+        return;
+      }
       this.touchOnlyPinch = true;
-      this.beginPinchAtMid(this.touchPairMidpoint(t0, t1), this.touchPairDistance(t0, t1));
+      if (lastTouchCount >= 2 || this.pinchGestureActive) {
+        this.beginPinchAtMid(mid, dist);
+      } else {
+        this.beginPinchAtMid(mid, dist);
+      }
+      lastTouchCount = n;
     };
 
     const onTouchPinchMove = (e: TouchEvent) => {
+      if (!isGameTouchTarget(e.target)) return;
+      if (e.touches.length >= 1) e.preventDefault();
       if (e.touches.length >= 2) {
-        e.preventDefault();
+        if (this.pointers.size >= 2) return;
         if (this.touchOnlyPinch && this.zoomSource === 'pointer') {
           const t0 = e.touches[0];
           const t1 = e.touches[1];
+          if (lastTouchCount !== e.touches.length) {
+            this.beginPinchAtMid(this.touchPairMidpoint(t0, t1), this.touchPairDistance(t0, t1));
+          }
           this.applyActivePinch(this.touchPairMidpoint(t0, t1), this.touchPairDistance(t0, t1));
         }
       }
+      lastTouchCount = e.touches.length;
     };
 
     const endTouchPinch = () => {
       if (!this.touchOnlyPinch) return;
+      if (this.pointers.size > 0) return;
       this.touchOnlyPinch = false;
       this.endZoomGesture();
     };
 
-    document.addEventListener('touchstart', onTouchPinchStart, { passive: false, capture: true });
-    document.addEventListener('touchmove', onTouchPinchMove, { passive: false, capture: true });
-    document.addEventListener(
+    canvas.addEventListener('touchstart', onTouchPinchStart, { passive: false });
+    canvas.addEventListener('touchmove', onTouchPinchMove, { passive: false });
+    canvas.addEventListener(
       'touchend',
       (e) => {
+        lastTouchCount = e.touches.length;
         if (e.touches.length < 2) endTouchPinch();
       },
-      { capture: true },
+      { passive: true },
     );
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.pointerType === 'touch') {
         this.touchOnlyPinch = false;
       }
+      const prevCount = this.pointers.size;
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this.pointers.size === 1) {
         this.pointerGestureSerial += 1;
         this.pixiTapGestureSerial = -1;
-        this.panMoved = false;
-        this.hadMultiPointerGesture = false;
+        this.firstPointerDownAt = performance.now();
+        this.secondFingerArrived = false;
+        if (!this.hadMultiPointerGesture) {
+          this.panMoved = false;
+        }
         this.lastPanPos = { x: e.clientX, y: e.clientY };
         this.tapStart = { x: e.clientX, y: e.clientY, t: performance.now() };
       }
-      if (this.pointers.size === 2 && this.zoomSource !== 'gesture') {
-        const mid = this.pointerMidpoint()!;
-        this.beginPinchAtMid(mid, this.pointerDistance());
+      if (this.pointers.size >= 2) {
+        this.secondFingerArrived = true;
+        this.clearDeferredTap();
       }
+      this.onPointerCountChanged(prevCount, this.pointers.size);
       if (e.pointerType !== 'touch') {
         try {
           canvas.setPointerCapture(e.pointerId);
@@ -905,10 +1181,7 @@ export class IsoScene {
         e.preventDefault();
         const mid = this.pointerMidpoint()!;
         const dist = this.pointerDistance();
-        const sw = this.app.screen.width;
-        const sh = this.app.screen.height;
-        const next = cameraFromPinchSession(this.pinchSession, dist, mid, sw, sh);
-        if (next) this.applyPinchCamera(next);
+        this.applyActivePinch(mid, dist);
         return;
       }
 
@@ -934,55 +1207,22 @@ export class IsoScene {
 
     const endPointerGesture = (e: PointerEvent) => {
       const wasPinch = this.pinchGestureActive;
+      const prevCount = this.pointers.size;
       this.pointers.delete(e.pointerId);
-
-      if (this.pointers.size === 1 && wasPinch && this.zoomSource === 'pointer') {
-        const remaining = [...this.pointers.values()][0];
-        this.lastPanPos = { x: remaining.x, y: remaining.y };
-        this.pinchSession = null;
-        this.pinchGestureActive = false;
-        this.gestureActive = false;
-        this.zoomSource = 'none';
-        this.suppressTapUntil = performance.now() + 400;
-        this.panMoved = true;
-      }
+      this.onPointerCountChanged(prevCount, this.pointers.size);
 
       if (this.pointers.size === 0) {
         if (wasPinch || this.hadMultiPointerGesture) {
-          this.suppressTapUntil = performance.now() + 400;
+          this.suppressTapUntil = performance.now() + 250;
         }
         if (this.zoomSource === 'pointer') {
           this.endZoomGesture();
         }
-
-        if (
-          this.tapStart &&
-          !this.shouldBlockTap() &&
-          e.pointerType === 'touch' &&
-          this.pixiTapGestureSerial !== this.pointerGestureSerial
-        ) {
-          const dt = performance.now() - this.tapStart.t;
-          const dist = Math.hypot(e.clientX - this.tapStart.x, e.clientY - this.tapStart.y);
-          const tapSlop = 14;
-          if (dt < 350 && dist < tapSlop) {
-            const now = performance.now();
-            const double = now - this.lastTapTime < 320;
-            this.lastTapTime = now;
-            const rect = canvas.getBoundingClientRect();
-            const sx = e.clientX - rect.left;
-            const sy = e.clientY - rect.top;
-            this.handleScreenTap(sx, sy, double);
-          }
-        }
-
+        this.tryScheduleDeferredTap(e);
         this.lastPanPos = null;
         this.tapStart = null;
-        if (this.zoomSource === 'pointer') {
-          this.pinchSession = null;
-          this.pinchGestureActive = false;
-          this.gestureActive = false;
-          this.zoomSource = 'none';
-        }
+        this.hadMultiPointerGesture = false;
+        this.secondFingerArrived = false;
         document.body.classList.remove('is-canvas-dragging');
       }
 
@@ -1029,6 +1269,7 @@ export class IsoScene {
         this.sprint = sprint;
         this.charState = sprint ? 'sprint' : 'walk';
         const speed = (sprint ? 0.12 : 0.07) * (this.app.ticker.deltaMS / 16);
+        const tileBefore = this.roundedCharTile();
         const ntx = this.charTx + dx * speed;
         const nty = this.charTy + dy * speed;
         const tx = Math.round(ntx);
@@ -1037,8 +1278,18 @@ export class IsoScene {
           this.charTx = ntx;
           this.charTy = nty;
         }
+        const tileAfter = this.roundedCharTile();
+        if (tileBefore.x !== tileAfter.x || tileBefore.y !== tileAfter.y) {
+          this.events.onChecklist('walk-keys');
+          if (
+            tileAfter.x !== this.lastRoundedTile.x ||
+            tileAfter.y !== this.lastRoundedTile.y
+          ) {
+            this.lastRoundedTile = { x: tileAfter.x, y: tileAfter.y };
+            this.openDoorIfOnTile(tileAfter.x, tileAfter.y);
+          }
+        }
         this.syncCharacterGraphic();
-        this.syncDoorOnTileChange(true);
       } else if (this.path.length === 0) {
         this.charState = 'idle';
         this.syncCharacterGraphic();
@@ -1075,13 +1326,12 @@ export class IsoScene {
 
   private doorCooldown = 0;
 
-  /** Keyboard: open only when the rounded tile changes onto a door. */
-  private syncDoorOnTileChange(fromKeyboard: boolean): void {
-    const tx = Math.round(this.charTx);
-    const ty = Math.round(this.charTy);
-    if (tx === this.lastRoundedTile.x && ty === this.lastRoundedTile.y) return;
-    this.lastRoundedTile = { x: tx, y: ty };
-    if (fromKeyboard) this.openDoorIfOnTile(tx, ty);
+  private roundedCharTile(): { x: number; y: number } {
+    return { x: Math.round(this.charTx), y: Math.round(this.charTy) };
+  }
+
+  private syncRoundedTileFromCharacter(): void {
+    this.lastRoundedTile = this.roundedCharTile();
   }
 
   private openDoorIfOnTile(tx: number, ty: number): void {
@@ -1100,8 +1350,7 @@ export class IsoScene {
     const tx = Math.round(this.charTx);
     const ty = Math.round(this.charTy);
     const d = this.pendingBuildingEntry.door;
-    const chebyshev = Math.max(Math.abs(tx - d.x), Math.abs(ty - d.y));
-    if (chebyshev > 1) {
+    if (tx !== d.x || ty !== d.y) {
       this.pendingBuildingEntry = null;
       return;
     }
@@ -1118,15 +1367,62 @@ export class IsoScene {
     return { x: Math.round(this.charTx), y: Math.round(this.charTy) };
   }
 
+  /** Same code path as a tap on the drawn door (QA / Playwright). */
+  tapBuildingDoor(name: string): boolean {
+    const client = this.getDoorScreenClientPoint(name);
+    if (!client || !this.canvasEl) return false;
+    const rect = this.canvasEl.getBoundingClientRect();
+    this.handleScreenTap(client.x - rect.left, client.y - rect.top, false);
+    return true;
+  }
+
+  /** Client coordinates for tapping the drawn door of a building (QA). */
+  getDoorScreenClientPoint(name: string): { x: number; y: number } | null {
+    const obj = objects.find((o) => o.type === 'building' && o.name === name);
+    if (!obj?.door || !this.canvasEl) return null;
+    const spec: FootprintDrawSpec = {
+      fx: obj.footprintX ?? obj.x,
+      fy: obj.footprintY ?? obj.y,
+      w: obj.w ?? 3,
+      h: obj.h ?? 3,
+      ax: obj.x,
+      ay: obj.y,
+      doorFace: obj.doorFace ?? '+y',
+      door: obj.door,
+      kind: obj.name,
+    };
+    const foot = tileFootWorld(obj.x, obj.y);
+    const local = doorCenterLocal(spec);
+    const wx = foot.x + local.x;
+    const wy = foot.y + local.y;
+    const screen = this.worldToScreen(wx, wy);
+    const rect = this.canvasEl.getBoundingClientRect();
+    return { x: rect.left + screen.x, y: rect.top + screen.y };
+  }
+
   /** For QA — place character on a walkable tile without opening doors. */
+  setSuppressTapForQa(ms: number): void {
+    this.suppressTapUntil = performance.now() + ms;
+  }
+
   setCharacterTileForQa(tx: number, ty: number): void {
     if (!cells[ty]?.[tx]?.walkable) return;
     this.path = [];
     this.charTx = tx;
     this.charTy = ty;
-    this.lastRoundedTile = { x: tx, y: ty };
+    this.syncRoundedTileFromCharacter();
     this.syncCharacterGraphic();
     this.drawPathPreview();
+  }
+
+  /** QA: same entry path as tapping a building (walk to door + open panel). */
+  walkToBuildingForQa(name: string): boolean {
+    const obj = objects.find((o) => o.type === 'building' && o.name === name);
+    if (!obj?.door || !obj.panelTitle) return false;
+    this.requestWalk(obj.door.x, obj.door.y, false, {
+      buildingEntry: { panelTitle: obj.panelTitle, door: obj.door },
+    });
+    return true;
   }
 
   getObjectIds(): string[] {
