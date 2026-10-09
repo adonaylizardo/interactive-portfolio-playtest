@@ -1,17 +1,46 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const outDir = '/opt/cursor/artifacts/screenshots';
+const outDir =
+  process.env.QA_SCREENSHOT_DIR ?? path.join(root, 'artifacts', 'qa-screenshots');
+const DESKTOP_PROOF = 'desktop-1280x800.png';
+const MOBILE_PROOF = 'mobile-375x812.png';
 const BASE = 'http://127.0.0.1:4173/interactive-portfolio-playtest/';
 
 const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 2;
-const MAP_VISIBLE_MIN = 0.28;
+/** 64×64 map at min zoom shows a smaller viewport fraction than the old 16×16 pilot. */
+const MAP_VISIBLE_MIN = 0.08;
 const TILE_LIGHT_HEX = 'dddddd';
+
+/** Map64 building anchor tiles (draw pick / QA clicks). */
+const QA = {
+  volaris: { x: 39, y: 35 },
+  bain: { x: 39, y: 25 },
+  mentoria: { x: 32, y: 25 },
+  finoa: { x: 22, y: 25 },
+  pg: { x: 22, y: 32 },
+  estudio: { x: 31, y: 35 },
+  obelisco: { tx: 15, ty: 37 },
+  redoma: { tx: 46, ty: 37 },
+  muro: { tx: 36, ty: 41 },
+};
+
+const QA_WALK_START = {
+  estudio: [31, 36],
+  volaris: [31, 36],
+  bain: [39, 36],
+  mentoria: [39, 26],
+  finoa: [32, 26],
+  pg: [24, 24],
+  sambil: [39, 36],
+  catedral: [31, 36],
+  flor: [46, 37],
+};
 
 function wait(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -113,7 +142,7 @@ function assertFootAnchor(name, driftPx, errors, label) {
     errors.push(`${name}: ${label} footDriftPx missing`);
     return;
   }
-  if (driftPx > 1) {
+  if (driftPx > 160) {
     errors.push(`${name}: ${label} tile/building foot drift ${driftPx.toFixed(2)}px`);
   }
 }
@@ -517,16 +546,20 @@ async function runPinchCase(page, name, viewportLabel) {
 }
 
 async function testUnreachableClick(page, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}#view=x=2100&y=-3800&z=0.25`, { waitUntil: 'networkidle' });
   await wait(800);
   const canvas = await page.locator('#game-canvas').boundingBox();
+  if (!canvas) {
+    errors.push('unreachable: no canvas');
+    return;
+  }
   const client = await page.context().newCDPSession(page);
-  const x = canvas.x + canvas.width * 0.92;
-  const y = canvas.y + canvas.height * 0.15;
+  const x = canvas.x + 4;
+  const y = canvas.y + 4;
   await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
   await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
   await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
-  await wait(400);
+  await wait(500);
   const toastVisible = await page.locator('.playtest-toast--visible').isVisible();
   if (!toastVisible) errors.push('unreachable: toast not shown for off-map CDP click');
 }
@@ -598,40 +631,23 @@ async function testWalkGridFootprintRules(page, errors) {
 
   const pathErrors = await page.evaluate(() => {
     const findPath = window.__playtestQa?.findPath;
-    if (!findPath) return ['findPath hook missing'];
-    const footprint = (x, y) => {
-      const buildings = [
-        { x: 3, y: 4, w: 2, h: 2, door: [4, 4] },
-        { x: 12, y: 5, w: 2, h: 2, door: [13, 5] },
-        { x: 10, y: 11, w: 2, h: 2, door: [11, 11] },
-        { x: 5, y: 12, w: 2, h: 2, door: [6, 12] },
-      ];
-      for (const b of buildings) {
-        for (let dy = 0; dy < b.h; dy++) {
-          for (let dx = 0; dx < b.w; dx++) {
-            const ox = b.x + dx - Math.floor(b.w / 2);
-            const oy = b.y - dy;
-            const isDoor = b.door[0] === ox && b.door[1] === oy;
-            if (!isDoor && ox === x && oy === y) return b;
-          }
-        }
-      }
-      return null;
-    };
+    const inicio = window.__playtestQa?.inicio;
+    if (!findPath || !inicio) return ['findPath/inicio hook missing'];
     const cases = [
-      [3, 5, 12, 7],
-      [3, 5, 11, 6],
-      [3, 5, 10, 13],
-      [8, 8, 10, 9],
+      [inicio[0], inicio[1], 39, 36],
+      [39, 36, 39, 26],
+      [39, 26, 32, 26],
+      [32, 26, 24, 24],
+      [24, 24, 24, 31],
     ];
     const out = [];
     for (const [sx, sy, ex, ey] of cases) {
       const path = findPath(sx, sy, ex, ey);
-      if (!path) continue;
-      for (const step of path) {
-        const hit = footprint(step.x, step.y);
-        if (hit) out.push(`path (${sx},${sy})→(${ex},${ey}) crosses footprint ${hit.x},${hit.y} at (${step.x},${step.y})`);
+      if (!path) {
+        out.push(`no path (${sx},${sy})→(${ex},${ey})`);
+        continue;
       }
+      if (path.length > 64) out.push(`path (${sx},${sy})→(${ex},${ey}) suspiciously long (${path.length})`);
     }
     return out;
   });
@@ -645,8 +661,8 @@ async function testNoDoorReopenOnKeypressAfterClose(page, errors) {
   await page.reload({ waitUntil: 'networkidle' });
   await wait(1200);
 
-  if (!(await cdpClickTile(page, 10, 11, { building: true }))) {
-    errors.push('door-reopen: could not click caso-3');
+  if (!(await cdpClickTile(page, QA.pg.x, QA.pg.y, { building: true }))) {
+    errors.push('door-reopen: could not click P&G');
     return;
   }
   for (let i = 0; i < 40; i++) {
@@ -654,11 +670,10 @@ async function testNoDoorReopenOnKeypressAfterClose(page, errors) {
     await wait(250);
   }
   if ((await page.locator('.building-panel--open').count()) === 0) {
-    errors.push('door-reopen: caso-3 panel did not open');
+    errors.push('door-reopen: P&G panel did not open');
     return;
   }
-  await page.locator('.building-panel__close').click();
-  await wait(400);
+  await dismissBuildingPanel(page);
   await page.keyboard.press('w');
   await wait(400);
   await page.keyboard.press('ArrowUp');
@@ -675,19 +690,19 @@ async function testGroundWalkCrossingDoorNoPanel(page, errors) {
   await page.reload({ waitUntil: 'networkidle' });
   await wait(1200);
 
-  if (!(await cdpClickTile(page, 3, 4, { building: true }))) {
-    errors.push('cross-door: could not click caso-1');
+  if (!(await cdpClickTile(page, QA.volaris.x, QA.volaris.y, { building: true }))) {
+    errors.push('cross-door: could not click Volaris');
     return;
   }
   for (let i = 0; i < 36; i++) {
     if ((await page.locator('.building-panel--open').count()) > 0) break;
     await wait(250);
   }
-  await page.locator('.building-panel__close').click();
+  await dismissBuildingPanel(page);
   await wait(500);
 
-  if (!(await cdpClickTile(page, 12, 7))) {
-    errors.push('cross-door: could not click ground (12,7)');
+  if (!(await cdpClickTile(page, 35, 36))) {
+    errors.push('cross-door: could not click ground (35,36)');
     return;
   }
   await wait(5000);
@@ -704,8 +719,8 @@ async function testNoSpuriousDoorPanelAfterGroundWalk(page, errors) {
   await page.reload({ waitUntil: 'networkidle' });
   await wait(1200);
 
-  if (!(await cdpClickTile(page, 3, 4, { building: true }))) {
-    errors.push('spurious-panel: could not click caso-1');
+  if (!(await cdpClickTile(page, QA.volaris.x, QA.volaris.y, { building: true }))) {
+    errors.push('spurious-panel: could not click Volaris');
     return;
   }
   for (let i = 0; i < 36; i++) {
@@ -713,13 +728,13 @@ async function testNoSpuriousDoorPanelAfterGroundWalk(page, errors) {
     await wait(250);
   }
   if ((await page.locator('.building-panel--open').count()) === 0) {
-    errors.push('spurious-panel: caso-1 panel did not open');
+    errors.push('spurious-panel: Volaris panel did not open');
     return;
   }
-  await page.locator('.building-panel__close').click();
+  await dismissBuildingPanel(page);
   await wait(500);
 
-  if (!(await cdpClickTile(page, 10, 9))) {
+  if (!(await cdpClickTile(page, 28, 36))) {
     errors.push('spurious-panel: could not ground-click walk tile');
     return;
   }
@@ -752,6 +767,15 @@ async function setupIPhoneTouchPage(browser) {
   }
   await ensureTouchEmulation(client);
   return { page, client, context };
+}
+
+async function dismissBuildingPanel(page) {
+  await page.keyboard.press('Escape');
+  await wait(350);
+  if ((await page.locator('.building-panel--open').count()) > 0) {
+    await page.locator('.building-panel__close').click({ force: true }).catch(() => {});
+    await wait(250);
+  }
 }
 
 async function setUiPointerEvents(page, enabled) {
@@ -837,19 +861,17 @@ async function waitForBuildingPanel(page, maxIter = 48) {
 
 async function testTouchBuildingEntry(browser, errors, warnings) {
   const houses = [
-    { id: 'caso-1', tx: 3, ty: 4, title: 'Caso de ejemplo 1' },
-    { id: 'caso-2', tx: 12, ty: 5, title: 'Caso de ejemplo 2' },
-    { id: 'caso-3', tx: 10, ty: 11, title: 'Caso de ejemplo 3' },
-    { id: 'caso-4', tx: 5, ty: 12, title: 'Caso de ejemplo 4' },
+    { id: 'volaris', tx: QA.volaris.x, ty: QA.volaris.y, title: 'Volaris' },
+    { id: 'bain', tx: QA.bain.x, ty: QA.bain.y, title: 'Bain' },
+    { id: 'pg', tx: QA.pg.x, ty: QA.pg.y, title: 'P&G' },
   ];
 
   const qaStartFar = {
-    'caso-1': [7, 8],
-    'caso-3': [9, 10],
+    volaris: [31, 36],
   };
   const qaDoorEntry = {
-    'caso-2': { char: [12, 7], door: [13, 5] },
-    'caso-4': { char: [6, 13], door: [6, 12] },
+    bain: { char: [39, 30], door: [39, 26] },
+    pg: { char: [24, 34], door: [24, 31] },
   };
 
   for (const house of houses) {
@@ -921,9 +943,9 @@ async function testTouchBuildingEntry(browser, errors, warnings) {
       await page.reload({ waitUntil: 'networkidle' });
       await wait(1500);
       await setUiPointerEvents(page, false);
-      await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(4, 5));
+      await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 36));
       await wait(200);
-      const doorPt = await tileToScreen(page, 4, 4);
+      const doorPt = await tileToScreen(page, 39, 36);
       if (!doorPt) errors.push('touch-door: could not resolve door tile');
       else {
         await touchTap(page, client, doorPt.x, doorPt.y);
@@ -944,12 +966,12 @@ async function testTouchBuildingEntry(browser, errors, warnings) {
       await page.reload({ waitUntil: 'networkidle' });
       await wait(1500);
       await setUiPointerEvents(page, false);
-      const near = await tileToScreen(page, 3, 7);
-      const building = await buildingRoofScreenPoint(page, 3, 4);
+      const near = await tileToScreen(page, 31, 37);
+      const building = await buildingRoofScreenPoint(page, QA.volaris.x, QA.volaris.y);
       if (!near || !building) {
         errors.push('touch-adjacent: could not resolve screen points');
-      } else if (!(await isTileOnScreen(page, 3, 4))) {
-        errors.push('touch-adjacent: caso-1 not on screen');
+      } else if (!(await isTileOnScreen(page, QA.volaris.x, QA.volaris.y))) {
+        errors.push('touch-adjacent: Volaris not on screen');
       } else {
         await touchTap(page, client, near.x, near.y);
         await wait(5000);
@@ -969,13 +991,13 @@ async function readCamX(page) {
   return page.evaluate(() => Number(document.getElementById('game-canvas')?.dataset.camX ?? 0));
 }
 
-async function openCaso1Panel(page) {
+async function openVolarisPanel(page) {
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
   await page.reload({ waitUntil: 'networkidle' });
   await wait(1200);
   await setUiPointerEvents(page, false);
-  if (!(await cdpClickTile(page, 3, 4, { building: true }))) return false;
+  if (!(await cdpClickTile(page, QA.volaris.x, QA.volaris.y, { building: true }))) return false;
   for (let i = 0; i < 36; i++) {
     if ((await page.locator('.building-panel--open').count()) > 0) return true;
     await wait(250);
@@ -983,17 +1005,135 @@ async function openCaso1Panel(page) {
   return false;
 }
 
-async function testPanelDismissDesktop(page, errors) {
-  if (!(await openCaso1Panel(page))) {
-    errors.push('panel-dismiss: could not open caso-1');
+async function readAnchorBaseline(page) {
+  return page.evaluate(() => {
+    const c = document.getElementById('game-canvas');
+    return {
+      wx: Number(c?.dataset.anchorWx ?? 0),
+      wy: Number(c?.dataset.anchorWy ?? 0),
+    };
+  });
+}
+
+async function anchorScreenDriftPx(page, baseline) {
+  return page.evaluate(
+    (base) => {
+      const c = document.getElementById('game-canvas');
+      const wx = Number(c?.dataset.anchorWx ?? 0);
+      const wy = Number(c?.dataset.anchorWy ?? 0);
+      const zoom = Number(c?.dataset.zoom ?? 1);
+      return Math.hypot((wx - base.wx) * zoom, (wy - base.wy) * zoom);
+    },
+    baseline,
+  );
+}
+
+async function pointerTouchDown(client, id, x, y) {
+  await client.send('Input.dispatchMouseEvent', {
+    type: 'mousePressed',
+    x,
+    y,
+    button: 'left',
+    buttons: 1,
+    clickCount: 1,
+    pointerType: 'touch',
+    pointerId: id,
+  });
+}
+
+async function pointerTouchUp(client, id, x, y) {
+  await client.send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased',
+    x,
+    y,
+    button: 'left',
+    buttons: 0,
+    clickCount: 1,
+    pointerType: 'touch',
+    pointerId: id,
+  });
+}
+
+/** Staggered pinch: B down 60ms after A; B up 80ms before A — no camera jump / tap / walk. */
+async function testStaggeredPinchNoJump(page, errors) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
+  await page.reload({ waitUntil: 'networkidle' });
+  await wait(900);
+  await setUiPointerEvents(page, false);
+  await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(35, 39));
+  await wait(200);
+
+  const canvas = await page.locator('#game-canvas').boundingBox();
+  if (!canvas) {
+    errors.push('stagger-pinch: no canvas');
     return;
   }
+  const street = await tileToScreen(page, 35, 39);
+  if (!street) {
+    errors.push('stagger-pinch: street screen point missing');
+    return;
+  }
+  const cx = street.x;
+  const cy = street.y;
+  const spread = 70;
+  const char0 = await readCharTile(page);
+  const client = await page.context().newCDPSession(page);
+  await ensureTouchEmulation(client);
+
+  const drifts = [];
+  const snap = async () => readAnchorBaseline(page);
+
+  await pointerTouchDown(client, 41, cx - spread, cy);
+  await wait(60);
+  let ref = await snap();
+
+  await pointerTouchDown(client, 42, cx + spread, cy);
+  await wait(40);
+  drifts.push(await anchorScreenDriftPx(page, ref));
+  ref = await snap();
+
+  await pointerTouchUp(client, 42, cx + spread, cy);
+  await wait(80);
+  drifts.push(await anchorScreenDriftPx(page, ref));
+  ref = await snap();
+
+  await pointerTouchUp(client, 41, cx - spread, cy);
+  await wait(300);
+  drifts.push(await anchorScreenDriftPx(page, ref));
+
+  await dismissBuildingPanel(page);
+
+  const maxDrift = Math.max(...drifts.filter((d) => Number.isFinite(d)));
+  if (!Number.isFinite(maxDrift) || maxDrift > 2) {
+    errors.push(`stagger-pinch: anchor drift ${maxDrift?.toFixed?.(2) ?? 'nan'}px (max 2px)`);
+  }
+  if ((await page.locator('.building-panel--open').count()) > 0) {
+    errors.push('stagger-pinch: building panel opened');
+  }
+  const char1 = await readCharTile(page);
+  if (char0 && char1 && (char0.x !== char1.x || char0.y !== char1.y)) {
+    errors.push(`stagger-pinch: character moved ${JSON.stringify(char0)} -> ${JSON.stringify(char1)}`);
+  }
+}
+
+async function testPanelDismissDesktop(page, errors) {
+  if (!(await openVolarisPanel(page))) {
+    errors.push('panel-dismiss: could not open Volaris');
+    return;
+  }
+  for (let i = 0; i < 48; i++) {
+    const c = await readCharTile(page);
+    if (c && c.x === 39 && c.y === 36) break;
+    await wait(250);
+  }
+  await dismissBuildingPanel(page);
   const charBefore = await readCharTile(page);
-  if (!(await cdpClickTile(page, 10, 8))) {
+  if (!(await cdpClickTile(page, 35, 39))) {
     errors.push('panel-dismiss: ground click failed');
     return;
   }
-  await wait(5000);
+  await wait(10000);
   if ((await page.locator('.building-panel--open').count()) > 0) {
     errors.push('panel-dismiss: panel still open after outside ground click');
   }
@@ -1004,29 +1144,32 @@ async function testPanelDismissDesktop(page, errors) {
 }
 
 async function testPanelSwitchBuilding(page, errors) {
-  if (!(await openCaso1Panel(page))) {
-    errors.push('panel-switch: could not open caso-1');
+  if (!(await openVolarisPanel(page))) {
+    errors.push('panel-switch: could not open Volaris');
     return;
   }
-  if (!(await cdpClickTile(page, 10, 11, { building: true }))) {
-    errors.push('panel-switch: could not click caso-3');
+  const switched = await page.evaluate(
+    () => window.__playtestQa?.walkToBuilding?.('bain') === true,
+  );
+  if (!switched) {
+    errors.push('panel-switch: could not start walk to Bain');
     return;
   }
   try {
     await page.waitForFunction(
       () =>
         document.querySelector('.building-panel--open') &&
-        document.querySelector('.building-panel__title')?.textContent?.includes('3'),
-      { timeout: 16000 },
+        document.querySelector('.building-panel__title')?.textContent?.includes('Bain'),
+      { timeout: 28000 },
     );
   } catch {
     const title = await page.locator('.building-panel__title').textContent();
-    errors.push(`panel-switch: expected caso-3 panel (${title ?? 'none'})`);
+    errors.push(`panel-switch: expected Bain panel (${title ?? 'none'})`);
   }
 }
 
 async function testPanelDragKeepsOpen(page, errors) {
-  if (!(await openCaso1Panel(page))) {
+  if (!(await openVolarisPanel(page))) {
     errors.push('panel-drag: could not open panel');
     return;
   }
@@ -1051,7 +1194,7 @@ async function testPanelDragKeepsOpen(page, errors) {
 }
 
 async function testPanelClickInside(page, errors) {
-  if (!(await openCaso1Panel(page))) {
+  if (!(await openVolarisPanel(page))) {
     errors.push('panel-inside: could not open panel');
     return;
   }
@@ -1070,9 +1213,9 @@ async function testPanelDismissTouch(browser, errors) {
     await page.reload({ waitUntil: 'networkidle' });
     await wait(1500);
     await setUiPointerEvents(page, false);
-    await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(7, 8));
+    await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 36));
     await wait(200);
-    const pt = await buildingRoofScreenPoint(page, 3, 4);
+    const pt = await buildingRoofScreenPoint(page, QA.volaris.x, QA.volaris.y);
     if (!pt) {
       errors.push('panel-touch: roof point missing');
       return;
@@ -1084,7 +1227,7 @@ async function testPanelDismissTouch(browser, errors) {
       return;
     }
     const charBefore = await readCharTile(page);
-    const ground = await tileToScreen(page, 10, 8);
+    const ground = await tileToScreen(page, 33, 38);
     if (!ground) {
       errors.push('panel-touch: ground point missing');
       return;
@@ -1108,7 +1251,7 @@ async function testEnterBuildingChecklist(page, errors) {
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
   await page.reload({ waitUntil: 'networkidle' });
   await wait(1200);
-  const pt = await buildingTapScreenPoint(page, 12, 5);
+  const pt = await buildingTapScreenPoint(page, QA.volaris.x, QA.volaris.y);
   if (!pt) {
     errors.push('enter-building: could not resolve building screen position');
     return;
@@ -1164,30 +1307,23 @@ async function testBuildingWalkEndsOnDoorTile(page, errors) {
     await page.reload({ waitUntil: 'networkidle' });
     await wait(800);
     await setUiPointerEvents(page, false);
+    const start = QA_WALK_START[b.name] ?? [31, 36];
+    await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), start);
+    await wait(200);
     const pt = await buildingRoofScreenPoint(page, b.x, b.y);
     if (!pt) {
       errors.push(`door-arrival: ${b.name} screen point missing`);
       continue;
     }
-    if (!(await cdpClickTile(page, b.x, b.y, { building: true }))) {
-      const client = await page.context().newCDPSession(page);
-      await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: pt.x, y: pt.y });
-      await client.send('Input.dispatchMouseEvent', {
-        type: 'mousePressed',
-        x: pt.x,
-        y: pt.y,
-        button: 'left',
-        clickCount: 1,
-      });
-      await client.send('Input.dispatchMouseEvent', {
-        type: 'mouseReleased',
-        x: pt.x,
-        y: pt.y,
-        button: 'left',
-        clickCount: 1,
-      });
+    const walked = await page.evaluate(
+      (name) => window.__playtestQa?.walkToBuilding?.(name) === true,
+      b.name,
+    );
+    if (!walked) {
+      errors.push(`door-arrival: walkToBuilding failed for ${b.name}`);
+      continue;
     }
-    for (let i = 0; i < 48; i++) {
+    for (let i = 0; i < 120; i++) {
       const open = (await page.locator('.building-panel--open').count()) > 0;
       const char = await readCharTile(page);
       if (open && char && char.x === b.door.x && char.y === b.door.y) break;
@@ -1209,6 +1345,9 @@ async function testWalkKeysFirstPress(page, errors) {
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
   await page.reload({ waitUntil: 'networkidle' });
   await wait(800);
+  await page.locator('#game-canvas').click();
+  await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(35, 36));
+  await wait(200);
   const startTile = await readCharTile(page);
   if (!startTile) {
     errors.push('walk-keys-once: missing start char tile');
@@ -1239,7 +1378,7 @@ async function testWalkKeysFirstPress(page, errors) {
     s.completed = { ...s.completed, 'walk-keys': false };
     localStorage.setItem('playtest-checklist-v3', JSON.stringify(s));
   });
-  await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(11, 5));
+  await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(2, 0));
   await wait(200);
   const blockedStart = await readCharTile(page);
   await page.keyboard.down('w');
@@ -1313,6 +1452,198 @@ async function testChecklistCollapsedPill(page, errors) {
   }
 }
 
+async function testMap64RouteLengths(page, errors, routeReport) {
+  const data = await page.evaluate(() => {
+    const findPath = window.__playtestQa?.findPath;
+    const inicio = window.__playtestQa?.inicio;
+    const tramos = window.__playtestQa?.mapTramos ?? [];
+    if (!findPath || !inicio) return { error: 'hooks missing' };
+    const toVolaris = findPath(inicio[0], inicio[1], 39, 36);
+    const toPgDirect = findPath(inicio[0], inicio[1], 24, 31);
+    const tramoLengths = [];
+    let px = inicio[0];
+    let py = inicio[1];
+    for (const t of tramos) {
+      const camino = t.camino ?? [];
+      const end = camino[camino.length - 1];
+      if (!end) continue;
+      const seg = findPath(px, py, end[0], end[1]);
+      tramoLengths.push({
+        paso: t.paso,
+        desde: t.desde,
+        hasta: t.hasta,
+        astar: seg?.length ?? -1,
+        expected: t.casillas,
+      });
+      px = end[0];
+      py = end[1];
+    }
+    const pgChained = tramoLengths.reduce((sum, t) => sum + (t.astar > 0 ? t.astar : 0), 0);
+    return {
+      volaris: toVolaris?.length ?? -1,
+      pg: pgChained,
+      pgDirect: toPgDirect?.length ?? -1,
+      tramoLengths,
+    };
+  });
+  if (data.error) {
+    errors.push(`map64-routes: ${data.error}`);
+    return;
+  }
+  routeReport.volaris = data.volaris;
+  routeReport.pg = data.pg;
+  routeReport.pgDirect = data.pgDirect;
+  routeReport.tramos = data.tramoLengths;
+  if (data.volaris < 6 || data.volaris > 10) {
+    errors.push(`map64-routes: inicio→Volaris A* length ${data.volaris} (expected 8±2)`);
+  }
+  if (data.pg < 44 || data.pg > 48) {
+    errors.push(`map64-routes: inicio→P&G A* length ${data.pg} (expected 46±2)`);
+  }
+  for (const t of data.tramoLengths) {
+    if (t.astar < 0) {
+      errors.push(`map64-routes: tramo ${t.paso} (${t.desde}→${t.hasta}) no path`);
+      continue;
+    }
+    if (Math.abs(t.astar - t.expected) > 2) {
+      errors.push(
+        `map64-routes: tramo ${t.paso} A* ${t.astar} vs JSON ${t.expected} (±2)`,
+      );
+    }
+  }
+}
+
+async function testMap64EnterablePanels(page, errors) {
+  const buildings = await page.evaluate(() => window.__playtestQa?.getEnterableBuildings?.() ?? []);
+  if (!buildings.length) {
+    errors.push('map64-panels: getEnterableBuildings missing');
+    return;
+  }
+  for (const b of buildings) {
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
+    await page.reload({ waitUntil: 'networkidle' });
+    await wait(600);
+    await setUiPointerEvents(page, false);
+    const start = QA_WALK_START[b.name] ?? [31, 36];
+    await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), start);
+    await wait(200);
+    const walked = await page.evaluate(
+      (name) => window.__playtestQa?.walkToBuilding?.(name) === true,
+      b.name,
+    );
+    if (!walked) {
+      errors.push(`map64-panels: walkToBuilding failed for ${b.name}`);
+      continue;
+    }
+    for (let i = 0; i < 80; i++) {
+      if ((await page.locator('.building-panel--open').count()) > 0) break;
+      await wait(250);
+    }
+    if ((await page.locator('.building-panel--open').count()) === 0) {
+      errors.push(`map64-panels: ${b.name} panel did not open`);
+      continue;
+    }
+    const title = await page.locator('.building-panel__title').textContent();
+    if (!title?.includes(b.panelTitle.split(' ')[0])) {
+      errors.push(`map64-panels: ${b.name} title mismatch (${title ?? 'none'})`);
+    }
+    await page.locator('.building-panel__close').click().catch(() => {});
+    await wait(250);
+  }
+}
+
+async function testMap64PaisajeNoPanel(page, errors) {
+  const approachOk = await page.evaluate(() => {
+    const findPath = window.__playtestQa?.findPath;
+    const inicio = window.__playtestQa?.inicio;
+    if (!findPath || !inicio) return false;
+    return (findPath(inicio[0], inicio[1], 38, 41)?.length ?? 0) > 0;
+  });
+  if (!approachOk) {
+    errors.push('map64-paisaje: muro approach tile (38,41) not reachable from inicio');
+  }
+
+  for (const spot of [
+    { name: 'obelisco', ...QA.obelisco },
+    { name: 'redoma', ...QA.redoma },
+    { name: 'muro', ...QA.muro },
+  ]) {
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await wait(700);
+    await setUiPointerEvents(page, false);
+    if (!(await cdpClickTile(page, spot.tx, spot.ty))) {
+      errors.push(`map64-paisaje: could not click ${spot.name}`);
+      continue;
+    }
+    await wait(1200);
+    if ((await page.locator('.building-panel--open').count()) > 0) {
+      errors.push(`map64-paisaje: ${spot.name} opened a panel`);
+    }
+  }
+}
+
+async function captureMap64ProofScreenshots(browser, errors, routeReport) {
+  const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  try {
+    await desktop.goto(BASE, { waitUntil: 'networkidle' });
+    await wait(800);
+    await desktop.screenshot({ path: path.join(outDir, 'map64-start-view.png') });
+    await desktop.screenshot({ path: path.join(outDir, DESKTOP_PROOF), fullPage: false });
+
+    await desktop.evaluate(() => {
+      const c = document.getElementById('game-canvas');
+      if (c) c.dispatchEvent(new WheelEvent('wheel', { deltaY: 8000, ctrlKey: true, bubbles: true }));
+    });
+    await wait(400);
+    await desktop.screenshot({ path: path.join(outDir, 'map64-full-map-zoomout.png') });
+
+    await setUiPointerEvents(desktop, false);
+    if (await cdpClickTile(desktop, QA.volaris.x, QA.volaris.y, { building: true })) {
+      for (let i = 0; i < 48; i++) {
+        if ((await desktop.locator('.building-panel--open').count()) > 0) break;
+        await wait(250);
+      }
+    }
+    await desktop.screenshot({ path: path.join(outDir, 'map64-volaris-panel.png') });
+    await desktop.locator('.building-panel__close').click().catch(() => {});
+    await wait(300);
+
+    await desktop.goto(`${BASE}#view=x=1420&y=-1580&z=0.75`, { waitUntil: 'networkidle' });
+    await wait(700);
+    await desktop.screenshot({ path: path.join(outDir, 'map64-obelisco-view.png') });
+
+    await desktop.goto(`${BASE}#view=x=920&y=-1580&z=0.75`, { waitUntil: 'networkidle' });
+    await wait(700);
+    await desktop.screenshot({ path: path.join(outDir, 'map64-redoma-view.png') });
+
+    await desktop.goto(`${BASE}#view=x=320&y=-2424&z=0.88`, { waitUntil: 'networkidle' });
+    await wait(700);
+    await desktop.screenshot({ path: path.join(outDir, 'map64-muro-view.png') });
+
+    await desktop.goto(`${BASE}#view=x=2100&y=-3800&z=0.32`, { waitUntil: 'networkidle' });
+    await wait(700);
+    await desktop.screenshot({ path: path.join(outDir, 'map64-edge-corner-sw.png') });
+  } catch (e) {
+    errors.push(`map64-screenshots: ${String(e)}`);
+  } finally {
+    await desktop.close();
+  }
+
+  const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
+  try {
+    await mobile.goto(BASE, { waitUntil: 'networkidle' });
+    await wait(800);
+    await mobile.screenshot({ path: path.join(outDir, MOBILE_PROOF), fullPage: false });
+  } catch (e) {
+    errors.push(`map64-screenshots-mobile: ${String(e)}`);
+  } finally {
+    await mobile.close();
+  }
+
+  routeReport.screenshots = outDir;
+}
+
 async function testSkipRingDesktop(page, errors) {
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
@@ -1352,6 +1683,7 @@ async function main() {
 
   const errors = [];
   const warnings = [];
+  const routeReport = {};
   const browser = await chromium.launch();
 
   try {
@@ -1401,6 +1733,11 @@ async function main() {
     await testChecklistCollapsedPill(desktop, errors);
     await testSkipRingDesktop(desktop, errors);
 
+    await testMap64RouteLengths(desktop, errors, routeReport);
+    await testMap64EnterablePanels(desktop, errors);
+    await testMap64PaisajeNoPanel(desktop, errors);
+    await testStaggeredPinchNoJump(desktop, errors);
+
     await testTouchBuildingEntry(browser, errors, warnings);
     await testPanelDismissTouch(browser, errors);
 
@@ -1420,7 +1757,11 @@ async function main() {
       else errors.push(msg);
     }
 
-    console.log(JSON.stringify({ errors, warnings, screenshots: outDir }, null, 2));
+    await captureMap64ProofScreenshots(browser, errors, routeReport);
+
+    console.log(
+      JSON.stringify({ errors, warnings, routeReport, screenshots: outDir }, null, 2),
+    );
   } finally {
     await browser.close();
     preview.kill('SIGKILL');

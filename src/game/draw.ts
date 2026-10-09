@@ -41,8 +41,8 @@ const DESK_FOOT: Pt[] = [
 ];
 const DESK_OFFSET = centeringOffset(DESK_FOOT);
 
-function ht(p: Pt): Pt {
-  return { x: p.x + HOUSE_OFFSET.x, y: p.y + HOUSE_OFFSET.y };
+function ht(p: Pt, scale = 1): Pt {
+  return { x: p.x * scale + HOUSE_OFFSET.x * scale, y: p.y * scale + HOUSE_OFFSET.y * scale };
 }
 
 function dt(p: Pt): Pt {
@@ -106,29 +106,37 @@ export function buildingFrontWallsCover(p: Pt): boolean {
 }
 
 /** Roof, gable, walls, and door — used for tap hit testing on buildings. */
-export function buildingPickHit(localP: Pt): boolean {
-  const S = ht({ x: 0, y: 0 });
-  const E = ht({ x: 48, y: -24 });
-  const Sp = ht({ x: 0, y: -56 });
-  const Ep = ht({ x: 48, y: -80 });
-  const Wp = ht({ x: -48, y: -80 });
-  const R1 = ht({ x: 24, y: -104 });
-  const R2 = ht({ x: -24, y: -128 });
-  if (buildingFrontWallsCover(localP)) return true;
+export function buildingPickHit(localP: Pt, scale = 1): boolean {
+  const S = ht({ x: 0, y: 0 }, scale);
+  const E = ht({ x: 48, y: -24 }, scale);
+  const Sp = ht({ x: 0, y: -56 }, scale);
+  const Ep = ht({ x: 48, y: -80 }, scale);
+  const Wp = ht({ x: -48, y: -80 }, scale);
+  const R1 = ht({ x: 24, y: -104 }, scale);
+  const R2 = ht({ x: -24, y: -128 }, scale);
+  if (buildingFrontWallsCoverScaled(localP, scale)) return true;
   if (pointInQuad(localP, S, E, Ep, R1) || pointInQuad(localP, S, E, R1, Sp)) return true;
   if (pointInQuad(localP, Sp, R1, R2, Wp)) return true;
   if (
     pointInQuad(
       localP,
-      ht({ x: 18, y: -9 }),
-      ht({ x: 30, y: -15 }),
-      ht({ x: 30, y: -39 }),
-      ht({ x: 18, y: -33 }),
+      ht({ x: 18, y: -9 }, scale),
+      ht({ x: 30, y: -15 }, scale),
+      ht({ x: 30, y: -39 }, scale),
+      ht({ x: 18, y: -33 }, scale),
     )
   ) {
     return true;
   }
   return false;
+}
+
+function buildingFrontWallsCoverScaled(p: Pt, scale: number): boolean {
+  const S = ht({ x: 0, y: 0 }, scale);
+  const W = ht({ x: -48, y: -24 }, scale);
+  const Wp = ht({ x: -48, y: -80 }, scale);
+  const Sp = ht({ x: 0, y: -56 }, scale);
+  return pointInQuad(p, S, W, Wp, Sp);
 }
 
 export function footprint(bwScale = 1): { bw: number; bh: number } {
@@ -168,21 +176,26 @@ export function drawDiamond(g: Graphics, fill: number, stroke?: number): void {
   }
 }
 
-export function drawBuilding(g: Graphics, hover: boolean): void {
+export function drawBuilding(
+  g: Graphics,
+  hover: boolean,
+  scale = 1,
+  _doorFace: '+y' | '+x' = '+y',
+): void {
   const left = hover ? C.buildingLeftHover : C.buildingLeft;
   const gable = hover ? C.buildingRightHover : C.buildingRight;
   const roof = hover ? C.buildingRoofNearHover : C.buildingRoofNear;
   const line = C.buildingFascia;
   const door = C.door;
 
-  const S = ht({ x: 0, y: 0 });
-  const E = ht({ x: 48, y: -24 });
-  const W = ht({ x: -48, y: -24 });
-  const Sp = ht({ x: 0, y: -56 });
-  const Ep = ht({ x: 48, y: -80 });
-  const Wp = ht({ x: -48, y: -80 });
-  const R1 = ht({ x: 24, y: -104 });
-  const R2 = ht({ x: -24, y: -128 });
+  const S = ht({ x: 0, y: 0 }, scale);
+  const E = ht({ x: 48, y: -24 }, scale);
+  const W = ht({ x: -48, y: -24 }, scale);
+  const Sp = ht({ x: 0, y: -56 }, scale);
+  const Ep = ht({ x: 48, y: -80 }, scale);
+  const Wp = ht({ x: -48, y: -80 }, scale);
+  const R1 = ht({ x: 24, y: -104 }, scale);
+  const R2 = ht({ x: -24, y: -128 }, scale);
 
   poly(g, [S, W, Wp, Sp], left);
   poly(g, [S, E, Ep, R1, Sp], gable);
@@ -195,9 +208,129 @@ export function drawBuilding(g: Graphics, hover: boolean): void {
 
   poly(
     g,
-    [ht({ x: 18, y: -9 }), ht({ x: 30, y: -15 }), ht({ x: 30, y: -39 }), ht({ x: 18, y: -33 })],
+    [
+      ht({ x: 18, y: -9 }, scale),
+      ht({ x: 30, y: -15 }, scale),
+      ht({ x: 30, y: -39 }, scale),
+      ht({ x: 18, y: -33 }, scale),
+    ],
     door,
   );
+}
+
+export function drawObelisco(g: Graphics, hover: boolean): void {
+  const slab = hover ? 0x707070 : 0x626262;
+  const base = hover ? 0x585858 : 0x4a4a4a;
+  poly(g, [ht({ x: -8, y: 0 }), ht({ x: 8, y: 0 }), ht({ x: 8, y: -120 }), ht({ x: -8, y: -120 })], base);
+  poly(g, [ht({ x: -6, y: -8 }), ht({ x: 6, y: -8 }), ht({ x: 6, y: -112 }), ht({ x: -6, y: -112 })], slab);
+  g.circle(ht({ x: 0, y: -100 }).x, ht({ x: 0, y: -100 }).y, 5);
+  g.fill(0x888888);
+}
+
+/** Climbing wall (muro): L-shaped plank walls, open top with beams, hold dots on +y face. */
+export function drawMuro(g: Graphics, hover: boolean): void {
+  const plank = hover ? 0x7a7a7a : 0x6e6e6e;
+  const plankDark = hover ? 0x656565 : 0x585858;
+  const beam = hover ? 0x848484 : 0x757575;
+  const hold = hover ? 0x959595 : 0x888888;
+
+  poly(
+    g,
+    [ht({ x: -20, y: 0 }), ht({ x: 20, y: 0 }), ht({ x: 20, y: -52 }), ht({ x: -20, y: -52 })],
+    plankDark,
+  );
+  poly(
+    g,
+    [ht({ x: -18, y: -2 }), ht({ x: 18, y: -2 }), ht({ x: 18, y: -48 }), ht({ x: -18, y: -48 })],
+    plank,
+  );
+
+  poly(
+    g,
+    [ht({ x: -48, y: 0 }), ht({ x: -20, y: 0 }), ht({ x: -20, y: -40 }), ht({ x: -48, y: -40 })],
+    plankDark,
+  );
+  poly(
+    g,
+    [ht({ x: -46, y: -2 }), ht({ x: -22, y: -2 }), ht({ x: -22, y: -36 }), ht({ x: -46, y: -36 })],
+    plank,
+  );
+
+  strokeSeg(g, ht({ x: -18, y: -48 }), ht({ x: 18, y: -48 }), 3, beam);
+  strokeSeg(g, ht({ x: -22, y: -36 }), ht({ x: -18, y: -48 }), 3, beam);
+
+  for (const pt of [
+    { x: -6, y: -14 },
+    { x: 4, y: -22 },
+    { x: -2, y: -32 },
+    { x: 8, y: -38 },
+  ]) {
+    const p = ht(pt);
+    g.circle(p.x, p.y, 3);
+    g.fill(hold);
+  }
+}
+
+export function drawRedoma(g: Graphics, hover: boolean): void {
+  const island = hover ? 0x6a6a6a : 0x5c5c5c;
+  const ring = hover ? 0x787878 : 0x686868;
+  g.ellipse(0, -8, 36, 18);
+  g.fill(ring);
+  g.ellipse(0, -10, 22, 12);
+  g.fill(island);
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const x1 = Math.cos(a) * 14;
+    const y1 = -10 + Math.sin(a) * 7;
+    const x2 = Math.cos(a) * 28;
+    const y2 = -8 + Math.sin(a) * 10;
+    strokeSeg(g, { x: x1, y: y1 }, { x: x2, y: y2 }, 2, 0x808080);
+  }
+}
+
+export function drawBench(g: Graphics, hover: boolean): void {
+  const c = hover ? 0x8a8a8a : 0x757575;
+  g.roundRect(-16, -10, 32, 8, 2);
+  g.fill(c);
+  g.rect(-14, -18, 4, 10);
+  g.fill(c);
+  g.rect(10, -18, 4, 10);
+  g.fill(c);
+}
+
+export function drawLamp(g: Graphics, hover: boolean): void {
+  const c = hover ? 0x909090 : 0x7a7a7a;
+  g.rect(-2, -28, 4, 24);
+  g.fill(c);
+  g.roundRect(-6, -34, 12, 8, 2);
+  g.fill(c);
+}
+
+/** 128×88 frame: top diamond aligns with walkable tiles; slab hangs 24px below south anchor. */
+export function drawBorderTile(g: Graphics, kind: string): void {
+  const slab = 0x565656;
+  const slabDark = 0x4a4a4a;
+  drawDiamond(g, C.tileLight);
+
+  const isSe = kind.includes('borde-se') || kind.includes('esquina-s');
+  const isSw = kind.includes('borde-sw') || kind.includes('esquina-s');
+
+  if (isSe) {
+    g.moveTo(0, 0);
+    g.lineTo(TILE_W / 2, -TILE_H / 2);
+    g.lineTo(TILE_W / 2, -TILE_H / 2 + 24);
+    g.lineTo(0, 24);
+    g.closePath();
+    g.fill({ color: slabDark, alpha: 0.9 });
+  }
+  if (isSw) {
+    g.moveTo(0, 0);
+    g.lineTo(-TILE_W / 2, -TILE_H / 2);
+    g.lineTo(-TILE_W / 2, -TILE_H / 2 + 24);
+    g.lineTo(0, 24);
+    g.closePath();
+    g.fill({ color: slab, alpha: 0.85 });
+  }
 }
 
 export function deskTopFillColor(hover: boolean): number {
