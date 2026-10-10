@@ -2135,9 +2135,7 @@ async function testPanelDismissTouch(browser, errors) {
         return;
       }
     }
-    await page.evaluate(() => window.__playtestQa?.expandInteriorSheet?.());
-    await wait(300);
-    const close = await page.locator('.building-panel__close, [data-close]').first().boundingBox();
+    const close = await page.locator('.building-panel__float-exit, .building-panel__close').first().boundingBox();
     if (!close) {
       errors.push('panel-touch-close: close button missing');
       return;

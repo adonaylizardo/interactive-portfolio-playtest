@@ -2055,6 +2055,7 @@ export class IsoScene {
 
   setZoomLevel(level: number, anchorScreen?: { x: number; y: number }): void {
     this.setZoom(level, anchorScreen);
+    this.applyCamera(false);
   }
 
   /** QA: synthetic map tap (scenery / ground) matching player pointer routing. */

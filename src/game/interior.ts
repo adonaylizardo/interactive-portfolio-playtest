@@ -483,7 +483,7 @@ export function interiorExitPick(
     { x: def.exit.x + 1, y: def.exit.y },
     { x: def.exit.x, y: def.exit.y - 1 },
   ];
-  const r = Math.max(18, 28 / Math.max(zoom, 0.2));
+  const r = Math.max(28, 48 / Math.max(zoom, 0.15));
   for (const t of tiles) {
     const f = tileFootWorld(t.x, t.y);
     if (Math.hypot(worldX - f.x, worldY - (f.y - TILE_H / 2)) <= r) return true;
