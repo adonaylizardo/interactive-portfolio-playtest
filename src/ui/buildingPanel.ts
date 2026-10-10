@@ -20,6 +20,7 @@ export class BuildingPanel {
     this.el.className = 'building-panel building-panel--interior-only';
     this.el.hidden = true;
     this.el.innerHTML = `
+      <button type="button" class="building-panel__float-exit" data-float-exit hidden>Salir</button>
       <div class="building-panel__backdrop" data-backdrop></div>
       <div class="building-panel__sheet" role="dialog" aria-modal="true">
         <div class="building-panel__drag" data-drag aria-hidden="true"></div>
@@ -38,8 +39,9 @@ export class BuildingPanel {
 
     this.el.querySelector('[data-exit]')!.addEventListener('click', () => this.salir());
     this.el.querySelector('[data-close]')!.addEventListener('click', () => this.salir());
+    this.el.querySelector('[data-float-exit]')!.addEventListener('click', () => this.salir());
     this.el.querySelector('[data-backdrop]')!.addEventListener('click', () => {
-      if (this.isMobile()) this.setPeek(true);
+      if (this.isMobile() && this.mode === 'interior') this.setPeek(true);
     });
     this.sheet.addEventListener('click', (e) => e.stopPropagation());
     this.sheet.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -99,6 +101,8 @@ export class BuildingPanel {
     this.titleEl.textContent = title;
     this.peekOnly = this.isMobile();
     this.el.hidden = false;
+    const floatExit = this.el.querySelector('[data-float-exit]') as HTMLElement;
+    floatExit.hidden = !this.isMobile();
     requestAnimationFrame(() => {
       this.el.classList.add('building-panel--open');
       this.syncPeekClass();
@@ -116,6 +120,8 @@ export class BuildingPanel {
   }
 
   hide(): void {
+    const floatExit = this.el.querySelector('[data-float-exit]') as HTMLElement;
+    floatExit.hidden = true;
     this.el.classList.remove('building-panel--open', 'building-panel--peek');
     const delay = this.reducedMotion() ? 0 : 200;
     setTimeout(() => {
@@ -156,6 +162,49 @@ export class BuildingPanel {
       return { left: 0, top: 0, right: 0, bottom: Math.ceil(bottom + 8) };
     }
     return { left: 0, top: 0, right: Math.ceil(sheet.width + 12), bottom: 0 };
+  }
+
+  containsSheetPoint(clientX: number, clientY: number): boolean {
+    if (!this.isOpen()) return false;
+    const floatExit = this.el.querySelector('[data-float-exit]') as HTMLElement;
+    if (!floatExit.hidden) {
+      const fr = floatExit.getBoundingClientRect();
+      if (
+        clientX >= fr.left &&
+        clientX <= fr.right &&
+        clientY >= fr.top &&
+        clientY <= fr.bottom
+      ) {
+        return true;
+      }
+    }
+    const sheet = this.sheet.getBoundingClientRect();
+    return (
+      clientX >= sheet.left &&
+      clientX <= sheet.right &&
+      clientY >= sheet.top &&
+      clientY <= sheet.bottom
+    );
+  }
+
+  /** Mobile interior: outside sheet tap collapses expanded sheet or consumes (no map walk). */
+  expandInteriorSheetForQa(): void {
+    if (!this.isMobile()) return;
+    this.peekOnly = false;
+    this.syncPeekClass();
+    this.onVisibilityChange();
+  }
+
+  collapseToPeekOnly(): void {
+    if (!this.isMobile() || !this.isOpen()) return;
+    this.setPeek(true);
+  }
+
+  consumeInteriorCanvasTap(clientX: number, clientY: number): boolean {
+    if (!this.isOpen() || this.mode !== 'interior' || !this.isMobile()) return false;
+    if (this.containsSheetPoint(clientX, clientY)) return false;
+    if (!this.peekOnly) this.setPeek(true);
+    return true;
   }
 
   private reducedMotion(): boolean {

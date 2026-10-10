@@ -448,7 +448,6 @@ export function drawMuro(
   ay = 41,
 ): void {
   const plank = hover ? 0x7a7a7a : 0x6e6e6e;
-  const plankDark = hover ? 0x656565 : 0x585858;
   const hold = hover ? 0x959595 : 0x888888;
   const wallH = 40;
   const thick = 0.15;
@@ -470,17 +469,7 @@ export function drawMuro(
   const leftInnerB = lerpPt(leftOuterB, leftInRef, thick);
 
   poly(g, [backInnerA, backInnerB, raise(backInnerB, wallH), raise(backInnerA, wallH)], plank);
-  poly(
-    g,
-    [raise(backInnerA, wallH), raise(backInnerB, wallH), raise(backInnerB, wallH + 2), raise(backInnerA, wallH + 2)],
-    plankDark,
-  );
   poly(g, [leftInnerA, leftInnerB, raise(leftInnerB, wallH), raise(leftInnerA, wallH)], plank);
-  poly(
-    g,
-    [raise(leftInnerA, wallH), raise(leftInnerB, wallH), raise(leftInnerB, wallH + 2), raise(leftInnerA, wallH + 2)],
-    plankDark,
-  );
 
   for (const [u, v] of [
     [0.2, 0.35],

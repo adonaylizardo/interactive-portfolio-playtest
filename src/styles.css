@@ -496,6 +496,22 @@ body.is-canvas-dragging * {
   background: #ccc;
 }
 
+.building-panel__float-exit {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 22;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 15%);
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+}
+
 .building-panel__salir {
   display: block;
   width: 100%;

@@ -87,6 +87,8 @@ export type BuildingPanelBridge = {
   openTitle: () => string;
   dismiss: () => void;
   layoutInsets?: () => { left: number; top: number; right: number; bottom: number };
+  consumeInteriorCanvasTap?: (clientX: number, clientY: number) => boolean;
+  expandInteriorSheetForQa?: () => void;
 };
 
 export type ChecklistBridge = {
@@ -499,10 +501,6 @@ export class IsoScene {
   }
 
   walkToTile(tx: number, ty: number, sprint: boolean): void {
-    if (this.pendingBuildingEntry) {
-      const d = this.pendingBuildingEntry.door;
-      if (d.x !== tx || d.y !== ty) this.pendingBuildingEntry = null;
-    }
     if (this.canvasEl) {
       this.canvasEl.dataset.walkGoal = JSON.stringify({ x: tx, y: ty });
     }
@@ -552,6 +550,10 @@ export class IsoScene {
 
   /** Door pick in world space (stable at min zoom ~0.04–0.15); closest opening wins. */
   private pickBuildingDoorAtScreen(sx: number, sy: number): MapObject | undefined {
+    if (this.zoom <= 0.15) {
+      const body = this.pickBuildingAtScreen(sx, sy);
+      if (body?.door && body.panelTitle) return body;
+    }
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
     const buildings = objects.filter((o) => o.type === 'building' && o.door && o.panelTitle);
     let best: { obj: MapObject; dist: number; depth: number } | null = null;
@@ -659,6 +661,10 @@ export class IsoScene {
       return;
     }
     if (this.interiorActive) {
+      const client = this.canvasLocalToClient(sx, sy);
+      if (this.events.buildingPanel?.consumeInteriorCanvasTap?.(client.x, client.y)) {
+        return;
+      }
       this.handleInteriorScreenTap(sx, sy, sprint);
       return;
     }
@@ -687,9 +693,23 @@ export class IsoScene {
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
     const tile = worldToTile(wx, wy);
     if (tile) {
+      const onDoor = getBuildingAtDoor(tile.x, tile.y);
+      if (onDoor?.panelTitle && onDoor.door) {
+        if (!this.prepareMapTap(onDoor)) return;
+        this.requestWalk(onDoor.door.x, onDoor.door.y, sprint, {
+          buildingEntry: { panelTitle: onDoor.panelTitle, door: onDoor.door },
+        });
+        return;
+      }
       if (!this.prepareMapTap(undefined, tile.x, tile.y)) return;
       this.requestWalk(tile.x, tile.y, sprint);
     } else this.events.onUnreachable?.();
+  }
+
+  private canvasLocalToClient(sx: number, sy: number): { x: number; y: number } {
+    const rect = this.canvasEl?.getBoundingClientRect();
+    if (!rect) return { x: sx, y: sy };
+    return { x: rect.left + sx, y: rect.top + sy };
   }
 
   private drawPathPreview(): void {
@@ -1004,7 +1024,7 @@ export class IsoScene {
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
     this.cameraX = -cx;
-    this.cameraY = -cy + 24;
+    this.cameraY = -cy - sh * 0.06;
     const hardened = stabilizeCameraAfterGesture(
       { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
       sw,
@@ -1696,7 +1716,17 @@ export class IsoScene {
 
     if (!this.pendingBuildingEntry) return;
     const d = this.pendingBuildingEntry.door;
-    if (d.x !== tx || d.y !== ty) return;
+    const onPendingDoor = tx === d.x && ty === d.y;
+    const adjacentPending =
+      Math.abs(tx - d.x) + Math.abs(ty - d.y) === 1 &&
+      getBuildingAtDoor(d.x, d.y)?.panelTitle === this.pendingBuildingEntry.panelTitle;
+    if (!onPendingDoor && !adjacentPending) return;
+    if (!onPendingDoor) {
+      this.charTx = d.x;
+      this.charTy = d.y;
+      tx = d.x;
+      ty = d.y;
+    }
     this.pendingBuildingEntry = null;
 
     this.doorCooldown = 120;
@@ -2039,5 +2069,25 @@ export class IsoScene {
     const rect = this.canvasEl?.getBoundingClientRect();
     if (!rect) return;
     this.handleScreenTap(clientX - rect.left, clientY - rect.top, sprint);
+  }
+
+  /** QA: client point for an interior grid tile (same space as tapScreen). */
+  getInteriorTileScreenClientPoint(tx: number, ty: number): { x: number; y: number } | null {
+    if (!this.interiorDef || !this.canvasEl) return null;
+    const foot = tileFootWorld(tx, ty);
+    const screen = this.worldToScreen(foot.x, foot.y - TILE_H / 2);
+    const rect = this.canvasEl.getBoundingClientRect();
+    return { x: rect.left + screen.x, y: rect.top + screen.y };
+  }
+
+  /** QA: tap an interior tile (walk / exit). */
+  tapInteriorTileForQa(tx: number, ty: number, sprint = false): void {
+    const pt = this.getInteriorTileScreenClientPoint(tx, ty);
+    if (!pt) return;
+    this.tapScreenForQa(pt.x, pt.y, sprint);
+  }
+
+  expandInteriorSheetForQa(): void {
+    this.events.buildingPanel?.expandInteriorSheetForQa?.();
   }
 }

@@ -1377,6 +1377,269 @@ async function testRun31ChecklistOutsideTapMobile(browser, errors) {
   }
 }
 
+/** Run #32: doorScreenPoint tap must enter every building @375 min zoom. */
+async function testRun32DoorPointEntersAll375(browser, errors) {
+  const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
+  try {
+    const buildings = await page.evaluate(() => window.__playtestQa?.getEnterableBuildings?.() ?? []);
+    for (const b of buildings) {
+      await page.goto(BASE, { waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'networkidle' });
+      await wait(700);
+      await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
+      const canvas = await page.locator('#game-canvas').boundingBox();
+      if (canvas) await wheelOutToMinZoom(page, canvas);
+      await wait(400);
+      const start = QA_WALK_START[b.name] ?? [31, 36];
+      await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), start);
+      await wait(250);
+      const pt = await page.evaluate((n) => window.__playtestQa?.doorScreenPoint?.(n), b.name);
+      if (!pt?.x) {
+        errors.push(`run32-door-enter: no door point ${b.name}`);
+        continue;
+      }
+      await page.evaluate(([x, y]) => window.__playtestQa?.tapScreen?.(x, y), [pt.x, pt.y]);
+      if (!(await waitForInterior(page, 25000))) {
+        errors.push(`run32-door-enter: ${b.name} did not enter via door point @375 min zoom`);
+      }
+      await page.evaluate(() => window.__playtestQa?.exitInterior?.());
+      await wait(500);
+    }
+  } finally {
+    await page.close();
+  }
+}
+
+/** Run #32: outside tap on expanded/peek interior sheet must not walk or toast. */
+async function testRun32SheetOutsideTapMobile(browser, errors) {
+  for (const name of ['flor', 'volaris']) {
+    const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
+    try {
+      await page.goto(BASE, { waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'networkidle' });
+      await wait(800);
+      await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
+      await waitForInterior(page);
+      await wait(500);
+      await page.evaluate(() => window.__playtestQa?.expandInteriorSheet?.());
+      await wait(400);
+      const hasPeekBefore = await page.evaluate(() =>
+        document.querySelector('.building-panel--peek') !== null,
+      );
+      if (hasPeekBefore) {
+        errors.push(`run32-sheet-${name}: expected expanded sheet before outside tap`);
+      }
+      await page.evaluate(() => window.__playtestQa?.tapScreen?.(187, 60));
+      await wait(500);
+      const toast = await page.locator('.playtest-toast--visible').count();
+      if (toast > 0) {
+        errors.push(`run32-sheet-${name}: toast after outside tap on expanded sheet`);
+      }
+      const goal = await page.evaluate(() => window.__playtestQa?.readWalkGoal?.());
+      if (goal?.x !== undefined) {
+        errors.push(`run32-sheet-${name}: walk goal set after outside tap (expanded)`);
+      }
+      const hasPeekAfter = await page.evaluate(() =>
+        document.querySelector('.building-panel--peek') !== null,
+      );
+      if (!hasPeekAfter) {
+        errors.push(`run32-sheet-${name}: sheet should collapse to peek, not close`);
+      }
+      await page.evaluate(() => window.__playtestQa?.collapseInteriorSheetToPeek?.());
+      await wait(300);
+      await page.evaluate(() => window.__playtestQa?.tapScreen?.(187, 60));
+      await wait(400);
+      if ((await page.locator('.playtest-toast--visible').count()) > 0) {
+        errors.push(`run32-sheet-${name}: toast after outside tap in peek`);
+      }
+      if ((await page.evaluate(() => window.__playtestQa?.readWalkGoal?.()))?.x !== undefined) {
+        errors.push(`run32-sheet-${name}: walk started from outside tap in peek`);
+      }
+      if (!(await page.evaluate(() => window.__playtestQa?.isInInterior?.()))) {
+        errors.push(`run32-sheet-${name}: interior closed after peek outside tap`);
+      }
+    } finally {
+      await page.close();
+    }
+  }
+}
+
+/** Run #32: exit tile reachable in every interior on phone. */
+async function testRun32InteriorExitAllMobile(browser, errors) {
+  const buildings = [
+    'estudio',
+    'volaris',
+    'bain',
+    'mentoria',
+    'finoa',
+    'pg',
+    'sambil',
+    'catedral',
+    'flor',
+  ];
+  const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
+  try {
+    for (const name of buildings) {
+      await page.goto(BASE, { waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'networkidle' });
+      await wait(600);
+      await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
+      await waitForInterior(page);
+      await wait(400);
+      const exit = await page.evaluate((n) => {
+        const defs = {
+          estudio: [3, 5],
+          volaris: [3, 5],
+          bain: [3, 5],
+          mentoria: [3, 5],
+          finoa: [3, 5],
+          pg: [3, 5],
+          sambil: [4, 7],
+          catedral: [4, 7],
+          flor: [3, 6],
+        };
+        const [tx, ty] = defs[n] ?? [3, 5];
+        return window.__playtestQa?.interiorTileScreenPoint?.(tx, ty);
+      }, name);
+      if (!exit?.x) {
+        errors.push(`run32-exit-${name}: no exit screen point`);
+        continue;
+      }
+      await page.evaluate(([x, y]) => window.__playtestQa?.tapScreen?.(x, y), [exit.x, exit.y]);
+      await wait(900);
+      if (await page.evaluate(() => window.__playtestQa?.isInInterior?.())) {
+        errors.push(`run32-exit-${name}: still inside after exit tile tap`);
+      }
+    }
+  } finally {
+    await page.close();
+  }
+}
+
+/** Run #32: walk survives 5 pinch cycles + 2 drags (5 trials). */
+async function testRun32WalkPinchFiveTrials(page, errors, client) {
+  for (let trial = 0; trial < 5; trial++) {
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'networkidle' });
+    await wait(700);
+    await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 36));
+    await page.evaluate(() => window.__playtestQa?.tapMapTile?.(46, 36));
+    await wait(500);
+    const goal = await page.evaluate(() => window.__playtestQa?.readWalkGoal?.());
+    if (!goal?.x) {
+      errors.push(`run32-walk-pinch trial ${trial}: no walk goal`);
+      continue;
+    }
+    const canvas = await page.locator('#game-canvas').boundingBox();
+    if (!canvas) continue;
+    const cx = canvas.x + canvas.width * 0.5;
+    const cy = canvas.y + canvas.height * 0.45;
+    for (let p = 0; p < 5; p++) {
+      const spread = 55 + p * 12;
+      await pointerTouchDown(client, 80 + p * 2 + trial, cx - spread, cy);
+      await wait(50);
+      await pointerTouchDown(client, 81 + p * 2 + trial, cx + spread, cy);
+      await wait(80);
+      await pointerTouchUp(client, 81 + p * 2 + trial, cx + spread, cy);
+      await wait(70);
+      await pointerTouchUp(client, 80 + p * 2 + trial, cx - spread, cy);
+      await wait(120);
+    }
+    for (let d = 0; d < 2; d++) {
+      await pointerTouchDown(client, 90 + d + trial * 3, cx, cy - 40);
+      for (let i = 0; i < 8; i++) {
+        await pointerTouchMove(client, 90 + d + trial * 3, cx + i * 8, cy - 40 + i * 10);
+        await wait(30);
+      }
+      await pointerTouchUp(client, 90 + d + trial * 3, cx + 56, cy + 40);
+      await wait(200);
+    }
+    if (!(await page.evaluate(() => window.__playtestQa?.readWalkGoal?.()))?.x) {
+      errors.push(`run32-walk-pinch trial ${trial}: walk goal cleared during gesture`);
+    }
+  }
+}
+
+/** Run #32: roof tap only enters on door arrival (pg, sambil, catedral, flor). */
+async function testRun32ArrivalOnlyFour(page, errors) {
+  const cases = [
+    { name: 'pg', start: [22, 34], roof: QA.pg },
+    { name: 'sambil', start: [39, 36], roof: { x: 39, y: 25 } },
+    { name: 'catedral', start: [31, 36], roof: { x: 31, y: 25 } },
+    { name: 'flor', start: [46, 37], roof: { x: 46, y: 25 } },
+  ];
+  for (const c of cases) {
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'networkidle' });
+    await wait(700);
+    await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), c.start);
+    await wait(200);
+    if (!(await cdpClickTile(page, c.roof.x, c.roof.y, { building: true }))) {
+      errors.push(`run32-arrival-${c.name}: roof tap failed`);
+      continue;
+    }
+    await wait(400);
+    for (let i = 0; i < 6; i++) {
+      await wait(250);
+      const inside = await page.evaluate(() => window.__playtestQa?.isInInterior?.());
+      const char = await readCharTile(page);
+      const b = await page.evaluate(
+        (n) => window.__playtestQa?.getEnterableBuildings?.().find((x) => x.name === n),
+        c.name,
+      );
+      if (inside && b?.door && char && (char.x !== b.door.x || char.y !== b.door.y)) {
+        errors.push(`run32-arrival-${c.name}: entered before door tile`);
+        break;
+      }
+    }
+    for (let i = 0; i < 80; i++) {
+      if (await page.evaluate(() => window.__playtestQa?.isInInterior?.())) break;
+      await wait(250);
+    }
+    if (!(await page.evaluate(() => window.__playtestQa?.isInInterior?.()))) {
+      errors.push(`run32-arrival-${c.name}: never entered after roof walk`);
+    }
+  }
+}
+
+async function captureRun32Interiors(browser) {
+  const dir = path.join(root, 'artifacts', 'run32');
+  await mkdir(dir, { recursive: true });
+  const names = ['estudio', 'volaris', 'bain', 'mentoria', 'finoa', 'pg', 'sambil', 'catedral', 'flor'];
+  const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  try {
+    for (const name of names) {
+      await desktop.goto(BASE, { waitUntil: 'networkidle' });
+      await desktop.reload({ waitUntil: 'networkidle' });
+      await wait(500);
+      await desktop.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
+      await waitForInterior(desktop);
+      await wait(500);
+      await desktop.screenshot({ path: path.join(dir, `interior-${name}-desktop.png`) });
+      await desktop.keyboard.press('Escape');
+      await wait(600);
+    }
+  } finally {
+    await desktop.close();
+  }
+  const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
+  try {
+    for (const name of names) {
+      await mobile.goto(BASE, { waitUntil: 'networkidle' });
+      await mobile.reload({ waitUntil: 'networkidle' });
+      await wait(500);
+      await mobile.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
+      await waitForInterior(mobile);
+      await wait(500);
+      await mobile.screenshot({ path: path.join(dir, `interior-${name}-375.png`) });
+      await mobile.keyboard.press('Escape');
+      await wait(600);
+    }
+  } finally {
+    await mobile.close();
+  }
+}
+
 async function captureRun31(browser, errors) {
   const dir = path.join(root, 'artifacts', 'run31');
   await mkdir(dir, { recursive: true });
@@ -2887,7 +3150,12 @@ async function main() {
     await testRun31SambilWalkCancel(desktop, errors);
     await testRun31InteriorExitTileZoom(desktop, errors);
     await testRun31ChecklistOutsideTapMobile(browser, errors);
+    await testRun32DoorPointEntersAll375(browser, errors);
+    await testRun32SheetOutsideTapMobile(browser, errors);
+    await testRun32InteriorExitAllMobile(browser, errors);
+    await testRun32ArrivalOnlyFour(desktop, errors);
     const desktopCdp = await desktop.context().newCDPSession(desktop);
+    await testRun32WalkPinchFiveTrials(desktop, errors, desktopCdp);
     await ensureTouchEmulation(desktopCdp);
     await testRun30WalkSurvivesPinch(desktop, errors, desktopCdp);
     await testMinZoomFullMapVisible(browser, errors);
@@ -2921,6 +3189,7 @@ async function main() {
     await captureRun29Closeups(browser);
     await captureRun30Interiors(browser);
     await captureRun31(browser, errors);
+    await captureRun32Interiors(browser);
 
     const report = {
       errors,

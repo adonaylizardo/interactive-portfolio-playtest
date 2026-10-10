@@ -62,6 +62,8 @@ async function main(): Promise<void> {
       openTitle: () => panel.openTitle(),
       dismiss: () => panel.hide(),
       layoutInsets: () => panel.layoutInsets(),
+      consumeInteriorCanvasTap: (x, y) => panel.consumeInteriorCanvasTap(x, y),
+      expandInteriorSheetForQa: () => panel.expandInteriorSheetForQa(),
     },
     checklist: {
       isMobileExpanded: () => checklist.isMobileExpanded(),
@@ -114,6 +116,11 @@ async function main(): Promise<void> {
       return raw ? JSON.parse(raw) : null;
     },
     setZoom: (z: number) => scene.setZoomLevel(z),
+    interiorTileScreenPoint: (tx: number, ty: number) =>
+      scene.getInteriorTileScreenClientPoint(tx, ty),
+    tapInteriorTile: (tx: number, ty: number) => scene.tapInteriorTileForQa(tx, ty),
+    expandInteriorSheet: () => panel.expandInteriorSheetForQa(),
+    collapseInteriorSheetToPeek: () => panel.collapseToPeekOnly(),
   };
 }
 

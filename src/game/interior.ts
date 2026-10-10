@@ -125,10 +125,25 @@ export function buildInteriorGrid(def: InteriorDef): InteriorCell[][] {
       [4, 3],
     ];
     for (const [x, y] of seats) setBlocked(cells, x, y);
-  } else {
-    const bx = Math.floor(def.w / 2) - 1;
-    setBlocked(cells, bx, 1);
-    setBlocked(cells, bx + 1, 1);
+  } else if (def.id === 'estudio') {
+    setBlocked(cells, 2, 1);
+    setBlocked(cells, 3, 1);
+  } else if (def.id === 'volaris') {
+    setBlocked(cells, 1, 1);
+    setBlocked(cells, 2, 1);
+    setBlocked(cells, 1, 2);
+  } else if (def.id === 'bain') {
+    setBlocked(cells, 3, 2);
+  } else if (def.id === 'mentoria') {
+    setBlocked(cells, 1, 1);
+    setBlocked(cells, 1, 2);
+  } else if (def.id === 'finoa') {
+    setBlocked(cells, 4, 1);
+    setBlocked(cells, 4, 2);
+  } else if (def.id === 'pg') {
+    setBlocked(cells, 2, 1);
+    setBlocked(cells, 3, 1);
+    setBlocked(cells, 4, 1);
   }
 
   return cells;
@@ -183,15 +198,16 @@ function drawIdentityProps(g: Graphics, def: InteriorDef): void {
   const propLight = 0xbcbcbc;
 
   if (def.id === 'catedral') {
-    drawIsoBlock(g, 2, 0, 4, 1, 36, propDark, propLight);
+    drawIsoBlock(g, 2, 0, 4, 1, 44, 0x8a8a8a, 0xb0b0b0);
     for (let row = 2; row <= 5; row++) {
       for (const col of [1, 2, 5, 6]) {
-        drawIsoBlock(g, col, row, 1, 1, 14, prop, propLight);
+        drawIsoBlock(g, col, row, 1, 1, 12, prop, propLight);
       }
     }
   } else if (def.id === 'sambil') {
-    const water = 0x9eb8c4;
-    const waterDark = 0x8aa8b5;
+    const water = 0x7aa8bc;
+    const waterDark = 0x5a8898;
+    const walk = 0xd4ccc0;
     for (let y = 1; y < def.h - 1; y++) {
       for (let x = 5; x < def.w - 1; x++) {
         const pos = localFoot(x, y);
@@ -200,26 +216,50 @@ function drawIdentityProps(g: Graphics, def: InteriorDef): void {
         g.lineTo(pos.x, pos.y - TILE_H);
         g.lineTo(pos.x - TILE_W / 2, pos.y - TILE_H / 2);
         g.closePath();
-        g.fill(y === 4 ? waterDark : water);
+        g.fill(y === 4 ? walk : y < 4 ? waterDark : water);
       }
     }
-    drawIsoBlock(g, 4, 3, 3, 1, 8, prop, propLight);
+    for (let x = 4; x <= 6; x++) {
+      const pos = localFoot(x, 4);
+      g.moveTo(pos.x, pos.y);
+      g.lineTo(pos.x + TILE_W / 2, pos.y - TILE_H / 2);
+      g.lineTo(pos.x, pos.y - TILE_H);
+      g.lineTo(pos.x - TILE_W / 2, pos.y - TILE_H / 2);
+      g.closePath();
+      g.fill(walk);
+    }
+    g.moveTo(localFoot(5, 1).x, localFoot(5, 1).y - TILE_H / 2);
+    g.lineTo(localFoot(7, 1).x, localFoot(7, 1).y - TILE_H / 2);
+    g.stroke({ width: 3, color: 0x555555 });
   } else if (def.id === 'flor') {
-    drawIsoBlock(g, 0, 0, 2, 3, 48, propDark, propLight);
+    drawIsoBlock(g, 0, 0, 2, 3, 56, 0x707070, 0x909090);
     const seats: [number, number][] = [
+      [6, 6],
       [5, 5],
       [4, 4],
       [3, 3],
-      [2, 2],
-      [5, 4],
-      [4, 3],
+      [5, 6],
+      [4, 5],
     ];
     for (let i = 0; i < seats.length; i++) {
       const [x, y] = seats[i];
-      drawIsoBlock(g, x, y, 1, 1, 10 + i * 3, prop, propLight);
+      drawIsoBlock(g, x, y, 1, 1, 8 + i * 4, prop, propLight);
     }
-  } else {
-    drawIsoBlock(g, Math.floor(def.w / 2) - 1, 1, 2, 1, 22, prop, propLight);
+  } else if (def.id === 'estudio') {
+    drawIsoBlock(g, 2, 1, 2, 1, 24, 0x9a8a7a, propLight);
+    drawIsoBlock(g, 2, 2, 1, 1, 14, prop, propLight);
+  } else if (def.id === 'volaris') {
+    drawIsoBlock(g, 1, 1, 2, 2, 28, 0x8a9098, propLight);
+  } else if (def.id === 'bain') {
+    drawIsoBlock(g, 2, 2, 2, 1, 18, 0x888888, propLight);
+    g.circle(localFoot(3, 2).x, localFoot(3, 2).y - 18, 10);
+    g.fill(propDark);
+  } else if (def.id === 'mentoria') {
+    drawIsoBlock(g, 1, 1, 1, 2, 32, 0x8a8478, propLight);
+  } else if (def.id === 'finoa') {
+    drawIsoBlock(g, 4, 1, 1, 2, 26, 0x7a9080, 0x9ab0a0);
+  } else if (def.id === 'pg') {
+    drawIsoBlock(g, 2, 1, 3, 1, 20, 0x909090, propLight);
   }
 }
 
@@ -282,12 +322,24 @@ export function drawInteriorRoom(g: Graphics, def: InteriorDef): void {
     const westH = def.id === 'flor' && ty <= 2 ? def.backWallH : def.backWallH;
     const sw = localFoot(0, ty);
     const nw = northTop(0, ty);
+    const westOut = { x: sw.x - TILE_W * 0.48, y: sw.y - TILE_H * 0.24 };
+    const westOutN = { x: nw.x - TILE_W * 0.48, y: nw.y - TILE_H * 0.24 };
+    poly(g, [westOut, sw, raise(sw, westH), raise(westOut, westH)], 0x858585);
+    poly(g, [westOut, westOutN, raise(westOutN, westH), raise(westOut, westH)], wallSide);
     poly(g, [sw, nw, raise(nw, westH), raise(sw, westH)], wallSide);
 
     const se = localFoot(def.w - 1, ty);
     const ne = northTop(def.w - 1, ty);
     poly(g, [se, ne, raise(ne, def.plinthH), raise(se, def.plinthH)], wallFront);
   }
+
+  const swCorner = localFoot(0, 0);
+  const westCorner = { x: swCorner.x - TILE_W * 0.48, y: swCorner.y - TILE_H * 0.24 };
+  poly(
+    g,
+    [westCorner, swCorner, raise(swCorner, def.backWallH), raise(westCorner, def.backWallH)],
+    0x7a7a7a,
+  );
 
   for (let tx = 0; tx < def.w; tx++) {
     const ty = def.h - 1;
