@@ -188,6 +188,8 @@ async function testBuildingSilhouetteStable(page, name, errors) {
     const hash = `#view=x=${cam.x}&y=${cam.y}&z=${z.toFixed(3)}`;
     await page.goto(`${BASE}${hash}`, { waitUntil: 'networkidle' });
     await wait(900);
+    await page.evaluate((targetZ) => window.__playtestQa?.setZoom?.(targetZ), z);
+    await wait(200);
     const sil = await readBuildingSilhouette(page);
     const metrics = await readCanvasMetrics(page);
     if (!sil) {
@@ -1301,30 +1303,7 @@ async function testRun31InteriorExitTileZoom(page, errors) {
   await waitForInterior(page);
   await page.evaluate(() => window.__playtestQa?.setZoom?.(1.5));
   await wait(300);
-  const pt = await page.evaluate(() => {
-    const c = document.getElementById('game-canvas');
-    if (!c) return null;
-    const rect = c.getBoundingClientRect();
-    const sw = c.width / (window.devicePixelRatio || 1);
-    const sh = c.height / (window.devicePixelRatio || 1);
-    const zoom = Number(c.dataset.zoom) || 1.5;
-    const camX = Number(c.dataset.camX);
-    const camY = Number(c.dataset.camY);
-    const exitX = 2;
-    const exitY = 5;
-    const TILE_W = 128;
-    const TILE_H = 64;
-    const foot = (tx, ty) => ({
-      x: (tx - ty) * (TILE_W / 2),
-      y: (tx + ty) * (TILE_H / 2),
-    });
-    const f = foot(exitX, exitY);
-    const wx = f.x;
-    const wy = f.y - TILE_H / 2;
-    const sx = sw / 2 + (wx + camX) * zoom;
-    const sy = sh / 2 + (wy + camY) * zoom;
-    return { x: rect.left + sx, y: rect.top + sy };
-  });
+  const pt = await page.evaluate(() => window.__playtestQa?.interiorTileScreenPoint?.(3, 5));
   if (!pt) {
     errors.push('run31-exit-tile: could not compute exit screen point');
     return;
@@ -2156,7 +2135,9 @@ async function testPanelDismissTouch(browser, errors) {
         return;
       }
     }
-    const close = await page.locator('[data-exit]').first().boundingBox();
+    await page.evaluate(() => window.__playtestQa?.expandInteriorSheet?.());
+    await wait(300);
+    const close = await page.locator('.building-panel__close, [data-close]').first().boundingBox();
     if (!close) {
       errors.push('panel-touch-close: close button missing');
       return;
