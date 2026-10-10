@@ -8,13 +8,12 @@ import {
   MAP_HEIGHT,
   MAP_WIDTH,
   objects,
-  resolveBuildingEntryFromTile,
   resolveWalkTarget,
   TILE_H,
   TILE_W,
   type MapObject,
 } from '../data/map';
-import { parseCameraFromHash, writeCameraToHash } from '../camera/hash';
+import { parseCameraFromHash, writeInteriorToHash } from '../camera/hash';
 import { isTouchPrimary, type ChecklistStepId } from '../checklist/storage';
 import { sortKey, tileFootWorld, tileToWorld, worldToTile } from '../iso/math';
 import { findPathOrNearest } from '../iso/pathfinding';
@@ -43,6 +42,15 @@ import {
   type FootprintDrawSpec,
 } from './draw';
 import {
+  buildInteriorGrid,
+  drawInteriorRoom,
+  findPathInterior,
+  getInteriorDef,
+  syncInteriorCharacter,
+  type InteriorCell,
+  type InteriorDef,
+} from './interior';
+import {
   cameraFitMargins,
   cameraFromPinchSession,
   clampPanMapFullyInView,
@@ -67,7 +75,8 @@ export type BuildingPanelBridge = {
 
 export type SceneEvents = {
   onChecklist: (step: ChecklistStepId) => void;
-  onEnterBuilding: (title: string) => void;
+  onEnterBuilding: (buildingId: string, panelTitle: string) => void;
+  onExitInterior?: () => void;
   onUnreachable?: () => void;
   buildingPanel?: BuildingPanelBridge;
 };
@@ -81,6 +90,7 @@ export class IsoScene {
   pathLayer = new Container();
   characterLayer = new Container();
   highlightLayer = new Container();
+  interiorLayer = new Container();
 
   charTx = INICIO[0];
   charTy = INICIO[1];
@@ -145,8 +155,17 @@ export class IsoScene {
   private secondFingerArrived = false;
   private deferredTapTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingViewportApply = false;
-  /** Last map tap in canvas pixels — used to re-resolve door intent for walk targets. */
-  private lastMapTapScreen: { x: number; y: number } | null = null;
+  private fadeEl: HTMLElement | null = null;
+  private interiorActive = false;
+  private interiorDef: InteriorDef | null = null;
+  private interiorGrid: InteriorCell[][] = [];
+  private interiorCharTx = 0;
+  private interiorCharTy = 0;
+  private interiorPath: { x: number; y: number }[] = [];
+  private interiorRoomGfx = new Graphics();
+  private interiorCharGfx = new Graphics();
+  private mapReturnDoor: { x: number; y: number } | null = null;
+  private suppressMapTapOnce = false;
   constructor(events: SceneEvents) {
     this.events = events;
   }
@@ -170,9 +189,17 @@ export class IsoScene {
     this.world.addChild(this.objectsLayer);
     this.world.addChild(this.highlightLayer);
     this.world.addChild(this.characterLayer);
+    this.world.addChild(this.interiorLayer);
+    this.interiorLayer.visible = false;
+    this.interiorLayer.addChild(this.interiorRoomGfx);
+    this.interiorLayer.addChild(this.interiorCharGfx);
 
     this.pathLayer.addChild(this.pathGfx);
     this.characterLayer.addChild(this.charGfx);
+
+    this.fadeEl = document.createElement('div');
+    this.fadeEl.className = 'scene-fade';
+    document.getElementById('app')?.appendChild(this.fadeEl);
 
     this.buildTiles();
     this.buildVoidClickLayer();
@@ -209,7 +236,18 @@ export class IsoScene {
         this.applyCamera(false);
         this.rebaselineChecklistFromCamera();
       }
+      const id = parseCameraFromHash()?.interiorId ?? null;
+      if (id && !this.interiorActive) {
+        this.enterInterior(id, { skipFade: true, fromHash: true });
+      } else if (!id && this.interiorActive) {
+        this.exitInterior({ skipFade: true, fromHash: true });
+      }
     });
+
+    const boot = parseCameraFromHash();
+    if (boot?.interiorId) {
+      this.enterInterior(boot.interiorId, { skipFade: true, fromHash: true });
+    }
   }
 
   /** After programmatic #view hash updates, do not treat the next gesture as user zoom/pan. */
@@ -387,20 +425,12 @@ export class IsoScene {
   ): void {
     let walkTx = tx;
     let walkTy = ty;
-    let entry = opts?.buildingEntry;
-    if (!entry && this.lastMapTapScreen) {
-      const doorBuilding = this.pickBuildingDoorAtScreen(
-        this.lastMapTapScreen.x,
-        this.lastMapTapScreen.y,
-      );
-      if (doorBuilding?.door && doorBuilding.panelTitle) {
-        walkTx = doorBuilding.door.x;
-        walkTy = doorBuilding.door.y;
-        entry = { panelTitle: doorBuilding.panelTitle, door: doorBuilding.door };
-      }
+    const entry = opts?.buildingEntry ?? null;
+    if (entry) {
+      this.pendingBuildingEntry = entry;
+    } else {
+      this.pendingBuildingEntry = null;
     }
-    const from = { x: Math.round(this.charTx), y: Math.round(this.charTy) };
-    this.pendingBuildingEntry = entry ?? resolveBuildingEntryFromTile(walkTx, walkTy, from);
     const target = resolveWalkTarget(walkTx, walkTy);
     this.walkToTile(target.x, target.y, sprint);
   }
@@ -441,7 +471,7 @@ export class IsoScene {
       const rtx = Math.round(this.charTx);
       const rty = Math.round(this.charTy);
       this.lastRoundedTile = { x: rtx, y: rty };
-      this.tryCompletePendingBuildingEntry();
+      this.tryArriveAtDoorTile(rtx, rty);
     }
   }
 
@@ -541,17 +571,32 @@ export class IsoScene {
       if (getBuildingAt(tx, ty)?.panelTitle === openTitle) return false;
     }
     bridge.dismiss();
+    this.pendingBuildingEntry = null;
     this.clearWalkPreview();
+    this.suppressMapTapOnce = true;
     const ctx = Math.round(this.charTx);
     const cty = Math.round(this.charTy);
     if (getBuildingAtDoor(ctx, cty)) {
       this.doorCooldown = 200;
     }
-    return true;
+    return false;
   }
 
   private handleScreenTap(sx: number, sy: number, sprint: boolean): void {
-    this.lastMapTapScreen = { x: sx, y: sy };
+    if (this.suppressMapTapOnce) {
+      this.suppressMapTapOnce = false;
+      return;
+    }
+    if (!this.interiorActive && this.events.buildingPanel?.isOpen()) {
+      this.events.buildingPanel.dismiss();
+      this.pendingBuildingEntry = null;
+      this.clearWalkPreview();
+      return;
+    }
+    if (this.interiorActive) {
+      this.handleInteriorScreenTap(sx, sy, sprint);
+      return;
+    }
     const doorFirst = this.pickBuildingDoorAtScreen(sx, sy);
     if (doorFirst?.door && doorFirst.panelTitle) {
       if (!this.prepareMapTap(doorFirst)) return;
@@ -746,7 +791,11 @@ export class IsoScene {
       this.updateTreeDeskProbes();
     }
     if (persistHash) {
-      writeCameraToHash({ x: this.cameraX, y: this.cameraY, zoom: this.zoom });
+      writeInteriorToHash(this.interiorActive ? this.interiorDef?.id ?? null : null, {
+        x: this.cameraX,
+        y: this.cameraY,
+        zoom: this.zoom,
+      });
     }
     if (
       this.zoomChanged &&
@@ -919,8 +968,6 @@ export class IsoScene {
     this.gestureActive = false;
     this.zoomSource = 'none';
     this.touchOnlyPinch = false;
-    this.path = [];
-    this.pendingBuildingEntry = null;
     this.drawPathPreview();
     this.suppressTapUntil = performance.now() + 250;
     this.panMoved = true;
@@ -1042,9 +1089,7 @@ export class IsoScene {
     const mid = this.pointerMidpoint();
     if (!mid) return;
     const dist = this.pointerDistance();
-    this.path = [];
     this.drawPathPreview();
-    this.pendingBuildingEntry = null;
     this.zoomSource = 'pointer';
     this.pinchGestureActive = true;
     this.gestureActive = true;
@@ -1058,9 +1103,7 @@ export class IsoScene {
 
   private beginPinchAtMid(mid: { x: number; y: number }, dist: number): void {
     if (this.zoomSource === 'gesture') return;
-    this.path = [];
     this.drawPathPreview();
-    this.pendingBuildingEntry = null;
     this.zoomSource = 'pointer';
     this.pinchGestureActive = true;
     this.gestureActive = true;
@@ -1449,6 +1492,37 @@ export class IsoScene {
       if (this.keys.has('s') || this.keys.has('arrowdown')) dy += 1;
       if (this.keys.has('a') || this.keys.has('arrowleft')) dx -= 1;
       if (this.keys.has('d') || this.keys.has('arrowright')) dx += 1;
+      if (this.interiorActive && this.interiorDef) {
+        if (dx !== 0 || dy !== 0) {
+          this.interiorPath = [];
+          const sprint = this.shiftHeld;
+          this.sprint = sprint;
+          this.charState = sprint ? 'sprint' : 'walk';
+          const speed = (sprint ? 0.12 : 0.07) * (this.app.ticker.deltaMS / 16);
+          const ntx = this.interiorCharTx + dx * speed;
+          const nty = this.interiorCharTy + dy * speed;
+          const tx = Math.round(ntx);
+          const ty = Math.round(nty);
+          if (this.interiorGrid[ty]?.[tx]?.walkable) {
+            this.interiorCharTx = ntx;
+            this.interiorCharTy = nty;
+          }
+          syncInteriorCharacter(
+            this.interiorCharGfx,
+            this.interiorCharTx,
+            this.interiorCharTy,
+            this.charState,
+          );
+          const rt = { x: Math.round(this.interiorCharTx), y: Math.round(this.interiorCharTy) };
+          if (
+            rt.x === this.interiorDef.exit.x &&
+            rt.y === this.interiorDef.exit.y
+          ) {
+            this.exitInterior();
+          }
+        }
+        return;
+      }
       if (dx !== 0 || dy !== 0) {
         this.path = [];
         this.drawPathPreview();
@@ -1473,7 +1547,7 @@ export class IsoScene {
             tileAfter.y !== this.lastRoundedTile.y
           ) {
             this.lastRoundedTile = { x: tileAfter.x, y: tileAfter.y };
-            this.openDoorIfOnTile(tileAfter.x, tileAfter.y);
+            this.tryArriveAtDoorTile(tileAfter.x, tileAfter.y);
           }
         }
         this.syncCharacterGraphic();
@@ -1500,7 +1574,7 @@ export class IsoScene {
         if (this.path.length === 0) {
           this.charState = 'idle';
           this.sprint = false;
-          this.tryCompletePendingBuildingEntry();
+          this.tryArriveAtDoorTile(tx, ty);
         }
       } else {
         this.charTx += (dx / dist) * speed;
@@ -1508,6 +1582,10 @@ export class IsoScene {
         this.charState = this.sprint ? 'sprint' : 'walk';
       }
       this.syncCharacterGraphic();
+    }
+
+    if (this.interiorActive && this.interiorPath.length > 0) {
+      this.updateInteriorWalk();
     }
   }
 
@@ -1521,32 +1599,201 @@ export class IsoScene {
     this.lastRoundedTile = this.roundedCharTile();
   }
 
-  private openDoorIfOnTile(tx: number, ty: number): void {
+  /** Enter interior only when idle on the door tile (never mid-path). */
+  private tryArriveAtDoorTile(tx: number, ty: number): void {
+    if (this.interiorActive) return;
+    if (this.path.length > 0) return;
     if (this.doorCooldown > 0) return;
     const building = getBuildingAtDoor(tx, ty);
-    if (!building?.panelTitle) return;
+    if (!building?.panelTitle || !building.door) return;
+
+    if (this.pendingBuildingEntry) {
+      const d = this.pendingBuildingEntry.door;
+      if (d.x !== tx || d.y !== ty) return;
+      this.pendingBuildingEntry = null;
+    }
+
     this.doorCooldown = 120;
-    this.pendingBuildingEntry = null;
-    this.events.onEnterBuilding(building.panelTitle);
+    this.mapReturnDoor = { x: building.door.x, y: building.door.y };
+    this.charTx = tx;
+    this.charTy = ty;
+    this.syncRoundedTileFromCharacter();
+    this.syncCharacterGraphic();
+    this.events.onEnterBuilding(building.name, building.panelTitle);
     this.events.onChecklist('enter-building');
   }
 
-  /** Mouse/tap path end: only when this walk was started from a building click. */
-  private tryCompletePendingBuildingEntry(): void {
-    if (this.doorCooldown > 0 || !this.pendingBuildingEntry) return;
-    const tx = Math.round(this.charTx);
-    const ty = Math.round(this.charTy);
-    const d = this.pendingBuildingEntry.door;
-    if (tx !== d.x || ty !== d.y) {
-      this.pendingBuildingEntry = null;
+  private async runFade(active: boolean): Promise<void> {
+    if (!this.fadeEl) return;
+    if (this.reducedMotion) {
+      this.fadeEl.classList.toggle('scene-fade--active', active);
       return;
     }
-    const building = objects.find((o) => o.panelTitle === this.pendingBuildingEntry!.panelTitle);
-    this.pendingBuildingEntry = null;
-    if (!building?.panelTitle) return;
-    this.doorCooldown = 120;
-    this.events.onEnterBuilding(building.panelTitle);
-    this.events.onChecklist('enter-building');
+    this.fadeEl.classList.toggle('scene-fade--active', active);
+    await new Promise((r) => setTimeout(r, active ? 280 : 280));
+  }
+
+  enterInterior(
+    buildingId: string,
+    opts?: { skipFade?: boolean; fromHash?: boolean },
+  ): void {
+    if (this.interiorActive && this.interiorDef?.id === buildingId) return;
+    const def = getInteriorDef(buildingId);
+    const building = objects.find((o) => o.type === 'building' && o.name === buildingId);
+    const door = building?.door;
+    if (!def || !door) return;
+
+    const finish = () => {
+      this.interiorActive = true;
+      this.interiorDef = def;
+      this.interiorGrid = buildInteriorGrid(def);
+      this.interiorCharTx = def.spawn.x;
+      this.interiorCharTy = def.spawn.y;
+      this.interiorPath = [];
+      this.path = [];
+      this.drawPathPreview();
+      this.tilesLayer.visible = false;
+      this.objectsLayer.visible = false;
+      this.pathLayer.visible = false;
+      this.characterLayer.visible = false;
+      this.interiorLayer.visible = true;
+      this.interiorRoomGfx.clear();
+      drawInteriorRoom(this.interiorRoomGfx, def);
+      syncInteriorCharacter(this.interiorCharGfx, this.interiorCharTx, this.interiorCharTy, 'idle');
+      this.interiorCharGfx.zIndex = sortKey(this.interiorCharTx, this.interiorCharTy, 500);
+      if (!this.mapReturnDoor) {
+        this.mapReturnDoor = { x: door.x, y: door.y };
+      }
+      const cx = tileToWorld(Math.floor(def.w / 2), Math.floor(def.h / 2));
+      this.cameraX = -cx.x;
+      this.cameraY = -cx.y + 40;
+      this.applyCamera(true);
+      if (this.canvasEl) {
+        this.canvasEl.dataset.interior = buildingId;
+      }
+      writeInteriorToHash(buildingId, {
+        x: this.cameraX,
+        y: this.cameraY,
+        zoom: this.zoom,
+      });
+    };
+
+    if (opts?.skipFade) {
+      finish();
+      return;
+    }
+    void this.runFade(true).then(() => {
+      finish();
+      void this.runFade(false);
+    });
+  }
+
+  exitInterior(opts?: { skipFade?: boolean; fromHash?: boolean }): void {
+    if (!this.interiorActive) return;
+    const door = this.mapReturnDoor;
+    const finish = () => {
+      this.interiorActive = false;
+      this.interiorDef = null;
+      this.interiorGrid = [];
+      this.interiorPath = [];
+      this.tilesLayer.visible = true;
+      this.objectsLayer.visible = true;
+      this.pathLayer.visible = true;
+      this.characterLayer.visible = true;
+      this.interiorLayer.visible = false;
+      this.interiorRoomGfx.clear();
+      if (door) {
+        this.charTx = door.x;
+        this.charTy = door.y;
+        this.syncRoundedTileFromCharacter();
+        this.syncCharacterGraphic();
+      }
+      this.events.onExitInterior?.();
+      if (this.canvasEl) {
+        this.canvasEl.dataset.interior = '';
+      }
+      if (!opts?.fromHash) {
+        writeInteriorToHash(null, {
+          x: this.cameraX,
+          y: this.cameraY,
+          zoom: this.zoom,
+        });
+      }
+      this.applyCamera(true);
+    };
+
+    finish();
+    if (opts?.skipFade || opts?.fromHash || this.reducedMotion) return;
+    void this.runFade(true).then(() => void this.runFade(false));
+  }
+
+  isInInterior(): boolean {
+    return this.interiorActive;
+  }
+
+  getInteriorBuildingId(): string | null {
+    return this.interiorActive ? this.interiorDef?.id ?? null : null;
+  }
+
+  private handleInteriorScreenTap(sx: number, sy: number, sprint: boolean): void {
+    if (!this.interiorDef) return;
+    const { x: wx, y: wy } = this.screenToWorld(sx, sy);
+    const tile = worldToTile(wx, wy);
+    if (!tile) return;
+    if (tile.x < 0 || tile.y < 0 || tile.x >= this.interiorDef.w || tile.y >= this.interiorDef.h) {
+      return;
+    }
+    if (!this.interiorGrid[tile.y]?.[tile.x]?.walkable) return;
+    if (tile.x === this.interiorDef.exit.x && tile.y === this.interiorDef.exit.y) {
+      this.exitInterior();
+      return;
+    }
+    const sx0 = Math.round(this.interiorCharTx);
+    const sy0 = Math.round(this.interiorCharTy);
+    const path = findPathInterior(this.interiorGrid, sx0, sy0, tile.x, tile.y);
+    if (!path) {
+      this.events.onUnreachable?.();
+      return;
+    }
+    this.interiorPath = path;
+    this.sprint = sprint;
+    this.charState = sprint ? 'sprint' : 'walk';
+  }
+
+  private updateInteriorWalk(): void {
+    const target = this.interiorPath[0];
+    const speed = (this.sprint ? 0.14 : 0.08) * (this.app.ticker.deltaMS / 16);
+    const dx = target.x - this.interiorCharTx;
+    const dy = target.y - this.interiorCharTy;
+    const dist = Math.hypot(dx, dy);
+    if (dist < speed) {
+      this.interiorCharTx = target.x;
+      this.interiorCharTy = target.y;
+      this.interiorPath.shift();
+      if (this.interiorPath.length === 0) {
+        this.charState = 'idle';
+        this.sprint = false;
+        const tx = Math.round(this.interiorCharTx);
+        const ty = Math.round(this.interiorCharTy);
+        if (
+          this.interiorDef &&
+          tx === this.interiorDef.exit.x &&
+          ty === this.interiorDef.exit.y
+        ) {
+          this.exitInterior();
+        }
+      }
+    } else {
+      this.interiorCharTx += (dx / dist) * speed;
+      this.interiorCharTy += (dy / dist) * speed;
+      this.charState = this.sprint ? 'sprint' : 'walk';
+    }
+    syncInteriorCharacter(
+      this.interiorCharGfx,
+      this.interiorCharTx,
+      this.interiorCharTy,
+      this.charState,
+    );
   }
 
   /** For QA — programmatic walk */
@@ -1629,5 +1876,12 @@ export class IsoScene {
     const foot = tileFootWorld(tx, ty);
     const scr = this.worldToScreen(foot.x, foot.y);
     this.handleScreenTap(scr.x, scr.y, false);
+  }
+
+  /** QA: client/screen coords (same routing as pointer release → handleScreenTap). */
+  tapScreenForQa(clientX: number, clientY: number, sprint = false): void {
+    const rect = this.canvasEl?.getBoundingClientRect();
+    if (!rect) return;
+    this.handleScreenTap(clientX - rect.left, clientY - rect.top, sprint);
   }
 }

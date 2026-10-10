@@ -992,8 +992,235 @@ async function dismissBuildingPanel(page) {
   await page.keyboard.press('Escape');
   await wait(350);
   if ((await page.locator('.building-panel--open').count()) > 0) {
-    await page.locator('.building-panel__close').click({ force: true }).catch(() => {});
+    await page.locator('[data-exit], .interior-panel__back').first().click({ force: true }).catch(() => {});
     await wait(250);
+  }
+}
+
+async function waitForInterior(page, maxMs = 20000) {
+  for (let i = 0; i < maxMs / 250; i++) {
+    const inside = await page.evaluate(() => window.__playtestQa?.isInInterior?.() === true);
+    if (inside) return true;
+    await wait(250);
+  }
+  return false;
+}
+
+/** Run #30: panel overlay on map — outside tap closes without walking (next tap walks). */
+async function testRun30DismissOutsideTapNoWalk(page, errors) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'networkidle' });
+  await wait(800);
+  await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 36));
+  await page.evaluate(() => window.__playtestQa?.showPanelOverlayForQa?.('Volaris'));
+  await wait(300);
+  const charBefore = await readCharTile(page);
+  const pt = await tileToScreen(page, 35, 39);
+  if (!pt) {
+    errors.push('run30-dismiss: could not resolve screen point');
+    return;
+  }
+  await page.evaluate(
+    ([x, y]) => window.__playtestQa?.tapScreen?.(x, y),
+    [pt.x, pt.y],
+  );
+  await wait(400);
+  if ((await page.locator('.building-panel--open').count()) > 0) {
+    errors.push('run30-dismiss: panel still open after outside tap');
+  }
+  const charAfterDismiss = await readCharTile(page);
+  if (
+    charBefore &&
+    charAfterDismiss &&
+    (charBefore.x !== charAfterDismiss.x || charBefore.y !== charAfterDismiss.y)
+  ) {
+    errors.push('run30-dismiss: outside tap moved character (should only close panel)');
+  }
+  const goal0 = await page.evaluate(() => window.__playtestQa?.readWalkGoal?.());
+  if (goal0 && goal0.x !== undefined) {
+    errors.push('run30-dismiss: path preview started on dismiss tap');
+  }
+  await page.evaluate(
+    ([x, y]) => window.__playtestQa?.tapScreen?.(x, y),
+    [pt.x, pt.y],
+  );
+  await wait(3500);
+  const charAfterWalk = await readCharTile(page);
+  if (
+    charBefore &&
+    charAfterWalk &&
+    charBefore.x === charAfterWalk.x &&
+    charBefore.y === charAfterWalk.y
+  ) {
+    errors.push('run30-dismiss: second tap did not start a walk');
+  }
+}
+
+/** Run #30: roof tap while walking must not open interior until door arrival. */
+async function testRun30NoEarlyInteriorOnRoofTap(page, errors) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'networkidle' });
+  await wait(800);
+  await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 36));
+  await page.evaluate(() => window.__playtestQa?.tapMapTile?.(46, 36));
+  await wait(400);
+  if (!(await cdpClickTile(page, QA.bain.x, QA.bain.y, { building: true }))) {
+    errors.push('run30-early-entry: could not tap Bain building');
+    return;
+  }
+  for (let i = 0; i < 8; i++) {
+    await wait(250);
+    const open = await page.evaluate(() => window.__playtestQa?.isBuildingPanelOpen?.());
+    const inside = await page.evaluate(() => window.__playtestQa?.isInInterior?.());
+    const char = await readCharTile(page);
+    if (open || inside) {
+      if (char && (char.x !== 39 || char.y !== 26)) {
+        errors.push(
+          `run30-early-entry: interior/panel opened before door (char at ${char.x},${char.y})`,
+        );
+        return;
+      }
+    }
+  }
+  for (let i = 0; i < 80; i++) {
+    const inside = await page.evaluate(() => window.__playtestQa?.isInInterior?.());
+    if (inside) break;
+    await wait(250);
+  }
+  if (!(await page.evaluate(() => window.__playtestQa?.isInInterior?.()))) {
+    errors.push('run30-early-entry: never entered Bain interior after walk');
+  }
+}
+
+/** Run #30: long walk survives staggered pinches and drags. */
+async function testRun30WalkSurvivesPinch(page, errors, client) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'networkidle' });
+  await wait(800);
+  await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 36));
+  await page.evaluate(() => window.__playtestQa?.tapMapTile?.(46, 36));
+  await wait(500);
+  const goal = await page.evaluate(() => window.__playtestQa?.readWalkGoal?.());
+  if (!goal?.x) {
+    errors.push('run30-walk-pinch: no walk goal after map tap');
+    return;
+  }
+  const canvas = await page.locator('#game-canvas').boundingBox();
+  if (!canvas) {
+    errors.push('run30-walk-pinch: no canvas');
+    return;
+  }
+  const cx = canvas.x + canvas.width * 0.5;
+  const cy = canvas.y + canvas.height * 0.45;
+  for (let p = 0; p < 5; p++) {
+    const spread = 55 + p * 12;
+    await pointerTouchDown(client, 80 + p * 2, cx - spread, cy);
+    await wait(50);
+    await pointerTouchDown(client, 81 + p * 2, cx + spread, cy);
+    await wait(80);
+    await pointerTouchMove(client, 80 + p * 2, cx - spread - 20, cy);
+    await pointerTouchMove(client, 81 + p * 2, cx + spread + 20, cy);
+    await wait(60);
+    await pointerTouchUp(client, 81 + p * 2, cx + spread + 20, cy);
+    await wait(70);
+    await pointerTouchUp(client, 80 + p * 2, cx - spread - 20, cy);
+    await wait(120);
+  }
+  for (let d = 0; d < 2; d++) {
+    await pointerTouchDown(client, 90 + d, cx, cy - 40);
+    for (let i = 0; i < 8; i++) {
+      await pointerTouchMove(client, 90 + d, cx + i * 8, cy - 40 + i * 10);
+      await wait(30);
+    }
+    await pointerTouchUp(client, 90 + d, cx + 56, cy + 40);
+    await wait(200);
+  }
+  const goalMid = await page.evaluate(() => window.__playtestQa?.readWalkGoal?.());
+  if (!goalMid?.x) {
+    errors.push('run30-walk-pinch: walk goal cleared during pinch/drag');
+    return;
+  }
+  for (let i = 0; i < 100; i++) {
+    const g = await page.evaluate(() => window.__playtestQa?.readWalkGoal?.());
+    const char = await readCharTile(page);
+    if (!g?.x && char && char.x === goal.x && char.y === goal.y) break;
+    if (!g?.x && char && (char.x !== goal.x || char.y !== goal.y)) {
+      await wait(250);
+      continue;
+    }
+    await wait(250);
+  }
+  const charEnd = await readCharTile(page);
+  const md = charEnd ? Math.abs(charEnd.x - goal.x) + Math.abs(charEnd.y - goal.y) : 99;
+  if (!charEnd || md > 1) {
+    errors.push(
+      `run30-walk-pinch: expected (${goal.x},${goal.y}) got (${charEnd?.x ?? '?'},${charEnd?.y ?? '?'}), md=${md}`,
+    );
+  }
+}
+
+/** Run #30: enter + exit all 9 buildings (click path). */
+async function testRun30AllInteriorsClick(page, errors) {
+  const buildings = await page.evaluate(() => window.__playtestQa?.getEnterableBuildings?.() ?? []);
+  for (const b of buildings) {
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'networkidle' });
+    await wait(600);
+    const start = QA_WALK_START[b.name] ?? [31, 36];
+    await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), start);
+    await wait(200);
+    if (!(await cdpClickBuildingDoor(page, b.name))) {
+      errors.push(`run30-interiors: door click failed ${b.name}`);
+      continue;
+    }
+    if (!(await waitForInterior(page))) {
+      errors.push(`run30-interiors: ${b.name} did not enter interior`);
+      continue;
+    }
+    await wait(400);
+    const hash = await page.evaluate(() => location.hash);
+    if (!hash.includes(`in=${b.name}`)) {
+      errors.push(`run30-interiors: hash missing in=${b.name} (${hash})`);
+    }
+    await page.keyboard.press('Escape');
+    await wait(600);
+    if (await page.evaluate(() => window.__playtestQa?.isInInterior?.())) {
+      errors.push(`run30-interiors: ${b.name} still inside after Esc`);
+    }
+    const char = await readCharTile(page);
+    if (!char || char.x !== b.door.x || char.y !== b.door.y) {
+      errors.push(
+        `run30-interiors: ${b.name} exit char (${char?.x},${char?.y}) not door (${b.door.x},${b.door.y})`,
+      );
+    }
+  }
+}
+
+async function captureRun30Interiors(browser) {
+  const dir = path.join(root, 'artifacts', 'run30');
+  await mkdir(dir, { recursive: true });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  try {
+    for (const [name, start] of [
+      ['bain', [39, 30]],
+      ['flor', [46, 37]],
+      ['sambil', [39, 36]],
+    ]) {
+      await page.goto(BASE, { waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'networkidle' });
+      await wait(600);
+      await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), start);
+      await wait(200);
+      await cdpClickBuildingDoor(page, name);
+      await waitForInterior(page);
+      await wait(500);
+      await page.screenshot({ path: path.join(dir, `interior-${name}.png`) });
+      await page.keyboard.press('Escape');
+      await wait(700);
+      await page.screenshot({ path: path.join(dir, `map-after-${name}-exit.png`) });
+    }
+  } finally {
+    await page.close();
   }
 }
 
@@ -1140,7 +1367,7 @@ async function testTouchBuildingEntry(browser, errors, warnings) {
       if (!title?.includes(house.title.split(' ').slice(-1)[0])) {
         errors.push(`touch-house: ${house.id} unexpected title (${title ?? 'none'})`);
       }
-      await page.locator('.building-panel__close').click();
+      await page.locator('[data-exit]').first().click();
       await wait(400);
     } finally {
       await context.close();
@@ -1332,29 +1559,7 @@ async function testStaggeredPinchNoJump(page, errors) {
 }
 
 async function testPanelDismissDesktop(page, errors) {
-  if (!(await openVolarisPanel(page))) {
-    errors.push('panel-dismiss: could not open Volaris');
-    return;
-  }
-  for (let i = 0; i < 48; i++) {
-    const c = await readCharTile(page);
-    if (c && c.x === 39 && c.y === 36) break;
-    await wait(250);
-  }
-  await dismissBuildingPanel(page);
-  const charBefore = await readCharTile(page);
-  if (!(await cdpClickTile(page, 35, 39))) {
-    errors.push('panel-dismiss: ground click failed');
-    return;
-  }
-  await wait(10000);
-  if ((await page.locator('.building-panel--open').count()) > 0) {
-    errors.push('panel-dismiss: panel still open after outside ground click');
-  }
-  const charAfter = await readCharTile(page);
-  if (charBefore && charAfter && charBefore.x === charAfter.x && charBefore.y === charAfter.y) {
-    errors.push('panel-dismiss: character did not walk after dismiss click');
-  }
+  await testRun30DismissOutsideTapNoWalk(page, errors);
 }
 
 async function testPanelSwitchBuilding(page, errors) {
@@ -1362,20 +1567,28 @@ async function testPanelSwitchBuilding(page, errors) {
     errors.push('panel-switch: could not open Volaris');
     return;
   }
+  await dismissBuildingPanel(page);
+  for (let i = 0; i < 24; i++) {
+    const inside = await page.evaluate(() => window.__playtestQa?.isInInterior?.());
+    if (!inside) break;
+    await wait(250);
+  }
+  if (await page.evaluate(() => window.__playtestQa?.isInInterior?.())) {
+    errors.push('panel-switch: still inside Volaris after dismiss');
+    return;
+  }
+  await wait(300);
   if (!(await cdpClickBuildingDoor(page, 'bain'))) {
     errors.push('panel-switch: could not click Bain door');
     return;
   }
-  try {
-    await page.waitForFunction(
-      () =>
-        document.querySelector('.building-panel--open') &&
-        document.querySelector('.building-panel__title')?.textContent?.includes('Bain'),
-      { timeout: 28000 },
-    );
-  } catch {
-    const title = await page.locator('.building-panel__title').textContent();
-    errors.push(`panel-switch: expected Bain panel (${title ?? 'none'})`);
+  if (!(await waitForInterior(page, 28000))) {
+    errors.push('panel-switch: did not enter Bain interior');
+    return;
+  }
+  const title = await page.locator('.building-panel__title').textContent();
+  if (!title?.includes('Bain')) {
+    errors.push(`panel-switch: expected Bain interior (${title ?? 'none'})`);
   }
 }
 
@@ -1432,7 +1645,7 @@ async function testPanelDismissTouch(browser, errors) {
         return;
       }
     }
-    const close = await page.locator('.building-panel__close').boundingBox();
+    const close = await page.locator('[data-exit]').first().boundingBox();
     if (!close) {
       errors.push('panel-touch-close: close button missing');
       return;
@@ -1653,7 +1866,7 @@ async function testBuildingWalkEndsOnDoorTile(page, errors) {
         `door-arrival: ${b.name} expected door (${b.door.x},${b.door.y}) got (${char?.x ?? '?'},${char?.y ?? '?'})`,
       );
     }
-    await page.locator('.building-panel__close').click().catch(() => {});
+    await page.locator('[data-exit]').first().click().catch(() => {});
     await wait(300);
   }
 }
@@ -1755,7 +1968,7 @@ async function testBainDoorLowZoomDeterministic(page, errors) {
   await page.goto(`${BASE}#view=x=920&y=-2180&z=0.370`, { waitUntil: 'networkidle' });
   await wait(900);
   for (let i = 0; i < 7; i++) {
-    await page.locator('.building-panel__close').click().catch(() => {});
+    await page.locator('[data-exit]').first().click().catch(() => {});
     await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
     await wait(150);
     if (!(await cdpClickBuildingDoor(page, 'bain'))) {
@@ -1938,7 +2151,7 @@ async function testMap64EnterablePanels(page, errors) {
     if (!title?.includes(b.panelTitle.split(' ')[0])) {
       errors.push(`map64-panels: ${b.name} title mismatch (${title ?? 'none'})`);
     }
-    await page.locator('.building-panel__close').click().catch(() => {});
+    await page.locator('[data-exit]').first().click().catch(() => {});
     await wait(250);
   }
 }
@@ -2252,7 +2465,7 @@ async function captureMap64ProofScreenshots(browser, errors, routeReport) {
       }
     }
     await desktop.screenshot({ path: path.join(outDir, 'map64-volaris-panel.png') });
-    await desktop.locator('.building-panel__close').click().catch(() => {});
+    await desktop.locator('[data-exit]').first().click().catch(() => {});
     await wait(300);
 
     await desktop.goto(`${BASE}#view=x=1420&y=-1580&z=0.75`, { waitUntil: 'networkidle' });
@@ -2418,6 +2631,11 @@ async function main() {
     await testSceneryTapWalks(desktop, errors);
     await testMinZoomPanThenPinchOutNoSnap(desktop, errors);
     await testStaggeredPinchNoJump(desktop, errors);
+    await testRun30NoEarlyInteriorOnRoofTap(desktop, errors);
+    await testRun30AllInteriorsClick(desktop, errors);
+    const desktopCdp = await desktop.context().newCDPSession(desktop);
+    await ensureTouchEmulation(desktopCdp);
+    await testRun30WalkSurvivesPinch(desktop, errors, desktopCdp);
     await testMinZoomFullMapVisible(browser, errors);
     await testMinZoomPhoneFraming(browser, errors);
 
@@ -2447,6 +2665,7 @@ async function main() {
     await captureRun27Closeups(browser);
     await captureRun28Closeups(browser);
     await captureRun29Closeups(browser);
+    await captureRun30Interiors(browser);
 
     const report = {
       errors,

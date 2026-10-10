@@ -1,11 +1,13 @@
 import { ChecklistUI } from './checklist/ui';
 import {
+  getBuildingByName,
   getBuildingDoorTiles,
   getEnterableBuildings,
   INICIO,
   MAP_TRAMOS,
   validateWalkGridFootprint,
 } from './data/map';
+import { parseInteriorFromHash } from './camera/hash';
 import { IsoScene } from './game/scene';
 import { findPath } from './iso/pathfinding';
 import { BuildingPanel } from './ui/buildingPanel';
@@ -18,30 +20,44 @@ async function main(): Promise<void> {
   const checklist = new ChecklistUI(uiRoot, { onSkip: () => {}, onDismiss: () => {} });
 
   let scene!: IsoScene;
-  const panel = new BuildingPanel(uiRoot, () => {
-    checklist.setBuildingPanelOpen(false);
-  });
+  const panel = new BuildingPanel(
+    uiRoot,
+    () => checklist.setBuildingPanelOpen(false),
+    () => {
+      if (scene.isInInterior()) scene.exitInterior();
+    },
+  );
 
-  let lastBuilding = '';
   scene = new IsoScene({
     onChecklist: (step) => checklist.complete(step),
-    onEnterBuilding: (title) => {
+    onEnterBuilding: (buildingId, title) => {
       checklist.complete('enter-building');
-      if (panel.isOpen() && lastBuilding === title) return;
-      lastBuilding = title;
       checklist.setBuildingPanelOpen(true);
-      scene.clearWalkPreview();
-      panel.show(title);
+      scene.enterInterior(buildingId);
+      panel.showInterior(title);
+    },
+    onExitInterior: () => {
+      checklist.setBuildingPanelOpen(false);
+      panel.hide();
     },
     onUnreachable: () => showToast('No se puede llegar'),
     buildingPanel: {
       isOpen: () => panel.isOpen(),
-      openTitle: () => lastBuilding,
+      openTitle: () => '',
       dismiss: () => panel.hide(),
     },
   });
 
   await scene.init(canvas);
+
+  const bootInterior = parseInteriorFromHash();
+  if (bootInterior) {
+    const b = getBuildingByName(bootInterior);
+    if (b?.panelTitle) {
+      checklist.setBuildingPanelOpen(true);
+      panel.showInterior(b.panelTitle);
+    }
+  }
 
   (window as unknown as { __playtestQa?: Record<string, unknown> }).__playtestQa = {
     validateWalkGridFootprint,
@@ -65,6 +81,21 @@ async function main(): Promise<void> {
     tapBuildingDoor: (name: string) => scene.tapBuildingDoor(name),
     setSuppressTap: (ms: number) => scene.setSuppressTapForQa(ms),
     tapMapTile: (tx: number, ty: number) => scene.tapMapTileForQa(tx, ty),
+    tapScreen: (sx: number, sy: number) => scene.tapScreenForQa(sx, sy),
+    isInInterior: () => scene.isInInterior(),
+    getInteriorId: () => scene.getInteriorBuildingId(),
+    enterInterior: (name: string) => scene.enterInterior(name),
+    exitInterior: () => scene.exitInterior(),
+    dismissBuildingPanel: () => panel.hide(),
+    showPanelOverlayForQa: (title: string) => {
+      checklist.setBuildingPanelOpen(true);
+      panel.showOverlayForQa(title);
+    },
+    isBuildingPanelOpen: () => panel.isOpen(),
+    readWalkGoal: () => {
+      const raw = document.getElementById('game-canvas')?.dataset.walkGoal;
+      return raw ? JSON.parse(raw) : null;
+    },
   };
 }
 

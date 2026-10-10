@@ -454,12 +454,57 @@ body.is-canvas-dragging * {
   }
 }
 
+.scene-fade {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  background: #e8e8e8;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease;
+}
+
+.scene-fade--active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-fade {
+    transition: none;
+  }
+}
+
 /* Building panel */
 .building-panel {
   position: fixed;
   inset: 0;
   z-index: 20;
   pointer-events: none;
+}
+
+.building-panel--interior-only .interior-panel {
+  position: absolute;
+  left: 50%;
+  top: max(72px, env(safe-area-inset-top));
+  transform: translateX(-50%);
+  width: min(320px, calc(100vw - 32px));
+  background: rgb(255 255 255 / 92%);
+  border-radius: 12px;
+  padding: 16px 18px 20px;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 12%);
+  pointer-events: auto;
+}
+
+.interior-panel__back {
+  margin-bottom: 8px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #5c5c5c;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
 }
 
 .building-panel__backdrop {
