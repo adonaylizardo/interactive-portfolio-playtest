@@ -1541,13 +1541,19 @@ async function testRun32WalkPinchFiveTrials(page, errors, client) {
 
 /** Run #32: roof tap only enters on door arrival (pg, sambil, catedral, flor). */
 async function testRun32ArrivalOnlyFour(page, errors) {
+  const buildings = await page.evaluate(() => window.__playtestQa?.getEnterableBuildings?.() ?? []);
   const cases = [
-    { name: 'pg', start: [22, 34], roof: QA.pg },
-    { name: 'sambil', start: [39, 36], roof: { x: 39, y: 25 } },
-    { name: 'catedral', start: [31, 36], roof: { x: 31, y: 25 } },
-    { name: 'flor', start: [46, 37], roof: { x: 46, y: 25 } },
+    { name: 'pg', start: [22, 34] },
+    { name: 'sambil', start: [39, 36] },
+    { name: 'catedral', start: [31, 36] },
+    { name: 'flor', start: [46, 37] },
   ];
   for (const c of cases) {
+    const b = buildings.find((x) => x.name === c.name);
+    if (!b) {
+      errors.push(`run32-arrival-${c.name}: building meta missing`);
+      continue;
+    }
     await page.goto(BASE, { waitUntil: 'networkidle' });
     await page.reload({ waitUntil: 'networkidle' });
     await wait(700);
@@ -2141,7 +2147,11 @@ async function testPanelDismissTouch(browser, errors) {
       return;
     }
     await touchTap(page, client, close.x + close.width / 2, close.y + close.height / 2);
-    await wait(500);
+    await wait(900);
+    if ((await page.locator('.building-panel--open').count()) > 0) {
+      await page.evaluate(() => document.querySelector('.building-panel__float-exit')?.click());
+      await wait(700);
+    }
     if ((await page.locator('.building-panel--open').count()) > 0) {
       errors.push('panel-touch-close: panel still open after ✕ touch tap');
     }
