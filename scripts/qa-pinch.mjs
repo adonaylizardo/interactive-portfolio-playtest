@@ -989,12 +989,20 @@ async function setupIPhoneTouchPage(browser) {
 }
 
 async function dismissBuildingPanel(page) {
+  await page.evaluate(() => {
+    if (window.__playtestQa?.isInInterior?.()) {
+      window.__playtestQa?.exitInterior?.();
+    }
+  });
+  await wait(200);
   await page.keyboard.press('Escape');
   await wait(350);
   if ((await page.locator('.building-panel--open').count()) > 0) {
     await page.locator('[data-exit], .interior-panel__back').first().click({ force: true }).catch(() => {});
     await wait(250);
   }
+  await page.evaluate(() => window.__playtestQa?.dismissBuildingPanel?.());
+  await wait(200);
 }
 
 async function waitForInterior(page, maxMs = 20000) {
