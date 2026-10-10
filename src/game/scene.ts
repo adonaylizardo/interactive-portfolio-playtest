@@ -2011,6 +2011,28 @@ export class IsoScene {
     return true;
   }
 
+  /** QA: pan so the character and target door are both on screen before a real pointer tap. */
+  frameBuildingDoorForQa(name: string): void {
+    const obj = objects.find((o) => o.type === 'building' && o.name === name);
+    if (!obj?.door) return;
+    const d = obj.door;
+    const midTx = (this.charTx + d.x) / 2;
+    const midTy = (this.charTy + d.y) / 2;
+    const mid = tileToWorld(midTx, midTy);
+    const doorW = tileToWorld(d.x, d.y);
+    const charW = tileToWorld(this.charTx, this.charTy);
+    const spanX = Math.abs(doorW.x - charW.x) + TILE_W * 2;
+    const spanY = Math.abs(doorW.y - charW.y) + TILE_H * 4;
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const zoomX = sw / spanX;
+    const zoomY = sh / spanY;
+    this.zoom = clampZoom(Math.min(zoomX, zoomY) * 0.88, sw, sh);
+    this.cameraX = -mid.x;
+    this.cameraY = -mid.y + 40;
+    this.applyCamera(false);
+  }
+
   /** Client coordinates for tapping the drawn door of a building (QA). */
   getDoorScreenClientPoint(name: string): { x: number; y: number } | null {
     const obj = objects.find((o) => o.type === 'building' && o.name === name);
@@ -2048,6 +2070,7 @@ export class IsoScene {
     this.syncRoundedTileFromCharacter();
     this.syncCharacterGraphic();
     this.drawPathPreview();
+    this.centerOnCharacter(false);
   }
 
   /** QA: same entry path as tapping a building (walk to door + open panel). */

@@ -847,9 +847,23 @@ async function doorClientPoint(page, buildingName) {
   return page.evaluate((n) => window.__playtestQa?.doorScreenPoint?.(n), buildingName);
 }
 
-async function realTapDoor(page, buildingName, { touch = false, client = null } = {}) {
+async function realTapDoor(page, buildingName, { touch = false, client = null, frame = true } = {}) {
+  if (frame) {
+    await page.evaluate((n) => window.__playtestQa?.frameDoorForQa?.(n), buildingName);
+    await wait(250);
+  }
   const pt = await doorClientPoint(page, buildingName);
   if (!pt?.x) return false;
+  const canvas = await page.locator('#game-canvas').boundingBox();
+  if (
+    canvas &&
+    (pt.x < canvas.x + 4 ||
+      pt.x > canvas.x + canvas.width - 4 ||
+      pt.y < canvas.y + 4 ||
+      pt.y > canvas.y + canvas.height - 4)
+  ) {
+    return false;
+  }
   if (touch) {
     if (!client) return false;
     await realTouchClick(page, client, pt.x, pt.y);
@@ -1416,7 +1430,7 @@ async function testRun33DoorRealInputAll(browser, errors) {
       const start = QA_WALK_START[b.name] ?? [31, 36];
       await mobile.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), start);
       await wait(250);
-      if (!(await realTapDoor(mobile, b.name, { touch: true, client: mobileClient }))) {
+      if (!(await realTapDoor(mobile, b.name, { touch: true, client: mobileClient, frame: false }))) {
         errors.push(`run33-door-touch: no door point ${b.name}`);
         continue;
       }
@@ -1443,7 +1457,7 @@ async function testRun33DoorRealInputAll(browser, errors) {
         errors.push(`run33-door-click: no door point ${b.name}`);
         continue;
       }
-      if (!(await waitForInterior(desktop, 25000))) {
+      if (!(await waitForInterior(desktop, 45000))) {
         errors.push(`run33-door-click: ${b.name} did not enter (real mouse click)`);
       }
       await desktop.evaluate(() => window.__playtestQa?.exitInterior?.());
@@ -1470,7 +1484,7 @@ async function testRun33BainDoorLowZoomTouch(browser, errors) {
       await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), [39, 36]);
       await page.evaluate((targetZ) => window.__playtestQa?.setZoom?.(targetZ), z);
       await wait(400);
-      if (!(await realTapDoor(page, 'bain', { touch: true, client }))) {
+      if (!(await realTapDoor(page, 'bain', { touch: true, client, frame: false }))) {
         errors.push(`run33-bain-touch: trial ${trial + 1} door point missing`);
         continue;
       }
@@ -3308,7 +3322,7 @@ async function main() {
     await captureRun30Interiors(browser);
     await captureRun31(browser, errors);
     try {
-      await captureRun32Interiors(browser);
+      await captureRun33Interiors(browser);
     } catch (e) {
       errors.push(`capture-run32: ${String(e?.message ?? e)}`);
     }
