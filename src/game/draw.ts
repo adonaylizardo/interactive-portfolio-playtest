@@ -482,9 +482,6 @@ export function drawMuro(
     plankDark,
   );
 
-  const corner = lerpPt(backInnerA, leftInnerA, 0.5);
-  poly(g, [corner, backInnerA, raise(backInnerA, wallH), raise(corner, wallH * 0.92)], plankDark);
-
   for (const [u, v] of [
     [0.2, 0.35],
     [0.5, 0.5],
@@ -537,7 +534,7 @@ export function drawRedoma(
   const centerTile = { x: fx + Math.floor(w / 2), y: fy + Math.floor(h / 2) };
   const cx = localFoot(ax, ay, centerTile.x, centerTile.y);
   cx.y -= TILE_H / 2;
-  const discRx = islandWidth * 0.3;
+  const discRx = islandWidth * 0.43;
   const discRy = discRx / 2;
   g.ellipse(cx.x, cx.y, discRx, discRy);
   g.fill(ring);

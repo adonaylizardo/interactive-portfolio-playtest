@@ -13,7 +13,17 @@ import {
   TILE_W,
   type MapObject,
 } from '../data/map';
-import { parseCameraFromHash, writeInteriorToHash } from '../camera/hash';
+import {
+  bindPopstate,
+  navigateBackFromInterior,
+  parseCameraFromHash,
+  parseInteriorFromHash,
+  pushInteriorEntry,
+  replaceOutdoorHash,
+  setHashWriteSuppressed,
+  writeInteriorToHash,
+  type HistoryNavigationState,
+} from '../camera/hash';
 import { isTouchPrimary, type ChecklistStepId } from '../checklist/storage';
 import { sortKey, tileFootWorld, tileToWorld, worldToTile } from '../iso/math';
 import { findPathOrNearest } from '../iso/pathfinding';
@@ -46,6 +56,8 @@ import {
   drawInteriorRoom,
   findPathInterior,
   getInteriorDef,
+  interiorExitPick,
+  interiorWorldBounds,
   syncInteriorCharacter,
   type InteriorCell,
   type InteriorDef,
@@ -53,8 +65,10 @@ import {
 import {
   cameraFitMargins,
   cameraFromPinchSession,
+  clampInteriorPanInView,
   clampPanMapFullyInView,
   clampZoom,
+  fitCameraToInteriorBounds,
   isMapFullyVisibleOnScreen,
   mapBoundsOnScreen,
   mapVisibleFractions,
@@ -63,6 +77,7 @@ import {
   stabilizeCameraAfterGesture,
   stabilizeCameraDuringPinch,
   viewportMapCoverage,
+  zoomMinForInteriorBounds,
   zoomMinForViewport,
   zoomAtScreenAnchor,
 } from './cameraControl';
@@ -71,14 +86,22 @@ export type BuildingPanelBridge = {
   isOpen: () => boolean;
   openTitle: () => string;
   dismiss: () => void;
+  layoutInsets?: () => { left: number; top: number; right: number; bottom: number };
+};
+
+export type ChecklistBridge = {
+  isMobileExpanded: () => boolean;
+  collapseMobile: () => void;
 };
 
 export type SceneEvents = {
   onChecklist: (step: ChecklistStepId) => void;
   onEnterBuilding: (buildingId: string, panelTitle: string) => void;
   onExitInterior?: () => void;
+  onInteriorIdChange?: (interiorId: string | null) => void;
   onUnreachable?: () => void;
   buildingPanel?: BuildingPanelBridge;
+  checklist?: ChecklistBridge;
 };
 
 export class IsoScene {
@@ -165,6 +188,9 @@ export class IsoScene {
   private interiorRoomGfx = new Graphics();
   private interiorCharGfx = new Graphics();
   private mapReturnDoor: { x: number; y: number } | null = null;
+  private outdoorCamBeforeInterior: { x: number; y: number; zoom: number } | null = null;
+  private interiorHistoryEntries = 0;
+  private historySyncInProgress = false;
   private suppressMapTapOnce = false;
   constructor(events: SceneEvents) {
     this.events = events;
@@ -207,6 +233,7 @@ export class IsoScene {
     this.syncCharacterGraphic();
     this.syncRoundedTileFromCharacter();
 
+    const bootInteriorId = parseInteriorFromHash();
     const fromHash = parseCameraFromHash();
     if (fromHash) {
       this.cameraX = fromHash.x;
@@ -217,7 +244,15 @@ export class IsoScene {
     } else {
       this.centerOnCharacter(false);
     }
-    this.applyCamera(true);
+    if (bootInteriorId) {
+      this.outdoorCamBeforeInterior = {
+        x: this.cameraX,
+        y: this.cameraY,
+        zoom: this.zoom,
+      };
+    }
+    setHashWriteSuppressed(true);
+    this.applyCamera(false);
     this.lastChecklistZoom = this.zoom;
 
     this.bindInput();
@@ -228,26 +263,48 @@ export class IsoScene {
       window.scrollTo(0, 0);
     });
     window.addEventListener('hashchange', () => {
-      const v = parseCameraFromHash();
-      if (v) {
-        this.cameraX = v.x;
-        this.cameraY = v.y;
-        this.zoom = clampZoom(v.zoom);
-        this.applyCamera(false);
-        this.rebaselineChecklistFromCamera();
-      }
-      const id = parseCameraFromHash()?.interiorId ?? null;
-      if (id && !this.interiorActive) {
-        this.enterInterior(id, { skipFade: true, fromHash: true });
-      } else if (!id && this.interiorActive) {
-        this.exitInterior({ skipFade: true, fromHash: true });
-      }
+      if (this.historySyncInProgress) return;
+      this.applyHashNavigation(null);
     });
 
-    const boot = parseCameraFromHash();
-    if (boot?.interiorId) {
-      this.enterInterior(boot.interiorId, { skipFade: true, fromHash: true });
+    bindPopstate((ev) => {
+      this.applyHashNavigation((ev.state as HistoryNavigationState | null) ?? null);
+    });
+
+    if (bootInteriorId) {
+      replaceOutdoorHash(this.outdoorCamBeforeInterior ?? { x: this.cameraX, y: this.cameraY, zoom: this.zoom });
+      this.enterInterior(bootInteriorId, { skipFade: true });
     }
+    setHashWriteSuppressed(false);
+    this.applyCamera(true);
+  }
+
+  private applyHashNavigation(state: HistoryNavigationState | null): void {
+    const v = parseCameraFromHash();
+    const id = parseInteriorFromHash();
+    if (v && !this.interiorActive) {
+      this.cameraX = v.x;
+      this.cameraY = v.y;
+      this.zoom = clampZoom(v.zoom);
+    }
+    if (id && !this.interiorActive) {
+      if (state?.outdoorCam && !this.outdoorCamBeforeInterior) {
+        this.outdoorCamBeforeInterior = { ...state.outdoorCam };
+      }
+      this.enterInterior(id, { skipFade: true, fromHash: true });
+    } else if (!id && this.interiorActive) {
+      this.exitInterior({
+        skipFade: true,
+        fromHash: true,
+        outdoorCam: state?.outdoorCam ?? this.outdoorCamBeforeInterior ?? undefined,
+      });
+    } else if (v && this.interiorActive) {
+      this.cameraX = v.x;
+      this.cameraY = v.y;
+      this.zoom = clampZoom(v.zoom);
+      this.applyCamera(false);
+    }
+    this.rebaselineChecklistFromCamera();
   }
 
   /** After programmatic #view hash updates, do not treat the next gesture as user zoom/pan. */
@@ -442,6 +499,10 @@ export class IsoScene {
   }
 
   walkToTile(tx: number, ty: number, sprint: boolean): void {
+    if (this.pendingBuildingEntry) {
+      const d = this.pendingBuildingEntry.door;
+      if (d.x !== tx || d.y !== ty) this.pendingBuildingEntry = null;
+    }
     if (this.canvasEl) {
       this.canvasEl.dataset.walkGoal = JSON.stringify({ x: tx, y: ty });
     }
@@ -587,6 +648,10 @@ export class IsoScene {
       this.suppressMapTapOnce = false;
       return;
     }
+    if (!this.interiorActive && this.events.checklist?.isMobileExpanded()) {
+      this.events.checklist.collapseMobile();
+      return;
+    }
     if (!this.interiorActive && this.events.buildingPanel?.isOpen()) {
       this.events.buildingPanel.dismiss();
       this.pendingBuildingEntry = null;
@@ -673,9 +738,16 @@ export class IsoScene {
     const sh = this.app.screen.height;
     let left = 16;
     let top = 16;
-    const right = 16;
+    let right = 16;
     let bottom = 16;
     const pad = 10;
+    const panelInsets = this.events.buildingPanel?.layoutInsets?.();
+    if (panelInsets && this.interiorActive) {
+      left = Math.max(left, panelInsets.left + pad);
+      top = Math.max(top, panelInsets.top + pad);
+      right = Math.max(right, panelInsets.right + pad);
+      bottom = Math.max(bottom, panelInsets.bottom + pad);
+    }
     const checklist = document.querySelector('.checklist');
     if (checklist) {
       const box = checklist.getBoundingClientRect();
@@ -708,29 +780,44 @@ export class IsoScene {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     this.updateCameraFitMargins();
-    this.zoom = clampZoom(this.zoom, sw, sh);
-    const stabilize =
-      this.pinchGestureActive && this.zoomSource === 'pointer'
-        ? stabilizeCameraDuringPinch
-        : stabilizeCameraAfterGesture;
-    const hardened = stabilize(
-      { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
-      sw,
-      sh,
-    );
-    this.cameraX = hardened.cameraX;
-    this.cameraY = hardened.cameraY;
-    this.zoom = hardened.zoom;
-    const zMin = zoomMinForViewport(sw, sh);
-    if (this.zoom <= zMin + 0.001) {
-      const fitted = clampPanMapFullyInView(
-        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: zMin },
+    if (this.interiorActive && this.interiorDef) {
+      const bounds = interiorWorldBounds(this.interiorDef);
+      const zMin = zoomMinForInteriorBounds(bounds, sw, sh);
+      this.zoom = Math.min(1.5, Math.max(zMin, this.zoom));
+      const fitted = clampInteriorPanInView(
+        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+        bounds,
         sw,
         sh,
       );
       this.cameraX = fitted.cameraX;
       this.cameraY = fitted.cameraY;
       this.zoom = fitted.zoom;
+    } else {
+      this.zoom = clampZoom(this.zoom, sw, sh);
+      const stabilize =
+        this.pinchGestureActive && this.zoomSource === 'pointer'
+          ? stabilizeCameraDuringPinch
+          : stabilizeCameraAfterGesture;
+      const hardened = stabilize(
+        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+        sw,
+        sh,
+      );
+      this.cameraX = hardened.cameraX;
+      this.cameraY = hardened.cameraY;
+      this.zoom = hardened.zoom;
+      const zMin = zoomMinForViewport(sw, sh);
+      if (this.zoom <= zMin + 0.001) {
+        const fitted = clampPanMapFullyInView(
+          { cameraX: this.cameraX, cameraY: this.cameraY, zoom: zMin },
+          sw,
+          sh,
+        );
+        this.cameraX = fitted.cameraX;
+        this.cameraY = fitted.cameraY;
+        this.zoom = fitted.zoom;
+      }
     }
     this.camera.position.set(sw / 2, sh / 2);
     this.camera.scale.set(1);
@@ -1607,11 +1694,10 @@ export class IsoScene {
     const building = getBuildingAtDoor(tx, ty);
     if (!building?.panelTitle || !building.door) return;
 
-    if (this.pendingBuildingEntry) {
-      const d = this.pendingBuildingEntry.door;
-      if (d.x !== tx || d.y !== ty) return;
-      this.pendingBuildingEntry = null;
-    }
+    if (!this.pendingBuildingEntry) return;
+    const d = this.pendingBuildingEntry.door;
+    if (d.x !== tx || d.y !== ty) return;
+    this.pendingBuildingEntry = null;
 
     this.doorCooldown = 120;
     this.mapReturnDoor = { x: building.door.x, y: building.door.y };
@@ -1633,6 +1719,36 @@ export class IsoScene {
     await new Promise((r) => setTimeout(r, active ? 280 : 280));
   }
 
+  private fitInteriorCamera(): void {
+    if (!this.interiorDef) return;
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    this.updateCameraFitMargins();
+    const fitted = fitCameraToInteriorBounds(interiorWorldBounds(this.interiorDef), sw, sh);
+    this.cameraX = fitted.cameraX;
+    this.cameraY = fitted.cameraY;
+    this.zoom = fitted.zoom;
+  }
+
+  private restoreOutdoorCameraAfterExit(outdoorCam?: { x: number; y: number; zoom: number }): void {
+    const saved = outdoorCam ?? this.outdoorCamBeforeInterior;
+    if (saved) {
+      this.cameraX = saved.x;
+      this.cameraY = saved.y;
+      this.zoom = clampZoom(saved.zoom);
+      return;
+    }
+    const door = this.mapReturnDoor;
+    if (door) {
+      const pos = tileToWorld(door.x, door.y);
+      this.cameraX = -pos.x;
+      this.cameraY = -pos.y + 40;
+      this.zoom = clampZoom(this.zoom);
+    } else {
+      this.centerOnCharacter(false);
+    }
+  }
+
   enterInterior(
     buildingId: string,
     opts?: { skipFade?: boolean; fromHash?: boolean },
@@ -1642,6 +1758,14 @@ export class IsoScene {
     const building = objects.find((o) => o.type === 'building' && o.name === buildingId);
     const door = building?.door;
     if (!def || !door) return;
+
+    if (!opts?.fromHash && !this.outdoorCamBeforeInterior) {
+      this.outdoorCamBeforeInterior = {
+        x: this.cameraX,
+        y: this.cameraY,
+        zoom: this.zoom,
+      };
+    }
 
     const finish = () => {
       this.interiorActive = true;
@@ -1664,18 +1788,22 @@ export class IsoScene {
       if (!this.mapReturnDoor) {
         this.mapReturnDoor = { x: door.x, y: door.y };
       }
-      const cx = tileToWorld(Math.floor(def.w / 2), Math.floor(def.h / 2));
-      this.cameraX = -cx.x;
-      this.cameraY = -cx.y + 40;
-      this.applyCamera(true);
+      this.fitInteriorCamera();
+      this.applyCamera(false);
       if (this.canvasEl) {
         this.canvasEl.dataset.interior = buildingId;
+        this.canvasEl.dataset.interiorW = String(def.w);
+        this.canvasEl.dataset.interiorH = String(def.h);
       }
-      writeInteriorToHash(buildingId, {
-        x: this.cameraX,
-        y: this.cameraY,
-        zoom: this.zoom,
-      });
+      const cam = { x: this.cameraX, y: this.cameraY, zoom: this.zoom };
+      if (opts?.fromHash) {
+        writeInteriorToHash(buildingId, cam, 'replace');
+      } else {
+        const outdoor = this.outdoorCamBeforeInterior ?? cam;
+        pushInteriorEntry(buildingId, cam, outdoor);
+        this.interiorHistoryEntries += 1;
+      }
+      this.events.onInteriorIdChange?.(buildingId);
     };
 
     if (opts?.skipFade) {
@@ -1688,8 +1816,17 @@ export class IsoScene {
     });
   }
 
-  exitInterior(opts?: { skipFade?: boolean; fromHash?: boolean }): void {
+  exitInterior(opts?: {
+    skipFade?: boolean;
+    fromHash?: boolean;
+    outdoorCam?: { x: number; y: number; zoom: number };
+  }): void {
     if (!this.interiorActive) return;
+    if (!opts?.fromHash && this.interiorHistoryEntries > 0) {
+      this.historySyncInProgress = true;
+      navigateBackFromInterior();
+      return;
+    }
     const door = this.mapReturnDoor;
     const finish = () => {
       this.interiorActive = false;
@@ -1708,18 +1845,27 @@ export class IsoScene {
         this.syncRoundedTileFromCharacter();
         this.syncCharacterGraphic();
       }
+      this.restoreOutdoorCameraAfterExit(opts?.outdoorCam);
       this.events.onExitInterior?.();
       if (this.canvasEl) {
         this.canvasEl.dataset.interior = '';
+        this.canvasEl.dataset.interiorW = '';
+        this.canvasEl.dataset.interiorH = '';
       }
       if (!opts?.fromHash) {
-        writeInteriorToHash(null, {
+        replaceOutdoorHash({
           x: this.cameraX,
           y: this.cameraY,
           zoom: this.zoom,
         });
       }
-      this.applyCamera(true);
+      this.outdoorCamBeforeInterior = null;
+      if (opts?.fromHash) {
+        this.interiorHistoryEntries = Math.max(0, this.interiorHistoryEntries - 1);
+        this.historySyncInProgress = false;
+      }
+      this.events.onInteriorIdChange?.(null);
+      this.applyCamera(!opts?.fromHash);
     };
 
     finish();
@@ -1731,6 +1877,12 @@ export class IsoScene {
     return this.interiorActive;
   }
 
+  /** Refit camera when the interior sheet peek height changes. */
+  applyCameraFromUi(): void {
+    if (this.interiorActive) this.fitInteriorCamera();
+    this.applyCamera(false);
+  }
+
   getInteriorBuildingId(): string | null {
     return this.interiorActive ? this.interiorDef?.id ?? null : null;
   }
@@ -1738,6 +1890,10 @@ export class IsoScene {
   private handleInteriorScreenTap(sx: number, sy: number, sprint: boolean): void {
     if (!this.interiorDef) return;
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
+    if (interiorExitPick(this.interiorDef, wx, wy, this.zoom)) {
+      this.exitInterior();
+      return;
+    }
     const tile = worldToTile(wx, wy);
     if (!tile) return;
     if (tile.x < 0 || tile.y < 0 || tile.x >= this.interiorDef.w || tile.y >= this.interiorDef.h) {

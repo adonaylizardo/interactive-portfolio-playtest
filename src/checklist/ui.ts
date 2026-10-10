@@ -170,6 +170,21 @@ export class ChecklistUI {
     this.applyLayoutClasses();
   }
 
+  isMobileExpanded(): boolean {
+    return (
+      this.mobile &&
+      !isChecklistHidden(this.state) &&
+      this.state.mobileExpanded === true
+    );
+  }
+
+  collapseMobile(): void {
+    if (!this.mobile) return;
+    this.state.mobileExpanded = false;
+    saveChecklist(this.state);
+    this.applyLayoutClasses();
+  }
+
   private applyLayoutClasses(): void {
     this.mobile = isMobileLayout();
     const total = totalStepsForPlatform(this.compactSteps);

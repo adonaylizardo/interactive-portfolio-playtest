@@ -418,3 +418,73 @@ export function softClampMapInView(
 ): CameraState {
   return clampPanMapFullyInView(cam, screenW, screenH);
 }
+
+const INTERIOR_FIT_MARGIN_PX = 24;
+
+/** Minimum zoom so an interior room bbox fits the viewport (with fit margins). */
+export function zoomMinForInteriorBounds(
+  bounds: { width: number; height: number },
+  screenW: number,
+  screenH: number,
+  margin = INTERIOR_FIT_MARGIN_PX,
+): number {
+  const ml = Math.max(margin, fitMarginLeft);
+  const mr = Math.max(margin, fitMarginRight);
+  const mt = Math.max(margin, fitMarginTop);
+  const mb = Math.max(margin, fitMarginBottom);
+  const innerW = Math.max(1, screenW - ml - mr);
+  const innerH = Math.max(1, screenH - mt - mb);
+  if (bounds.width <= 0 || bounds.height <= 0) return 0.25;
+  const fit = Math.min(innerW / bounds.width, innerH / bounds.height);
+  return Math.min(ZOOM_MAX, Math.max(0.08, fit));
+}
+
+export function fitCameraToInteriorBounds(
+  bounds: { minX: number; maxX: number; minY: number; maxY: number; width: number; height: number },
+  screenW: number,
+  screenH: number,
+): CameraState {
+  const ml = Math.max(INTERIOR_FIT_MARGIN_PX, fitMarginLeft);
+  const mr = Math.max(INTERIOR_FIT_MARGIN_PX, fitMarginRight);
+  const mt = Math.max(INTERIOR_FIT_MARGIN_PX, fitMarginTop);
+  const mb = Math.max(INTERIOR_FIT_MARGIN_PX, fitMarginBottom);
+  const zoom = zoomMinForInteriorBounds(bounds, screenW, screenH);
+  const worldCx = (bounds.minX + bounds.maxX) / 2;
+  const worldCy = (bounds.minY + bounds.maxY) / 2;
+  const innerCx = ml + (screenW - ml - mr) / 2;
+  const innerCy = mt + (screenH - mt - mb) / 2;
+  const cameraX = (innerCx - screenW / 2) / zoom - worldCx;
+  const cameraY = (innerCy - screenH / 2) / zoom - worldCy;
+  return clampInteriorPanInView({ cameraX, cameraY, zoom }, bounds, screenW, screenH);
+}
+
+export function clampInteriorPanInView(
+  cam: CameraState,
+  bounds: { minX: number; maxX: number; minY: number; maxY: number },
+  screenW: number,
+  screenH: number,
+): CameraState {
+  const ml = Math.max(INTERIOR_FIT_MARGIN_PX, fitMarginLeft);
+  const mr = Math.max(INTERIOR_FIT_MARGIN_PX, fitMarginRight);
+  const mt = Math.max(INTERIOR_FIT_MARGIN_PX, fitMarginTop);
+  const mb = Math.max(INTERIOR_FIT_MARGIN_PX, fitMarginBottom);
+  let { cameraX, cameraY, zoom } = cam;
+  zoom = Math.min(ZOOM_MAX, Math.max(0.08, zoom));
+  const camPx = screenW / 2 + cameraX * zoom;
+  const camPy = screenH / 2 + cameraY * zoom;
+  const left = camPx + bounds.minX * zoom;
+  const right = camPx + bounds.maxX * zoom;
+  const top = camPy + bounds.minY * zoom;
+  const bottom = camPy + bounds.maxY * zoom;
+  let dx = 0;
+  let dy = 0;
+  if (left < ml) dx = ml - left;
+  if (right > screenW - mr) dx = screenW - mr - right;
+  if (top < mt) dy = mt - top;
+  if (bottom > screenH - mb) dy = screenH - mb - bottom;
+  return {
+    cameraX: cameraX + dx / zoom,
+    cameraY: cameraY + dy / zoom,
+    zoom,
+  };
+}

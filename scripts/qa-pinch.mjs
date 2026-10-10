@@ -998,7 +998,7 @@ async function dismissBuildingPanel(page) {
   await page.keyboard.press('Escape');
   await wait(350);
   if ((await page.locator('.building-panel--open').count()) > 0) {
-    await page.locator('[data-exit], .interior-panel__back').first().click({ force: true }).catch(() => {});
+    await page.locator('[data-exit], .building-panel__salir').first().click({ force: true }).catch(() => {});
     await wait(250);
   }
   await page.evaluate(() => window.__playtestQa?.dismissBuildingPanel?.());
@@ -1204,6 +1204,246 @@ async function testRun30AllInteriorsClick(page, errors) {
   }
 }
 
+/** Run #31: browser back exits interior without leaving the app. */
+async function testRun31HistoryBackExitsInterior(page, errors) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'networkidle' });
+  await wait(800);
+  await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(39, 30));
+  await cdpClickBuildingDoor(page, 'bain');
+  if (!(await waitForInterior(page))) {
+    errors.push('run31-history: failed to enter Bain');
+    return;
+  }
+  const origin = await page.evaluate(() => location.origin + location.pathname);
+  await page.goBack();
+  await wait(700);
+  if (await page.evaluate(() => window.__playtestQa?.isInInterior?.())) {
+    errors.push('run31-history: still in interior after goBack');
+  }
+  const after = await page.evaluate(() => location.origin + location.pathname);
+  if (after !== origin) {
+    errors.push('run31-history: goBack left the playtest route');
+  }
+}
+
+/** Run #31: deep-link opens interior + panel on first load. */
+async function testRun31DeepLinkInterior(page, errors) {
+  await page.goto(`${BASE}#view=x=0&y=0&z=0.85&in=flor`, { waitUntil: 'networkidle' });
+  await wait(1200);
+  if (!(await page.evaluate(() => window.__playtestQa?.isInInterior?.()))) {
+    errors.push('run31-deeplink: flor interior not active on boot');
+  }
+  if ((await page.locator('.building-panel--open').count()) < 1) {
+    errors.push('run31-deeplink: interior panel not open on boot');
+  }
+  const hash = await page.evaluate(() => location.hash);
+  if (!hash.includes('in=flor')) {
+    errors.push(`run31-deeplink: hash lost interior (${hash})`);
+  }
+}
+
+/** Run #31: per-building interior grid sizes. */
+async function testRun31InteriorSizes(page, errors) {
+  const expected = {
+    catedral: [8, 8],
+    sambil: [8, 8],
+    flor: [7, 7],
+    bain: [6, 6],
+  };
+  for (const [name, [ew, eh]] of Object.entries(expected)) {
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'networkidle' });
+    await wait(600);
+    await page.evaluate(
+      ([n]) => window.__playtestQa?.enterInterior?.(n),
+      [name],
+    );
+    await wait(500);
+    const dims = await page.evaluate(() => {
+      const c = document.getElementById('game-canvas');
+      return { w: Number(c?.dataset.interiorW), h: Number(c?.dataset.interiorH) };
+    });
+    if (dims.w !== ew || dims.h !== eh) {
+      errors.push(`run31-size-${name}: expected ${ew}x${eh} got ${dims.w}x${dims.h}`);
+    }
+    await page.evaluate(() => window.__playtestQa?.exitInterior?.());
+    await wait(400);
+  }
+}
+
+/** Run #31: mid-walk map tap cancels pending Sambil entry. */
+async function testRun31SambilWalkCancel(page, errors) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'networkidle' });
+  await wait(800);
+  await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(39, 36));
+  await page.evaluate(() => window.__playtestQa?.walkToBuilding?.('sambil'));
+  await wait(350);
+  await page.evaluate(() => window.__playtestQa?.tapMapTile?.(44, 18));
+  await wait(4500);
+  const inside = await page.evaluate(() => window.__playtestQa?.isInInterior?.());
+  const char = await readCharTile(page);
+  if (inside) {
+    errors.push('run31-sambil-cancel: entered interior after diverting walk');
+  }
+  if (char && char.x === 39 && char.y === 26) {
+    errors.push('run31-sambil-cancel: character still on Sambil door after cancel walk');
+  }
+}
+
+/** Run #31: exit tile tap at high zoom. */
+async function testRun31InteriorExitTileZoom(page, errors) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'networkidle' });
+  await wait(600);
+  await page.evaluate(() => window.__playtestQa?.enterInterior?.('bain'));
+  await waitForInterior(page);
+  await page.evaluate(() => window.__playtestQa?.setZoom?.(1.5));
+  await wait(300);
+  const pt = await page.evaluate(() => {
+    const c = document.getElementById('game-canvas');
+    if (!c) return null;
+    const rect = c.getBoundingClientRect();
+    const sw = c.width / (window.devicePixelRatio || 1);
+    const sh = c.height / (window.devicePixelRatio || 1);
+    const zoom = Number(c.dataset.zoom) || 1.5;
+    const camX = Number(c.dataset.camX);
+    const camY = Number(c.dataset.camY);
+    const exitX = 2;
+    const exitY = 5;
+    const TILE_W = 128;
+    const TILE_H = 64;
+    const foot = (tx, ty) => ({
+      x: (tx - ty) * (TILE_W / 2),
+      y: (tx + ty) * (TILE_H / 2),
+    });
+    const f = foot(exitX, exitY);
+    const wx = f.x;
+    const wy = f.y - TILE_H / 2;
+    const sx = sw / 2 + (wx + camX) * zoom;
+    const sy = sh / 2 + (wy + camY) * zoom;
+    return { x: rect.left + sx, y: rect.top + sy };
+  });
+  if (!pt) {
+    errors.push('run31-exit-tile: could not compute exit screen point');
+    return;
+  }
+  await page.evaluate(([x, y]) => window.__playtestQa?.tapScreen?.(x, y), [pt.x, pt.y]);
+  await wait(800);
+  if (await page.evaluate(() => window.__playtestQa?.isInInterior?.())) {
+    errors.push('run31-exit-tile: still inside after exit tap at zoom 1.5');
+  }
+}
+
+async function testRun31ChecklistOutsideTapMobile(browser, errors) {
+  const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
+  try {
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'networkidle' });
+    await wait(800);
+    await page.locator('.checklist__ring-btn').click();
+    await wait(300);
+    const expanded = await page.locator('.checklist__list').isVisible();
+    if (!expanded) {
+      errors.push('run31-checklist: could not expand mobile checklist');
+      return;
+    }
+    const charBefore = await readCharTile(page);
+    const pt = await tileToScreen(page, 35, 39);
+    if (!pt) {
+      errors.push('run31-checklist: no screen point');
+      return;
+    }
+    await page.evaluate(([x, y]) => window.__playtestQa?.tapScreen?.(x, y), [pt.x, pt.y]);
+    await wait(400);
+    if (await page.locator('.checklist__list').isVisible()) {
+      errors.push('run31-checklist: list still open after outside tap');
+    }
+    const goal = await page.evaluate(() => window.__playtestQa?.readWalkGoal?.());
+    if (goal?.x !== undefined) {
+      errors.push('run31-checklist: outside tap started walk while dismissing sheet');
+    }
+    const charAfter = await readCharTile(page);
+    if (
+      charBefore &&
+      charAfter &&
+      (charBefore.x !== charAfter.x || charBefore.y !== charAfter.y)
+    ) {
+      errors.push('run31-checklist: character moved on dismiss tap');
+    }
+  } finally {
+    await page.close();
+  }
+}
+
+async function captureRun31(browser, errors) {
+  const dir = path.join(root, 'artifacts', 'run31');
+  await mkdir(dir, { recursive: true });
+  const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  try {
+    for (const name of ['catedral', 'sambil', 'bain', 'flor']) {
+      await desktop.goto(BASE, { waitUntil: 'networkidle' });
+      await desktop.reload({ waitUntil: 'networkidle' });
+      await wait(600);
+      await desktop.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
+      await waitForInterior(desktop);
+      await wait(600);
+      await desktop.screenshot({ path: path.join(dir, `interior-${name}-desktop.png`) });
+      await desktop.keyboard.press('Escape');
+      await wait(700);
+    }
+    await desktop.goto(`${BASE}#view=x=1420&y=-1580&z=1.2`, { waitUntil: 'networkidle' });
+    await wait(800);
+    await desktop.screenshot({ path: path.join(dir, 'obelisco-z1.2.png') });
+  } finally {
+    await desktop.close();
+  }
+  const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
+  try {
+    for (const [name, start] of [
+      ['flor', [46, 37]],
+      ['sambil', [39, 36]],
+    ]) {
+      await mobile.goto(BASE, { waitUntil: 'networkidle' });
+      await mobile.reload({ waitUntil: 'networkidle' });
+      await wait(600);
+      if (start) {
+        await mobile.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), start);
+        await wait(200);
+      }
+      if (name === 'sambil') {
+        await cdpClickBuildingDoor(mobile, name);
+        await waitForInterior(mobile);
+      } else {
+        await mobile.evaluate(() => window.__playtestQa?.enterInterior?.('flor'));
+        await waitForInterior(mobile);
+      }
+      await wait(600);
+      if (name === 'flor') {
+        await mobile.screenshot({ path: path.join(dir, 'interior-flor-375.png') });
+      }
+      if (name === 'sambil') {
+        await mobile.screenshot({ path: path.join(dir, 'interior-sambil-fitted-375.png') });
+      }
+      await mobile.keyboard.press('Escape');
+      await wait(900);
+      await mobile.screenshot({ path: path.join(dir, `map-after-${name}-exit-375.png`) });
+    }
+    await mobile.goto(BASE, { waitUntil: 'networkidle' });
+    await mobile.reload({ waitUntil: 'networkidle' });
+    await wait(600);
+    await mobile.evaluate(() => window.__playtestQa?.setCharacterTile?.(39, 35));
+    await cdpClickBuildingDoor(mobile, 'volaris');
+    await waitForInterior(mobile);
+    await mobile.keyboard.press('Escape');
+    await wait(900);
+    await mobile.screenshot({ path: path.join(dir, 'map-after-volaris-exit-375.png') });
+  } finally {
+    await mobile.close();
+  }
+}
+
 async function captureRun30Interiors(browser) {
   const dir = path.join(root, 'artifacts', 'run30');
   await mkdir(dir, { recursive: true });
@@ -1375,8 +1615,8 @@ async function testTouchBuildingEntry(browser, errors, warnings) {
       if (!title?.includes(house.title.split(' ').slice(-1)[0])) {
         errors.push(`touch-house: ${house.id} unexpected title (${title ?? 'none'})`);
       }
-      await page.locator('[data-exit]').first().click();
-      await wait(400);
+      await page.keyboard.press('Escape');
+      await wait(500);
     } finally {
       await context.close();
     }
@@ -2641,6 +2881,12 @@ async function main() {
     await testStaggeredPinchNoJump(desktop, errors);
     await testRun30NoEarlyInteriorOnRoofTap(desktop, errors);
     await testRun30AllInteriorsClick(desktop, errors);
+    await testRun31HistoryBackExitsInterior(desktop, errors);
+    await testRun31DeepLinkInterior(desktop, errors);
+    await testRun31InteriorSizes(desktop, errors);
+    await testRun31SambilWalkCancel(desktop, errors);
+    await testRun31InteriorExitTileZoom(desktop, errors);
+    await testRun31ChecklistOutsideTapMobile(browser, errors);
     const desktopCdp = await desktop.context().newCDPSession(desktop);
     await ensureTouchEmulation(desktopCdp);
     await testRun30WalkSurvivesPinch(desktop, errors, desktopCdp);
@@ -2674,6 +2920,7 @@ async function main() {
     await captureRun28Closeups(browser);
     await captureRun29Closeups(browser);
     await captureRun30Interiors(browser);
+    await captureRun31(browser, errors);
 
     const report = {
       errors,

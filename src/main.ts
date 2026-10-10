@@ -22,29 +22,50 @@ async function main(): Promise<void> {
   let scene!: IsoScene;
   const panel = new BuildingPanel(
     uiRoot,
-    () => checklist.setBuildingPanelOpen(false),
+    () => {
+      checklist.setBuildingPanelOpen(false);
+      scene.applyCameraFromUi();
+    },
     () => {
       if (scene.isInInterior()) scene.exitInterior();
     },
   );
 
+  const syncInteriorPanel = (interiorId: string | null): void => {
+    if (interiorId) {
+      const b = getBuildingByName(interiorId);
+      if (b?.panelTitle) {
+        checklist.setBuildingPanelOpen(true);
+        panel.showInterior(b.panelTitle);
+      }
+    } else {
+      checklist.setBuildingPanelOpen(false);
+      panel.hide();
+    }
+    scene.applyCameraFromUi();
+  };
+
   scene = new IsoScene({
     onChecklist: (step) => checklist.complete(step),
-    onEnterBuilding: (buildingId, title) => {
+    onEnterBuilding: (buildingId) => {
       checklist.complete('enter-building');
-      checklist.setBuildingPanelOpen(true);
       scene.enterInterior(buildingId);
-      panel.showInterior(title);
     },
     onExitInterior: () => {
       checklist.setBuildingPanelOpen(false);
       panel.hide();
     },
+    onInteriorIdChange: (id) => syncInteriorPanel(id),
     onUnreachable: () => showToast('No se puede llegar'),
     buildingPanel: {
       isOpen: () => panel.isOpen(),
-      openTitle: () => '',
+      openTitle: () => panel.openTitle(),
       dismiss: () => panel.hide(),
+      layoutInsets: () => panel.layoutInsets(),
+    },
+    checklist: {
+      isMobileExpanded: () => checklist.isMobileExpanded(),
+      collapseMobile: () => checklist.collapseMobile(),
     },
   });
 
@@ -52,11 +73,7 @@ async function main(): Promise<void> {
 
   const bootInterior = parseInteriorFromHash();
   if (bootInterior) {
-    const b = getBuildingByName(bootInterior);
-    if (b?.panelTitle) {
-      checklist.setBuildingPanelOpen(true);
-      panel.showInterior(b.panelTitle);
-    }
+    syncInteriorPanel(bootInterior);
   }
 
   (window as unknown as { __playtestQa?: Record<string, unknown> }).__playtestQa = {
@@ -96,6 +113,7 @@ async function main(): Promise<void> {
       const raw = document.getElementById('game-canvas')?.dataset.walkGoal;
       return raw ? JSON.parse(raw) : null;
     },
+    setZoom: (z: number) => scene.setZoomLevel(z),
   };
 }
 
