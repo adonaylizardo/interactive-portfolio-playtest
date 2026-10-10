@@ -661,6 +661,11 @@ export class IsoScene {
       return;
     }
     if (this.interiorActive) {
+      const { x: iwx, y: iwy } = this.screenToWorld(sx, sy);
+      if (this.interiorDef && interiorExitPick(this.interiorDef, iwx, iwy, this.zoom)) {
+        this.exitInterior();
+        return;
+      }
       const client = this.canvasLocalToClient(sx, sy);
       if (this.events.buildingPanel?.consumeInteriorCanvasTap?.(client.x, client.y)) {
         return;

@@ -1553,7 +1553,7 @@ async function testRun32ArrivalOnlyFour(page, errors) {
     await wait(700);
     await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), c.start);
     await wait(200);
-    if (!(await cdpClickTile(page, c.roof.x, c.roof.y, { building: true }))) {
+    if (!(await cdpClickTile(page, b.x, b.y, { building: true }))) {
       errors.push(`run32-arrival-${c.name}: roof tap failed`);
       continue;
     }
@@ -3168,7 +3168,11 @@ async function main() {
     await captureRun29Closeups(browser);
     await captureRun30Interiors(browser);
     await captureRun31(browser, errors);
-    await captureRun32Interiors(browser);
+    try {
+      await captureRun32Interiors(browser);
+    } catch (e) {
+      errors.push(`capture-run32: ${String(e?.message ?? e)}`);
+    }
 
     const report = {
       errors,
