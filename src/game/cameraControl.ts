@@ -286,6 +286,20 @@ export function stabilizeCameraAfterGesture(
   return hardKeepMapPartiallyVisible(next, screenW, screenH);
 }
 
+/** During an active pinch: edge clamp only — no re-center when the map bbox fits in view. */
+export function stabilizeCameraDuringPinch(
+  cam: CameraState,
+  screenW: number,
+  screenH: number,
+): CameraState {
+  let next = { ...cam, zoom: clampZoom(cam.zoom, screenW, screenH) };
+  const zMin = zoomMinForViewport(screenW, screenH);
+  if (next.zoom <= zMin + 0.0005) {
+    return clampPanMapFullyInView(next, screenW, screenH);
+  }
+  return hardKeepMapPartiallyVisible(next, screenW, screenH);
+}
+
 /** Keep at least MAP_VISIBLE_MIN_FRAC of the viewport over the map (camera position only; never caps zoom). */
 export function hardKeepMapPartiallyVisible(
   cam: CameraState,
@@ -377,7 +391,7 @@ export function cameraFromPinchSession(
     zoom: next.zoom,
   };
 
-  return stabilizeCameraAfterGesture(next, screenW, screenH);
+  return stabilizeCameraDuringPinch(next, screenW, screenH);
 }
 
 /** Center the map in the viewport (used at min zoom). */

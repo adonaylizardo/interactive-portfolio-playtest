@@ -251,6 +251,27 @@ export function buildWorld(): { cells: MapCell[][]; objects: MapObject[] } {
     });
   }
 
+  const pathDirs: [number, number][] = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ];
+  for (let ty = 0; ty < MAP_HEIGHT; ty++) {
+    for (let tx = 0; tx < MAP_WIDTH; tx++) {
+      const cell = cells[ty][tx];
+      if (!cell.groundId.includes('path/street')) continue;
+      let pathNeighbors = 0;
+      for (const [dx, dy] of pathDirs) {
+        const n = cells[ty + dy]?.[tx + dx];
+        if (n?.groundId.includes('path/street')) pathNeighbors++;
+      }
+      if (pathNeighbors < 2) {
+        cell.groundId = 'tile/ground/default';
+      }
+    }
+  }
+
   for (const f of FILLER_PROPS) {
     if (f.x < 0 || f.y < 0 || f.x >= MAP_WIDTH || f.y >= MAP_HEIGHT) continue;
     if (nearMuroClearance(f.x, f.y)) continue;

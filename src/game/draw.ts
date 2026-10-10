@@ -360,8 +360,9 @@ export function drawFootprintBuilding(g: Graphics, hover: boolean, spec: Footpri
   }
 
   if (spec.kind === 'catedral') {
-    drawIsoTowerPrism(g, sw, left, gable, roof, 120);
-    drawIsoTowerPrism(g, se, gable, left, roof, 120);
+    const towerH = Math.min(130, Math.round(wallH * 1.45));
+    drawIsoTowerPrism(g, sw, left, gable, roof, towerH);
+    drawIsoTowerPrism(g, se, gable, left, roof, towerH);
   }
 }
 
@@ -399,8 +400,8 @@ export function drawObelisco(
   const faceRight = hover ? C.buildingRightHover : C.buildingRight;
   const cap = hover ? 0x757575 : 0x686868;
   const cx = localFoot(ax, ay, fx + Math.floor(w / 2), fy + Math.floor(h / 2));
-  const bw = (TILE_W / 2) * 0.55;
-  const bh = (TILE_H / 2) * 0.55;
+  const bw = (TILE_W / 2) * 0.4;
+  const bh = (TILE_H / 2) * 0.4;
   const height = 138;
   const taper = 0.7;
   const s = { x: cx.x, y: cx.y };
@@ -468,8 +469,6 @@ export function drawMuro(
   const leftInnerA = lerpPt(leftOuterA, leftInRef, thick);
   const leftInnerB = lerpPt(leftOuterB, leftInRef, thick);
 
-  poly(g, [backOuterA, backOuterB, backInnerB, backInnerA], { color: 0x000000, alpha: 0.12 });
-  poly(g, [leftOuterA, leftOuterB, leftInnerB, leftInnerA], { color: 0x000000, alpha: 0.12 });
   poly(g, [backInnerA, backInnerB, raise(backInnerB, wallH), raise(backInnerA, wallH)], plank);
   poly(
     g,
@@ -525,9 +524,16 @@ export function drawRedoma(
   const ring = hover ? 0x787878 : 0x686868;
   const swFoot = localFoot(ax, ay, fx, fy + h - 1);
   const seFoot = localFoot(ax, ay, fx + w - 1, fy + h - 1);
-  const west = { x: swFoot.x - TILE_W / 2, y: swFoot.y - TILE_H / 2 };
-  const east = { x: seFoot.x + TILE_W / 2, y: seFoot.y - TILE_H / 2 };
-  const islandWidth = Math.hypot(east.x - west.x, east.y - west.y);
+  const nwFoot = localFoot(ax, ay, fx, fy);
+  const neFoot = localFoot(ax, ay, fx + w - 1, fy);
+  const westS = { x: swFoot.x - TILE_W / 2, y: swFoot.y - TILE_H / 2 };
+  const eastS = { x: seFoot.x + TILE_W / 2, y: seFoot.y - TILE_H / 2 };
+  const westN = { x: nwFoot.x - TILE_W / 2, y: nwFoot.y - TILE_H / 2 };
+  const eastN = { x: neFoot.x + TILE_W / 2, y: neFoot.y - TILE_H / 2 };
+  const islandWidth = Math.max(
+    Math.hypot(eastS.x - westS.x, eastS.y - westS.y),
+    Math.hypot(eastN.x - westN.x, eastN.y - westN.y),
+  );
   const centerTile = { x: fx + Math.floor(w / 2), y: fy + Math.floor(h / 2) };
   const cx = localFoot(ax, ay, centerTile.x, centerTile.y);
   cx.y -= TILE_H / 2;

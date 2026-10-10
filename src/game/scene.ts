@@ -53,6 +53,7 @@ import {
   setCameraFitMargins,
   setCameraViewportSize,
   stabilizeCameraAfterGesture,
+  stabilizeCameraDuringPinch,
   viewportMapCoverage,
   zoomMinForViewport,
   zoomAtScreenAnchor,
@@ -588,6 +589,7 @@ export class IsoScene {
     const points = [{ x: this.charTx, y: this.charTy }, ...this.path];
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
+      if (i === points.length - 1 && getBuildingAtDoor(p.x, p.y)) continue;
       const foot = tileFootWorld(p.x, p.y);
       const w = { x: foot.x, y: foot.y - TILE_H / 2 };
       this.pathGfx.moveTo(w.x, w.y - 8);
@@ -662,7 +664,11 @@ export class IsoScene {
     const sh = this.app.screen.height;
     this.updateCameraFitMargins();
     this.zoom = clampZoom(this.zoom, sw, sh);
-    const hardened = stabilizeCameraAfterGesture(
+    const stabilize =
+      this.pinchGestureActive && this.zoomSource === 'pointer'
+        ? stabilizeCameraDuringPinch
+        : stabilizeCameraAfterGesture;
+    const hardened = stabilize(
       { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
       sw,
       sh,
@@ -970,19 +976,6 @@ export class IsoScene {
     this.pinchFrameSerial += 1;
     this.zoomChanged = true;
     this.applyCamera(false);
-    const zMin = zoomMinForViewport(sw, sh);
-    if (this.pinchSession && this.zoom <= zMin + 0.0005) {
-      const mid = this.pointerMidpoint() ?? this.pinchSession.startMid;
-      const dist = this.pointerDistance();
-      this.pinchSession = {
-        ...this.pinchSession,
-        startDist: dist >= 10 ? dist : this.pinchSession.startDist,
-        startZoom: this.zoom,
-        startCamX: this.cameraX,
-        startCamY: this.cameraY,
-        startMid: mid,
-      };
-    }
   }
 
   /** Pinch baseline uses post-clamp camera so the first pinch frame does not snap. */
@@ -1146,23 +1139,6 @@ export class IsoScene {
     if (this.zoomSource !== 'pointer' || !this.pinchSession) return;
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
-    const zMin = zoomMinForViewport(sw, sh);
-    if (this.zoom <= zMin + 0.0005) {
-      const stable = stabilizeCameraAfterGesture(
-        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
-        sw,
-        sh,
-      );
-      this.cameraX = stable.cameraX;
-      this.cameraY = stable.cameraY;
-      this.zoom = stable.zoom;
-      this.pinchSession = {
-        ...this.pinchSession,
-        startCamX: this.cameraX,
-        startCamY: this.cameraY,
-        startMid: mid,
-      };
-    }
     const next = cameraFromPinchSession(this.pinchSession, dist, mid, sw, sh);
     if (next) this.applyPinchCamera(next);
   }

@@ -2126,6 +2126,27 @@ async function captureRun25Closeups(browser) {
   }
 }
 
+async function captureRun29Closeups(browser) {
+  const dir = path.join(root, 'artifacts', 'run29');
+  await mkdir(dir, { recursive: true });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  try {
+    for (const v of [
+      { file: 'redoma-z1.2.png', hash: '#view=x=920&y=-1580&z=1.2' },
+      { file: 'muro-z1.2.png', hash: '#view=x=320&y=-2424&z=1.2' },
+      { file: 'catedral-door-z1.2.png', hash: '#view=x=-920&y=-920&z=1.2' },
+      { file: 'catedral-towers-z1.2.png', hash: '#view=x=-1180&y=-780&z=1.2' },
+      { file: 'obelisco-z1.2.png', hash: '#view=x=1420&y=-1580&z=1.2' },
+    ]) {
+      await page.goto(`${BASE}${v.hash}`, { waitUntil: 'networkidle' });
+      await wait(700);
+      await page.screenshot({ path: path.join(dir, v.file) });
+    }
+  } finally {
+    await page.close();
+  }
+}
+
 async function captureRun28Closeups(browser) {
   const dir = path.join(root, 'artifacts', 'run28');
   await mkdir(dir, { recursive: true });
@@ -2425,6 +2446,7 @@ async function main() {
     await captureRun26Closeups(browser);
     await captureRun27Closeups(browser);
     await captureRun28Closeups(browser);
+    await captureRun29Closeups(browser);
 
     const report = {
       errors,
