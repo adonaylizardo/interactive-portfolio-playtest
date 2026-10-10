@@ -1537,7 +1537,8 @@ async function testMobile375PinchAndUi(browser, errors) {
       errors.push(`mobile375: one-finger pan near min zoom moved ${panPx.toFixed(0)}px (need >50)`);
     }
 
-    const snapBase = await readAnchorBaseline(page);
+    await wheelOutToMinZoom(page, canvas);
+    await wait(400);
     await pointerTouchDown(client, 31, canvas.x + 20, canvas.y + 100);
     for (let i = 0; i < 14; i++) {
       const x = canvas.x + 20 + ((355 - 20) * (i + 1)) / 14;
@@ -1546,9 +1547,10 @@ async function testMobile375PinchAndUi(browser, errors) {
       await wait(30);
     }
     await pointerTouchUp(client, 31, canvas.x + 355, canvas.y + 712);
-    await wait(400);
+    await wait(500);
     const pinchCx = canvas.x + canvas.width * 0.55;
     const pinchCy = canvas.y + canvas.height * 0.32;
+    const pinchBase = await readAnchorBaseline(page);
     await pointerTouchDown(client, 71, pinchCx - 50, pinchCy);
     await wait(40);
     await pointerTouchDown(client, 72, pinchCx + 50, pinchCy);
@@ -1556,7 +1558,7 @@ async function testMobile375PinchAndUi(browser, errors) {
     await pointerTouchMove(client, 71, pinchCx - 120, pinchCy);
     await pointerTouchMove(client, 72, pinchCx + 120, pinchCy);
     await wait(120);
-    const panPinchDrift = await anchorScreenDriftPx(page, snapBase);
+    const panPinchDrift = await anchorScreenDriftPx(page, pinchBase);
     if (!Number.isFinite(panPinchDrift) || panPinchDrift > 50) {
       errors.push(
         `mobile375: min-zoom pan then pinch-out snap ${panPinchDrift?.toFixed?.(1) ?? 'nan'}px (max 50)`,

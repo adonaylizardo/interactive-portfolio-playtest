@@ -272,16 +272,16 @@ export function clampPanMapFullyInView(
   return { cameraX, cameraY, zoom };
 }
 
-/** After pan/zoom/pinch: partial visibility when zoomed in; full-map pan clamp at min zoom. */
+/** After pan/zoom/pinch: full-map fit in the free rect while it fits; else partial visibility. */
 export function stabilizeCameraAfterGesture(
   cam: CameraState,
   screenW: number,
   screenH: number,
 ): CameraState {
-  const zMin = zoomMinForViewport(screenW, screenH);
   let next = { ...cam, zoom: clampZoom(cam.zoom, screenW, screenH) };
-  if (next.zoom <= zMin + 0.0005) {
-    return clampPanMapFullyInView(next, screenW, screenH);
+  const fitted = clampPanMapFullyInView(next, screenW, screenH);
+  if (isMapFullyVisibleOnScreen(fitted, screenW, screenH)) {
+    return fitted;
   }
   return hardKeepMapPartiallyVisible(next, screenW, screenH);
 }
