@@ -448,7 +448,6 @@ export function drawMuro(
   ay = 41,
 ): void {
   const plank = hover ? 0x7a7a7a : 0x6e6e6e;
-  const hold = hover ? 0x959595 : 0x888888;
   const wallH = 40;
   const thick = 0.15;
 
@@ -470,30 +469,6 @@ export function drawMuro(
 
   poly(g, [backInnerA, backInnerB, raise(backInnerB, wallH), raise(backInnerA, wallH)], plank);
   poly(g, [leftInnerA, leftInnerB, raise(leftInnerB, wallH), raise(leftInnerA, wallH)], plank);
-
-  for (const [u, v] of [
-    [0.2, 0.35],
-    [0.5, 0.5],
-    [0.82, 0.3],
-  ] as const) {
-    const p = {
-      x: backInnerA.x + (backInnerB.x - backInnerA.x) * u,
-      y: backInnerA.y + (backInnerB.y - backInnerA.y) * u - wallH * v,
-    };
-    g.circle(p.x, p.y, 3);
-    g.fill(hold);
-  }
-  for (const [u, v] of [
-    [0.3, 0.38],
-    [0.7, 0.55],
-  ] as const) {
-    const p = {
-      x: leftInnerA.x + (leftInnerB.x - leftInnerA.x) * u,
-      y: leftInnerA.y + (leftInnerB.y - leftInnerA.y) * u - wallH * v,
-    };
-    g.circle(p.x, p.y, 3);
-    g.fill(hold);
-  }
 }
 
 export function drawRedoma(

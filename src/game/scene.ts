@@ -8,6 +8,7 @@ import {
   MAP_HEIGHT,
   MAP_WIDTH,
   objects,
+  resolveBuildingEntryFromTile,
   resolveWalkTarget,
   TILE_H,
   TILE_W,
@@ -482,14 +483,12 @@ export class IsoScene {
     sprint: boolean,
     opts?: { buildingEntry?: { panelTitle: string; door: { x: number; y: number } } },
   ): void {
-    let walkTx = tx;
-    let walkTy = ty;
-    const entry = opts?.buildingEntry ?? null;
-    if (entry) {
-      this.pendingBuildingEntry = entry;
-    } else {
-      this.pendingBuildingEntry = null;
-    }
+    const walkTx = tx;
+    const walkTy = ty;
+    const entry =
+      opts?.buildingEntry ??
+      resolveBuildingEntryFromTile(walkTx, walkTy, this.roundedCharTile());
+    this.pendingBuildingEntry = entry;
     const target = resolveWalkTarget(walkTx, walkTy);
     this.walkToTile(target.x, target.y, sprint);
   }
@@ -663,6 +662,16 @@ export class IsoScene {
     if (this.interiorActive) {
       const { x: iwx, y: iwy } = this.screenToWorld(sx, sy);
       if (this.interiorDef && interiorExitPick(this.interiorDef, iwx, iwy, this.zoom)) {
+        this.exitInterior();
+        return;
+      }
+      const tile = worldToTile(iwx, iwy);
+      if (
+        tile &&
+        this.interiorDef &&
+        tile.x === this.interiorDef.exit.x &&
+        tile.y === this.interiorDef.exit.y
+      ) {
         this.exitInterior();
         return;
       }
@@ -1029,7 +1038,7 @@ export class IsoScene {
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
     this.cameraX = -cx;
-    this.cameraY = -cy - sh * 0.06;
+    this.cameraY = -cy + sh * 0.12;
     const hardened = stabilizeCameraAfterGesture(
       { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
       sw,
@@ -1164,6 +1173,7 @@ export class IsoScene {
 
   private shouldBlockTap(): boolean {
     return (
+      this.interiorActive ||
       this.panMoved ||
       this.pinchGestureActive ||
       this.hadMultiPointerGesture ||
