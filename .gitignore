@@ -1,0 +1,7 @@
+node_modules
+dist
+artifacts/qa-screenshots/*
+!artifacts/qa-screenshots/.gitkeep
+.DS_Store
+*.local
+.env

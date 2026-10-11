@@ -1,0 +1,686 @@
+{
+ "mapa": "64×64",
+ "tile_px": [
+  128,
+  64
+ ],
+ "inicio": [
+  31,
+  36
+ ],
+ "tramos": [
+  {
+   "paso": 1,
+   "desde": "estudio",
+   "hasta": "volaris",
+   "casillas": 8,
+   "s": 1.67,
+   "s_teclado": 1.9,
+   "manhattan_directo": 8,
+   "acum_casillas": 8,
+   "acum_s": 1.67,
+   "directo_desde_inicio": 8,
+   "camino": [
+    [
+     31,
+     36
+    ],
+    [
+     32,
+     36
+    ],
+    [
+     33,
+     36
+    ],
+    [
+     34,
+     36
+    ],
+    [
+     35,
+     36
+    ],
+    [
+     36,
+     36
+    ],
+    [
+     37,
+     36
+    ],
+    [
+     38,
+     36
+    ],
+    [
+     39,
+     36
+    ]
+   ]
+  },
+  {
+   "paso": 2,
+   "desde": "volaris",
+   "hasta": "bain",
+   "casillas": 14,
+   "s": 2.92,
+   "s_teclado": 3.33,
+   "manhattan_directo": 10,
+   "acum_casillas": 22,
+   "acum_s": 4.58,
+   "directo_desde_inicio": 18,
+   "camino": [
+    [
+     39,
+     36
+    ],
+    [
+     38,
+     36
+    ],
+    [
+     37,
+     36
+    ],
+    [
+     37,
+     35
+    ],
+    [
+     37,
+     34
+    ],
+    [
+     37,
+     33
+    ],
+    [
+     37,
+     32
+    ],
+    [
+     37,
+     31
+    ],
+    [
+     37,
+     30
+    ],
+    [
+     37,
+     29
+    ],
+    [
+     37,
+     28
+    ],
+    [
+     37,
+     27
+    ],
+    [
+     37,
+     26
+    ],
+    [
+     38,
+     26
+    ],
+    [
+     39,
+     26
+    ]
+   ]
+  },
+  {
+   "paso": 3,
+   "desde": "bain",
+   "hasta": "mentoria",
+   "casillas": 7,
+   "s": 1.46,
+   "s_teclado": 1.67,
+   "manhattan_directo": 7,
+   "acum_casillas": 29,
+   "acum_s": 6.04,
+   "directo_desde_inicio": 21,
+   "camino": [
+    [
+     39,
+     26
+    ],
+    [
+     38,
+     26
+    ],
+    [
+     37,
+     26
+    ],
+    [
+     36,
+     26
+    ],
+    [
+     35,
+     26
+    ],
+    [
+     34,
+     26
+    ],
+    [
+     33,
+     26
+    ],
+    [
+     32,
+     26
+    ]
+   ]
+  },
+  {
+   "paso": 4,
+   "desde": "mentoria",
+   "hasta": "finoa",
+   "casillas": 10,
+   "s": 2.08,
+   "s_teclado": 2.38,
+   "manhattan_directo": 10,
+   "acum_casillas": 39,
+   "acum_s": 8.12,
+   "directo_desde_inicio": 19,
+   "camino": [
+    [
+     32,
+     26
+    ],
+    [
+     31,
+     26
+    ],
+    [
+     30,
+     26
+    ],
+    [
+     29,
+     26
+    ],
+    [
+     28,
+     26
+    ],
+    [
+     27,
+     26
+    ],
+    [
+     26,
+     26
+    ],
+    [
+     25,
+     26
+    ],
+    [
+     24,
+     26
+    ],
+    [
+     24,
+     25
+    ],
+    [
+     24,
+     24
+    ]
+   ]
+  },
+  {
+   "paso": 5,
+   "desde": "finoa",
+   "hasta": "pg",
+   "casillas": 7,
+   "s": 1.46,
+   "s_teclado": 1.67,
+   "manhattan_directo": 7,
+   "acum_casillas": 46,
+   "acum_s": 9.58,
+   "directo_desde_inicio": 12,
+   "camino": [
+    [
+     24,
+     24
+    ],
+    [
+     24,
+     25
+    ],
+    [
+     24,
+     26
+    ],
+    [
+     24,
+     27
+    ],
+    [
+     24,
+     28
+    ],
+    [
+     24,
+     29
+    ],
+    [
+     24,
+     30
+    ],
+    [
+     24,
+     31
+    ]
+   ]
+  }
+ ],
+ "regreso_pg_a_estudio": 12,
+ "bucle_total": 58,
+ "hitos": [
+  {
+   "id": "sambil",
+   "casillas": "x 44–51, y 12–15",
+   "acceso": [
+    47,
+    16
+   ],
+   "desde_inicio": 36,
+   "s": 7.5,
+   "casa_mas_cercana": "volaris",
+   "desde_casa": 28,
+   "tipo": "hito con puerta",
+   "huella": "8×4",
+   "hueco_min_a_edificio": 7
+  },
+  {
+   "id": "catedral",
+   "casillas": "x 12–16, y 12–16",
+   "acceso": [
+    14,
+    17
+   ],
+   "desde_inicio": 36,
+   "s": 7.5,
+   "casa_mas_cercana": "finoa",
+   "desde_casa": 17,
+   "tipo": "hito con puerta",
+   "huella": "5×5",
+   "hueco_min_a_edificio": 6
+  },
+  {
+   "id": "flor",
+   "casillas": "x 42–45, y 45–48",
+   "acceso": [
+    46,
+    46
+   ],
+   "desde_inicio": 25,
+   "s": 5.21,
+   "casa_mas_cercana": "volaris",
+   "desde_casa": 17,
+   "tipo": "hito con puerta",
+   "huella": "4×4",
+   "hueco_min_a_edificio": 7
+  },
+  {
+   "id": "obelisco",
+   "casillas": "x 14–16, y 35–37",
+   "acceso": [
+    17,
+    36
+   ],
+   "desde_inicio": 14,
+   "s": 2.92,
+   "casa_mas_cercana": "pg",
+   "desde_casa": 12,
+   "tipo": "paisaje (sin interior)",
+   "huella": "3×3",
+   "hueco_min_a_edificio": 4
+  },
+  {
+   "id": "redoma",
+   "casillas": "x 45–47, y 35–37",
+   "acceso": [
+    44,
+    36
+   ],
+   "desde_inicio": 13,
+   "s": 2.71,
+   "casa_mas_cercana": "volaris",
+   "desde_casa": 5,
+   "tipo": "paisaje (sin interior)",
+   "huella": "3×3 (isla) + anillo de calle = 5×5",
+   "hueco_min_a_edificio": 4
+  },
+  {
+   "id": "muro",
+   "casillas": "x 35–37, y 40–41",
+   "acceso": [
+    38,
+    41
+   ],
+   "desde_inicio": 10,
+   "s": 2.08,
+   "casa_mas_cercana": "estudio",
+   "desde_casa": 6,
+   "tipo": "paisaje (sin interior)",
+   "huella": "3×2",
+   "hueco_min_a_edificio": 4
+  }
+ ],
+ "cruce": {
+  "casillas": 64,
+  "s_tocar": 13.33,
+  "s_teclado": 15.24,
+  "s_correr": 7.62,
+  "diagonal_esquina_esquina": 126,
+  "diametro_red_caminos": 72,
+  "diametro_par": [
+   [
+    47,
+    16
+   ],
+   [
+    14,
+    17
+   ]
+  ]
+ },
+ "edificios": {
+  "estudio": {
+   "x": 28,
+   "y": 30,
+   "w": 6,
+   "h": 6,
+   "cara_puerta": "+y",
+   "acceso": [
+    31,
+    36
+   ],
+   "paisaje": false,
+   "interior": true
+  },
+  "volaris": {
+   "x": 38,
+   "y": 33,
+   "w": 3,
+   "h": 3,
+   "cara_puerta": "+y",
+   "acceso": [
+    39,
+    36
+   ],
+   "paisaje": false,
+   "interior": true
+  },
+  "bain": {
+   "x": 38,
+   "y": 23,
+   "w": 3,
+   "h": 3,
+   "cara_puerta": "+y",
+   "acceso": [
+    39,
+    26
+   ],
+   "paisaje": false,
+   "interior": true
+  },
+  "mentoria": {
+   "x": 31,
+   "y": 23,
+   "w": 3,
+   "h": 3,
+   "cara_puerta": "+y",
+   "acceso": [
+    32,
+    26
+   ],
+   "paisaje": false,
+   "interior": true
+  },
+  "finoa": {
+   "x": 21,
+   "y": 23,
+   "w": 3,
+   "h": 3,
+   "cara_puerta": "+x",
+   "acceso": [
+    24,
+    24
+   ],
+   "paisaje": false,
+   "interior": true
+  },
+  "pg": {
+   "x": 21,
+   "y": 30,
+   "w": 3,
+   "h": 3,
+   "cara_puerta": "+x",
+   "acceso": [
+    24,
+    31
+   ],
+   "paisaje": false,
+   "interior": true
+  },
+  "sambil": {
+   "x": 44,
+   "y": 12,
+   "w": 8,
+   "h": 4,
+   "cara_puerta": "+y",
+   "acceso": [
+    47,
+    16
+   ],
+   "paisaje": false,
+   "interior": true
+  },
+  "catedral": {
+   "x": 12,
+   "y": 12,
+   "w": 5,
+   "h": 5,
+   "cara_puerta": "+y",
+   "acceso": [
+    14,
+    17
+   ],
+   "paisaje": false,
+   "interior": true
+  },
+  "flor": {
+   "x": 42,
+   "y": 45,
+   "w": 4,
+   "h": 4,
+   "cara_puerta": "+x",
+   "acceso": [
+    46,
+    46
+   ],
+   "paisaje": false,
+   "interior": true
+  },
+  "obelisco": {
+   "x": 14,
+   "y": 35,
+   "w": 3,
+   "h": 3,
+   "cara_puerta": null,
+   "acceso": [
+    17,
+    36
+   ],
+   "paisaje": true,
+   "interior": false
+  },
+  "redoma": {
+   "x": 45,
+   "y": 35,
+   "w": 3,
+   "h": 3,
+   "cara_puerta": null,
+   "acceso": [
+    44,
+    36
+   ],
+   "paisaje": true,
+   "interior": false
+  },
+  "muro": {
+   "x": 35,
+   "y": 40,
+   "w": 3,
+   "h": 2,
+   "cara_puerta": null,
+   "acceso": [
+    38,
+    41
+   ],
+   "paisaje": true,
+   "interior": false
+  }
+ },
+ "separacion": {
+  "minimo_exigido": 4,
+  "minimo_real": 4,
+  "pares": [
+   [
+    4,
+    "bain",
+    "mentoria"
+   ],
+   [
+    4,
+    "estudio",
+    "bain"
+   ],
+   [
+    4,
+    "estudio",
+    "finoa"
+   ],
+   [
+    4,
+    "estudio",
+    "mentoria"
+   ],
+   [
+    4,
+    "estudio",
+    "pg"
+   ],
+   [
+    4,
+    "estudio",
+    "volaris"
+   ],
+   [
+    4,
+    "finoa",
+    "pg"
+   ],
+   [
+    4,
+    "pg",
+    "obelisco"
+   ]
+  ]
+ },
+ "redoma_anillo": [
+  [
+   44,
+   34
+  ],
+  [
+   44,
+   35
+  ],
+  [
+   44,
+   36
+  ],
+  [
+   44,
+   37
+  ],
+  [
+   44,
+   38
+  ],
+  [
+   45,
+   34
+  ],
+  [
+   45,
+   38
+  ],
+  [
+   46,
+   34
+  ],
+  [
+   46,
+   38
+  ],
+  [
+   47,
+   34
+  ],
+  [
+   47,
+   38
+  ],
+  [
+   48,
+   34
+  ],
+  [
+   48,
+   35
+  ],
+  [
+   48,
+   36
+  ],
+  [
+   48,
+   37
+  ],
+  [
+   48,
+   38
+  ]
+ ],
+ "escala": {
+  "nota": "64×64: entre 52 (estudio Tom 7×5 u = casa) y 73 (tiendas 4,26 u = casa); ver size-research/tomjohn-map-size.md",
+  "unidades_tom_por_casilla": 1.625,
+  "m_por_casilla": 3.07
+ },
+ "v1_comparacion": {
+  "mapa": "30×30",
+  "tramos": [
+   6,
+   13,
+   6,
+   7,
+   10
+  ],
+  "acum": 42
+ },
+ "errores": []
+}
