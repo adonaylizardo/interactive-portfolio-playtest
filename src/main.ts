@@ -118,8 +118,8 @@ async function main(): Promise<void> {
       return raw ? JSON.parse(raw) : null;
     },
     setZoom: (z: number) => scene.setZoomLevel(z),
-    interiorTileScreenPoint: (tx: number, ty: number) =>
-      scene.getInteriorTileScreenClientPoint(tx, ty),
+    interiorTileScreenPoint: (tx: number, ty: number, liftPx = 0) =>
+      scene.getInteriorTileScreenClientPoint(tx, ty, liftPx),
     interiorForwardScreenPoint: () => scene.getInteriorForwardScreenPoint(),
     tapInteriorTile: (tx: number, ty: number) => scene.tapInteriorTileForQa(tx, ty),
     expandInteriorSheet: () => panel.expandInteriorSheetForQa(),

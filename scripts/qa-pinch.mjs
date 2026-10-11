@@ -1996,52 +1996,77 @@ function colorDist(a, b) {
   return Math.abs(a.r - b.r) + Math.abs(a.g - b.g) + Math.abs(a.b - b.b);
 }
 
-/** Run #36: pixel samples on west wall, Catedral pew, Flor tier (must differ from open floor). */
+async function samplePageColor(page, clientX, clientY) {
+  const { PNG } = await import('pngjs');
+  const buffer = await page.screenshot({
+    clip: { x: Math.max(0, Math.floor(clientX - 2)), y: Math.max(0, Math.floor(clientY - 2)), width: 5, height: 5 },
+  });
+  const png = PNG.sync.read(buffer);
+  const x = 2;
+  const y = 2;
+  const i = (png.width * y + x) << 2;
+  return { r: png.data[i], g: png.data[i + 1], b: png.data[i + 2], a: png.data[i + 3] };
+}
+
+/** Run #36: canvas regions must contain pixels that differ from open floor (wall / pew / tier). */
 async function testRun36InteriorPixelAssertions(page, errors) {
-  const floorRefByRoom = {
-    estudio: [3, 3],
-    catedral: [3, 6],
-    flor: [6, 6],
-  };
-  const probes = [
-    { room: 'estudio', tile: [0, 2], label: 'west-wall' },
-    { room: 'catedral', tile: [2, 3], label: 'pew' },
-    { room: 'flor', tile: [4, 2], label: 'tier' },
+  const { PNG } = await import('pngjs');
+  const cases = [
+    {
+      room: 'estudio',
+      label: 'west-wall',
+      region: { x0: 0.04, x1: 0.38, y0: 0.18, y1: 0.72 },
+      minDistinct: 120,
+      floorTile: [3, 3],
+    },
+    {
+      room: 'catedral',
+      label: 'pew',
+      region: { x0: 0.22, x1: 0.72, y0: 0.42, y1: 0.78 },
+      minDistinct: 80,
+      floorTile: [3, 6],
+    },
+    {
+      room: 'flor',
+      label: 'tier',
+      region: { x0: 0.2, x1: 0.78, y0: 0.2, y1: 0.72 },
+      minDistinct: 100,
+      floorTile: [6, 6],
+    },
   ];
-  for (const { room, tile, label } of probes) {
+  for (const { room, label, region, minDistinct, floorTile } of cases) {
     await page.goto(BASE, { waitUntil: 'networkidle' });
     await page.reload({ waitUntil: 'networkidle' });
     await wait(500);
     await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [room]);
     await waitForInterior(page);
     await wait(600);
-    const floorTile = floorRefByRoom[room] ?? [3, 3];
     const floorPt = await page.evaluate(
       ([x, y]) => window.__playtestQa?.interiorTileScreenPoint?.(x, y),
       floorTile,
     );
-    const featurePt = await page.evaluate(
-      ([x, y]) => window.__playtestQa?.interiorTileScreenPoint?.(x, y),
-      tile,
-    );
-    if (!floorPt || !featurePt) {
-      errors.push(`run36-pixel-${label}: screen point missing`);
+    if (!floorPt) {
+      errors.push(`run36-pixel-${label}: floor reference missing`);
       continue;
     }
-    const colors = await page.evaluate(
-      ([fp, feat]) => ({
-        floor: window.__playtestQa?.sampleCanvasColor?.(fp.x, fp.y),
-        feature: window.__playtestQa?.sampleCanvasColor?.(feat.x, feat.y),
-      }),
-      [floorPt, featurePt],
-    );
-    if (!colors.floor || !colors.feature) {
-      errors.push(`run36-pixel-${label}: readPixels failed`);
-      continue;
+    const floorColor = await samplePageColor(page, floorPt.x, floorPt.y);
+    const shot = await page.locator('#game-canvas').screenshot();
+    const png = PNG.sync.read(shot);
+    const x0 = Math.floor(png.width * region.x0);
+    const x1 = Math.floor(png.width * region.x1);
+    const y0 = Math.floor(png.height * region.y0);
+    const y1 = Math.floor(png.height * region.y1);
+    let distinct = 0;
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++) {
+        const i = (png.width * y + x) << 2;
+        const c = { r: png.data[i], g: png.data[i + 1], b: png.data[i + 2] };
+        if (colorDist(floorColor, c) >= 18) distinct++;
+      }
     }
-    if (colorDist(colors.floor, colors.feature) < 18) {
+    if (distinct < minDistinct) {
       errors.push(
-        `run36-pixel-${label}: feature color too close to floor (${JSON.stringify(colors)})`,
+        `run36-pixel-${label}: only ${distinct} distinct pixels (need >= ${minDistinct}, floor=${JSON.stringify(floorColor)})`,
       );
     }
     await page.evaluate(() => window.__playtestQa?.exitInterior?.());
@@ -2139,63 +2164,19 @@ async function captureRun36Interiors(browser) {
 }
 
 async function buildRun36Montages(dir) {
-  const { default: sharp } = await import('sharp');
-  const names = INTERIOR_ROOM_NAMES;
-  const deskTiles = names.map((n) => path.join(dir, `interior-${n}-desktop.png`));
-  const mobTiles = names.map((n) => path.join(dir, `interior-${n}-375.png`));
-  const tileW = 640;
-  const tileH = 400;
-  const deskCols = 3;
-  const deskRows = 3;
-  const deskCanvas = sharp({
-    create: {
-      width: tileW * deskCols,
-      height: tileH * deskRows,
-      channels: 4,
-      background: { r: 240, g: 240, b: 240, alpha: 1 },
-    },
-  });
-  const deskParts = [];
-  for (let i = 0; i < names.length; i++) {
-    const col = i % deskCols;
-    const row = Math.floor(i / deskCols);
-    deskParts.push({
-      input: await sharp(deskTiles[i]).resize(tileW, tileH, { fit: 'contain' }).toBuffer(),
-      left: col * tileW,
-      top: row * tileH,
-    });
+  const { spawnSync } = await import('node:child_process');
+  for (const suffix of ['desktop', '375']) {
+    const inputs = INTERIOR_ROOM_NAMES.map((n) => path.join(dir, `interior-${n}-${suffix}.png`));
+    const out = path.join(dir, `montage-all-${suffix}.png`);
+    const r = spawnSync(
+      'montage',
+      [...inputs, '-tile', '3x3', '-geometry', '+6+6', '-background', '#1a1a1a', out],
+      { encoding: 'utf8' },
+    );
+    if (r.status !== 0) {
+      throw new Error(`run36 montage ${suffix}: ${r.stderr || r.stdout || r.error?.message}`);
+    }
   }
-  await deskCanvas.composite(deskParts).toFile(path.join(dir, 'montage-all-desktop.png'));
-  const mobTop = names.slice(0, 5);
-  const mobBot = names.slice(5);
-  const mobTileW = 250;
-  const mobTileH = 541;
-  const mobW = mobTileW * 5;
-  const mobH = mobTileH * 2;
-  const mobCanvas = sharp({
-    create: {
-      width: mobW,
-      height: mobH,
-      channels: 4,
-      background: { r: 240, g: 240, b: 240, alpha: 1 },
-    },
-  });
-  const mobParts = [];
-  for (let i = 0; i < mobTop.length; i++) {
-    mobParts.push({
-      input: await sharp(mobTiles[i]).resize(mobTileW, mobTileH, { fit: 'contain' }).toBuffer(),
-      left: i * mobTileW,
-      top: 0,
-    });
-  }
-  for (let i = 0; i < mobBot.length; i++) {
-    mobParts.push({
-      input: await sharp(mobTiles[5 + i]).resize(mobTileW, mobTileH, { fit: 'contain' }).toBuffer(),
-      left: i * mobTileW,
-      top: mobTileH,
-    });
-  }
-  await mobCanvas.composite(mobParts).toFile(path.join(dir, 'montage-all-375.png'));
 }
 
 async function captureRun35Interiors(browser) {

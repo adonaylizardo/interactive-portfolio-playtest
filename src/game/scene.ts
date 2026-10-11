@@ -2160,10 +2160,14 @@ export class IsoScene {
   }
 
   /** QA: client point for an interior grid tile (same space as tapScreen). */
-  getInteriorTileScreenClientPoint(tx: number, ty: number): { x: number; y: number } | null {
+  getInteriorTileScreenClientPoint(
+    tx: number,
+    ty: number,
+    liftPx = 0,
+  ): { x: number; y: number } | null {
     if (!this.interiorDef || !this.canvasEl) return null;
     const foot = tileFootWorld(tx, ty);
-    const screen = this.worldToScreen(foot.x, foot.y - TILE_H / 2);
+    const screen = this.worldToScreen(foot.x, foot.y - TILE_H / 2 - liftPx);
     const rect = this.canvasEl.getBoundingClientRect();
     return { x: rect.left + screen.x, y: rect.top + screen.y };
   }
@@ -2197,12 +2201,15 @@ export class IsoScene {
     this.app.render();
     const rect = canvas.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return null;
-    const x = Math.floor((clientX - rect.left) * (canvas.width / rect.width));
-    const y = Math.floor((clientY - rect.top) * (canvas.height / rect.height));
-    const gl = canvas.getContext('webgl2') ?? canvas.getContext('webgl');
-    if (!gl) return null;
-    const pixel = new Uint8Array(4);
-    gl.readPixels(x, canvas.height - 1 - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-    return { r: pixel[0], g: pixel[1], b: pixel[2], a: pixel[3] };
+    const sx = (clientX - rect.left) * (canvas.width / rect.width);
+    const sy = (clientY - rect.top) * (canvas.height / rect.height);
+    const tmp = document.createElement('canvas');
+    tmp.width = 1;
+    tmp.height = 1;
+    const ctx = tmp.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(canvas, Math.floor(sx), Math.floor(sy), 1, 1, 0, 0, 1, 1);
+    const d = ctx.getImageData(0, 0, 1, 1).data;
+    return { r: d[0], g: d[1], b: d[2], a: d[3] };
   }
 }
