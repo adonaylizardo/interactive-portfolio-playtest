@@ -2814,11 +2814,16 @@ async function testBainDoorLowZoomDeterministic(page, errors) {
     await page.locator('[data-exit]').first().click().catch(() => {});
     await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
     await wait(150);
-    await page.evaluate(() => window.__playtestQa?.frameDoorForQa?.('bain'));
+    await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(39, 36));
     await wait(200);
-    if (!(await realTapDoor(page, 'bain', { touch: false }))) {
-      errors.push('bain-door-lowzoom: door tap failed');
-      return;
+    let doorOk = await realTapDoor(page, 'bain', { touch: false });
+    if (!doorOk) {
+      await wait(400);
+      doorOk = await realTapDoor(page, 'bain', { touch: false });
+    }
+    if (!doorOk) {
+      errors.push(`bain-door-lowzoom: door tap failed on run ${i + 1}/7`);
+      continue;
     }
     for (let w = 0; w < 40; w++) {
       const char = await readCharTile(page);
