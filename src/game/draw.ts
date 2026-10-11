@@ -459,16 +459,14 @@ export function drawMuro(
 
   const backOuterA = meet;
   const backOuterB = backEnd;
-  const backInnerA = lerpPt(backOuterA, backInRef, thick);
-  const backInnerB = lerpPt(backOuterB, backInRef, thick);
-
   const leftOuterA = meet;
   const leftOuterB = leftEnd;
-  const leftInnerA = lerpPt(leftOuterA, leftInRef, thick);
-  const leftInnerB = lerpPt(leftOuterB, leftInRef, thick);
+  void thick;
+  void backInRef;
+  void leftInRef;
 
-  poly(g, [backInnerA, backInnerB, raise(backInnerB, wallH), raise(backInnerA, wallH)], plank);
-  poly(g, [leftInnerA, leftInnerB, raise(leftInnerB, wallH), raise(leftInnerA, wallH)], plank);
+  poly(g, [backOuterA, backOuterB, raise(backOuterB, wallH), raise(backOuterA, wallH)], plank);
+  poly(g, [leftOuterA, leftOuterB, raise(leftOuterB, wallH), raise(leftOuterA, wallH)], plank);
 }
 
 export function drawRedoma(

@@ -1,6 +1,6 @@
 import { Graphics } from 'pixi.js';
 import { TILE_H, TILE_W } from '../data/world';
-import { tileFootWorld, worldToTile } from '../iso/math';
+import { tileFootWorld } from '../iso/math';
 import { drawCharacter } from './draw';
 
 export const INTERIOR_BUILDING_IDS = [
@@ -190,7 +190,10 @@ function drawIsoBlock(
 
 /** NW walkable corner — both back walls meet at grid (0,0). */
 const CASE_CORNER = { x: 1, y: 1, w: 2, h: 2 };
-const WEST_FACE_DEPTH = TILE_W * 0.44;
+/** Extruded west face visible from the default SE camera. */
+const WEST_FACE_DEPTH = TILE_W * 0.72;
+const FLOOR_A = 0xc8c8c8;
+const FLOOR_B = 0xb8b8b8;
 /** ~1.5–2× character silhouette (~52px). */
 const CASE_PROP_H = 58;
 
@@ -284,16 +287,6 @@ function drawIdentityProps(g: Graphics, def: InteriorDef): void {
 
   if (def.id === 'catedral') {
     drawIsoBlock(g, 2, 0, 4, 1, 52, 0x8a8a8a, 0xc8c8c8);
-    const pewSeat = 0x4a4540;
-    const pewTop = 0x7a7268;
-    for (let row = 2; row <= 5; row++) {
-      for (const col of [1, 2, 5, 6]) {
-        const h = 20 + (5 - row) * 2;
-        drawIsoBlock(g, col, row, 1, 1, h, pewSeat, pewTop);
-      }
-    }
-    drawIsoBlock(g, 3, 1, 1, 1, 18, pewSeat, pewTop);
-    drawIsoBlock(g, 4, 1, 1, 1, 18, pewSeat, pewTop);
   } else if (def.id === 'sambil') {
     const water = 0x7aa8bc;
     const waterDark = 0x5a8898;
@@ -331,19 +324,9 @@ function drawIdentityProps(g: Graphics, def: InteriorDef): void {
       [raise(wn, screenH - 14), raise(ws, screenH - 14), raise(ws, screenH), raise(wn, screenH)],
       0x444455,
     );
-    drawIsoBlock(g, 1, 1, 2, 2, 28, 0x585858, 0x787878);
-    drawIsoBlock(g, 1, 0, 2, 1, 44, 0x454545, 0x656565);
-    const tierRows: { y: number; h: number; cols: number[] }[] = [
-      { y: 5, h: 12, cols: [2, 3] },
-      { y: 4, h: 18, cols: [2, 3, 4] },
-      { y: 3, h: 24, cols: [3, 4, 5] },
-      { y: 2, h: 30, cols: [4, 5, 6] },
-    ];
-    for (const row of tierRows) {
-      for (const x of row.cols) {
-        drawIsoBlock(g, x, row.y, 1, 1, row.h, 0x656565, 0x909090);
-      }
-    }
+    drawIsoBlock(g, 1, 1, 2, 2, 34, 0x484848, 0x707070);
+    drawIsoBlock(g, 0, 0, 2, 2, 8, 0x404040, 0x585858);
+    drawIsoBlock(g, 1, 0, 2, 1, 48, 0x3a3a3a, 0x555555);
   } else if (def.id === 'estudio') {
     drawCaseCornerProp(g, 0x8a7868, 'desk', 0x9a8a7a, propLight);
   } else if (def.id === 'volaris') {
@@ -393,18 +376,18 @@ function drawExitMat(g: Graphics, def: InteriorDef): void {
   g.fill(frame);
 }
 
-/** Gray dollhouse cutaway — per-building props; back (-x,-y) tall, front (+x,+y) low plinth. */
-export function drawInteriorRoom(g: Graphics, def: InteriorDef): void {
-  const floor = 0xc8c8c8;
-  const floorDark = 0xb8b8b8;
-  const wallBack = 0x9a9a9a;
-  const wallSide = 0x8e8e8e;
-  const wallFront = 0xa0a0a0;
+function westOut(nw: Pt, sw: Pt): { nwO: Pt; swO: Pt } {
+  return {
+    nwO: { x: nw.x - WEST_FACE_DEPTH, y: nw.y + TILE_H * 0.12 },
+    swO: { x: sw.x - WEST_FACE_DEPTH, y: sw.y + TILE_H * 0.12 },
+  };
+}
 
+function paintInteriorFloor(g: Graphics, def: InteriorDef): void {
   for (let ty = 0; ty < def.h; ty++) {
     for (let tx = 0; tx < def.w; tx++) {
       const pos = localFoot(tx, ty);
-      const fill = (tx + ty) % 2 === 0 ? floor : floorDark;
+      const fill = (tx + ty) % 2 === 0 ? FLOOR_A : FLOOR_B;
       g.moveTo(pos.x, pos.y);
       g.lineTo(pos.x + TILE_W / 2, pos.y - TILE_H / 2);
       g.lineTo(pos.x, pos.y - TILE_H);
@@ -413,6 +396,13 @@ export function drawInteriorRoom(g: Graphics, def: InteriorDef): void {
       g.fill(fill);
     }
   }
+}
+
+function paintInteriorWalls(g: Graphics, def: InteriorDef): void {
+  const wallBack = 0x9a9a9a;
+  const wallSide = 0x848484;
+  const wallFront = 0xa0a0a0;
+  const meet = northTop(0, 0);
 
   for (let tx = 0; tx < def.w; tx++) {
     const nw = northTop(tx, 0);
@@ -420,22 +410,24 @@ export function drawInteriorRoom(g: Graphics, def: InteriorDef): void {
     poly(g, [nw, ne, raise(ne, def.backWallH), raise(nw, def.backWallH)], wallBack);
   }
 
+  const faceShift = TILE_W * 0.2;
+  const faceDrop = TILE_H * 0.1;
   for (let ty = 0; ty < def.h; ty++) {
     const sw = localFoot(0, ty);
     const nw = northTop(0, ty);
-    const swOut = { x: sw.x - WEST_FACE_DEPTH * 0.52, y: sw.y + TILE_H * 0.06 };
-    const nwOut = { x: nw.x - WEST_FACE_DEPTH * 0.52, y: nw.y + TILE_H * 0.06 };
-    poly(g, [swOut, nwOut, raise(nwOut, def.backWallH), raise(swOut, def.backWallH)], wallSide);
-    poly(g, [sw, nw, raise(nw, def.backWallH), raise(sw, def.backWallH)], 0x858585);
+    const { nwO, swO } = westOut(nw, sw);
+    poly(g, [swO, nwO, raise(nwO, def.backWallH), raise(swO, def.backWallH)], wallSide);
+    const swF = { x: sw.x + faceShift, y: sw.y + faceDrop };
+    const nwF = { x: nw.x + faceShift, y: nw.y + faceDrop };
+    poly(g, [swF, nwF, raise(nwF, def.backWallH), raise(swF, def.backWallH)], 0x7a7a7a);
+    poly(g, [sw, nw, raise(nw, def.backWallH), raise(sw, def.backWallH)], 0x6e6e6e);
   }
   {
-    const nw0 = northTop(0, 0);
-    const nwOut0 = { x: nw0.x - WEST_FACE_DEPTH * 0.52, y: nw0.y + TILE_H * 0.06 };
-    poly(
-      g,
-      [nwOut0, nw0, raise(nw0, def.backWallH), raise(nwOut0, def.backWallH)],
-      0x828282,
-    );
+    const nw0 = meet;
+    const sw0 = localFoot(0, 0);
+    const { nwO, swO } = westOut(nw0, sw0);
+    poly(g, [nwO, nw0, meet, raise(meet, def.backWallH), raise(nwO, def.backWallH)], 0x828282);
+    poly(g, [swO, nwO, raise(nwO, def.backWallH), raise(swO, def.backWallH)], wallSide);
   }
 
   for (let ty = 0; ty < def.h; ty++) {
@@ -452,9 +444,74 @@ export function drawInteriorRoom(g: Graphics, def: InteriorDef): void {
     const se = localFoot(tx + 1, ty);
     poly(g, [sw, se, raise(se, def.plinthH), raise(sw, def.plinthH)], wallFront);
   }
+}
 
+function drawPewBench(g: Graphics, tx: number, ty: number): void {
+  drawIsoBlock(g, tx, ty, 1, 1, 32, 0x3a352e, 0x6a5f54);
+}
+
+function drawFlorTier(g: Graphics, room: InteriorDef, tx: number, ty: number): void {
+  const h = 12 + (defFlorTierHeight(room, tx, ty) ?? 10);
+  drawIsoBlock(g, tx, ty, 1, 1, h, 0x555555, 0xababab);
+}
+
+function defFlorTierHeight(_room: InteriorDef, tx: number, ty: number): number | null {
+  const tiers: { y: number; h: number; cols: number[] }[] = [
+    { y: 5, h: 12, cols: [2, 3] },
+    { y: 4, h: 20, cols: [2, 3, 4] },
+    { y: 3, h: 28, cols: [3, 4, 5] },
+    { y: 2, h: 36, cols: [4, 5, 6] },
+  ];
+  for (const row of tiers) {
+    if (row.y === ty && row.cols.includes(tx)) return row.h;
+  }
+  return null;
+}
+
+function drawBlockedTileMeshes(g: Graphics, def: InteriorDef, grid: InteriorCell[][]): void {
+  for (let y = 0; y < def.h; y++) {
+    for (let x = 0; x < def.w; x++) {
+      if (grid[y][x].walkable || isPerimeterShell(def, x, y)) continue;
+      if (def.id === 'catedral') {
+        drawPewBench(g, x, y);
+      } else if (def.id === 'flor' && defFlorTierHeight(def, x, y) != null) {
+        drawFlorTier(g, def, x, y);
+      } else if (def.id === 'sambil' && x >= 5 && x < def.w - 1 && y >= 1 && y < def.h - 1 && y !== 4) {
+        /* water drawn in identity */
+      }
+    }
+  }
+}
+
+function paintInteriorProps(g: Graphics, def: InteriorDef): void {
+  g.alpha = 1;
+  const grid = buildInteriorGrid(def);
   drawIdentityProps(g, def);
+  drawBlockedTileMeshes(g, def, grid);
   drawExitMat(g, def);
+}
+
+export function drawInteriorFloor(g: Graphics, def: InteriorDef): void {
+  g.clear();
+  paintInteriorFloor(g, def);
+}
+
+export function drawInteriorWalls(g: Graphics, def: InteriorDef): void {
+  g.clear();
+  paintInteriorWalls(g, def);
+}
+
+export function drawInteriorProps(g: Graphics, def: InteriorDef): void {
+  g.clear();
+  paintInteriorProps(g, def);
+}
+
+/** Single-buffer draw (floor → walls → props). Prefer layered gfx in scene. */
+export function drawInteriorRoom(g: Graphics, def: InteriorDef): void {
+  g.clear();
+  paintInteriorFloor(g, def);
+  paintInteriorWalls(g, def);
+  paintInteriorProps(g, def);
 }
 
 export function interiorWorldBounds(def: InteriorDef): {
@@ -577,23 +634,39 @@ export function syncInteriorCharacter(
   g.position.set(pos.x, pos.y);
 }
 
-/** Exit mat / doorway — generous so real clicks on the cream tile always exit. */
+/** Nearest interior tile to a world point (matches visual tile diamonds, fixes touch offset). */
+export function interiorPickTile(
+  def: InteriorDef,
+  worldX: number,
+  worldY: number,
+): { x: number; y: number } | null {
+  let best: { x: number; y: number } | null = null;
+  let bestD = Infinity;
+  for (let y = 0; y < def.h; y++) {
+    for (let x = 0; x < def.w; x++) {
+      const f = tileFootWorld(x, y);
+      const cx = f.x;
+      const cy = f.y - TILE_H / 2;
+      const d = Math.hypot(worldX - cx, worldY - cy);
+      if (d < bestD) {
+        bestD = d;
+        best = { x, y };
+      }
+    }
+  }
+  if (bestD > TILE_W * 0.42) return null;
+  return best;
+}
+
+/** Exit only on the exit tile (same rule for touch and mouse). */
 export function interiorHitExit(
   def: InteriorDef,
   worldX: number,
   worldY: number,
-  zoom: number,
+  _zoom: number,
 ): boolean {
-  const f = tileFootWorld(def.exit.x, def.exit.y);
-  const cx = f.x;
-  const cy = f.y - TILE_H * 0.38;
-  const r = Math.max(28, 52 / Math.max(zoom, 0.25));
-  if (Math.hypot(worldX - cx, worldY - cy) <= r) return true;
-  const tile = worldToTile(worldX, worldY);
-  if (!tile) return false;
-  if (tile.x === def.exit.x && tile.y === def.exit.y) return true;
-  if (tile.y === def.exit.y && Math.abs(tile.x - def.exit.x) === 1) return true;
-  return false;
+  const pick = interiorPickTile(def, worldX, worldY);
+  return pick != null && pick.x === def.exit.x && pick.y === def.exit.y;
 }
 
 /** @deprecated use interiorHitExit */

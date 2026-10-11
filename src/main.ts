@@ -129,6 +129,8 @@ async function main(): Promise<void> {
       const def = getInteriorDef(name);
       return def ? interiorBlockedTilesHaveProps(def) : false;
     },
+    sampleCanvasColor: (clientX: number, clientY: number) =>
+      scene.sampleCanvasColorAtClient(clientX, clientY),
   };
 }
 

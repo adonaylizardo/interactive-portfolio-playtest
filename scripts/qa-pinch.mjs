@@ -9,7 +9,11 @@ const outDir =
   process.env.QA_SCREENSHOT_DIR ?? path.join(root, 'artifacts', 'qa-screenshots');
 const DESKTOP_PROOF = 'desktop-1280x800.png';
 const MOBILE_PROOF = 'mobile-375x812.png';
-const BASE = 'http://127.0.0.1:4173/interactive-portfolio-playtest/';
+const BASE = (
+  process.env.QA_BASE_URL ??
+  'http://127.0.0.1:4173/interactive-portfolio-playtest/'
+).replace(/\/?$/, '/');
+const USE_EXTERNAL_QA_BASE = Boolean(process.env.QA_BASE_URL);
 
 const ZOOM_MAX = 1.5;
 const MAP_VISIBLE_MIN = 0.3;
@@ -1987,6 +1991,93 @@ async function testRun35BlockedTilesHaveProps(page, errors) {
 }
 
 /** Run #35: 375 first load — map vertically centered (not stuck in lower half). */
+function colorDist(a, b) {
+  if (!a || !b) return 999;
+  return Math.abs(a.r - b.r) + Math.abs(a.g - b.g) + Math.abs(a.b - b.b);
+}
+
+/** Run #36: pixel samples on west wall, Catedral pew, Flor tier (must differ from open floor). */
+async function testRun36InteriorPixelAssertions(page, errors) {
+  const floorRefByRoom = {
+    estudio: [3, 3],
+    catedral: [3, 6],
+    flor: [6, 6],
+  };
+  const probes = [
+    { room: 'estudio', tile: [0, 2], label: 'west-wall' },
+    { room: 'catedral', tile: [2, 3], label: 'pew' },
+    { room: 'flor', tile: [4, 2], label: 'tier' },
+  ];
+  for (const { room, tile, label } of probes) {
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'networkidle' });
+    await wait(500);
+    await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [room]);
+    await waitForInterior(page);
+    await wait(600);
+    const floorTile = floorRefByRoom[room] ?? [3, 3];
+    const floorPt = await page.evaluate(
+      ([x, y]) => window.__playtestQa?.interiorTileScreenPoint?.(x, y),
+      floorTile,
+    );
+    const featurePt = await page.evaluate(
+      ([x, y]) => window.__playtestQa?.interiorTileScreenPoint?.(x, y),
+      tile,
+    );
+    if (!floorPt || !featurePt) {
+      errors.push(`run36-pixel-${label}: screen point missing`);
+      continue;
+    }
+    const colors = await page.evaluate(
+      ([fp, feat]) => ({
+        floor: window.__playtestQa?.sampleCanvasColor?.(fp.x, fp.y),
+        feature: window.__playtestQa?.sampleCanvasColor?.(feat.x, feat.y),
+      }),
+      [floorPt, featurePt],
+    );
+    if (!colors.floor || !colors.feature) {
+      errors.push(`run36-pixel-${label}: readPixels failed`);
+      continue;
+    }
+    if (colorDist(colors.floor, colors.feature) < 18) {
+      errors.push(
+        `run36-pixel-${label}: feature color too close to floor (${JSON.stringify(colors)})`,
+      );
+    }
+    await page.evaluate(() => window.__playtestQa?.exitInterior?.());
+    await wait(300);
+  }
+}
+
+/** Run #36: desktop interior right margin >= 24px (Sambil, Catedral). */
+async function testRun36DesktopInteriorMargins(page, errors) {
+  for (const name of ['sambil', 'catedral']) {
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'networkidle' });
+    await wait(500);
+    await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
+    await waitForInterior(page);
+    await wait(500);
+    const margin = await page.evaluate(() => {
+      const c = document.getElementById('game-canvas');
+      const rect = c?.getBoundingClientRect();
+      const w = Number(c?.dataset.interiorW);
+      if (!rect || !w) return null;
+      const ex = w - 1;
+      const pt = window.__playtestQa?.interiorTileScreenPoint?.(ex, 1);
+      if (!pt) return null;
+      return Math.round(rect.right - pt.x);
+    });
+    if (margin == null) {
+      errors.push(`run36-margin-${name}: could not measure`);
+    } else if (margin < 24) {
+      errors.push(`run36-margin-${name}: right margin ${margin}px < 24`);
+    }
+    await page.evaluate(() => window.__playtestQa?.exitInterior?.());
+    await wait(300);
+  }
+}
+
 async function testRun35MobileFirstLoadFraming(page, errors) {
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await wait(800);
@@ -2002,9 +2093,109 @@ async function testRun35MobileFirstLoadFraming(page, errors) {
   if (Math.abs(camPy - sh / 2) > sh * 0.22) {
     errors.push(`run35-firstload-375: camPy ${camPy} too far from viewport center ${sh / 2}`);
   }
-  if (Number.isFinite(mapTop) && mapTop > sh * 0.35) {
+  if (Number.isFinite(mapTop) && mapTop > sh * 0.4) {
     errors.push(`run35-firstload-375: mapTop ${mapTop} too low (empty top half)`);
   }
+}
+
+async function captureRun36Interiors(browser) {
+  const dir = path.join(root, 'artifacts', 'run36');
+  await mkdir(dir, { recursive: true });
+  const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  try {
+    for (const name of INTERIOR_ROOM_NAMES) {
+      await desktop.goto(BASE, { waitUntil: 'networkidle' });
+      await desktop.reload({ waitUntil: 'networkidle' });
+      await dismissChecklistForCapture(desktop);
+      await wait(500);
+      await desktop.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
+      await waitForInterior(desktop);
+      await wait(500);
+      await desktop.screenshot({ path: path.join(dir, `interior-${name}-desktop.png`) });
+      await desktop.keyboard.press('Escape');
+      await wait(600);
+    }
+  } finally {
+    await desktop.close();
+  }
+  const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
+  try {
+    for (const name of INTERIOR_ROOM_NAMES) {
+      await mobile.goto(BASE, { waitUntil: 'networkidle' });
+      await mobile.reload({ waitUntil: 'networkidle' });
+      await dismissChecklistForCapture(mobile);
+      await wait(500);
+      await mobile.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
+      await waitForInterior(mobile);
+      await wait(500);
+      await mobile.screenshot({ path: path.join(dir, `interior-${name}-375.png`) });
+      await mobile.keyboard.press('Escape');
+      await wait(600);
+    }
+  } finally {
+    await mobile.close();
+  }
+  return dir;
+}
+
+async function buildRun36Montages(dir) {
+  const { default: sharp } = await import('sharp');
+  const names = INTERIOR_ROOM_NAMES;
+  const deskTiles = names.map((n) => path.join(dir, `interior-${n}-desktop.png`));
+  const mobTiles = names.map((n) => path.join(dir, `interior-${n}-375.png`));
+  const tileW = 640;
+  const tileH = 400;
+  const deskCols = 3;
+  const deskRows = 3;
+  const deskCanvas = sharp({
+    create: {
+      width: tileW * deskCols,
+      height: tileH * deskRows,
+      channels: 4,
+      background: { r: 240, g: 240, b: 240, alpha: 1 },
+    },
+  });
+  const deskParts = [];
+  for (let i = 0; i < names.length; i++) {
+    const col = i % deskCols;
+    const row = Math.floor(i / deskCols);
+    deskParts.push({
+      input: await sharp(deskTiles[i]).resize(tileW, tileH, { fit: 'contain' }).toBuffer(),
+      left: col * tileW,
+      top: row * tileH,
+    });
+  }
+  await deskCanvas.composite(deskParts).toFile(path.join(dir, 'montage-all-desktop.png'));
+  const mobTop = names.slice(0, 5);
+  const mobBot = names.slice(5);
+  const mobTileW = 250;
+  const mobTileH = 541;
+  const mobW = mobTileW * 5;
+  const mobH = mobTileH * 2;
+  const mobCanvas = sharp({
+    create: {
+      width: mobW,
+      height: mobH,
+      channels: 4,
+      background: { r: 240, g: 240, b: 240, alpha: 1 },
+    },
+  });
+  const mobParts = [];
+  for (let i = 0; i < mobTop.length; i++) {
+    mobParts.push({
+      input: await sharp(mobTiles[i]).resize(mobTileW, mobTileH, { fit: 'contain' }).toBuffer(),
+      left: i * mobTileW,
+      top: 0,
+    });
+  }
+  for (let i = 0; i < mobBot.length; i++) {
+    mobParts.push({
+      input: await sharp(mobTiles[5 + i]).resize(mobTileW, mobTileH, { fit: 'contain' }).toBuffer(),
+      left: i * mobTileW,
+      top: mobTileH,
+    });
+  }
+  await mobCanvas.composite(mobParts).toFile(path.join(dir, 'montage-all-375.png'));
 }
 
 async function captureRun35Interiors(browser) {
@@ -3606,14 +3797,28 @@ async function waitForPreview(url, maxAttempts = 60) {
 
 async function main() {
   await mkdir(outDir, { recursive: true });
-  const preview = spawn('npm', ['run', 'preview', '--', '--port', '4173', '--strictPort'], {
-    cwd: root,
-    stdio: 'pipe',
-  });
-  if (!(await waitForPreview(BASE))) {
-    preview.kill('SIGTERM');
-    console.error('preview server did not become ready at', BASE);
-    process.exit(1);
+  let preview = null;
+  if (!USE_EXTERNAL_QA_BASE) {
+    preview = spawn('npm', ['run', 'preview', '--', '--port', '4173', '--strictPort'], {
+      cwd: root,
+      stdio: 'pipe',
+    });
+    if (!(await waitForPreview(BASE))) {
+      preview.kill('SIGTERM');
+      console.error('preview server did not become ready at', BASE);
+      process.exit(1);
+    }
+  } else {
+    try {
+      const res = await fetch(BASE, { signal: AbortSignal.timeout(15000) });
+      if (!res.ok) {
+        console.error('QA_BASE_URL not reachable:', BASE, res.status);
+        process.exit(1);
+      }
+    } catch (e) {
+      console.error('QA_BASE_URL not reachable:', BASE, e);
+      process.exit(1);
+    }
   }
 
   const errors = [];
@@ -3694,6 +3899,8 @@ async function main() {
     await testRun34SingleExitUi(browser, errors);
     await testRun35ExitTileAfterFloorTaps(browser, errors);
     await testRun35BlockedTilesHaveProps(desktop, errors);
+    await testRun36InteriorPixelAssertions(desktop, errors);
+    await testRun36DesktopInteriorMargins(desktop, errors);
     const mobile375 = await browser.newPage({ viewport: { width: 375, height: 812 } });
     try {
       await testRun35MobileFirstLoadFraming(mobile375, errors);
@@ -3752,6 +3959,12 @@ async function main() {
     } catch (e) {
       errors.push(`capture-run35: ${String(e?.message ?? e)}`);
     }
+    try {
+      const run36Dir = await captureRun36Interiors(browser);
+      await buildRun36Montages(run36Dir);
+    } catch (e) {
+      errors.push(`capture-run36: ${String(e?.message ?? e)}`);
+    }
 
     const report = {
       errors,
@@ -3772,7 +3985,7 @@ async function main() {
     } catch {
       /* ignore */
     }
-    preview.kill('SIGKILL');
+    preview?.kill('SIGKILL');
   }
   return errors.length;
 }

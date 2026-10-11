@@ -54,12 +54,15 @@ import {
 } from './draw';
 import {
   buildInteriorGrid,
-  drawInteriorRoom,
+  drawInteriorFloor,
+  drawInteriorProps,
+  drawInteriorWalls,
   findPathInterior,
   getInteriorDef,
   interiorWorldBounds,
   interiorForwardTile,
   interiorHitExit,
+  interiorPickTile,
   syncInteriorCharacter,
   type InteriorCell,
   type InteriorDef,
@@ -191,7 +194,9 @@ export class IsoScene {
   private interiorCharTx = 0;
   private interiorCharTy = 0;
   private interiorPath: { x: number; y: number }[] = [];
-  private interiorRoomGfx = new Graphics();
+  private interiorFloorGfx = new Graphics();
+  private interiorWallGfx = new Graphics();
+  private interiorPropGfx = new Graphics();
   private interiorCharGfx = new Graphics();
   private mapReturnDoor: { x: number; y: number } | null = null;
   private outdoorCamBeforeInterior: { x: number; y: number; zoom: number } | null = null;
@@ -212,6 +217,7 @@ export class IsoScene {
       autoDensity: true,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
       resizeTo: window,
+      preserveDrawingBuffer: true,
     });
 
     this.app.stage.addChild(this.camera);
@@ -223,7 +229,13 @@ export class IsoScene {
     this.world.addChild(this.characterLayer);
     this.world.addChild(this.interiorLayer);
     this.interiorLayer.visible = false;
-    this.interiorLayer.addChild(this.interiorRoomGfx);
+    this.interiorLayer.sortableChildren = true;
+    this.interiorFloorGfx.zIndex = 0;
+    this.interiorWallGfx.zIndex = 100;
+    this.interiorPropGfx.zIndex = 200;
+    this.interiorLayer.addChild(this.interiorFloorGfx);
+    this.interiorLayer.addChild(this.interiorWallGfx);
+    this.interiorLayer.addChild(this.interiorPropGfx);
     this.interiorLayer.addChild(this.interiorCharGfx);
     this.bindInteriorPointerRouting();
 
@@ -807,7 +819,7 @@ export class IsoScene {
     if (panelInsets && this.interiorActive) {
       left = Math.max(left, panelInsets.left + pad, 24 + pad);
       top = Math.max(top, panelInsets.top + pad);
-      right = Math.max(right, panelInsets.right + pad, 24 + pad);
+      right = Math.max(right, panelInsets.right + pad, 25 + pad);
       bottom = Math.max(bottom, panelInsets.bottom + pad);
     }
     const checklist = document.querySelector('.checklist');
@@ -1057,11 +1069,11 @@ export class IsoScene {
   private frameMobileDefaultView(): void {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
-    setCameraFitMargins({ left: 20, right: 20, top: 36, bottom: 168 });
+    setCameraFitMargins({ left: 20, right: 20, top: 48, bottom: 96 });
     const bounds = mapWorldBounds();
-    this.zoom = clampZoom(zoomMinForViewport(sw, sh) * 0.94, sw, sh);
+    this.zoom = clampZoom(zoomMinForViewport(sw, sh) * 0.92, sw, sh);
     const worldCx = (bounds.minX + bounds.maxX) / 2;
-    const worldCy = (bounds.minY + bounds.maxY) / 2;
+    const worldCy = (bounds.minY + bounds.maxY) / 2 - TILE_H * 2.5;
     this.cameraX = -worldCx;
     this.cameraY = -worldCy;
     const hardened = stabilizeCameraAfterGesture(
@@ -1858,10 +1870,13 @@ export class IsoScene {
       this.pathLayer.visible = false;
       this.characterLayer.visible = false;
       this.interiorLayer.visible = true;
-      this.interiorRoomGfx.eventMode = 'none';
+      this.interiorFloorGfx.eventMode = 'none';
+      this.interiorWallGfx.eventMode = 'none';
+      this.interiorPropGfx.eventMode = 'none';
       this.interiorCharGfx.eventMode = 'none';
-      this.interiorRoomGfx.clear();
-      drawInteriorRoom(this.interiorRoomGfx, def);
+      drawInteriorFloor(this.interiorFloorGfx, def);
+      drawInteriorWalls(this.interiorWallGfx, def);
+      drawInteriorProps(this.interiorPropGfx, def);
       syncInteriorCharacter(this.interiorCharGfx, this.interiorCharTx, this.interiorCharTy, 'idle');
       this.interiorCharGfx.zIndex = sortKey(this.interiorCharTx, this.interiorCharTy, 500);
       if (!this.mapReturnDoor) {
@@ -1922,7 +1937,9 @@ export class IsoScene {
       this.pathLayer.visible = true;
       this.characterLayer.visible = true;
       this.interiorLayer.visible = false;
-      this.interiorRoomGfx.clear();
+      this.interiorFloorGfx.clear();
+      this.interiorWallGfx.clear();
+      this.interiorPropGfx.clear();
       if (door) {
         this.charTx = door.x;
         this.charTy = door.y;
@@ -1978,11 +1995,8 @@ export class IsoScene {
       this.exitInterior({ immediate: true });
       return;
     }
-    const tile = worldToTile(wx, wy);
+    const tile = interiorPickTile(this.interiorDef, wx, wy);
     if (!tile) return;
-    if (tile.x < 0 || tile.y < 0 || tile.x >= this.interiorDef.w || tile.y >= this.interiorDef.h) {
-      return;
-    }
     if (!this.interiorGrid[tile.y]?.[tile.x]?.walkable) return;
     const sx0 = Math.round(this.interiorCharTx);
     const sy0 = Math.round(this.interiorCharTy);
@@ -2169,5 +2183,26 @@ export class IsoScene {
 
   expandInteriorSheetForQa(): void {
     this.events.buildingPanel?.expandInteriorSheetForQa?.();
+  }
+
+  /** QA: RGBA at a client point on the game canvas (WebGL readPixels). */
+  sampleCanvasColorAtClient(clientX: number, clientY: number): {
+    r: number;
+    g: number;
+    b: number;
+    a: number;
+  } | null {
+    const canvas = this.canvasEl;
+    if (!canvas) return null;
+    this.app.render();
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    const x = Math.floor((clientX - rect.left) * (canvas.width / rect.width));
+    const y = Math.floor((clientY - rect.top) * (canvas.height / rect.height));
+    const gl = canvas.getContext('webgl2') ?? canvas.getContext('webgl');
+    if (!gl) return null;
+    const pixel = new Uint8Array(4);
+    gl.readPixels(x, canvas.height - 1 - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+    return { r: pixel[0], g: pixel[1], b: pixel[2], a: pixel[3] };
   }
 }
