@@ -466,7 +466,7 @@ export function drawMuro(
   void leftInRef;
 
   poly(g, [backOuterA, backOuterB, raise(backOuterB, wallH), raise(backOuterA, wallH)], plank);
-  poly(g, [leftOuterA, leftOuterB, raise(leftOuterB, wallH), raise(leftOuterA, wallH)], plank);
+  poly(g, [leftOuterA, leftOuterB, raise(leftOuterB, wallH), raise(leftOuterA, wallH)], plank + 0x101010);
 }
 
 export function drawRedoma(

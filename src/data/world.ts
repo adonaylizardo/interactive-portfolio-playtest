@@ -197,7 +197,8 @@ export function buildWorld(): { cells: MapCell[][]; objects: MapObject[] } {
         if (borderKind(fx, fy)) continue;
         const isWall = muroWalls?.has(`${fx},${fy}`) ?? true;
         cells[fy][fx].walkable = !isWall;
-        cells[fy][fx].groundId = isWall ? 'tile/building/footprint' : 'tile/ground/default';
+        // Muro is drawn as thin wall faces only; a footprint fill under it reads as a thick slab.
+        cells[fy][fx].groundId = isWall && !muroWalls ? 'tile/building/footprint' : 'tile/ground/default';
       }
       objects.push({
         id: `paisaje/${id}`,
