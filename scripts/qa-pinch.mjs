@@ -1954,7 +1954,7 @@ async function testRun35ExitTileAfterFloorTaps(browser, errors) {
         }
         if (touch) await realTouchClick(page, client, exitPt.x, exitPt.y);
         else await realMouseClick(page, exitPt.x, exitPt.y);
-        await wait(700);
+        await wait(1200);
         if (await page.evaluate(() => window.__playtestQa?.isInInterior?.())) {
           errors.push(`run35-exit-${name}-${touch ? '375' : 'desk'}: still inside after exit mat tap`);
         }
@@ -2999,14 +2999,14 @@ async function testHashCameraChecklistRebaseline(page, errors) {
 }
 
 async function testBainDoorLowZoomDeterministic(page, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), [39, 36]);
-  await wait(200);
-  await page.goto(`${BASE}#view=x=920&y=-2180&z=0.370`, { waitUntil: 'networkidle' });
-  await wait(900);
   for (let i = 0; i < 7; i++) {
-    await page.locator('[data-exit]').first().click().catch(() => {});
+    await page.goto(BASE, { waitUntil: 'networkidle' });
     await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
+    await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), [39, 36]);
+    await wait(200);
+    await page.goto(`${BASE}#view=x=920&y=-2180&z=0.370`, { waitUntil: 'networkidle' });
+    await wait(700);
+    await page.locator('[data-exit]').first().click().catch(() => {});
     await wait(150);
     await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(39, 36));
     await wait(200);

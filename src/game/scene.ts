@@ -26,7 +26,7 @@ import {
   type HistoryNavigationState,
 } from '../camera/hash';
 import { isTouchPrimary, type ChecklistStepId } from '../checklist/storage';
-import { sortKey, tileFootWorld, tileToWorld, worldToTile } from '../iso/math';
+import { mapWorldBounds, sortKey, tileFootWorld, tileToWorld, worldToTile } from '../iso/math';
 import { findPathOrNearest } from '../iso/pathfinding';
 import { C } from './colors';
 import {
@@ -666,7 +666,7 @@ export class IsoScene {
         this.interiorDef &&
         interiorHitExit(this.interiorDef, iwx, iwy, this.zoom)
       ) {
-        this.exitInterior();
+        this.exitInterior({ immediate: true });
         return;
       }
       const client = this.canvasLocalToClient(sx, sy);
@@ -1013,26 +1013,16 @@ export class IsoScene {
     return window.matchMedia('(max-width: 767px)').matches;
   }
 
-  /** Frame character (8,8) and building caso-1 (3,4) on narrow viewports. */
+  /** First-load mobile: center the map in the upper viewport (above future sheet). */
   private frameMobileDefaultView(): void {
-    const char = tileToWorld(this.charTx, this.charTy);
-    const building = tileToWorld(39, 35);
-    const minX = Math.min(char.x, building.x) - TILE_W;
-    const maxX = Math.max(char.x, building.x) + TILE_W;
-    const minY = Math.min(char.y, building.y) - TILE_H * 4;
-    const maxY = Math.max(char.y, building.y) + TILE_H * 2;
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
-    const worldW = maxX - minX;
-    const worldH = maxY - minY;
-    const padding = 1.12;
-    const zoomX = sw / (worldW * padding);
-    const zoomY = sh / (worldH * padding);
-    this.zoom = clampZoom(Math.min(zoomX, zoomY) * 0.92, sw, sh);
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-    this.cameraX = -cx;
-    this.cameraY = -cy + sh * 0.04;
+    const bounds = mapWorldBounds();
+    this.zoom = clampZoom(zoomMinForViewport(sw, sh) * 0.94, sw, sh);
+    const worldCx = (bounds.minX + bounds.maxX) / 2;
+    const worldCy = (bounds.minY + bounds.maxY) / 2;
+    this.cameraX = -worldCx;
+    this.cameraY = -worldCy - (sh * 0.14) / this.zoom;
     const hardened = stabilizeCameraAfterGesture(
       { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
       sw,
@@ -1859,12 +1849,17 @@ export class IsoScene {
     skipFade?: boolean;
     fromHash?: boolean;
     outdoorCam?: { x: number; y: number; zoom: number };
+    /** User tapped exit tile / Salir — finish immediately (no history.pop delay). */
+    immediate?: boolean;
   }): void {
     if (!this.interiorActive) return;
-    if (!opts?.fromHash && this.interiorHistoryEntries > 0) {
+    if (!opts?.fromHash && !opts?.immediate && this.interiorHistoryEntries > 0) {
       this.historySyncInProgress = true;
       navigateBackFromInterior();
       return;
+    }
+    if (opts?.immediate && this.interiorHistoryEntries > 0) {
+      this.interiorHistoryEntries = 0;
     }
     const door = this.mapReturnDoor;
     const finish = () => {
@@ -1930,7 +1925,7 @@ export class IsoScene {
     if (!this.interiorDef) return;
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
     if (interiorHitExit(this.interiorDef, wx, wy, this.zoom)) {
-      this.exitInterior();
+      this.exitInterior({ immediate: true });
       return;
     }
     const tile = worldToTile(wx, wy);
