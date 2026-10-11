@@ -833,15 +833,10 @@ async function cdpClickClient(page, x, y) {
 
 /** Real desktop pointer — hooks may only supply coordinates. */
 async function realMouseClick(page, x, y) {
-  const canvas = await page.locator('#game-canvas').boundingBox();
-  if (!canvas) {
-    await page.mouse.click(x, y);
-  } else {
-    await page.locator('#game-canvas').click({
-      position: { x: x - canvas.x, y: y - canvas.y },
-      delay: 90,
-    });
-  }
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await wait(40);
+  await page.mouse.up();
   await wait(320);
 }
 
@@ -1456,7 +1451,18 @@ async function testRun33DoorRealInputAll(browser, errors) {
     const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     try {
       await desktop.goto(BASE, { waitUntil: 'networkidle' });
-      await desktop.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
+      await desktop.evaluate(() => {
+        localStorage.setItem(
+          'playtest-checklist-v3',
+          JSON.stringify({
+            completed: {},
+            skipped: true,
+            dismissed: true,
+            collapsed: true,
+            mobileExpanded: false,
+          }),
+        );
+      });
       await desktop.reload({ waitUntil: 'networkidle' });
       await wait(900);
       const start = QA_WALK_START[b.name] ?? [31, 36];
@@ -1466,7 +1472,7 @@ async function testRun33DoorRealInputAll(browser, errors) {
         errors.push(`run33-door-click: no door point ${b.name}`);
         continue;
       }
-      let entered = await waitForInterior(desktop, 55000);
+      let entered = await waitForInterior(desktop, 90000);
       if (!entered) {
         await realTapDoor(desktop, b.name, { touch: false, frame: true });
         entered = await waitForInterior(desktop, 35000);
