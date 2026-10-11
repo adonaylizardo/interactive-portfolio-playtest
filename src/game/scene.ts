@@ -57,8 +57,8 @@ import {
   drawInteriorRoom,
   findPathInterior,
   getInteriorDef,
-  interiorExitPick,
   interiorWorldBounds,
+  interiorForwardTile,
   syncInteriorCharacter,
   type InteriorCell,
   type InteriorDef,
@@ -661,10 +661,6 @@ export class IsoScene {
     }
     if (this.interiorActive) {
       const { x: iwx, y: iwy } = this.screenToWorld(sx, sy);
-      if (this.interiorDef && interiorExitPick(this.interiorDef, iwx, iwy, this.zoom)) {
-        this.exitInterior();
-        return;
-      }
       const tile = worldToTile(iwx, iwy);
       if (
         tile &&
@@ -1038,7 +1034,7 @@ export class IsoScene {
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
     this.cameraX = -cx;
-    this.cameraY = -cy + sh * 0.12;
+    this.cameraY = -cy - sh * 0.14;
     const hardened = stabilizeCameraAfterGesture(
       { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
       sw,
@@ -1935,10 +1931,6 @@ export class IsoScene {
   private handleInteriorScreenTap(sx: number, sy: number, sprint: boolean): void {
     if (!this.interiorDef) return;
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
-    if (interiorExitPick(this.interiorDef, wx, wy, this.zoom)) {
-      this.exitInterior();
-      return;
-    }
     const tile = worldToTile(wx, wy);
     if (!tile) return;
     if (tile.x < 0 || tile.y < 0 || tile.x >= this.interiorDef.w || tile.y >= this.interiorDef.h) {
@@ -2117,6 +2109,12 @@ export class IsoScene {
     const screen = this.worldToScreen(foot.x, foot.y - TILE_H / 2);
     const rect = this.canvasEl.getBoundingClientRect();
     return { x: rect.left + screen.x, y: rect.top + screen.y };
+  }
+
+  getInteriorForwardScreenPoint(): { x: number; y: number } | null {
+    if (!this.interiorDef) return null;
+    const t = interiorForwardTile(this.interiorDef);
+    return this.getInteriorTileScreenClientPoint(t.x, t.y);
   }
 
   /** QA: tap an interior tile (walk / exit). */

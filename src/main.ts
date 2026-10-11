@@ -119,6 +119,7 @@ async function main(): Promise<void> {
     setZoom: (z: number) => scene.setZoomLevel(z),
     interiorTileScreenPoint: (tx: number, ty: number) =>
       scene.getInteriorTileScreenClientPoint(tx, ty),
+    interiorForwardScreenPoint: () => scene.getInteriorForwardScreenPoint(),
     tapInteriorTile: (tx: number, ty: number) => scene.tapInteriorTileForQa(tx, ty),
     expandInteriorSheet: () => panel.expandInteriorSheetForQa(),
     collapseInteriorSheetToPeek: () => panel.collapseToPeekOnly(),

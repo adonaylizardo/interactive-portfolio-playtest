@@ -45,7 +45,7 @@ function def(
   },
 ): InteriorDef {
   const exit = opts?.exit ?? { x: Math.floor(w / 2), y: h - 1 };
-  const spawn = opts?.spawn ?? { x: exit.x, y: h - 2 };
+  const spawn = opts?.spawn ?? { x: exit.x, y: Math.max(1, exit.y - 2) };
   return {
     id,
     w,
@@ -116,34 +116,30 @@ export function buildInteriorGrid(def: InteriorDef): InteriorCell[][] {
       setBlocked(cells, 0, y);
       setBlocked(cells, 1, y);
     }
-    const seats: [number, number][] = [
-      [5, 5],
-      [4, 4],
-      [3, 3],
-      [2, 2],
-      [5, 4],
-      [4, 3],
+    setBlocked(cells, 1, 0);
+    setBlocked(cells, 2, 0);
+    const tierRows: { y: number; cols: number[] }[] = [
+      { y: 2, cols: [4, 5, 6] },
+      { y: 3, cols: [3, 4, 5] },
+      { y: 4, cols: [2, 3, 4] },
+      { y: 5, cols: [2, 3] },
     ];
-    for (const [x, y] of seats) setBlocked(cells, x, y);
-  } else if (def.id === 'estudio') {
-    setBlocked(cells, 2, 1);
-    setBlocked(cells, 3, 1);
-  } else if (def.id === 'volaris') {
-    setBlocked(cells, 1, 1);
-    setBlocked(cells, 2, 1);
-    setBlocked(cells, 1, 2);
-  } else if (def.id === 'bain') {
-    setBlocked(cells, 3, 2);
-  } else if (def.id === 'mentoria') {
-    setBlocked(cells, 1, 1);
-    setBlocked(cells, 1, 2);
-  } else if (def.id === 'finoa') {
-    setBlocked(cells, 4, 1);
-    setBlocked(cells, 4, 2);
-  } else if (def.id === 'pg') {
-    setBlocked(cells, 2, 1);
-    setBlocked(cells, 3, 1);
-    setBlocked(cells, 4, 1);
+    for (const row of tierRows) {
+      for (const x of row.cols) setBlocked(cells, x, row.y);
+    }
+  } else if (
+    def.id === 'estudio' ||
+    def.id === 'volaris' ||
+    def.id === 'bain' ||
+    def.id === 'mentoria' ||
+    def.id === 'finoa' ||
+    def.id === 'pg'
+  ) {
+    for (let dy = 0; dy < 2; dy++) {
+      for (let dx = 0; dx < 2; dx++) {
+        setBlocked(cells, 1 + dx, 1 + dy);
+      }
+    }
   }
 
   return cells;
@@ -192,20 +188,99 @@ function drawIsoBlock(
   poly(g, [raise(sw, slabH), raise(se, slabH), raise(ne, slabH + 6), raise(nw, slabH + 6)], top);
 }
 
+const CASE_CORNER = { x: 1, y: 1, w: 2, h: 2 };
+/** ~1.5–2× character silhouette (~52px). */
+const CASE_PROP_H = 58;
+
+function drawCaseRug(g: Graphics, accent: number): void {
+  const light = Math.min(0xffffff, accent + 0x141414);
+  for (let dy = 0; dy < CASE_CORNER.h; dy++) {
+    for (let dx = 0; dx < CASE_CORNER.w; dx++) {
+      const tx = CASE_CORNER.x + dx;
+      const ty = CASE_CORNER.y + dy;
+      const pos = localFoot(tx, ty);
+      g.moveTo(pos.x, pos.y);
+      g.lineTo(pos.x + TILE_W / 2, pos.y - TILE_H / 2);
+      g.lineTo(pos.x, pos.y - TILE_H);
+      g.lineTo(pos.x - TILE_W / 2, pos.y - TILE_H / 2);
+      g.closePath();
+      g.fill((tx + ty) % 2 === 0 ? accent : light);
+    }
+  }
+}
+
+type CasePropKind = 'desk' | 'panel' | 'table' | 'round' | 'books' | 'display';
+
+function drawCaseCornerProp(
+  g: Graphics,
+  accent: number,
+  kind: CasePropKind,
+  body = 0xaaaaaa,
+  top = 0xbcbcbc,
+): void {
+  drawCaseRug(g, accent);
+  const { x, y, w, h } = CASE_CORNER;
+  if (kind === 'panel') {
+    const nw = northTop(x, y);
+    const panelH = CASE_PROP_H + 18;
+    poly(
+      g,
+      [
+        raise(nw, 8),
+        raise(nw, panelH),
+        raise({ x: nw.x - TILE_W * 0.35, y: nw.y - TILE_H * 0.18 }, panelH),
+        raise({ x: nw.x - TILE_W * 0.35, y: nw.y - TILE_H * 0.18 }, 8),
+      ],
+      0x3a3a48,
+    );
+    poly(
+      g,
+      [
+        raise(nw, panelH - 10),
+        raise({ x: nw.x - TILE_W * 0.32, y: nw.y - TILE_H * 0.16 }, panelH - 10),
+        raise({ x: nw.x - TILE_W * 0.32, y: nw.y - TILE_H * 0.16 }, panelH),
+        raise(nw, panelH),
+      ],
+      0x555566,
+    );
+    drawIsoBlock(g, x, y, w, h, CASE_PROP_H - 12, body, top);
+  } else if (kind === 'display') {
+    drawIsoBlock(g, x, y, w, h, CASE_PROP_H, body, top);
+    const cap = localFoot(x + 1, y);
+    g.moveTo(cap.x - 14, cap.y - CASE_PROP_H - 6);
+    g.lineTo(cap.x + 14, cap.y - CASE_PROP_H - 6);
+    g.lineTo(cap.x + 10, cap.y - CASE_PROP_H - 18);
+    g.lineTo(cap.x - 10, cap.y - CASE_PROP_H - 18);
+    g.closePath();
+    g.fill(0xd8d8e0);
+  } else if (kind === 'round') {
+    drawIsoBlock(g, x, y, w, h, CASE_PROP_H - 8, body, top);
+    g.ellipse(localFoot(x + 1, y + 1).x, localFoot(x + 1, y + 1).y - CASE_PROP_H, 16, 10);
+    g.fill(0x707070);
+  } else if (kind === 'books') {
+    drawIsoBlock(g, x, y, 2, 1, CASE_PROP_H, body, top);
+    drawIsoBlock(g, x, y + 1, 1, 1, CASE_PROP_H - 16, 0x9a9088, top);
+  } else if (kind === 'table') {
+    drawIsoBlock(g, x, y, w, 1, CASE_PROP_H - 10, body, top);
+    drawIsoBlock(g, x, y + 1, 1, 1, 22, 0x888888, 0xa0a0a0);
+    drawIsoBlock(g, x + 1, y + 1, 1, 1, 22, 0x888888, 0xa0a0a0);
+  } else {
+    drawIsoBlock(g, x, y, w, h, CASE_PROP_H, body, top);
+  }
+}
+
 function drawIdentityProps(g: Graphics, def: InteriorDef): void {
-  const prop = 0xaaaaaa;
-  const propDark = 0x959595;
   const propLight = 0xbcbcbc;
 
   if (def.id === 'catedral') {
     drawIsoBlock(g, 2, 0, 4, 1, 52, 0x8a8a8a, 0xc8c8c8);
+    const pewSeat = 0x5c564c;
+    const pewTop = 0x8a8274;
     for (let row = 2; row <= 5; row++) {
       for (const col of [1, 2, 5, 6]) {
-        drawIsoBlock(g, col, row, 1, 1, 22, 0x7a7568, 0xa09888);
+        const h = 14 + (5 - row) * 2;
+        drawIsoBlock(g, col, row, 1, 1, h, pewSeat, pewTop);
       }
-    }
-    for (const col of [1, 2, 5, 6]) {
-      drawIsoBlock(g, col, 2, 1, 1, 8, propDark, prop);
     }
   } else if (def.id === 'sambil') {
     const water = 0x7aa8bc;
@@ -235,57 +310,53 @@ function drawIdentityProps(g: Graphics, def: InteriorDef): void {
     g.lineTo(localFoot(7, 1).x, localFoot(7, 1).y - TILE_H / 2);
     g.stroke({ width: 3, color: 0x555555 });
   } else if (def.id === 'flor') {
-    drawIsoBlock(g, 2, 0, 3, 1, 36, 0x505050, 0x707070);
-    drawIsoBlock(g, 0, 0, 2, 3, 48, 0x606060, 0x888888);
-    const screenH = def.backWallH - 12;
-    const nw = northTop(2, 0);
-    const ne = northTop(5, 0);
+    drawIsoBlock(g, 1, 0, 2, 1, 36, 0x505050, 0x707070);
+    const screenH = def.backWallH - 8;
+    const wn = northTop(0, 0);
+    const ws = northTop(0, 2);
     poly(
       g,
-      [raise(nw, 36), raise(ne, 36), raise(ne, screenH), raise(nw, screenH)],
+      [
+        raise(wn, 28),
+        raise(ws, 28),
+        raise(ws, screenH),
+        raise(wn, screenH),
+      ],
       0x3a3a48,
     );
     poly(
       g,
       [
-        raise(nw, screenH - 8),
-        raise(ne, screenH - 8),
-        raise(ne, screenH),
-        raise(nw, screenH),
+        raise(wn, screenH - 10),
+        raise(ws, screenH - 10),
+        raise(ws, screenH),
+        raise(wn, screenH),
       ],
       0x555566,
     );
-    const seatRows: [number, number, number][] = [
-      [6, 6, 10],
-      [5, 5, 14],
-      [4, 4, 18],
-      [3, 3, 22],
-      [5, 5, 12],
-      [4, 5, 16],
+    const tierRows: { y: number; h: number; cols: number[] }[] = [
+      { y: 5, h: 10, cols: [2, 3] },
+      { y: 4, h: 16, cols: [2, 3, 4] },
+      { y: 3, h: 22, cols: [3, 4, 5] },
+      { y: 2, h: 28, cols: [4, 5, 6] },
     ];
-    for (const [x, y, h] of seatRows) {
-      drawIsoBlock(g, x, y, 1, 1, h, 0x888888, propLight);
+    for (const row of tierRows) {
+      for (const x of row.cols) {
+        drawIsoBlock(g, x, row.y, 1, 1, row.h, 0x757575, 0x9a9a9a);
+      }
     }
   } else if (def.id === 'estudio') {
-    drawIsoBlock(g, 2, 1, 2, 1, 24, 0x9a8a7a, propLight);
-    drawIsoBlock(g, 2, 2, 1, 1, 14, prop, propLight);
+    drawCaseCornerProp(g, 0x8a7868, 'desk', 0x9a8a7a, propLight);
   } else if (def.id === 'volaris') {
-    drawIsoBlock(g, 1, 1, 2, 2, 28, 0x8a9098, propLight);
+    drawCaseCornerProp(g, 0x5a88b8, 'panel', 0x8a9098, propLight);
   } else if (def.id === 'bain') {
-    drawIsoBlock(g, 2, 2, 2, 1, 18, 0x888888, propLight);
-    g.circle(localFoot(3, 2).x, localFoot(3, 2).y - 18, 10);
-    g.fill(propDark);
+    drawCaseCornerProp(g, 0x787878, 'round', 0x888888, propLight);
   } else if (def.id === 'mentoria') {
-    drawIsoBlock(g, 1, 1, 2, 1, 28, 0x8a8478, 0xb0a898);
-    drawIsoBlock(g, 1, 2, 1, 1, 20, 0x9a9088, propLight);
-    drawIsoBlock(g, 3, 3, 1, 1, 16, prop, propDark);
+    drawCaseCornerProp(g, 0x8a8070, 'books', 0x8a8478, 0xb0a898);
   } else if (def.id === 'finoa') {
-    drawIsoBlock(g, 4, 1, 1, 2, 30, 0x7a9080, 0x9ab0a0);
-    drawIsoBlock(g, 2, 3, 2, 1, 18, 0x6a8078, 0x88a090);
-    g.circle(localFoot(3, 3).x, localFoot(3, 3).y - 22, 8);
-    g.fill(0x5a7068);
+    drawCaseCornerProp(g, 0x6a9080, 'table', 0x7a9080, 0x9ab0a0);
   } else if (def.id === 'pg') {
-    drawIsoBlock(g, 2, 1, 3, 1, 20, 0x909090, propLight);
+    drawCaseCornerProp(g, 0x989898, 'display', 0x909090, propLight);
   }
 }
 
@@ -298,7 +369,13 @@ function drawExitMat(g: Graphics, def: InteriorDef): void {
   g.lineTo(pos.x, pos.y - TILE_H);
   g.lineTo(pos.x - TILE_W / 2, pos.y - TILE_H / 2);
   g.closePath();
-  g.fill(0xa8a8a8);
+  g.fill(0xe4e2dc);
+  g.moveTo(pos.x, pos.y);
+  g.lineTo(pos.x + TILE_W / 2, pos.y - TILE_H / 2);
+  g.lineTo(pos.x, pos.y - TILE_H);
+  g.lineTo(pos.x - TILE_W / 2, pos.y - TILE_H / 2);
+  g.closePath();
+  g.stroke({ width: 2, color: 0xc8c4bc });
   const frame = 0x707070;
   const lw = 5;
   const left = localFoot(ex - 1, ey);
@@ -344,24 +421,10 @@ export function drawInteriorRoom(g: Graphics, def: InteriorDef): void {
     poly(g, [nw, ne, raise(ne, def.backWallH), raise(nw, def.backWallH)], wallBack);
   }
 
-  {
-    const sw0 = localFoot(0, def.h - 1);
-    const nw0 = northTop(0, 0);
-    const westOutS = { x: sw0.x - TILE_W * 0.48, y: sw0.y - TILE_H * 0.24 };
-    const westOutN = { x: nw0.x - TILE_W * 0.48, y: nw0.y - TILE_H * 0.24 };
-    const westH = def.id === 'flor' ? def.backWallH : def.backWallH;
-    poly(g, [westOutS, sw0, raise(sw0, westH), raise(westOutS, westH)], 0x858585);
-    poly(g, [westOutN, nw0, raise(nw0, westH), raise(westOutN, westH)], wallSide);
-    poly(
-      g,
-      [westOutS, westOutN, raise(westOutN, westH), raise(westOutS, westH)],
-      wallSide,
-    );
-    for (let ty = 0; ty < def.h; ty++) {
-      const sw = localFoot(0, ty);
-      const nw = northTop(0, ty);
-      poly(g, [sw, nw, raise(nw, westH), raise(sw, westH)], wallSide);
-    }
+  for (let ty = 0; ty < def.h; ty++) {
+    const sw = localFoot(0, ty);
+    const nw = northTop(0, ty);
+    poly(g, [sw, nw, raise(nw, def.backWallH), raise(sw, def.backWallH)], wallSide);
   }
 
   for (let ty = 0; ty < def.h; ty++) {
@@ -409,10 +472,7 @@ export function interiorWorldBounds(def: InteriorDef): {
   }
   push(raise(northTop(0, 0), def.backWallH));
   push(raise(northTop(def.w - 1, 0), def.backWallH));
-  const sw0 = localFoot(0, def.h - 1);
-  push({ x: sw0.x - TILE_W * 0.52, y: sw0.y - TILE_H * 0.28 });
-  push(raise(northTop(0, 0), def.backWallH));
-  push({ x: northTop(0, 0).x - TILE_W * 0.52, y: northTop(0, 0).y - TILE_H * 0.28 - def.backWallH });
+  push(raise(localFoot(0, def.h - 1), def.backWallH));
   const pad = TILE_W * 0.35;
   return {
     minX: minX - pad,
@@ -500,23 +560,20 @@ export function syncInteriorCharacter(
   g.position.set(pos.x, pos.y);
 }
 
-/** Screen-radius hit for exit tile + door gap (works at high zoom). */
+/** Tight hit test — only the exit tile (not neighbors or spawn approach). */
 export function interiorExitPick(
   def: InteriorDef,
   worldX: number,
   worldY: number,
   zoom: number,
 ): boolean {
-  const tiles: { x: number; y: number }[] = [
-    def.exit,
-    { x: def.exit.x - 1, y: def.exit.y },
-    { x: def.exit.x + 1, y: def.exit.y },
-    { x: def.exit.x, y: def.exit.y - 1 },
-  ];
-  const r = Math.max(28, 48 / Math.max(zoom, 0.15));
-  for (const t of tiles) {
-    const f = tileFootWorld(t.x, t.y);
-    if (Math.hypot(worldX - f.x, worldY - (f.y - TILE_H / 2)) <= r) return true;
-  }
-  return false;
+  const f = tileFootWorld(def.exit.x, def.exit.y);
+  const cy = f.y - TILE_H / 2;
+  const r = Math.max(10, 18 / Math.max(zoom, 0.4));
+  return Math.hypot(worldX - f.x, worldY - cy) <= r;
+}
+
+/** Tile one step inward from spawn (typical “tap ahead” probe). */
+export function interiorForwardTile(def: InteriorDef): { x: number; y: number } {
+  return { x: def.spawn.x, y: Math.max(0, def.spawn.y - 1) };
 }

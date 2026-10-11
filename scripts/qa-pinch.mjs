@@ -1472,7 +1472,7 @@ async function testRun33DoorRealInputAll(browser, errors) {
         errors.push(`run33-door-click: no door point ${b.name}`);
         continue;
       }
-      let entered = await waitForInterior(desktop, 90000);
+      let entered = await waitForInterior(desktop, 65000);
       if (!entered) {
         await realTapDoor(desktop, b.name, { touch: false, frame: true });
         entered = await waitForInterior(desktop, 35000);
@@ -1746,6 +1746,180 @@ async function testRun33ArrivalOnlyFour(page, errors) {
     if (!(await page.evaluate(() => window.__playtestQa?.isInInterior?.()))) {
       errors.push(`run33-arrival-${c.name}-${mode}: never entered after ${mode} tap`);
     }
+    }
+  }
+}
+
+/** Run #34: floor tap ahead must walk, not exit (all interiors). */
+async function testRun34FloorTapNoExit(browser, errors) {
+  const names = [
+    'estudio',
+    'volaris',
+    'bain',
+    'mentoria',
+    'finoa',
+    'pg',
+    'sambil',
+    'catedral',
+    'flor',
+  ];
+  for (const touch of [false, true]) {
+    const page = await browser.newPage({
+      viewport: touch ? { width: 375, height: 812 } : { width: 1280, height: 800 },
+    });
+    let client;
+    if (touch) {
+      client = await page.context().newCDPSession(page);
+      await ensureTouchEmulation(client);
+    }
+    try {
+      for (const name of names) {
+        await page.goto(BASE, { waitUntil: 'networkidle' });
+        await page.reload({ waitUntil: 'networkidle' });
+        await wait(500);
+        await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
+        await waitForInterior(page);
+        await wait(400);
+        const pt = await page.evaluate(() => window.__playtestQa?.interiorForwardScreenPoint?.());
+        if (!pt) {
+          errors.push(`run34-floor-${name}-${touch ? '375' : 'desktop'}: forward point missing`);
+          continue;
+        }
+        if (touch) await realTouchClick(page, client, pt.x, pt.y);
+        else await realMouseClick(page, pt.x, pt.y);
+        await wait(700);
+        const inside = await page.evaluate(() => window.__playtestQa?.isInInterior?.());
+        if (!inside) {
+          errors.push(`run34-floor-${name}-${touch ? '375' : 'desktop'}: exited on forward floor tap`);
+        }
+        await page.evaluate(() => window.__playtestQa?.exitInterior?.());
+        await wait(400);
+      }
+    } finally {
+      await page.close();
+    }
+  }
+}
+
+/** Run #34: mobile peek has no scrim; expanded sheet shows scrim. */
+async function testRun34MobileSheetScrim(browser, errors) {
+  const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
+  try {
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'networkidle' });
+    await wait(500);
+    await page.evaluate(() => window.__playtestQa?.enterInterior?.('bain'));
+    await waitForInterior(page);
+    await wait(400);
+    const peekOpacity = await page.evaluate(() => {
+      const el = document.querySelector('.building-panel__backdrop');
+      return el ? getComputedStyle(el).opacity : null;
+    });
+    if (peekOpacity !== '0') {
+      errors.push(`run34-scrim-peek: expected opacity 0 got ${peekOpacity}`);
+    }
+    await page.evaluate(() => window.__playtestQa?.expandInteriorSheet?.());
+    await wait(350);
+    const expandedOpacity = await page.evaluate(() => {
+      const el = document.querySelector('.building-panel__backdrop');
+      return el ? getComputedStyle(el).opacity : null;
+    });
+    if (expandedOpacity !== '1') {
+      errors.push(`run34-scrim-expanded: expected opacity 1 got ${expandedOpacity}`);
+    }
+  } finally {
+    await page.close();
+  }
+}
+
+/** Run #34: one exit control — mobile float Salir + drag; desktop × only. */
+async function testRun34SingleExitUi(browser, errors) {
+  const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
+  try {
+    await mobile.goto(BASE, { waitUntil: 'networkidle' });
+    await mobile.reload({ waitUntil: 'networkidle' });
+    await wait(500);
+    await mobile.evaluate(() => window.__playtestQa?.enterInterior?.('estudio'));
+    await waitForInterior(mobile);
+    const closeVis = await mobile.locator('.building-panel__close').isVisible();
+    const floatVis = await mobile.locator('[data-float-exit]').isVisible();
+    const dragVis = await mobile.locator('.building-panel__drag').isVisible();
+    if (closeVis) errors.push('run34-exit-ui-mobile: sheet × should be hidden');
+    if (!floatVis) errors.push('run34-exit-ui-mobile: float Salir missing');
+    if (!dragVis) errors.push('run34-exit-ui-mobile: drag handle missing');
+  } finally {
+    await mobile.close();
+  }
+  const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  try {
+    await desktop.goto(BASE, { waitUntil: 'networkidle' });
+    await desktop.reload({ waitUntil: 'networkidle' });
+    await wait(500);
+    await desktop.evaluate(() => window.__playtestQa?.enterInterior?.('estudio'));
+    await waitForInterior(desktop);
+    const salirCount = await desktop.locator('.building-panel__salir').count();
+    const closeVis = await desktop.locator('.building-panel__close').isVisible();
+    if (salirCount > 0 && (await desktop.locator('.building-panel__salir').first().isVisible())) {
+      errors.push('run34-exit-ui-desktop: duplicate Salir in sheet');
+    }
+    if (!closeVis) errors.push('run34-exit-ui-desktop: desktop × exit missing');
+  } finally {
+    await desktop.close();
+  }
+}
+
+async function captureRun34Interiors(browser) {
+  const dir = path.join(root, 'artifacts', 'run34');
+  await mkdir(dir, { recursive: true });
+  const names = ['estudio', 'volaris', 'bain', 'mentoria', 'finoa', 'pg', 'sambil', 'catedral', 'flor'];
+  const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  try {
+    for (const name of names) {
+      await desktop.goto(BASE, { waitUntil: 'networkidle' });
+      await desktop.reload({ waitUntil: 'networkidle' });
+      await wait(500);
+      await desktop.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
+      await waitForInterior(desktop);
+      await wait(500);
+      await desktop.screenshot({ path: path.join(dir, `interior-${name}-desktop.png`) });
+      await desktop.keyboard.press('Escape');
+      await wait(600);
+    }
+  } finally {
+    await desktop.close();
+  }
+  const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
+  try {
+    for (const name of names) {
+      await mobile.goto(BASE, { waitUntil: 'networkidle' });
+      await mobile.reload({ waitUntil: 'networkidle' });
+      await wait(500);
+      await mobile.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
+      await waitForInterior(mobile);
+      await wait(500);
+      await mobile.screenshot({ path: path.join(dir, `interior-${name}-375.png`) });
+      await mobile.keyboard.press('Escape');
+      await wait(600);
+    }
+  } finally {
+    await mobile.close();
+  }
+  return dir;
+}
+
+async function buildRun34Montages(dir) {
+  const { spawnSync } = await import('node:child_process');
+  const names = ['estudio', 'volaris', 'bain', 'mentoria', 'finoa', 'pg', 'sambil', 'catedral', 'flor'];
+  for (const suffix of ['desktop', '375']) {
+    const inputs = names.map((n) => path.join(dir, `interior-${n}-${suffix}.png`));
+    const out = path.join(dir, `montage-all-${suffix}.png`);
+    const args = ['montage', ...inputs, '-tile', '3x3', '-geometry', '+6+6', '-background', '#1a1a1a', out];
+    let r = spawnSync('magick', args, { encoding: 'utf8' });
+    if (r.status !== 0) {
+      r = spawnSync('convert', args, { encoding: 'utf8' });
+    }
+    if (r.status !== 0) {
+      throw new Error(`montage failed for ${suffix}: ${r.stderr || r.stdout}`);
     }
   }
 }
@@ -3307,6 +3481,9 @@ async function main() {
     await testRun33SheetOutsideTapMobile(browser, errors);
     await testRun33InteriorExitAllMobile(browser, errors);
     await testRun33ArrivalOnlyFour(desktop, errors);
+    await testRun34FloorTapNoExit(browser, errors);
+    await testRun34MobileSheetScrim(browser, errors);
+    await testRun34SingleExitUi(browser, errors);
     const desktopCdp = await desktop.context().newCDPSession(desktop);
     await testRun32WalkPinchFiveTrials(desktop, errors, desktopCdp);
     await ensureTouchEmulation(desktopCdp);
@@ -3345,7 +3522,13 @@ async function main() {
     try {
       await captureRun33Interiors(browser);
     } catch (e) {
-      errors.push(`capture-run32: ${String(e?.message ?? e)}`);
+      errors.push(`capture-run33: ${String(e?.message ?? e)}`);
+    }
+    try {
+      const run34Dir = await captureRun34Interiors(browser);
+      await buildRun34Montages(run34Dir);
+    } catch (e) {
+      errors.push(`capture-run34: ${String(e?.message ?? e)}`);
     }
 
     const report = {
