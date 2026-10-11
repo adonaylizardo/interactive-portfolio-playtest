@@ -1823,11 +1823,15 @@ async function testRun34MobileSheetScrim(browser, errors) {
       errors.push(`run34-scrim-peek: expected opacity 0 got ${peekOpacity}`);
     }
     await page.evaluate(() => window.__playtestQa?.expandInteriorSheet?.());
-    await wait(350);
-    const expandedOpacity = await page.evaluate(() => {
-      const el = document.querySelector('.building-panel__backdrop');
-      return el ? getComputedStyle(el).opacity : null;
-    });
+    // The scrim fades in with a CSS transition; slow CI runners can still be mid-fade at 350ms.
+    let expandedOpacity = null;
+    for (let i = 0; i < 20 && expandedOpacity !== '1'; i++) {
+      await wait(i === 0 ? 350 : 100);
+      expandedOpacity = await page.evaluate(() => {
+        const el = document.querySelector('.building-panel__backdrop');
+        return el ? getComputedStyle(el).opacity : null;
+      });
+    }
     if (expandedOpacity !== '1') {
       errors.push(`run34-scrim-expanded: expected opacity 1 got ${expandedOpacity}`);
     }
