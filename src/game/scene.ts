@@ -1299,43 +1299,45 @@ export class IsoScene {
     }
   }
 
+  /**
+   * Touch taps on the map, and every tap (touch or mouse) inside an interior, resolve here
+   * after the pointer is released so both input types share one picking path.
+   */
   private tryScheduleDeferredTap(e: PointerEvent): void {
+    const tapStart = this.tapStart;
+    if (!tapStart) return;
     this.clearDeferredTap();
-    if (!this.tapStart) return;
     if (this.pixiTapGestureSerial === this.pointerGestureSerial) return;
-    if (e.pointerType !== 'touch') return;
+    if (e.pointerType !== 'touch' && !this.interiorActive) return;
 
     const hadMulti = this.hadMultiPointerGesture;
     const hadSecond = this.secondFingerArrived;
     if (hadMulti || hadSecond || this.panMoved) return;
 
-    const dist = Math.hypot(e.clientX - this.tapStart.x, e.clientY - this.tapStart.y);
+    const dist = Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y);
     if (dist >= 10) return;
+    const gestureSerial = this.pointerGestureSerial;
 
     const fire = () => {
       this.deferredTapTimer = null;
       if (this.pointers.size > 0) return;
+      if (this.pointerGestureSerial !== gestureSerial) return;
+      if (this.pixiTapGestureSerial === gestureSerial) return;
       if (performance.now() < this.suppressTapUntil) return;
-      if (!this.tapStart) return;
       const now = performance.now();
-      const dt = now - this.tapStart.t;
+      const dt = now - tapStart.t;
       if (dt > 450) return;
       const canvas = this.canvasEl;
       if (!canvas) return;
-      const nowDist = Math.hypot(e.clientX - this.tapStart.x, e.clientY - this.tapStart.y);
-      if (nowDist >= 10) return;
       const double = now - this.lastTapTime < 320;
       this.lastTapTime = now;
       const rect = canvas.getBoundingClientRect();
       this.handleScreenTap(e.clientX - rect.left, e.clientY - rect.top, double);
     };
 
+    // Always async so a Pixi pointertap dispatched by this same pointerup can claim the tap first.
     const waitMs = Math.max(0, this.firstPointerDownAt + 120 - performance.now());
-    if (waitMs > 0) {
-      this.deferredTapTimer = setTimeout(fire, waitMs);
-    } else {
-      fire();
-    }
+    this.deferredTapTimer = setTimeout(fire, waitMs);
   }
 
   private applyActivePinch(mid: { x: number; y: number }, dist: number): void {
@@ -1623,12 +1625,6 @@ export class IsoScene {
       }
     };
 
-    canvas.addEventListener('click', (e) => {
-      if (!this.interiorActive) return;
-      if (e.pointerType === 'touch') return;
-      const rect = canvas.getBoundingClientRect();
-      this.handleScreenTap(e.clientX - rect.left, e.clientY - rect.top, false);
-    });
     canvas.addEventListener('pointerdown', onPointerDown);
     canvas.addEventListener('pointermove', onPointerMove);
     canvas.addEventListener('pointerup', endPointerGesture);

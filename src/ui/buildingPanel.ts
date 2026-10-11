@@ -216,7 +216,8 @@ export class BuildingPanel {
   consumeInteriorCanvasTap(clientX: number, clientY: number): boolean {
     if (!this.isOpen() || this.mode !== 'interior' || !this.isMobile()) return false;
     if (this.containsSheetPoint(clientX, clientY)) return false;
-    if (!this.peekOnly) this.setPeek(true);
+    if (this.peekOnly) return false;
+    this.setPeek(true);
     return true;
   }
 
