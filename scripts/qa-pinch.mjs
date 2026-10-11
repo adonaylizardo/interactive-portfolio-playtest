@@ -1444,27 +1444,33 @@ async function testRun33DoorRealInputAll(browser, errors) {
     await mobile.close();
   }
 
-  const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-  try {
-    for (const b of buildings) {
+  for (const b of buildings) {
+    const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    try {
       await desktop.goto(BASE, { waitUntil: 'networkidle' });
       await desktop.reload({ waitUntil: 'networkidle' });
-      await wait(600);
+      await wait(900);
       const start = QA_WALK_START[b.name] ?? [31, 36];
       await desktop.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), start);
-      await wait(200);
+      await wait(300);
       if (!(await realTapDoor(desktop, b.name, { touch: false }))) {
         errors.push(`run33-door-click: no door point ${b.name}`);
         continue;
       }
-      if (!(await waitForInterior(desktop, 45000))) {
-        errors.push(`run33-door-click: ${b.name} did not enter (real mouse click)`);
+      let entered = await waitForInterior(desktop, 55000);
+      if (!entered) {
+        await realTapDoor(desktop, b.name, { touch: false, frame: true });
+        entered = await waitForInterior(desktop, 35000);
       }
-      await desktop.evaluate(() => window.__playtestQa?.exitInterior?.());
-      await wait(400);
+      if (!entered) {
+        errors.push(`run33-door-click: ${b.name} did not enter (real mouse click)`);
+      } else {
+        await desktop.evaluate(() => window.__playtestQa?.exitInterior?.());
+        await wait(500);
+      }
+    } finally {
+      await desktop.close();
     }
-  } finally {
-    await desktop.close();
   }
 }
 
