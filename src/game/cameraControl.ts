@@ -420,6 +420,8 @@ export function softClampMapInView(
 }
 
 const INTERIOR_FIT_MARGIN_PX = 24;
+/** Phones fit rooms to ~90% of the width, so the side floor is lower than top/bottom. */
+const INTERIOR_SIDE_FIT_MARGIN_PX = 12;
 
 /** Minimum zoom so an interior room bbox fits the viewport (with fit margins). */
 export function zoomMinForInteriorBounds(
@@ -428,8 +430,8 @@ export function zoomMinForInteriorBounds(
   screenH: number,
   margin = INTERIOR_FIT_MARGIN_PX,
 ): number {
-  const ml = Math.max(margin, fitMarginLeft);
-  const mr = Math.max(margin, fitMarginRight);
+  const ml = Math.max(Math.min(margin, INTERIOR_SIDE_FIT_MARGIN_PX), fitMarginLeft);
+  const mr = Math.max(Math.min(margin, INTERIOR_SIDE_FIT_MARGIN_PX), fitMarginRight);
   const mt = Math.max(margin, fitMarginTop);
   const mb = Math.max(margin, fitMarginBottom);
   const innerW = Math.max(1, screenW - ml - mr);
@@ -444,8 +446,8 @@ export function fitCameraToInteriorBounds(
   screenW: number,
   screenH: number,
 ): CameraState {
-  const ml = Math.max(INTERIOR_FIT_MARGIN_PX, fitMarginLeft);
-  const mr = Math.max(INTERIOR_FIT_MARGIN_PX, fitMarginRight);
+  const ml = Math.max(INTERIOR_SIDE_FIT_MARGIN_PX, fitMarginLeft);
+  const mr = Math.max(INTERIOR_SIDE_FIT_MARGIN_PX, fitMarginRight);
   const mt = Math.max(INTERIOR_FIT_MARGIN_PX, fitMarginTop);
   const mb = Math.max(INTERIOR_FIT_MARGIN_PX, fitMarginBottom);
   const zoom = zoomMinForInteriorBounds(bounds, screenW, screenH);
@@ -464,8 +466,8 @@ export function clampInteriorPanInView(
   screenW: number,
   screenH: number,
 ): CameraState {
-  const ml = Math.max(INTERIOR_FIT_MARGIN_PX, fitMarginLeft);
-  const mr = Math.max(INTERIOR_FIT_MARGIN_PX, fitMarginRight);
+  const ml = Math.max(INTERIOR_SIDE_FIT_MARGIN_PX, fitMarginLeft);
+  const mr = Math.max(INTERIOR_SIDE_FIT_MARGIN_PX, fitMarginRight);
   const mt = Math.max(INTERIOR_FIT_MARGIN_PX, fitMarginTop);
   const mb = Math.max(INTERIOR_FIT_MARGIN_PX, fitMarginBottom);
   let { cameraX, cameraY, zoom } = cam;

@@ -12,7 +12,7 @@ import { getInteriorDef, interiorBlockedTilesHaveProps } from './game/interior';
 import { IsoScene } from './game/scene';
 import { findPath } from './iso/pathfinding';
 import { BuildingPanel } from './ui/buildingPanel';
-import { showToast } from './ui/toast';
+import { hideToast, showToast } from './ui/toast';
 
 async function main(): Promise<void> {
   const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -56,7 +56,10 @@ async function main(): Promise<void> {
       checklist.setBuildingPanelOpen(false);
       panel.hide();
     },
-    onInteriorIdChange: (id) => syncInteriorPanel(id),
+    onInteriorIdChange: (id) => {
+      hideToast();
+      syncInteriorPanel(id);
+    },
     onUnreachable: () => showToast('No se puede llegar'),
     buildingPanel: {
       isOpen: () => panel.isOpen(),

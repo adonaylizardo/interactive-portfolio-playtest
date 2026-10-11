@@ -2182,8 +2182,8 @@ async function testRun37DesktopInteriorMargins(browser, errors) {
   }
 }
 
-/** Run #37: real 375 first load (no hash, no QA reframe) — map centered in the free area. */
-async function testRun37MobileFirstLoadFraming(browser, errors) {
+/** Run #38: real 375 first load frames the Estudio and the first house (Volaris), character at the door. */
+async function testRun38MobileFirstLoadFraming(browser, errors) {
   const context = await browser.newContext({
     viewport: { width: 375, height: 812 },
     deviceScaleFactor: 2,
@@ -2196,28 +2196,131 @@ async function testRun37MobileFirstLoadFraming(browser, errors) {
     await wait(1200);
     const m = await page.evaluate(() => {
       const d = document.getElementById('game-canvas')?.dataset ?? {};
+      const qa = window.__playtestQa;
       return {
-        mapTop: Number(d.mapTop),
-        mapBottom: Number(d.mapBottom),
-        fitTop: Number(d.fitTop),
-        fitBottom: Number(d.fitBottom),
+        zoom: Number(d.zoom),
+        zoomMin: Number(d.zoomMin),
+        estudio: qa?.doorScreenPoint?.('estudio') ?? null,
+        volaris: qa?.doorScreenPoint?.('volaris') ?? null,
+        char: qa?.getCharacterTile?.() ?? null,
       };
     });
-    if (![m.mapTop, m.mapBottom, m.fitTop, m.fitBottom].every(Number.isFinite)) {
-      errors.push(`run37-firstload-375: frame data missing ${JSON.stringify(m)}`);
-      return;
+    if (!(m.zoom >= 0.28)) {
+      errors.push(`run38-firstload-375: zoom ${m.zoom} too small (want >= 0.28; map-fit min ${m.zoomMin})`);
     }
-    const freeCy = (m.fitTop + m.fitBottom) / 2;
-    const mapCy = (m.mapTop + m.mapBottom) / 2;
-    if (Math.abs(mapCy - freeCy) > 40) {
-      errors.push(`run37-firstload-375: map center ${mapCy} vs free-area center ${freeCy}`);
+    for (const key of ['estudio', 'volaris']) {
+      const pt = m[key];
+      if (!pt || pt.x < 8 || pt.x > 375 - 8 || pt.y < 60 || pt.y > 700) {
+        errors.push(`run38-firstload-375: ${key} door not in view ${JSON.stringify(pt)}`);
+      }
     }
-    if (m.mapTop > 812 * 0.4) {
-      errors.push(`run37-firstload-375: mapTop ${m.mapTop} leaves the top empty`);
+    if (!m.char || m.char.x !== 31 || m.char.y !== 36) {
+      errors.push(`run38-firstload-375: character not at the Estudio door ${JSON.stringify(m.char)}`);
     }
-    if (m.mapBottom > m.fitBottom + 1) {
-      errors.push(`run37-firstload-375: map bottom ${m.mapBottom} below free area ${m.fitBottom}`);
+  } finally {
+    await context.close();
+  }
+}
+
+/** Run #38: on a phone every room spans ~90% of the width, centered between the Salir pill and the sheet. */
+async function testRun38PhoneInteriorFit(browser, errors) {
+  const { PNG } = await import('pngjs');
+  const context = await browser.newContext({
+    viewport: { width: 375, height: 812 },
+    deviceScaleFactor: 1,
+    isMobile: true,
+    hasTouch: true,
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto(BASE.replace(/#.*$/, ''), { waitUntil: 'networkidle' });
+    await wait(800);
+    for (const name of INTERIOR_ROOM_NAMES) {
+      await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
+      await waitForInterior(page);
+      await wait(900);
+      const free = await page.evaluate(() => {
+        const pill = document.querySelector('[data-float-exit]')?.getBoundingClientRect();
+        const sheet = document.querySelector('.building-panel__sheet')?.getBoundingClientRect();
+        return pill && sheet ? { top: Math.ceil(pill.bottom), bottom: Math.floor(sheet.top) } : null;
+      });
+      if (!free) {
+        errors.push(`run38-fit-${name}: pill or sheet missing`);
+        continue;
+      }
+      const png = PNG.sync.read(await page.screenshot());
+      const bg = pngColorAt(png, 4, free.top + 4);
+      let minX = Infinity;
+      let maxX = -1;
+      let minY = Infinity;
+      let maxY = -1;
+      for (let y = free.top + 2; y < free.bottom - 30; y++) {
+        for (let x = 0; x < png.width; x++) {
+          if (colorDist(pngColorAt(png, x, y), bg) > 60) {
+            minX = Math.min(minX, x);
+            maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+          }
+        }
+      }
+      if (maxX < 0) {
+        errors.push(`run38-fit-${name}: room not found`);
+      } else {
+        const frac = (maxX - minX + 1) / png.width;
+        const cy = (minY + maxY) / 2;
+        const freeCy = (free.top + free.bottom) / 2;
+        if (frac < 0.86 || frac > 0.97) {
+          errors.push(`run38-fit-${name}: room spans ${(frac * 100).toFixed(0)}% of the width (want ~90%)`);
+        }
+        if (Math.abs(cy - freeCy) > 24) {
+          errors.push(`run38-fit-${name}: room center y ${cy} vs free-space center ${freeCy}`);
+        }
+      }
+      await page.evaluate(() => window.__playtestQa?.exitInterior?.());
+      await wait(500);
     }
+  } finally {
+    await context.close();
+  }
+}
+
+/** Run #38: tapping Sambil water gives feedback; the toast clears when entering or leaving a room. */
+async function testRun38ToastClearsAcrossRooms(browser, errors) {
+  const context = await browser.newContext({
+    viewport: { width: 375, height: 812 },
+    deviceScaleFactor: 1,
+    isMobile: true,
+    hasTouch: true,
+  });
+  const page = await context.newPage();
+  const toastVisible = () =>
+    page.evaluate(() => document.getElementById('playtest-toast')?.classList.contains('playtest-toast--visible') ?? false);
+  try {
+    await page.goto(BASE.replace(/#.*$/, ''), { waitUntil: 'networkidle' });
+    await wait(800);
+    await page.evaluate(() => window.__playtestQa?.enterInterior?.('sambil'));
+    await waitForInterior(page);
+    await wait(900);
+    const pt = await page.evaluate(() => window.__playtestQa?.interiorTileScreenPoint?.(6, 2));
+    await page.touchscreen.tap(Math.round(pt.x), Math.round(pt.y));
+    await wait(700);
+    if (!(await toastVisible())) errors.push('run38-toast: tapping Sambil water showed no feedback');
+    await page.evaluate(() => window.__playtestQa?.exitInterior?.());
+    await wait(900);
+    if (await toastVisible()) errors.push('run38-toast: stale toast survived leaving the room');
+    await page.evaluate(() => window.__playtestQa?.enterInterior?.('sambil'));
+    await waitForInterior(page);
+    await wait(900);
+    const pt2 = await page.evaluate(() => window.__playtestQa?.interiorTileScreenPoint?.(6, 2));
+    await page.touchscreen.tap(Math.round(pt2.x), Math.round(pt2.y));
+    await wait(500);
+    await page.evaluate(() => window.__playtestQa?.exitInterior?.());
+    await wait(600);
+    await page.evaluate(() => window.__playtestQa?.enterInterior?.('estudio'));
+    await waitForInterior(page);
+    await wait(600);
+    if (await toastVisible()) errors.push('run38-toast: stale toast survived entering another room');
   } finally {
     await context.close();
   }
@@ -3983,7 +4086,9 @@ async function main() {
     await testRun37InteriorPixelProbes(browser, errors);
     await testRun37DesktopInteriorMargins(browser, errors);
     await testRun37PhoneTouchWalkAllRooms(browser, errors);
-    await testRun37MobileFirstLoadFraming(browser, errors);
+    await testRun38MobileFirstLoadFraming(browser, errors);
+    await testRun38PhoneInteriorFit(browser, errors);
+    await testRun38ToastClearsAcrossRooms(browser, errors);
     const desktopCdp = await desktop.context().newCDPSession(desktop);
     await testRun32WalkPinchFiveTrials(desktop, errors, desktopCdp);
     await ensureTouchEmulation(desktopCdp);

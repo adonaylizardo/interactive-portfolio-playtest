@@ -13,3 +13,10 @@ export function showToast(message: string, durationMs = 2200): void {
     el?.classList.remove('playtest-toast--visible');
   }, durationMs);
 }
+
+export function hideToast(): void {
+  const el = document.getElementById('playtest-toast') as (HTMLElement & { _t?: number }) | null;
+  if (!el) return;
+  window.clearTimeout(el._t);
+  el.classList.remove('playtest-toast--visible');
+}

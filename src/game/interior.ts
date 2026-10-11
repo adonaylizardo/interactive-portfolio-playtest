@@ -218,10 +218,13 @@ const MAT = 0xe8e4da;
 const PEW: Palette = { top: 0x9c7650, left: 0x7a5638, right: 0x5c3f28 };
 const STONE: Palette = { top: 0xdcd6cc, left: 0xb2aca2, right: 0x968f85 };
 const STAGE: Palette = { top: 0xa87c52, left: 0x7c5a3a, right: 0x5e4329 };
-const TIER: Palette = { top: 0x7c7c8a, left: 0x5c5c68, right: 0x4a4a54 };
-const TIER_ALT: Palette = { top: 0x6a6a78, left: 0x4e4e5a, right: 0x3e3e48 };
+/** Treads are light; each riser (the +y / +x walls) is one step darker than its own tread. */
+const TIER: Palette = { top: 0xa6a6b6, left: 0x62626f, right: 0x52525e };
+const TIER_ALT: Palette = { top: 0x9696a6, left: 0x565663, right: 0x484855 };
+const TIER_NOSING = 0xd2d2de;
 const SEAT: Palette = { top: 0xc04c4c, left: 0x983838, right: 0x762a2a };
 const TIER_EDGE = 0x2e2e36;
+const BENCH: Palette = { top: 0xa08058, left: 0x7a5e3e, right: 0x5e462c };
 const SCREEN_FRAME = 0x2a2a36;
 const SCREEN_GLOW = 0x46506a;
 
@@ -320,9 +323,7 @@ function paintCaseProp(g: Graphics, def: InteriorDef): void {
       box(g, 0.5, 0.35, 1.3, 0.5, 28, 44, DARK);
       break;
     case 'bain':
-      box(g, 0.2, 0.75, 0.5, 1.2, 0, 16, DARK);
-      box(g, 0.75, 0.2, 1.2, 0.5, 0, 16, DARK);
-      drum(g, 1.05, 1.05, 0.7, 0, 28, 0x5a4a40, 0x8a7060);
+      paintBainTable(g);
       break;
     case 'mentoria': {
       box(g, 0.1, 0.05, 1.9, 0.55, 0, 80, SHELF);
@@ -351,6 +352,20 @@ function paintCaseProp(g: Graphics, def: InteriorDef): void {
     default:
       break;
   }
+}
+
+const BAIN_TABLE_Z = 34;
+const BAIN_TABLE_TOP = 0xb08e6c;
+const BAIN_TABLE_SIDE = 0x6a5646;
+
+/** Round pedestal table at table height, with a chair on each open side against the walls. */
+function paintBainTable(g: Graphics): void {
+  box(g, 0.12, 0.7, 0.58, 1.3, 0, 16, CHAIR);
+  box(g, 0.12, 0.7, 0.24, 1.3, 16, 40, CHAIR);
+  box(g, 0.7, 0.12, 1.3, 0.58, 0, 16, CHAIR);
+  box(g, 0.7, 0.12, 1.3, 0.24, 16, 40, CHAIR);
+  drum(g, 1.05, 1.05, 0.16, 0, BAIN_TABLE_Z - 6, BAIN_TABLE_SIDE, BAIN_TABLE_SIDE);
+  drum(g, 1.05, 1.05, 0.62, BAIN_TABLE_Z - 6, BAIN_TABLE_Z, BAIN_TABLE_SIDE, BAIN_TABLE_TOP);
 }
 
 function paintDisplayCase(g: Graphics): void {
@@ -399,6 +414,19 @@ function paintCatedral(g: Graphics, def: InteriorDef, grid: InteriorCell[][]): v
   for (const t of tiles) paintPew(g, t.x, t.y);
 }
 
+/** Small benches on the walkway (row 4), tucked to opposite edges so the lane stays clear. */
+const SAMBIL_BENCHES = [
+  { x0: 5.12, y0: 4.04, x1: 5.88, y1: 4.3 },
+  { x0: 6.12, y0: 4.7, x1: 6.88, y1: 4.96 },
+];
+
+function paintBench(g: Graphics, x0: number, y0: number, x1: number, y1: number): void {
+  const leg = 0.1;
+  box(g, x0 + 0.04, y0, x0 + 0.04 + leg, y1, 0, 9, BENCH);
+  box(g, x1 - 0.04 - leg, y0, x1 - 0.04, y1, 0, 9, BENCH);
+  box(g, x0, y0, x1, y1, 9, 15, BENCH);
+}
+
 function paintSambil(g: Graphics, def: InteriorDef): void {
   const water = 0x7aa8bc;
   const waterDark = 0x5a8898;
@@ -409,6 +437,7 @@ function paintSambil(g: Graphics, def: InteriorDef): void {
     }
   }
   tileDiamond(g, 4, 4, walk);
+  for (const b of SAMBIL_BENCHES) paintBench(g, b.x0, b.y0, b.x1, b.y1);
   const a = P(5, 1.5, 6);
   const b = P(7, 1.5, 6);
   g.moveTo(a.x, a.y);
@@ -437,7 +466,7 @@ function paintFlor(g: Graphics, def: InteriorDef): void {
     const n1 = P(tier.x + 1, FLOR_TIER_Y1, tier.h);
     g.moveTo(n0.x, n0.y);
     g.lineTo(n1.x, n1.y);
-    g.stroke({ width: 2, color: 0xa4a4b0 });
+    g.stroke({ width: 2, color: TIER_NOSING });
     for (let y = FLOR_TIER_Y0; y < FLOR_TIER_Y1; y++) {
       box(g, tier.x + 0.22, y + 0.14, tier.x + 0.66, y + 0.86, tier.h, tier.h + 8, SEAT);
       box(g, tier.x + 0.66, y + 0.14, tier.x + 0.84, y + 0.86, tier.h, tier.h + 26, SEAT);
@@ -477,7 +506,7 @@ export function drawInteriorRoom(g: Graphics, def: InteriorDef): void {
   paintInteriorProps(g, def);
 }
 
-export function interiorWorldBounds(def: InteriorDef): {
+export function interiorWorldBounds(def: InteriorDef, tightSides = false): {
   minX: number;
   maxX: number;
   minY: number;
@@ -507,7 +536,7 @@ export function interiorWorldBounds(def: InteriorDef): {
     minY = Math.min(minY, p.y);
     maxY = Math.max(maxY, p.y);
   }
-  const padX = TILE_W * 0.25;
+  const padX = TILE_W * (tightSides ? 0.03 : 0.25);
   const padY = TILE_H * 0.4;
   return {
     minX: minX - padX,
@@ -712,6 +741,14 @@ export function interiorPixelProbes(def: InteriorDef): InteriorPixelProbe[] {
         }
       }
     }
+  } else if (def.id === 'sambil') {
+    SAMBIL_BENCHES.forEach((b, i) => {
+      out.push({
+        label: `sambil-bench-${i}`,
+        world: P((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, 15),
+        expect: [BENCH.top],
+      });
+    });
   } else if (def.id === 'flor') {
     out.push({
       label: 'flor-stage',
@@ -729,7 +766,7 @@ export function interiorPixelProbes(def: InteriorDef): InteriorPixelProbe[] {
     const caseProbe: Record<string, { world: Pt; expect: number[] }> = {
       estudio: { world: P(1.2, 0.9, 30), expect: pal(WOOD) },
       volaris: { world: P(1.2, 1.0, 28), expect: pal(CONSOLE) },
-      bain: { world: P(1.05, 1.05, 28), expect: [0x8a7060, 0x5a4a40] },
+      bain: { world: P(1.05, 1.05, BAIN_TABLE_Z), expect: [BAIN_TABLE_TOP] },
       mentoria: { world: P(1.0, 1.3, 26), expect: pal(LIGHT_WOOD) },
       finoa: { world: P(1.5, 1.4, 30), expect: pal(FINOA_TABLE) },
       pg: { world: P(1.65, 1.0, 40), expect: [...pal(GLASS), ...pal(PRODUCT)] },

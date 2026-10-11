@@ -3,6 +3,7 @@ import {
   cells,
   getBuildingAt,
   getBuildingAtDoor,
+  getBuildingByName,
   getSceneryAt,
   INICIO,
   MAP_HEIGHT,
@@ -202,6 +203,7 @@ export class IsoScene {
   private interiorPath: { x: number; y: number }[] = [];
   private interiorFloorGfx = new Graphics();
   private interiorWallGfx = new Graphics();
+  private interiorBottomSheet = false;
   private interiorPropGfx = new Graphics();
   private interiorCharGfx = new Graphics();
   private mapReturnDoor: { x: number; y: number } | null = null;
@@ -265,7 +267,7 @@ export class IsoScene {
       this.cameraY = fromHash.y;
       this.zoom = clampZoom(fromHash.zoom);
     } else if (this.shouldUseMobileFraming()) {
-      this.frameMobileDefaultView();
+      this.frameMobileFirstLoadView();
     } else {
       this.cameraX = DESKTOP_DEFAULT_VIEW.x;
       this.cameraY = DESKTOP_DEFAULT_VIEW.y;
@@ -824,10 +826,25 @@ export class IsoScene {
     let bottom = 16;
     const pad = 10;
     const panelInsets = this.events.buildingPanel?.layoutInsets?.();
+    const bottomSheet =
+      !!panelInsets && this.interiorActive && panelInsets.bottom > 0 && panelInsets.right === 0;
+    this.interiorBottomSheet = bottomSheet;
+    if (this.interiorActive && !bottomSheet) {
+      left = Math.max(left, 24);
+      right = Math.max(right, 24);
+    }
     if (panelInsets && this.interiorActive) {
-      left = Math.max(left, panelInsets.left + pad, 24 + pad);
-      top = Math.max(top, panelInsets.top + pad);
-      right = Math.max(right, panelInsets.right + pad, 25 + pad);
+      if (bottomSheet) {
+        // Phone: the room spans ~90% of the width, centered between the Salir pill and the sheet.
+        const side = Math.round(sw * 0.05);
+        left = Math.max(left, panelInsets.left + side);
+        right = Math.max(right, panelInsets.right + side);
+        top = Math.max(top, panelInsets.top);
+      } else {
+        left = Math.max(left, panelInsets.left + pad, 24 + pad);
+        right = Math.max(right, panelInsets.right + pad, 25 + pad);
+        top = Math.max(top, panelInsets.top + pad);
+      }
       bottom = Math.max(bottom, panelInsets.bottom + pad);
     }
     const checklist = document.querySelector('.checklist');
@@ -863,7 +880,7 @@ export class IsoScene {
     const sh = this.app.screen.height;
     this.updateCameraFitMargins();
     if (this.interiorActive && this.interiorDef) {
-      const bounds = interiorWorldBounds(this.interiorDef);
+      const bounds = interiorWorldBounds(this.interiorDef, this.interiorBottomSheet);
       const zMin = zoomMinForInteriorBounds(bounds, sw, sh);
       this.zoom = Math.min(1.5, Math.max(zMin, this.zoom));
       const fitted = clampInteriorPanInView(
@@ -1072,6 +1089,58 @@ export class IsoScene {
     if (!this.shouldUseMobileFraming()) return;
     this.frameMobileDefaultView();
     this.applyCamera(false);
+  }
+
+  /** Phone first load: Estudio and the first house (Volaris) fill the width, character at the door. */
+  private frameMobileFirstLoadView(): void {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const estudio = getBuildingByName('estudio');
+    const volaris = getBuildingByName('volaris');
+    if (!estudio || !volaris) {
+      this.frameMobileDefaultView();
+      return;
+    }
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const b of [estudio, volaris]) {
+      const x0 = b.footprintX ?? b.x;
+      const y0 = b.footprintY ?? b.y;
+      const w = b.w ?? 1;
+      const h = b.h ?? 1;
+      const corners = [
+        tileToWorld(x0, y0),
+        tileToWorld(x0 + w, y0),
+        tileToWorld(x0, y0 + h),
+        tileToWorld(x0 + w, y0 + h),
+      ];
+      for (const c of corners) {
+        minX = Math.min(minX, c.x);
+        maxX = Math.max(maxX, c.x);
+        minY = Math.min(minY, c.y);
+        maxY = Math.max(maxY, c.y);
+      }
+    }
+    const roofRise = 140;
+    const side = 12;
+    const zoom = clampZoom((sw - side * 2) / (maxX - minX), sw, sh);
+    const cx = (minX + maxX) / 2;
+    const cy = (minY - roofRise + maxY) / 2;
+    setCameraFitMargins({ left: 20, right: 20, top: 48, bottom: 96 });
+    this.zoom = zoom;
+    this.cameraX = -cx;
+    this.cameraY = -cy + (sh * 0.42 - sh / 2) / zoom;
+    const hardened = stabilizeCameraAfterGesture(
+      { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+      sw,
+      sh,
+    );
+    this.cameraX = hardened.cameraX;
+    this.cameraY = hardened.cameraY;
+    this.zoom = hardened.zoom;
+    setCameraFitMargins({ left: MAP_FIT_MARGIN_PX, right: MAP_FIT_MARGIN_PX, top: MAP_FIT_MARGIN_PX, bottom: MAP_FIT_MARGIN_PX });
   }
 
   private frameMobileDefaultView(): void {
@@ -1819,7 +1888,11 @@ export class IsoScene {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     this.updateCameraFitMargins();
-    const fitted = fitCameraToInteriorBounds(interiorWorldBounds(this.interiorDef), sw, sh);
+    const fitted = fitCameraToInteriorBounds(
+      interiorWorldBounds(this.interiorDef, this.interiorBottomSheet),
+      sw,
+      sh,
+    );
     this.cameraX = fitted.cameraX;
     this.cameraY = fitted.cameraY;
     this.zoom = fitted.zoom;
@@ -2003,7 +2076,10 @@ export class IsoScene {
     }
     const tile = interiorPickTile(this.interiorDef, wx, wy);
     if (!tile) return;
-    if (!this.interiorGrid[tile.y]?.[tile.x]?.walkable) return;
+    if (!this.interiorGrid[tile.y]?.[tile.x]?.walkable) {
+      if (this.interiorDef.id === 'sambil' && tile.x >= 5) this.events.onUnreachable?.();
+      return;
+    }
     const sx0 = Math.round(this.interiorCharTx);
     const sy0 = Math.round(this.interiorCharTy);
     const path = findPathInterior(this.interiorGrid, sx0, sy0, tile.x, tile.y);

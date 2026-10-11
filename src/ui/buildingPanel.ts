@@ -172,7 +172,10 @@ export class BuildingPanel {
     if (this.isMobile()) {
       const peek = this.el.classList.contains('building-panel--peek');
       const bottom = peek ? Math.min(88, sheet.height) : sheet.height;
-      return { left: 0, top: 0, right: 0, bottom: Math.ceil(bottom + 8) };
+      const floatExit = this.el.querySelector('[data-float-exit]') as HTMLElement | null;
+      const pill = floatExit && !floatExit.hidden ? floatExit.getBoundingClientRect() : null;
+      const top = pill && pill.height > 0 ? Math.ceil(pill.bottom + 6) : 0;
+      return { left: 0, top, right: 0, bottom: Math.ceil(bottom + 8) };
     }
     return { left: 0, top: 0, right: Math.ceil(sheet.width + 32), bottom: 0 };
   }
