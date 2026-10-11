@@ -610,13 +610,19 @@ function tileKey(x: number, y: number): string {
   return `${x},${y}`;
 }
 
-/** Blocked interior tiles that must have a visible prop mesh. */
+function isPerimeterShell(def: InteriorDef, x: number, y: number): boolean {
+  const edge = x === 0 || y === 0 || x === def.w - 1 || y === def.h - 1;
+  const isExit = x === def.exit.x && y === def.exit.y;
+  return edge && !isExit;
+}
+
+/** Blocked tiles that must show furniture/terrain (not plain wall shell). */
 export function interiorBlockedPropTiles(def: InteriorDef): { x: number; y: number }[] {
   const grid = buildInteriorGrid(def);
   const out: { x: number; y: number }[] = [];
   for (let y = 0; y < def.h; y++) {
     for (let x = 0; x < def.w; x++) {
-      if (!grid[y][x].walkable) out.push({ x, y });
+      if (!grid[y][x].walkable && !isPerimeterShell(def, x, y)) out.push({ x, y });
     }
   }
   return out;
