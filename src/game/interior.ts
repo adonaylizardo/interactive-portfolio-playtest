@@ -1,6 +1,6 @@
 import { Graphics } from 'pixi.js';
 import { TILE_H, TILE_W } from '../data/world';
-import { tileFootWorld } from '../iso/math';
+import { tileFootWorld, worldToTile } from '../iso/math';
 import { drawCharacter } from './draw';
 
 export const INTERIOR_BUILDING_IDS = [
@@ -188,7 +188,9 @@ function drawIsoBlock(
   poly(g, [raise(sw, slabH), raise(se, slabH), raise(ne, slabH + 6), raise(nw, slabH + 6)], top);
 }
 
+/** NW walkable corner — both back walls meet at grid (0,0). */
 const CASE_CORNER = { x: 1, y: 1, w: 2, h: 2 };
+const WEST_FACE_DEPTH = TILE_W * 0.44;
 /** ~1.5–2× character silhouette (~52px). */
 const CASE_PROP_H = 58;
 
@@ -221,38 +223,46 @@ function drawCaseCornerProp(
   drawCaseRug(g, accent);
   const { x, y, w, h } = CASE_CORNER;
   if (kind === 'panel') {
-    const nw = northTop(x, y);
-    const panelH = CASE_PROP_H + 18;
+    const wn = northTop(0, 0);
+    const ws = northTop(0, 2);
+    const panelH = CASE_PROP_H + 22;
     poly(
       g,
       [
-        raise(nw, 8),
-        raise(nw, panelH),
-        raise({ x: nw.x - TILE_W * 0.35, y: nw.y - TILE_H * 0.18 }, panelH),
-        raise({ x: nw.x - TILE_W * 0.35, y: nw.y - TILE_H * 0.18 }, 8),
+        raise(wn, 12),
+        raise(ws, 12),
+        raise(ws, panelH),
+        raise(wn, panelH),
       ],
-      0x3a3a48,
+      0x2e2e38,
     );
     poly(
       g,
       [
-        raise(nw, panelH - 10),
-        raise({ x: nw.x - TILE_W * 0.32, y: nw.y - TILE_H * 0.16 }, panelH - 10),
-        raise({ x: nw.x - TILE_W * 0.32, y: nw.y - TILE_H * 0.16 }, panelH),
-        raise(nw, panelH),
+        raise(wn, panelH - 12),
+        raise(ws, panelH - 12),
+        raise(ws, panelH),
+        raise(wn, panelH),
       ],
-      0x555566,
+      0x484858,
     );
-    drawIsoBlock(g, x, y, w, h, CASE_PROP_H - 12, body, top);
+    drawIsoBlock(g, x, y, w, h, CASE_PROP_H, body, top);
   } else if (kind === 'display') {
     drawIsoBlock(g, x, y, w, h, CASE_PROP_H, body, top);
     const cap = localFoot(x + 1, y);
-    g.moveTo(cap.x - 14, cap.y - CASE_PROP_H - 6);
-    g.lineTo(cap.x + 14, cap.y - CASE_PROP_H - 6);
-    g.lineTo(cap.x + 10, cap.y - CASE_PROP_H - 18);
-    g.lineTo(cap.x - 10, cap.y - CASE_PROP_H - 18);
+    g.moveTo(cap.x - 16, cap.y - CASE_PROP_H - 4);
+    g.lineTo(cap.x + 16, cap.y - CASE_PROP_H - 4);
+    g.lineTo(cap.x + 14, cap.y - CASE_PROP_H - 22);
+    g.lineTo(cap.x - 14, cap.y - CASE_PROP_H - 22);
     g.closePath();
-    g.fill(0xd8d8e0);
+    g.fill(0xe8eef8);
+    g.stroke({ width: 2, color: 0xb0b8c8 });
+    for (const shelfY of [0.35, 0.55, 0.72]) {
+      const sy = cap.y - CASE_PROP_H * shelfY;
+      g.moveTo(cap.x - 12, sy);
+      g.lineTo(cap.x + 12, sy);
+      g.stroke({ width: 2, color: 0x909090 });
+    }
   } else if (kind === 'round') {
     drawIsoBlock(g, x, y, w, h, CASE_PROP_H - 8, body, top);
     g.ellipse(localFoot(x + 1, y + 1).x, localFoot(x + 1, y + 1).y - CASE_PROP_H, 16, 10);
@@ -274,14 +284,16 @@ function drawIdentityProps(g: Graphics, def: InteriorDef): void {
 
   if (def.id === 'catedral') {
     drawIsoBlock(g, 2, 0, 4, 1, 52, 0x8a8a8a, 0xc8c8c8);
-    const pewSeat = 0x5c564c;
-    const pewTop = 0x8a8274;
+    const pewSeat = 0x4a4540;
+    const pewTop = 0x7a7268;
     for (let row = 2; row <= 5; row++) {
       for (const col of [1, 2, 5, 6]) {
-        const h = 14 + (5 - row) * 2;
+        const h = 20 + (5 - row) * 2;
         drawIsoBlock(g, col, row, 1, 1, h, pewSeat, pewTop);
       }
     }
+    drawIsoBlock(g, 3, 1, 1, 1, 18, pewSeat, pewTop);
+    drawIsoBlock(g, 4, 1, 1, 1, 18, pewSeat, pewTop);
   } else if (def.id === 'sambil') {
     const water = 0x7aa8bc;
     const waterDark = 0x5a8898;
@@ -310,39 +322,26 @@ function drawIdentityProps(g: Graphics, def: InteriorDef): void {
     g.lineTo(localFoot(7, 1).x, localFoot(7, 1).y - TILE_H / 2);
     g.stroke({ width: 3, color: 0x555555 });
   } else if (def.id === 'flor') {
-    drawIsoBlock(g, 1, 0, 2, 1, 36, 0x505050, 0x707070);
-    const screenH = def.backWallH - 8;
+    const screenH = def.backWallH - 4;
     const wn = northTop(0, 0);
     const ws = northTop(0, 2);
+    poly(g, [raise(wn, 20), raise(ws, 20), raise(ws, screenH), raise(wn, screenH)], 0x2a2a34);
     poly(
       g,
-      [
-        raise(wn, 28),
-        raise(ws, 28),
-        raise(ws, screenH),
-        raise(wn, screenH),
-      ],
-      0x3a3a48,
+      [raise(wn, screenH - 14), raise(ws, screenH - 14), raise(ws, screenH), raise(wn, screenH)],
+      0x444455,
     );
-    poly(
-      g,
-      [
-        raise(wn, screenH - 10),
-        raise(ws, screenH - 10),
-        raise(ws, screenH),
-        raise(wn, screenH),
-      ],
-      0x555566,
-    );
+    drawIsoBlock(g, 1, 1, 2, 2, 28, 0x585858, 0x787878);
+    drawIsoBlock(g, 1, 0, 2, 1, 44, 0x454545, 0x656565);
     const tierRows: { y: number; h: number; cols: number[] }[] = [
-      { y: 5, h: 10, cols: [2, 3] },
-      { y: 4, h: 16, cols: [2, 3, 4] },
-      { y: 3, h: 22, cols: [3, 4, 5] },
-      { y: 2, h: 28, cols: [4, 5, 6] },
+      { y: 5, h: 12, cols: [2, 3] },
+      { y: 4, h: 18, cols: [2, 3, 4] },
+      { y: 3, h: 24, cols: [3, 4, 5] },
+      { y: 2, h: 30, cols: [4, 5, 6] },
     ];
     for (const row of tierRows) {
       for (const x of row.cols) {
-        drawIsoBlock(g, x, row.y, 1, 1, row.h, 0x757575, 0x9a9a9a);
+        drawIsoBlock(g, x, row.y, 1, 1, row.h, 0x656565, 0x909090);
       }
     }
   } else if (def.id === 'estudio') {
@@ -424,7 +423,19 @@ export function drawInteriorRoom(g: Graphics, def: InteriorDef): void {
   for (let ty = 0; ty < def.h; ty++) {
     const sw = localFoot(0, ty);
     const nw = northTop(0, ty);
-    poly(g, [sw, nw, raise(nw, def.backWallH), raise(sw, def.backWallH)], wallSide);
+    const swOut = { x: sw.x - WEST_FACE_DEPTH * 0.52, y: sw.y + TILE_H * 0.06 };
+    const nwOut = { x: nw.x - WEST_FACE_DEPTH * 0.52, y: nw.y + TILE_H * 0.06 };
+    poly(g, [swOut, nwOut, raise(nwOut, def.backWallH), raise(swOut, def.backWallH)], wallSide);
+    poly(g, [sw, nw, raise(nw, def.backWallH), raise(sw, def.backWallH)], 0x858585);
+  }
+  {
+    const nw0 = northTop(0, 0);
+    const nwOut0 = { x: nw0.x - WEST_FACE_DEPTH * 0.52, y: nw0.y + TILE_H * 0.06 };
+    poly(
+      g,
+      [nwOut0, nw0, raise(nw0, def.backWallH), raise(nwOut0, def.backWallH)],
+      0x828282,
+    );
   }
 
   for (let ty = 0; ty < def.h; ty++) {
@@ -473,6 +484,12 @@ export function interiorWorldBounds(def: InteriorDef): {
   push(raise(northTop(0, 0), def.backWallH));
   push(raise(northTop(def.w - 1, 0), def.backWallH));
   push(raise(localFoot(0, def.h - 1), def.backWallH));
+  {
+    const nw0 = northTop(0, 0);
+    push({ x: nw0.x - WEST_FACE_DEPTH * 0.55, y: nw0.y - def.backWallH });
+    const sw0 = localFoot(0, def.h - 1);
+    push({ x: sw0.x - WEST_FACE_DEPTH * 0.55, y: sw0.y });
+  }
   const pad = TILE_W * 0.35;
   return {
     minX: minX - pad,
@@ -560,17 +577,108 @@ export function syncInteriorCharacter(
   g.position.set(pos.x, pos.y);
 }
 
-/** Tight hit test — only the exit tile (not neighbors or spawn approach). */
-export function interiorExitPick(
+/** Exit mat / doorway — generous so real clicks on the cream tile always exit. */
+export function interiorHitExit(
   def: InteriorDef,
   worldX: number,
   worldY: number,
   zoom: number,
 ): boolean {
   const f = tileFootWorld(def.exit.x, def.exit.y);
-  const cy = f.y - TILE_H / 2;
-  const r = Math.max(10, 18 / Math.max(zoom, 0.4));
-  return Math.hypot(worldX - f.x, worldY - cy) <= r;
+  const cx = f.x;
+  const cy = f.y - TILE_H * 0.38;
+  const r = Math.max(28, 52 / Math.max(zoom, 0.25));
+  if (Math.hypot(worldX - cx, worldY - cy) <= r) return true;
+  const tile = worldToTile(worldX, worldY);
+  if (!tile) return false;
+  if (tile.x === def.exit.x && tile.y === def.exit.y) return true;
+  if (tile.y === def.exit.y && Math.abs(tile.x - def.exit.x) === 1) return true;
+  return false;
+}
+
+/** @deprecated use interiorHitExit */
+export function interiorExitPick(
+  def: InteriorDef,
+  worldX: number,
+  worldY: number,
+  zoom: number,
+): boolean {
+  return interiorHitExit(def, worldX, worldY, zoom);
+}
+
+function tileKey(x: number, y: number): string {
+  return `${x},${y}`;
+}
+
+/** Blocked interior tiles that must have a visible prop mesh. */
+export function interiorBlockedPropTiles(def: InteriorDef): { x: number; y: number }[] {
+  const grid = buildInteriorGrid(def);
+  const out: { x: number; y: number }[] = [];
+  for (let y = 0; y < def.h; y++) {
+    for (let x = 0; x < def.w; x++) {
+      if (!grid[y][x].walkable) out.push({ x, y });
+    }
+  }
+  return out;
+}
+
+/** Tiles covered by drawIdentityProps (must match every blocked tile). */
+export function interiorRenderedPropTiles(def: InteriorDef): { x: number; y: number }[] {
+  const keys = new Set<string>();
+  const mark = (x: number, y: number, w = 1, h = 1) => {
+    for (let dy = 0; dy < h; dy++) {
+      for (let dx = 0; dx < w; dx++) keys.add(tileKey(x + dx, y + dy));
+    }
+  };
+  if (def.id === 'catedral') {
+    mark(2, 0, 4, 1);
+    for (let row = 2; row <= 5; row++) {
+      for (const col of [1, 2, 5, 6]) mark(col, row);
+    }
+    mark(3, 1);
+    mark(4, 1);
+  } else if (def.id === 'sambil') {
+    for (let y = 1; y < def.h - 1; y++) {
+      for (let x = 5; x < def.w - 1; x++) {
+        if (y !== 4) mark(x, y);
+      }
+    }
+  } else if (def.id === 'flor') {
+    for (let y = 0; y <= 2; y++) {
+      mark(0, y);
+      mark(1, y);
+    }
+    mark(1, 0);
+    mark(2, 0);
+    const tiers: { y: number; cols: number[] }[] = [
+      { y: 2, cols: [4, 5, 6] },
+      { y: 3, cols: [3, 4, 5] },
+      { y: 4, cols: [2, 3, 4] },
+      { y: 5, cols: [2, 3] },
+    ];
+    for (const row of tiers) for (const x of row.cols) mark(x, row.y);
+    mark(1, 1, 2, 2);
+    mark(1, 0, 2, 1);
+  } else if (
+    def.id === 'estudio' ||
+    def.id === 'volaris' ||
+    def.id === 'bain' ||
+    def.id === 'mentoria' ||
+    def.id === 'finoa' ||
+    def.id === 'pg'
+  ) {
+    mark(CASE_CORNER.x, CASE_CORNER.y, CASE_CORNER.w, CASE_CORNER.h);
+  }
+  return [...keys].map((k) => {
+    const [x, y] = k.split(',').map(Number);
+    return { x, y };
+  });
+}
+
+export function interiorBlockedTilesHaveProps(def: InteriorDef): boolean {
+  const blocked = interiorBlockedPropTiles(def);
+  const rendered = new Set(interiorRenderedPropTiles(def).map((t) => tileKey(t.x, t.y)));
+  return blocked.every((t) => rendered.has(tileKey(t.x, t.y)));
 }
 
 /** Tile one step inward from spawn (typical “tap ahead” probe). */

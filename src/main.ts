@@ -8,6 +8,7 @@ import {
   validateWalkGridFootprint,
 } from './data/map';
 import { parseInteriorFromHash } from './camera/hash';
+import { getInteriorDef, interiorBlockedTilesHaveProps } from './game/interior';
 import { IsoScene } from './game/scene';
 import { findPath } from './iso/pathfinding';
 import { BuildingPanel } from './ui/buildingPanel';
@@ -123,6 +124,10 @@ async function main(): Promise<void> {
     tapInteriorTile: (tx: number, ty: number) => scene.tapInteriorTileForQa(tx, ty),
     expandInteriorSheet: () => panel.expandInteriorSheetForQa(),
     collapseInteriorSheetToPeek: () => panel.collapseToPeekOnly(),
+    interiorBlockedTilesHaveProps: (name: string) => {
+      const def = getInteriorDef(name);
+      return def ? interiorBlockedTilesHaveProps(def) : false;
+    },
   };
 }
 

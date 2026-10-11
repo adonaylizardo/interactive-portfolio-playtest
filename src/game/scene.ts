@@ -59,6 +59,7 @@ import {
   getInteriorDef,
   interiorWorldBounds,
   interiorForwardTile,
+  interiorHitExit,
   syncInteriorCharacter,
   type InteriorCell,
   type InteriorDef,
@@ -661,12 +662,9 @@ export class IsoScene {
     }
     if (this.interiorActive) {
       const { x: iwx, y: iwy } = this.screenToWorld(sx, sy);
-      const tile = worldToTile(iwx, iwy);
       if (
-        tile &&
         this.interiorDef &&
-        tile.x === this.interiorDef.exit.x &&
-        tile.y === this.interiorDef.exit.y
+        interiorHitExit(this.interiorDef, iwx, iwy, this.zoom)
       ) {
         this.exitInterior();
         return;
@@ -773,9 +771,9 @@ export class IsoScene {
     const pad = 10;
     const panelInsets = this.events.buildingPanel?.layoutInsets?.();
     if (panelInsets && this.interiorActive) {
-      left = Math.max(left, panelInsets.left + pad);
+      left = Math.max(left, panelInsets.left + pad, 24 + pad);
       top = Math.max(top, panelInsets.top + pad);
-      right = Math.max(right, panelInsets.right + pad);
+      right = Math.max(right, panelInsets.right + pad, 24 + pad);
       bottom = Math.max(bottom, panelInsets.bottom + pad);
     }
     const checklist = document.querySelector('.checklist');
@@ -1034,7 +1032,7 @@ export class IsoScene {
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
     this.cameraX = -cx;
-    this.cameraY = -cy - sh * 0.14;
+    this.cameraY = -cy + sh * 0.04;
     const hardened = stabilizeCameraAfterGesture(
       { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
       sw,
@@ -1931,16 +1929,16 @@ export class IsoScene {
   private handleInteriorScreenTap(sx: number, sy: number, sprint: boolean): void {
     if (!this.interiorDef) return;
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
+    if (interiorHitExit(this.interiorDef, wx, wy, this.zoom)) {
+      this.exitInterior();
+      return;
+    }
     const tile = worldToTile(wx, wy);
     if (!tile) return;
     if (tile.x < 0 || tile.y < 0 || tile.x >= this.interiorDef.w || tile.y >= this.interiorDef.h) {
       return;
     }
     if (!this.interiorGrid[tile.y]?.[tile.x]?.walkable) return;
-    if (tile.x === this.interiorDef.exit.x && tile.y === this.interiorDef.exit.y) {
-      this.exitInterior();
-      return;
-    }
     const sx0 = Math.round(this.interiorCharTx);
     const sy0 = Math.round(this.interiorCharTy);
     const path = findPathInterior(this.interiorGrid, sx0, sy0, tile.x, tile.y);
