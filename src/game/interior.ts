@@ -31,7 +31,7 @@ export type InteriorDef = {
 
 /** ~2× character silhouette height in px. */
 export const INTERIOR_BACK_WALL_H = 88;
-export const INTERIOR_PLINTH_H = 22;
+export const INTERIOR_PLINTH_H = 12;
 
 function def(
   id: InteriorBuildingId,
@@ -74,6 +74,22 @@ export function getInteriorDef(id: string): InteriorDef | null {
   return LAYOUTS[id as InteriorBuildingId];
 }
 
+const CASE_IDS: readonly InteriorBuildingId[] = ['estudio', 'volaris', 'bain', 'mentoria', 'finoa', 'pg'];
+
+function isCaseRoom(def: InteriorDef): boolean {
+  return CASE_IDS.includes(def.id);
+}
+
+/** Flor: stage against the west-wall screen, seating tiers rising away from it (+x). */
+const FLOR_STAGE = { x0: 0, x1: 2, y0: 1, y1: 4, h: 20 };
+const FLOR_TIERS = [
+  { x: 3, h: 16 },
+  { x: 4, h: 36 },
+  { x: 5, h: 56 },
+];
+const FLOR_TIER_Y0 = 1;
+const FLOR_TIER_Y1 = 4;
+
 export type InteriorCell = { walkable: boolean };
 
 function setBlocked(cells: InteriorCell[][], x: number, y: number): void {
@@ -105,390 +121,337 @@ export function buildInteriorGrid(def: InteriorDef): InteriorCell[][] {
   } else if (def.id === 'sambil') {
     for (let y = 1; y < def.h - 1; y++) {
       for (let x = 5; x < def.w - 1; x++) {
-        setBlocked(cells, x, y);
+        if (y !== 4) setBlocked(cells, x, y);
       }
-    }
-    for (let x = 5; x < def.w - 1; x++) {
-      cells[4][x].walkable = true;
     }
   } else if (def.id === 'flor') {
-    for (let y = 0; y <= 2; y++) {
-      setBlocked(cells, 0, y);
-      setBlocked(cells, 1, y);
+    for (let y = FLOR_STAGE.y0; y < FLOR_STAGE.y1; y++) {
+      for (let x = Math.max(1, FLOR_STAGE.x0); x < FLOR_STAGE.x1; x++) setBlocked(cells, x, y);
     }
-    setBlocked(cells, 1, 0);
-    setBlocked(cells, 2, 0);
-    const tierRows: { y: number; cols: number[] }[] = [
-      { y: 2, cols: [4, 5, 6] },
-      { y: 3, cols: [3, 4, 5] },
-      { y: 4, cols: [2, 3, 4] },
-      { y: 5, cols: [2, 3] },
-    ];
-    for (const row of tierRows) {
-      for (const x of row.cols) setBlocked(cells, x, row.y);
+    for (const tier of FLOR_TIERS) {
+      for (let y = FLOR_TIER_Y0; y < FLOR_TIER_Y1; y++) setBlocked(cells, tier.x, y);
     }
-  } else if (
-    def.id === 'estudio' ||
-    def.id === 'volaris' ||
-    def.id === 'bain' ||
-    def.id === 'mentoria' ||
-    def.id === 'finoa' ||
-    def.id === 'pg'
-  ) {
-    for (let dy = 0; dy < 2; dy++) {
-      for (let dx = 0; dx < 2; dx++) {
-        setBlocked(cells, 1 + dx, 1 + dy);
-      }
-    }
+  } else if (isCaseRoom(def)) {
+    setBlocked(cells, 1, 1);
   }
 
   return cells;
 }
 
 type Pt = { x: number; y: number };
+type Palette = { top: number; left: number; right: number };
 
-function localFoot(tx: number, ty: number): Pt {
-  const f = tileFootWorld(tx, ty);
-  return { x: f.x, y: f.y };
+/**
+ * World point of a grid-lattice coordinate (gx, gy) raised by z px.
+ * Lattice (tx, ty) is the north vertex of tile (tx, ty); tile centers sit at (tx + 0.5, ty + 0.5),
+ * matching `tileToWorld` / `tileFootWorld`.
+ */
+function P(gx: number, gy: number, z = 0): Pt {
+  return { x: (gx - gy) * (TILE_W / 2), y: (gx + gy - 1) * (TILE_H / 2) - z };
 }
 
-function northTop(tx: number, ty: number): Pt {
-  const f = localFoot(tx, ty);
-  return { x: f.x, y: f.y - TILE_H };
-}
-
-function raise(p: Pt, h: number): Pt {
-  return { x: p.x, y: p.y - h };
-}
-
-function poly(g: Graphics, pts: Pt[], fill: number | { color: number; alpha?: number }): void {
-  if (!pts.length) return;
+function poly(g: Graphics, pts: Pt[], fill: number): void {
   g.moveTo(pts[0].x, pts[0].y);
   for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
   g.closePath();
-  if (typeof fill === 'number') g.fill(fill);
-  else g.fill(fill);
+  g.fill(fill);
 }
 
-function drawIsoBlock(
+function tileDiamond(g: Graphics, tx: number, ty: number, fill: number): void {
+  poly(g, [P(tx, ty), P(tx + 1, ty), P(tx + 1, ty + 1), P(tx, ty + 1)], fill);
+}
+
+/**
+ * Axis-aligned box on the floor lattice. Only the camera-facing faces are drawn:
+ * +y ("left", faces down-left), +x ("right", faces down-right) and the top.
+ */
+function box(
   g: Graphics,
-  tx: number,
-  ty: number,
-  wTiles: number,
-  hTiles: number,
-  slabH: number,
-  fill: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  z0: number,
+  z1: number,
+  pal: Palette,
+): void {
+  poly(g, [P(x0, y1, z0), P(x1, y1, z0), P(x1, y1, z1), P(x0, y1, z1)], pal.left);
+  poly(g, [P(x1, y1, z0), P(x1, y0, z0), P(x1, y0, z1), P(x1, y1, z1)], pal.right);
+  poly(g, [P(x0, y0, z1), P(x1, y0, z1), P(x1, y1, z1), P(x0, y1, z1)], pal.top);
+}
+
+/** Vertical cylinder centered at lattice (cx, cy), radius r in tiles. */
+function drum(
+  g: Graphics,
+  cx: number,
+  cy: number,
+  r: number,
+  z0: number,
+  z1: number,
+  side: number,
   top: number,
 ): void {
-  const sw = localFoot(tx, ty + hTiles - 1);
-  const se = localFoot(tx + wTiles - 1, ty + hTiles - 1);
-  const nw = northTop(tx, ty);
-  const ne = northTop(tx + wTiles - 1, ty);
-  poly(g, [sw, se, raise(se, slabH), raise(sw, slabH)], fill);
-  poly(g, [raise(sw, slabH), raise(se, slabH), raise(ne, slabH + 6), raise(nw, slabH + 6)], top);
+  const rx = r * (TILE_W / 2) * Math.SQRT2;
+  const ry = r * (TILE_H / 2) * Math.SQRT2;
+  const b = P(cx, cy, z0);
+  const t = P(cx, cy, z1);
+  g.ellipse(b.x, b.y, rx, ry);
+  g.fill(side);
+  g.rect(b.x - rx, t.y, rx * 2, b.y - t.y);
+  g.fill(side);
+  g.ellipse(t.x, t.y, rx, ry);
+  g.fill(top);
 }
 
-/** NW walkable corner — both back walls meet at grid (0,0). */
-const CASE_CORNER = { x: 1, y: 1, w: 2, h: 2 };
-/** Extruded west face visible from the default SE camera. */
-const WEST_FACE_DEPTH = TILE_W * 0.72;
 const FLOOR_A = 0xc8c8c8;
 const FLOOR_B = 0xb8b8b8;
-/** ~1.5–2× character silhouette (~52px). */
-const CASE_PROP_H = 58;
+const NORTH_WALL = 0x9e9e9e;
+const WEST_WALL = 0x8a8a8a;
+const WALL_CAP = 0x5e5e5e;
+const WALL_END = 0x747474;
+const WALL_THICK = 0.18;
+const PLINTH_DEPTH = 0.14;
+const PLINTH: Palette = { top: 0xa8a8a8, left: 0x8c8c8c, right: 0x7a7a7a };
+const POST: Palette = { top: 0x8a8a8a, left: 0x6a6a6a, right: 0x585858 };
+const MAT = 0xe8e4da;
 
-function drawCaseRug(g: Graphics, accent: number): void {
-  const light = Math.min(0xffffff, accent + 0x141414);
-  for (let dy = 0; dy < CASE_CORNER.h; dy++) {
-    for (let dx = 0; dx < CASE_CORNER.w; dx++) {
-      const tx = CASE_CORNER.x + dx;
-      const ty = CASE_CORNER.y + dy;
-      const pos = localFoot(tx, ty);
-      g.moveTo(pos.x, pos.y);
-      g.lineTo(pos.x + TILE_W / 2, pos.y - TILE_H / 2);
-      g.lineTo(pos.x, pos.y - TILE_H);
-      g.lineTo(pos.x - TILE_W / 2, pos.y - TILE_H / 2);
-      g.closePath();
-      g.fill((tx + ty) % 2 === 0 ? accent : light);
-    }
-  }
-}
+const PEW: Palette = { top: 0x9c7650, left: 0x7a5638, right: 0x5c3f28 };
+const STONE: Palette = { top: 0xdcd6cc, left: 0xb2aca2, right: 0x968f85 };
+const STAGE: Palette = { top: 0xa87c52, left: 0x7c5a3a, right: 0x5e4329 };
+const TIER: Palette = { top: 0x7c7c8a, left: 0x5c5c68, right: 0x4a4a54 };
+const TIER_ALT: Palette = { top: 0x6a6a78, left: 0x4e4e5a, right: 0x3e3e48 };
+const SEAT: Palette = { top: 0xc04c4c, left: 0x983838, right: 0x762a2a };
+const TIER_EDGE = 0x2e2e36;
+const SCREEN_FRAME = 0x2a2a36;
+const SCREEN_GLOW = 0x46506a;
 
-type CasePropKind = 'desk' | 'panel' | 'table' | 'round' | 'books' | 'display';
+const WOOD: Palette = { top: 0xc49a74, left: 0x9c7656, right: 0x7c5a40 };
+const DARK: Palette = { top: 0x4a4a54, left: 0x34343c, right: 0x26262c };
+const CHAIR: Palette = { top: 0x707070, left: 0x585858, right: 0x464646 };
+const CONSOLE: Palette = { top: 0x8ea4bc, left: 0x6a8098, right: 0x52667c };
+const SHELF: Palette = { top: 0x8a6a4c, left: 0x6c5038, right: 0x523c2a };
+const LIGHT_WOOD: Palette = { top: 0xd8bc98, left: 0xb09472, right: 0x8e7656 };
+const FINOA_TABLE: Palette = { top: 0x8fb0a0, left: 0x6c8c7c, right: 0x547062 };
+const PEDESTAL: Palette = { top: 0x5a5a64, left: 0x44444c, right: 0x34343a };
+const GLASS: Palette = { top: 0xeef4fa, left: 0xd2e2ee, right: 0xb6cadc };
+const PRODUCT: Palette = { top: 0xf0a860, left: 0xd08440, right: 0xa86830 };
 
-function drawCaseCornerProp(
-  g: Graphics,
-  accent: number,
-  kind: CasePropKind,
-  body = 0xaaaaaa,
-  top = 0xbcbcbc,
-): void {
-  drawCaseRug(g, accent);
-  const { x, y, w, h } = CASE_CORNER;
-  if (kind === 'panel') {
-    const wn = northTop(0, 0);
-    const ws = northTop(0, 2);
-    const panelH = CASE_PROP_H + 22;
-    poly(
-      g,
-      [
-        raise(wn, 12),
-        raise(ws, 12),
-        raise(ws, panelH),
-        raise(wn, panelH),
-      ],
-      0x2e2e38,
-    );
-    poly(
-      g,
-      [
-        raise(wn, panelH - 12),
-        raise(ws, panelH - 12),
-        raise(ws, panelH),
-        raise(wn, panelH),
-      ],
-      0x484858,
-    );
-    drawIsoBlock(g, x, y, w, h, CASE_PROP_H, body, top);
-  } else if (kind === 'display') {
-    drawIsoBlock(g, x, y, w, h, CASE_PROP_H, body, top);
-    const cap = localFoot(x + 1, y);
-    g.moveTo(cap.x - 16, cap.y - CASE_PROP_H - 4);
-    g.lineTo(cap.x + 16, cap.y - CASE_PROP_H - 4);
-    g.lineTo(cap.x + 14, cap.y - CASE_PROP_H - 22);
-    g.lineTo(cap.x - 14, cap.y - CASE_PROP_H - 22);
-    g.closePath();
-    g.fill(0xe8eef8);
-    g.stroke({ width: 2, color: 0xb0b8c8 });
-    for (const shelfY of [0.35, 0.55, 0.72]) {
-      const sy = cap.y - CASE_PROP_H * shelfY;
-      g.moveTo(cap.x - 12, sy);
-      g.lineTo(cap.x + 12, sy);
-      g.stroke({ width: 2, color: 0x909090 });
-    }
-  } else if (kind === 'round') {
-    drawIsoBlock(g, x, y, w, h, CASE_PROP_H - 8, body, top);
-    g.ellipse(localFoot(x + 1, y + 1).x, localFoot(x + 1, y + 1).y - CASE_PROP_H, 16, 10);
-    g.fill(0x707070);
-  } else if (kind === 'books') {
-    drawIsoBlock(g, x, y, 2, 1, CASE_PROP_H, body, top);
-    drawIsoBlock(g, x, y + 1, 1, 1, CASE_PROP_H - 16, 0x9a9088, top);
-  } else if (kind === 'table') {
-    drawIsoBlock(g, x, y, w, 1, CASE_PROP_H - 10, body, top);
-    drawIsoBlock(g, x, y + 1, 1, 1, 22, 0x888888, 0xa0a0a0);
-    drawIsoBlock(g, x + 1, y + 1, 1, 1, 22, 0x888888, 0xa0a0a0);
-  } else {
-    drawIsoBlock(g, x, y, w, h, CASE_PROP_H, body, top);
-  }
-}
-
-function drawIdentityProps(g: Graphics, def: InteriorDef): void {
-  const propLight = 0xbcbcbc;
-
-  if (def.id === 'catedral') {
-    drawIsoBlock(g, 2, 0, 4, 1, 52, 0x8a8a8a, 0xc8c8c8);
-  } else if (def.id === 'sambil') {
-    const water = 0x7aa8bc;
-    const waterDark = 0x5a8898;
-    const walk = 0xd4ccc0;
-    for (let y = 1; y < def.h - 1; y++) {
-      for (let x = 5; x < def.w - 1; x++) {
-        const pos = localFoot(x, y);
-        g.moveTo(pos.x, pos.y);
-        g.lineTo(pos.x + TILE_W / 2, pos.y - TILE_H / 2);
-        g.lineTo(pos.x, pos.y - TILE_H);
-        g.lineTo(pos.x - TILE_W / 2, pos.y - TILE_H / 2);
-        g.closePath();
-        g.fill(y === 4 ? walk : y < 4 ? waterDark : water);
-      }
-    }
-    for (let x = 4; x <= 6; x++) {
-      const pos = localFoot(x, 4);
-      g.moveTo(pos.x, pos.y);
-      g.lineTo(pos.x + TILE_W / 2, pos.y - TILE_H / 2);
-      g.lineTo(pos.x, pos.y - TILE_H);
-      g.lineTo(pos.x - TILE_W / 2, pos.y - TILE_H / 2);
-      g.closePath();
-      g.fill(walk);
-    }
-    g.moveTo(localFoot(5, 1).x, localFoot(5, 1).y - TILE_H / 2);
-    g.lineTo(localFoot(7, 1).x, localFoot(7, 1).y - TILE_H / 2);
-    g.stroke({ width: 3, color: 0x555555 });
-  } else if (def.id === 'flor') {
-    const screenH = def.backWallH - 4;
-    const wn = northTop(0, 0);
-    const ws = northTop(0, 2);
-    poly(g, [raise(wn, 20), raise(ws, 20), raise(ws, screenH), raise(wn, screenH)], 0x2a2a34);
-    poly(
-      g,
-      [raise(wn, screenH - 14), raise(ws, screenH - 14), raise(ws, screenH), raise(wn, screenH)],
-      0x444455,
-    );
-    drawIsoBlock(g, 1, 1, 2, 2, 34, 0x484848, 0x707070);
-    drawIsoBlock(g, 0, 0, 2, 2, 8, 0x404040, 0x585858);
-    drawIsoBlock(g, 1, 0, 2, 1, 48, 0x3a3a3a, 0x555555);
-  } else if (def.id === 'estudio') {
-    drawCaseCornerProp(g, 0x8a7868, 'desk', 0x9a8a7a, propLight);
-  } else if (def.id === 'volaris') {
-    drawCaseCornerProp(g, 0x5a88b8, 'panel', 0x8a9098, propLight);
-  } else if (def.id === 'bain') {
-    drawCaseCornerProp(g, 0x787878, 'round', 0x888888, propLight);
-  } else if (def.id === 'mentoria') {
-    drawCaseCornerProp(g, 0x8a8070, 'books', 0x8a8478, 0xb0a898);
-  } else if (def.id === 'finoa') {
-    drawCaseCornerProp(g, 0x6a9080, 'table', 0x7a9080, 0x9ab0a0);
-  } else if (def.id === 'pg') {
-    drawCaseCornerProp(g, 0x989898, 'display', 0x909090, propLight);
-  }
-}
-
-function drawExitMat(g: Graphics, def: InteriorDef): void {
-  const ex = def.exit.x;
-  const ey = def.exit.y;
-  const pos = localFoot(ex, ey);
-  g.moveTo(pos.x, pos.y);
-  g.lineTo(pos.x + TILE_W / 2, pos.y - TILE_H / 2);
-  g.lineTo(pos.x, pos.y - TILE_H);
-  g.lineTo(pos.x - TILE_W / 2, pos.y - TILE_H / 2);
-  g.closePath();
-  g.fill(0xe4e2dc);
-  g.moveTo(pos.x, pos.y);
-  g.lineTo(pos.x + TILE_W / 2, pos.y - TILE_H / 2);
-  g.lineTo(pos.x, pos.y - TILE_H);
-  g.lineTo(pos.x - TILE_W / 2, pos.y - TILE_H / 2);
-  g.closePath();
-  g.stroke({ width: 2, color: 0xc8c4bc });
-  const frame = 0x707070;
-  const lw = 5;
-  const left = localFoot(ex - 1, ey);
-  const right = localFoot(ex + 1, ey);
-  g.moveTo(left.x - 4, left.y - TILE_H / 2);
-  g.lineTo(left.x - 4, left.y - TILE_H / 2 - 28);
-  g.lineTo(left.x + lw, left.y - TILE_H / 2 - 28);
-  g.lineTo(left.x + lw, left.y - TILE_H / 2);
-  g.closePath();
-  g.fill(frame);
-  g.moveTo(right.x + 4, right.y - TILE_H / 2);
-  g.lineTo(right.x + 4, right.y - TILE_H / 2 - 28);
-  g.lineTo(right.x - lw, right.y - TILE_H / 2 - 28);
-  g.lineTo(right.x - lw, right.y - TILE_H / 2);
-  g.closePath();
-  g.fill(frame);
-}
-
-function westOut(nw: Pt, sw: Pt): { nwO: Pt; swO: Pt } {
-  return {
-    nwO: { x: nw.x - WEST_FACE_DEPTH, y: nw.y + TILE_H * 0.12 },
-    swO: { x: sw.x - WEST_FACE_DEPTH, y: sw.y + TILE_H * 0.12 },
-  };
-}
+const CASE_RUG: Record<string, number> = {
+  estudio: 0xb08a68,
+  volaris: 0x6a96c8,
+  bain: 0xb86a5e,
+  mentoria: 0xa08c70,
+  finoa: 0x7aa090,
+  pg: 0x7f92c4,
+};
 
 function paintInteriorFloor(g: Graphics, def: InteriorDef): void {
   for (let ty = 0; ty < def.h; ty++) {
     for (let tx = 0; tx < def.w; tx++) {
-      const pos = localFoot(tx, ty);
-      const fill = (tx + ty) % 2 === 0 ? FLOOR_A : FLOOR_B;
-      g.moveTo(pos.x, pos.y);
-      g.lineTo(pos.x + TILE_W / 2, pos.y - TILE_H / 2);
-      g.lineTo(pos.x, pos.y - TILE_H);
-      g.lineTo(pos.x - TILE_W / 2, pos.y - TILE_H / 2);
-      g.closePath();
-      g.fill(fill);
+      tileDiamond(g, tx, ty, (tx + ty) % 2 === 0 ? FLOOR_A : FLOOR_B);
     }
   }
 }
 
+/**
+ * North wall runs along the y = 0 floor edge, west wall along the x = 0 edge; both rise from
+ * the floor edge to backWallH and their caps share the inner corner vertex P(0, 0, H).
+ */
 function paintInteriorWalls(g: Graphics, def: InteriorDef): void {
-  const wallBack = 0x9a9a9a;
-  const wallSide = 0x848484;
-  const wallFront = 0xa0a0a0;
-  const meet = northTop(0, 0);
+  const H = def.backWallH;
+  const t = WALL_THICK;
+  const { w, h } = def;
 
-  for (let tx = 0; tx < def.w; tx++) {
-    const nw = northTop(tx, 0);
-    const ne = northTop(tx + 1, 0);
-    poly(g, [nw, ne, raise(ne, def.backWallH), raise(nw, def.backWallH)], wallBack);
-  }
+  poly(g, [P(0, 0, 0), P(0, h, 0), P(0, h, H), P(0, 0, H)], WEST_WALL);
+  poly(g, [P(0, 0, 0), P(w, 0, 0), P(w, 0, H), P(0, 0, H)], NORTH_WALL);
+  poly(g, [P(-t, h, 0), P(0, h, 0), P(0, h, H), P(-t, h, H)], WALL_END);
+  poly(g, [P(w, -t, 0), P(w, 0, 0), P(w, 0, H), P(w, -t, H)], WALL_END);
+  poly(g, [P(0, 0, H), P(-t, -t, H), P(-t, h, H), P(0, h, H)], WALL_CAP);
+  poly(g, [P(0, 0, H), P(w, 0, H), P(w, -t, H), P(-t, -t, H)], WALL_CAP);
 
-  const faceShift = TILE_W * 0.2;
-  const faceDrop = TILE_H * 0.1;
-  for (let ty = 0; ty < def.h; ty++) {
-    const sw = localFoot(0, ty);
-    const nw = northTop(0, ty);
-    const { nwO, swO } = westOut(nw, sw);
-    poly(g, [swO, nwO, raise(nwO, def.backWallH), raise(swO, def.backWallH)], wallSide);
-    const swF = { x: sw.x + faceShift, y: sw.y + faceDrop };
-    const nwF = { x: nw.x + faceShift, y: nw.y + faceDrop };
-    poly(g, [swF, nwF, raise(nwF, def.backWallH), raise(swF, def.backWallH)], 0x7a7a7a);
-    poly(g, [sw, nw, raise(nw, def.backWallH), raise(sw, def.backWallH)], 0x6e6e6e);
+  const ex = def.exit.x;
+  for (let tx = 0; tx < w; tx++) {
+    if (tx === ex) continue;
+    box(g, tx, h, tx + 1, h + PLINTH_DEPTH, 0, def.plinthH, PLINTH);
   }
-  {
-    const nw0 = meet;
-    const sw0 = localFoot(0, 0);
-    const { nwO, swO } = westOut(nw0, sw0);
-    poly(g, [nwO, nw0, meet, raise(meet, def.backWallH), raise(nwO, def.backWallH)], 0x828282);
-    poly(g, [swO, nwO, raise(nwO, def.backWallH), raise(swO, def.backWallH)], wallSide);
-  }
+  box(g, w, 0, w + PLINTH_DEPTH, h + PLINTH_DEPTH, 0, def.plinthH, PLINTH);
+  box(g, ex - 0.1, h, ex + 0.02, h + PLINTH_DEPTH, 0, 34, POST);
+  box(g, ex + 0.98, h, ex + 1.1, h + PLINTH_DEPTH, 0, 34, POST);
+}
 
-  for (let ty = 0; ty < def.h; ty++) {
-    const se = localFoot(def.w - 1, ty);
-    const ne = northTop(def.w - 1, ty);
-    poly(g, [se, ne, raise(ne, def.plinthH), raise(se, def.plinthH)], wallFront);
-  }
+function paintExitMat(g: Graphics, def: InteriorDef): void {
+  const { x, y } = def.exit;
+  tileDiamond(g, x, y, MAT);
+  g.moveTo(P(x, y).x, P(x, y).y);
+  g.lineTo(P(x + 1, y).x, P(x + 1, y).y);
+  g.lineTo(P(x + 1, y + 1).x, P(x + 1, y + 1).y);
+  g.lineTo(P(x, y + 1).x, P(x, y + 1).y);
+  g.closePath();
+  g.stroke({ width: 2, color: 0xc4bfb2 });
+}
 
-  for (let tx = 0; tx < def.w; tx++) {
-    const ty = def.h - 1;
-    if (tx === def.exit.x && ty === def.exit.y) continue;
-    if (tx === def.exit.x - 1 || tx === def.exit.x) continue;
-    const sw = localFoot(tx, ty);
-    const se = localFoot(tx + 1, ty);
-    poly(g, [sw, se, raise(se, def.plinthH), raise(sw, def.plinthH)], wallFront);
+function paintCaseRug(g: Graphics, accent: number): void {
+  const light = Math.min(0xffffff, accent + 0x141414);
+  for (let ty = 0; ty < 3; ty++) {
+    for (let tx = 0; tx < 3; tx++) tileDiamond(g, tx, ty, (tx + ty) % 2 === 0 ? accent : light);
   }
 }
 
-function drawPewBench(g: Graphics, tx: number, ty: number): void {
-  drawIsoBlock(g, tx, ty, 1, 1, 32, 0x3a352e, 0x6a5f54);
+/** Panel mounted on the west wall face (x = 0 plane), y range in tiles. */
+function westWallPanel(g: Graphics, y0: number, y1: number, z0: number, z1: number, frame: number, glow: number): void {
+  const e = 0.02;
+  poly(g, [P(e, y0, z0), P(e, y1, z0), P(e, y1, z1), P(e, y0, z1)], frame);
+  const iy0 = y0 + 0.12;
+  const iy1 = y1 - 0.12;
+  poly(g, [P(e, iy0, z0 + 6), P(e, iy1, z0 + 6), P(e, iy1, z1 - 6), P(e, iy0, z1 - 6)], glow);
 }
 
-function drawFlorTier(g: Graphics, room: InteriorDef, tx: number, ty: number): void {
-  const h = 12 + (defFlorTierHeight(room, tx, ty) ?? 10);
-  drawIsoBlock(g, tx, ty, 1, 1, h, 0x555555, 0xababab);
-}
-
-function defFlorTierHeight(_room: InteriorDef, tx: number, ty: number): number | null {
-  const tiers: { y: number; h: number; cols: number[] }[] = [
-    { y: 5, h: 12, cols: [2, 3] },
-    { y: 4, h: 20, cols: [2, 3, 4] },
-    { y: 3, h: 28, cols: [3, 4, 5] },
-    { y: 2, h: 36, cols: [4, 5, 6] },
-  ];
-  for (const row of tiers) {
-    if (row.y === ty && row.cols.includes(tx)) return row.h;
-  }
-  return null;
-}
-
-function drawBlockedTileMeshes(g: Graphics, def: InteriorDef, grid: InteriorCell[][]): void {
-  for (let y = 0; y < def.h; y++) {
-    for (let x = 0; x < def.w; x++) {
-      if (grid[y][x].walkable || isPerimeterShell(def, x, y)) continue;
-      if (def.id === 'catedral') {
-        drawPewBench(g, x, y);
-      } else if (def.id === 'flor' && defFlorTierHeight(def, x, y) != null) {
-        drawFlorTier(g, def, x, y);
-      } else if (def.id === 'sambil' && x >= 5 && x < def.w - 1 && y >= 1 && y < def.h - 1 && y !== 4) {
-        /* water drawn in identity */
+function paintCaseProp(g: Graphics, def: InteriorDef): void {
+  paintCaseRug(g, CASE_RUG[def.id] ?? 0x999999);
+  switch (def.id) {
+    case 'estudio':
+      box(g, 0.15, 0.15, 1.85, 1.3, 0, 30, WOOD);
+      box(g, 0.55, 0.3, 1.35, 0.42, 30, 56, DARK);
+      box(g, 0.75, 1.5, 1.25, 1.9, 0, 18, CHAIR);
+      break;
+    case 'volaris':
+      westWallPanel(g, 0.25, 1.85, 30, 76, 0x1e2a44, 0x4a7ab8);
+      box(g, 0.2, 0.2, 1.6, 1.4, 0, 28, CONSOLE);
+      box(g, 0.5, 0.35, 1.3, 0.5, 28, 44, DARK);
+      break;
+    case 'bain':
+      box(g, 0.2, 0.75, 0.5, 1.2, 0, 16, DARK);
+      box(g, 0.75, 0.2, 1.2, 0.5, 0, 16, DARK);
+      drum(g, 1.05, 1.05, 0.7, 0, 28, 0x5a4a40, 0x8a7060);
+      break;
+    case 'mentoria': {
+      box(g, 0.1, 0.05, 1.9, 0.55, 0, 80, SHELF);
+      const books = [0x6a4a8a, 0x3a6a8a, 0x8a5a3a, 0x4a7a4a, 0x8a3a3a];
+      for (const z of [8, 30, 52]) {
+        for (let i = 0; i < 5; i++) {
+          const bx0 = 0.2 + i * 0.33;
+          poly(
+            g,
+            [P(bx0, 0.551, z), P(bx0 + 0.26, 0.551, z), P(bx0 + 0.26, 0.551, z + 16), P(bx0, 0.551, z + 16)],
+            books[(i + z) % books.length],
+          );
+        }
       }
+      box(g, 0.35, 0.9, 1.65, 1.75, 0, 26, LIGHT_WOOD);
+      break;
+    }
+    case 'finoa':
+      box(g, 0.2, 0.3, 1.8, 1.7, 0, 30, FINOA_TABLE);
+      box(g, 0.7, 0.75, 1.3, 1.15, 30, 33, DARK);
+      box(g, 0.7, 0.7, 1.3, 0.78, 33, 52, DARK);
+      break;
+    case 'pg':
+      paintDisplayCase(g);
+      break;
+    default:
+      break;
+  }
+}
+
+function paintDisplayCase(g: Graphics): void {
+  box(g, 0.3, 0.3, 1.7, 1.7, 0, 24, PEDESTAL);
+  box(g, 0.35, 0.35, 1.65, 1.65, 24, 72, GLASS);
+  box(g, 0.8, 0.8, 1.2, 1.2, 24, 50, PRODUCT);
+  const frame = { width: 2, color: 0x4c5660 };
+  const edges: [Pt, Pt][] = [
+    [P(0.35, 1.65, 24), P(0.35, 1.65, 72)],
+    [P(1.65, 1.65, 24), P(1.65, 1.65, 72)],
+    [P(1.65, 0.35, 24), P(1.65, 0.35, 72)],
+    [P(0.35, 0.35, 72), P(1.65, 0.35, 72)],
+    [P(1.65, 0.35, 72), P(1.65, 1.65, 72)],
+    [P(1.65, 1.65, 72), P(0.35, 1.65, 72)],
+    [P(0.35, 1.65, 72), P(0.35, 0.35, 72)],
+  ];
+  for (const [a, b] of edges) {
+    g.moveTo(a.x, a.y);
+    g.lineTo(b.x, b.y);
+    g.stroke(frame);
+  }
+  const plate = [P(0.75, 1.701, 8), P(1.25, 1.701, 8), P(1.25, 1.701, 16), P(0.75, 1.701, 16)];
+  poly(g, plate, 0xf2f2f2);
+}
+
+function paintPew(g: Graphics, tx: number, ty: number): void {
+  box(g, tx + 0.06, ty + 0.14, tx + 0.94, ty + 0.34, 0, 38, PEW);
+  box(g, tx + 0.06, ty + 0.34, tx + 0.94, ty + 0.86, 0, 18, PEW);
+}
+
+function paintCatedral(g: Graphics, def: InteriorDef, grid: InteriorCell[][]): void {
+  box(g, 2, 0.1, 6, 0.8, 0, 40, STONE);
+  const cross = 0x5a4632;
+  const c = 4;
+  const e = 0.02;
+  poly(g, [P(c - 0.06, e, 52), P(c + 0.06, e, 52), P(c + 0.06, e, 84), P(c - 0.06, e, 84)], cross);
+  poly(g, [P(c - 0.3, e, 70), P(c + 0.3, e, 70), P(c + 0.3, e, 76), P(c - 0.3, e, 76)], cross);
+  box(g, 3, 1.25, 5, 1.55, 0, 16, PEW);
+  const tiles: { x: number; y: number }[] = [];
+  for (let y = 2; y < def.h - 1; y++) {
+    for (let x = 1; x < def.w - 1; x++) {
+      if (!grid[y][x].walkable) tiles.push({ x, y });
     }
   }
+  tiles.sort((a, b) => a.x + a.y - (b.x + b.y) || a.x - b.x);
+  for (const t of tiles) paintPew(g, t.x, t.y);
+}
+
+function paintSambil(g: Graphics, def: InteriorDef): void {
+  const water = 0x7aa8bc;
+  const waterDark = 0x5a8898;
+  const walk = 0xd4ccc0;
+  for (let y = 1; y < def.h - 1; y++) {
+    for (let x = 5; x < def.w - 1; x++) {
+      tileDiamond(g, x, y, y === 4 ? walk : y < 4 ? waterDark : water);
+    }
+  }
+  tileDiamond(g, 4, 4, walk);
+  const a = P(5, 1.5, 6);
+  const b = P(7, 1.5, 6);
+  g.moveTo(a.x, a.y);
+  g.lineTo(b.x, b.y);
+  g.stroke({ width: 3, color: 0x555555 });
+}
+
+function paintFlor(g: Graphics, def: InteriorDef): void {
+  const H = def.backWallH;
+  westWallPanel(g, FLOR_STAGE.y0 - 0.2, FLOR_STAGE.y1 + 0.2, 34, H - 16, SCREEN_FRAME, SCREEN_GLOW);
+  box(g, FLOR_STAGE.x0, FLOR_STAGE.y0, FLOR_STAGE.x1, FLOR_STAGE.y1, 0, FLOR_STAGE.h, STAGE);
+  const lip = [P(FLOR_STAGE.x1, FLOR_STAGE.y0, FLOR_STAGE.h), P(FLOR_STAGE.x1, FLOR_STAGE.y1, FLOR_STAGE.h)];
+  g.moveTo(lip[0].x, lip[0].y);
+  g.lineTo(lip[1].x, lip[1].y);
+  g.stroke({ width: 2, color: 0xd8b088 });
+
+  FLOR_TIERS.forEach((tier, i) => {
+    box(g, tier.x, FLOR_TIER_Y0, tier.x + 1, FLOR_TIER_Y1, 0, tier.h, i % 2 === 0 ? TIER : TIER_ALT);
+    // Risers face the stage (away from the camera), so the step reads through this edge line.
+    const a = P(tier.x, FLOR_TIER_Y0, tier.h);
+    const b = P(tier.x, FLOR_TIER_Y1, tier.h);
+    g.moveTo(a.x, a.y);
+    g.lineTo(b.x, b.y);
+    g.stroke({ width: 3, color: TIER_EDGE });
+    const n0 = P(tier.x, FLOR_TIER_Y1, tier.h);
+    const n1 = P(tier.x + 1, FLOR_TIER_Y1, tier.h);
+    g.moveTo(n0.x, n0.y);
+    g.lineTo(n1.x, n1.y);
+    g.stroke({ width: 2, color: 0xa4a4b0 });
+    for (let y = FLOR_TIER_Y0; y < FLOR_TIER_Y1; y++) {
+      box(g, tier.x + 0.22, y + 0.14, tier.x + 0.66, y + 0.86, tier.h, tier.h + 8, SEAT);
+      box(g, tier.x + 0.66, y + 0.14, tier.x + 0.84, y + 0.86, tier.h, tier.h + 26, SEAT);
+    }
+  });
 }
 
 function paintInteriorProps(g: Graphics, def: InteriorDef): void {
-  g.alpha = 1;
   const grid = buildInteriorGrid(def);
-  drawIdentityProps(g, def);
-  drawBlockedTileMeshes(g, def, grid);
-  drawExitMat(g, def);
+  paintExitMat(g, def);
+  if (isCaseRoom(def)) paintCaseProp(g, def);
+  else if (def.id === 'catedral') paintCatedral(g, def, grid);
+  else if (def.id === 'sambil') paintSambil(g, def);
+  else if (def.id === 'flor') paintFlor(g, def);
 }
 
 export function drawInteriorFloor(g: Graphics, def: InteriorDef): void {
@@ -506,7 +469,7 @@ export function drawInteriorProps(g: Graphics, def: InteriorDef): void {
   paintInteriorProps(g, def);
 }
 
-/** Single-buffer draw (floor → walls → props). Prefer layered gfx in scene. */
+/** Single-buffer draw (floor → walls → props). The scene uses one Graphics per layer. */
 export function drawInteriorRoom(g: Graphics, def: InteriorDef): void {
   g.clear();
   paintInteriorFloor(g, def);
@@ -522,39 +485,37 @@ export function interiorWorldBounds(def: InteriorDef): {
   width: number;
   height: number;
 } {
+  const H = def.backWallH;
+  const t = WALL_THICK;
+  const d = PLINTH_DEPTH;
+  const pts: Pt[] = [
+    P(-t, -t, H),
+    P(def.w, -t, H),
+    P(-t, def.h, H),
+    P(-t, def.h, 0),
+    P(def.w + d, 0, def.plinthH),
+    P(def.w + d, def.h + d, 0),
+    P(0, def.h + d, 0),
+  ];
   let minX = Infinity;
   let maxX = -Infinity;
   let minY = Infinity;
   let maxY = -Infinity;
-  const push = (p: Pt) => {
+  for (const p of pts) {
     minX = Math.min(minX, p.x);
     maxX = Math.max(maxX, p.x);
     minY = Math.min(minY, p.y);
     maxY = Math.max(maxY, p.y);
-  };
-  for (let ty = 0; ty < def.h; ty++) {
-    for (let tx = 0; tx < def.w; tx++) {
-      push(localFoot(tx, ty));
-      push(northTop(tx, ty));
-    }
   }
-  push(raise(northTop(0, 0), def.backWallH));
-  push(raise(northTop(def.w - 1, 0), def.backWallH));
-  push(raise(localFoot(0, def.h - 1), def.backWallH));
-  {
-    const nw0 = northTop(0, 0);
-    push({ x: nw0.x - WEST_FACE_DEPTH * 0.55, y: nw0.y - def.backWallH });
-    const sw0 = localFoot(0, def.h - 1);
-    push({ x: sw0.x - WEST_FACE_DEPTH * 0.55, y: sw0.y });
-  }
-  const pad = TILE_W * 0.35;
+  const padX = TILE_W * 0.25;
+  const padY = TILE_H * 0.4;
   return {
-    minX: minX - pad,
-    maxX: maxX + pad,
-    minY: minY - def.backWallH - pad,
-    maxY: maxY + pad,
-    width: maxX - minX + pad * 2,
-    height: maxY - minY + def.backWallH + pad * 2,
+    minX: minX - padX,
+    maxX: maxX + padX,
+    minY: minY - padY,
+    maxY: maxY + padY,
+    width: maxX - minX + padX * 2,
+    height: maxY - minY + padY * 2,
   };
 }
 
@@ -566,8 +527,8 @@ export function findPathInterior(
   gy: number,
 ): { x: number; y: number }[] | null {
   const h = grid.length;
-  const w = grid[0]?.length ?? 0;
-  if (gy < 0 || gx < 0 || gy >= h || gx >= w) return null;
+  const wd = grid[0]?.length ?? 0;
+  if (gy < 0 || gx < 0 || gy >= h || gx >= wd) return null;
   if (!grid[gy][gx].walkable) return null;
   if (sx === gx && sy === gy) return [];
 
@@ -602,7 +563,7 @@ export function findPathInterior(
     for (const [dx, dy] of dirs) {
       const nx = cur.x + dx;
       const ny = cur.y + dy;
-      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+      if (nx < 0 || ny < 0 || nx >= wd || ny >= h) continue;
       if (!grid[ny][nx].walkable) continue;
       const nk = `${nx},${ny}`;
       if (closed.has(nk)) continue;
@@ -634,28 +595,18 @@ export function syncInteriorCharacter(
   g.position.set(pos.x, pos.y);
 }
 
-/** Nearest interior tile to a world point (matches visual tile diamonds, fixes touch offset). */
+/** Interior tile whose drawn diamond contains the world point (null outside the floor). */
 export function interiorPickTile(
   def: InteriorDef,
   worldX: number,
   worldY: number,
 ): { x: number; y: number } | null {
-  let best: { x: number; y: number } | null = null;
-  let bestD = Infinity;
-  for (let y = 0; y < def.h; y++) {
-    for (let x = 0; x < def.w; x++) {
-      const f = tileFootWorld(x, y);
-      const cx = f.x;
-      const cy = f.y - TILE_H / 2;
-      const d = Math.hypot(worldX - cx, worldY - cy);
-      if (d < bestD) {
-        bestD = d;
-        best = { x, y };
-      }
-    }
-  }
-  if (bestD > TILE_W * 0.42) return null;
-  return best;
+  const gx = (worldX / (TILE_W / 2) + worldY / (TILE_H / 2)) / 2;
+  const gy = (worldY / (TILE_H / 2) - worldX / (TILE_W / 2)) / 2;
+  const x = Math.round(gx);
+  const y = Math.round(gy);
+  if (x < 0 || y < 0 || x >= def.w || y >= def.h) return null;
+  return { x, y };
 }
 
 /** Exit only on the exit tile (same rule for touch and mouse). */
@@ -701,52 +652,26 @@ export function interiorBlockedPropTiles(def: InteriorDef): { x: number; y: numb
   return out;
 }
 
-/** Tiles covered by drawIdentityProps (must match every blocked tile). */
+/** Tiles whose footprint is covered by a drawn prop (same tables the painters use). */
 export function interiorRenderedPropTiles(def: InteriorDef): { x: number; y: number }[] {
   const keys = new Set<string>();
-  const mark = (x: number, y: number, w = 1, h = 1) => {
-    for (let dy = 0; dy < h; dy++) {
-      for (let dx = 0; dx < w; dx++) keys.add(tileKey(x + dx, y + dy));
-    }
+  const mark = (x0: number, y0: number, x1: number, y1: number) => {
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) keys.add(tileKey(x, y));
   };
   if (def.id === 'catedral') {
-    mark(2, 0, 4, 1);
-    for (let row = 2; row <= 5; row++) {
-      for (const col of [1, 2, 5, 6]) mark(col, row);
+    const grid = buildInteriorGrid(def);
+    for (let y = 2; y < def.h - 1; y++) {
+      for (let x = 1; x < def.w - 1; x++) if (!grid[y][x].walkable) mark(x, y, x + 1, y + 1);
     }
-    mark(3, 1);
-    mark(4, 1);
+    mark(3, 1, 5, 2);
+    mark(2, 0, 6, 1);
   } else if (def.id === 'sambil') {
-    for (let y = 1; y < def.h - 1; y++) {
-      for (let x = 5; x < def.w - 1; x++) {
-        if (y !== 4) mark(x, y);
-      }
-    }
+    for (let y = 1; y < def.h - 1; y++) for (let x = 5; x < def.w - 1; x++) mark(x, y, x + 1, y + 1);
   } else if (def.id === 'flor') {
-    for (let y = 0; y <= 2; y++) {
-      mark(0, y);
-      mark(1, y);
-    }
-    mark(1, 0);
-    mark(2, 0);
-    const tiers: { y: number; cols: number[] }[] = [
-      { y: 2, cols: [4, 5, 6] },
-      { y: 3, cols: [3, 4, 5] },
-      { y: 4, cols: [2, 3, 4] },
-      { y: 5, cols: [2, 3] },
-    ];
-    for (const row of tiers) for (const x of row.cols) mark(x, row.y);
-    mark(1, 1, 2, 2);
-    mark(1, 0, 2, 1);
-  } else if (
-    def.id === 'estudio' ||
-    def.id === 'volaris' ||
-    def.id === 'bain' ||
-    def.id === 'mentoria' ||
-    def.id === 'finoa' ||
-    def.id === 'pg'
-  ) {
-    mark(CASE_CORNER.x, CASE_CORNER.y, CASE_CORNER.w, CASE_CORNER.h);
+    mark(FLOR_STAGE.x0, FLOR_STAGE.y0, FLOR_STAGE.x1, FLOR_STAGE.y1);
+    for (const tier of FLOR_TIERS) mark(tier.x, FLOR_TIER_Y0, tier.x + 1, FLOR_TIER_Y1);
+  } else if (isCaseRoom(def)) {
+    mark(0, 0, 2, 2);
   }
   return [...keys].map((k) => {
     const [x, y] = k.split(',').map(Number);
@@ -759,6 +684,63 @@ export function interiorBlockedTilesHaveProps(def: InteriorDef): boolean {
   const rendered = new Set(interiorRenderedPropTiles(def).map((t) => tileKey(t.x, t.y)));
   return blocked.every((t) => rendered.has(tileKey(t.x, t.y)));
 }
+
+export type InteriorPixelProbe = {
+  label: string;
+  world: Pt;
+  /** Any of these colors counts as the feature being drawn at this point. */
+  expect: number[];
+};
+
+/**
+ * QA pixel probes: one point per west-wall segment, per pew tile, per Flor stage/tier, per case
+ * prop. Each must render as its feature color (not floor, not background).
+ */
+export function interiorPixelProbes(def: InteriorDef): InteriorPixelProbe[] {
+  const out: InteriorPixelProbe[] = [];
+  const pal = (p: Palette) => [p.top, p.left, p.right];
+  const wallZ = def.backWallH - 6;
+  for (let ty = 0; ty < def.h; ty++) {
+    out.push({ label: `west-wall-${ty}`, world: P(0, ty + 0.5, wallZ), expect: [WEST_WALL] });
+  }
+  if (def.id === 'catedral') {
+    const grid = buildInteriorGrid(def);
+    for (let y = 2; y < def.h - 1; y++) {
+      for (let x = 1; x < def.w - 1; x++) {
+        if (!grid[y][x].walkable) {
+          out.push({ label: `pew-${x}-${y}`, world: P(x + 0.5, y + 0.6, 18), expect: pal(PEW) });
+        }
+      }
+    }
+  } else if (def.id === 'flor') {
+    out.push({
+      label: 'flor-stage',
+      world: P((FLOR_STAGE.x0 + FLOR_STAGE.x1) / 2, (FLOR_STAGE.y0 + FLOR_STAGE.y1) / 2, FLOR_STAGE.h),
+      expect: pal(STAGE),
+    });
+    for (const tier of FLOR_TIERS) {
+      out.push({
+        label: `flor-tier-${tier.x}`,
+        world: P(tier.x + 0.75, FLOR_TIER_Y1 - 0.5, tier.h + 18),
+        expect: [...pal(SEAT), ...pal(TIER), ...pal(TIER_ALT)],
+      });
+    }
+  } else if (isCaseRoom(def)) {
+    const caseProbe: Record<string, { world: Pt; expect: number[] }> = {
+      estudio: { world: P(1.2, 0.9, 30), expect: pal(WOOD) },
+      volaris: { world: P(1.2, 1.0, 28), expect: pal(CONSOLE) },
+      bain: { world: P(1.05, 1.05, 28), expect: [0x8a7060, 0x5a4a40] },
+      mentoria: { world: P(1.0, 1.3, 26), expect: pal(LIGHT_WOOD) },
+      finoa: { world: P(1.5, 1.4, 30), expect: pal(FINOA_TABLE) },
+      pg: { world: P(1.65, 1.0, 40), expect: [...pal(GLASS), ...pal(PRODUCT)] },
+    };
+    const c = caseProbe[def.id];
+    if (c) out.push({ label: `case-${def.id}`, ...c });
+  }
+  return out;
+}
+
+export const INTERIOR_FLOOR_COLORS = [FLOOR_A, FLOOR_B];
 
 /** Tile one step inward from spawn (typical “tap ahead” probe). */
 export function interiorForwardTile(def: InteriorDef): { x: number; y: number } {

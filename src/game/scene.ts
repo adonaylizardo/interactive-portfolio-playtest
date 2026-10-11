@@ -63,6 +63,7 @@ import {
   interiorForwardTile,
   interiorHitExit,
   interiorPickTile,
+  interiorPixelProbes,
   syncInteriorCharacter,
   type InteriorCell,
   type InteriorDef,
@@ -2171,6 +2172,21 @@ export class IsoScene {
     const screen = this.worldToScreen(foot.x, foot.y - TILE_H / 2 - liftPx);
     const rect = this.canvasEl.getBoundingClientRect();
     return { x: rect.left + screen.x, y: rect.top + screen.y };
+  }
+
+  /** QA: interior feature probes (west wall, pews, Flor tiers, case props) in client coordinates. */
+  getInteriorPixelProbesClient(): { label: string; x: number; y: number; expect: number[] }[] {
+    if (!this.interiorDef || !this.canvasEl) return [];
+    const rect = this.canvasEl.getBoundingClientRect();
+    return interiorPixelProbes(this.interiorDef).map((p) => {
+      const s = this.worldToScreen(p.world.x, p.world.y);
+      return { label: p.label, x: rect.left + s.x, y: rect.top + s.y, expect: p.expect };
+    });
+  }
+
+  getInteriorCharTile(): { x: number; y: number } | null {
+    if (!this.interiorActive) return null;
+    return { x: Math.round(this.interiorCharTx), y: Math.round(this.interiorCharTy) };
   }
 
   getInteriorForwardScreenPoint(): { x: number; y: number } | null {

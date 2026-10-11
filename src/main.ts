@@ -121,6 +121,8 @@ async function main(): Promise<void> {
     interiorTileScreenPoint: (tx: number, ty: number, liftPx = 0) =>
       scene.getInteriorTileScreenClientPoint(tx, ty, liftPx),
     interiorForwardScreenPoint: () => scene.getInteriorForwardScreenPoint(),
+    interiorCharTile: () => scene.getInteriorCharTile(),
+    interiorPixelProbes: () => scene.getInteriorPixelProbesClient(),
     tapInteriorTile: (tx: number, ty: number) => scene.tapInteriorTileForQa(tx, ty),
     expandInteriorSheet: () => panel.expandInteriorSheetForQa(),
     collapseInteriorSheetToPeek: () => panel.collapseToPeekOnly(),
