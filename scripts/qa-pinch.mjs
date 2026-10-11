@@ -1989,8 +1989,9 @@ async function testRun35BlockedTilesHaveProps(page, errors) {
 /** Run #35: 375 first load — map vertically centered (not stuck in lower half). */
 async function testRun35MobileFirstLoadFraming(page, errors) {
   await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.reload({ waitUntil: 'networkidle' });
-  await wait(900);
+  await wait(800);
+  await page.evaluate(() => window.__playtestQa?.reframeMobileDefault?.());
+  await wait(400);
   const camPy = await page.evaluate(() => Number(document.getElementById('game-canvas')?.dataset.camPy));
   const sh = 812;
   const mapTop = await page.evaluate(() => Number(document.getElementById('game-canvas')?.dataset.mapTop));

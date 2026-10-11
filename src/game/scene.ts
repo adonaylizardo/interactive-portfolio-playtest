@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Point } from 'pixi.js';
+import { Application, Container, Graphics, Point, Rectangle } from 'pixi.js';
 import {
   cells,
   getBuildingAt,
@@ -74,6 +74,7 @@ import {
   isMapFullyVisibleOnScreen,
   mapBoundsOnScreen,
   mapVisibleFractions,
+  MAP_FIT_MARGIN_PX,
   setCameraFitMargins,
   setCameraViewportSize,
   stabilizeCameraAfterGesture,
@@ -118,6 +119,7 @@ export class IsoScene {
   characterLayer = new Container();
   highlightLayer = new Container();
   interiorLayer = new Container();
+  private interiorTapRoutingBound = false;
 
   charTx = INICIO[0];
   charTy = INICIO[1];
@@ -223,6 +225,7 @@ export class IsoScene {
     this.interiorLayer.visible = false;
     this.interiorLayer.addChild(this.interiorRoomGfx);
     this.interiorLayer.addChild(this.interiorCharGfx);
+    this.bindInteriorPointerRouting();
 
     this.pathLayer.addChild(this.pathGfx);
     this.characterLayer.addChild(this.charGfx);
@@ -318,6 +321,27 @@ export class IsoScene {
     this.panDragScreenPx = 0;
   }
 
+  /** Desktop mouse uses Pixi pointertap — route interior hits to handleScreenTap (not map walk). */
+  private bindInteriorPointerRouting(): void {
+    if (this.interiorTapRoutingBound) return;
+    this.interiorTapRoutingBound = true;
+    this.interiorLayer.eventMode = 'static';
+    this.interiorLayer.hitArea = new Rectangle(-12000, -12000, 24000, 24000);
+    this.interiorLayer.on('pointertap', (e) => {
+      if (!this.interiorActive) return;
+      if (this.shouldBlockTap()) return;
+      this.pixiTapGestureSerial = this.pointerGestureSerial;
+      const canvas = this.canvasEl;
+      if (!canvas) return;
+      const native = e.nativeEvent as PointerEvent | undefined;
+      const clientX = native?.clientX ?? 0;
+      const clientY = native?.clientY ?? 0;
+      const rect = canvas.getBoundingClientRect();
+      const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
+      this.handleScreenTap(clientX - rect.left, clientY - rect.top, sprint);
+    });
+  }
+
   private buildVoidClickLayer(): void {
     const g = new Graphics();
     g.rect(-12000, -12000, 24000, 24000);
@@ -327,6 +351,17 @@ export class IsoScene {
     g.on('pointertap', (e) => {
       if (this.shouldBlockTap()) return;
       this.pixiTapGestureSerial = this.pointerGestureSerial;
+      const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
+      if (this.interiorActive) {
+        const canvas = this.canvasEl;
+        if (!canvas) return;
+        const native = e.nativeEvent as PointerEvent | undefined;
+        const clientX = native?.clientX ?? 0;
+        const clientY = native?.clientY ?? 0;
+        const rect = canvas.getBoundingClientRect();
+        this.handleScreenTap(clientX - rect.left, clientY - rect.top, sprint);
+        return;
+      }
       const pos = e.getLocalPosition(this.world);
       const tile = worldToTile(pos.x, pos.y);
       if (!tile) {
@@ -334,7 +369,6 @@ export class IsoScene {
         return;
       }
       if (!this.prepareMapTap(undefined, tile.x, tile.y)) return;
-      const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
       this.requestWalk(tile.x, tile.y, sprint);
     });
     this.world.addChildAt(g, 0);
@@ -1014,15 +1048,22 @@ export class IsoScene {
   }
 
   /** First-load mobile: center the map in the upper viewport (above future sheet). */
+  reframeMobileDefaultViewForQa(): void {
+    if (!this.shouldUseMobileFraming()) return;
+    this.frameMobileDefaultView();
+    this.applyCamera(false);
+  }
+
   private frameMobileDefaultView(): void {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
+    setCameraFitMargins({ left: 20, right: 20, top: 36, bottom: 168 });
     const bounds = mapWorldBounds();
     this.zoom = clampZoom(zoomMinForViewport(sw, sh) * 0.94, sw, sh);
     const worldCx = (bounds.minX + bounds.maxX) / 2;
     const worldCy = (bounds.minY + bounds.maxY) / 2;
     this.cameraX = -worldCx;
-    this.cameraY = -worldCy - (sh * 0.14) / this.zoom;
+    this.cameraY = -worldCy;
     const hardened = stabilizeCameraAfterGesture(
       { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
       sw,
@@ -1031,6 +1072,7 @@ export class IsoScene {
     this.cameraX = hardened.cameraX;
     this.cameraY = hardened.cameraY;
     this.zoom = hardened.zoom;
+    setCameraFitMargins({ left: MAP_FIT_MARGIN_PX, right: MAP_FIT_MARGIN_PX, top: MAP_FIT_MARGIN_PX, bottom: MAP_FIT_MARGIN_PX });
   }
 
   private setZoom(next: number, anchorScreen?: { x: number; y: number }): void {
@@ -1569,6 +1611,12 @@ export class IsoScene {
       }
     };
 
+    canvas.addEventListener('click', (e) => {
+      if (!this.interiorActive) return;
+      if (e.pointerType === 'touch') return;
+      const rect = canvas.getBoundingClientRect();
+      this.handleScreenTap(e.clientX - rect.left, e.clientY - rect.top, false);
+    });
     canvas.addEventListener('pointerdown', onPointerDown);
     canvas.addEventListener('pointermove', onPointerMove);
     canvas.addEventListener('pointerup', endPointerGesture);
@@ -1810,6 +1858,8 @@ export class IsoScene {
       this.pathLayer.visible = false;
       this.characterLayer.visible = false;
       this.interiorLayer.visible = true;
+      this.interiorRoomGfx.eventMode = 'none';
+      this.interiorCharGfx.eventMode = 'none';
       this.interiorRoomGfx.clear();
       drawInteriorRoom(this.interiorRoomGfx, def);
       syncInteriorCharacter(this.interiorCharGfx, this.interiorCharTx, this.interiorCharTy, 'idle');

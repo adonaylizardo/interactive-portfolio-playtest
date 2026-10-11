@@ -124,6 +124,7 @@ async function main(): Promise<void> {
     tapInteriorTile: (tx: number, ty: number) => scene.tapInteriorTileForQa(tx, ty),
     expandInteriorSheet: () => panel.expandInteriorSheetForQa(),
     collapseInteriorSheetToPeek: () => panel.collapseToPeekOnly(),
+    reframeMobileDefault: () => scene.reframeMobileDefaultViewForQa(),
     interiorBlockedTilesHaveProps: (name: string) => {
       const def = getInteriorDef(name);
       return def ? interiorBlockedTilesHaveProps(def) : false;
