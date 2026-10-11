@@ -151,6 +151,8 @@ export class IsoScene {
   private lastPanPos: { x: number; y: number } | null = null;
   private tapStart: { x: number; y: number; t: number } | null = null;
   private lastTapTime = 0;
+  /** Event timestamp of the gesture's first pointerdown (input time, not handler time). */
+  private tapDownStamp = 0;
   private panMoved = false;
   /** Screen pixels dragged during an active single-finger pan (pinch does not increment). */
   private panDragScreenPx = 0;
@@ -1322,6 +1324,10 @@ export class IsoScene {
 
     const dist = Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y);
     if (dist >= 10) return;
+    // Rooms have no long-press action, so any still press is a tap there. On the map, press length
+    // comes from input timestamps: handlers and timers run late on a busy main thread.
+    if (!this.interiorActive && e.timeStamp - this.tapDownStamp > 450) return;
+    const upStamp = e.timeStamp;
     const gestureSerial = this.pointerGestureSerial;
 
     const fire = () => {
@@ -1329,14 +1335,11 @@ export class IsoScene {
       if (this.pointers.size > 0) return;
       if (this.pointerGestureSerial !== gestureSerial) return;
       if (this.pixiTapGestureSerial === gestureSerial) return;
-      if (performance.now() < this.suppressTapUntil) return;
-      const now = performance.now();
-      const dt = now - tapStart.t;
-      if (dt > 450) return;
+      if (upStamp < this.suppressTapUntil) return;
       const canvas = this.canvasEl;
       if (!canvas) return;
-      const double = now - this.lastTapTime < 320;
-      this.lastTapTime = now;
+      const double = upStamp - this.lastTapTime < 320;
+      this.lastTapTime = upStamp;
       const rect = canvas.getBoundingClientRect();
       this.handleScreenTap(e.clientX - rect.left, e.clientY - rect.top, double);
     };
@@ -1550,6 +1553,7 @@ export class IsoScene {
         }
         this.lastPanPos = { x: e.clientX, y: e.clientY };
         this.tapStart = { x: e.clientX, y: e.clientY, t: performance.now() };
+        this.tapDownStamp = e.timeStamp;
       }
       if (this.pointers.size >= 2) {
         this.secondFingerArrived = true;
