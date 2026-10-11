@@ -33,9 +33,10 @@ export function buildHash(view: CameraView): string {
 
 export function parseCameraFromHash(): CameraView | null {
   const params = hashParams();
-  const x = Number(params.get('x'));
-  const y = Number(params.get('y'));
-  const zoom = Number(params.get('z'));
+  const num = (key: string) => (params.has(key) ? Number(params.get(key)) : NaN);
+  const x = num('x');
+  const y = num('y');
+  const zoom = num('z');
   const interiorId = params.get('in');
   if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(zoom)) {
     if (!interiorId) return null;

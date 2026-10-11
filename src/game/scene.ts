@@ -112,6 +112,9 @@ export type SceneEvents = {
   checklist?: ChecklistBridge;
 };
 
+/** Desktop first-load camera when the URL carries no #view. */
+const DESKTOP_DEFAULT_VIEW = { x: 0, y: 0, zoom: 0.15 };
+
 export class IsoScene {
   app!: Application;
   world = new Container();
@@ -261,7 +264,9 @@ export class IsoScene {
     } else if (this.shouldUseMobileFraming()) {
       this.frameMobileDefaultView();
     } else {
-      this.centerOnCharacter(false);
+      this.cameraX = DESKTOP_DEFAULT_VIEW.x;
+      this.cameraY = DESKTOP_DEFAULT_VIEW.y;
+      this.zoom = clampZoom(DESKTOP_DEFAULT_VIEW.zoom);
     }
     if (bootInteriorId) {
       this.outdoorCamBeforeInterior = {
