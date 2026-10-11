@@ -833,8 +833,16 @@ async function cdpClickClient(page, x, y) {
 
 /** Real desktop pointer — hooks may only supply coordinates. */
 async function realMouseClick(page, x, y) {
-  await page.mouse.click(x, y);
-  await wait(200);
+  const canvas = await page.locator('#game-canvas').boundingBox();
+  if (!canvas) {
+    await page.mouse.click(x, y);
+  } else {
+    await page.locator('#game-canvas').click({
+      position: { x: x - canvas.x, y: y - canvas.y },
+      delay: 90,
+    });
+  }
+  await wait(320);
 }
 
 /** Real mobile touch at client coords (CDP / Playwright touchscreen). */
@@ -1448,6 +1456,7 @@ async function testRun33DoorRealInputAll(browser, errors) {
     const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     try {
       await desktop.goto(BASE, { waitUntil: 'networkidle' });
+      await desktop.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
       await desktop.reload({ waitUntil: 'networkidle' });
       await wait(900);
       const start = QA_WALK_START[b.name] ?? [31, 36];
