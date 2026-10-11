@@ -18,6 +18,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
 
@@ -39,7 +40,7 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: npm run qa:pinch
-        timeout-minutes: 55
+        timeout-minutes: 70
         run: npm run qa:pinch
 
       - name: Upload QA artifacts

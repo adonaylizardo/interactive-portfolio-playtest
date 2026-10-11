@@ -449,26 +449,13 @@ export function drawMuro(
 ): void {
   const plank = hover ? 0x7a7a7a : 0x6e6e6e;
   const wallH = 40;
-  const thick = 0.15;
 
   const meet = gridCornerLocal(ax, ay, fx, fy);
   const backEnd = gridCornerLocal(ax, ay, fx + w, fy);
   const leftEnd = gridCornerLocal(ax, ay, fx, fy + h);
-  const backInRef = localFoot(ax, ay, fx + Math.floor(w / 2), fy + 1);
-  const leftInRef = localFoot(ax, ay, fx + 1, fy + Math.floor(h / 2));
 
-  const backOuterA = meet;
-  const backOuterB = backEnd;
-  const backInnerA = lerpPt(backOuterA, backInRef, thick);
-  const backInnerB = lerpPt(backOuterB, backInRef, thick);
-
-  const leftOuterA = meet;
-  const leftOuterB = leftEnd;
-  const leftInnerA = lerpPt(leftOuterA, leftInRef, thick);
-  const leftInnerB = lerpPt(leftOuterB, leftInRef, thick);
-
-  poly(g, [backInnerA, backInnerB, raise(backInnerB, wallH), raise(backInnerA, wallH)], plank);
-  poly(g, [leftInnerA, leftInnerB, raise(leftInnerB, wallH), raise(leftInnerA, wallH)], plank);
+  poly(g, [meet, backEnd, raise(backEnd, wallH), raise(meet, wallH)], plank);
+  poly(g, [meet, leftEnd, raise(leftEnd, wallH), raise(meet, wallH)], plank);
 }
 
 export function drawRedoma(

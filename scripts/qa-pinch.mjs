@@ -1913,13 +1913,19 @@ async function buildRun34Montages(dir) {
   for (const suffix of ['desktop', '375']) {
     const inputs = names.map((n) => path.join(dir, `interior-${n}-${suffix}.png`));
     const out = path.join(dir, `montage-all-${suffix}.png`);
-    const args = ['montage', ...inputs, '-tile', '3x3', '-geometry', '+6+6', '-background', '#1a1a1a', out];
-    let r = spawnSync('magick', args, { encoding: 'utf8' });
+    const args = [
+      ...inputs,
+      '-tile',
+      '3x3',
+      '-geometry',
+      '+6+6',
+      '-background',
+      '#1a1a1a',
+      out,
+    ];
+    const r = spawnSync('montage', args, { encoding: 'utf8' });
     if (r.status !== 0) {
-      r = spawnSync('convert', args, { encoding: 'utf8' });
-    }
-    if (r.status !== 0) {
-      throw new Error(`montage failed for ${suffix}: ${r.stderr || r.stdout}`);
+      throw new Error(`montage failed for ${suffix}: ${r.stderr || r.stdout || r.error?.message}`);
     }
   }
 }
@@ -2808,8 +2814,10 @@ async function testBainDoorLowZoomDeterministic(page, errors) {
     await page.locator('[data-exit]').first().click().catch(() => {});
     await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
     await wait(150);
-    if (!(await cdpClickBuildingDoor(page, 'bain'))) {
-      errors.push('bain-door-lowzoom: tapBuildingDoor failed');
+    await page.evaluate(() => window.__playtestQa?.frameDoorForQa?.('bain'));
+    await wait(200);
+    if (!(await realTapDoor(page, 'bain', { touch: false }))) {
+      errors.push('bain-door-lowzoom: door tap failed');
       return;
     }
     for (let w = 0; w < 40; w++) {

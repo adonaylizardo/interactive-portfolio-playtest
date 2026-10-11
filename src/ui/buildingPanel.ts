@@ -38,7 +38,15 @@ export class BuildingPanel {
     this.titleEl = this.el.querySelector('.building-panel__title')!;
 
     this.el.querySelector('[data-exit]')!.addEventListener('click', () => this.salir());
-    this.el.querySelector('[data-close]')!.addEventListener('click', () => this.salir());
+    this.el.querySelector('[data-close]')!.addEventListener('click', () => {
+      if (this.isMobile() && this.mode === 'interior' && !this.peekOnly) {
+        this.setPeek(true);
+        return;
+      }
+      if (!this.isMobile() || this.mode !== 'interior') {
+        this.salir();
+      }
+    });
     this.el.querySelector('[data-float-exit]')!.addEventListener('click', () => this.salir());
     this.el.querySelector('[data-backdrop]')!.addEventListener('click', () => {
       if (this.isMobile() && this.mode === 'interior') this.setPeek(true);
@@ -76,7 +84,12 @@ export class BuildingPanel {
   }
 
   private syncPeekClass(): void {
-    this.el.classList.toggle('building-panel--peek', this.isMobile() && this.peekOnly && this.isOpen());
+    const mobileInterior = this.isMobile() && this.mode === 'interior' && this.isOpen();
+    this.el.classList.toggle('building-panel--peek', mobileInterior && this.peekOnly);
+    this.el.classList.toggle(
+      'building-panel--expanded',
+      mobileInterior && !this.peekOnly,
+    );
   }
 
   private onDragStart(e: PointerEvent): void {
@@ -161,7 +174,7 @@ export class BuildingPanel {
       const bottom = peek ? Math.min(88, sheet.height) : sheet.height;
       return { left: 0, top: 0, right: 0, bottom: Math.ceil(bottom + 8) };
     }
-    return { left: 0, top: 0, right: Math.ceil(sheet.width + 12), bottom: 0 };
+    return { left: 0, top: 0, right: Math.ceil(sheet.width + 28), bottom: 0 };
   }
 
   containsSheetPoint(clientX: number, clientY: number): boolean {
