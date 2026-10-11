@@ -1868,6 +1868,200 @@ async function testRun34SingleExitUi(browser, errors) {
   }
 }
 
+const INTERIOR_ROOM_NAMES = [
+  'estudio',
+  'volaris',
+  'bain',
+  'mentoria',
+  'finoa',
+  'pg',
+  'sambil',
+  'catedral',
+  'flor',
+];
+
+async function dismissChecklistForCapture(page) {
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'playtest-checklist-v3',
+      JSON.stringify({
+        completed: {
+          'walk-around': false,
+          'walk-keys': false,
+          'move-camera': false,
+          zoom: false,
+          'enter-building': false,
+        },
+        skipped: true,
+        dismissed: true,
+        collapsed: true,
+        mobileExpanded: false,
+      }),
+    );
+  });
+}
+
+/** Run #35: exit mat tap/click after floor taps — 9/9 mobile + desktop. */
+async function testRun35ExitTileAfterFloorTaps(browser, errors) {
+  for (const touch of [false, true]) {
+    const page = await browser.newPage({
+      viewport: touch ? { width: 375, height: 812 } : { width: 1280, height: 800 },
+    });
+    let client;
+    if (touch) {
+      client = await page.context().newCDPSession(page);
+      await ensureTouchEmulation(client);
+    }
+    try {
+      for (const name of INTERIOR_ROOM_NAMES) {
+        await page.goto(BASE, { waitUntil: 'networkidle' });
+        await page.reload({ waitUntil: 'networkidle' });
+        await wait(500);
+        await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
+        await waitForInterior(page);
+        await wait(400);
+        const dims = await page.evaluate(() => ({
+          w: Number(document.getElementById('game-canvas')?.dataset.interiorW),
+          h: Number(document.getElementById('game-canvas')?.dataset.interiorH),
+        }));
+        const probes = [
+          [Math.floor(dims.w / 2), Math.floor(dims.h / 2)],
+          [1, 1],
+          [Math.max(1, dims.w - 2), 2],
+        ];
+        for (const [tx, ty] of probes) {
+          const pt = await page.evaluate(
+            ([x, y]) => window.__playtestQa?.interiorTileScreenPoint?.(x, y),
+            [tx, ty],
+          );
+          if (pt) {
+            if (touch) await realTouchClick(page, client, pt.x, pt.y);
+            else await realMouseClick(page, pt.x, pt.y);
+            await wait(350);
+          }
+        }
+        const exitPt = await page.evaluate(() => {
+          const c = document.getElementById('game-canvas');
+          const w = Number(c?.dataset.interiorW);
+          const h = Number(c?.dataset.interiorH);
+          const ex = Math.floor(w / 2);
+          const ey = h - 1;
+          return window.__playtestQa?.interiorTileScreenPoint?.(ex, ey);
+        });
+        if (!exitPt) {
+          errors.push(`run35-exit-${name}-${touch ? '375' : 'desk'}: exit screen point missing`);
+          continue;
+        }
+        if (touch) await realTouchClick(page, client, exitPt.x, exitPt.y);
+        else await realMouseClick(page, exitPt.x, exitPt.y);
+        await wait(700);
+        if (await page.evaluate(() => window.__playtestQa?.isInInterior?.())) {
+          errors.push(`run35-exit-${name}-${touch ? '375' : 'desk'}: still inside after exit mat tap`);
+        }
+      }
+    } finally {
+      await page.close();
+    }
+  }
+}
+
+/** Run #35: every blocked interior tile has a drawn prop. */
+async function testRun35BlockedTilesHaveProps(page, errors) {
+  for (const name of INTERIOR_ROOM_NAMES) {
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'networkidle' });
+    await wait(500);
+    await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
+    await waitForInterior(page);
+    await wait(300);
+    const ok = await page.evaluate(
+      (n) => window.__playtestQa?.interiorBlockedTilesHaveProps?.(n),
+      name,
+    );
+    if (!ok) {
+      errors.push(`run35-blocked-props-${name}: blocked tile missing visible prop`);
+    }
+    await page.evaluate(() => window.__playtestQa?.exitInterior?.());
+    await wait(400);
+  }
+}
+
+/** Run #35: 375 first load — map vertically centered (not stuck in lower half). */
+async function testRun35MobileFirstLoadFraming(page, errors) {
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'networkidle' });
+  await wait(900);
+  const camPy = await page.evaluate(() => Number(document.getElementById('game-canvas')?.dataset.camPy));
+  const sh = 812;
+  const mapTop = await page.evaluate(() => Number(document.getElementById('game-canvas')?.dataset.mapTop));
+  if (!Number.isFinite(camPy)) {
+    errors.push('run35-firstload-375: camPy missing');
+    return;
+  }
+  if (Math.abs(camPy - sh / 2) > sh * 0.22) {
+    errors.push(`run35-firstload-375: camPy ${camPy} too far from viewport center ${sh / 2}`);
+  }
+  if (Number.isFinite(mapTop) && mapTop > sh * 0.35) {
+    errors.push(`run35-firstload-375: mapTop ${mapTop} too low (empty top half)`);
+  }
+}
+
+async function captureRun35Interiors(browser) {
+  const dir = path.join(root, 'artifacts', 'run35');
+  await mkdir(dir, { recursive: true });
+  const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  try {
+    for (const name of INTERIOR_ROOM_NAMES) {
+      await desktop.goto(BASE, { waitUntil: 'networkidle' });
+      await desktop.reload({ waitUntil: 'networkidle' });
+      await dismissChecklistForCapture(desktop);
+      await wait(500);
+      await desktop.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
+      await waitForInterior(desktop);
+      await wait(500);
+      await desktop.screenshot({ path: path.join(dir, `interior-${name}-desktop.png`) });
+      await desktop.keyboard.press('Escape');
+      await wait(600);
+    }
+  } finally {
+    await desktop.close();
+  }
+  const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
+  try {
+    for (const name of INTERIOR_ROOM_NAMES) {
+      await mobile.goto(BASE, { waitUntil: 'networkidle' });
+      await mobile.reload({ waitUntil: 'networkidle' });
+      await dismissChecklistForCapture(mobile);
+      await wait(500);
+      await mobile.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
+      await waitForInterior(mobile);
+      await wait(500);
+      await mobile.screenshot({ path: path.join(dir, `interior-${name}-375.png`) });
+      await mobile.keyboard.press('Escape');
+      await wait(600);
+    }
+  } finally {
+    await mobile.close();
+  }
+  return dir;
+}
+
+async function buildRun35Montages(dir) {
+  const { spawnSync } = await import('node:child_process');
+  for (const suffix of ['desktop', '375']) {
+    const inputs = INTERIOR_ROOM_NAMES.map((n) => path.join(dir, `interior-${n}-${suffix}.png`));
+    const out = path.join(dir, `montage-all-${suffix}.png`);
+    const r = spawnSync(
+      'montage',
+      [...inputs, '-tile', '3x3', '-geometry', '+6+6', '-background', '#1a1a1a', out],
+      { encoding: 'utf8' },
+    );
+    if (r.status !== 0) {
+      throw new Error(`run35 montage ${suffix}: ${r.stderr || r.stdout || r.error?.message}`);
+    }
+  }
+}
+
 async function captureRun34Interiors(browser) {
   const dir = path.join(root, 'artifacts', 'run34');
   await mkdir(dir, { recursive: true });
@@ -3497,6 +3691,14 @@ async function main() {
     await testRun34FloorTapNoExit(browser, errors);
     await testRun34MobileSheetScrim(browser, errors);
     await testRun34SingleExitUi(browser, errors);
+    await testRun35ExitTileAfterFloorTaps(browser, errors);
+    await testRun35BlockedTilesHaveProps(desktop, errors);
+    const mobile375 = await browser.newPage({ viewport: { width: 375, height: 812 } });
+    try {
+      await testRun35MobileFirstLoadFraming(mobile375, errors);
+    } finally {
+      await mobile375.close();
+    }
     const desktopCdp = await desktop.context().newCDPSession(desktop);
     await testRun32WalkPinchFiveTrials(desktop, errors, desktopCdp);
     await ensureTouchEmulation(desktopCdp);
@@ -3542,6 +3744,12 @@ async function main() {
       await buildRun34Montages(run34Dir);
     } catch (e) {
       errors.push(`capture-run34: ${String(e?.message ?? e)}`);
+    }
+    try {
+      const run35Dir = await captureRun35Interiors(browser);
+      await buildRun35Montages(run35Dir);
+    } catch (e) {
+      errors.push(`capture-run35: ${String(e?.message ?? e)}`);
     }
 
     const report = {
