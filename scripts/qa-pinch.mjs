@@ -2008,118 +2008,214 @@ async function samplePageColor(page, clientX, clientY) {
   return { r: png.data[i], g: png.data[i + 1], b: png.data[i + 2], a: png.data[i + 3] };
 }
 
-/** Run #36: canvas regions must contain pixels that differ from open floor (wall / pew / tier). */
-async function testRun36InteriorPixelAssertions(page, errors) {
+const INTERIOR_FLOOR_RGB = [
+  { r: 0xc8, g: 0xc8, b: 0xc8 },
+  { r: 0xb8, g: 0xb8, b: 0xb8 },
+];
+
+function hexToRgb(hex) {
+  return { r: (hex >> 16) & 0xff, g: (hex >> 8) & 0xff, b: hex & 0xff };
+}
+
+function pngColorAt(png, x, y, scale = 1) {
+  const px = Math.round(x * scale);
+  const py = Math.round(y * scale);
+  if (px < 0 || py < 0 || px >= png.width || py >= png.height) return null;
+  const i = (png.width * py + px) << 2;
+  return { r: png.data[i], g: png.data[i + 1], b: png.data[i + 2] };
+}
+
+/**
+ * Run #37: every feature probe (west wall per tile row, each Catedral pew, Flor stage + tiers,
+ * each case prop) renders in its own color, not floor color.
+ */
+async function testRun37InteriorPixelProbes(browser, errors) {
   const { PNG } = await import('pngjs');
-  const cases = [
-    {
-      room: 'estudio',
-      label: 'west-wall',
-      region: { x0: 0.04, x1: 0.38, y0: 0.18, y1: 0.72 },
-      minDistinct: 120,
-      floorTile: [3, 3],
-    },
-    {
-      room: 'catedral',
-      label: 'pew',
-      region: { x0: 0.22, x1: 0.72, y0: 0.42, y1: 0.78 },
-      minDistinct: 80,
-      floorTile: [3, 6],
-    },
-    {
-      room: 'flor',
-      label: 'tier',
-      region: { x0: 0.2, x1: 0.78, y0: 0.2, y1: 0.72 },
-      minDistinct: 100,
-      floorTile: [6, 6],
-    },
-  ];
-  for (const { room, label, region, minDistinct, floorTile } of cases) {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
-    await page.reload({ waitUntil: 'networkidle' });
-    await wait(500);
-    await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [room]);
-    await waitForInterior(page);
-    await wait(600);
-    const floorPt = await page.evaluate(
-      ([x, y]) => window.__playtestQa?.interiorTileScreenPoint?.(x, y),
-      floorTile,
-    );
-    if (!floorPt) {
-      errors.push(`run36-pixel-${label}: floor reference missing`);
-      continue;
+  for (const vp of [
+    { label: 'desk', width: 1280, height: 800 },
+    { label: '375', width: 375, height: 812 },
+  ]) {
+    const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
+    try {
+      for (const name of INTERIOR_ROOM_NAMES) {
+        await page.goto(BASE, { waitUntil: 'networkidle' });
+        await page.reload({ waitUntil: 'networkidle' });
+        await wait(500);
+        await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
+        await waitForInterior(page);
+        await wait(700);
+        const probes = await page.evaluate(() => window.__playtestQa?.interiorPixelProbes?.() ?? []);
+        if (!probes.length) {
+          errors.push(`run37-probe-${name}-${vp.label}: no probes`);
+          continue;
+        }
+        const png = PNG.sync.read(await page.screenshot());
+        const scale = png.width / vp.width;
+        for (const probe of probes) {
+          const c = pngColorAt(png, probe.x, probe.y, scale);
+          const toExpected = Math.min(...probe.expect.map((hex) => colorDist(c, hexToRgb(hex))));
+          const toFloor = Math.min(...INTERIOR_FLOOR_RGB.map((f) => colorDist(c, f)));
+          if (toExpected > 36 || toFloor < 18) {
+            errors.push(
+              `run37-probe-${name}-${vp.label}: ${probe.label} at (${Math.round(probe.x)},${Math.round(probe.y)}) is ${JSON.stringify(c)} (dExpected=${toExpected}, dFloor=${toFloor})`,
+            );
+          }
+        }
+        await page.evaluate(() => window.__playtestQa?.exitInterior?.());
+        await wait(300);
+      }
+    } finally {
+      await page.close();
     }
-    const floorColor = await samplePageColor(page, floorPt.x, floorPt.y);
-    const shot = await page.locator('#game-canvas').screenshot();
-    const png = PNG.sync.read(shot);
-    const x0 = Math.floor(png.width * region.x0);
-    const x1 = Math.floor(png.width * region.x1);
-    const y0 = Math.floor(png.height * region.y0);
-    const y1 = Math.floor(png.height * region.y1);
-    let distinct = 0;
-    for (let y = y0; y < y1; y++) {
-      for (let x = x0; x < x1; x++) {
-        const i = (png.width * y + x) << 2;
-        const c = { r: png.data[i], g: png.data[i + 1], b: png.data[i + 2] };
-        if (colorDist(floorColor, c) >= 18) distinct++;
+  }
+}
+
+/** Walkable, reachable, non-exit floor tiles per room (3 each) for the phone touch-walk test. */
+const RUN37_TOUCH_WALK_TILES = {
+  estudio: [[4, 4], [1, 3], [4, 1]],
+  volaris: [[4, 4], [1, 3], [4, 1]],
+  bain: [[4, 4], [1, 3], [4, 1]],
+  mentoria: [[4, 4], [1, 3], [4, 1]],
+  finoa: [[4, 4], [1, 3], [4, 1]],
+  pg: [[4, 4], [1, 3], [4, 1]],
+  catedral: [[3, 2], [1, 6], [6, 6]],
+  sambil: [[1, 1], [6, 4], [2, 6]],
+  flor: [[2, 2], [5, 5], [1, 4]],
+};
+
+/** Run #37: real touch @375 walks to 3 floor tiles in each of the 9 rooms and arrives. */
+async function testRun37PhoneTouchWalkAllRooms(browser, errors) {
+  const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
+  const client = await page.context().newCDPSession(page);
+  await ensureTouchEmulation(client);
+  try {
+    for (const name of INTERIOR_ROOM_NAMES) {
+      await page.goto(BASE, { waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'networkidle' });
+      await wait(600);
+      await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
+      await waitForInterior(page);
+      await wait(500);
+      for (const [tx, ty] of RUN37_TOUCH_WALK_TILES[name]) {
+        const pt = await page.evaluate(
+          ([x, y]) => window.__playtestQa?.interiorTileScreenPoint?.(x, y),
+          [tx, ty],
+        );
+        if (!pt?.x) {
+          errors.push(`run37-touchwalk-${name}: no screen point for ${tx},${ty}`);
+          continue;
+        }
+        await realTouchClick(page, client, pt.x, pt.y);
+        let arrived = false;
+        for (let i = 0; i < 40 && !arrived; i++) {
+          const at = await page.evaluate(() => window.__playtestQa?.interiorCharTile?.());
+          arrived = at?.x === tx && at?.y === ty;
+          if (!arrived) await wait(150);
+        }
+        if (!arrived) {
+          const at = await page.evaluate(() => window.__playtestQa?.interiorCharTile?.());
+          errors.push(`run37-touchwalk-${name}: touch on ${tx},${ty} did not arrive (at ${JSON.stringify(at)})`);
+        }
+        if (!(await page.evaluate(() => window.__playtestQa?.isInInterior?.()))) {
+          errors.push(`run37-touchwalk-${name}: floor touch on ${tx},${ty} exited the room`);
+          break;
+        }
       }
     }
-    if (distinct < minDistinct) {
-      errors.push(
-        `run36-pixel-${label}: only ${distinct} distinct pixels (need >= ${minDistinct}, floor=${JSON.stringify(floorColor)})`,
-      );
-    }
-    await page.evaluate(() => window.__playtestQa?.exitInterior?.());
-    await wait(300);
+  } finally {
+    await page.close();
   }
 }
 
-/** Run #36: desktop interior right margin >= 24px (Sambil, Catedral). */
-async function testRun36DesktopInteriorMargins(page, errors) {
-  for (const name of ['sambil', 'catedral']) {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
-    await page.reload({ waitUntil: 'networkidle' });
-    await wait(500);
-    await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
-    await waitForInterior(page);
-    await wait(500);
-    const margin = await page.evaluate(() => {
-      const c = document.getElementById('game-canvas');
-      const rect = c?.getBoundingClientRect();
-      const w = Number(c?.dataset.interiorW);
-      if (!rect || !w) return null;
-      const ex = w - 1;
-      const pt = window.__playtestQa?.interiorTileScreenPoint?.(ex, 1);
-      if (!pt) return null;
-      return Math.round(rect.right - pt.x);
+/** Run #37: desktop gap between the room's right-most drawn pixel and the sheet edge >= 24px (9 rooms). */
+async function testRun37DesktopInteriorMargins(browser, errors) {
+  const { PNG } = await import('pngjs');
+  for (const vp of [
+    { width: 1280, height: 800 },
+    { width: 1440, height: 900 },
+  ]) {
+    const page = await browser.newPage({ viewport: vp });
+    try {
+      for (const name of INTERIOR_ROOM_NAMES) {
+        await page.goto(BASE, { waitUntil: 'networkidle' });
+        await page.reload({ waitUntil: 'networkidle' });
+        await wait(500);
+        await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
+        await waitForInterior(page);
+        await wait(700);
+        const sheetLeft = await page.evaluate(() => {
+          const r = document.querySelector('.building-panel__sheet')?.getBoundingClientRect();
+          return r && r.width > 0 ? Math.floor(r.left) : null;
+        });
+        if (sheetLeft == null) {
+          errors.push(`run37-margin-${name}-${vp.width}: sheet not found`);
+          continue;
+        }
+        const png = PNG.sync.read(await page.screenshot());
+        const bg = pngColorAt(png, sheetLeft - 120, png.height - 8);
+        let roomRight = -1;
+        for (let y = 0; y < png.height; y++) {
+          for (let x = sheetLeft - 1; x > roomRight; x--) {
+            // The sheet's drop shadow darkens bg by < 50 (sum of channels); room pixels differ far more.
+            if (colorDist(pngColorAt(png, x, y), bg) > 60) {
+              roomRight = x;
+              break;
+            }
+          }
+        }
+        const gap = sheetLeft - roomRight - 1;
+        if (roomRight < 0) {
+          errors.push(`run37-margin-${name}-${vp.width}: room not found left of sheet`);
+        } else if (gap < 24) {
+          errors.push(`run37-margin-${name}-${vp.width}: right gap ${gap}px < 24 (room right ${roomRight}, sheet ${sheetLeft})`);
+        }
+        await page.evaluate(() => window.__playtestQa?.exitInterior?.());
+        await wait(300);
+      }
+    } finally {
+      await page.close();
+    }
+  }
+}
+
+/** Run #37: real 375 first load (no hash, no QA reframe) — map centered in the free area. */
+async function testRun37MobileFirstLoadFraming(browser, errors) {
+  const context = await browser.newContext({
+    viewport: { width: 375, height: 812 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto(BASE.replace(/#.*$/, ''), { waitUntil: 'networkidle' });
+    await wait(1200);
+    const m = await page.evaluate(() => {
+      const d = document.getElementById('game-canvas')?.dataset ?? {};
+      return {
+        mapTop: Number(d.mapTop),
+        mapBottom: Number(d.mapBottom),
+        fitTop: Number(d.fitTop),
+        fitBottom: Number(d.fitBottom),
+      };
     });
-    if (margin == null) {
-      errors.push(`run36-margin-${name}: could not measure`);
-    } else if (margin < 24) {
-      errors.push(`run36-margin-${name}: right margin ${margin}px < 24`);
+    if (![m.mapTop, m.mapBottom, m.fitTop, m.fitBottom].every(Number.isFinite)) {
+      errors.push(`run37-firstload-375: frame data missing ${JSON.stringify(m)}`);
+      return;
     }
-    await page.evaluate(() => window.__playtestQa?.exitInterior?.());
-    await wait(300);
-  }
-}
-
-async function testRun35MobileFirstLoadFraming(page, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
-  await wait(800);
-  await page.evaluate(() => window.__playtestQa?.reframeMobileDefault?.());
-  await wait(400);
-  const camPy = await page.evaluate(() => Number(document.getElementById('game-canvas')?.dataset.camPy));
-  const sh = 812;
-  const mapTop = await page.evaluate(() => Number(document.getElementById('game-canvas')?.dataset.mapTop));
-  if (!Number.isFinite(camPy)) {
-    errors.push('run35-firstload-375: camPy missing');
-    return;
-  }
-  if (Math.abs(camPy - sh / 2) > sh * 0.22) {
-    errors.push(`run35-firstload-375: camPy ${camPy} too far from viewport center ${sh / 2}`);
-  }
-  if (Number.isFinite(mapTop) && mapTop > sh * 0.4) {
-    errors.push(`run35-firstload-375: mapTop ${mapTop} too low (empty top half)`);
+    const freeCy = (m.fitTop + m.fitBottom) / 2;
+    const mapCy = (m.mapTop + m.mapBottom) / 2;
+    if (Math.abs(mapCy - freeCy) > 40) {
+      errors.push(`run37-firstload-375: map center ${mapCy} vs free-area center ${freeCy}`);
+    }
+    if (m.mapTop > 812 * 0.4) {
+      errors.push(`run37-firstload-375: mapTop ${m.mapTop} leaves the top empty`);
+    }
+    if (m.mapBottom > m.fitBottom + 1) {
+      errors.push(`run37-firstload-375: map bottom ${m.mapBottom} below free area ${m.fitBottom}`);
+    }
+  } finally {
+    await context.close();
   }
 }
 
@@ -3880,14 +3976,10 @@ async function main() {
     await testRun34SingleExitUi(browser, errors);
     await testRun35ExitTileAfterFloorTaps(browser, errors);
     await testRun35BlockedTilesHaveProps(desktop, errors);
-    await testRun36InteriorPixelAssertions(desktop, errors);
-    await testRun36DesktopInteriorMargins(desktop, errors);
-    const mobile375 = await browser.newPage({ viewport: { width: 375, height: 812 } });
-    try {
-      await testRun35MobileFirstLoadFraming(mobile375, errors);
-    } finally {
-      await mobile375.close();
-    }
+    await testRun37InteriorPixelProbes(browser, errors);
+    await testRun37DesktopInteriorMargins(browser, errors);
+    await testRun37PhoneTouchWalkAllRooms(browser, errors);
+    await testRun37MobileFirstLoadFraming(browser, errors);
     const desktopCdp = await desktop.context().newCDPSession(desktop);
     await testRun32WalkPinchFiveTrials(desktop, errors, desktopCdp);
     await ensureTouchEmulation(desktopCdp);
