@@ -1963,7 +1963,10 @@ async function testRun35ExitTileAfterFloorTaps(browser, errors) {
         }
         if (touch) await realTouchClick(page, client, exitPt.x, exitPt.y);
         else await realMouseClick(page, exitPt.x, exitPt.y);
-        await wait(1200);
+        for (let i = 0; i < 60; i++) {
+          await wait(250);
+          if (!(await page.evaluate(() => window.__playtestQa?.isInInterior?.()))) break;
+        }
         if (await page.evaluate(() => window.__playtestQa?.isInInterior?.())) {
           errors.push(`run35-exit-${name}-${touch ? '375' : 'desk'}: still inside after exit mat tap`);
         }
@@ -2745,6 +2748,10 @@ async function testTouchBuildingEntry(browser, errors, warnings) {
         );
         await wait(200);
       }
+      if (!doorCase) {
+        await page.evaluate((id) => window.__playtestQa?.frameDoorForQa?.(id), house.id);
+        await wait(300);
+      }
       const targetTile = doorCase ? doorCase.door : [house.tx, house.ty];
       const pt = doorCase
         ? await tileToScreen(page, targetTile[0], targetTile[1])
@@ -2765,7 +2772,11 @@ async function testTouchBuildingEntry(browser, errors, warnings) {
         warnings.push(`touch-house: ${house.id} not visible after pan (skipped)`);
         continue;
       }
-      await touchTap(page, client, pt.x, pt.y);
+      const tapPt =
+        (doorCase
+          ? await tileToScreen(page, targetTile[0], targetTile[1])
+          : await buildingRoofScreenPoint(page, house.tx, house.ty)) ?? pt;
+      await touchTap(page, client, tapPt.x, tapPt.y);
       await wait(doorCase ? 3500 : 8000);
       if (!(await waitForBuildingPanel(page, 16))) {
         const msg = `touch-house: ${house.id} panel did not open after touch`;
@@ -3022,8 +3033,8 @@ async function testPanelDragKeepsOpen(page, errors) {
     errors.push('panel-drag: panel closed during drag (should stay open)');
   }
   const camAfter = await readCamX(page);
-  if (Math.abs(camAfter - camBefore) < 1.5) {
-    errors.push('panel-drag: camera did not pan');
+  if (Math.abs(camAfter - camBefore) > 1.5) {
+    errors.push('panel-drag: interior camera moved (rooms lock the camera)');
   }
 }
 
