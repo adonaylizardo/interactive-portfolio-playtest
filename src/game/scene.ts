@@ -178,6 +178,8 @@ export class IsoScene {
   >();
   private lodLejos = false;
   private qaIsolation: Set<string> | null = null;
+  private qaForcedState: BuildingSpriteState | null = null;
+  private qaPreview: Sprite | null = null;
   private interiorSprite: Sprite | null = null;
   private lastPanPos: { x: number; y: number } | null = null;
   private tapStart: { x: number; y: number; t: number } | null = null;
@@ -558,6 +560,7 @@ export class IsoScene {
 
   /** Building state sprite: hover (pointer) > resaltado (panel open / walking to it) > default. */
   private buildingSpriteState(obj: MapObject): BuildingSpriteState {
+    if (this.qaForcedState) return this.qaForcedState;
     if (this.hoveredObject?.id === obj.id) return 'hover';
     if (this.pendingBuildingEntry && obj.door) {
       const d = this.pendingBuildingEntry.door;
@@ -2513,6 +2516,28 @@ export class IsoScene {
   qaIsolateSprites(ids: string[] | null): void {
     this.qaIsolation = ids ? new Set(ids) : null;
     this.applyCamera(false);
+  }
+
+  /** QA: show one sprite key on its own with its front vertex at world (sx, sy); null removes it. */
+  qaPreviewSprite(key: string | null, sx = 0, sy = 0): { tl: { x: number; y: number }; w: number; h: number } | null {
+    this.qaPreview?.destroy();
+    this.qaPreview = null;
+    if (!key) return null;
+    const a = spriteAsset(key);
+    const sp = new Sprite(spriteTexture(key));
+    sp.position.set(sx - a.vfs.x, sy - a.vfs.y);
+    sp.zIndex = 2_000_000;
+    sp.eventMode = 'none';
+    this.objectsLayer.addChild(sp);
+    this.qaPreview = sp;
+    return { tl: { x: sx - a.vfs.x, y: sy - a.vfs.y }, w: a.w, h: a.h };
+  }
+
+  /** QA: force every building sprite into one state (default | hover | resaltado), or null to release. */
+  qaForceBuildingState(state: BuildingSpriteState | null): void {
+    this.qaForcedState = state;
+    this.syncObjectSprites(true);
+    this.app.render();
   }
 
   /** QA: put a world point at the canvas centre at an exact zoom. */

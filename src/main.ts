@@ -140,6 +140,8 @@ async function main(): Promise<void> {
     sampleCanvasColors: (points: { x: number; y: number }[]) =>
       scene.sampleCanvasColorsAtClient(points),
     spriteInstances: () => scene.qaSpriteInstances(),
+    forceBuildingState: (s: 'default' | 'hover' | 'resaltado' | null) => scene.qaForceBuildingState(s),
+    previewSprite: (k: string | null, x?: number, y?: number) => scene.qaPreviewSprite(k, x, y),
     isolateSprites: (ids: string[] | null) => scene.qaIsolateSprites(ids),
     frameWorld: (x: number, y: number, zoom: number) => scene.qaFrameWorld(x, y, zoom),
     worldToClient: (x: number, y: number) => scene.qaWorldToClient(x, y),
