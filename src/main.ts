@@ -137,6 +137,13 @@ async function main(): Promise<void> {
     },
     sampleCanvasColor: (clientX: number, clientY: number) =>
       scene.sampleCanvasColorAtClient(clientX, clientY),
+    sampleCanvasColors: (points: { x: number; y: number }[]) =>
+      scene.sampleCanvasColorsAtClient(points),
+    spriteInstances: () => scene.qaSpriteInstances(),
+    isolateSprites: (ids: string[] | null) => scene.qaIsolateSprites(ids),
+    frameWorld: (x: number, y: number, zoom: number) => scene.qaFrameWorld(x, y, zoom),
+    worldToClient: (x: number, y: number) => scene.qaWorldToClient(x, y),
+    streetTiles: () => scene.qaStreetTiles(),
   };
 }
 

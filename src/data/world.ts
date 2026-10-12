@@ -21,6 +21,8 @@ export type MapObject = {
   doorFace?: '+y' | '+x';
   panelTitle?: string;
   acceso?: { x: number; y: number };
+  /** Sprite variant: tree species (redondo|cipres|araguaney) or bench/lamp side (izq|der). */
+  variant?: string;
 };
 
 export const MAP_WIDTH = 64;
@@ -73,6 +75,20 @@ export function anchorForBuilding(x: number, y: number, w: number, h: number): {
 /** Front-edge frame only: x=63 (se), y=63 (sw), corner (63,63). Back edges x=0/y=0 have no frame tile. */
 const MURO_FOOTPRINT = { x: 35, y: 40, w: 3, h: 2 };
 const MURO_APPROACH: [number, number] = [38, 41];
+
+/**
+ * Obelisco: only the central strip (plinth + slab) is solid; the rest of the plaza is walkable
+ * decoration (obelisco manifest `colision.solida`).
+ */
+export const OBELISCO_SOLID_TILES: readonly [number, number][] = [
+  [15, 35],
+  [15, 36],
+  [15, 37],
+];
+
+export function obeliscoSolidTiles(): Set<string> {
+  return new Set(OBELISCO_SOLID_TILES.map(([x, y]) => `${x},${y}`));
+}
 
 /** Muro collision tiles — thin L walls only; interior stays walkable. */
 export function muroWallTiles(): Set<string> {
@@ -150,7 +166,23 @@ const FILLER_PROPS: { kind: 'tree' | 'bench' | 'lamp' | 'plaza'; x: number; y: n
   { kind: 'bench', x: 38, y: 36 },
   { kind: 'lamp', x: 20, y: 36 },
   { kind: 'lamp', x: 45, y: 36 },
+  { kind: 'lamp', x: 19, y: 35 },
+  { kind: 'lamp', x: 23, y: 35 },
+  { kind: 'lamp', x: 27, y: 35 },
+  { kind: 'lamp', x: 35, y: 35 },
+  { kind: 'lamp', x: 45, y: 41 },
+  { kind: 'lamp', x: 45, y: 43 },
 ];
+
+const TREE_SPECIES = ['redondo', 'redondo', 'redondo', 'redondo', 'redondo', 'cipres', 'cipres', 'cipres', 'araguaney', 'araguaney'];
+
+/** Benches face the street they sit beside (izq = +y, der = +x); lamps arm over it the same way. */
+function sideFacingStreet(cells: MapCell[][], x: number, y: number): 'izq' | 'der' {
+  const isStreet = (tx: number, ty: number) => cells[ty]?.[tx]?.groundId.includes('path/street') ?? false;
+  if (isStreet(x, y + 1)) return 'izq';
+  if (isStreet(x + 1, y)) return 'der';
+  return (x + y) % 2 === 0 ? 'izq' : 'der';
+}
 
 export function buildWorld(): { cells: MapCell[][]; objects: MapObject[] } {
   const cells: MapCell[][] = [];
@@ -192,13 +224,18 @@ export function buildWorld(): { cells: MapCell[][]; objects: MapObject[] } {
       const kind =
         id === 'obelisco' ? 'obelisco' : id === 'redoma' ? 'redoma' : id === 'muro' ? 'muro' : 'paisaje';
       const muroWalls = id === 'muro' ? muroWallTiles() : null;
+      const obeliscoSolid = id === 'obelisco' ? obeliscoSolidTiles() : null;
       for (const { x: fx, y: fy } of footprintTiles(ed.x, ed.y, ed.w, ed.h)) {
         if (fx < 0 || fy < 0 || fx >= MAP_WIDTH || fy >= MAP_HEIGHT) continue;
         if (borderKind(fx, fy)) continue;
-        const isWall = muroWalls?.has(`${fx},${fy}`) ?? true;
+        const isWall = muroWalls
+          ? muroWalls.has(`${fx},${fy}`)
+          : obeliscoSolid
+            ? obeliscoSolid.has(`${fx},${fy}`)
+            : true;
         cells[fy][fx].walkable = !isWall;
-        // Muro is drawn as thin wall faces only; a footprint fill under it reads as a thick slab.
-        cells[fy][fx].groundId = isWall && !muroWalls ? 'tile/building/footprint' : 'tile/ground/default';
+        cells[fy][fx].groundId =
+          isWall && !muroWalls && !obeliscoSolid ? 'tile/building/footprint' : 'tile/ground/default';
       }
       objects.push({
         id: `paisaje/${id}`,
@@ -291,6 +328,10 @@ export function buildWorld(): { cells: MapCell[][]; objects: MapObject[] } {
       state: 'default',
       x: f.x,
       y: f.y,
+      variant:
+        f.kind === 'tree'
+          ? TREE_SPECIES[(f.x * 31 + f.y * 17) % TREE_SPECIES.length]
+          : sideFacingStreet(cells, f.x, f.y),
       w: 1,
       h: 1,
       walkable: false,

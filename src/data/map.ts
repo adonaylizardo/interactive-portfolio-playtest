@@ -7,6 +7,7 @@ import {
   MAP_TRAMOS,
   MAP_WIDTH,
   muroWallTiles,
+  obeliscoSolidTiles,
   REDOMA_ANILLO,
   TILE_H,
   TILE_W,
@@ -66,6 +67,7 @@ export function getSceneryAt(tx: number, ty: number): MapObject | undefined {
 export function validateWalkGridFootprint(): string[] {
   const errors: string[] = [];
   const muroWalls = muroWallTiles();
+  const obeliscoSolid = obeliscoSolidTiles();
   for (const o of objects) {
     if (o.type !== 'building' && !isSceneryObject(o)) continue;
     if (!o.w || !o.h) continue;
@@ -73,6 +75,7 @@ export function validateWalkGridFootprint(): string[] {
       const isDoor = o.door && o.door.x === ox && o.door.y === oy;
       if (isDoor) continue;
       if (o.name === 'muro' && !muroWalls.has(`${ox},${oy}`)) continue;
+      if (o.name === 'obelisco' && !obeliscoSolid.has(`${ox},${oy}`)) continue;
       if (cells[oy]?.[ox]?.walkable) {
         errors.push(`footprint tile (${ox},${oy}) walkable for ${o.name}`);
       }

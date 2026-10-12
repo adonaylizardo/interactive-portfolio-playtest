@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Point, Rectangle } from 'pixi.js';
+import { Application, Container, Graphics, Point, Polygon, Rectangle, Sprite } from 'pixi.js';
 import {
   cells,
   getBuildingAt,
@@ -39,26 +39,41 @@ import {
   buildingInteriorGapSample,
   buildingPickHit,
   deskTopFillColor,
-  drawBench,
-  drawBorderTile,
   drawCharacter,
-  drawDiamond,
-  drawFootprintBuilding,
-  drawLamp,
-  drawMuro,
-  drawObelisco,
-  drawPropDesk,
-  drawPropTree,
-  drawRedoma,
   treeCanopyTrunkOverlap,
   type FootprintDrawSpec,
 } from './draw';
+import {
+  streetOpenSides,
+  objectDepth,
+  objectOccluder,
+  objectSpriteKey,
+  objectSpriteTopLeft,
+  playerBehind,
+  tileSpriteKey,
+  TILE_DIAMOND,
+  type OccluderBox,
+} from './mapSprites';
+import {
+  interiorSpriteKey,
+  isLejosZoom,
+  isSpriteInterior,
+  loadInteriorSprite,
+  loadMapSprites,
+  loadSpriteProbes,
+  spriteAsset,
+  spritesLoaded,
+  spriteTexture,
+  worldBackgroundColor,
+  type BuildingSpriteState,
+} from './sprites';
 import {
   buildInteriorGrid,
   drawInteriorFloor,
   drawInteriorProps,
   drawInteriorWalls,
   findPathInterior,
+  interiorSpriteTopLeft,
   getInteriorDef,
   interiorWorldBounds,
   interiorForwardTile,
@@ -148,7 +163,22 @@ export class IsoScene {
   private pathGfx = new Graphics();
   private charGfx = new Graphics();
   private events: SceneEvents;
-  private objectGraphics = new Map<string, Graphics>();
+  private objectGraphics = new Map<string, Container>();
+  private objectVisuals = new Map<
+    string,
+    {
+      obj: MapObject;
+      sprite: Sprite;
+      key: string;
+      state: BuildingSpriteState;
+      cull: { x0: number; y0: number; x1: number; y1: number };
+      occluder: OccluderBox | null;
+      zIndex: number;
+    }
+  >();
+  private lodLejos = false;
+  private qaIsolation: Set<string> | null = null;
+  private interiorSprite: Sprite | null = null;
   private lastPanPos: { x: number; y: number } | null = null;
   private tapStart: { x: number; y: number; t: number } | null = null;
   private lastTapTime = 0;
@@ -187,7 +217,7 @@ export class IsoScene {
   private pendingBuildingEntry: { panelTitle: string; door: { x: number; y: number } } | null =
     null;
   private lastRoundedTile = { x: INICIO[0], y: INICIO[1] };
-  private tileCullEntries: { g: Graphics; tx: number; ty: number }[] = [];
+  private tileCullEntries: { g: Container; tx: number; ty: number }[] = [];
   private pointerGestureSerial = 0;
   private pixiTapGestureSerial = -1;
   private firstPointerDownAt = 0;
@@ -220,13 +250,19 @@ export class IsoScene {
     this.app = new Application();
     await this.app.init({
       canvas,
-      background: C.bg,
+      background: worldBackgroundColor(),
       antialias: true,
       autoDensity: true,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
       resizeTo: window,
       preserveDrawingBuffer: true,
     });
+
+    await loadMapSprites(this.app.renderer.resolution);
+    void loadSpriteProbes();
+    const bootInterior = parseInteriorFromHash();
+    if (bootInterior && isSpriteInterior(bootInterior)) await loadInteriorSprite(bootInterior);
+    for (const id of ['volaris', 'bain', 'mentoria', 'finoa', 'pg']) void loadInteriorSprite(id);
 
     this.app.stage.addChild(this.camera);
     this.camera.addChild(this.world);
@@ -248,7 +284,8 @@ export class IsoScene {
     this.bindInteriorPointerRouting();
 
     this.pathLayer.addChild(this.pathGfx);
-    this.characterLayer.addChild(this.charGfx);
+    this.objectsLayer.sortableChildren = true;
+    this.objectsLayer.addChild(this.charGfx);
 
     this.fadeEl = document.createElement('div');
     this.fadeEl.className = 'scene-fade';
@@ -397,25 +434,16 @@ export class IsoScene {
   }
 
   private buildTiles(): void {
+    const diamond = new Polygon(TILE_DIAMOND);
     for (let ty = 0; ty < MAP_HEIGHT; ty++) {
       for (let tx = 0; tx < MAP_WIDTH; tx++) {
         const cell = cells[ty][tx];
-        const pos = tileFootWorld(tx, ty);
-        const g = new Graphics();
-        const isFrame = cell.groundId.includes('borde');
-        g.position.set(pos.x, pos.y);
-        if (isFrame) {
-          drawBorderTile(g, cell.groundId);
-        } else {
-          const fill = cell.groundId.includes('path')
-            ? C.tileMid
-            : cell.groundId.includes('park')
-              ? 0xd0d4cc
-              : cell.groundId.includes('footprint') || cell.groundId.includes('building')
-                ? C.tileDark
-                : C.tileLight;
-          drawDiamond(g, fill);
-        }
+        const key = tileSpriteKey(cells, tx, ty);
+        const g = new Sprite(spriteTexture(key));
+        const foot = tileFootWorld(tx, ty);
+        const a = spriteAsset(key);
+        g.position.set(foot.x - a.vfs.x, foot.y - a.vfs.y);
+        g.hitArea = diamond;
         g.eventMode = 'static';
         g.cursor = cell.walkable ? 'pointer' : 'default';
         g.on('pointertap', (e) => {
@@ -431,24 +459,72 @@ export class IsoScene {
     }
   }
 
+  private buildingHitArea(obj: MapObject): { contains(x: number, y: number): boolean } {
+    const spec = this.footprintSpec(obj);
+    return {
+      contains: (x: number, y: number) => {
+        const local = { x, y };
+        return (
+          buildingDoorPickHit(local, spec) ||
+          buildingFootprintBodyPickHit(local, spec) ||
+          buildingPickHit(local, spec)
+        );
+      },
+    };
+  }
+
   private buildObjects(): void {
     const sorted = [...objects].sort((a, b) => sortKey(a.x, a.y) - sortKey(b.x, b.y));
     for (const obj of sorted) {
       const pos = tileFootWorld(obj.x, obj.y);
-      const g = new Graphics();
+      const g = new Container();
       g.position.set(pos.x, pos.y);
       g.eventMode = 'static';
       g.cursor = 'pointer';
+      const key = objectSpriteKey(obj, 'default', false);
+      if (key) {
+        const sprite = new Sprite(spriteTexture(key));
+        const tl = objectSpriteTopLeft(obj, key);
+        sprite.position.set(tl.x - pos.x, tl.y - pos.y);
+        g.addChild(sprite);
+        const a = spriteAsset(key);
+        const tlw = { x: tl.x, y: tl.y };
+        g.hitArea =
+          obj.type === 'building'
+            ? this.buildingHitArea(obj)
+            : new Rectangle(
+                tlw.x + a.bbox.x0 - pos.x,
+                tlw.y + a.bbox.y0 - pos.y,
+                a.bbox.x1 - a.bbox.x0,
+                a.bbox.y1 - a.bbox.y0,
+              );
+        const flat = obj.name === 'redoma';
+        const zIndex = flat ? -10 : objectDepth(obj) + (obj.x - obj.y) * 0.0001;
+        g.zIndex = zIndex;
+        const spriteBox = {
+          x0: tlw.x - 8,
+          y0: tlw.y - 8,
+          x1: tlw.x + a.w + 8,
+          y1: tlw.y + a.h + 8,
+        };
+        this.objectVisuals.set(obj.id, {
+          obj,
+          sprite,
+          key,
+          state: 'default',
+          cull: spriteBox,
+          occluder: objectOccluder(obj),
+          zIndex,
+        });
+      }
       g.on('pointerover', () => {
         if (matchMedia('(hover: hover)').matches) {
           this.hoveredObject = obj;
-          this.refreshObjectVisuals();
         }
       });
       g.on('pointerout', () => {
         if (this.hoveredObject?.id === obj.id) {
           this.hoveredObject = null;
-          this.refreshObjectVisuals();
         }
       });
       g.on('pointertap', (e) => {
@@ -477,7 +553,50 @@ export class IsoScene {
       this.objectGraphics.set(obj.id, g);
       this.objectsLayer.addChild(g);
     }
-    this.refreshObjectVisuals();
+    this.syncObjectSprites(true);
+  }
+
+  /** Building state sprite: hover (pointer) > resaltado (panel open / walking to it) > default. */
+  private buildingSpriteState(obj: MapObject): BuildingSpriteState {
+    if (this.hoveredObject?.id === obj.id) return 'hover';
+    if (this.pendingBuildingEntry && obj.door) {
+      const d = this.pendingBuildingEntry.door;
+      if (d.x === obj.door.x && d.y === obj.door.y) return 'resaltado';
+    }
+    const bridge = this.events.buildingPanel;
+    if (obj.panelTitle && bridge?.isOpen() && bridge.openTitle() === obj.panelTitle) return 'resaltado';
+    return 'default';
+  }
+
+  /** Applies the zoom variant (cerca / lejos) and building states to every object sprite. */
+  private syncObjectSprites(force = false): void {
+    const lejos = isLejosZoom(this.zoom);
+    const lodChanged = lejos !== this.lodLejos;
+    this.lodLejos = lejos;
+    for (const v of this.objectVisuals.values()) {
+      const state = v.obj.type === 'building' ? this.buildingSpriteState(v.obj) : 'default';
+      if (!force && !lodChanged && state === v.state) continue;
+      const key = objectSpriteKey(v.obj, state, lejos);
+      if (!key) continue;
+      v.state = state;
+      v.key = key;
+      v.sprite.texture = spriteTexture(key);
+    }
+    if (this.interiorSprite && this.interiorDef?.sprite) {
+      const key = interiorSpriteKey(this.interiorDef.id, lejos);
+      if (spritesLoaded(key)) this.interiorSprite.texture = spriteTexture(key);
+    }
+    if (this.canvasEl) this.canvasEl.dataset.lod = lejos ? 'lejos' : 'cerca';
+  }
+
+  /** Player draws in front of everything except objects it stands behind (front-row ordering). */
+  private syncCharacterDepth(): void {
+    let zi = Infinity;
+    for (const v of this.objectVisuals.values()) {
+      if (!v.occluder || v.zIndex >= zi) continue;
+      if (playerBehind(v.occluder, this.charTx, this.charTy)) zi = v.zIndex;
+    }
+    this.charGfx.zIndex = Number.isFinite(zi) ? zi - 0.5 : 1_000_000;
   }
 
   /** Screen coords (canvas pixels) ↔ world coords with world scaled under a fixed camera pivot. */
@@ -499,39 +618,6 @@ export class IsoScene {
       x: sw / 2 + (this.cameraX + wx) * z,
       y: sh / 2 + (this.cameraY + wy) * z,
     };
-  }
-
-  private refreshObjectVisuals(): void {
-    for (const obj of objects) {
-      const g = this.objectGraphics.get(obj.id);
-      if (!g) continue;
-      g.clear();
-      const hover = this.hoveredObject?.id === obj.id;
-      if (obj.name === 'escritorio') drawPropDesk(g, hover);
-      else if (obj.name === 'arbol' || obj.name === 'tree') drawPropTree(g, hover);
-      else if (obj.name === 'bench') drawBench(g, hover);
-      else if (obj.name === 'lamp') drawLamp(g, hover);
-      else if (obj.name === 'obelisco')
-        drawObelisco(g, hover, obj.footprintX, obj.footprintY, obj.w, obj.h, obj.x, obj.y);
-      else if (obj.name === 'redoma')
-        drawRedoma(g, hover, obj.footprintX, obj.footprintY, obj.w, obj.h, obj.x, obj.y);
-      else if (obj.name === 'muro')
-        drawMuro(g, hover, obj.footprintX, obj.footprintY, obj.w, obj.h, obj.x, obj.y);
-      else if (obj.type === 'building') {
-        const spec: FootprintDrawSpec = {
-          fx: obj.footprintX ?? obj.x,
-          fy: obj.footprintY ?? obj.y,
-          w: obj.w ?? 3,
-          h: obj.h ?? 3,
-          ax: obj.x,
-          ay: obj.y,
-          doorFace: obj.doorFace ?? '+y',
-          door: obj.door ?? { x: obj.x, y: obj.y + 1 },
-          kind: obj.name,
-        };
-        drawFootprintBuilding(g, hover, spec);
-      }
-    }
   }
 
   requestWalk(
@@ -823,7 +909,7 @@ export class IsoScene {
     drawCharacter(this.charGfx, this.charState);
     const pos = tileFootWorld(this.charTx, this.charTy);
     this.charGfx.position.set(pos.x, pos.y);
-    this.charGfx.zIndex = sortKey(this.charTx, this.charTy, 500);
+    this.syncCharacterDepth();
     if (this.canvasEl) {
       this.canvasEl.dataset.charTile = JSON.stringify({
         x: Math.round(this.charTx),
@@ -1036,6 +1122,7 @@ export class IsoScene {
       this.events.onChecklist('move-camera');
       this.panDragScreenPx = 0;
     }
+    this.syncObjectSprites();
     this.cullVisibleTiles();
   }
 
@@ -1054,7 +1141,13 @@ export class IsoScene {
     const maxX = Math.max(...corners.map((c) => c.x));
     const minY = Math.min(...corners.map((c) => c.y));
     const maxY = Math.max(...corners.map((c) => c.y));
+    const iso = this.qaIsolation;
+    this.charGfx.visible = !iso;
     for (const { g, tx, ty } of this.tileCullEntries) {
+      if (iso) {
+        g.visible = iso.has(`tile:${tx},${ty}`);
+        continue;
+      }
       const foot = tileFootWorld(tx, ty);
       g.visible =
         foot.x >= minX - TILE_W &&
@@ -1062,15 +1155,13 @@ export class IsoScene {
         foot.y >= minY - TILE_H &&
         foot.y <= maxY + TILE_H;
     }
-    for (const obj of objects) {
-      const g = this.objectGraphics.get(obj.id);
+    for (const v of this.objectVisuals.values()) {
+      const g = this.objectGraphics.get(v.obj.id);
       if (!g) continue;
-      const foot = tileFootWorld(obj.x, obj.y);
-      g.visible =
-        foot.x >= minX - TILE_W * 3 &&
-        foot.x <= maxX + TILE_W * 3 &&
-        foot.y >= minY - TILE_H * 6 &&
-        foot.y <= maxY + TILE_H * 2;
+      const c = v.cull;
+      g.visible = iso
+        ? iso.has(v.obj.id)
+        : c.x1 >= minX && c.x0 <= maxX && c.y1 >= minY && c.y0 <= maxY;
     }
   }
 
@@ -1762,6 +1853,7 @@ export class IsoScene {
   }
 
   private update(): void {
+    this.syncObjectSprites();
     if (this.doorCooldown > 0) {
       this.doorCooldown -= this.app.ticker.deltaMS;
     }
@@ -1965,6 +2057,10 @@ export class IsoScene {
     const building = objects.find((o) => o.type === 'building' && o.name === buildingId);
     const door = building?.door;
     if (!def || !door) return;
+    if (def.sprite && !spritesLoaded(interiorSpriteKey(def.id, false))) {
+      void loadInteriorSprite(def.id).then(() => this.enterInterior(buildingId, opts));
+      return;
+    }
 
     if (!opts?.fromHash && !this.outdoorCamBeforeInterior) {
       this.outdoorCamBeforeInterior = {
@@ -1995,6 +2091,18 @@ export class IsoScene {
       drawInteriorFloor(this.interiorFloorGfx, def);
       drawInteriorWalls(this.interiorWallGfx, def);
       drawInteriorProps(this.interiorPropGfx, def);
+      this.interiorSprite?.destroy();
+      this.interiorSprite = null;
+      if (def.sprite) {
+        const key = interiorSpriteKey(def.id, isLejosZoom(this.zoom));
+        const sprite = new Sprite(spriteTexture(key));
+        const tl = interiorSpriteTopLeft(def);
+        sprite.position.set(tl.x, tl.y);
+        sprite.zIndex = 0;
+        sprite.eventMode = 'none';
+        this.interiorLayer.addChild(sprite);
+        this.interiorSprite = sprite;
+      }
       syncInteriorCharacter(this.interiorCharGfx, this.interiorCharTx, this.interiorCharTy, 'idle');
       this.interiorCharGfx.zIndex = sortKey(this.interiorCharTx, this.interiorCharTy, 500);
       if (!this.mapReturnDoor) {
@@ -2058,6 +2166,8 @@ export class IsoScene {
       this.interiorFloorGfx.clear();
       this.interiorWallGfx.clear();
       this.interiorPropGfx.clear();
+      this.interiorSprite?.destroy();
+      this.interiorSprite = null;
       if (door) {
         this.charTx = door.x;
         this.charTy = door.y;
@@ -2318,7 +2428,7 @@ export class IsoScene {
   getInteriorPixelProbesClient(): { label: string; x: number; y: number; expect: number[] }[] {
     if (!this.interiorDef || !this.canvasEl) return [];
     const rect = this.canvasEl.getBoundingClientRect();
-    return interiorPixelProbes(this.interiorDef).map((p) => {
+    return interiorPixelProbes(this.interiorDef, isLejosZoom(this.zoom)).map((p) => {
       const s = this.worldToScreen(p.world.x, p.world.y);
       return { label: p.label, x: rect.left + s.x, y: rect.top + s.y, expect: p.expect };
     });
@@ -2364,6 +2474,96 @@ export class IsoScene {
   }
 
   /** QA: RGBA at a client point on the game canvas (WebGL readPixels). */
+  /** QA: every map sprite (objects + one tile per ground variant) with its world top-left. */
+  qaSpriteInstances(): {
+    id: string;
+    key: string;
+    tl: { x: number; y: number };
+    w: number;
+    h: number;
+    kind: string;
+  }[] {
+    const out: { id: string; key: string; tl: { x: number; y: number }; w: number; h: number; kind: string }[] = [];
+    for (const v of this.objectVisuals.values()) {
+      const key = objectSpriteKey(v.obj, 'default', false)!;
+      const tl = objectSpriteTopLeft(v.obj, key);
+      const a = spriteAsset(key);
+      out.push({ id: v.obj.id, key, tl, w: a.w, h: a.h, kind: v.obj.name });
+    }
+    const seen = new Set<string>();
+    for (const { tx, ty } of this.tileCullEntries) {
+      const key = tileSpriteKey(cells, tx, ty);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const foot = tileFootWorld(tx, ty);
+      const a = spriteAsset(key);
+      out.push({
+        id: `tile:${tx},${ty}`,
+        key,
+        tl: { x: foot.x - a.vfs.x, y: foot.y - a.vfs.y },
+        w: a.w,
+        h: a.h,
+        kind: 'tile',
+      });
+    }
+    return out;
+  }
+
+  /** QA: draw only the given sprite ids (objects by id, tiles as `tile:x,y`), no character. */
+  qaIsolateSprites(ids: string[] | null): void {
+    this.qaIsolation = ids ? new Set(ids) : null;
+    this.applyCamera(false);
+  }
+
+  /** QA: put a world point at the canvas centre at an exact zoom. */
+  qaFrameWorld(wx: number, wy: number, zoom: number): void {
+    this.zoom = zoom;
+    this.cameraX = -wx;
+    this.cameraY = -wy;
+    this.applyCamera(false);
+    this.app.render();
+  }
+
+  qaWorldToClient(wx: number, wy: number): { x: number; y: number } {
+    const rect = this.canvasEl?.getBoundingClientRect();
+    const s = this.worldToScreen(wx, wy);
+    return { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y };
+  }
+
+  /** QA: which ground sprite each street cell uses, and its open sides (for neighbour checks). */
+  qaStreetTiles(): { x: number; y: number; key: string; sides: string[] }[] {
+    const out: { x: number; y: number; key: string; sides: string[] }[] = [];
+    for (let y = 0; y < MAP_HEIGHT; y++) {
+      for (let x = 0; x < MAP_WIDTH; x++) {
+        if (!cells[y][x].groundId.includes('path/street')) continue;
+        out.push({ x, y, key: tileSpriteKey(cells, x, y), sides: streetOpenSides(cells, x, y) });
+      }
+    }
+    return out;
+  }
+
+  sampleCanvasColorsAtClient(
+    points: { x: number; y: number }[],
+  ): ({ r: number; g: number; b: number; a: number } | null)[] {
+    const canvas = this.canvasEl;
+    if (!canvas) return points.map(() => null);
+    this.app.render();
+    const rect = canvas.getBoundingClientRect();
+    const tmp = document.createElement('canvas');
+    tmp.width = canvas.width;
+    tmp.height = canvas.height;
+    const ctx = tmp.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return points.map(() => null);
+    ctx.drawImage(canvas, 0, 0);
+    return points.map((p) => {
+      const sx = Math.floor((p.x - rect.left) * (canvas.width / rect.width));
+      const sy = Math.floor((p.y - rect.top) * (canvas.height / rect.height));
+      if (sx < 0 || sy < 0 || sx >= canvas.width || sy >= canvas.height) return null;
+      const d = ctx.getImageData(sx, sy, 1, 1).data;
+      return { r: d[0], g: d[1], b: d[2], a: d[3] };
+    });
+  }
+
   sampleCanvasColorAtClient(clientX: number, clientY: number): {
     r: number;
     g: number;

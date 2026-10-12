@@ -113,13 +113,14 @@ function lerpPt(a: Pt, b: Pt, t: number): Pt {
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
 
+/** Tap-body height per building, matched to the sprite silhouettes (wall + roof). */
 function wallHeightForKind(kind: string, w: number, h: number): number {
-  if (kind === 'estudio') return 46;
-  if (kind === 'sambil') return 58;
-  if (kind === 'catedral') return 88;
-  if (kind === 'flor') return 50;
-  if (w >= 6 || h >= 6) return 46;
-  return 72;
+  if (kind === 'estudio') return 110;
+  if (kind === 'sambil') return 64;
+  if (kind === 'catedral') return 150;
+  if (kind === 'flor') return 100;
+  if (w >= 6 || h >= 6) return 110;
+  return 96;
 }
 
 function footprintCorners(spec: FootprintDrawSpec): { sw: Pt; se: Pt; nw: Pt; ne: Pt } {

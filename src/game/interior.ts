@@ -2,6 +2,7 @@ import { Graphics } from 'pixi.js';
 import { TILE_H, TILE_W } from '../data/world';
 import { tileFootWorld } from '../iso/math';
 import { drawCharacter } from './draw';
+import { cachedSpriteProbes, interiorSpriteKey, spriteAsset, spriteMeta } from './sprites';
 
 export const INTERIOR_BUILDING_IDS = [
   'estudio',
@@ -27,6 +28,10 @@ export type InteriorDef = {
   plinthH: number;
   spawn: { x: number; y: number };
   exit: { x: number; y: number };
+  /** Room drawn from a baked Figma sprite (furniture included). */
+  sprite?: boolean;
+  /** Sprite rooms: walk grid rows y = 0.., '#' blocked, '.' 'E' 'S' free (manifest `mascara_caminable`). */
+  mask?: readonly string[];
 };
 
 /** ~2× character silhouette height in px. */
@@ -42,6 +47,8 @@ function def(
     plinthH?: number;
     spawn?: { x: number; y: number };
     exit?: { x: number; y: number };
+    sprite?: boolean;
+    mask?: readonly string[];
   },
 ): InteriorDef {
   const exit = opts?.exit ?? { x: Math.floor(w / 2), y: h - 1 };
@@ -54,16 +61,32 @@ function def(
     plinthH: opts?.plinthH ?? INTERIOR_PLINTH_H,
     spawn,
     exit,
+    sprite: opts?.sprite,
+    mask: opts?.mask,
   };
+}
+
+function spriteRoom(id: InteriorBuildingId): InteriorDef {
+  const mask = spriteMeta(`int/${id}`)?.mascara_caminable?.filas_y0_a_y5 as string[] | undefined;
+  if (!mask) throw new Error(`missing walk mask for ${id}`);
+  let spawn = { x: 3, y: 4 };
+  let exit = { x: 3, y: 5 };
+  mask.forEach((row, y) => {
+    [...row].forEach((c, x) => {
+      if (c === 'E') spawn = { x, y };
+      if (c === 'S') exit = { x, y };
+    });
+  });
+  return def(id, mask[0].length, mask.length, { spawn, exit, sprite: true, mask });
 }
 
 const LAYOUTS: Record<InteriorBuildingId, InteriorDef> = {
   estudio: def('estudio', 6, 6),
-  volaris: def('volaris', 6, 6),
-  bain: def('bain', 6, 6),
-  mentoria: def('mentoria', 6, 6),
-  finoa: def('finoa', 6, 6),
-  pg: def('pg', 6, 6),
+  volaris: spriteRoom('volaris'),
+  bain: spriteRoom('bain'),
+  mentoria: spriteRoom('mentoria'),
+  finoa: spriteRoom('finoa'),
+  pg: spriteRoom('pg'),
   sambil: def('sambil', 8, 8),
   catedral: def('catedral', 8, 8),
   flor: def('flor', 7, 7, { backWallH: 140 }),
@@ -74,10 +97,9 @@ export function getInteriorDef(id: string): InteriorDef | null {
   return LAYOUTS[id as InteriorBuildingId];
 }
 
-const CASE_IDS: readonly InteriorBuildingId[] = ['estudio', 'volaris', 'bain', 'mentoria', 'finoa', 'pg'];
-
+/** The Estudio room is still drawn procedurally (placeholder); the five case rooms are sprites. */
 function isCaseRoom(def: InteriorDef): boolean {
-  return CASE_IDS.includes(def.id);
+  return def.id === 'estudio';
 }
 
 /** Flor: stage against the west-wall screen, seating tiers rising away from it (+x). */
@@ -97,6 +119,12 @@ function setBlocked(cells: InteriorCell[][], x: number, y: number): void {
 }
 
 export function buildInteriorGrid(def: InteriorDef): InteriorCell[][] {
+  if (def.mask) {
+    const rows = def.mask.map((row) => [...row].map((c) => ({ walkable: c !== '#' })));
+    rows[def.spawn.y][def.spawn.x].walkable = true;
+    rows[def.exit.y][def.exit.x].walkable = true;
+    return rows;
+  }
   const cells: InteriorCell[][] = [];
   for (let y = 0; y < def.h; y++) {
     cells[y] = [];
@@ -150,6 +178,13 @@ function P(gx: number, gy: number, z = 0): Pt {
   return { x: (gx - gy) * (TILE_W / 2), y: (gx + gy - 1) * (TILE_H / 2) - z };
 }
 
+/** World top-left of a sprite room: its floor front vertex sits on the foot of the last cell. */
+export function interiorSpriteTopLeft(def: InteriorDef): Pt {
+  const a = spriteAsset(interiorSpriteKey(def.id, false));
+  const foot = tileFootWorld(def.w - 1, def.h - 1);
+  return { x: foot.x - a.vfs.x, y: foot.y - a.vfs.y };
+}
+
 function poly(g: Graphics, pts: Pt[], fill: number): void {
   g.moveTo(pts[0].x, pts[0].y);
   for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
@@ -178,29 +213,6 @@ function box(
   poly(g, [P(x0, y1, z0), P(x1, y1, z0), P(x1, y1, z1), P(x0, y1, z1)], pal.left);
   poly(g, [P(x1, y1, z0), P(x1, y0, z0), P(x1, y0, z1), P(x1, y1, z1)], pal.right);
   poly(g, [P(x0, y0, z1), P(x1, y0, z1), P(x1, y1, z1), P(x0, y1, z1)], pal.top);
-}
-
-/** Vertical cylinder centered at lattice (cx, cy), radius r in tiles. */
-function drum(
-  g: Graphics,
-  cx: number,
-  cy: number,
-  r: number,
-  z0: number,
-  z1: number,
-  side: number,
-  top: number,
-): void {
-  const rx = r * (TILE_W / 2) * Math.SQRT2;
-  const ry = r * (TILE_H / 2) * Math.SQRT2;
-  const b = P(cx, cy, z0);
-  const t = P(cx, cy, z1);
-  g.ellipse(b.x, b.y, rx, ry);
-  g.fill(side);
-  g.rect(b.x - rx, t.y, rx * 2, b.y - t.y);
-  g.fill(side);
-  g.ellipse(t.x, t.y, rx, ry);
-  g.fill(top);
 }
 
 const FLOOR_A = 0xc8c8c8;
@@ -233,24 +245,11 @@ const SCREEN_GLOW = 0x46506a;
 const WOOD: Palette = { top: 0xc49a74, left: 0x9c7656, right: 0x7c5a40 };
 const DARK: Palette = { top: 0x4a4a54, left: 0x34343c, right: 0x26262c };
 const CHAIR: Palette = { top: 0x707070, left: 0x585858, right: 0x464646 };
-const CONSOLE: Palette = { top: 0x8ea4bc, left: 0x6a8098, right: 0x52667c };
-const SHELF: Palette = { top: 0x8a6a4c, left: 0x6c5038, right: 0x523c2a };
-const LIGHT_WOOD: Palette = { top: 0xd8bc98, left: 0xb09472, right: 0x8e7656 };
-const FINOA_TABLE: Palette = { top: 0x8fb0a0, left: 0x6c8c7c, right: 0x547062 };
-const PEDESTAL: Palette = { top: 0x5a5a64, left: 0x44444c, right: 0x34343a };
-const GLASS: Palette = { top: 0xeef4fa, left: 0xd2e2ee, right: 0xb6cadc };
-const PRODUCT: Palette = { top: 0xf0a860, left: 0xd08440, right: 0xa86830 };
 
-const CASE_RUG: Record<string, number> = {
-  estudio: 0xb08a68,
-  volaris: 0x6a96c8,
-  bain: 0xb86a5e,
-  mentoria: 0xa08c70,
-  finoa: 0x7aa090,
-  pg: 0x7f92c4,
-};
+const CASE_RUG: Record<string, number> = { estudio: 0xb08a68 };
 
 function paintInteriorFloor(g: Graphics, def: InteriorDef): void {
+  if (def.sprite) return;
   for (let ty = 0; ty < def.h; ty++) {
     for (let tx = 0; tx < def.w; tx++) {
       tileDiamond(g, tx, ty, (tx + ty) % 2 === 0 ? FLOOR_A : FLOOR_B);
@@ -263,6 +262,7 @@ function paintInteriorFloor(g: Graphics, def: InteriorDef): void {
  * the floor edge to backWallH and their caps share the inner corner vertex P(0, 0, H).
  */
 function paintInteriorWalls(g: Graphics, def: InteriorDef): void {
+  if (def.sprite) return;
   const H = def.backWallH;
   const t = WALL_THICK;
   const { w, h } = def;
@@ -313,84 +313,11 @@ function westWallPanel(g: Graphics, y0: number, y1: number, z0: number, z1: numb
 
 function paintCaseProp(g: Graphics, def: InteriorDef): void {
   paintCaseRug(g, CASE_RUG[def.id] ?? 0x999999);
-  switch (def.id) {
-    case 'estudio':
-      box(g, 0.15, 0.15, 1.85, 1.3, 0, 30, WOOD);
-      box(g, 0.55, 0.3, 1.35, 0.42, 30, 56, DARK);
-      box(g, 0.75, 1.5, 1.25, 1.9, 0, 18, CHAIR);
-      break;
-    case 'volaris':
-      westWallPanel(g, 0.25, 1.85, 30, 76, 0x1e2a44, 0x4a7ab8);
-      box(g, 0.2, 0.2, 1.6, 1.4, 0, 28, CONSOLE);
-      box(g, 0.5, 0.35, 1.3, 0.5, 28, 44, DARK);
-      break;
-    case 'bain':
-      paintBainTable(g);
-      break;
-    case 'mentoria': {
-      box(g, 0.1, 0.05, 1.9, 0.55, 0, 80, SHELF);
-      const books = [0x6a4a8a, 0x3a6a8a, 0x8a5a3a, 0x4a7a4a, 0x8a3a3a];
-      for (const z of [8, 30, 52]) {
-        for (let i = 0; i < 5; i++) {
-          const bx0 = 0.2 + i * 0.33;
-          poly(
-            g,
-            [P(bx0, 0.551, z), P(bx0 + 0.26, 0.551, z), P(bx0 + 0.26, 0.551, z + 16), P(bx0, 0.551, z + 16)],
-            books[(i + z) % books.length],
-          );
-        }
-      }
-      box(g, 0.35, 0.9, 1.65, 1.75, 0, 26, LIGHT_WOOD);
-      break;
-    }
-    case 'finoa':
-      box(g, 0.2, 0.3, 1.8, 1.7, 0, 30, FINOA_TABLE);
-      box(g, 0.7, 0.75, 1.3, 1.15, 30, 33, DARK);
-      box(g, 0.7, 0.7, 1.3, 0.78, 33, 52, DARK);
-      break;
-    case 'pg':
-      paintDisplayCase(g);
-      break;
-    default:
-      break;
+  if (def.id === 'estudio') {
+    box(g, 0.15, 0.15, 1.85, 1.3, 0, 30, WOOD);
+    box(g, 0.55, 0.3, 1.35, 0.42, 30, 56, DARK);
+    box(g, 0.75, 1.5, 1.25, 1.9, 0, 18, CHAIR);
   }
-}
-
-const BAIN_TABLE_Z = 34;
-const BAIN_TABLE_TOP = 0xb08e6c;
-const BAIN_TABLE_SIDE = 0x6a5646;
-
-/** Round pedestal table at table height, with a chair on each open side against the walls. */
-function paintBainTable(g: Graphics): void {
-  box(g, 0.12, 0.7, 0.58, 1.3, 0, 16, CHAIR);
-  box(g, 0.12, 0.7, 0.24, 1.3, 16, 40, CHAIR);
-  box(g, 0.7, 0.12, 1.3, 0.58, 0, 16, CHAIR);
-  box(g, 0.7, 0.12, 1.3, 0.24, 16, 40, CHAIR);
-  drum(g, 1.05, 1.05, 0.16, 0, BAIN_TABLE_Z - 6, BAIN_TABLE_SIDE, BAIN_TABLE_SIDE);
-  drum(g, 1.05, 1.05, 0.62, BAIN_TABLE_Z - 6, BAIN_TABLE_Z, BAIN_TABLE_SIDE, BAIN_TABLE_TOP);
-}
-
-function paintDisplayCase(g: Graphics): void {
-  box(g, 0.3, 0.3, 1.7, 1.7, 0, 24, PEDESTAL);
-  box(g, 0.35, 0.35, 1.65, 1.65, 24, 72, GLASS);
-  box(g, 0.8, 0.8, 1.2, 1.2, 24, 50, PRODUCT);
-  const frame = { width: 2, color: 0x4c5660 };
-  const edges: [Pt, Pt][] = [
-    [P(0.35, 1.65, 24), P(0.35, 1.65, 72)],
-    [P(1.65, 1.65, 24), P(1.65, 1.65, 72)],
-    [P(1.65, 0.35, 24), P(1.65, 0.35, 72)],
-    [P(0.35, 0.35, 72), P(1.65, 0.35, 72)],
-    [P(1.65, 0.35, 72), P(1.65, 1.65, 72)],
-    [P(1.65, 1.65, 72), P(0.35, 1.65, 72)],
-    [P(0.35, 1.65, 72), P(0.35, 0.35, 72)],
-  ];
-  for (const [a, b] of edges) {
-    g.moveTo(a.x, a.y);
-    g.lineTo(b.x, b.y);
-    g.stroke(frame);
-  }
-  const plate = [P(0.75, 1.701, 8), P(1.25, 1.701, 8), P(1.25, 1.701, 16), P(0.75, 1.701, 16)];
-  poly(g, plate, 0xf2f2f2);
 }
 
 function paintPew(g: Graphics, tx: number, ty: number): void {
@@ -477,6 +404,7 @@ function paintFlor(g: Graphics, def: InteriorDef): void {
 }
 
 function paintInteriorProps(g: Graphics, def: InteriorDef): void {
+  if (def.sprite) return;
   const grid = buildInteriorGrid(def);
   paintExitMat(g, def);
   if (isCaseRoom(def)) paintCaseProp(g, def);
@@ -516,6 +444,24 @@ export function interiorWorldBounds(def: InteriorDef, tightSides = false): {
   width: number;
   height: number;
 } {
+  if (def.sprite) {
+    const b = spriteAsset(interiorSpriteKey(def.id, false)).bbox;
+    const fx = interiorSpriteTopLeft(def);
+    const padX = TILE_W * (tightSides ? 0.03 : 0.25);
+    const padY = TILE_H * 0.4;
+    const minX = fx.x + b.x0;
+    const maxX = fx.x + b.x1;
+    const minY = fx.y + b.y0;
+    const maxY = fx.y + b.y1;
+    return {
+      minX: minX - padX,
+      maxX: maxX + padX,
+      minY: minY - padY,
+      maxY: maxY + padY,
+      width: maxX - minX + padX * 2,
+      height: maxY - minY + padY * 2,
+    };
+  }
   const H = def.backWallH;
   const t = WALL_THICK;
   const d = PLINTH_DEPTH;
@@ -672,6 +618,7 @@ function tileKey(x: number, y: number): string {
 }
 
 function isPerimeterShell(def: InteriorDef, x: number, y: number): boolean {
+  if (def.sprite) return false;
   const edge = x === 0 || y === 0 || x === def.w - 1 || y === def.h - 1;
   const isExit = x === def.exit.x && y === def.exit.y;
   return edge && !isExit;
@@ -707,6 +654,12 @@ export function interiorRenderedPropTiles(def: InteriorDef): { x: number; y: num
   } else if (def.id === 'flor') {
     mark(FLOR_STAGE.x0, FLOR_STAGE.y0, FLOR_STAGE.x1, FLOR_STAGE.y1);
     for (const tier of FLOR_TIERS) mark(tier.x, FLOR_TIER_Y0, tier.x + 1, FLOR_TIER_Y1);
+  } else if (def.mask) {
+    def.mask.forEach((row, y) => {
+      [...row].forEach((c, x) => {
+        if (c === '#') mark(x, y, x + 1, y + 1);
+      });
+    });
   } else if (isCaseRoom(def)) {
     mark(0, 0, 2, 2);
   }
@@ -733,9 +686,22 @@ export type InteriorPixelProbe = {
  * QA pixel probes: one point per west-wall segment, per pew tile, per Flor stage/tier, per case
  * prop. Each must render as its feature color (not floor, not background).
  */
-export function interiorPixelProbes(def: InteriorDef): InteriorPixelProbe[] {
+export function interiorPixelProbes(def: InteriorDef, lejos = false): InteriorPixelProbe[] {
   const out: InteriorPixelProbe[] = [];
   const pal = (p: Palette) => [p.top, p.left, p.right];
+  if (def.sprite) {
+    // Pixel-diff against the exported frame: flat-colour samples of the PNG at their world spots.
+    const key = interiorSpriteKey(def.id, lejos);
+    const tl = interiorSpriteTopLeft(def);
+    (cachedSpriteProbes()?.[key] ?? []).forEach(([x, y, r, g, b], i) => {
+      out.push({
+        label: `sprite-${def.id}-${lejos ? 'lejos' : 'cerca'}-${i}`,
+        world: { x: tl.x + x + 0.5, y: tl.y + y + 0.5 },
+        expect: [(r << 16) | (g << 8) | b],
+      });
+    });
+    return out;
+  }
   const wallZ = def.backWallH - 6;
   for (let ty = 0; ty < def.h; ty++) {
     out.push({ label: `west-wall-${ty}`, world: P(0, ty + 0.5, wallZ), expect: [WEST_WALL] });
@@ -771,16 +737,7 @@ export function interiorPixelProbes(def: InteriorDef): InteriorPixelProbe[] {
       });
     }
   } else if (isCaseRoom(def)) {
-    const caseProbe: Record<string, { world: Pt; expect: number[] }> = {
-      estudio: { world: P(1.2, 0.9, 30), expect: pal(WOOD) },
-      volaris: { world: P(1.2, 1.0, 28), expect: pal(CONSOLE) },
-      bain: { world: P(1.05, 1.05, BAIN_TABLE_Z), expect: [BAIN_TABLE_TOP] },
-      mentoria: { world: P(1.0, 1.3, 26), expect: pal(LIGHT_WOOD) },
-      finoa: { world: P(1.5, 1.4, 30), expect: pal(FINOA_TABLE) },
-      pg: { world: P(1.65, 1.0, 40), expect: [...pal(GLASS), ...pal(PRODUCT)] },
-    };
-    const c = caseProbe[def.id];
-    if (c) out.push({ label: `case-${def.id}`, ...c });
+    out.push({ label: `case-${def.id}`, world: P(1.2, 0.9, 30), expect: pal(WOOD) });
   }
   return out;
 }
