@@ -18,7 +18,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
 
@@ -47,7 +47,7 @@ jobs:
         run: npm run qa:sprites -- --shots
 
       - name: npm run qa:pinch
-        timeout-minutes: 225
+        timeout-minutes: 330
         run: npm run qa:pinch
 
       - name: Upload QA artifacts

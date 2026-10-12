@@ -2989,6 +2989,7 @@ async function testStaggeredPinchNoJump(page, errors) {
 }
 
 async function testPanelDismissDesktop(page, errors) {
+  mark('testRun30DismissOutsideTapNoWalk');
   await testRun30DismissOutsideTapNoWalk(page, errors);
 }
 
@@ -4000,6 +4001,11 @@ async function waitForPreview(url, maxAttempts = 60) {
   return false;
 }
 
+const QA_T0 = Date.now();
+function mark(name) {
+  console.log(`[qa +${Math.round((Date.now() - QA_T0) / 1000)}s] ${name}`);
+}
+
 async function main() {
   await mkdir(outDir, { recursive: true });
   let preview = null;
@@ -4034,6 +4040,7 @@ async function main() {
   try {
     const desktop = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     await wheelSweep(desktop, 'desktop-wheel', errors);
+    mark('testBuildingSilhouetteStable');
     await testBuildingSilhouetteStable(desktop, 'desktop-silhouette', errors);
     await desktop.goto(BASE, { waitUntil: 'networkidle' });
     await wait(800);
@@ -4063,65 +4070,122 @@ async function main() {
     const m = await readCanvasMetrics(desktop);
     assertFrameMetrics('desktop-ctrl-wheel', m, errors, 'after-ctrl-wheel');
 
+    mark('testUnreachableClick');
+
     await testUnreachableClick(desktop, errors);
+    mark('testWalkGridFootprintRules');
     await testWalkGridFootprintRules(desktop, errors);
+    mark('testEnterBuildingChecklist');
     await testEnterBuildingChecklist(desktop, errors);
+    mark('testGroundWalkCrossingDoorNoPanel');
     await testGroundWalkCrossingDoorNoPanel(desktop, errors);
+    mark('testNoSpuriousDoorPanelAfterGroundWalk');
     await testNoSpuriousDoorPanelAfterGroundWalk(desktop, errors);
+    mark('testNoDoorReopenOnKeypressAfterClose');
     await testNoDoorReopenOnKeypressAfterClose(desktop, errors);
+    mark('testPanelDismissDesktop');
     await testPanelDismissDesktop(desktop, errors);
+    mark('testPanelSwitchBuilding');
     await testPanelSwitchBuilding(desktop, errors);
+    mark('testPanelDragKeepsOpen');
     await testPanelDragKeepsOpen(desktop, errors);
+    mark('testPanelClickInside');
     await testPanelClickInside(desktop, errors);
+    mark('testBuildingWalkEndsOnDoorTile');
     await testBuildingWalkEndsOnDoorTile(desktop, errors);
+    mark('testWalkKeysFirstPress');
     await testWalkKeysFirstPress(desktop, errors);
+    mark('testChecklistCollapsedPill');
     await testChecklistCollapsedPill(desktop, errors);
+    mark('testHashCameraChecklistRebaseline');
     await testHashCameraChecklistRebaseline(desktop, errors);
+    mark('testBainDoorLowZoomDeterministic');
     await testBainDoorLowZoomDeterministic(desktop, errors);
+    mark('testSkipRingDesktop');
     await testSkipRingDesktop(desktop, errors);
 
+    mark('testMap64RouteLengths');
+
     await testMap64RouteLengths(desktop, errors, routeReport);
+    mark('testMap64EnterablePanels');
     await testMap64EnterablePanels(desktop, errors);
+    mark('testMap64PaisajeNoPanel');
     await testMap64PaisajeNoPanel(desktop, errors);
+    mark('testSceneryTapWalks');
     await testSceneryTapWalks(desktop, errors);
+    mark('testMinZoomPanThenPinchOutNoSnap');
     await testMinZoomPanThenPinchOutNoSnap(desktop, errors);
+    mark('testStaggeredPinchNoJump');
     await testStaggeredPinchNoJump(desktop, errors);
+    mark('testRun30NoEarlyInteriorOnRoofTap');
     await testRun30NoEarlyInteriorOnRoofTap(desktop, errors);
+    mark('testRun30AllInteriorsClick');
     await testRun30AllInteriorsClick(desktop, errors);
+    mark('testRun31HistoryBackExitsInterior');
     await testRun31HistoryBackExitsInterior(desktop, errors);
+    mark('testRun31DeepLinkInterior');
     await testRun31DeepLinkInterior(desktop, errors);
+    mark('testRun31InteriorSizes');
     await testRun31InteriorSizes(desktop, errors);
+    mark('testRun31SambilWalkCancel');
     await testRun31SambilWalkCancel(desktop, errors);
+    mark('testRun31InteriorExitTileZoom');
     await testRun31InteriorExitTileZoom(desktop, errors);
+    mark('testRun31ChecklistOutsideTapMobile');
     await testRun31ChecklistOutsideTapMobile(browser, errors);
+    mark('testRun33DoorRealInputAll');
     await testRun33DoorRealInputAll(browser, errors);
+    mark('testRun33BainDoorLowZoomTouch');
     await testRun33BainDoorLowZoomTouch(browser, errors);
+    mark('testRun33SheetOutsideTapMobile');
     await testRun33SheetOutsideTapMobile(browser, errors);
+    mark('testRun33InteriorExitAllMobile');
     await testRun33InteriorExitAllMobile(browser, errors);
+    mark('testRun33ArrivalOnlyFour');
     await testRun33ArrivalOnlyFour(desktop, errors);
+    mark('testRun34FloorTapNoExit');
     await testRun34FloorTapNoExit(browser, errors);
+    mark('testRun34MobileSheetScrim');
     await testRun34MobileSheetScrim(browser, errors);
+    mark('testRun34SingleExitUi');
     await testRun34SingleExitUi(browser, errors);
+    mark('testRun35ExitTileAfterFloorTaps');
     await testRun35ExitTileAfterFloorTaps(browser, errors);
+    mark('testRun35BlockedTilesHaveProps');
     await testRun35BlockedTilesHaveProps(desktop, errors);
+    mark('testRun37InteriorPixelProbes');
     await testRun37InteriorPixelProbes(browser, errors);
+    mark('testRun37DesktopInteriorMargins');
     await testRun37DesktopInteriorMargins(browser, errors);
+    mark('testRun37PhoneTouchWalkAllRooms');
     await testRun37PhoneTouchWalkAllRooms(browser, errors);
+    mark('testRun38MobileFirstLoadFraming');
     await testRun38MobileFirstLoadFraming(browser, errors);
+    mark('testRun38PhoneInteriorFit');
     await testRun38PhoneInteriorFit(browser, errors);
+    mark('testRun38ToastClearsAcrossRooms');
     await testRun38ToastClearsAcrossRooms(browser, errors);
     for (const kind of ['chromium-desktop', 'chromium-phone', 'webkit-iphone']) {
+      mark(`run38 input suite ${kind}`);
       await runRun38InputSuite({ kind, base: BASE.replace(/#.*$/, ''), errors });
     }
     const desktopCdp = await desktop.context().newCDPSession(desktop);
+    mark('testRun32WalkPinchFiveTrials');
     await testRun32WalkPinchFiveTrials(desktop, errors, desktopCdp);
     await ensureTouchEmulation(desktopCdp);
+    mark('testRun30WalkSurvivesPinch');
     await testRun30WalkSurvivesPinch(desktop, errors, desktopCdp);
+    mark('testMinZoomFullMapVisible');
     await testMinZoomFullMapVisible(browser, errors);
+    mark('testMinZoomPhoneFraming');
     await testMinZoomPhoneFraming(browser, errors);
 
+    mark('testTouchBuildingEntry');
+
     await testTouchBuildingEntry(browser, errors, warnings);
+    mark('testPanelDismissTouch');
     await testPanelDismissTouch(browser, errors);
+    mark('testMobile375PinchAndUi');
     await testMobile375PinchAndUi(browser, errors);
 
     const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
