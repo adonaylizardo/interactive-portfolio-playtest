@@ -387,7 +387,7 @@ export class IsoScene {
       const pos = e.getLocalPosition(this.world);
       const tile = worldToTile(pos.x, pos.y);
       if (!tile) {
-        this.events.onUnreachable?.();
+        this.tapBeyondMapEdge(pos.x, pos.y, sprint);
         return;
       }
       if (!this.prepareMapTap(undefined, tile.x, tile.y)) return;
@@ -561,6 +561,7 @@ export class IsoScene {
       this.canvasEl.dataset.walkGoal = JSON.stringify({ x: tx, y: ty });
     }
     if (tx < 0 || ty < 0 || tx >= MAP_WIDTH || ty >= MAP_HEIGHT) {
+      this.pendingBuildingEntry = null;
       this.clearWalkPreview();
       if (this.canvasEl) this.canvasEl.dataset.walkGoal = '';
       this.events.onUnreachable?.();
@@ -570,9 +571,14 @@ export class IsoScene {
     const sy = Math.round(this.charTy);
     const result = findPathOrNearest(sx, sy, tx, ty);
     if (!result) {
+      this.pendingBuildingEntry = null;
       this.clearWalkPreview();
       this.events.onUnreachable?.();
       return;
+    }
+    if (!result.direct && this.pendingBuildingEntry) {
+      const d = this.pendingBuildingEntry.door;
+      if (result.target.x !== d.x || result.target.y !== d.y) this.pendingBuildingEntry = null;
     }
     this.path = result.path;
     this.sprint = sprint;
@@ -722,7 +728,7 @@ export class IsoScene {
         this.interiorDef &&
         interiorHitExit(this.interiorDef, iwx, iwy, this.zoom)
       ) {
-        this.exitInterior({ immediate: true });
+        this.walkToInteriorExit(sprint);
         return;
       }
       const client = this.canvasLocalToClient(sx, sy);
@@ -767,7 +773,23 @@ export class IsoScene {
       }
       if (!this.prepareMapTap(undefined, tile.x, tile.y)) return;
       this.requestWalk(tile.x, tile.y, sprint);
-    } else this.events.onUnreachable?.();
+    } else this.tapBeyondMapEdge(wx, wy, sprint);
+  }
+
+  /** A tap just past the map edge walks to the nearest reachable tile; a far tap cancels and says so. */
+  private tapBeyondMapEdge(wx: number, wy: number, sprint: boolean): void {
+    const gx = (wx / (TILE_W / 2) + wy / (TILE_H / 2)) / 2;
+    const gy = (wy / (TILE_H / 2) - wx / (TILE_W / 2)) / 2;
+    const cx = Math.min(MAP_WIDTH - 1, Math.max(0, Math.round(gx)));
+    const cy = Math.min(MAP_HEIGHT - 1, Math.max(0, Math.round(gy)));
+    if (Math.hypot(gx - cx, gy - cy) > 6) {
+      this.pendingBuildingEntry = null;
+      this.clearWalkPreview();
+      this.events.onUnreachable?.();
+      return;
+    }
+    if (!this.prepareMapTap(undefined, cx, cy)) return;
+    this.requestWalk(cx, cy, sprint);
   }
 
   private canvasLocalToClient(sx: number, sy: number): { x: number; y: number } {
@@ -892,6 +914,23 @@ export class IsoScene {
       this.cameraX = fitted.cameraX;
       this.cameraY = fitted.cameraY;
       this.zoom = fitted.zoom;
+      if (this.canvasEl) {
+        const camPx = sw / 2 + this.cameraX * this.zoom;
+        const camPy = sh / 2 + this.cameraY * this.zoom;
+        const m = cameraFitMargins();
+        this.canvasEl.dataset.interiorBox = JSON.stringify({
+          l: camPx + bounds.minX * this.zoom,
+          r: camPx + bounds.maxX * this.zoom,
+          t: camPy + bounds.minY * this.zoom,
+          b: camPy + bounds.maxY * this.zoom,
+        });
+        this.canvasEl.dataset.interiorFree = JSON.stringify({
+          l: Math.max(12, m.left),
+          r: sw - Math.max(12, m.right),
+          t: Math.max(24, m.top),
+          b: sh - Math.max(24, m.bottom),
+        });
+      }
     } else {
       this.zoom = clampZoom(this.zoom, sw, sh);
       const stabilize =
@@ -2071,7 +2110,7 @@ export class IsoScene {
     if (!this.interiorDef) return;
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
     if (interiorHitExit(this.interiorDef, wx, wy, this.zoom)) {
-      this.exitInterior({ immediate: true });
+      this.walkToInteriorExit(sprint);
       return;
     }
     const tile = interiorPickTile(this.interiorDef, wx, wy);
@@ -2085,6 +2124,27 @@ export class IsoScene {
     const path = findPathInterior(this.interiorGrid, sx0, sy0, tile.x, tile.y);
     if (!path) {
       this.events.onUnreachable?.();
+      return;
+    }
+    this.interiorPath = path;
+    this.sprint = sprint;
+    this.charState = sprint ? 'sprint' : 'walk';
+  }
+
+  /** One tap on the exit mat / door gap: walk there from anywhere; the walk exits on arrival. */
+  private walkToInteriorExit(sprint: boolean): void {
+    const def = this.interiorDef;
+    if (!def) return;
+    const sx0 = Math.round(this.interiorCharTx);
+    const sy0 = Math.round(this.interiorCharTy);
+    const path = findPathInterior(this.interiorGrid, sx0, sy0, def.exit.x, def.exit.y);
+    if (!path) {
+      this.events.onUnreachable?.();
+      return;
+    }
+    if (path.length === 0) {
+      this.interiorPath = [];
+      this.exitInterior({ immediate: true });
       return;
     }
     this.interiorPath = path;
@@ -2262,6 +2322,23 @@ export class IsoScene {
       const s = this.worldToScreen(p.world.x, p.world.y);
       return { label: p.label, x: rect.left + s.x, y: rect.top + s.y, expect: p.expect };
     });
+  }
+
+  getInteriorLayoutForQa(): {
+    w: number;
+    h: number;
+    exit: { x: number; y: number };
+    walkable: { x: number; y: number }[];
+  } | null {
+    const def = this.interiorDef;
+    if (!def) return null;
+    const walkable: { x: number; y: number }[] = [];
+    for (let y = 0; y < def.h; y++) {
+      for (let x = 0; x < def.w; x++) {
+        if (this.interiorGrid[y]?.[x]?.walkable) walkable.push({ x, y });
+      }
+    }
+    return { w: def.w, h: def.h, exit: def.exit, walkable };
   }
 
   getInteriorCharTile(): { x: number; y: number } | null {

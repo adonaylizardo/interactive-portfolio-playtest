@@ -1,5 +1,6 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
+import { runRun38InputSuite } from './qa-run38-input.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -4089,6 +4090,9 @@ async function main() {
     await testRun38MobileFirstLoadFraming(browser, errors);
     await testRun38PhoneInteriorFit(browser, errors);
     await testRun38ToastClearsAcrossRooms(browser, errors);
+    for (const kind of ['chromium-desktop', 'chromium-phone', 'webkit-iphone']) {
+      await runRun38InputSuite({ kind, base: BASE.replace(/#.*$/, ''), errors });
+    }
     const desktopCdp = await desktop.context().newCDPSession(desktop);
     await testRun32WalkPinchFiveTrials(desktop, errors, desktopCdp);
     await ensureTouchEmulation(desktopCdp);

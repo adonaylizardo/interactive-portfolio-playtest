@@ -211,6 +211,8 @@ const WALL_CAP = 0x5e5e5e;
 const WALL_END = 0x747474;
 const WALL_THICK = 0.18;
 const PLINTH_DEPTH = 0.14;
+/** How far past the floor edge the door gap counts as the exit target (lattice tiles). */
+const EXIT_GAP_DEPTH = 0.6;
 const PLINTH: Palette = { top: 0xa8a8a8, left: 0x8c8c8c, right: 0x7a7a7a };
 const POST: Palette = { top: 0x8a8a8a, left: 0x6a6a6a, right: 0x585858 };
 const MAT = 0xe8e4da;
@@ -638,15 +640,21 @@ export function interiorPickTile(
   return { x, y };
 }
 
-/** Exit only on the exit tile (same rule for touch and mouse). */
+/**
+ * Exit target: the mat tile plus the door gap in front of it (between the two posts, outside the
+ * floor). Neighbouring floor tiles are not part of it. Tapping it walks there and exits on arrival.
+ */
 export function interiorHitExit(
   def: InteriorDef,
   worldX: number,
   worldY: number,
   _zoom: number,
 ): boolean {
-  const pick = interiorPickTile(def, worldX, worldY);
-  return pick != null && pick.x === def.exit.x && pick.y === def.exit.y;
+  // Pick coordinates are tile-center based; lattice = pick + 0.5.
+  const lx = (worldX / (TILE_W / 2) + worldY / (TILE_H / 2)) / 2 + 0.5;
+  const ly = (worldY / (TILE_H / 2) - worldX / (TILE_W / 2)) / 2 + 0.5;
+  const { x, y } = def.exit;
+  return lx >= x - 0.1 && lx <= x + 1.1 && ly >= y && ly <= y + 1 + EXIT_GAP_DEPTH;
 }
 
 /** @deprecated use interiorHitExit */

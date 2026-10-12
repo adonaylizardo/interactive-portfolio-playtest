@@ -478,12 +478,16 @@ export function clampInteriorPanInView(
   const right = camPx + bounds.maxX * zoom;
   const top = camPy + bounds.minY * zoom;
   const bottom = camPy + bounds.maxY * zoom;
-  let dx = 0;
-  let dy = 0;
-  if (left < ml) dx = ml - left;
-  if (right > screenW - mr) dx = screenW - mr - right;
-  if (top < mt) dy = mt - top;
-  if (bottom > screenH - mb) dy = screenH - mb - bottom;
+  // A room that fits the free area stays centered in it (no dragging it away); a zoomed-in room
+  // can only pan until its edge meets the free-area edge, so the void never shows.
+  const axis = (lo: number, hi: number, freeLo: number, freeHi: number): number => {
+    if (hi - lo <= freeHi - freeLo) return (freeLo + freeHi) / 2 - (lo + hi) / 2;
+    if (lo > freeLo) return freeLo - lo;
+    if (hi < freeHi) return freeHi - hi;
+    return 0;
+  };
+  const dx = axis(left, right, ml, screenW - mr);
+  const dy = axis(top, bottom, mt, screenH - mb);
   return {
     cameraX: cameraX + dx / zoom,
     cameraY: cameraY + dy / zoom,
