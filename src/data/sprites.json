@@ -2150,20 +2150,13 @@
   },
   "prop/obelisco": {
    "colision": {
-    "huella_plaza": {
-     "celdas_x": [
-      14,
-      16
-     ],
-     "celdas_y": [
-      35,
-      37
-     ],
-     "celdas": 9,
-     "nota": "plaza + redoma verde decorativa; el asset ocupa las 9 casillas pero solo una franja es masa sólida"
-    },
+    "decision": "La escalinata BLOQUEA: el Obelisco no tiene interior y la puerta no se abre, así que subir no lleva a nada, y el mapa no tiene alturas. El jugador llega al pie de la escalinata, en el acceso (17, 36). El arco es solo apoyo, pero su pie en la plaza bloquea (14, 36), que pasa a ser sólida. Lo que queda debajo del arco está en (14, 36) y (15, 36), las dos sólidas. (15, 37) sigue sólida por las gradas (45 %) y la losa, no por el arco.",
     "solida": {
      "celdas": [
+      [
+       14,
+       36
+      ],
       [
        15,
        35
@@ -2175,9 +2168,13 @@
       [
        15,
        37
+      ],
+      [
+       16,
+       36
       ]
      ],
-     "nota": "franja central x = 15, y 35–37: el plinto de dos escalones (casillas locales u 0,85–2,15 × v 0,55–2,45) cubre el 100 % de (15, 36) y el 45 % de (15, 35) y (15, 37); la losa (u 1,35–1,65 × v 0,95–2,05, 0,3 × 1,1 casilla) cae entera en esa franja y el arco (u 1,44–1,56, v 2,05–2,85) termina dentro de (15, 37). Bloquea estas 3 casillas."
+     "nota": "x = 15, y 35–37: gradas y losa (las gradas cubren 100 % de (15, 36) y 45 % de (15, 35) y (15, 37)); (16, 36): la escalinata con sus muros (u 1,65–2,95 × v 1,06–1,94, 84 % de la casilla) la cruza entera. (14, 36): pie del arco (u 0,50–0,60 × v 1,44–1,56) y arco por encima."
     },
     "caminable": {
      "celdas": [
@@ -2187,10 +2184,6 @@
       ],
       [
        14,
-       36
-      ],
-      [
-       14,
        37
       ],
       [
@@ -2199,28 +2192,30 @@
       ],
       [
        16,
-       36
-      ],
-      [
-       16,
        37
       ]
      ],
-     "nota": "el plinto solo las roza (≤ 15 % en (14, 36) y (16, 36), ≤ 7 % en las esquinas). Si prefieres que el jugador no pise la redoma verde, bloquéalas también y deja solo el sendero (16, 36) → acceso (17, 36)."
+     "nota": "plaza y redoma decorativas: las gradas solo las rozan (≤ 15 %). Si no quieres que se pise la redoma, bloquéalas también."
     },
-    "cobertura_plinto": {
-     "14,35": 0.07,
-     "15,35": 0.45,
-     "16,35": 0.07,
-     "14,36": 0.15,
-     "15,36": 1,
-     "16,36": 0.15,
-     "14,37": 0.07,
-     "15,37": 0.45,
-     "16,37": 0.07
+    "cobertura": {
+     "gradas": {
+      "14,35": 0.07,
+      "15,35": 0.45,
+      "16,35": 0.07,
+      "14,36": 0.15,
+      "15,36": 1,
+      "16,36": 0.15,
+      "14,37": 0.07,
+      "15,37": 0.45,
+      "16,37": 0.07
+     },
+     "escalinata": {
+      "15,36": 0.31,
+      "16,36": 0.84
+     }
     },
     "rectangulos_locales": {
-     "plinto": {
+     "gradas": {
       "u": [
        0.85,
        2.15
@@ -2248,19 +2243,43 @@
        396
       ]
      },
-     "arco": {
+     "escalinata": {
       "u": [
-       1.44,
-       1.56
+       1.65,
+       2.95
       ],
       "v": [
-       2.05,
-       2.85
+       1.06,
+       1.94
       ],
       "z": [
        0,
-       110
+       59
       ]
+     },
+     "arco": {
+      "u": [
+       0.5,
+       1.35
+      ],
+      "v": [
+       1.44,
+       1.56
+      ],
+      "z": [
+       0,
+       104
+      ],
+      "pie": {
+       "u": [
+        0.5,
+        0.6
+       ],
+       "v": [
+        1.44,
+        1.56
+       ]
+      }
      }
     },
     "unidades": "casillas del mapa (x, y); locales: u = x − 14, v = y − 35",
@@ -2270,9 +2289,68 @@
     ]
    },
    "punto_lejos": {
-    "x": 204.8,
-    "y": 49.48,
+    "x": 202.88,
+    "y": 50.44,
     "radio": 4
+   },
+   "frente": {
+    "cara": "+x",
+    "mira_a": [
+     17,
+     36
+    ],
+    "elementos": [
+     "ranuras del mirador",
+     "reloj",
+     "placa",
+     "puerta",
+     "escalinata"
+    ],
+    "puerta_frame": {
+     "x": 201.6,
+     "y": 384.8,
+     "nota": "centro del umbral, z 52; la puerta no se abre"
+    },
+    "pie_escalinata_frame": {
+     "x": 284.8,
+     "y": 478.4
+    },
+    "trasera": {
+     "cara": "-x",
+     "elementos": [
+      "reloj",
+      "inscripción 1552 · 1952"
+     ],
+     "nota": "oculta en esta vista"
+    }
+   },
+   "arco": {
+    "cara": "-x",
+    "nace": {
+     "u": 1.35,
+     "v": [
+      1.44,
+      1.56
+     ],
+     "z": 104
+    },
+    "apoya": {
+     "u": [
+      0.5,
+      0.6
+     ],
+     "v": [
+      1.44,
+      1.56
+     ],
+     "z": 0,
+     "celda": [
+      14,
+      36
+     ]
+    },
+    "escalones": false,
+    "visible_en_iso": "asoma a la izquierda de la losa (lomo + cara +y); lo de detrás de la losa queda tapado"
    }
   }
  }

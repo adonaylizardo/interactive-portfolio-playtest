@@ -1,5 +1,5 @@
 import type { MapCell, MapObject } from '../data/world';
-import { TILE_H, TILE_W } from '../data/world';
+import { OBELISCO_SOLID_TILES, TILE_H, TILE_W } from '../data/world';
 import { tileFootWorld } from '../iso/math';
 import { spriteAsset } from './sprites';
 
@@ -93,7 +93,11 @@ export type OccluderBox = { x0: number; y0: number; x1: number; y1: number };
  */
 export function objectOccluder(o: MapObject): OccluderBox | null {
   if (o.name === 'redoma') return null;
-  if (o.name === 'obelisco') return { x0: 14.5, y0: 34.5, x1: 15.5, y1: 37.5 };
+  if (o.name === 'obelisco') {
+    const xs = OBELISCO_SOLID_TILES.map(([x]) => x);
+    const ys = OBELISCO_SOLID_TILES.map(([, y]) => y);
+    return { x0: Math.min(...xs) - 0.5, y0: Math.min(...ys) - 0.5, x1: Math.max(...xs) + 0.5, y1: Math.max(...ys) + 0.5 };
+  }
   const fx = o.footprintX ?? o.x;
   const fy = o.footprintY ?? o.y;
   return { x0: fx - 0.5, y0: fy - 0.5, x1: fx + (o.w ?? 1) - 0.5, y1: fy + (o.h ?? 1) - 0.5 };

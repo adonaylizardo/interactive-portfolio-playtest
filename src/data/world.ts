@@ -1,4 +1,5 @@
 import mapData from './mapa_datos.json';
+import spritesJson from './sprites.json';
 
 export type MapCell = {
   walkable: boolean;
@@ -76,15 +77,20 @@ export function anchorForBuilding(x: number, y: number, w: number, h: number): {
 const MURO_FOOTPRINT = { x: 35, y: 40, w: 3, h: 2 };
 const MURO_APPROACH: [number, number] = [38, 41];
 
-/**
- * Obelisco: only the central strip (plinth + slab) is solid; the rest of the plaza is walkable
- * decoration (obelisco manifest `colision.solida`).
- */
-export const OBELISCO_SOLID_TILES: readonly [number, number][] = [
-  [15, 35],
-  [15, 36],
-  [15, 37],
-];
+type ObeliscoManifest = {
+  colision: { solida: { celdas: [number, number][] }; acceso?: [number, number] };
+  frente: { mira_a: [number, number] };
+};
+const obeliscoManifest = (spritesJson as unknown as { meta: Record<string, ObeliscoManifest> }).meta['prop/obelisco'];
+
+/** Obelisco collision comes from the sprite manifest (`colision.solida`); the rest of the plaza is walkable decoration. */
+export const OBELISCO_SOLID_TILES: readonly [number, number][] = obeliscoManifest.colision.solida.celdas;
+
+/** Stair foot on the front (+x) face, from the manifest `frente.mira_a`: where the player stops. */
+export const OBELISCO_ACCESS: { x: number; y: number } = {
+  x: obeliscoManifest.frente.mira_a[0],
+  y: obeliscoManifest.frente.mira_a[1],
+};
 
 export function obeliscoSolidTiles(): Set<string> {
   return new Set(OBELISCO_SOLID_TILES.map(([x, y]) => `${x},${y}`));
@@ -139,7 +145,7 @@ const FILLER_PROPS: { kind: 'tree' | 'bench' | 'lamp' | 'plaza'; x: number; y: n
   { kind: 'tree', x: 40, y: 18 },
   { kind: 'bench', x: 19, y: 34 },
   { kind: 'bench', x: 42, y: 34 },
-  { kind: 'lamp', x: 17, y: 36 },
+  { kind: 'lamp', x: 17, y: 35 },
   { kind: 'lamp', x: 49, y: 36 },
   { kind: 'tree', x: 23, y: 42 },
   { kind: 'tree', x: 50, y: 40 },

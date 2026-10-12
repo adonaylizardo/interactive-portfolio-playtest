@@ -125,11 +125,28 @@ function staticChecks() {
       fail(`static: int/${c} mask has free cells not connected to the exit`);
     }
   }
-  const col = sprites.meta['prop/obelisco']?.colision?.solida?.celdas;
-  const want = [[15, 35], [15, 36], [15, 37]];
-  if (JSON.stringify(col) !== JSON.stringify(want)) {
-    fail(`static: obelisco manifest colision.solida is ${JSON.stringify(col)}`);
+  const ob = sprites.meta['prop/obelisco'];
+  const solid = ob?.colision?.solida?.celdas ?? [];
+  const walk = ob?.colision?.caminable?.celdas ?? [];
+  const front = ob?.frente?.mira_a;
+  if (!solid.length || !front) fail('static: obelisco manifest lacks colision.solida or frente.mira_a');
+  const EXPECT_SOLID = [[14, 36], [15, 35], [15, 36], [15, 37], [16, 36]];
+  const EXPECT_WALK = [[14, 35], [14, 37], [16, 35], [16, 37]];
+  const norm = (l) => JSON.stringify([...l].sort((a, b) => a[0] - b[0] || a[1] - b[1]));
+  if (norm(solid) !== norm(EXPECT_SOLID)) fail(`static: obelisco manifest solid cells ${norm(solid)} != ${norm(EXPECT_SOLID)}`);
+  if (norm(walk) !== norm(EXPECT_WALK)) fail(`static: obelisco manifest walkable cells ${norm(walk)} != ${norm(EXPECT_WALK)}`);
+  if (JSON.stringify(front) !== '[17,36]') fail(`static: obelisco stair foot ${JSON.stringify(front)} != [17,36]`);
+  const footprint = (x, y) => x >= 14 && x <= 16 && y >= 35 && y <= 37;
+  if (![...solid, ...walk].every(([x, y]) => footprint(x, y)) || solid.length + walk.length !== 9) {
+    fail('static: obelisco manifest solida + caminable do not tile the 3x3 footprint');
   }
+  if (solid.some(([x, y]) => x === front[0] && y === front[1])) fail('static: obelisco access cell is solid');
+  const foot = ob?.arco?.apoya?.celda;
+  if (foot && !solid.some(([x, y]) => x === foot[0] && y === foot[1])) fail(`static: obelisco arch foot ${foot} is not a solid cell`);
+  const mapa = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/data/mapa_datos.json'), 'utf8'));
+  const row = (mapa.hitos ?? mapa.landmarks ?? []).find?.((h) => h.id === 'obelisco');
+  const listed = JSON.stringify(row?.acceso ?? front);
+  if (listed !== JSON.stringify(front)) fail(`static: mapa_datos obelisco access ${listed} != manifest frente ${JSON.stringify(front)}`);
 }
 
 function maskCells(rows) {
@@ -299,19 +316,47 @@ async function mapChecks(page) {
     }
   }
 
-  const pathCells = (p) => (p ? p.map((c) => `${c.x},${c.y}`) : null);
-  for (const [x, y] of [[15, 35], [15, 36], [15, 37]]) {
-    const p = await page.evaluate(([a, b]) => window.__playtestQa.findPath(14, 34, a, b), [x, y]);
-    if (p) fail(`obelisco: solid cell (${x},${y}) is reachable`);
+  const ob = sprites.meta['prop/obelisco'];
+  const solid = ob.colision.solida.celdas;
+  const walkable = ob.colision.caminable.celdas;
+  const front = ob.frente.mira_a;
+  const start = [front[0] + 3, front[1]];
+  const reach = (x, y) => page.evaluate(([a, b, c, d]) => window.__playtestQa.findPath(a, b, c, d), [start[0], start[1], x, y]);
+  for (const [x, y] of solid) {
+    if (await reach(x, y)) fail(`obelisco: manifest solid cell (${x},${y}) is reachable`);
   }
-  for (const [x, y] of [[14, 35], [14, 36], [14, 37], [16, 35], [16, 36], [16, 37]]) {
-    const p = await page.evaluate(([a, b]) => window.__playtestQa.findPath(14, 34, a, b), [x, y]);
-    if (!p) fail(`obelisco: plaza cell (${x},${y}) is not walkable`);
+  for (const [x, y] of [...walkable, front]) {
+    if (!(await reach(x, y))) fail(`obelisco: manifest walkable cell (${x},${y}) is not walkable`);
   }
-  const around = await page.evaluate(() => window.__playtestQa.findPath(14, 36, 16, 36));
-  if (!around) fail('obelisco: no way around the strip from (14,36) to (16,36)');
-  else if (pathCells(around).includes('15,36')) fail('obelisco: path crosses the solid strip');
-  notes.push('doors: 5 case houses match manifest puerta.verificacion; obelisco: 3 solid cells, 6 plaza cells walkable');
+  const solidKeys = new Set(solid.map(([x, y]) => `${x},${y}`));
+  const around = await page.evaluate(([a, b]) => window.__playtestQa.findPath(a[0], a[1], b[0], b[1]), [[14, 35], front]);
+  if (!around) fail('obelisco: no way from the back of the plaza to the stair foot');
+  else if (around.some((c) => solidKeys.has(`${c.x},${c.y}`))) fail('obelisco: path crosses a solid cell');
+
+  // Tapping the monument itself walks to the stair foot and never enters a solid cell.
+  for (const [tx, ty] of solid) {
+    await page.evaluate(([x, y]) => window.__playtestQa.setCharacterTile(x, y), [front[0] + 3, front[1]]);
+    await wait(150);
+    await page.evaluate(([x, y]) => {
+      const q = window.__playtestQa;
+      const cx = (x - y) * 64;
+      const cy = (x + y) * 32;
+      q.frameWorld(cx, cy - 40, 1);
+      const pt = q.worldToClient(cx, cy);
+      q.tapScreen(pt.x, pt.y);
+    }, [tx, ty]);
+    let last = null;
+    let entered = false;
+    for (let i = 0; i < 80; i++) {
+      await wait(150);
+      last = await page.evaluate(() => JSON.parse(document.getElementById('game-canvas').dataset.charTile ?? 'null'));
+      if (last && solidKeys.has(`${last.x},${last.y}`)) entered = true;
+      if (last && last.x === front[0] && last.y === front[1]) break;
+    }
+    if (entered) fail(`obelisco: walking after tapping (${tx},${ty}) entered a solid cell`);
+    if (!last || last.x !== front[0] || last.y !== front[1]) fail(`obelisco: tap on (${tx},${ty}) ended at ${JSON.stringify(last)}, expected stair foot ${front}`);
+  }
+  notes.push(`doors: 5 case houses match manifest puerta.verificacion; obelisco: ${solid.length} manifest solid cells blocked, ${walkable.length} plaza cells + stair foot (${front}) walkable, tap on the monument ends at the stair foot`);
 }
 
 async function enterRoom(page, name) {
@@ -397,9 +442,11 @@ async function shots(browser) {
       await wait(300);
       await page.screenshot({ path: path.join(OUT, `exterior-${b.name}-${vp.tag}.png`) });
     }
+    await page.evaluate(() => window.__playtestQa.setCharacterTile(17, 36));
     for (const [name, x, y, z] of [
-      ['obelisco', 1420, -1580, 1.0],
-      ['calles', 1420, -1100, 0.8],
+      ['obelisco', -1344, 1480, 1.0],
+      ['obelisco-lejos', -1344, 1480, 0.3],
+      ['calles', -1344, 1700, 0.8],
     ]) {
       await page.evaluate(([a, b, zz]) => window.__playtestQa.frameWorld(a, b, zz), [x, y, z]);
       await wait(300);

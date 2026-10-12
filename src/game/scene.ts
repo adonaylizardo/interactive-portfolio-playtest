@@ -27,6 +27,7 @@ import {
   type HistoryNavigationState,
 } from '../camera/hash';
 import { isTouchPrimary, type ChecklistStepId } from '../checklist/storage';
+import { OBELISCO_ACCESS, OBELISCO_SOLID_TILES } from '../data/world';
 import { mapWorldBounds, sortKey, tileFootWorld, tileToWorld, worldToTile } from '../iso/math';
 import { findPathOrNearest } from '../iso/pathfinding';
 import { C } from './colors';
@@ -655,6 +656,10 @@ export class IsoScene {
   }
 
   walkToTile(tx: number, ty: number, sprint: boolean): void {
+    if (OBELISCO_SOLID_TILES.some(([ox, oy]) => ox === tx && oy === ty)) {
+      tx = OBELISCO_ACCESS.x;
+      ty = OBELISCO_ACCESS.y;
+    }
     if (this.canvasEl) {
       this.canvasEl.dataset.walkGoal = JSON.stringify({ x: tx, y: ty });
     }
