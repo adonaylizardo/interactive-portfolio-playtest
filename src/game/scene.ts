@@ -31,19 +31,15 @@ import { OBELISCO_ACCESS, OBELISCO_SOLID_TILES } from '../data/world';
 import { mapWorldBounds, sortKey, tileFootWorld, tileToWorld, worldToTile } from '../iso/math';
 import { findPathOrNearest } from '../iso/pathfinding';
 import { C } from './colors';
+import { deskTopFillColor, drawCharacter, treeCanopyTrunkOverlap } from './draw';
 import {
-  buildingDoorOpeningPickHit,
-  buildingDoorPickHit,
-  buildingFootprintBodyPickHit,
-  doorTapLocalPoint,
-  buildingFrontWallsCover,
-  buildingInteriorGapSample,
-  buildingPickHit,
-  deskTopFillColor,
-  drawCharacter,
-  treeCanopyTrunkOverlap,
-  type FootprintDrawSpec,
-} from './draw';
+  buildingBodyHit,
+  byDepthDesc,
+  doorHit,
+  doorTapPoint,
+  footprintCorners,
+  spriteAlphaHit,
+} from './pick';
 import {
   streetOpenSides,
   objectDepth,
@@ -468,16 +464,10 @@ export class IsoScene {
   }
 
   private buildingHitArea(obj: MapObject): { contains(x: number, y: number): boolean } {
-    const spec = this.footprintSpec(obj);
+    const pos = tileFootWorld(obj.x, obj.y);
     return {
-      contains: (x: number, y: number) => {
-        const local = { x, y };
-        return (
-          buildingDoorPickHit(local, spec) ||
-          buildingFootprintBodyPickHit(local, spec) ||
-          buildingPickHit(local, spec)
-        );
-      },
+      contains: (x: number, y: number) =>
+        doorHit(obj, pos.x + x, pos.y + y) || buildingBodyHit(obj, pos.x + x, pos.y + y),
     };
   }
 
@@ -699,20 +689,6 @@ export class IsoScene {
     }
   }
 
-  private footprintSpec(obj: MapObject): FootprintDrawSpec {
-    return {
-      fx: obj.footprintX ?? obj.x,
-      fy: obj.footprintY ?? obj.y,
-      w: obj.w ?? 3,
-      h: obj.h ?? 3,
-      ax: obj.x,
-      ay: obj.y,
-      doorFace: obj.doorFace ?? '+y',
-      door: obj.door ?? { x: obj.x, y: obj.y + 1 },
-      kind: obj.name,
-    };
-  }
-
   /** Door pick in world space (stable at min zoom ~0.04–0.15); closest opening wins. */
   private pickBuildingDoorAtScreen(sx: number, sy: number): MapObject | undefined {
     if (this.zoom <= 0.15) {
@@ -723,14 +699,10 @@ export class IsoScene {
     const buildings = objects.filter((o) => o.type === 'building' && o.door && o.panelTitle);
     let best: { obj: MapObject; dist: number; depth: number } | null = null;
     for (const obj of buildings) {
-      const spec = this.footprintSpec(obj);
-      const foot = tileFootWorld(obj.x, obj.y);
-      const local = { x: wx - foot.x, y: wy - foot.y };
-      if (!buildingDoorOpeningPickHit(local, spec) && !buildingDoorPickHit(local, spec)) {
-        continue;
-      }
-      const tap = doorTapLocalPoint(spec);
-      const dist = Math.hypot(local.x - tap.x, local.y - tap.y);
+      if (!doorHit(obj, wx, wy)) continue;
+      const tap = doorTapPoint(obj);
+      if (!tap) continue;
+      const dist = Math.hypot(wx - tap.x, wy - tap.y);
       const depth = sortKey(obj.x, obj.y);
       if (!best || dist < best.dist - 0.5 || (Math.abs(dist - best.dist) < 0.5 && depth > best.depth)) {
         best = { obj, dist, depth };
@@ -763,17 +735,11 @@ export class IsoScene {
 
   private pickBuildingAtScreen(sx: number, sy: number): MapObject | undefined {
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
-    const buildings = objects
-      .filter((o) => o.type === 'building')
-      .sort((a, b) => sortKey(b.x, b.y) - sortKey(a.x, a.y));
+    const buildings = objects.filter((o) => o.type === 'building').sort(byDepthDesc);
     const fatFinger = this.zoom <= 0.11;
     for (const obj of buildings) {
-      const foot = tileFootWorld(obj.x, obj.y);
-      const local = { x: wx - foot.x, y: wy - foot.y };
-      const spec = this.footprintSpec(obj);
-      if (buildingDoorPickHit(local, spec)) return obj;
-      if (fatFinger && buildingFootprintBodyPickHit(local, spec)) return obj;
-      if (buildingPickHit(local, spec)) return obj;
+      if (doorHit(obj, wx, wy)) return obj;
+      if (buildingBodyHit(obj, wx, wy)) return obj;
     }
     if (fatFinger) {
       const tile = worldToTile(wx, wy);
@@ -1213,9 +1179,12 @@ export class IsoScene {
 
   private updateBuildingInteriorProbe(): void {
     if (!this.canvasEl) return;
-    const sample = buildingInteriorGapSample();
-    const covered = buildingFrontWallsCover(sample);
-    this.canvasEl.dataset.buildingInteriorWallCover = covered ? '1' : '0';
+    const estudio = objects.find((o) => o.id === 'building/estudio');
+    if (!estudio) return;
+    const { west, south } = footprintCorners(estudio);
+    const sx = west.x + (south.x - west.x) * 0.38;
+    const sy = west.y + (south.y - west.y) * 0.38 - 40;
+    this.canvasEl.dataset.buildingInteriorWallCover = spriteAlphaHit(estudio, sx, sy) ? '1' : '0';
   }
 
   private updateTreeDeskProbes(): void {
@@ -2355,23 +2324,9 @@ export class IsoScene {
   /** Client coordinates for tapping the drawn door of a building (QA). */
   getDoorScreenClientPoint(name: string): { x: number; y: number } | null {
     const obj = objects.find((o) => o.type === 'building' && o.name === name);
-    if (!obj?.door || !this.canvasEl) return null;
-    const spec: FootprintDrawSpec = {
-      fx: obj.footprintX ?? obj.x,
-      fy: obj.footprintY ?? obj.y,
-      w: obj.w ?? 3,
-      h: obj.h ?? 3,
-      ax: obj.x,
-      ay: obj.y,
-      doorFace: obj.doorFace ?? '+y',
-      door: obj.door,
-      kind: obj.name,
-    };
-    const foot = tileFootWorld(obj.x, obj.y);
-    const tap = doorTapLocalPoint(spec);
-    const wx = foot.x + tap.x;
-    const wy = foot.y + tap.y;
-    const screen = this.worldToScreen(wx, wy);
+    const tap = obj ? doorTapPoint(obj) : null;
+    if (!tap || !this.canvasEl) return null;
+    const screen = this.worldToScreen(tap.x, tap.y);
     const rect = this.canvasEl.getBoundingClientRect();
     return { x: rect.left + screen.x, y: rect.top + screen.y };
   }
@@ -2567,6 +2522,17 @@ export class IsoScene {
     this.cameraY = -wy;
     this.applyCamera(false);
     this.app.render();
+  }
+
+  /** QA: what a tap at client (x, y) would pick, without acting on it. */
+  qaPickAt(cx: number, cy: number): { door: string | null; building: string | null } {
+    const rect = this.canvasEl?.getBoundingClientRect();
+    const sx = cx - (rect?.left ?? 0);
+    const sy = cy - (rect?.top ?? 0);
+    return {
+      door: this.pickBuildingDoorAtScreen(sx, sy)?.name ?? null,
+      building: this.pickBuildingAtScreen(sx, sy)?.name ?? null,
+    };
   }
 
   qaWorldToClient(wx: number, wy: number): { x: number; y: number } {

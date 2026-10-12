@@ -146,6 +146,7 @@ async function main(): Promise<void> {
     isolateSprites: (ids: string[] | null) => scene.qaIsolateSprites(ids),
     frameWorld: (x: number, y: number, zoom: number) => scene.qaFrameWorld(x, y, zoom),
     worldToClient: (x: number, y: number) => scene.qaWorldToClient(x, y),
+    pickAt: (x: number, y: number) => scene.qaPickAt(x, y),
     streetTiles: () => scene.qaStreetTiles(),
   };
 }

@@ -129,9 +129,29 @@ function uniformProbes(png, count, skip) {
   return out.map((p) => [p.x, p.y, p.c[0], p.c[1], p.c[2]]);
 }
 
+const MASK_CELL = 4;
+const MASKED = /^(ext\/[^/]+|prop\/(muro|obelisco|redoma))\//;
+
+/** Tap mask: a cell is solid when any pixel in it is clearly opaque (union over all states/zooms). */
+function orAlphaMask(masks, baseId, png) {
+  const cw = Math.ceil(png.width / MASK_CELL);
+  const ch = Math.ceil(png.height / MASK_CELL);
+  let m = masks[baseId];
+  if (!m) m = masks[baseId] = { w: cw, h: ch, cell: MASK_CELL, bits: new Uint8Array(Math.ceil((cw * ch) / 8)) };
+  if (m.w !== cw || m.h !== ch) throw new Error(`${baseId}: variant sizes differ, cannot share a tap mask`);
+  for (let y = 0; y < png.height; y++) {
+    for (let x = 0; x < png.width; x++) {
+      if (png.data[(y * png.width + x) * 4 + 3] <= 64) continue;
+      const i = Math.floor(y / MASK_CELL) * cw + Math.floor(x / MASK_CELL);
+      m.bits[i >> 3] |= 1 << (i & 7);
+    }
+  }
+}
+
 const assets = {};
 const probes = {};
 const meta = {};
+const masks = {};
 
 await rm(outDir, { recursive: true, force: true });
 
@@ -168,6 +188,7 @@ for (const g of GROUPS) {
     // Keep the character's spawn and exit cells out of the interior probes.
     const skip = key.startsWith('int/') ? (x, y) => Math.abs(x - 300) < 90 && y > 380 : undefined;
     probes[key] = uniformProbes(png1, 12, skip);
+    if (MASKED.test(key)) orAlphaMask(masks, key.split('/').slice(0, 2).join('/'), png1);
   }
 }
 
@@ -177,4 +198,9 @@ await writeFile(
   path.join(root, 'src', 'data', 'sprites.json'),
   JSON.stringify({ assets, meta }, null, 1) + '\n',
 );
-console.log(`sprites: ${Object.keys(assets).length} variants, ${Object.keys(meta).length} meta groups`);
+const maskOut = {};
+for (const [k, m] of Object.entries(masks)) {
+  maskOut[k] = { w: m.w, h: m.h, cell: m.cell, bits: Buffer.from(m.bits).toString('base64') };
+}
+await writeFile(path.join(root, 'src', 'data', 'sprite-alpha.json'), JSON.stringify(maskOut) + '\n');
+console.log(`sprites: ${Object.keys(assets).length} variants, ${Object.keys(meta).length} meta groups, ${Object.keys(masks).length} tap masks`);
