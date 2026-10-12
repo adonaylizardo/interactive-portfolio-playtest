@@ -1,3 +1,4 @@
+import { installReadyWait } from './qa-ready.mjs';
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { runRun38InputSuite } from './qa-run38-input.mjs';
@@ -2304,9 +2305,13 @@ async function testRun38ToastClearsAcrossRooms(browser, errors) {
     await page.goto(BASE.replace(/#.*$/, ''), { waitUntil: 'networkidle' });
     await wait(800);
     await page.evaluate(() => window.__playtestQa?.enterInterior?.('sambil'));
-    await waitForInterior(page);
+    const entered = await waitForInterior(page);
     await wait(900);
     const pt = await page.evaluate(() => window.__playtestQa?.interiorTileScreenPoint?.(6, 2));
+    if (!pt) {
+      errors.push(`run38-toast: no Sambil tile point (entered=${entered}, url=${page.url()})`);
+      return;
+    }
     await page.touchscreen.tap(Math.round(pt.x), Math.round(pt.y));
     await wait(700);
     if (!(await toastVisible())) errors.push('run38-toast: tapping Sambil water showed no feedback');
@@ -2317,6 +2322,10 @@ async function testRun38ToastClearsAcrossRooms(browser, errors) {
     await waitForInterior(page);
     await wait(900);
     const pt2 = await page.evaluate(() => window.__playtestQa?.interiorTileScreenPoint?.(6, 2));
+    if (!pt2) {
+      errors.push('run38-toast: no Sambil tile point on re-entry');
+      return;
+    }
     await page.touchscreen.tap(Math.round(pt2.x), Math.round(pt2.y));
     await wait(500);
     await page.evaluate(() => window.__playtestQa?.exitInterior?.());
@@ -4020,7 +4029,7 @@ async function main() {
   const errors = [];
   const warnings = [];
   const routeReport = {};
-  const browser = await chromium.launch();
+  const browser = installReadyWait(await chromium.launch());
 
   try {
     const desktop = await browser.newPage({ viewport: { width: 1440, height: 900 } });

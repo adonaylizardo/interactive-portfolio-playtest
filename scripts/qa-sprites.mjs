@@ -13,6 +13,7 @@
  */
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
+import { installReadyWait } from './qa-ready.mjs';
 import { PNG } from 'pngjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -175,10 +176,10 @@ async function diffSprite(page, { key, tlx, tly, zoom, id, state }) {
     return;
   }
   await page.evaluate(
-    (o) => {
+    async (o) => {
       const q = window.__playtestQa;
       if (o.id) {
-        q.forceBuildingState(o.state);
+        await q.forceBuildingState(o.state);
         q.isolateSprites([o.id]);
       } else {
         q.isolateSprites([]);
@@ -212,6 +213,7 @@ async function diffSprite(page, { key, tlx, tly, zoom, id, state }) {
 }
 
 async function pixelDiffMap(page) {
+  await page.evaluate(() => window.__playtestQa.loadAllSprites());
   const instances = await page.evaluate(() => window.__playtestQa.spriteInstances());
   const covered = new Set();
   const seenKey = new Set();
@@ -244,9 +246,9 @@ async function pixelDiffMap(page) {
       }
     }
   }
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     window.__playtestQa.isolateSprites(null);
-    window.__playtestQa.forceBuildingState(null);
+    await window.__playtestQa.forceBuildingState(null);
   });
 
   const unplaced = [...fullCoverage].filter((k) => !covered.has(k));
@@ -427,7 +429,7 @@ for (let i = 0; i < 60; i++) {
   await wait(500);
 }
 
-const browser = await chromium.launch();
+const browser = installReadyWait(await chromium.launch());
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
   await openMap(page);

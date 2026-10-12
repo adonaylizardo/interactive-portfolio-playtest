@@ -79,12 +79,14 @@ export function spriteResolution(): number {
   return resolution;
 }
 
+/** `lejos` frames only show below zoom 0.4, so @1x is plenty and keeps texture memory a quarter. */
 function spriteUrl(key: string): string {
   const a = spriteAsset(key);
-  return `${import.meta.env.BASE_URL}sprites/${resolution >= 2 ? a.f2 : a.f1}`;
+  const hi = resolution >= 2 && !key.endsWith('/lejos');
+  return `${import.meta.env.BASE_URL}sprites/${hi ? a.f2 : a.f1}`;
 }
 
-async function loadKeys(keys: string[]): Promise<void> {
+export async function loadKeys(keys: string[]): Promise<void> {
   const todo = keys.filter((k) => !textures.has(k));
   await Promise.all(
     todo.map((k) => {
@@ -105,10 +107,28 @@ async function loadKeys(keys: string[]): Promise<void> {
   );
 }
 
-/** Everything the map needs (interiors are fetched on demand). Uses @2x on dense screens. */
+/** Building sprite keys for one state (both zoom variants). */
+export function buildingStateKeys(state: BuildingSpriteState): string[] {
+  return allSpriteKeys().filter((k) => k.startsWith('ext/') && k.includes(`/${state}/`));
+}
+
+/**
+ * What the map needs on first paint: ground, props and every building's default frames.
+ * Hover / resaltado frames and interiors are fetched later so phones keep a small texture budget.
+ */
 export async function loadMapSprites(rendererResolution: number): Promise<void> {
   resolution = rendererResolution >= 1.5 ? 2 : 1;
-  await loadKeys(allSpriteKeys().filter((k) => !k.startsWith('int/')));
+  const stateFrames = new Set([...buildingStateKeys('hover'), ...buildingStateKeys('resaltado')]);
+  await loadKeys(allSpriteKeys().filter((k) => !k.startsWith('int/') && !stateFrames.has(k)));
+}
+
+/** Hover and resaltado frames, after the first frame is on screen. */
+export function loadBuildingStateSprites(): Promise<void> {
+  return loadKeys([...buildingStateKeys('hover'), ...buildingStateKeys('resaltado')]);
+}
+
+export async function loadAllSprites(): Promise<void> {
+  await loadKeys(allSpriteKeys());
 }
 
 export async function loadInteriorSprite(id: string): Promise<void> {

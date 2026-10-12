@@ -60,6 +60,9 @@ import {
   isSpriteInterior,
   loadInteriorSprite,
   loadMapSprites,
+  loadBuildingStateSprites,
+  loadKeys,
+  loadAllSprites,
   loadSpriteProbes,
   spriteAsset,
   spritesLoaded,
@@ -264,7 +267,9 @@ export class IsoScene {
     void loadSpriteProbes();
     const bootInterior = parseInteriorFromHash();
     if (bootInterior && isSpriteInterior(bootInterior)) await loadInteriorSprite(bootInterior);
-    for (const id of ['volaris', 'bain', 'mentoria', 'finoa', 'pg']) void loadInteriorSprite(id);
+    window.setTimeout(() => {
+      void loadBuildingStateSprites().then(() => this.syncObjectSprites(true));
+    }, 2500);
 
     this.app.stage.addChild(this.camera);
     this.camera.addChild(this.world);
@@ -581,6 +586,10 @@ export class IsoScene {
       if (!force && !lodChanged && state === v.state) continue;
       const key = objectSpriteKey(v.obj, state, lejos);
       if (!key) continue;
+      if (!spritesLoaded(key)) {
+        void loadKeys([key]).then(() => this.syncObjectSprites(true));
+        continue;
+      }
       v.state = state;
       v.key = key;
       v.sprite.texture = spriteTexture(key);
@@ -1176,7 +1185,8 @@ export class IsoScene {
     const buildG = this.objectGraphics.get('building/estudio');
     if (!tileG || !buildG) return;
     const foot = tileFootWorld(INICIO[0], INICIO[1]);
-    const expected = this.worldToScreen(foot.x, foot.y);
+    const vfs = spriteAsset(tileSpriteKey(cells, INICIO[0], INICIO[1])).vfs;
+    const expected = this.worldToScreen(foot.x - vfs.x, foot.y - vfs.y);
     const tileGlobal = tileG.getGlobalPosition(new Point());
     const driftTileFormula = Math.hypot(tileGlobal.x - expected.x, tileGlobal.y - expected.y);
     this.canvasEl.dataset.footDriftPx = String(driftTileFormula);
@@ -2534,10 +2544,15 @@ export class IsoScene {
   }
 
   /** QA: force every building sprite into one state (default | hover | resaltado), or null to release. */
-  qaForceBuildingState(state: BuildingSpriteState | null): void {
+  async qaForceBuildingState(state: BuildingSpriteState | null): Promise<void> {
     this.qaForcedState = state;
+    await loadAllSprites();
     this.syncObjectSprites(true);
     this.app.render();
+  }
+
+  async qaLoadAllSprites(): Promise<void> {
+    await loadAllSprites();
   }
 
   /** QA: put a world point at the canvas centre at an exact zoom. */
