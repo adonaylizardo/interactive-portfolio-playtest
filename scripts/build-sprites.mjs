@@ -146,7 +146,8 @@ for (const g of GROUPS) {
   for (const v of manifest.variantes) {
     const p = parseName(v.nombre);
     const key = g.key(p);
-    const vfs = v.vertice_frontal_suelo ?? v.ancla;
+    // Manifest placement: top-left = S − ancla − (0, offset_y); edge slabs hang below S with offset_y = −24.
+    const vfs = v.vertice_frontal_suelo ?? { x: v.ancla.x, y: v.ancla.y + (v.offset_y ?? 0) };
     const dstDir = path.join(outDir, g.dir);
     await mkdir(dstDir, { recursive: true });
     for (const k of ['png1x', 'png2x']) {
