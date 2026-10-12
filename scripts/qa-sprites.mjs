@@ -359,6 +359,265 @@ async function mapChecks(page) {
   notes.push(`doors: 5 case houses match manifest puerta.verificacion; obelisco: ${solid.length} manifest solid cells blocked, ${walkable.length} plaza cells + stair foot (${front}) walkable, tap on the monument ends at the stair foot`);
 }
 
+/**
+ * Expected sprite top-left per item, worked out by hand from the manifests:
+ * S = south vertex of the footprint's front cell (x+w−1, y+h−1) = ((x−y)·64, (x+y)·32 + 32),
+ * top-left = S − ancla − (0, offset_y), or S − vertice_frontal_suelo for Sambil and Muro.
+ */
+const ITEM_TOP_LEFT = {
+  'building/estudio': [-512, 1688],
+  'building/volaris': [128, 2080],
+  'building/bain': [768, 1760],
+  'building/mentoria': [320, 1536],
+  'building/finoa': [-320, 1216],
+  'building/pg': [-768, 1440],
+  'building/sambil': [1792, 1696],
+  'building/catedral': [-320, 480],
+  'building/flor': [-448, 2624],
+  'paisaje/obelisco': [-1536, 1200],
+  'paisaje/redoma': [448, 2496],
+  'paisaje/muro': [-448, 2304],
+};
+const ITEMS = Object.keys(ITEM_TOP_LEFT);
+const MAP_BOUNDS = { minX: -63 * 64 - 128, maxX: 63 * 64 + 128, minY: 0, maxY: 126 * 32 + 128 };
+
+async function placementChecks(page) {
+  const instances = await page.evaluate(() => window.__playtestQa.spriteInstances());
+  const mapa = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/data/mapa_datos.json'), 'utf8')).edificios;
+  for (const id of ITEMS) {
+    const inst = instances.find((i) => i.id === id);
+    const [ex, ey] = ITEM_TOP_LEFT[id];
+    if (!inst) {
+      fail(`top-left: ${id} has no sprite on the map`);
+      continue;
+    }
+    if (inst.tl.x !== ex || inst.tl.y !== ey) fail(`top-left: ${id} at (${inst.tl.x},${inst.tl.y}), expected (${ex},${ey})`);
+    const e = mapa[id.split('/')[1]];
+    const fx = e.x + e.w - 1;
+    const fy = e.y + e.h - 1;
+    const vfs = A[inst.key].vfs;
+    const fx0 = (fx - fy) * 64 - vfs.x;
+    const fy0 = (fx + fy) * 32 + 32 - vfs.y;
+    if (fx0 !== ex || fy0 !== ey) fail(`top-left: ${id} formula from mapa_datos + sprites.json gives (${fx0},${fy0}), expected (${ex},${ey})`);
+    const b = A[inst.key].bbox;
+    const top = inst.tl.y + b.y0;
+    if (inst.tl.x + b.x0 < MAP_BOUNDS.minX || inst.tl.x + b.x1 > MAP_BOUNDS.maxX || top < MAP_BOUNDS.minY || inst.tl.y + b.y1 > MAP_BOUNDS.maxY) {
+      fail(`camera: ${id} opaque box leaves the camera fit bounds (top y ${top})`);
+    }
+  }
+  for (const [key, a] of Object.entries(A)) {
+    if (key.startsWith('tile/') && (a.vfs.x !== 64 || a.vfs.y !== 64)) {
+      fail(`top-left: ${key} diamond is not at the top of its frame (vfs ${a.vfs.x},${a.vfs.y}, want 64,64)`);
+    }
+  }
+  const cat = instances.find((i) => i.id === 'building/catedral');
+  notes.push(
+    `top-left: ${ITEMS.length} items match the manifest formula; all inside the camera fit bounds (Catedral top at y=${cat ? cat.tl.y + A[cat.key].bbox.y0 : '?'}, bounds minY=${MAP_BOUNDS.minY}); every tile diamond sits at its frame top`,
+  );
+}
+
+/** Taps resolve by sprite alpha + footprint diamond + door rectangle (no face geometry). */
+async function pickChecks(page) {
+  const masks = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/data/sprite-alpha.json'), 'utf8'));
+  const mapa = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/data/mapa_datos.json'), 'utf8')).edificios;
+  const instances = await page.evaluate(() => window.__playtestQa.spriteInstances());
+  const pickAtWorld = async (wx, wy) =>
+    page.evaluate(([x, y]) => {
+      const q = window.__playtestQa;
+      q.frameWorld(x, y + 60, 1);
+      const p = q.worldToClient(x, y);
+      return q.pickAt(p.x, p.y);
+    }, [wx, wy]);
+  const inFootprint = (name, wx, wy) => {
+    const e = mapa[name];
+    const foot = (x, y) => [(x - y) * 64, (x + y) * 32 + 32];
+    const [swx, swy] = foot(e.x, e.y + e.h - 1);
+    const [sx, sy] = foot(e.x + e.w - 1, e.y + e.h - 1);
+    const [nex, ney] = foot(e.x + e.w - 1, e.y);
+    const [nx, ny] = foot(e.x, e.y);
+    const poly = [[swx - 64, swy - 32], [sx, sy], [nex + 64, ney - 32], [nx, ny - 64]];
+    let inside = false;
+    for (let i = 0, j = 3; i < 4; j = i++) {
+      const [ax, ay] = poly[i];
+      const [bx, by] = poly[j];
+      if (ay > wy !== by > wy && wx < ((bx - ax) * (wy - ay)) / (by - ay) + ax) inside = !inside;
+    }
+    return inside;
+  };
+  const opaqueAt = (base, inst, wx, wy) => {
+    const m = masks[base];
+    if (!m || !inst) return false;
+    const cx = Math.floor((wx - inst.tl.x) / m.cell);
+    const cy = Math.floor((wy - inst.tl.y) / m.cell);
+    if (cx < 0 || cy < 0 || cx >= m.w || cy >= m.h) return false;
+    const i = cy * m.w + cx;
+    return ((Buffer.from(m.bits, 'base64')[i >> 3] >> (i & 7)) & 1) === 1;
+  };
+  const buildings = ITEMS.filter((i) => i.startsWith('building/')).map((i) => i.split('/')[1]);
+  let checked = 0;
+  for (const name of buildings) {
+    const inst = instances.find((i) => i.id === `building/${name}`);
+    const m = masks[`ext/${name}`];
+    if (!inst || !m) {
+      fail(`pick: ${name} has no sprite or tap mask`);
+      continue;
+    }
+    const bits = Buffer.from(m.bits, 'base64');
+    const on = (cx, cy) => cx >= 0 && cy >= 0 && cx < m.w && cy < m.h && ((bits[(cy * m.w + cx) >> 3] >> ((cy * m.w + cx) & 7)) & 1) === 1;
+    let top = null;
+    for (let cy = 0; cy < m.h && !top; cy++) {
+      for (let cx = 0; cx < m.w; cx++) {
+        if (on(cx, cy) && on(cx + 1, cy) && on(cx, cy + 1) && on(cx + 1, cy + 1)) {
+          top = [cx, cy];
+          break;
+        }
+      }
+    }
+    const wx = inst.tl.x + top[0] * m.cell + m.cell;
+    const wy = inst.tl.y + top[1] * m.cell + m.cell;
+    const topPick = await pickAtWorld(wx, wy);
+    if (topPick.building !== name) fail(`pick: tap on the top of ${name} (${wx},${wy}) picked ${topPick.building}`);
+
+    let clear = null;
+    for (let cy = 2; cy < m.h * 0.5 && !clear; cy += 2) {
+      for (let cx = 2; cx < m.w - 2; cx += 2) {
+        let near = false;
+        for (let dy = -3; dy <= 3 && !near; dy++) for (let dx = -3; dx <= 3; dx++) if (on(cx + dx, cy + dy)) near = true;
+        if (near) continue;
+        const px = inst.tl.x + cx * m.cell + 2;
+        const py = inst.tl.y + cy * m.cell + 2;
+        if (inFootprint(name, px, py)) continue;
+        const others = buildings.some(
+          (o) => o !== name && (opaqueAt(`ext/${o}`, instances.find((i) => i.id === `building/${o}`), px, py) || inFootprint(o, px, py)),
+        );
+        if (!others) {
+          clear = [px, py];
+          break;
+        }
+      }
+    }
+    if (clear) {
+      const p = await pickAtWorld(clear[0], clear[1]);
+      if (p.building === name) fail(`pick: transparent pixel of ${name} at (${clear}) still picks the building`);
+    }
+
+    await page.evaluate((n) => window.__playtestQa.frameDoorForQa(n), name);
+    await wait(60);
+    const door = await page.evaluate((n) => {
+      const q = window.__playtestQa;
+      const p = q.doorScreenPoint(n);
+      return p ? q.pickAt(p.x, p.y) : null;
+    }, name);
+    if (door?.door !== name) fail(`pick: door tap point of ${name} picked door ${door?.door ?? 'none'}`);
+    checked++;
+  }
+  notes.push(`picks: ${checked} buildings — sprite top picks the building, a transparent pixel inside its frame does not, the door point picks its door`);
+}
+
+const DIFF_VIEWS = [
+  { tag: '1280@1x z1.0', width: 1280, height: 800, dpr: 1, zoom: 1 },
+  { tag: '375@2x z0.5', width: 375, height: 812, dpr: 2, zoom: 0.5 },
+];
+const diffTable = [];
+
+/** Each item drawn alone vs its @1x export (1 device px = 1 export px in both views), masked by alpha > 128. */
+async function fullFrameDiff(browser) {
+  for (const vp of DIFF_VIEWS) {
+    const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: vp.dpr });
+    const page = await ctx.newPage();
+    try {
+      await openMap(page);
+      await page.addStyleTag({ content: '#ui-root{visibility:hidden !important}' });
+      await page.evaluate(async () => {
+        await window.__playtestQa.loadAllSprites();
+        await window.__playtestQa.forceBuildingState('default');
+      });
+      await page.evaluate(() => window.__playtestQa.setCharacterTile(46, 30));
+      const instances = await page.evaluate(() => window.__playtestQa.spriteInstances());
+      for (const id of ITEMS) {
+        const inst = instances.find((i) => i.id === id);
+        if (!inst) continue;
+        const a = A[inst.key];
+        const grab = async (ids) => {
+          await page.evaluate(
+            ([i, cx, cy, z]) => {
+              window.__playtestQa.isolateSprites(i);
+              window.__playtestQa.frameWorld(cx, cy, z);
+            },
+            [ids, inst.tl.x + a.w / 2, inst.tl.y + a.h / 2, vp.zoom],
+          );
+          await wait(80);
+          const c0 = await page.evaluate(([x, y]) => window.__playtestQa.worldToClient(x, y), [inst.tl.x, inst.tl.y]);
+          const x0 = Math.max(0, c0.x);
+          const y0 = Math.max(0, c0.y);
+          const x1 = Math.min(vp.width, c0.x + a.w * vp.zoom);
+          const y1 = Math.min(vp.height, c0.y + a.h * vp.zoom);
+          const clip = { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
+          const png = PNG.sync.read(await page.screenshot({ clip }));
+          return { png, ox: Math.round((x0 - c0.x) / vp.zoom), oy: Math.round((y0 - c0.y) / vp.zoom), c0 };
+        };
+        const drawn = await grab([id]);
+        const bg = await grab([]);
+        const scene = await grab(null);
+        const ref = PNG.sync.read(fs.readFileSync(path.join(ROOT, 'public/sprites', a.f1)));
+        let n = 0;
+        let off = 0;
+        const sum = [0, 0, 0];
+        const sceneSum = [0, 0, 0];
+        for (let v = 0; v < drawn.png.height; v++) {
+          for (let u = 0; u < drawn.png.width; u++) {
+            const rx = u + drawn.ox;
+            const ry = v + drawn.oy;
+            if (rx >= ref.width || ry >= ref.height) continue;
+            const ri = (ry * ref.width + rx) * 4;
+            const al = ref.data[ri + 3];
+            if (al <= 128) continue;
+            const si = (v * drawn.png.width + u) * 4;
+            let worst = 0;
+            for (let ch = 0; ch < 3; ch++) {
+              const want = (ref.data[ri + ch] * al + bg.png.data[si + ch] * (255 - al)) / 255;
+              const d = Math.abs(drawn.png.data[si + ch] - want);
+              sum[ch] += d;
+              if (d > worst) worst = d;
+              sceneSum[ch] += Math.abs(scene.png.data[si + ch] - ref.data[ri + ch]);
+            }
+            if (worst > 60) off++;
+            n++;
+          }
+        }
+        const mean = sum.map((s) => s / Math.max(1, n));
+        const row = {
+          view: vp.tag,
+          item: id.split('/')[1],
+          mean: Math.max(...mean),
+          offPct: (100 * off) / Math.max(1, n),
+          inSitu: Math.max(...sceneSum.map((s) => s / Math.max(1, n))),
+          px: n,
+          coverage: n / Math.max(1, [...Array(ref.width * ref.height).keys()].filter((i) => ref.data[i * 4 + 3] > 128).length),
+          subpx: drawn.c0.x * vp.dpr % 1 !== 0 || drawn.c0.y * vp.dpr % 1 !== 0,
+        };
+        diffTable.push(row);
+        if (!(row.mean < 6) || !(row.offPct < 1)) {
+          fail(`diff ${vp.tag}: ${row.item} mean ${row.mean.toFixed(2)}/255, ${row.offPct.toFixed(2)}% px off by >60 (need <6 and <1%)`);
+        }
+      }
+    } finally {
+      await page.evaluate(async () => {
+        window.__playtestQa.isolateSprites(null);
+        await window.__playtestQa.forceBuildingState(null);
+      }).catch(() => {});
+      await ctx.close();
+    }
+  }
+  const lines = diffTable.map(
+    (r) =>
+      `  ${r.view.padEnd(13)} ${r.item.padEnd(9)} mean ${r.mean.toFixed(2).padStart(5)}/255  off>60 ${r.offPct.toFixed(2).padStart(5)}%  in-map ${r.inSitu.toFixed(1).padStart(5)}/255  px ${String(r.px).padStart(6)}  coverage ${(r.coverage * 100).toFixed(0)}%${r.subpx ? '  (sub-pixel origin)' : ''}`,
+  );
+  notes.push(`full-frame alpha-masked diff vs @1x export (pass: mean < 6/255 and < 1% px off by > 60):\n${lines.join('\n')}`);
+  fs.mkdirSync(OUT, { recursive: true });
+  fs.writeFileSync(path.join(OUT, 'pixel-diff.json'), JSON.stringify(diffTable, null, 1) + '\n');
+}
+
 async function enterRoom(page, name) {
   await page.evaluate((n) => window.__playtestQa.enterInterior(n), name);
   for (let i = 0; i < 80; i++) {
@@ -480,9 +739,12 @@ const browser = installReadyWait(await chromium.launch());
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
   await openMap(page);
+  await placementChecks(page);
+  await pickChecks(page);
   await mapChecks(page);
   await pixelDiffMap(page);
   await page.close();
+  await fullFrameDiff(browser);
   await interiorChecks(browser);
   if (SHOTS) await shots(browser);
 } finally {
