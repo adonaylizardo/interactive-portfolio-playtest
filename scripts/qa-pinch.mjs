@@ -2083,10 +2083,10 @@ async function testRun37InteriorPixelProbes(browser, errors) {
 const RUN37_TOUCH_WALK_TILES = {
   estudio: [[4, 4], [1, 3], [4, 1]],
   volaris: [[4, 4], [1, 3], [4, 1]],
-  bain: [[4, 4], [1, 3], [4, 1]],
+  bain: [[4, 4], [1, 3], [4, 3]],
   mentoria: [[4, 4], [1, 3], [4, 1]],
   finoa: [[4, 4], [1, 3], [4, 1]],
-  pg: [[4, 4], [1, 3], [4, 1]],
+  pg: [[4, 2], [1, 3], [4, 1]],
   catedral: [[3, 2], [1, 6], [6, 6]],
   sambil: [[1, 1], [6, 4], [2, 6]],
   flor: [[2, 2], [5, 5], [1, 4]],
@@ -3311,7 +3311,7 @@ async function testWalkKeysFirstPress(page, errors) {
   await page.reload({ waitUntil: 'networkidle' });
   await wait(800);
   await page.locator('#game-canvas').click();
-  await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(35, 36));
+  await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(36, 36));
   await wait(200);
   const startTile = await readCharTile(page);
   if (!startTile) {
