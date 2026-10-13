@@ -48,9 +48,12 @@ export async function readExitTimer(page, maxWallMs = 3000) {
   return null;
 }
 
-/** Immediate = under the ms budget, or (slow renderer) within 3 frames of the tap with no walk first. */
+/**
+ * Immediate = no walk first, and under the ms budget, or (slow renderer, ~180 ms/frame) within 6 frames
+ * and 1.5 s of the tap. The walk-first regression this guards against took > 3.5 s.
+ */
 export function exitIsImmediate(r, budgetMs = 700) {
-  return !!r && !r.walked && (r.ms <= budgetMs || r.frames <= 3);
+  return !!r && !r.walked && (r.ms <= budgetMs || (r.frames <= 6 && r.ms <= 1500));
 }
 
 export function describeExit(r) {
