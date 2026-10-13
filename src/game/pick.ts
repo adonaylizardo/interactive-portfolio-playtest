@@ -136,6 +136,51 @@ export function buildingBodyHit(o: MapObject, wx: number, wy: number): boolean {
   return spriteAlphaHit(o, wx, wy) || footprintHit(o, wx, wy);
 }
 
+type Box3 = { u: [number, number]; v: [number, number]; z: [number, number] };
+const obeliscoBoxes = Object.values(
+  (spritesJson.meta as unknown as Record<string, { colision: { rectangulos_locales: Record<string, Box3> } }>)['prop/obelisco']
+    .colision.rectangulos_locales,
+);
+
+function hull(points: Pt[]): Pt[] {
+  const p = [...points].sort((a, b) => a.x - b.x || a.y - b.y);
+  const cross = (o: Pt, a: Pt, b: Pt) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const lower: Pt[] = [];
+  for (const q of p) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) lower.pop();
+    lower.push(q);
+  }
+  const upper: Pt[] = [];
+  for (const q of [...p].reverse()) {
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0) upper.pop();
+    upper.push(q);
+  }
+  return [...lower.slice(0, -1), ...upper.slice(0, -1)];
+}
+
+/**
+ * Screen silhouettes of the monument's solid parts (steps, slab, stair, arch) from the manifest
+ * `colision.rectangulos_locales`, in footprint-local lattice units (u = x, v = y, z = px up).
+ */
+export function obeliscoSilhouettes(o: MapObject): Pt[][] {
+  const fx = (o.footprintX ?? o.x) - 0.5;
+  const fy = (o.footprintY ?? o.y) - 0.5;
+  const at = (u: number, v: number, z: number): Pt => ({
+    x: (fx + u - (fy + v)) * (TILE_W / 2),
+    y: (fx + u + fy + v) * (TILE_H / 2) - z,
+  });
+  return obeliscoBoxes.map((b) => {
+    const pts: Pt[] = [];
+    for (const u of b.u) for (const v of b.v) for (const z of b.z) pts.push(at(u, v, z));
+    return hull(pts);
+  });
+}
+
+/** True when the world point lands on the drawn monument, not on plaza ground around it. */
+export function obeliscoMonumentHit(o: MapObject, wx: number, wy: number): boolean {
+  return obeliscoSilhouettes(o).some((h) => pointInPoly({ x: wx, y: wy }, h));
+}
+
 /** Front-most first, matching the sprites' draw order. */
 export function byDepthDesc(a: MapObject, b: MapObject): number {
   return objectDepth(b) + (b.x - b.y) * 0.0001 - (objectDepth(a) + (a.x - a.y) * 0.0001);

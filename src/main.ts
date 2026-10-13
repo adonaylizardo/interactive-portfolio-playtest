@@ -147,6 +147,7 @@ async function main(): Promise<void> {
     frameWorld: (x: number, y: number, zoom: number) => scene.qaFrameWorld(x, y, zoom),
     worldToClient: (x: number, y: number) => scene.qaWorldToClient(x, y),
     pickAt: (x: number, y: number) => scene.qaPickAt(x, y),
+    obeliscoSilhouettes: () => scene.qaObeliscoSilhouettes(),
     streetTiles: () => scene.qaStreetTiles(),
   };
 }

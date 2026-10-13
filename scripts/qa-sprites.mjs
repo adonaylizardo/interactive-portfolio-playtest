@@ -24,6 +24,9 @@ const PREVIEW_PORT = 4192;
 const BASE =
   process.env.QA_BASE_URL ?? `http://127.0.0.1:${PREVIEW_PORT}/interactive-portfolio-playtest/`;
 const SHOTS = process.argv.includes('--shots');
+/** QA_SPRITES_ONLY=map,picks runs a subset (placement, picks, map, diff, interiors); unset runs all. */
+const ONLY = process.env.QA_SPRITES_ONLY?.split(',');
+const want = (part) => !ONLY || ONLY.includes(part);
 const OUT = path.join(ROOT, 'artifacts', 'run39');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -334,7 +337,18 @@ async function mapChecks(page) {
   else if (around.some((c) => solidKeys.has(`${c.x},${c.y}`))) fail('obelisco: path crosses a solid cell');
 
   // Tapping the monument itself walks to the stair foot and never enters a solid cell.
-  for (const [tx, ty] of solid) {
+  const sil = await page.evaluate(() => window.__playtestQa.obeliscoSilhouettes());
+  const onSil = (x, y) =>
+    sil.some((pts) => {
+      let inside = false;
+      for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        const a = pts[i];
+        const b = pts[j];
+        if (a.y > y !== b.y > y && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+      }
+      return inside;
+    });
+  for (const [tx, ty] of solid.filter(([x, y]) => onSil((x - y) * 64, (x + y) * 32))) {
     await page.evaluate(([x, y]) => window.__playtestQa.setCharacterTile(x, y), [front[0] + 3, front[1]]);
     await wait(150);
     await page.evaluate(([x, y]) => {
@@ -357,6 +371,194 @@ async function mapChecks(page) {
     if (!last || last.x !== front[0] || last.y !== front[1]) fail(`obelisco: tap on (${tx},${ty}) ended at ${JSON.stringify(last)}, expected stair foot ${front}`);
   }
   notes.push(`doors: 5 case houses match manifest puerta.verificacion; obelisco: ${solid.length} manifest solid cells blocked, ${walkable.length} plaza cells + stair foot (${front}) walkable, tap on the monument ends at the stair foot`);
+  await groundTapChecks(page, solidKeys, front);
+  await muroChecks(page);
+}
+
+/**
+ * Taps over tall sprites: walkable ground under the tap wins (behind the obelisco shaft, behind
+ * trees and lamps); on a solid obelisco cell only the drawn monument goes to the stair foot and
+ * bare plaza goes to an open neighbour. Each point is tapped through Pixi (mouse) and the touch path.
+ */
+async function groundTapChecks(page, solidKeys, front) {
+  const sil = await page.evaluate(() => window.__playtestQa.obeliscoSilhouettes());
+  const inPoly = (x, y, pts) => {
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const a = pts[i];
+      const b = pts[j];
+      if (a.y > y !== b.y > y && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+    }
+    return inside;
+  };
+  const onMonument = (x, y) => sil.some((h) => inPoly(x, y, h));
+  const centre = (x, y) => [(x - y) * 64, (x + y) * 32];
+  const tapGoal = (wx, wy, via) =>
+    page.evaluate(
+      async ([x, y, mode]) => {
+        const q = window.__playtestQa;
+        const c = document.getElementById('game-canvas');
+        q.setCharacterTile(24, 40);
+        q.frameWorld(x, y, 1);
+        await new Promise((r) => setTimeout(r, 30));
+        c.dataset.walkGoal = '';
+        const p = q.worldToClient(x, y);
+        if (mode === 'touch') q.tapScreen(p.x, p.y);
+        return mode === 'touch' ? JSON.parse(c.dataset.walkGoal || 'null') : p;
+      },
+      [wx, wy, via],
+    );
+  const goalAt = async (wx, wy) => {
+    const out = {};
+    out.touch = await tapGoal(wx, wy, 'touch');
+    const p = await tapGoal(wx, wy, 'mouse');
+    await page.mouse.click(p.x, p.y);
+    await wait(60);
+    out.mouse = await page.evaluate(() => JSON.parse(document.getElementById('game-canvas').dataset.walkGoal || 'null'));
+    return out;
+  };
+  const same = (g, x, y) => g && g.x === x && g.y === y;
+  let behind = 0;
+  for (let y = 30; y <= 37; y++) {
+    for (let x = 9; x <= 16; x++) {
+      if (solidKeys.has(`${x},${y}`) || x + y >= 51) continue;
+      const [cx, cy] = centre(x, y);
+      if (!onMonument(cx, cy)) continue;
+      const g = await goalAt(cx, cy);
+      behind++;
+      for (const via of ['touch', 'mouse']) {
+        if (!same(g[via], x, y)) fail(`ground tap (${via}): centre of (${x},${y}) behind the obelisco shaft went to ${JSON.stringify(g[via])}`);
+      }
+    }
+  }
+  if (behind < 3) fail(`ground tap: only ${behind} tiles found behind the obelisco shaft`);
+
+  let bare = 0;
+  let monument = 0;
+  for (const key of solidKeys) {
+    const [x, y] = key.split(',').map(Number);
+    const [cx, cy] = centre(x, y);
+    let barePt = null;
+    let monPt = null;
+    for (let fy = -0.4; fy <= 0.4 && (!barePt || !monPt); fy += 0.1) {
+      for (let fx = -0.4; fx <= 0.4; fx += 0.1) {
+        const wx = cx + (fx - fy) * 64;
+        const wy = cy + (fx + fy) * 32;
+        if (!barePt && !onMonument(wx, wy)) barePt = [wx, wy];
+        if (!monPt && onMonument(wx, wy)) monPt = [wx, wy];
+      }
+    }
+    if (monPt) {
+      const g = await goalAt(...monPt);
+      monument++;
+      for (const via of ['touch', 'mouse']) {
+        if (!same(g[via], front[0], front[1])) fail(`ground tap (${via}): monument on (${x},${y}) went to ${JSON.stringify(g[via])}, want stair foot`);
+      }
+    }
+    if (barePt) {
+      const g = await goalAt(...barePt);
+      bare++;
+      for (const via of ['touch', 'mouse']) {
+        const t = g[via];
+        const near = t && Math.max(Math.abs(t.x - x), Math.abs(t.y - y)) === 1 && !solidKeys.has(`${t.x},${t.y}`);
+        if (!near) fail(`ground tap (${via}): bare plaza on solid (${x},${y}) went to ${JSON.stringify(t)}, want an open neighbour`);
+      }
+    }
+  }
+
+  const props = (await page.evaluate(() => window.__playtestQa.spriteInstances())).filter((i) => /^prop\/(tree|lamp)\//.test(i.id));
+  let propTaps = 0;
+  for (const inst of props.slice(0, 12)) {
+    const [px, py] = inst.id.split('/')[2].split('-').map(Number);
+    const tx = px - 1;
+    const ty = py - 1;
+    const free = await page.evaluate(([a, b, c, d]) => window.__playtestQa.findPath(a, b, c, d), [24, 40, tx, ty]);
+    if (!free) continue;
+    const [cx, cy] = centre(tx, ty);
+    const claimed = await page.evaluate(async ([x, y]) => {
+      const q = window.__playtestQa;
+      q.setCharacterTile(24, 40);
+      q.frameWorld(x, y, 1);
+      await new Promise((r) => setTimeout(r, 30));
+      const p = q.worldToClient(x, y);
+      const k = q.pickAt(p.x, p.y);
+      return k.building ?? k.door;
+    }, [cx, cy]);
+    if (claimed) continue;
+    const g = await goalAt(cx, cy);
+    propTaps++;
+    for (const via of ['touch', 'mouse']) {
+      if (!same(g[via], tx, ty)) fail(`ground tap (${via}): tile (${tx},${ty}) behind ${inst.id} went to ${JSON.stringify(g[via])}`);
+    }
+  }
+  notes.push(`ground taps (mouse + touch): ${behind} tiles behind the obelisco shaft, ${monument} monument points -> stair foot, ${bare} bare-plaza points on solid cells -> open neighbour, ${propTaps} tiles behind trees/lamps`);
+}
+
+/**
+ * Muro: sprite floor == the 3×2 footprint, and collision == the cells behind the walls the sprite
+ * actually draws. A footprint edge carries a wall when the point 16 px above its midpoint is opaque
+ * in the sprite's alpha mask and lies outside the floor diamond.
+ */
+async function muroChecks(page) {
+  const masks = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/data/sprite-alpha.json'), 'utf8'));
+  const e = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/data/mapa_datos.json'), 'utf8')).edificios.muro;
+  const inst = (await page.evaluate(() => window.__playtestQa.spriteInstances())).find((i) => i.id === 'paisaje/muro');
+  const m = masks['prop/muro'];
+  if (!inst || !m) {
+    fail('muro: no sprite instance or alpha mask');
+    return;
+  }
+  const bits = Buffer.from(m.bits, 'base64');
+  const opaque = (wx, wy) => {
+    const cx = Math.floor((wx - inst.tl.x) / m.cell);
+    const cy = Math.floor((wy - inst.tl.y) / m.cell);
+    if (cx < 0 || cy < 0 || cx >= m.w || cy >= m.h) return false;
+    const i = cy * m.w + cx;
+    return ((bits[i >> 3] >> (i & 7)) & 1) === 1;
+  };
+  const centre = (x, y) => [(x - y) * 64, (x + y) * 32];
+  const vfs = A[inst.key].vfs;
+  const [fsx, fsy] = centre(e.x + e.w - 1, e.y + e.h - 1);
+  if (inst.tl.x + vfs.x !== fsx || inst.tl.y + vfs.y !== fsy + 32) {
+    fail(`muro: sprite floor front vertex (${inst.tl.x + vfs.x},${inst.tl.y + vfs.y}) is not the footprint front vertex (${fsx},${fsy + 32})`);
+  }
+  const inFoot = (x, y) => x >= e.x && x < e.x + e.w && y >= e.y && y < e.y + e.h;
+  const wallBehind = new Set();
+  for (let y = e.y; y < e.y + e.h; y++) {
+    for (let x = e.x; x < e.x + e.w; x++) {
+      const [cx, cy] = centre(x, y);
+      if (!opaque(cx, cy)) fail(`muro: footprint cell (${x},${y}) centre is not on the sprite floor`);
+      // Back edges only (−y, −x): raising their midpoint leaves the floor diamond.
+      for (const [dx, dy, ex, ey] of [[0, -1, 32, -16], [-1, 0, -32, -16]]) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (inFoot(nx, ny)) continue;
+        if (opaque(cx + ex, cy + ey - 16)) wallBehind.add(`${nx},${ny}`);
+      }
+    }
+  }
+  if (wallBehind.size) {
+    const xs = [...wallBehind].map((k) => k.split(',').map(Number));
+    const minX = Math.min(...xs.map(([x]) => x));
+    const minY = Math.min(...xs.map(([, y]) => y));
+    if (xs.some(([x]) => x === minX) && xs.some(([, y]) => y === minY)) wallBehind.add(`${minX},${minY}`);
+  }
+  const start = [e.acceso[0], e.acceso[1]];
+  const reach = (x, y) => page.evaluate(([a, b, c, d]) => window.__playtestQa.findPath(a, b, c, d), [start[0], start[1], x, y]);
+  const blocked = [];
+  for (let y = e.y - 1; y <= e.y + e.h; y++) {
+    for (let x = e.x - 1; x <= e.x + e.w; x++) {
+      if (x === start[0] && y === start[1]) continue;
+      const ok = await reach(x, y);
+      if (!ok) blocked.push(`${x},${y}`);
+      if (inFoot(x, y) && !ok) fail(`muro: footprint cell (${x},${y}) is blocked; the sprite draws open floor there`);
+    }
+  }
+  const want = [...wallBehind].sort().join(' ');
+  const got = blocked.filter((k) => !inFoot(...k.split(',').map(Number))).sort().join(' ');
+  if (want !== got) fail(`muro: collision cells [${got}] != cells behind the sprite's walls [${want}]`);
+  if (wallBehind.size !== 6) fail(`muro: expected the back wall (3) + left wall (2) + corner, found ${wallBehind.size} cells`);
+  notes.push(`muro: checked sprite floor vs footprint (${e.x}-${e.x + e.w - 1}, ${e.y}-${e.y + e.h - 1}) and collision vs the ${wallBehind.size} cells behind the walls found in the sprite alpha`);
 }
 
 /**
@@ -739,13 +941,13 @@ const browser = installReadyWait(await chromium.launch());
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
   await openMap(page);
-  await placementChecks(page);
-  await pickChecks(page);
-  await mapChecks(page);
-  await pixelDiffMap(page);
+  if (want('placement')) await placementChecks(page);
+  if (want('picks')) await pickChecks(page);
+  if (want('map')) await mapChecks(page);
+  if (want('diff')) await pixelDiffMap(page);
   await page.close();
-  await fullFrameDiff(browser);
-  await interiorChecks(browser);
+  if (want('diff')) await fullFrameDiff(browser);
+  if (want('interiors')) await interiorChecks(browser);
   if (SHOTS) await shots(browser);
 } finally {
   await browser.close();
