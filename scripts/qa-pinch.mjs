@@ -2152,25 +2152,36 @@ async function testRun37DesktopInteriorMargins(browser, errors) {
         await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
         await waitForInterior(page);
         await wait(700);
-        const sheetLeft = await page.evaluate(() => {
-          const r = document.querySelector('.building-panel__sheet')?.getBoundingClientRect();
-          return r && r.width > 0 ? Math.floor(r.left) : null;
-        });
+        // Slow runners can still be sliding the sheet in or refitting the room: measure until two reads agree.
+        let sheetLeft = null;
+        let roomRight = -1;
+        let prev = null;
+        for (let attempt = 0; attempt < 8; attempt++) {
+          sheetLeft = await page.evaluate(() => {
+            const r = document.querySelector('.building-panel__sheet')?.getBoundingClientRect();
+            return r && r.width > 0 ? Math.floor(r.left) : null;
+          });
+          if (sheetLeft == null) break;
+          const png = PNG.sync.read(await page.screenshot());
+          const bg = pngColorAt(png, sheetLeft - 120, png.height - 8);
+          roomRight = -1;
+          for (let y = 0; y < png.height; y++) {
+            for (let x = sheetLeft - 1; x > roomRight; x--) {
+              // The sheet's drop shadow darkens bg by < 50 (sum of channels); room pixels differ far more.
+              if (colorDist(pngColorAt(png, x, y), bg) > 60) {
+                roomRight = x;
+                break;
+              }
+            }
+          }
+          const now = `${sheetLeft},${roomRight}`;
+          if (now === prev) break;
+          prev = now;
+          await wait(400);
+        }
         if (sheetLeft == null) {
           errors.push(`run37-margin-${name}-${vp.width}: sheet not found`);
           continue;
-        }
-        const png = PNG.sync.read(await page.screenshot());
-        const bg = pngColorAt(png, sheetLeft - 120, png.height - 8);
-        let roomRight = -1;
-        for (let y = 0; y < png.height; y++) {
-          for (let x = sheetLeft - 1; x > roomRight; x--) {
-            // The sheet's drop shadow darkens bg by < 50 (sum of channels); room pixels differ far more.
-            if (colorDist(pngColorAt(png, x, y), bg) > 60) {
-              roomRight = x;
-              break;
-            }
-          }
         }
         const gap = sheetLeft - roomRight - 1;
         if (roomRight < 0) {
