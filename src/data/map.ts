@@ -81,6 +81,10 @@ export function validateWalkGridFootprint(): string[] {
       }
     }
   }
+  for (const key of muroWalls) {
+    const [x, y] = key.split(',').map(Number);
+    if (cells[y]?.[x]?.walkable) errors.push(`muro wall cell (${x},${y}) walkable`);
+  }
   return errors;
 }
 

@@ -96,10 +96,25 @@ export function obeliscoSolidTiles(): Set<string> {
   return new Set(OBELISCO_SOLID_TILES.map(([x, y]) => `${x},${y}`));
 }
 
-/** Muro collision tiles — thin L walls only; interior stays walkable. */
+/**
+ * The muro sprite stands its two walls on the back (−y) and left (−x) edges of the 3×2 footprint and
+ * draws them upward over the row and column behind, so those cells (and the corner) carry the
+ * collision. All six footprint cells are open floor the player can stand on, as the manifest says.
+ */
 export function muroWallTiles(): Set<string> {
-  return new Set(['35,40', '36,40', '37,40', '35,41']);
+  const { x, y, w, h } = MURO_FOOTPRINT;
+  const out = new Set<string>([`${x - 1},${y - 1}`]);
+  for (let dx = 0; dx < w; dx++) out.add(`${x + dx},${y - 1}`);
+  for (let dy = 0; dy < h; dy++) out.add(`${x - 1},${y + dy}`);
+  return out;
 }
+
+export const MURO_FOOTPRINT_TILES: { x: number; y: number }[] = footprintTiles(
+  MURO_FOOTPRINT.x,
+  MURO_FOOTPRINT.y,
+  MURO_FOOTPRINT.w,
+  MURO_FOOTPRINT.h,
+);
 
 function nearMuroClearance(tx: number, ty: number): boolean {
   if (tx === MURO_APPROACH[0] && ty === MURO_APPROACH[1]) return false;
@@ -242,6 +257,10 @@ export function buildWorld(): { cells: MapCell[][]; objects: MapObject[] } {
         cells[fy][fx].walkable = !isWall;
         cells[fy][fx].groundId =
           isWall && !muroWalls && !obeliscoSolid ? 'tile/building/footprint' : 'tile/ground/default';
+      }
+      for (const key of muroWalls ?? []) {
+        const [wx, wy] = key.split(',').map(Number);
+        if (cells[wy]?.[wx] && !borderKind(wx, wy)) cells[wy][wx].walkable = false;
       }
       objects.push({
         id: `paisaje/${id}`,
