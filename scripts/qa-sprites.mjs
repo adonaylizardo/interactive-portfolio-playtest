@@ -31,6 +31,8 @@ const OUT = path.join(ROOT, 'artifacts', 'run39');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const CASES = ['volaris', 'bain', 'mentoria', 'finoa', 'pg'];
+/** Landmark cutaway rooms: hand-authored masks in src/data/interior-rooms.json. */
+const ART_ROOMS = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/data/interior-rooms.json'), 'utf8'));
 const sprites = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/data/sprites.json'), 'utf8'));
 const probes = JSON.parse(fs.readFileSync(path.join(ROOT, 'public/sprites/probes.json'), 'utf8'));
 const A = sprites.assets;
@@ -832,12 +834,13 @@ async function enterRoom(page, name) {
 async function interiorChecks(browser) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   try {
-    for (const c of CASES) {
+    for (const c of [...CASES, ...Object.keys(ART_ROOMS)]) {
       await openMap(page);
       await enterRoom(page, c);
       const layout = await page.evaluate(() => window.__playtestQa.interiorLayout());
-      const rows = sprites.meta[`int/${c}`].mascara_caminable.filas_y0_a_y5;
+      const rows = ART_ROOMS[c]?.mask ?? sprites.meta[`int/${c}`].mascara_caminable.filas_y0_a_y5;
       const { free, exit } = maskCells(rows);
+      if (ART_ROOMS[c] && !allConnected(free, exit)) fail(`interior ${c}: not every free cell connects to the exit`);
       if (!layout) {
         fail(`interior ${c}: no layout`);
         continue;
@@ -873,7 +876,57 @@ async function interiorChecks(browser) {
       await page.evaluate(() => window.__playtestQa.exitInterior());
       await wait(300);
     }
-    notes.push(`interiors: ${CASES.join(', ')} walk grid == mascara_caminable, exit mat walkable, probes cerca + lejos`);
+    notes.push(`interiors: ${CASES.join(', ')} walk grid == mascara_caminable; ${Object.keys(ART_ROOMS).join(', ')} == interior-rooms.json (all free cells reach the exit); exit mat walkable, probes cerca + lejos`);
+
+    // Estudio noche: dark floor, amber only on lights (windows, monitor, lamp).
+    await openMap(page);
+    await enterRoom(page, 'estudio');
+    const pr = await page.evaluate(() => window.__playtestQa.interiorPixelProbes());
+    const cols = await page.evaluate((p) => window.__playtestQa.sampleCanvasColors(p), pr.map((p) => ({ x: p.x, y: p.y })));
+    pr.forEach((p, i) => {
+      const c0 = cols[i];
+      const d = Math.min(...p.expect.map((hex) => (c0 ? Math.abs(c0.r - ((hex >> 16) & 255)) + Math.abs(c0.g - ((hex >> 8) & 255)) + Math.abs(c0.b - (hex & 255)) : 999)));
+      if (d > 36) fail(`interior estudio: probe ${p.label} is ${JSON.stringify(c0)}`);
+    });
+    const est = await page.evaluate(() => window.__playtestQa.interiorLayout());
+    const floorPts = [];
+    const ch = await page.evaluate(() => window.__playtestQa.interiorCharTile());
+    for (const t of est.walkable) {
+      if ((t.x === est.exit.x && t.y === est.exit.y) || t.x + t.y < 4 || (t.x === ch.x && t.y === ch.y)) continue;
+      floorPts.push(await page.evaluate(([x, y]) => window.__playtestQa.interiorTileScreenPoint(x, y), [t.x, t.y]));
+    }
+    const fc = await page.evaluate((p) => window.__playtestQa.sampleCanvasColors(p), floorPts);
+    const NOCHE = [0x1a1c20, 0x1d1f24, 0x2a2d33];
+    fc.forEach((c0, i) => {
+      const d = Math.min(...NOCHE.map((hex) => (c0 ? Math.abs(c0.r - ((hex >> 16) & 255)) + Math.abs(c0.g - ((hex >> 8) & 255)) + Math.abs(c0.b - (hex & 255)) : 999)));
+      if (d > 24) fail(`interior estudio: floor at ${Math.round(floorPts[i].x)},${Math.round(floorPts[i].y)} is ${JSON.stringify(c0)}, not the Estudio-noche tile`);
+    });
+    await page.evaluate(() => window.__playtestQa.exitInterior());
+    await wait(300);
+    notes.push(`interiors: estudio uses the Estudio-noche palette (${fc.length} floor samples, ${pr.length} wall/window/desk/monitor probes)`);
+
+    // One real click on the exit mat leaves every room at once.
+    for (const c of ['estudio', ...CASES, ...Object.keys(ART_ROOMS)]) {
+      await openMap(page);
+      await enterRoom(page, c);
+      const lay = await page.evaluate(() => window.__playtestQa.interiorLayout());
+      const pt = await page.evaluate(([x, y]) => window.__playtestQa.interiorTileScreenPoint(x, y), [lay.exit.x, lay.exit.y]);
+      const t0 = Date.now();
+      await page.mouse.click(pt.x, pt.y);
+      let out = false;
+      while (Date.now() - t0 < 1500) {
+        if (!(await page.evaluate(() => window.__playtestQa.isInInterior()))) {
+          out = true;
+          break;
+        }
+        await wait(25);
+      }
+      const ms = Date.now() - t0;
+      if (!out || ms > 700) fail(`interior ${c}: click on exit mat took ${out ? ms + ' ms' : '>1500 ms'} to leave (need <= 700)`);
+      if (!out) await page.evaluate(() => window.__playtestQa.exitInterior());
+      await wait(300);
+    }
+    notes.push('interiors: one click on the exit mat leaves each of the 9 rooms within 700 ms');
   } finally {
     await page.close();
   }

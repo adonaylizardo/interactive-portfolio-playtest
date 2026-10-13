@@ -1024,6 +1024,102 @@
    "f1": "interiores/casas-caso/pg/interior-pg__caso-pg_zoom-lejos@1x.png",
    "f2": "interiores/casas-caso/pg/interior-pg__caso-pg_zoom-lejos@2x.png"
   },
+  "int/flor/cerca": {
+   "w": 512,
+   "h": 384,
+   "vfs": {
+    "x": 256,
+    "y": 384
+   },
+   "bbox": {
+    "x0": 93,
+    "y0": 33,
+    "x1": 419,
+    "y1": 330
+   },
+   "f1": "interiores/flor-de-venezuela/flor-de-venezuela-interior__estado-interior_zoom-cerca@1x.png",
+   "f2": "interiores/flor-de-venezuela/flor-de-venezuela-interior__estado-interior_zoom-cerca@2x.png"
+  },
+  "int/flor/lejos": {
+   "w": 512,
+   "h": 384,
+   "vfs": {
+    "x": 256,
+    "y": 384
+   },
+   "bbox": {
+    "x0": 110,
+    "y0": 54,
+    "x1": 402,
+    "y1": 303
+   },
+   "f1": "interiores/flor-de-venezuela/flor-de-venezuela-interior__estado-interior_zoom-lejos@1x.png",
+   "f2": "interiores/flor-de-venezuela/flor-de-venezuela-interior__estado-interior_zoom-lejos@2x.png"
+  },
+  "int/catedral/cerca": {
+   "w": 640,
+   "h": 576,
+   "vfs": {
+    "x": 320,
+    "y": 576
+   },
+   "bbox": {
+    "x0": 152,
+    "y0": 34,
+    "x1": 488,
+    "y1": 500
+   },
+   "f1": "interiores/catedral-de-barquisimeto/catedral-de-barquisimeto-interior__estado-interior_zoom-cerca@1x.png",
+   "f2": "interiores/catedral-de-barquisimeto/catedral-de-barquisimeto-interior__estado-interior_zoom-cerca@2x.png"
+  },
+  "int/catedral/lejos": {
+   "w": 640,
+   "h": 576,
+   "vfs": {
+    "x": 320,
+    "y": 576
+   },
+   "bbox": {
+    "x0": 152,
+    "y0": 35,
+    "x1": 488,
+    "y1": 500
+   },
+   "f1": "interiores/catedral-de-barquisimeto/catedral-de-barquisimeto-interior__estado-interior_zoom-lejos@1x.png",
+   "f2": "interiores/catedral-de-barquisimeto/catedral-de-barquisimeto-interior__estado-interior_zoom-lejos@2x.png"
+  },
+  "int/sambil/cerca": {
+   "w": 768,
+   "h": 448,
+   "vfs": {
+    "x": 512,
+    "y": 448
+   },
+   "bbox": {
+    "x0": 81,
+    "y0": 30,
+    "x1": 709,
+    "y1": 428
+   },
+   "f1": "interiores/sambil-barquisimeto/sambil-barquisimeto-interior__estado-interior_zoom-cerca@1x.png",
+   "f2": "interiores/sambil-barquisimeto/sambil-barquisimeto-interior__estado-interior_zoom-cerca@2x.png"
+  },
+  "int/sambil/lejos": {
+   "w": 768,
+   "h": 448,
+   "vfs": {
+    "x": 512,
+    "y": 448
+   },
+   "bbox": {
+    "x0": 81,
+    "y0": 32,
+    "x1": 721,
+    "y1": 424
+   },
+   "f1": "interiores/sambil-barquisimeto/sambil-barquisimeto-interior__estado-interior_zoom-lejos@1x.png",
+   "f2": "interiores/sambil-barquisimeto/sambil-barquisimeto-interior__estado-interior_zoom-lejos@2x.png"
+  },
   "prop/arbol/redondo/cerca": {
    "w": 128,
    "h": 208,

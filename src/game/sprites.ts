@@ -59,8 +59,11 @@ export function buildingSpriteKey(id: string, state: BuildingSpriteState, lejos:
   return `ext/${id}/${state}/${lejos ? 'lejos' : 'cerca'}`;
 }
 
+/** Landmark cutaways' `lejos` frame is the closed exterior silhouette, so their rooms stay on `cerca`. */
+const CERCA_ONLY_INTERIORS = new Set(['flor', 'catedral', 'sambil']);
+
 export function interiorSpriteKey(id: string, lejos: boolean): string {
-  return `int/${id}/${lejos ? 'lejos' : 'cerca'}`;
+  return `int/${id}/${lejos && !CERCA_ONLY_INTERIORS.has(id) ? 'lejos' : 'cerca'}`;
 }
 
 export function isSpriteBuilding(id: string): boolean {
@@ -79,10 +82,13 @@ export function spriteResolution(): number {
   return resolution;
 }
 
+/** Landmark interiors are their @1x cutaway drawn at 2×: the @2x file is their 1:1 texture. */
+const SCALED_INTERIORS = /^int\/(flor|catedral|sambil)\//;
+
 /** `lejos` frames only show below zoom 0.4, so @1x is plenty and keeps texture memory a quarter. */
 function spriteUrl(key: string): string {
   const a = spriteAsset(key);
-  const hi = resolution >= 2 && !key.endsWith('/lejos');
+  const hi = (resolution >= 2 && !key.endsWith('/lejos')) || SCALED_INTERIORS.test(key);
   return `${import.meta.env.BASE_URL}sprites/${hi ? a.f2 : a.f1}`;
 }
 

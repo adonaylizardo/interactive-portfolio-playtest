@@ -45,6 +45,9 @@ const GROUPS = [
     key: (p) => `int/${id}/${p.zoom}`,
     meta: ['mascara_caminable', 'puerta', 'tapete_salida'],
   })),
+  { dir: 'interiores/flor-de-venezuela', key: (p) => `int/flor/${p.zoom}` },
+  { dir: 'interiores/catedral-de-barquisimeto', key: (p) => `int/catedral/${p.zoom}` },
+  { dir: 'interiores/sambil-barquisimeto', key: (p) => `int/sambil/${p.zoom}` },
   { dir: 'paisaje/arbol', key: (p) => `prop/arbol/${p.especie}/${p.vista}` },
   { dir: 'paisaje/banco-exterior', key: (p) => `prop/banco/${p.orientacion}/${p.vista}` },
   { dir: 'paisaje/farol-exterior', key: (p) => `prop/farol/${p.orientacion}/${p.vista}` },
@@ -148,6 +151,23 @@ function orAlphaMask(masks, baseId, png) {
   }
 }
 
+/** Building interiors scaled up into rooms (src/data/interior-rooms.json). */
+const ART_ROOMS = JSON.parse(readFileSync(path.join(root, 'src', 'data', 'interior-rooms.json'), 'utf8'));
+
+/** Frame (@1x) rects covered by the character at spawn and by the exit mat overlay. */
+function artRoomSkip(room, vfs) {
+  const h = room.mask.length;
+  const w = room.mask[0].length;
+  const cells = [];
+  room.mask.forEach((row, y) => [...row].forEach((c, x) => (c === 'E' || c === 'S') && cells.push({ x, y })));
+  const rects = cells.map(({ x, y }) => {
+    const fx = vfs.x + ((x - y - (w - h)) * 64) / room.scale;
+    const fy = vfs.y + ((x + y - (w - 1 + h - 1)) * 32 - room.lift) / room.scale;
+    return { x0: fx - 80 / room.scale, x1: fx + 80 / room.scale, y0: fy - 120 / room.scale, y1: fy + 16 / room.scale };
+  });
+  return (x, y) => rects.some((r) => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1);
+}
+
 const assets = {};
 const probes = {};
 const meta = {};
@@ -186,7 +206,12 @@ for (const g of GROUPS) {
       f2: `${g.dir}/${v.archivos.png2x}`,
     };
     // Keep the character's spawn and exit cells out of the interior probes.
-    const skip = key.startsWith('int/') ? (x, y) => Math.abs(x - 300) < 90 && y > 380 : undefined;
+    const artRoom = ART_ROOMS[key.split('/')[1]];
+    const skip = artRoom
+      ? artRoomSkip(artRoom, vfs)
+      : key.startsWith('int/')
+        ? (x, y) => Math.abs(x - 300) < 90 && y > 380
+        : undefined;
     probes[key] = uniformProbes(png1, 12, skip);
     if (MASKED.test(key)) orAlphaMask(masks, key.split('/').slice(0, 2).join('/'), png1);
   }

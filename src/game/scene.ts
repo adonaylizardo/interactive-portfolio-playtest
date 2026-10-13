@@ -2151,6 +2151,7 @@ export class IsoScene {
         const sprite = new Sprite(spriteTexture(key));
         const tl = interiorSpriteTopLeft(def);
         sprite.position.set(tl.x, tl.y);
+        sprite.scale.set(def.scale);
         sprite.zIndex = 0;
         sprite.eventMode = 'none';
         this.interiorLayer.addChild(sprite);
@@ -2278,10 +2279,7 @@ export class IsoScene {
     }
     const tile = interiorPickTile(this.interiorDef, wx, wy);
     if (!tile) return;
-    if (!this.interiorGrid[tile.y]?.[tile.x]?.walkable) {
-      if (this.interiorDef.id === 'sambil' && tile.x >= 5) this.events.onUnreachable?.();
-      return;
-    }
+    if (!this.interiorGrid[tile.y]?.[tile.x]?.walkable) return;
     const sx0 = Math.round(this.interiorCharTx);
     const sy0 = Math.round(this.interiorCharTy);
     const path = findPathInterior(this.interiorGrid, sx0, sy0, tile.x, tile.y);

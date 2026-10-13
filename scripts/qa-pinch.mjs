@@ -1320,9 +1320,9 @@ async function testRun31DeepLinkInterior(page, errors) {
 /** Run #31: per-building interior grid sizes. */
 async function testRun31InteriorSizes(page, errors) {
   const expected = {
-    catedral: [8, 8],
-    sambil: [8, 8],
-    flor: [7, 7],
+    catedral: [10, 10],
+    sambil: [16, 8],
+    flor: [8, 8],
     bain: [6, 6],
   };
   for (const [name, [ew, eh]] of Object.entries(expected)) {
@@ -1610,9 +1610,9 @@ const INTERIOR_EXIT_TILE = {
   mentoria: [3, 5],
   finoa: [3, 5],
   pg: [3, 5],
-  sambil: [4, 7],
-  catedral: [4, 7],
-  flor: [3, 6],
+  sambil: [15, 4],
+  catedral: [6, 6],
+  flor: [5, 6],
 };
 
 /** Run #33: real touch — exit tile + floating Salir in every interior on phone. */
@@ -1967,9 +1967,8 @@ async function testRun35ExitTileAfterFloorTaps(browser, errors) {
           const c = document.getElementById('game-canvas');
           const w = Number(c?.dataset.interiorW);
           const h = Number(c?.dataset.interiorH);
-          const ex = Math.floor(w / 2);
-          const ey = h - 1;
-          return window.__playtestQa?.interiorTileScreenPoint?.(ex, ey);
+          const { exit } = window.__playtestQa?.interiorLayout?.() ?? { exit: { x: Math.floor(w / 2), y: h - 1 } };
+          return window.__playtestQa?.interiorTileScreenPoint?.(exit.x, exit.y);
         });
         if (!exitPt) {
           errors.push(`run35-exit-${name}-${touch ? '375' : 'desk'}: exit screen point missing`);
@@ -2031,8 +2030,8 @@ async function samplePageColor(page, clientX, clientY) {
 }
 
 const INTERIOR_FLOOR_RGB = [
-  { r: 0xc8, g: 0xc8, b: 0xc8 },
-  { r: 0xb8, g: 0xb8, b: 0xb8 },
+  { r: 0x1a, g: 0x1c, b: 0x20 },
+  { r: 0x1d, g: 0x1f, b: 0x24 },
 ];
 
 function hexToRgb(hex) {
@@ -2077,7 +2076,10 @@ async function testRun37InteriorPixelProbes(browser, errors) {
           const c = pngColorAt(png, probe.x, probe.y, scale);
           const toExpected = Math.min(...probe.expect.map((hex) => colorDist(c, hexToRgb(hex))));
           const toFloor = Math.min(...INTERIOR_FLOOR_RGB.map((f) => colorDist(c, f)));
-          if (toExpected > 36 || toFloor < 18) {
+          const expectedIsFloorTone = probe.expect.some((hex) =>
+            INTERIOR_FLOOR_RGB.some((f) => colorDist(hexToRgb(hex), f) < 18),
+          );
+          if (toExpected > 36 || (toFloor < 18 && !expectedIsFloorTone)) {
             errors.push(
               `run37-probe-${name}-${vp.label}: ${probe.label} at (${Math.round(probe.x)},${Math.round(probe.y)}) is ${JSON.stringify(c)} (dExpected=${toExpected}, dFloor=${toFloor})`,
             );
@@ -2100,9 +2102,9 @@ const RUN37_TOUCH_WALK_TILES = {
   mentoria: [[4, 4], [1, 3], [4, 1]],
   finoa: [[4, 4], [1, 3], [4, 1]],
   pg: [[4, 2], [1, 3], [4, 1]],
-  catedral: [[3, 2], [1, 6], [6, 6]],
-  sambil: [[1, 1], [6, 4], [2, 6]],
-  flor: [[2, 2], [5, 5], [1, 4]],
+  catedral: [[3, 6], [6, 2], [7, 3]],
+  sambil: [[2, 3], [9, 3], [12, 2]],
+  flor: [[2, 3], [6, 2], [3, 6]],
 };
 
 /** Run #37: real touch @375 walks to 3 floor tiles in each of the 9 rooms and arrives. */

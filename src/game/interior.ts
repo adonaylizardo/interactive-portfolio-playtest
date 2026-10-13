@@ -1,4 +1,5 @@
 import { Graphics } from 'pixi.js';
+import roomData from '../data/interior-rooms.json';
 import { TILE_H, TILE_W } from '../data/world';
 import { tileFootWorld } from '../iso/math';
 import { drawCharacter } from './draw';
@@ -28,10 +29,18 @@ export type InteriorDef = {
   plinthH: number;
   spawn: { x: number; y: number };
   exit: { x: number; y: number };
+  /** Room side the exit door opens through; the door gap past the mat is part of the exit target. */
+  exitFace: '+x' | '+y';
   /** Room drawn from a baked Figma sprite (furniture included). */
   sprite?: boolean;
   /** Sprite rooms: walk grid rows y = 0.., '#' blocked, '.' 'E' 'S' free (manifest `mascara_caminable`). */
   mask?: readonly string[];
+  /** Sprite drawn at this multiple of its @1x frame (building cutaways: one map tile = 2×2 room cells). */
+  scale: number;
+  /** Height of the walkable floor above the frame's ground plane, in world px. */
+  lift: number;
+  /** The art has no exit mat of its own: draw one on the exit cell. */
+  matOverlay?: boolean;
 };
 
 /** ~2× character silhouette height in px. */
@@ -42,14 +51,7 @@ function def(
   id: InteriorBuildingId,
   w: number,
   h: number,
-  opts?: {
-    backWallH?: number;
-    plinthH?: number;
-    spawn?: { x: number; y: number };
-    exit?: { x: number; y: number };
-    sprite?: boolean;
-    mask?: readonly string[];
-  },
+  opts?: Partial<Omit<InteriorDef, 'id' | 'w' | 'h'>>,
 ): InteriorDef {
   const exit = opts?.exit ?? { x: Math.floor(w / 2), y: h - 1 };
   const spawn = opts?.spawn ?? { x: exit.x, y: Math.max(1, exit.y - 2) };
@@ -61,14 +63,16 @@ function def(
     plinthH: opts?.plinthH ?? INTERIOR_PLINTH_H,
     spawn,
     exit,
+    exitFace: opts?.exitFace ?? '+y',
     sprite: opts?.sprite,
     mask: opts?.mask,
+    scale: opts?.scale ?? 1,
+    lift: opts?.lift ?? 0,
+    matOverlay: opts?.matOverlay,
   };
 }
 
-function spriteRoom(id: InteriorBuildingId): InteriorDef {
-  const mask = spriteMeta(`int/${id}`)?.mascara_caminable?.filas_y0_a_y5 as string[] | undefined;
-  if (!mask) throw new Error(`missing walk mask for ${id}`);
+function maskCells(mask: readonly string[]): { spawn: { x: number; y: number }; exit: { x: number; y: number } } {
   let spawn = { x: 3, y: 4 };
   let exit = { x: 3, y: 5 };
   mask.forEach((row, y) => {
@@ -77,7 +81,32 @@ function spriteRoom(id: InteriorBuildingId): InteriorDef {
       if (c === 'S') exit = { x, y };
     });
   });
-  return def(id, mask[0].length, mask.length, { spawn, exit, sprite: true, mask });
+  return { spawn, exit };
+}
+
+function spriteRoom(id: InteriorBuildingId): InteriorDef {
+  const mask = spriteMeta(`int/${id}`)?.mascara_caminable?.filas_y0_a_y5 as string[] | undefined;
+  if (!mask) throw new Error(`missing walk mask for ${id}`);
+  return def(id, mask[0].length, mask.length, { ...maskCells(mask), sprite: true, mask });
+}
+
+type ArtRoom = { scale: number; lift: number; exitFace: '+x' | '+y'; mask: string[] };
+
+/**
+ * Landmark interiors: the pack's `estado=interior` cutaway of the building, scaled up so each map
+ * tile becomes 2×2 room cells. Walk masks are hand-authored against the art (src/data/interior-rooms.json).
+ */
+function artRoom(id: 'flor' | 'catedral' | 'sambil'): InteriorDef {
+  const r = (roomData as Record<string, ArtRoom>)[id];
+  return def(id, r.mask[0].length, r.mask.length, {
+    ...maskCells(r.mask),
+    sprite: true,
+    mask: r.mask,
+    scale: r.scale,
+    lift: r.lift,
+    exitFace: r.exitFace,
+    matOverlay: true,
+  });
 }
 
 const LAYOUTS: Record<InteriorBuildingId, InteriorDef> = {
@@ -87,9 +116,9 @@ const LAYOUTS: Record<InteriorBuildingId, InteriorDef> = {
   mentoria: spriteRoom('mentoria'),
   finoa: spriteRoom('finoa'),
   pg: spriteRoom('pg'),
-  sambil: def('sambil', 8, 8),
-  catedral: def('catedral', 8, 8),
-  flor: def('flor', 7, 7, { backWallH: 140 }),
+  sambil: artRoom('sambil'),
+  catedral: artRoom('catedral'),
+  flor: artRoom('flor'),
 };
 
 export function getInteriorDef(id: string): InteriorDef | null {
@@ -97,26 +126,7 @@ export function getInteriorDef(id: string): InteriorDef | null {
   return LAYOUTS[id as InteriorBuildingId];
 }
 
-/** The Estudio room is still drawn procedurally (placeholder); the five case rooms are sprites. */
-function isCaseRoom(def: InteriorDef): boolean {
-  return def.id === 'estudio';
-}
-
-/** Flor: stage against the west-wall screen, seating tiers rising away from it (+x). */
-const FLOR_STAGE = { x0: 0, x1: 2, y0: 1, y1: 4, h: 20 };
-const FLOR_TIERS = [
-  { x: 3, h: 16 },
-  { x: 4, h: 36 },
-  { x: 5, h: 56 },
-];
-const FLOR_TIER_Y0 = 1;
-const FLOR_TIER_Y1 = 4;
-
 export type InteriorCell = { walkable: boolean };
-
-function setBlocked(cells: InteriorCell[][], x: number, y: number): void {
-  if (cells[y]?.[x]) cells[y][x].walkable = false;
-}
 
 export function buildInteriorGrid(def: InteriorDef): InteriorCell[][] {
   if (def.mask) {
@@ -136,33 +146,8 @@ export function buildInteriorGrid(def: InteriorDef): InteriorCell[][] {
   }
   cells[def.spawn.y][def.spawn.x].walkable = true;
   cells[def.exit.y][def.exit.x].walkable = true;
-
-  if (def.id === 'catedral') {
-    for (let row = 2; row <= 5; row++) {
-      for (let col = 1; col <= 6; col++) {
-        if (col === 3 || col === 4) continue;
-        setBlocked(cells, col, row);
-      }
-    }
-    setBlocked(cells, 3, 1);
-    setBlocked(cells, 4, 1);
-  } else if (def.id === 'sambil') {
-    for (let y = 1; y < def.h - 1; y++) {
-      for (let x = 5; x < def.w - 1; x++) {
-        if (y !== 4) setBlocked(cells, x, y);
-      }
-    }
-  } else if (def.id === 'flor') {
-    for (let y = FLOR_STAGE.y0; y < FLOR_STAGE.y1; y++) {
-      for (let x = Math.max(1, FLOR_STAGE.x0); x < FLOR_STAGE.x1; x++) setBlocked(cells, x, y);
-    }
-    for (const tier of FLOR_TIERS) {
-      for (let y = FLOR_TIER_Y0; y < FLOR_TIER_Y1; y++) setBlocked(cells, tier.x, y);
-    }
-  } else if (isCaseRoom(def)) {
-    setBlocked(cells, 1, 1);
-  }
-
+  // Estudio desk.
+  cells[1][1].walkable = false;
   return cells;
 }
 
@@ -178,22 +163,31 @@ function P(gx: number, gy: number, z = 0): Pt {
   return { x: (gx - gy) * (TILE_W / 2), y: (gx + gy - 1) * (TILE_H / 2) - z };
 }
 
-/** World top-left of a sprite room: its floor front vertex sits on the foot of the last cell. */
+/**
+ * World top-left of a sprite room: its floor front vertex sits on the foot of the last cell, and a
+ * raised floor (`lift`) is lowered onto the room's ground plane.
+ */
 export function interiorSpriteTopLeft(def: InteriorDef): Pt {
   const a = spriteAsset(interiorSpriteKey(def.id, false));
   const foot = tileFootWorld(def.w - 1, def.h - 1);
-  return { x: foot.x - a.vfs.x, y: foot.y - a.vfs.y };
+  return { x: foot.x - a.vfs.x * def.scale, y: foot.y - a.vfs.y * def.scale + def.lift };
 }
 
-function poly(g: Graphics, pts: Pt[], fill: number): void {
+function poly(g: Graphics, pts: Pt[], fill: number, alpha = 1): void {
   g.moveTo(pts[0].x, pts[0].y);
   for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
   g.closePath();
-  g.fill(fill);
+  g.fill({ color: fill, alpha });
 }
 
-function tileDiamond(g: Graphics, tx: number, ty: number, fill: number): void {
-  poly(g, [P(tx, ty), P(tx + 1, ty), P(tx + 1, ty + 1), P(tx, ty + 1)], fill);
+function line(g: Graphics, a: Pt, b: Pt, color: number, width: number): void {
+  g.moveTo(a.x, a.y);
+  g.lineTo(b.x, b.y);
+  g.stroke({ width, color });
+}
+
+function tileDiamond(g: Graphics, tx: number, ty: number, fill: number, alpha = 1): void {
+  poly(g, [P(tx, ty), P(tx + 1, ty), P(tx + 1, ty + 1), P(tx, ty + 1)], fill, alpha);
 }
 
 /**
@@ -215,38 +209,30 @@ function box(
   poly(g, [P(x0, y0, z1), P(x1, y0, z1), P(x1, y1, z1), P(x0, y1, z1)], pal.top);
 }
 
-const FLOOR_A = 0xc8c8c8;
-const FLOOR_B = 0xb8b8b8;
-const NORTH_WALL = 0x9e9e9e;
-const WEST_WALL = 0x8a8a8a;
-const WALL_CAP = 0x5e5e5e;
-const WALL_END = 0x747474;
+/** Estudio noche: near-black room, dark tiles, amber is the only light. */
+const BG = 0x0b0c0e;
+const FLOOR_A = 0x1a1c20;
+const FLOOR_B = 0x1d1f24;
+const FLOOR_SEAM = 0x2a2d33;
+const NORTH_WALL = 0x202226;
+const WEST_WALL = 0x26292f;
+const WALL_SEAM = 0x34373e;
+const WALL_CAP = 0x3a3d44;
+const WALL_END = 0x141518;
+const AMBER = 0xffb547;
 const WALL_THICK = 0.18;
 const PLINTH_DEPTH = 0.14;
+/** Art rooms: world px kept in view above the floor's back vertex. */
+const ART_ROOM_HEADROOM = 120;
 /** How far past the floor edge the door gap counts as the exit target (lattice tiles). */
 const EXIT_GAP_DEPTH = 0.6;
-const PLINTH: Palette = { top: 0xa8a8a8, left: 0x8c8c8c, right: 0x7a7a7a };
-const POST: Palette = { top: 0x8a8a8a, left: 0x6a6a6a, right: 0x585858 };
-const MAT = 0xe8e4da;
-
-const PEW: Palette = { top: 0x9c7650, left: 0x7a5638, right: 0x5c3f28 };
-const STONE: Palette = { top: 0xdcd6cc, left: 0xb2aca2, right: 0x968f85 };
-const STAGE: Palette = { top: 0xa87c52, left: 0x7c5a3a, right: 0x5e4329 };
-/** Treads are light; each riser (the +y / +x walls) is one step darker than its own tread. */
-const TIER: Palette = { top: 0xa6a6b6, left: 0x62626f, right: 0x52525e };
-const TIER_ALT: Palette = { top: 0x9696a6, left: 0x565663, right: 0x484855 };
-const TIER_NOSING = 0xd2d2de;
-const SEAT: Palette = { top: 0xc04c4c, left: 0x983838, right: 0x762a2a };
-const TIER_EDGE = 0x2e2e36;
-const BENCH: Palette = { top: 0xa08058, left: 0x7a5e3e, right: 0x5e462c };
-const SCREEN_FRAME = 0x2a2a36;
-const SCREEN_GLOW = 0x46506a;
-
-const WOOD: Palette = { top: 0xc49a74, left: 0x9c7656, right: 0x7c5a40 };
-const DARK: Palette = { top: 0x4a4a54, left: 0x34343c, right: 0x26262c };
-const CHAIR: Palette = { top: 0x707070, left: 0x585858, right: 0x464646 };
-
-const CASE_RUG: Record<string, number> = { estudio: 0xb08a68 };
+const PLINTH: Palette = { top: 0x2a2d33, left: 0x1f2125, right: 0x17191c };
+const POST: Palette = { top: 0x34373e, left: 0x24272d, right: 0x1a1c20 };
+const MAT = 0x24272d;
+const DESK: Palette = { top: 0x34373e, left: 0x24272d, right: 0x1a1c20 };
+const SHELF: Palette = { top: 0x2e3137, left: 0x202226, right: 0x17191c };
+const CHAIR: Palette = { top: 0x2a2d33, left: 0x1f2125, right: 0x17191c };
+const MONITOR: Palette = { top: 0x24272d, left: AMBER, right: 0x1a1c20 };
 
 function paintInteriorFloor(g: Graphics, def: InteriorDef): void {
   if (def.sprite) return;
@@ -255,6 +241,28 @@ function paintInteriorFloor(g: Graphics, def: InteriorDef): void {
       tileDiamond(g, tx, ty, (tx + ty) % 2 === 0 ? FLOOR_A : FLOOR_B);
     }
   }
+  for (let i = 1; i < def.w; i++) line(g, P(i, 0), P(i, def.h), FLOOR_SEAM, 1);
+  for (let i = 1; i < def.h; i++) line(g, P(0, i), P(def.w, i), FLOOR_SEAM, 1);
+}
+
+/** Window on the north wall (y = 0 plane), x range in tiles: amber panes, dark mullions. */
+function northWindow(g: Graphics, x0: number, x1: number, z0: number, z1: number): void {
+  const e = 0.02;
+  poly(g, [P(x0, e, z0), P(x1, e, z0), P(x1, e, z1), P(x0, e, z1)], AMBER);
+  const xm = (x0 + x1) / 2;
+  const zm = (z0 + z1) / 2;
+  line(g, P(xm, e, z0), P(xm, e, z1), BG, 3);
+  line(g, P(x0, e, zm), P(x1, e, zm), BG, 3);
+}
+
+/** Window on the west wall (x = 0 plane), y range in tiles. */
+function westWindow(g: Graphics, y0: number, y1: number, z0: number, z1: number): void {
+  const e = 0.02;
+  poly(g, [P(e, y0, z0), P(e, y1, z0), P(e, y1, z1), P(e, y0, z1)], AMBER);
+  const ym = (y0 + y1) / 2;
+  const zm = (z0 + z1) / 2;
+  line(g, P(e, ym, z0), P(e, ym, z1), BG, 3);
+  line(g, P(e, y0, zm), P(e, y1, zm), BG, 3);
 }
 
 /**
@@ -269,6 +277,11 @@ function paintInteriorWalls(g: Graphics, def: InteriorDef): void {
 
   poly(g, [P(0, 0, 0), P(0, h, 0), P(0, h, H), P(0, 0, H)], WEST_WALL);
   poly(g, [P(0, 0, 0), P(w, 0, 0), P(w, 0, H), P(0, 0, H)], NORTH_WALL);
+  for (let i = 1; i < h; i++) line(g, P(0.01, i, 0), P(0.01, i, H), WALL_SEAM, 1);
+  for (let i = 1; i < w; i++) line(g, P(i, 0.01, 0), P(i, 0.01, H), WALL_SEAM, 1);
+  westWindow(g, 2.2, 2.8, 34, 74);
+  northWindow(g, 1.2, 1.8, 34, 74);
+  northWindow(g, 4.9, 5.5, 34, 74);
   poly(g, [P(-t, h, 0), P(0, h, 0), P(0, h, H), P(-t, h, H)], WALL_END);
   poly(g, [P(w, -t, 0), P(w, 0, 0), P(w, 0, H), P(w, -t, H)], WALL_END);
   poly(g, [P(0, 0, H), P(-t, -t, H), P(-t, h, H), P(0, h, H)], WALL_CAP);
@@ -284,133 +297,56 @@ function paintInteriorWalls(g: Graphics, def: InteriorDef): void {
   box(g, ex + 0.98, h, ex + 1.1, h + PLINTH_DEPTH, 0, 34, POST);
 }
 
-function paintExitMat(g: Graphics, def: InteriorDef): void {
+/** Exit mat: dark rug with an amber threshold line on the door side. */
+function paintExitMat(g: Graphics, def: InteriorDef, alpha = 1): void {
   const { x, y } = def.exit;
-  tileDiamond(g, x, y, MAT);
+  tileDiamond(g, x, y, MAT, alpha);
   g.moveTo(P(x, y).x, P(x, y).y);
   g.lineTo(P(x + 1, y).x, P(x + 1, y).y);
   g.lineTo(P(x + 1, y + 1).x, P(x + 1, y + 1).y);
   g.lineTo(P(x, y + 1).x, P(x, y + 1).y);
   g.closePath();
-  g.stroke({ width: 2, color: 0xc4bfb2 });
+  g.stroke({ width: 2, color: FLOOR_SEAM });
+  if (def.exitFace === '+x') line(g, P(x + 1, y + 0.08), P(x + 1, y + 0.92), AMBER, 4);
+  else line(g, P(x + 0.08, y + 1), P(x + 0.92, y + 1), AMBER, 4);
 }
 
-function paintCaseRug(g: Graphics, accent: number): void {
-  const light = Math.min(0xffffff, accent + 0x141414);
-  for (let ty = 0; ty < 3; ty++) {
-    for (let tx = 0; tx < 3; tx++) tileDiamond(g, tx, ty, (tx + ty) % 2 === 0 ? accent : light);
+function paintEstudio(g: Graphics): void {
+  // Floor lamp in the west corner: amber pool of light, pole, shade.
+  const lx = 0.45;
+  const ly = 4.5;
+  for (const [r, a] of [
+    [0.75, 0.12],
+    [0.5, 0.2],
+    [0.28, 0.32],
+  ] as const) {
+    const x0 = Math.max(0.02, lx - r);
+    poly(g, [P(x0, ly - r), P(lx + r, ly - r), P(lx + r, ly + r), P(x0, ly + r)], AMBER, a);
   }
-}
+  box(g, lx - 0.12, ly - 0.12, lx + 0.12, ly + 0.12, 0, 3, DESK);
+  box(g, lx - 0.02, ly - 0.02, lx + 0.02, ly + 0.02, 3, 62, DESK);
+  box(g, lx - 0.14, ly - 0.14, lx + 0.14, ly + 0.14, 62, 76, SHELF);
+  poly(g, [P(lx - 0.14, ly + 0.14, 62), P(lx + 0.14, ly + 0.14, 62), P(lx + 0.14, ly - 0.14, 62)], AMBER, 0.9);
 
-/** Panel mounted on the west wall face (x = 0 plane), y range in tiles. */
-function westWallPanel(g: Graphics, y0: number, y1: number, z0: number, z1: number, frame: number, glow: number): void {
-  const e = 0.02;
-  poly(g, [P(e, y0, z0), P(e, y1, z0), P(e, y1, z1), P(e, y0, z1)], frame);
-  const iy0 = y0 + 0.12;
-  const iy1 = y1 - 0.12;
-  poly(g, [P(e, iy0, z0 + 6), P(e, iy1, z0 + 6), P(e, iy1, z1 - 6), P(e, iy0, z1 - 6)], glow);
-}
+  // Bookshelf on the north wall with a small amber lamp on top.
+  box(g, 2.9, 0.04, 4.1, 0.42, 0, 80, SHELF);
+  for (const z of [20, 40, 60]) line(g, P(2.9, 0.42, z), P(4.1, 0.42, z), FLOOR_SEAM, 2);
+  box(g, 3.75, 0.16, 3.9, 0.3, 80, 86, DESK);
+  box(g, 3.78, 0.19, 3.87, 0.27, 86, 92, MONITOR);
 
-function paintCaseProp(g: Graphics, def: InteriorDef): void {
-  paintCaseRug(g, CASE_RUG[def.id] ?? 0x999999);
-  if (def.id === 'estudio') {
-    box(g, 0.15, 0.15, 1.85, 1.3, 0, 30, WOOD);
-    box(g, 0.55, 0.3, 1.35, 0.42, 30, 56, DARK);
-    box(g, 0.75, 1.5, 1.25, 1.9, 0, 18, CHAIR);
-  }
-}
-
-function paintPew(g: Graphics, tx: number, ty: number): void {
-  box(g, tx + 0.06, ty + 0.14, tx + 0.94, ty + 0.34, 0, 38, PEW);
-  box(g, tx + 0.06, ty + 0.34, tx + 0.94, ty + 0.86, 0, 18, PEW);
-}
-
-function paintCatedral(g: Graphics, def: InteriorDef, grid: InteriorCell[][]): void {
-  box(g, 2, 0.1, 6, 0.8, 0, 40, STONE);
-  const cross = 0x5a4632;
-  const c = 4;
-  const e = 0.02;
-  poly(g, [P(c - 0.06, e, 52), P(c + 0.06, e, 52), P(c + 0.06, e, 84), P(c - 0.06, e, 84)], cross);
-  poly(g, [P(c - 0.3, e, 70), P(c + 0.3, e, 70), P(c + 0.3, e, 76), P(c - 0.3, e, 76)], cross);
-  box(g, 3, 1.25, 5, 1.55, 0, 16, PEW);
-  const tiles: { x: number; y: number }[] = [];
-  for (let y = 2; y < def.h - 1; y++) {
-    for (let x = 1; x < def.w - 1; x++) {
-      if (!grid[y][x].walkable) tiles.push({ x, y });
-    }
-  }
-  tiles.sort((a, b) => a.x + a.y - (b.x + b.y) || a.x - b.x);
-  for (const t of tiles) paintPew(g, t.x, t.y);
-}
-
-/** Small benches on the walkway (row 4), tucked to opposite edges so the lane stays clear. */
-const SAMBIL_BENCHES = [
-  { x0: 5.12, y0: 4.04, x1: 5.88, y1: 4.3 },
-  { x0: 6.12, y0: 4.7, x1: 6.88, y1: 4.96 },
-];
-
-function paintBench(g: Graphics, x0: number, y0: number, x1: number, y1: number): void {
-  const leg = 0.1;
-  box(g, x0 + 0.04, y0, x0 + 0.04 + leg, y1, 0, 9, BENCH);
-  box(g, x1 - 0.04 - leg, y0, x1 - 0.04, y1, 0, 9, BENCH);
-  box(g, x0, y0, x1, y1, 9, 15, BENCH);
-}
-
-function paintSambil(g: Graphics, def: InteriorDef): void {
-  const water = 0x7aa8bc;
-  const waterDark = 0x5a8898;
-  const walk = 0xd4ccc0;
-  for (let y = 1; y < def.h - 1; y++) {
-    for (let x = 5; x < def.w - 1; x++) {
-      tileDiamond(g, x, y, y === 4 ? walk : y < 4 ? waterDark : water);
-    }
-  }
-  tileDiamond(g, 4, 4, walk);
-  for (const b of SAMBIL_BENCHES) paintBench(g, b.x0, b.y0, b.x1, b.y1);
-  const a = P(5, 1.5, 6);
-  const b = P(7, 1.5, 6);
-  g.moveTo(a.x, a.y);
-  g.lineTo(b.x, b.y);
-  g.stroke({ width: 3, color: 0x555555 });
-}
-
-function paintFlor(g: Graphics, def: InteriorDef): void {
-  const H = def.backWallH;
-  westWallPanel(g, FLOR_STAGE.y0 - 0.2, FLOR_STAGE.y1 + 0.2, 34, H - 16, SCREEN_FRAME, SCREEN_GLOW);
-  box(g, FLOR_STAGE.x0, FLOR_STAGE.y0, FLOR_STAGE.x1, FLOR_STAGE.y1, 0, FLOR_STAGE.h, STAGE);
-  const lip = [P(FLOR_STAGE.x1, FLOR_STAGE.y0, FLOR_STAGE.h), P(FLOR_STAGE.x1, FLOR_STAGE.y1, FLOR_STAGE.h)];
-  g.moveTo(lip[0].x, lip[0].y);
-  g.lineTo(lip[1].x, lip[1].y);
-  g.stroke({ width: 2, color: 0xd8b088 });
-
-  FLOR_TIERS.forEach((tier, i) => {
-    box(g, tier.x, FLOR_TIER_Y0, tier.x + 1, FLOR_TIER_Y1, 0, tier.h, i % 2 === 0 ? TIER : TIER_ALT);
-    // Risers face the stage (away from the camera), so the step reads through this edge line.
-    const a = P(tier.x, FLOR_TIER_Y0, tier.h);
-    const b = P(tier.x, FLOR_TIER_Y1, tier.h);
-    g.moveTo(a.x, a.y);
-    g.lineTo(b.x, b.y);
-    g.stroke({ width: 3, color: TIER_EDGE });
-    const n0 = P(tier.x, FLOR_TIER_Y1, tier.h);
-    const n1 = P(tier.x + 1, FLOR_TIER_Y1, tier.h);
-    g.moveTo(n0.x, n0.y);
-    g.lineTo(n1.x, n1.y);
-    g.stroke({ width: 2, color: TIER_NOSING });
-    for (let y = FLOR_TIER_Y0; y < FLOR_TIER_Y1; y++) {
-      box(g, tier.x + 0.22, y + 0.14, tier.x + 0.66, y + 0.86, tier.h, tier.h + 8, SEAT);
-      box(g, tier.x + 0.66, y + 0.14, tier.x + 0.84, y + 0.86, tier.h, tier.h + 26, SEAT);
-    }
-  });
+  // Desk in the back corner, monitor glowing amber toward the room, chair in front.
+  box(g, 0.15, 0.15, 1.85, 1.3, 0, 30, DESK);
+  box(g, 0.55, 0.3, 1.35, 0.42, 30, 56, MONITOR);
+  box(g, 0.75, 1.5, 1.25, 1.9, 0, 18, CHAIR);
 }
 
 function paintInteriorProps(g: Graphics, def: InteriorDef): void {
-  if (def.sprite) return;
-  const grid = buildInteriorGrid(def);
+  if (def.sprite) {
+    if (def.matOverlay) paintExitMat(g, def, 0.88);
+    return;
+  }
   paintExitMat(g, def);
-  if (isCaseRoom(def)) paintCaseProp(g, def);
-  else if (def.id === 'catedral') paintCatedral(g, def, grid);
-  else if (def.id === 'sambil') paintSambil(g, def);
-  else if (def.id === 'flor') paintFlor(g, def);
+  paintEstudio(g);
 }
 
 export function drawInteriorFloor(g: Graphics, def: InteriorDef): void {
@@ -447,12 +383,14 @@ export function interiorWorldBounds(def: InteriorDef, tightSides = false): {
   if (def.sprite) {
     const b = spriteAsset(interiorSpriteKey(def.id, false)).bbox;
     const fx = interiorSpriteTopLeft(def);
+    const k = def.scale;
     const padX = TILE_W * (tightSides ? 0.03 : 0.25);
     const padY = TILE_H * 0.4;
-    const minX = fx.x + b.x0;
-    const maxX = fx.x + b.x1;
-    const minY = fx.y + b.y0;
-    const maxY = fx.y + b.y1;
+    const minX = fx.x + b.x0 * k;
+    const maxX = fx.x + b.x1 * k;
+    // Cutaways draw the removed roof / spire as a dashed outline above the room: frame the room.
+    const minY = def.matOverlay ? Math.max(fx.y + b.y0 * k, P(0, 0).y - ART_ROOM_HEADROOM) : fx.y + b.y0 * k;
+    const maxY = fx.y + b.y1 * k;
     return {
       minX: minX - padX,
       maxX: maxX + padX,
@@ -588,7 +526,7 @@ export function interiorPickTile(
 
 /**
  * Exit target: the mat tile plus the door gap in front of it (between the two posts, outside the
- * floor). Neighbouring floor tiles are not part of it. Tapping it walks there and exits on arrival.
+ * floor on the exit face). Neighbouring floor tiles are not part of it.
  */
 export function interiorHitExit(
   def: InteriorDef,
@@ -600,17 +538,10 @@ export function interiorHitExit(
   const lx = (worldX / (TILE_W / 2) + worldY / (TILE_H / 2)) / 2 + 0.5;
   const ly = (worldY / (TILE_H / 2) - worldX / (TILE_W / 2)) / 2 + 0.5;
   const { x, y } = def.exit;
+  if (def.exitFace === '+x') {
+    return ly >= y - 0.1 && ly <= y + 1.1 && lx >= x && lx <= x + 1 + EXIT_GAP_DEPTH;
+  }
   return lx >= x - 0.1 && lx <= x + 1.1 && ly >= y && ly <= y + 1 + EXIT_GAP_DEPTH;
-}
-
-/** @deprecated use interiorHitExit */
-export function interiorExitPick(
-  def: InteriorDef,
-  worldX: number,
-  worldY: number,
-  zoom: number,
-): boolean {
-  return interiorHitExit(def, worldX, worldY, zoom);
 }
 
 function tileKey(x: number, y: number): string {
@@ -639,29 +570,14 @@ export function interiorBlockedPropTiles(def: InteriorDef): { x: number; y: numb
 /** Tiles whose footprint is covered by a drawn prop (same tables the painters use). */
 export function interiorRenderedPropTiles(def: InteriorDef): { x: number; y: number }[] {
   const keys = new Set<string>();
-  const mark = (x0: number, y0: number, x1: number, y1: number) => {
-    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) keys.add(tileKey(x, y));
-  };
-  if (def.id === 'catedral') {
-    const grid = buildInteriorGrid(def);
-    for (let y = 2; y < def.h - 1; y++) {
-      for (let x = 1; x < def.w - 1; x++) if (!grid[y][x].walkable) mark(x, y, x + 1, y + 1);
-    }
-    mark(3, 1, 5, 2);
-    mark(2, 0, 6, 1);
-  } else if (def.id === 'sambil') {
-    for (let y = 1; y < def.h - 1; y++) for (let x = 5; x < def.w - 1; x++) mark(x, y, x + 1, y + 1);
-  } else if (def.id === 'flor') {
-    mark(FLOR_STAGE.x0, FLOR_STAGE.y0, FLOR_STAGE.x1, FLOR_STAGE.y1);
-    for (const tier of FLOR_TIERS) mark(tier.x, FLOR_TIER_Y0, tier.x + 1, FLOR_TIER_Y1);
-  } else if (def.mask) {
+  if (def.mask) {
     def.mask.forEach((row, y) => {
       [...row].forEach((c, x) => {
-        if (c === '#') mark(x, y, x + 1, y + 1);
+        if (c === '#') keys.add(tileKey(x, y));
       });
     });
-  } else if (isCaseRoom(def)) {
-    mark(0, 0, 2, 2);
+  } else {
+    for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) keys.add(tileKey(x, y));
   }
   return [...keys].map((k) => {
     const [x, y] = k.split(',').map(Number);
@@ -683,20 +599,20 @@ export type InteriorPixelProbe = {
 };
 
 /**
- * QA pixel probes: one point per west-wall segment, per pew tile, per Flor stage/tier, per case
- * prop. Each must render as its feature color (not floor, not background).
+ * QA pixel probes. Sprite rooms: flat-colour samples of the exported frame at their world spots.
+ * Estudio: one point per west-wall segment, the windows, the desk and the monitor.
  */
 export function interiorPixelProbes(def: InteriorDef, lejos = false): InteriorPixelProbe[] {
   const out: InteriorPixelProbe[] = [];
   const pal = (p: Palette) => [p.top, p.left, p.right];
   if (def.sprite) {
-    // Pixel-diff against the exported frame: flat-colour samples of the PNG at their world spots.
     const key = interiorSpriteKey(def.id, lejos);
     const tl = interiorSpriteTopLeft(def);
+    const k = def.scale;
     (cachedSpriteProbes()?.[key] ?? []).forEach(([x, y, r, g, b], i) => {
       out.push({
         label: `sprite-${def.id}-${lejos ? 'lejos' : 'cerca'}-${i}`,
-        world: { x: tl.x + x + 0.5, y: tl.y + y + 0.5 },
+        world: { x: tl.x + (x + 0.5) * k, y: tl.y + (y + 0.5) * k },
         expect: [(r << 16) | (g << 8) | b],
       });
     });
@@ -704,47 +620,31 @@ export function interiorPixelProbes(def: InteriorDef, lejos = false): InteriorPi
   }
   const wallZ = def.backWallH - 6;
   for (let ty = 0; ty < def.h; ty++) {
+    if (ty === 2) continue;
     out.push({ label: `west-wall-${ty}`, world: P(0, ty + 0.5, wallZ), expect: [WEST_WALL] });
   }
-  if (def.id === 'catedral') {
-    const grid = buildInteriorGrid(def);
-    for (let y = 2; y < def.h - 1; y++) {
-      for (let x = 1; x < def.w - 1; x++) {
-        if (!grid[y][x].walkable) {
-          out.push({ label: `pew-${x}-${y}`, world: P(x + 0.5, y + 0.6, 18), expect: pal(PEW) });
-        }
-      }
-    }
-  } else if (def.id === 'sambil') {
-    SAMBIL_BENCHES.forEach((b, i) => {
-      out.push({
-        label: `sambil-bench-${i}`,
-        world: P((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, 15),
-        expect: [BENCH.top],
-      });
-    });
-  } else if (def.id === 'flor') {
-    out.push({
-      label: 'flor-stage',
-      world: P((FLOR_STAGE.x0 + FLOR_STAGE.x1) / 2, (FLOR_STAGE.y0 + FLOR_STAGE.y1) / 2, FLOR_STAGE.h),
-      expect: pal(STAGE),
-    });
-    for (const tier of FLOR_TIERS) {
-      out.push({
-        label: `flor-tier-${tier.x}`,
-        world: P(tier.x + 0.75, FLOR_TIER_Y1 - 0.5, tier.h + 18),
-        expect: [...pal(SEAT), ...pal(TIER), ...pal(TIER_ALT)],
-      });
-    }
-  } else if (isCaseRoom(def)) {
-    out.push({ label: `case-${def.id}`, world: P(1.2, 0.9, 30), expect: pal(WOOD) });
-  }
+  out.push({ label: 'west-window', world: P(0.02, 2.35, 44), expect: [AMBER] });
+  out.push({ label: 'north-window', world: P(1.35, 0.02, 44), expect: [AMBER] });
+  out.push({ label: 'estudio-desk', world: P(1.2, 0.9, 30), expect: pal(DESK) });
+  out.push({ label: 'estudio-monitor', world: P(0.95, 0.42, 43), expect: [AMBER] });
   return out;
 }
 
 export const INTERIOR_FLOOR_COLORS = [FLOOR_A, FLOOR_B];
 
-/** Tile one step inward from spawn (typical “tap ahead” probe). */
+/** Walkable tile next to spawn, away from the exit (typical “tap ahead” probe). */
 export function interiorForwardTile(def: InteriorDef): { x: number; y: number } {
-  return { x: def.spawn.x, y: Math.max(0, def.spawn.y - 1) };
+  const grid = buildInteriorGrid(def);
+  const { x, y } = def.spawn;
+  for (const [dx, dy] of [
+    [0, -1],
+    [-1, 0],
+    [1, 0],
+    [0, 1],
+  ]) {
+    const t = { x: x + dx, y: y + dy };
+    if (t.x === def.exit.x && t.y === def.exit.y) continue;
+    if (grid[t.y]?.[t.x]?.walkable) return t;
+  }
+  return { x, y: Math.max(0, y - 1) };
 }
