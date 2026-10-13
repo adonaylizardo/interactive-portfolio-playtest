@@ -14,7 +14,7 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { installReadyWait } from './qa-ready.mjs';
-import { armExitTimer, readExitTimer } from './qa-exit-timer.mjs';
+import { armExitTimer, readExitTimer, exitIsImmediate, describeExit } from './qa-exit-timer.mjs';
 import { PNG } from 'pngjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -914,12 +914,12 @@ async function interiorChecks(browser) {
       const pt = await page.evaluate(([x, y]) => window.__playtestQa.interiorTileScreenPoint(x, y), [lay.exit.x, lay.exit.y]);
       await armExitTimer(page);
       await page.mouse.click(pt.x, pt.y);
-      const ms = await readExitTimer(page, 1500);
-      if (ms == null || ms > 700) fail(`interior ${c}: click on exit mat took ${ms == null ? '>1500 ms' : ms + ' ms'} to leave (need <= 700)`);
-      if (ms == null) await page.evaluate(() => window.__playtestQa.exitInterior());
+      const r = await readExitTimer(page, 1500);
+      if (!exitIsImmediate(r)) fail(`interior ${c}: click on exit mat was not immediate (${describeExit(r)}; need <= 700 ms, or <= 3 frames with no walk)`);
+      if (!r) await page.evaluate(() => window.__playtestQa.exitInterior());
       await wait(300);
     }
-    notes.push('interiors: one click on the exit mat leaves each of the 9 rooms within 700 ms');
+    notes.push('interiors: one click on the exit mat leaves each of the 9 rooms without walking (<= 700 ms, or <= 3 frames on slow renderers)');
   } finally {
     await page.close();
   }

@@ -3,7 +3,8 @@
  * Fast real-input smoke (deploy gate, ~5 min): Chromium desktop + phone and WebKit iPhone.
  *  - first load: 1280×800 centred on the character, phones frame the Estudio and Volaris doors
  *  - a door tap walks there and enters only on arrival
- *  - one tap on the exit mat or the door gap leaves each of the 9 rooms within 700 ms
+ *  - one tap on the exit mat or the door gap leaves each of the 9 rooms without walking first
+ *    (<= 700 ms in-page, or <= 3 rendered frames on software-GL runners)
  * Usage: npm run qa:smoke   (builds first; QA_BASE_URL skips the local preview server)
  */
 import { spawn } from 'node:child_process';
