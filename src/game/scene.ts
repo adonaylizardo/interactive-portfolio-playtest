@@ -38,6 +38,8 @@ import {
   doorHit,
   doorTapPoint,
   footprintCorners,
+  obeliscoMonumentHit,
+  obeliscoSilhouettes,
   spriteAlphaHit,
 } from './pick';
 import {
@@ -130,7 +132,8 @@ export type SceneEvents = {
 };
 
 /** Desktop first-load camera when the URL carries no #view. */
-const DESKTOP_DEFAULT_VIEW = { x: 0, y: 0, zoom: 0.15 };
+const DESKTOP_FIRST_LOAD_BUILDINGS = ['estudio', 'volaris', 'mentoria', 'pg'] as const;
+const DESKTOP_ROOF_RISE = 160;
 
 export class IsoScene {
   app!: Application;
@@ -310,9 +313,7 @@ export class IsoScene {
     } else if (this.shouldUseMobileFraming()) {
       this.frameMobileFirstLoadView();
     } else {
-      this.cameraX = DESKTOP_DEFAULT_VIEW.x;
-      this.cameraY = DESKTOP_DEFAULT_VIEW.y;
-      this.zoom = clampZoom(DESKTOP_DEFAULT_VIEW.zoom);
+      this.frameDesktopFirstLoadView();
     }
     if (bootInteriorId) {
       this.outdoorCamBeforeInterior = {
@@ -538,12 +539,12 @@ export class IsoScene {
           return;
         }
         this.pendingBuildingEntry = null;
-        if (obj.name === 'obelisco' || obj.name === 'redoma' || obj.name === 'muro') {
-          const pos = e.getLocalPosition(this.world);
-          const tile = worldToTile(pos.x, pos.y);
-          const gx = tile?.x ?? obj.x;
-          const gy = tile?.y ?? obj.y;
-          this.requestWalk(gx, gy, sprint);
+        const pos = e.getLocalPosition(this.world);
+        const tile = this.resolveGroundTap(pos.x, pos.y);
+        const scenery = obj.name === 'obelisco' || obj.name === 'redoma' || obj.name === 'muro';
+        if (tile && (scenery || cells[tile.y][tile.x].walkable)) {
+          if (!this.prepareMapTap(undefined, tile.x, tile.y)) return;
+          this.requestWalk(tile.x, tile.y, sprint);
           return;
         }
         this.requestWalk(obj.x, obj.y, sprint);
@@ -711,9 +712,33 @@ export class IsoScene {
     return best?.obj;
   }
 
+  /**
+   * Tile a map tap targets when it lands on scenery or a prop. Walkable ground under the tap wins,
+   * even where a tall sprite is drawn over it. On a solid obelisco cell only the drawn monument
+   * (steps, slab, stair, arch) counts as the monument; bare plaza there goes to the nearest open cell.
+   */
+  private resolveGroundTap(wx: number, wy: number): { x: number; y: number } | null {
+    const tile = worldToTile(wx, wy);
+    if (!tile || cells[tile.y][tile.x].walkable) return tile;
+    const obelisco = getSceneryAt(tile.x, tile.y);
+    if (obelisco?.name !== 'obelisco' || obeliscoMonumentHit(obelisco, wx, wy)) return tile;
+    let best: { x: number; y: number; d: number } | null = null;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const x = tile.x + dx;
+        const y = tile.y + dy;
+        if (!cells[y]?.[x]?.walkable) continue;
+        const c = tileToWorld(x, y);
+        const d = Math.hypot(wx - c.x, wy - c.y);
+        if (!best || d < best.d) best = { x, y, d };
+      }
+    }
+    return best ? { x: best.x, y: best.y } : tile;
+  }
+
   private pickSceneryAtScreen(sx: number, sy: number): { tx: number; ty: number } | undefined {
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
-    const tile = worldToTile(wx, wy);
+    const tile = this.resolveGroundTap(wx, wy);
     if (tile && getSceneryAt(tile.x, tile.y)) return { tx: tile.x, ty: tile.y };
     const scenery = objects
       .filter((o) => o.name === 'obelisco' || o.name === 'redoma' || o.name === 'muro')
@@ -726,8 +751,7 @@ export class IsoScene {
       const hitW = 36 + w * 14;
       const hitH = 52 + h * 18;
       if (Math.abs(local.x) < hitW && local.y > -hitH && local.y < 28) {
-        const t = worldToTile(wx, wy);
-        return t ? { tx: t.x, ty: t.y } : { tx: obj.x, ty: obj.y };
+        return tile ? { tx: tile.x, ty: tile.y } : { tx: obj.x, ty: obj.y };
       }
     }
     return undefined;
@@ -797,7 +821,7 @@ export class IsoScene {
         this.interiorDef &&
         interiorHitExit(this.interiorDef, iwx, iwy, this.zoom)
       ) {
-        this.walkToInteriorExit(sprint);
+        this.exitInteriorFromTap();
         return;
       }
       const client = this.canvasLocalToClient(sx, sy);
@@ -830,7 +854,7 @@ export class IsoScene {
       return;
     }
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
-    const tile = worldToTile(wx, wy);
+    const tile = this.resolveGroundTap(wx, wy);
     if (tile) {
       const onDoor = getBuildingAtDoor(tile.x, tile.y);
       if (onDoor?.panelTitle && onDoor.door) {
@@ -1206,6 +1230,48 @@ export class IsoScene {
     if (!this.shouldUseMobileFraming()) return;
     this.frameMobileDefaultView();
     this.applyCamera(false);
+  }
+
+  /**
+   * Desktop first load: centred on the character, zoomed so the Estudio and the nearest houses
+   * (Volaris, Mentoría, P&G, roofs included) fit around it.
+   */
+  private frameDesktopFirstLoadView(): void {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const char = tileToWorld(this.charTx, this.charTy);
+    let hw = 0;
+    let hh = 0;
+    for (const name of DESKTOP_FIRST_LOAD_BUILDINGS) {
+      const b = getBuildingByName(name);
+      if (!b) continue;
+      const x0 = b.footprintX ?? b.x;
+      const y0 = b.footprintY ?? b.y;
+      const w = b.w ?? 1;
+      const h = b.h ?? 1;
+      for (const [cx, cy] of [
+        [x0, y0],
+        [x0 + w, y0],
+        [x0, y0 + h],
+        [x0 + w, y0 + h],
+      ]) {
+        const c = tileToWorld(cx, cy);
+        hw = Math.max(hw, Math.abs(c.x - char.x));
+        hh = Math.max(hh, Math.abs(c.y - DESKTOP_ROOF_RISE - char.y), Math.abs(c.y - char.y));
+      }
+    }
+    const fit = Math.min(sw / (2 * (hw + 60)), sh / (2 * (hh + 40)));
+    this.zoom = clampZoom(Math.min(1, Math.max(0.4, fit)), sw, sh);
+    this.cameraX = -char.x;
+    this.cameraY = -char.y;
+    const hardened = stabilizeCameraAfterGesture(
+      { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+      sw,
+      sh,
+    );
+    this.cameraX = hardened.cameraX;
+    this.cameraY = hardened.cameraY;
+    this.zoom = hardened.zoom;
   }
 
   /** Phone first load: Estudio and the first house (Volaris) fill the width, character at the door. */
@@ -2207,7 +2273,7 @@ export class IsoScene {
     if (!this.interiorDef) return;
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
     if (interiorHitExit(this.interiorDef, wx, wy, this.zoom)) {
-      this.walkToInteriorExit(sprint);
+      this.exitInteriorFromTap();
       return;
     }
     const tile = interiorPickTile(this.interiorDef, wx, wy);
@@ -2228,25 +2294,18 @@ export class IsoScene {
     this.charState = sprint ? 'sprint' : 'walk';
   }
 
-  /** One tap on the exit mat / door gap: walk there from anywhere; the walk exits on arrival. */
-  private walkToInteriorExit(sprint: boolean): void {
+  /** One tap on the exit mat / door gap leaves right away, from anywhere the exit is reachable. */
+  private exitInteriorFromTap(): void {
     const def = this.interiorDef;
     if (!def) return;
     const sx0 = Math.round(this.interiorCharTx);
     const sy0 = Math.round(this.interiorCharTy);
-    const path = findPathInterior(this.interiorGrid, sx0, sy0, def.exit.x, def.exit.y);
-    if (!path) {
+    if (!findPathInterior(this.interiorGrid, sx0, sy0, def.exit.x, def.exit.y)) {
       this.events.onUnreachable?.();
       return;
     }
-    if (path.length === 0) {
-      this.interiorPath = [];
-      this.exitInterior({ immediate: true });
-      return;
-    }
-    this.interiorPath = path;
-    this.sprint = sprint;
-    this.charState = sprint ? 'sprint' : 'walk';
+    this.interiorPath = [];
+    this.exitInterior({ immediate: true });
   }
 
   private updateInteriorWalk(): void {
@@ -2533,6 +2592,12 @@ export class IsoScene {
       door: this.pickBuildingDoorAtScreen(sx, sy)?.name ?? null,
       building: this.pickBuildingAtScreen(sx, sy)?.name ?? null,
     };
+  }
+
+  /** QA: screen silhouettes (world coords) of the obelisco's solid parts. */
+  qaObeliscoSilhouettes(): { x: number; y: number }[][] {
+    const o = objects.find((ob) => ob.name === 'obelisco');
+    return o ? obeliscoSilhouettes(o) : [];
   }
 
   qaWorldToClient(wx: number, wy: number): { x: number; y: number } {

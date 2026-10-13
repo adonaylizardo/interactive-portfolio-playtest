@@ -120,14 +120,14 @@ async function testExitSingleTap(ctx, kind, base, errors) {
         const { layout } = st;
         const ty = target === 'mat' ? layout.exit.y : layout.h - 0.2;
         const pt = await tilePoint(page, layout.exit.x, ty);
+        const t0 = Date.now();
         await tapAt(page, kind, pt.x, pt.y);
-        await wait(120);
-        const early = await inInterior(page);
-        const at = await charTile(page);
-        if (!early || (at?.x === layout.exit.x && at?.y === layout.exit.y)) {
-          errors.push(`${tag}: exited instantly instead of walking to the exit (${JSON.stringify(at)})`);
+        if (!(await waitLeftRoom(page, 700))) {
+          errors.push(`${tag}: one tap on the ${target} from the far tile did not exit within 700 ms`);
+          if (!(await waitLeftRoom(page))) errors.push(`${tag}: one tap on the ${target} did not exit`);
+        } else if (Date.now() - t0 > 700) {
+          errors.push(`${tag}: exit took ${Date.now() - t0} ms`);
         }
-        if (!(await waitLeftRoom(page))) errors.push(`${tag}: one tap on the ${target} did not exit`);
       } finally {
         await page.close();
       }
