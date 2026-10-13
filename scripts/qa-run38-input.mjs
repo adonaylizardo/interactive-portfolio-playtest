@@ -118,8 +118,11 @@ async function testExitSingleTap(ctx, kind, base, errors) {
         const st = await standFarFromExit(page, kind, errors, tag);
         if (!st) continue;
         const { layout } = st;
-        const ty = target === 'mat' ? layout.exit.y : layout.h - 0.2;
-        const pt = await tilePoint(page, layout.exit.x, ty);
+        const gap = target === 'mat' ? 0 : 0.8;
+        const pt =
+          layout.exitFace === '+x'
+            ? await tilePoint(page, layout.exit.x + gap, layout.exit.y)
+            : await tilePoint(page, layout.exit.x, layout.exit.y + gap);
         const t0 = Date.now();
         await tapAt(page, kind, pt.x, pt.y);
         if (!(await waitLeftRoom(page, 700))) {

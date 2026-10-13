@@ -2468,6 +2468,7 @@ export class IsoScene {
     w: number;
     h: number;
     exit: { x: number; y: number };
+    exitFace: '+x' | '+y';
     walkable: { x: number; y: number }[];
   } | null {
     const def = this.interiorDef;
@@ -2478,7 +2479,7 @@ export class IsoScene {
         if (this.interiorGrid[y]?.[x]?.walkable) walkable.push({ x, y });
       }
     }
-    return { w: def.w, h: def.h, exit: def.exit, walkable };
+    return { w: def.w, h: def.h, exit: def.exit, exitFace: def.exitFace, walkable };
   }
 
   getInteriorCharTile(): { x: number; y: number } | null {
