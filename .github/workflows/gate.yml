@@ -1,0 +1,72 @@
+name: Gate
+
+# Fast checks (~15 min wall clock) that must pass before anything is deployed:
+# build, typecheck, sprite placement / picking / interiors, and the real-input smoke
+# (first load framing, door entry, single-tap exits) on Chromium and WebKit.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  sprites:
+    name: build + typecheck + qa:sprites
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: npm
+
+      - name: npm ci
+        run: npm ci
+
+      - name: npm run build
+        run: npm run build
+
+      - name: npm run typecheck
+        run: npm run typecheck
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: qa:sprites
+        timeout-minutes: 15
+        run: node scripts/qa-sprites.mjs --shots
+
+      - name: Upload sprite shots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-sprites-${{ github.run_id }}
+          path: artifacts/run39/*.png
+          if-no-files-found: warn
+
+  smoke:
+    name: real-input smoke (Chromium + WebKit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: npm
+
+      - name: npm ci
+        run: npm ci
+
+      - name: npm run build
+        run: npm run build
+
+      - name: Install Playwright Chromium + WebKit
+        run: npx playwright install chromium webkit --with-deps
+
+      - name: qa:smoke
+        timeout-minutes: 15
+        run: node scripts/qa-smoke.mjs

@@ -11,6 +11,8 @@
     "qa": "npm run build && node scripts/qa.mjs",
     "qa:pinch": "npm run build && node scripts/qa-pinch.mjs",
     "qa:sprites": "npm run build && node scripts/qa-sprites.mjs",
+    "qa:smoke": "npm run build && node scripts/qa-smoke.mjs",
+    "qa:gate": "npm run build && npm run typecheck && node scripts/qa-sprites.mjs && node scripts/qa-smoke.mjs",
     "deploy:gh-pages": "node scripts/deploy-gh-pages.mjs"
   },
   "devDependencies": {

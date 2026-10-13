@@ -7,7 +7,9 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
 const stage = path.join(root, '.gh-pages-stage');
 
-execSync('npm run build', { cwd: root, stdio: 'inherit' });
+// Same fast checks as the CI gate (builds dist/ first); a failure stops the deploy.
+if (process.env.DEPLOY_GATE_PASSED === '1') execSync('npm run build', { cwd: root, stdio: 'inherit' });
+else execSync('npm run qa:gate', { cwd: root, stdio: 'inherit' });
 
 rmSync(stage, { recursive: true, force: true });
 mkdirSync(stage, { recursive: true });

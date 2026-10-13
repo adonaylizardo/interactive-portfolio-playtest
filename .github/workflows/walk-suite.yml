@@ -1,0 +1,56 @@
+name: Walk suite (non-blocking)
+
+# The long real-input regression suite (qa:pinch, hours on software GL). Informational:
+# it is not part of the gate, so a failure here never blocks a merge or a deploy.
+on:
+  pull_request:
+    branches:
+      - 'cursor/**'
+  push:
+    branches:
+      - 'cursor/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: walk-suite-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  walk-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: npm
+
+      - name: npm ci
+        run: npm ci
+
+      - name: Install Playwright Chromium + WebKit
+        run: npx playwright install chromium webkit --with-deps
+
+      - name: Install ImageMagick (QA montages)
+        run: command -v montage || (sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick)
+
+      - name: npm run qa:pinch
+        timeout-minutes: 330
+        run: npm run qa:pinch
+
+      - name: Upload QA artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-screenshots-${{ github.run_id }}
+          path: |
+            artifacts/qa-screenshots/desktop-1280x800.png
+            artifacts/qa-screenshots/mobile-375x812.png
+            artifacts/qa-screenshots/qa-pinch-results.json
+          if-no-files-found: warn
