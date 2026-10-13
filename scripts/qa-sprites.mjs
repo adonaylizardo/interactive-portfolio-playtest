@@ -14,6 +14,7 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { installReadyWait } from './qa-ready.mjs';
+import { armExitTimer, readExitTimer } from './qa-exit-timer.mjs';
 import { PNG } from 'pngjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -911,19 +912,11 @@ async function interiorChecks(browser) {
       await enterRoom(page, c);
       const lay = await page.evaluate(() => window.__playtestQa.interiorLayout());
       const pt = await page.evaluate(([x, y]) => window.__playtestQa.interiorTileScreenPoint(x, y), [lay.exit.x, lay.exit.y]);
-      const t0 = Date.now();
+      await armExitTimer(page);
       await page.mouse.click(pt.x, pt.y);
-      let out = false;
-      while (Date.now() - t0 < 1500) {
-        if (!(await page.evaluate(() => window.__playtestQa.isInInterior()))) {
-          out = true;
-          break;
-        }
-        await wait(25);
-      }
-      const ms = Date.now() - t0;
-      if (!out || ms > 700) fail(`interior ${c}: click on exit mat took ${out ? ms + ' ms' : '>1500 ms'} to leave (need <= 700)`);
-      if (!out) await page.evaluate(() => window.__playtestQa.exitInterior());
+      const ms = await readExitTimer(page, 1500);
+      if (ms == null || ms > 700) fail(`interior ${c}: click on exit mat took ${ms == null ? '>1500 ms' : ms + ' ms'} to leave (need <= 700)`);
+      if (ms == null) await page.evaluate(() => window.__playtestQa.exitInterior());
       await wait(300);
     }
     notes.push('interiors: one click on the exit mat leaves each of the 9 rooms within 700 ms');

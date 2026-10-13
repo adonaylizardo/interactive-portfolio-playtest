@@ -5,6 +5,7 @@
  */
 import { chromium, webkit, devices } from 'playwright';
 import { installReadyWait } from './qa-ready.mjs';
+import { armExitTimer, readExitTimer } from './qa-exit-timer.mjs';
 
 const ROOMS = (process.env.R38_ROOMS ? process.env.R38_ROOMS.split(',') : ['estudio', 'volaris', 'bain', 'mentoria', 'finoa', 'pg', 'sambil', 'catedral', 'flor']);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -123,13 +124,13 @@ async function testExitSingleTap(ctx, kind, base, errors) {
           layout.exitFace === '+x'
             ? await tilePoint(page, layout.exit.x + gap, layout.exit.y)
             : await tilePoint(page, layout.exit.x, layout.exit.y + gap);
-        const t0 = Date.now();
+        await armExitTimer(page);
         await tapAt(page, kind, pt.x, pt.y);
-        if (!(await waitLeftRoom(page, 700))) {
-          errors.push(`${tag}: one tap on the ${target} from the far tile did not exit within 700 ms`);
-          if (!(await waitLeftRoom(page))) errors.push(`${tag}: one tap on the ${target} did not exit`);
-        } else if (Date.now() - t0 > 700) {
-          errors.push(`${tag}: exit took ${Date.now() - t0} ms`);
+        const ms = await readExitTimer(page);
+        if (ms == null) {
+          errors.push(`${tag}: one tap on the ${target} from the far tile did not exit`);
+        } else if (ms > 700) {
+          errors.push(`${tag}: exit took ${ms} ms`);
         }
       } finally {
         await page.close();
