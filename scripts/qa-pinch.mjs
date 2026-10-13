@@ -1064,13 +1064,28 @@ async function dismissBuildingPanel(page) {
   await wait(200);
 }
 
-async function waitForInterior(page, maxMs = 20000) {
-  for (let i = 0; i < maxMs / 250; i++) {
-    const inside = await page.evaluate(() => window.__playtestQa?.isInInterior?.() === true);
-    if (inside) return true;
+/**
+ * Walk speed scales with frame time and Pixi caps a frame at 100 ms, so software-GL runners below
+ * 10 fps walk slower than real devices: keep waiting (up to 4x) while the character is still moving.
+ */
+async function waitWhileWalking(page, done, maxMs) {
+  const t0 = Date.now();
+  let deadline = t0 + maxMs;
+  let last = null;
+  while (Date.now() < deadline) {
+    if (await done()) return true;
+    const c = await page.evaluate(() => document.getElementById('game-canvas')?.dataset.charTile ?? null);
+    if (c !== last) {
+      last = c;
+      deadline = Math.min(t0 + maxMs * 4, Math.max(deadline, Date.now() + 3000));
+    }
     await wait(250);
   }
-  return false;
+  return done();
+}
+
+async function waitForInterior(page, maxMs = 20000) {
+  return waitWhileWalking(page, () => page.evaluate(() => window.__playtestQa?.isInInterior?.() === true), maxMs);
 }
 
 /** Run #30: panel overlay on map — outside tap closes without walking (next tap walks). */
@@ -1318,6 +1333,7 @@ async function testRun31InteriorSizes(page, errors) {
       ([n]) => window.__playtestQa?.enterInterior?.(n),
       [name],
     );
+    await waitForInterior(page);
     await wait(500);
     const dims = await page.evaluate(() => {
       const c = document.getElementById('game-canvas');
@@ -1745,10 +1761,7 @@ async function testRun33ArrivalOnlyFour(page, errors) {
         break;
       }
     }
-    for (let i = 0; i < 80; i++) {
-      if (await page.evaluate(() => window.__playtestQa?.isInInterior?.())) break;
-      await wait(250);
-    }
+    await waitForInterior(page);
     if (!(await page.evaluate(() => window.__playtestQa?.isInInterior?.()))) {
       errors.push(`run33-arrival-${c.name}-${mode}: never entered after ${mode} tap`);
     }
@@ -3592,10 +3605,7 @@ async function testMap64EnterablePanels(page, errors) {
       errors.push(`map64-panels: door click failed for ${b.name}`);
       continue;
     }
-    for (let i = 0; i < 80; i++) {
-      if ((await page.locator('.building-panel--open').count()) > 0) break;
-      await wait(250);
-    }
+    await waitWhileWalking(page, async () => (await page.locator('.building-panel--open').count()) > 0, 20000);
     if ((await page.locator('.building-panel--open').count()) === 0) {
       errors.push(`map64-panels: ${b.name} panel did not open`);
       continue;
