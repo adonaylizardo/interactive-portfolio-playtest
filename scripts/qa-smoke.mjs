@@ -79,7 +79,11 @@ async function firstLoad({ tag, type, options, minZoom, centred }) {
 
 let preview = null;
 if (!process.env.QA_BASE_URL) {
-  preview = spawn('npx', ['vite', 'preview', '--port', String(PREVIEW_PORT), '--strictPort'], { cwd: ROOT, stdio: 'ignore' });
+  // Run vite itself (not through npx) so killing `preview` stops the server.
+  preview = spawn(process.execPath, [path.join(ROOT, 'node_modules/vite/bin/vite.js'), 'preview', '--port', String(PREVIEW_PORT), '--strictPort'], {
+    cwd: ROOT,
+    stdio: 'ignore',
+  });
   // A stale server on the port would answer with an old build.
   preview.on('exit', (code) => {
     if (code) {
