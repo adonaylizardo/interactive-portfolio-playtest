@@ -28,19 +28,19 @@ const STEP_COPY: Record<ChecklistStepId, StepCopy> = {
   'walk-keys': {
     id: 'walk-keys',
     title: 'Camina con las teclas',
-    detailDesktop: 'Usa WASD o las flechas para mover al personaje.',
+    detailDesktop: 'Usa WASD o las flechas para mover al personaje. Camina hacia una puerta (o pulsa Enter junto a ella) para entrar.',
     detailTouch: 'Usa WASD o las flechas para mover al personaje.',
   },
   'move-camera': {
     id: 'move-camera',
     title: 'Mueve la cámara',
-    detailDesktop: 'Arrastra con el mouse para desplazar la vista.',
+    detailDesktop: 'Arrastra con el mouse o desliza con dos dedos en el trackpad para desplazar la vista.',
     detailTouch: 'Arrastra con un dedo para desplazar la vista.',
   },
   zoom: {
     id: 'zoom',
     title: 'Acerca y aleja',
-    detailDesktop: 'Usa la rueda del mouse o pellizco en trackpad.',
+    detailDesktop: 'Pellizca en el trackpad, o usa Ctrl / ⌘ + rueda del mouse.',
     detailTouch: 'Pellizca con dos dedos para acercar o alejar.',
   },
   'enter-building': {

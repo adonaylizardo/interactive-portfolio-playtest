@@ -94,6 +94,27 @@ export function getBuildingAtDoor(tx: number, ty: number): MapObject | undefined
   );
 }
 
+const DOOR_FACE_INWARD: Record<string, { x: number; y: number }> = {
+  '+x': { x: -1, y: 0 },
+  '-x': { x: 1, y: 0 },
+  '+y': { x: 0, y: -1 },
+  '-y': { x: 0, y: 1 },
+};
+
+/** Unit step from a building's access tile into its footprint (the direction that walks through the door). */
+export function doorInwardStep(o: MapObject): { x: number; y: number } | null {
+  if (!o.door) return null;
+  for (const d of [
+    { x: 1, y: 0 },
+    { x: -1, y: 0 },
+    { x: 0, y: 1 },
+    { x: 0, y: -1 },
+  ]) {
+    if (getBuildingAt(o.door.x + d.x, o.door.y + d.y) === o) return d;
+  }
+  return DOOR_FACE_INWARD[o.doorFace ?? '+y'] ?? null;
+}
+
 export function getBuildingAtDoorOrAdjacent(tx: number, ty: number): MapObject | undefined {
   return objects.find((o) => {
     if (o.type !== 'building' || !o.door) return false;

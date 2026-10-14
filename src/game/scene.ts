@@ -1,6 +1,7 @@
 import { Application, Container, Graphics, Point, Polygon, Rectangle, Sprite } from 'pixi.js';
 import {
   cells,
+  doorInwardStep,
   getBuildingAt,
   getBuildingAtDoor,
   getBuildingByName,
@@ -106,6 +107,24 @@ import {
   zoomMinForViewport,
   zoomAtScreenAnchor,
 } from './cameraControl';
+
+/**
+ * Keyboard step on a tile grid: move on both axes if the target tile is walkable, otherwise slide
+ * along whichever single axis is free (so a diagonal into a wall follows the wall).
+ */
+function slideStep(
+  x: number,
+  y: number,
+  dx: number,
+  dy: number,
+  walkable: (tx: number, ty: number) => boolean,
+): { x: number; y: number } {
+  const ok = (nx: number, ny: number) => walkable(Math.round(nx), Math.round(ny));
+  if (ok(x + dx, y + dy)) return { x: x + dx, y: y + dy };
+  if (dx !== 0 && ok(x + dx, y)) return { x: x + dx, y };
+  if (dy !== 0 && ok(x, y + dy)) return { x, y: y + dy };
+  return { x, y };
+}
 
 export type BuildingPanelBridge = {
   isOpen: () => boolean;
@@ -221,7 +240,6 @@ export class IsoScene {
   private touchOnlyPinch = false;
   private pendingBuildingEntry: { panelTitle: string; door: { x: number; y: number } } | null =
     null;
-  private lastRoundedTile = { x: INICIO[0], y: INICIO[1] };
   private tileCullEntries: { g: Container; tx: number; ty: number }[] = [];
   private pointerGestureSerial = 0;
   private pixiTapGestureSerial = -1;
@@ -302,7 +320,6 @@ export class IsoScene {
     this.buildVoidClickLayer();
     this.buildObjects();
     this.syncCharacterGraphic();
-    this.syncRoundedTileFromCharacter();
 
     const bootInteriorId = parseInteriorFromHash();
     const fromHash = parseCameraFromHash();
@@ -685,7 +702,6 @@ export class IsoScene {
       this.syncCharacterGraphic();
       const rtx = Math.round(this.charTx);
       const rty = Math.round(this.charTy);
-      this.lastRoundedTile = { x: rtx, y: rty };
       this.tryArriveAtDoorTile(rtx, rty);
     }
   }
@@ -1347,6 +1363,15 @@ export class IsoScene {
     setCameraFitMargins({ left: MAP_FIT_MARGIN_PX, right: MAP_FIT_MARGIN_PX, top: MAP_FIT_MARGIN_PX, bottom: MAP_FIT_MARGIN_PX });
   }
 
+  /** Wheel / two-finger scroll: move the view by screen pixels (content follows the fingers). */
+  private panByScreen(dx: number, dy: number): void {
+    if (dx === 0 && dy === 0) return;
+    this.cameraX += dx / this.zoom;
+    this.cameraY += dy / this.zoom;
+    this.panDragScreenPx += Math.hypot(dx, dy);
+    this.applyCamera();
+  }
+
   private setZoom(next: number, anchorScreen?: { x: number; y: number }): void {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
@@ -1693,6 +1718,9 @@ export class IsoScene {
       canvas.addEventListener(type, fn, { passive: false });
     }
 
+    const isTypingTarget = (t: EventTarget | null) =>
+      t instanceof HTMLElement &&
+      (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(t.tagName));
     window.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
       if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
@@ -1700,6 +1728,9 @@ export class IsoScene {
         e.preventDefault();
       }
       if (e.key === 'Shift') this.shiftHeld = true;
+      if ((e.key === 'Enter' || e.key === ' ') && !e.repeat && !isTypingTarget(e.target)) {
+        if (this.enterNearbyDoorFromKeyboard()) e.preventDefault();
+      }
     });
     window.addEventListener('keyup', (e) => {
       this.keys.delete(e.key.toLowerCase());
@@ -1713,14 +1744,26 @@ export class IsoScene {
         if (this.pinchGestureActive || this.zoomSource === 'pointer' || this.zoomSource === 'gesture') {
           return;
         }
-        this.zoomSource = 'wheel';
-        let dy = e.deltaY;
-        if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) dy *= 24;
-        else if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) dy *= 480;
-        const factor = e.ctrlKey ? 0.004 : 0.002;
-        const delta = -dy * factor;
-        this.setZoom(this.zoom * (1 + delta), { x: e.clientX, y: e.clientY });
-        this.zoomSource = 'none';
+        const unit =
+          e.deltaMode === WheelEvent.DOM_DELTA_LINE ? 24 : e.deltaMode === WheelEvent.DOM_DELTA_PAGE ? 480 : 1;
+        let dx = e.deltaX * unit;
+        let dy = e.deltaY * unit;
+        // Trackpad pinch arrives as ctrl+wheel; ctrl/cmd + mouse wheel zooms too. Everything else pans.
+        if (e.ctrlKey || e.metaKey) {
+          this.zoomSource = 'wheel';
+          // Pinch deltas are small and frequent; mouse notches are ~100 px.
+          const rate = Math.abs(dy) < 50 ? 1 / 100 : 1 / 450;
+          const d = Math.max(-240, Math.min(240, dy));
+          const rect = canvas.getBoundingClientRect();
+          this.setZoom(this.zoom * Math.pow(2, -d * rate), { x: e.clientX - rect.left, y: e.clientY - rect.top });
+          this.zoomSource = 'none';
+          return;
+        }
+        if (e.shiftKey && dx === 0) {
+          dx = dy;
+          dy = 0;
+        }
+        this.panByScreen(-dx, -dy);
       },
       { passive: false },
     );
@@ -1924,25 +1967,27 @@ export class IsoScene {
           this.sprint = sprint;
           this.charState = sprint ? 'sprint' : 'walk';
           const speed = (sprint ? 0.12 : 0.07) * (this.app.ticker.deltaMS / 16);
-          const ntx = this.interiorCharTx + dx * speed;
-          const nty = this.interiorCharTy + dy * speed;
-          const tx = Math.round(ntx);
-          const ty = Math.round(nty);
-          if (this.interiorGrid[ty]?.[tx]?.walkable) {
-            this.interiorCharTx = ntx;
-            this.interiorCharTy = nty;
-          }
+          const grid = this.interiorGrid;
+          const next = slideStep(
+            this.interiorCharTx,
+            this.interiorCharTy,
+            dx * speed,
+            dy * speed,
+            (x, y) => !!grid[y]?.[x]?.walkable,
+          );
+          this.interiorCharTx = next.x;
+          this.interiorCharTy = next.y;
           syncInteriorCharacter(
             this.interiorCharGfx,
             this.interiorCharTx,
             this.interiorCharTy,
             this.charState,
           );
+          const def = this.interiorDef;
           const rt = { x: Math.round(this.interiorCharTx), y: Math.round(this.interiorCharTy) };
-          if (
-            rt.x === this.interiorDef.exit.x &&
-            rt.y === this.interiorDef.exit.y
-          ) {
+          // Only stepping onto the mat toward the door leaves; crossing the mat sideways does not.
+          const towardDoor = def.exitFace === '+x' ? dx > 0 : dy > 0;
+          if (rt.x === def.exit.x && rt.y === def.exit.y && towardDoor) {
             this.exitInterior();
           }
         }
@@ -1956,26 +2001,15 @@ export class IsoScene {
         this.charState = sprint ? 'sprint' : 'walk';
         const speed = (sprint ? 0.12 : 0.07) * (this.app.ticker.deltaMS / 16);
         const tileBefore = this.roundedCharTile();
-        const ntx = this.charTx + dx * speed;
-        const nty = this.charTy + dy * speed;
-        const tx = Math.round(ntx);
-        const ty = Math.round(nty);
-        if (cells[ty]?.[tx]?.walkable) {
-          this.charTx = ntx;
-          this.charTy = nty;
-        }
+        const next = slideStep(this.charTx, this.charTy, dx * speed, dy * speed, (x, y) => !!cells[y]?.[x]?.walkable);
+        this.charTx = next.x;
+        this.charTy = next.y;
         const tileAfter = this.roundedCharTile();
         if (tileBefore.x !== tileAfter.x || tileBefore.y !== tileAfter.y) {
           this.events.onChecklist('walk-keys');
-          if (
-            tileAfter.x !== this.lastRoundedTile.x ||
-            tileAfter.y !== this.lastRoundedTile.y
-          ) {
-            this.lastRoundedTile = { x: tileAfter.x, y: tileAfter.y };
-            this.tryArriveAtDoorTile(tileAfter.x, tileAfter.y);
-          }
         }
         this.syncCharacterGraphic();
+        this.tryEnterDoorFromKeyboard(dx, dy);
       } else if (this.path.length === 0) {
         this.charState = 'idle';
         this.syncCharacterGraphic();
@@ -1995,7 +2029,6 @@ export class IsoScene {
         this.drawPathPreview();
         const tx = Math.round(this.charTx);
         const ty = Math.round(this.charTy);
-        this.lastRoundedTile = { x: tx, y: ty };
         if (this.path.length === 0) {
           this.charState = 'idle';
           this.sprint = false;
@@ -2020,10 +2053,6 @@ export class IsoScene {
     return { x: Math.round(this.charTx), y: Math.round(this.charTy) };
   }
 
-  private syncRoundedTileFromCharacter(): void {
-    this.lastRoundedTile = this.roundedCharTile();
-  }
-
   /** Enter interior only when idle on the door tile (never mid-path). */
   private tryArriveAtDoorTile(tx: number, ty: number): void {
     if (this.interiorActive) return;
@@ -2045,16 +2074,56 @@ export class IsoScene {
       tx = d.x;
       ty = d.y;
     }
-    this.pendingBuildingEntry = null;
+    this.enterBuildingFromDoor(building);
+  }
 
+  private enterBuildingFromDoor(building: MapObject): void {
+    if (!building.door || !building.panelTitle) return;
+    this.pendingBuildingEntry = null;
+    this.path = [];
+    this.drawPathPreview();
     this.doorCooldown = 120;
     this.mapReturnDoor = { x: building.door.x, y: building.door.y };
-    this.charTx = tx;
-    this.charTy = ty;
-    this.syncRoundedTileFromCharacter();
+    this.charTx = building.door.x;
+    this.charTy = building.door.y;
+    this.charState = 'idle';
     this.syncCharacterGraphic();
     this.events.onEnterBuilding(building.name, building.panelTitle);
     this.events.onChecklist('enter-building');
+  }
+
+  /** Arrow/WASD: walking onto a door's access tile toward the building, or pushing into it from there, enters. */
+  private tryEnterDoorFromKeyboard(dx: number, dy: number): void {
+    if (this.interiorActive || this.doorCooldown > 0) return;
+    const t = this.roundedCharTile();
+    const building = getBuildingAtDoor(t.x, t.y);
+    if (!building?.panelTitle) return;
+    const inward = doorInwardStep(building);
+    if (!inward || dx * inward.x + dy * inward.y <= 0) return;
+    this.enterBuildingFromDoor(building);
+  }
+
+  /** Enter / Space: on a door's access tile enters; next to one walks onto it and enters. */
+  private enterNearbyDoorFromKeyboard(): boolean {
+    if (this.interiorActive || this.doorCooldown > 0) return false;
+    const t = this.roundedCharTile();
+    const onDoor = getBuildingAtDoor(t.x, t.y);
+    if (onDoor?.panelTitle) {
+      this.enterBuildingFromDoor(onDoor);
+      return true;
+    }
+    const near = objects.find(
+      (o) =>
+        o.type === 'building' &&
+        o.panelTitle &&
+        o.door &&
+        Math.max(Math.abs(o.door.x - t.x), Math.abs(o.door.y - t.y)) === 1,
+    );
+    if (!near?.door || !near.panelTitle) return false;
+    this.requestWalk(near.door.x, near.door.y, false, {
+      buildingEntry: { panelTitle: near.panelTitle, door: near.door },
+    });
+    return true;
   }
 
   private async runFade(active: boolean): Promise<void> {
@@ -2225,7 +2294,6 @@ export class IsoScene {
       if (door) {
         this.charTx = door.x;
         this.charTy = door.y;
-        this.syncRoundedTileFromCharacter();
         this.syncCharacterGraphic();
       }
       this.restoreOutdoorCameraAfterExit(opts?.outdoorCam);
@@ -2398,7 +2466,6 @@ export class IsoScene {
     this.path = [];
     this.charTx = tx;
     this.charTy = ty;
-    this.syncRoundedTileFromCharacter();
     this.syncCharacterGraphic();
     this.drawPathPreview();
     this.centerOnCharacter(false);
