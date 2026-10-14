@@ -111,6 +111,7 @@ export class NpcCrowd {
   private seatOffsets = new Map<string, { dx: number; dy: number }>();
   private seed: number;
   private loaded = false;
+  private loading: Promise<void> | null = null;
   private enabled: boolean;
   private stillPose: boolean;
   private hidden = false;
@@ -134,8 +135,12 @@ export class NpcCrowd {
     return this.enabled;
   }
 
-  async load(): Promise<void> {
-    if (this.loaded) return;
+  load(): Promise<void> {
+    this.loading ??= this.loadStrips();
+    return this.loading;
+  }
+
+  private async loadStrips(): Promise<void> {
     const defs = manifest.npcs as ManifestNpc[];
     const base = `${import.meta.env.BASE_URL}sprites/personaje/npcs/`;
     await Promise.all(

@@ -434,7 +434,8 @@ export class IsoScene {
       },
       { enabled: npcsWanted(), seed: npcSeed(), stillPose: this.reducedMotion },
     );
-    void this.npcs.load().then(() => this.cullVisibleTiles());
+    // 300+ strips: only fetched once the crowd is on, so automated runs without ?npcs=1 skip them.
+    if (this.npcs.isEnabled()) this.loadNpcs();
     this.fillActors = new FillActors(
       this.objectsLayer,
       fill.actors,
@@ -3162,6 +3163,11 @@ export class IsoScene {
 
   qaSetNpcs(on: boolean): void {
     this.npcs.setEnabled(on);
+    if (on) this.loadNpcs();
+  }
+
+  private loadNpcs(): void {
+    void this.npcs.load().then(() => this.cullVisibleTiles());
   }
 
   qaNpcTown(): ReturnType<NpcCrowd['town']> {
