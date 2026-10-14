@@ -157,6 +157,7 @@ async function main(): Promise<void> {
     npcs: () => scene.qaNpcs(),
     setNpcs: (on: boolean) => scene.qaSetNpcs(on),
     playerAvatar: () => scene.qaPlayerAvatar(),
+    noah: () => scene.qaNoah(),
   };
 }
 

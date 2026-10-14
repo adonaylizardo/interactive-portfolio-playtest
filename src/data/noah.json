@@ -1,0 +1,232 @@
+{
+ "personaje": "noah",
+ "celda": {
+  "w": 24,
+  "h": 36
+ },
+ "unidades": "px @1x (x2 para @2x)",
+ "fps": 8,
+ "anclas": {
+  "pies": {
+   "x": 12,
+   "y": 32,
+   "nota": "en escalada es el punto virtual de los pies; colocar frame en (pos.x-12, pos.y-32)"
+  },
+  "pelvis": {
+   "x": 12,
+   "y": 23
+  },
+  "manos_en_presa_arriba": {
+   "dx": 0,
+   "dy": -24,
+   "nota": "aprox. respecto al ancla de pies"
+  }
+ },
+ "disparador": "on talk (jugador junto a Noah en inicio_idle y pulsa hablar)",
+ "animaciones": {
+  "idle": {
+   "archivo1x": "noah__idle@1x.png",
+   "archivo2x": "noah__idle@2x.png",
+   "frames": [
+    0
+   ],
+   "loop": true,
+   "vista": "se"
+  },
+  "hablar": {
+   "archivo1x": "noah__hablar@1x.png",
+   "archivo2x": "noah__hablar@2x.png",
+   "frames": [
+    0,
+    1
+   ],
+   "loop": true,
+   "vista": "se"
+  },
+  "caminar_ne": {
+   "archivo1x": "noah__caminar_ne@1x.png",
+   "archivo2x": "noah__caminar_ne@2x.png",
+   "frames": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "loop": true,
+   "vista": "back"
+  },
+  "subir": {
+   "archivo1x": "noah__subir@1x.png",
+   "archivo2x": "noah__subir@2x.png",
+   "frames": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+   ],
+   "loop": true,
+   "vista": "back"
+  },
+  "travesia_derecha": {
+   "archivo1x": "noah__travesia_derecha@1x.png",
+   "archivo2x": "noah__travesia_derecha@2x.png",
+   "frames": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "loop": true,
+   "vista": "back"
+  },
+  "bajar": {
+   "archivo1x": "noah__bajar@1x.png",
+   "archivo2x": "noah__bajar@2x.png",
+   "frames": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "loop": true,
+   "vista": "back"
+  },
+  "salto_aterrizaje": {
+   "archivo1x": "noah__salto_aterrizaje@1x.png",
+   "archivo2x": "noah__salto_aterrizaje@2x.png",
+   "frames": [
+    0,
+    1,
+    2
+   ],
+   "loop": false,
+   "vista": "back"
+  }
+ },
+ "waypoints_marco_muro": {
+  "inicio_idle": {
+   "1x": [
+    244,
+    148
+   ],
+   "2x": [
+    488,
+    296
+   ]
+  },
+  "base_muro": {
+   "1x": [
+    264,
+    138
+   ],
+   "2x": [
+    528,
+    276
+   ]
+  },
+  "presa_arriba_izq": {
+   "1x": [
+    264,
+    125
+   ],
+   "2x": [
+    528,
+    250
+   ]
+  },
+  "presa_arriba_der": {
+   "1x": [
+    298,
+    142
+   ],
+   "2x": [
+    596,
+    284
+   ]
+  },
+  "abajo_der": {
+   "1x": [
+    298,
+    149
+   ],
+   "2x": [
+    596,
+    298
+   ]
+  },
+  "aterrizaje": {
+   "1x": [
+    305,
+    160
+   ],
+   "2x": [
+    610,
+    320
+   ]
+  }
+ },
+ "secuencia": [
+  {
+   "anim": "hablar",
+   "desde": null,
+   "hasta": "inicio_idle",
+   "frames_totales": 4,
+   "duracion_s": 0.5
+  },
+  {
+   "anim": "caminar_ne",
+   "desde": "inicio_idle",
+   "hasta": "base_muro",
+   "frames_totales": 10,
+   "duracion_s": 1.25
+  },
+  {
+   "anim": "subir",
+   "desde": "base_muro",
+   "hasta": "presa_arriba_izq",
+   "frames_totales": 8,
+   "duracion_s": 1.0
+  },
+  {
+   "anim": "travesia_derecha",
+   "desde": "presa_arriba_izq",
+   "hasta": "presa_arriba_der",
+   "frames_totales": 12,
+   "duracion_s": 1.5
+  },
+  {
+   "anim": "bajar",
+   "desde": "presa_arriba_der",
+   "hasta": "abajo_der",
+   "frames_totales": 6,
+   "duracion_s": 0.75
+  },
+  {
+   "anim": "salto_aterrizaje",
+   "desde": "abajo_der",
+   "hasta": "aterrizaje",
+   "frames_totales": 3,
+   "duracion_s": 0.375
+  },
+  {
+   "anim": "idle",
+   "desde": null,
+   "hasta": "aterrizaje",
+   "frames_totales": 8,
+   "duracion_s": 1.0
+  }
+ ],
+ "profundidad": "en el muro dibujar justo después de muro-escalada; en el suelo ordenar por fila (x+y) normal",
+ "geometria_muro_principal": "cara de madera: borde superior y = 66 + 0.5*(x-200), base y = 101 + 0.5*(x-200), x 150-312 (marco @1x)",
+ "letras_NOAH": "x 195-246 aprox.; la ruta usa x >= 252 para no taparlas"
+}

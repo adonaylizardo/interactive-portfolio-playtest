@@ -111,6 +111,7 @@ import {
   smoothDampToZero,
 } from './cameraControl';
 import { NpcCrowd, type NpcSnapshot } from './npcs';
+import { Noah, type NoahSnapshot } from './noah';
 import {
   loadPlayerSheets,
   PlayerAvatar,
@@ -131,6 +132,14 @@ function tileMoveWorld(dx: number, dy: number): number {
   return Math.hypot((dx - dy) * (TILE_W / 2), (dx + dy) * (TILE_H / 2));
 }
 
+/** `?noahScale=1` draws Noah at the scale his wall route was authored for (QA comparison). */
+function noahScale(): number | undefined {
+  const raw = new URLSearchParams(location.search).get('noahScale');
+  return raw === '1' || raw === '2' ? Number(raw) : undefined;
+}
+
+/** Tiles within this distance of Noah can talk to him without walking. */
+const NOAH_TALK_RANGE = 1.6;
 
 /**
  * Keyboard step on a tile grid: move on both axes if the target tile is walkable, otherwise slide
@@ -242,6 +251,9 @@ export class IsoScene {
   private pathGfx = new Graphics();
   private avatar!: PlayerAvatar;
   private interiorAvatar!: PlayerAvatar;
+  private noah!: Noah;
+  /** Set by a tap on Noah from afar: talk to him once the walk there ends. */
+  private pendingNoahTalk = false;
   private npcs!: NpcCrowd;
   private events: SceneEvents;
   private objectGraphics = new Map<string, Container>();
@@ -411,6 +423,7 @@ export class IsoScene {
       { enabled: npcsWanted(), seed: npcSeed(), stillPose: this.reducedMotion },
     );
     void this.npcs.load().then(() => this.cullVisibleTiles());
+    this.buildNoah();
     this.syncCharacterGraphic();
 
     const bootInteriorId = parseInteriorFromHash();
@@ -724,6 +737,73 @@ export class IsoScene {
     return (Number.isFinite(zi) ? zi - 0.5 : 1_000_000) + (fx + fy) * 1e-4;
   }
 
+  private buildNoah(): void {
+    const muro = objects.find((o) => o.name === 'muro');
+    if (!muro) return;
+    const muroKey = objectSpriteKey(muro, 'default', false)!;
+    this.noah = new Noah(
+      this.objectsLayer,
+      {
+        muroTopLeft: () => objectSpriteTopLeft(muro, muroKey),
+        muroZIndex: () => this.objectVisuals.get(muro.id)?.zIndex ?? objectDepth(muro),
+        zIndexAt: (fx, fy) => this.walkerZIndex(fx, fy),
+      },
+      noahScale(),
+    );
+    this.noah.bindTap((e) => {
+      if (this.shouldBlockTap()) return;
+      e.stopPropagation();
+      this.pixiTapGestureSerial = this.pointerGestureSerial;
+      if (!this.prepareMapTap()) return;
+      this.talkToNoahOrWalkThere(this.shiftHeld);
+    });
+    void this.noah.load(this.app.renderer.resolution).then(() => this.cullVisibleTiles());
+  }
+
+  private playerNearNoah(): boolean {
+    if (!this.noah?.isLoaded() || this.interiorActive) return false;
+    const n = this.noah.tile();
+    return Math.hypot(this.charTx - n.x, this.charTy - n.y) <= NOAH_TALK_RANGE;
+  }
+
+  /** Beside Noah: he starts his climb. Farther away: walk next to him first, then talk. */
+  private talkToNoahOrWalkThere(sprint: boolean): void {
+    if (!this.noah?.isLoaded() || this.noah.busy()) return;
+    if (this.playerNearNoah() && this.path.length === 0) {
+      this.startNoahTalk();
+      return;
+    }
+    const n = this.noah.tile();
+    const spots: { x: number; y: number; d: number }[] = [];
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        const x = Math.round(n.x) + dx;
+        const y = Math.round(n.y) + dy;
+        const d = Math.hypot(x - n.x, y - n.y);
+        if (d < 0.6 || d > NOAH_TALK_RANGE || !cells[y]?.[x]?.walkable) continue;
+        // In front of him (lower on screen) first, so the player never stands over the NOAH letters.
+        spots.push({ x, y, d: d + (x + y > n.x + n.y ? 0 : 10) });
+      }
+    }
+    spots.sort((a, b) => a.d - b.d);
+    const spot = spots[0];
+    if (!spot) return;
+    this.requestWalk(spot.x, spot.y, sprint);
+    this.pendingNoahTalk = this.path.length > 0 || this.playerNearNoah();
+    if (this.path.length === 0 && this.pendingNoahTalk) {
+      this.pendingNoahTalk = false;
+      this.startNoahTalk();
+    }
+  }
+
+  private startNoahTalk(): void {
+    if (!this.noah.talk()) return;
+    const n = this.noah.tile();
+    this.avatar.setFacing(
+      (n.y + n.x >= this.charTx + this.charTy ? 's' : 'n') + (n.x - n.y >= this.charTx - this.charTy ? 'e' : 'w') as FacingDir,
+    );
+  }
+
   /** Feeds the player's foot to whichever avatar is on screen; once per tick. */
   private updateAvatars(dt: number): void {
     if (this.interiorActive) {
@@ -733,6 +813,7 @@ export class IsoScene {
     }
     const f = tileToWorld(this.charTx, this.charTy);
     this.avatar.update(f.x, f.y, dt);
+    this.noah?.update(dt);
   }
 
   /** Screen coords (canvas pixels) ↔ world coords with world scaled under a fixed camera pivot. */
@@ -762,6 +843,7 @@ export class IsoScene {
     sprint: boolean,
     opts?: { buildingEntry?: { panelTitle: string; door: { x: number; y: number } } },
   ): void {
+    this.pendingNoahTalk = false;
     const walkTx = tx;
     const walkTy = ty;
     const entry =
@@ -1282,6 +1364,7 @@ export class IsoScene {
     const maxY = Math.max(...corners.map((c) => c.y));
     const iso = this.qaIsolation;
     this.avatar?.setVisible(!iso);
+    this.noah?.setHidden(!!iso || this.interiorActive);
     this.npcs?.cull({ minX, maxX, minY, maxY }, !!iso || this.interiorActive);
     for (const { g, tx, ty } of this.tileCullEntries) {
       if (iso) {
@@ -1895,6 +1978,10 @@ export class IsoScene {
       if (e.key === 'Shift') this.shiftHeld = true;
       if ((e.key === 'Enter' || e.key === ' ') && !e.repeat && !isTypingTarget(e.target)) {
         if (this.enterNearbyDoorFromKeyboard()) e.preventDefault();
+        else if (this.playerNearNoah() && !this.noah.busy()) {
+          this.startNoahTalk();
+          e.preventDefault();
+        }
       }
     });
     window.addEventListener('keyup', (e) => {
@@ -2258,6 +2345,7 @@ export class IsoScene {
         const sprint = this.shiftHeld;
         this.sprint = sprint;
         this.charState = sprint ? 'sprint' : 'walk';
+        this.pendingNoahTalk = false;
         const tileBefore = this.roundedCharTile();
         const next = this.keyboardStep(this.charTx, this.charTy, dx, dy, sprint, (x, y) => !!cells[y]?.[x]?.walkable);
         this.charTx = next.x;
@@ -2297,6 +2385,10 @@ export class IsoScene {
           this.charState = 'idle';
           this.sprint = false;
           this.tryArriveAtDoorTile(Math.round(this.charTx), Math.round(this.charTy));
+          if (this.pendingNoahTalk) {
+            this.pendingNoahTalk = false;
+            if (this.playerNearNoah()) this.startNoahTalk();
+          }
         }
       }
       this.syncCharacterGraphic();
@@ -2991,6 +3083,18 @@ export class IsoScene {
     };
   }
 
+  qaNoah(): (NoahSnapshot & { client: { x: number; y: number } | null; talkRange: number }) | null {
+    if (!this.noah) return null;
+    const s = this.noah.snapshot();
+    const rect = this.canvasEl?.getBoundingClientRect();
+    // Middle of the body: half the drawn height above the feet.
+    const scr = this.worldToScreen(s.x, s.y - s.worldH * 0.45);
+    return {
+      ...s,
+      client: rect ? { x: rect.left + scr.x, y: rect.top + scr.y } : null,
+      talkRange: NOAH_TALK_RANGE,
+    };
+  }
   /** QA: which ground sprite each street cell uses, and its open sides (for neighbour checks). */
   qaStreetTiles(): { x: number; y: number; key: string; sides: string[] }[] {
     const out: { x: number; y: number; key: string; sides: string[] }[] = [];
