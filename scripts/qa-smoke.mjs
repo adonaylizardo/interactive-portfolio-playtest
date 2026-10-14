@@ -13,13 +13,14 @@
  *  - pixel-art player: facing from movement, frames locked to distance, ~4.5 tiles/s, Pantone one tile behind, Noah's climb (qa-run45-player.mjs)
  *  - airline case panel: headline title, full text on desktop / short on phone, client never named, scrolls (qa-run46-case.mjs)
  *  - map fill: placements clear of streets, footprints and doors, nothing over the Estudio, props block only their cells (qa-run46-fill.mjs)
+ *  - Estudio "About me": about.md line for line after the logo strip, lazy WebP photos within the panel; Noah's 1.5x tap box on phones (qa-run47-about.mjs)
  * Usage: npm run qa:smoke   (builds first; QA_BASE_URL skips the local preview server)
  */
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit, devices } from 'playwright';
-import { installReadyWait } from './qa-ready.mjs';
+import { launchBrowser } from './qa-ready.mjs';
 import { runRun38InputSuite } from './qa-run38-input.mjs';
 import { runRun41InputSuite } from './qa-run41-input.mjs';
 import { runRun42FollowSuite } from './qa-run42-follow.mjs';
@@ -28,6 +29,7 @@ import { runRun44NpcSuite } from './qa-run44-npcs.mjs';
 import { runRun45PlayerSuite } from './qa-run45-player.mjs';
 import { runRun46CaseSuite } from './qa-run46-case.mjs';
 import { runRun46FillSuite } from './qa-run46-fill.mjs';
+import { runRun47AboutSuite } from './qa-run47-about.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PREVIEW_PORT = 4194;
@@ -50,7 +52,7 @@ const FIRST_LOAD = [
 
 /** Character on screen near the middle, zoom in range, Estudio and Volaris doors in view. */
 async function firstLoad({ tag, type, options, minZoom, centred }) {
-  const browser = installReadyWait(await type.launch());
+  const browser = await launchBrowser(type);
   const ctx = await browser.newContext(options);
   const page = await ctx.newPage();
   try {
@@ -193,6 +195,11 @@ const GROUPS = {
   fill: async () => {
     for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
       await runRun46FillSuite({ kind, base: BASE, errors, notes });
+    }
+  },
+  about: async () => {
+    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-390', 'webkit-iphone']) {
+      await runRun47AboutSuite({ kind, base: BASE, errors, notes });
     }
   },
 };

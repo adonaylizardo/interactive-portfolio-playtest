@@ -44,8 +44,10 @@ jobs:
       - name: check:logos
         run: node scripts/check-logos.mjs
 
-      - name: Install Playwright Chromium
-        run: npx playwright install chromium --with-deps
+      - name: Install Playwright Chromium + Mesa llvmpipe
+        run: |
+          npx playwright install chromium --with-deps
+          sudo apt-get install -y --no-install-recommends libegl1 libgl1-mesa-dri
 
       - name: qa:sprites
         timeout-minutes: 15
@@ -70,7 +72,7 @@ jobs:
       matrix:
         groups:
           - exits-iphone
-          - exits-desktop,exits-phone
+          - exits-desktop,exits-phone,about
           - firstload,input,case,fill
           - follow,logos,npcs,player
     steps:
@@ -87,8 +89,10 @@ jobs:
       - name: npm run build
         run: npm run build
 
-      - name: Install Playwright Chromium + WebKit
-        run: npx playwright install chromium webkit --with-deps
+      - name: Install Playwright Chromium + WebKit + Mesa llvmpipe
+        run: |
+          npx playwright install chromium webkit --with-deps
+          sudo apt-get install -y --no-install-recommends libegl1 libgl1-mesa-dri
 
       - name: qa:smoke
         timeout-minutes: 24
