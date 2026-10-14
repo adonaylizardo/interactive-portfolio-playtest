@@ -1236,7 +1236,7 @@ export class IsoScene {
     const maxY = Math.max(...corners.map((c) => c.y));
     const iso = this.qaIsolation;
     this.charGfx.visible = !iso;
-    this.npcs?.cull({ minX, maxX, minY, maxY }, !!iso);
+    this.npcs?.cull({ minX, maxX, minY, maxY }, !!iso || this.interiorActive);
     for (const { g, tx, ty } of this.tileCullEntries) {
       if (iso) {
         g.visible = iso.has(`tile:${tx},${ty}`);
@@ -2421,6 +2421,7 @@ export class IsoScene {
       this.drawPathPreview();
       this.tilesLayer.visible = false;
       this.objectsLayer.visible = false;
+      this.cullVisibleTiles();
       this.pathLayer.visible = false;
       this.characterLayer.visible = false;
       this.interiorLayer.visible = true;
@@ -2501,6 +2502,7 @@ export class IsoScene {
       this.interiorPath = [];
       this.tilesLayer.visible = true;
       this.objectsLayer.visible = true;
+      this.cullVisibleTiles();
       this.pathLayer.visible = true;
       this.characterLayer.visible = true;
       this.interiorLayer.visible = false;
