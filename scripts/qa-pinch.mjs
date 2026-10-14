@@ -576,6 +576,8 @@ async function wheelSweep(page, name, errors) {
   assertFrameMetrics(name, prev, errors, 'wheel-start');
   assertFootAnchor(name, await readFootDriftPx(page), errors, 'wheel-start');
 
+  // Plain wheel pans; ctrl+wheel is the trackpad pinch / zoom gesture.
+  await page.keyboard.down('Control');
   for (let i = 0; i < 28; i++) {
     await page.mouse.wheel(0, -80);
     await wait(35);
@@ -599,6 +601,7 @@ async function wheelSweep(page, name, errors) {
     }
     prev = next;
   }
+  await page.keyboard.up('Control');
 
   const zMin = Number.isFinite(prev?.zoomMin) ? prev.zoomMin : zoomMinForViewportJs(canvas.width, canvas.height);
   if (prev && Math.abs(prev.zoom - zMin) > 0.02) {
@@ -610,12 +613,14 @@ async function wheelOutToMinZoom(page, canvas) {
   const cx = canvas.x + canvas.width / 2;
   const cy = canvas.y + canvas.height / 2;
   await page.mouse.move(cx, cy);
+  await page.keyboard.down('Control');
   for (let i = 0; i < 48; i++) {
     const m = await readCanvasMetrics(page);
     if (m && Number.isFinite(m.zoomMin) && Math.abs(m.zoom - m.zoomMin) < 0.003) break;
     await page.mouse.wheel(0, 120);
     await wait(25);
   }
+  await page.keyboard.up('Control');
   await wait(200);
 }
 

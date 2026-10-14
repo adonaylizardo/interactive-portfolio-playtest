@@ -174,6 +174,7 @@ async function main() {
     if (canvasBox) {
       await desktop.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
     }
+    await desktop.keyboard.down('Control');
     for (let i = 0; i < 18; i++) {
       await desktop.mouse.wheel(0, 160);
       await wait(50);
@@ -188,6 +189,7 @@ async function main() {
       }
       zoom = await readZoom(desktop);
     }
+    await desktop.keyboard.up('Control');
     if (zoom > 0.28) errors.push(`desktop: far zoom not reached via wheel (${zoom})`);
     await desktop.screenshot({ path: path.join(outDir, 'desktop-far-zoom.png') });
 

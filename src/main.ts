@@ -1,5 +1,6 @@
 import { ChecklistUI } from './checklist/ui';
 import {
+  doorInwardStep,
   getBuildingByName,
   getBuildingDoorTiles,
   getEnterableBuildings,
@@ -93,11 +94,13 @@ async function main(): Promise<void> {
         panelTitle: o.panelTitle ?? '',
         door: o.door,
         doorFace: o.doorFace ?? '+y',
+        inward: doorInwardStep(o),
       })),
     inicio: INICIO,
     mapTramos: MAP_TRAMOS,
     findPath,
     getCharacterTile: () => scene.getCharacterTile(),
+    getCharacterPos: () => scene.getCharacterPosForQa(),
     setCharacterTile: (x: number, y: number) => scene.setCharacterTileForQa(x, y),
     walkToBuilding: (name: string) => scene.walkToBuildingForQa(name),
     doorScreenPoint: (name: string) => scene.getDoorScreenClientPoint(name),
@@ -125,6 +128,7 @@ async function main(): Promise<void> {
       scene.getInteriorTileScreenClientPoint(tx, ty, liftPx),
     interiorForwardScreenPoint: () => scene.getInteriorForwardScreenPoint(),
     interiorCharTile: () => scene.getInteriorCharTile(),
+    interiorWalk: () => scene.getInteriorWalkForQa(),
     interiorLayout: () => scene.getInteriorLayoutForQa(),
     interiorPixelProbes: () => scene.getInteriorPixelProbesClient(),
     tapInteriorTile: (tx: number, ty: number) => scene.tapInteriorTileForQa(tx, ty),

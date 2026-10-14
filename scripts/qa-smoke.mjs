@@ -5,6 +5,8 @@
  *  - a door tap walks there and enters only on arrival
  *  - one tap on the exit mat or the door gap leaves each of the 9 rooms without walking first
  *    (<= 700 ms in-page, or <= 6 rendered frames and 1.5 s on software-GL runners)
+ *  - LOD: detailed (cerca) sprites at every first load; lejos only in the last ×2 of zoom-out
+ *  - keyboard door entry, wheel pan / pinch zoom, Sambil + Flor tap feel (qa-run41-input.mjs)
  * Usage: npm run qa:smoke   (builds first; QA_BASE_URL skips the local preview server)
  */
 import { spawn } from 'node:child_process';
@@ -13,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium, webkit, devices } from 'playwright';
 import { installReadyWait } from './qa-ready.mjs';
 import { runRun38InputSuite } from './qa-run38-input.mjs';
+import { runRun41InputSuite } from './qa-run41-input.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PREVIEW_PORT = 4194;
@@ -48,6 +51,9 @@ async function firstLoad({ tag, type, options, minZoom, centred }) {
       const foot = qa.worldToClient((t.x - t.y) * 64, (t.x + t.y) * 32 + 32);
       return {
         zoom: Number(d.zoom),
+        zoomMin: Number(d.zoomMin),
+        lod: d.lod,
+        lodBelow: Number(d.lodBelow),
         w: innerWidth,
         h: innerHeight,
         tile: t,
@@ -71,7 +77,21 @@ async function firstLoad({ tag, type, options, minZoom, centred }) {
         errors.push(`firstload-${tag}: ${key} door not in view ${JSON.stringify(pt)}`);
       }
     }
-    notes.push(`firstload ${tag}: zoom ${m.zoom.toFixed(3)}, character tile ${m.tile.x},${m.tile.y} at ${Math.round(m.foot.x)},${Math.round(m.foot.y)}`);
+    if (m.lod !== 'cerca') errors.push(`firstload-${tag}: loads with ${m.lod} sprites at zoom ${m.zoom.toFixed(3)} (want cerca)`);
+    if (!(m.lodBelow <= 0.25 + 1e-9 && m.lodBelow <= m.zoomMin * 2 + 1e-9)) {
+      errors.push(`firstload-${tag}: lejos threshold ${m.lodBelow} is not within the last ×2 of zoom-out (min ${m.zoomMin})`);
+    }
+    const lodAt = async (z) => {
+      await page.evaluate((zz) => window.__playtestQa.setZoom(zz), z);
+      await wait(250);
+      return page.evaluate(() => document.getElementById('game-canvas')?.dataset.lod);
+    };
+    const mid = Math.sqrt(m.zoom * m.zoomMin);
+    for (const [z, want] of [[mid, 'cerca'], [m.lodBelow * 1.04, 'cerca'], [m.lodBelow * 0.96, 'lejos'], [m.zoomMin, 'lejos']]) {
+      const got = await lodAt(z);
+      if (got !== want) errors.push(`firstload-${tag}: zoom ${z.toFixed(3)} shows ${got} (want ${want}; lejos below ${m.lodBelow.toFixed(3)})`);
+    }
+    notes.push(`firstload ${tag}: zoom ${m.zoom.toFixed(3)} (${m.lod}, lejos below ${m.lodBelow.toFixed(3)}, min ${m.zoomMin.toFixed(3)}), character tile ${m.tile.x},${m.tile.y} at ${Math.round(m.foot.x)},${Math.round(m.foot.y)}`);
   } finally {
     await ctx.close();
     await browser.close();
@@ -115,6 +135,13 @@ try {
     const only = kind === 'chromium-phone' ? ['exit'] : ['exit', 'door'];
     await runRun38InputSuite({ kind, base: BASE, errors, only });
     notes.push(`${kind}: ${only.join(' + ')} ${errors.length === before ? 'ok' : `${errors.length - before} failure(s)`}`);
+  }
+  for (const [kind, only] of [
+    ['chromium-1280', ['keys', 'wheel', 'interior']],
+    ['webkit-1280', ['keys', 'wheel']],
+    ['chromium-375', ['interior']],
+  ]) {
+    await runRun41InputSuite({ kind, base: BASE, errors, notes, only });
   }
 } finally {
   preview?.kill('SIGKILL');

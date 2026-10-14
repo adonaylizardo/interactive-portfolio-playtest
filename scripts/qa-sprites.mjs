@@ -235,8 +235,19 @@ async function diffSprite(page, { key, tlx, tly, zoom, id, state }) {
   if (bad.length > allowed) fail(`pixel: ${key} ${bad.length}/${pr.length} probes off: ${bad.slice(0, 3).join(' | ')}`);
 }
 
+/** A zoom inside this viewport's lejos band (the scene switches below `data-lod-below`). */
+async function lejosZoom(page) {
+  const z = await page.evaluate(() => {
+    const d = document.getElementById('game-canvas').dataset;
+    return (Number(d.lodBelow) + Number(d.zoomMin)) / 2;
+  });
+  if (!(z > 0)) fail('lod: canvas has no data-lod-below / data-zoom-min');
+  return z;
+}
+
 async function pixelDiffMap(page) {
   await page.evaluate(() => window.__playtestQa.loadAllSprites());
+  const LEJOS_Z = await lejosZoom(page);
   const instances = await page.evaluate(() => window.__playtestQa.spriteInstances());
   const covered = new Set();
   const seenKey = new Set();
@@ -262,7 +273,7 @@ async function pixelDiffMap(page) {
           key,
           tlx: sx - A[key].vfs.x,
           tly: sy - A[key].vfs.y,
-          zoom: lod === 'cerca' || !probes[key]?.length ? 1 : 0.3,
+          zoom: lod === 'cerca' || !probes[key]?.length ? 1 : LEJOS_Z,
           id: inst.id,
           state,
         });
@@ -280,7 +291,7 @@ async function pixelDiffMap(page) {
       key,
       tlx: -A[key].vfs.x,
       tly: -A[key].vfs.y,
-      zoom: key.endsWith('/lejos') && probes[key]?.length ? 0.3 : 1,
+      zoom: key.endsWith('/lejos') && probes[key]?.length ? LEJOS_Z : 1,
     });
     covered.add(key);
   }
@@ -855,10 +866,12 @@ async function interiorChecks(browser) {
       if (layout.exit.x !== exit.x || layout.exit.y !== exit.y) fail(`interior ${c}: exit ${layout.exit.x},${layout.exit.y} != mask S ${exit.x},${exit.y}`);
       if (!got.has(`${exit.x},${exit.y}`)) fail(`interior ${c}: exit mat tile is not walkable`);
 
-      for (const [label, zoom] of [['cerca', null], ['lejos', 0.3]]) {
+      for (const [label, zoom] of [['cerca', null], ['lejos', await lejosZoom(page)]]) {
         if (zoom) {
           await page.evaluate((z) => window.__playtestQa.frameWorld(0, 0, z), zoom);
           await wait(120);
+          const lod = await page.evaluate(() => document.getElementById('game-canvas').dataset.lod);
+          if (lod !== 'lejos') fail(`interior ${c}: zoom ${zoom.toFixed(3)} should be in the lejos band but shows ${lod}`);
         }
         const pr = await page.evaluate(() => window.__playtestQa.interiorPixelProbes());
         if (!pr.length) {
@@ -952,7 +965,7 @@ async function shots(browser) {
     await page.evaluate(() => window.__playtestQa.setCharacterTile(17, 36));
     for (const [name, x, y, z] of [
       ['obelisco', -1344, 1480, 1.0],
-      ['obelisco-lejos', -1344, 1480, 0.3],
+      ['obelisco-lejos', -1344, 1480, await lejosZoom(page)],
       ['calles', -1344, 1700, 0.8],
     ]) {
       await page.evaluate(([a, b, zz]) => window.__playtestQa.frameWorld(a, b, zz), [x, y, z]);

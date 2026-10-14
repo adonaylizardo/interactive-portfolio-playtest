@@ -2435,6 +2435,10 @@ export class IsoScene {
     return { x: Math.round(this.charTx), y: Math.round(this.charTy) };
   }
 
+  getCharacterPosForQa(): { x: number; y: number } {
+    return { x: this.charTx, y: this.charTy };
+  }
+
   /** Same code path as a tap on the drawn door (QA / Playwright). */
   tapBuildingDoor(name: string): boolean {
     const client = this.getDoorScreenClientPoint(name);
@@ -2572,6 +2576,11 @@ export class IsoScene {
   getInteriorCharTile(): { x: number; y: number } | null {
     if (!this.interiorActive) return null;
     return { x: Math.round(this.interiorCharTx), y: Math.round(this.interiorCharTy) };
+  }
+
+  getInteriorWalkForQa(): { pos: { x: number; y: number }; path: { x: number; y: number }[] } | null {
+    if (!this.interiorActive) return null;
+    return { pos: { x: this.interiorCharTx, y: this.interiorCharTy }, path: this.interiorPath.map((p) => ({ ...p })) };
   }
 
   getInteriorForwardScreenPoint(): { x: number; y: number } | null {
