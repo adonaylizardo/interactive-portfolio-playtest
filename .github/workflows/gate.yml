@@ -1,8 +1,10 @@
 name: Gate
 
-# Fast checks (~15 min wall clock) that must pass before anything is deployed:
-# build, typecheck, sprite placement / picking / interiors, and the real-input smoke
-# (first load framing, door entry, single-tap exits) on Chromium and WebKit.
+# Fast checks that must pass before anything is deployed: build, typecheck, sprite
+# placement / picking / interiors, and the real-input smoke (first load framing, door
+# entry, single-tap exits, input, camera follow, logos, NPCs, player, case panel, map
+# fill) on Chromium and WebKit. Each suite runs as parallel shards so every job stays
+# well inside its timeout (~12 min wall clock); `gate passed` is the single check to require.
 on:
   workflow_call:
 
@@ -11,9 +13,17 @@ permissions:
 
 jobs:
   sprites:
-    name: build + typecheck + qa:sprites
+    name: qa:sprites (${{ matrix.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: map + pixel diff + shots
+            parts: placement,picks,map,diff,shots
+          - name: interiors
+            parts: interiors
     steps:
       - uses: actions/checkout@v4
 
@@ -39,10 +49,12 @@ jobs:
 
       - name: qa:sprites
         timeout-minutes: 15
+        env:
+          QA_SPRITES_ONLY: ${{ matrix.parts }}
         run: node scripts/qa-sprites.mjs --shots
 
       - name: Upload sprite shots
-        if: always()
+        if: always() && contains(matrix.parts, 'shots')
         uses: actions/upload-artifact@v4
         with:
           name: gate-sprites-${{ github.run_id }}
@@ -50,9 +62,17 @@ jobs:
           if-no-files-found: warn
 
   smoke:
-    name: real-input smoke (Chromium + WebKit)
+    name: qa:smoke (${{ matrix.groups }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        groups:
+          - exits-iphone
+          - exits-desktop,exits-phone
+          - firstload,input,case,fill
+          - follow,logos,npcs,player
     steps:
       - uses: actions/checkout@v4
 
@@ -72,4 +92,17 @@ jobs:
 
       - name: qa:smoke
         timeout-minutes: 24
+        env:
+          QA_SMOKE_ONLY: ${{ matrix.groups }}
         run: node scripts/qa-smoke.mjs
+
+  result:
+    name: gate passed
+    needs: [sprites, smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: every shard passed
+        run: |
+          echo "sprites: ${{ needs.sprites.result }}, smoke: ${{ needs.smoke.result }}"
+          test "${{ needs.sprites.result }}" = success && test "${{ needs.smoke.result }}" = success
