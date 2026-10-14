@@ -45,7 +45,7 @@ function patchContext(ctx) {
   return ctx;
 }
 
-export function installReadyWait(browser) {
+function installReadyWait(browser) {
   const newContext = browser.newContext.bind(browser);
   const newPage = browser.newPage.bind(browser);
   browser.newContext = async (...a) => patchContext(await newContext(...a));
@@ -55,4 +55,17 @@ export function installReadyWait(browser) {
     return p;
   };
   return browser;
+}
+
+/**
+ * Chromium's default software GL (SwiftShader) draws the map at ~4 fps on CI runners, far below the
+ * frame rates the walk / animation / follow timings assume. Mesa llvmpipe through ANGLE's GL backend
+ * is ~3.5x faster on the same CPU (needs Mesa's EGL/GL drivers installed). QA_GL=swiftshader opts out.
+ */
+const CHROMIUM_GL_ARGS = process.env.QA_GL === 'swiftshader' ? [] : ['--use-angle=gl', '--ignore-gpu-blocklist'];
+
+/** Launches a Playwright browser type with the QA GL backend and the QA-hook readiness wait. */
+export async function launchBrowser(type, options = {}) {
+  const args = type.name() === 'chromium' ? [...CHROMIUM_GL_ARGS, ...(options.args ?? [])] : options.args;
+  return installReadyWait(await type.launch({ ...options, args }));
 }

@@ -8,7 +8,7 @@
  *    and long walks are a few straight segments instead of a grid staircase
  */
 import { chromium, webkit } from 'playwright';
-import { installReadyWait } from './qa-ready.mjs';
+import { launchBrowser } from './qa-ready.mjs';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -410,7 +410,7 @@ async function testInteriorFeel(ctx, kind, base, errors, notes) {
  */
 export async function runRun41InputSuite({ kind, base, errors, notes, only }) {
   const spec = RUN41_KINDS[kind];
-  const browser = installReadyWait(await spec.type.launch());
+  const browser = await launchBrowser(spec.type);
   const ctx = await browser.newContext(spec.options);
   // QA_CPU_THROTTLE=8 slows Chromium pages to software-GL runner frame times to reproduce CI.
   const throttle = Number(process.env.QA_CPU_THROTTLE);

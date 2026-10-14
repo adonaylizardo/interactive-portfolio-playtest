@@ -13,7 +13,7 @@
  */
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { installReadyWait } from './qa-ready.mjs';
+import { launchBrowser } from './qa-ready.mjs';
 import { armExitTimer, readExitTimer, exitIsImmediate, describeExit } from './qa-exit-timer.mjs';
 import { PNG } from 'pngjs';
 import fs from 'node:fs';
@@ -1029,10 +1029,16 @@ async function part(name, fn) {
   console.log(`qa-sprites: ${name} ${((Date.now() - t) / 1000).toFixed(0)} s`);
 }
 
-const browser = installReadyWait(await chromium.launch());
+const browser = await launchBrowser(chromium);
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
   await openMap(page);
+  const gl = await page.evaluate(() => {
+    const ctx = document.createElement('canvas').getContext('webgl2');
+    const info = ctx?.getExtension('WEBGL_debug_renderer_info');
+    return info ? ctx.getParameter(info.UNMASKED_RENDERER_WEBGL) : 'no WebGL2';
+  });
+  console.log(`qa-sprites: WebGL renderer ${gl}`);
   if (want('placement')) await part('placement', () => placementChecks(page));
   if (want('picks')) await part('picks', () => pickChecks(page));
   if (want('map')) await part('map', () => mapChecks(page));

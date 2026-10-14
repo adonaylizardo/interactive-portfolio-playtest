@@ -4,7 +4,7 @@
  * door entry only on arrival, and near-edge taps.
  */
 import { chromium, webkit, devices } from 'playwright';
-import { installReadyWait } from './qa-ready.mjs';
+import { launchBrowser } from './qa-ready.mjs';
 import { armExitTimer, readExitTimer, exitIsImmediate, describeExit } from './qa-exit-timer.mjs';
 
 const ROOMS = (process.env.R38_ROOMS ? process.env.R38_ROOMS.split(',') : ['estudio', 'volaris', 'bain', 'mentoria', 'finoa', 'pg', 'sambil', 'catedral', 'flor']);
@@ -362,7 +362,7 @@ async function testNearTaps(ctx, kind, base, errors) {
  */
 export async function runRun38InputSuite({ kind, base, errors, only }) {
   const spec = RUN38_KINDS[kind];
-  const browser = installReadyWait(await spec.type.launch());
+  const browser = await launchBrowser(spec.type);
   const ctx = await browser.newContext(spec.options);
   const want = (n) => !only || only.includes(n);
   try {

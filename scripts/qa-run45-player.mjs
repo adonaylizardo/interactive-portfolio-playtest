@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright';
-import { installReadyWait } from './qa-ready.mjs';
+import { launchBrowser } from './qa-ready.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -380,7 +380,7 @@ async function noahChecks(page, spec, tag, errors, shots, kind) {
 export async function runRun45PlayerSuite({ kind, base, errors, notes, shots }) {
   const spec = RUN45_KINDS[kind];
   const tag = `run45-${kind}-player`;
-  const browser = installReadyWait(await spec.type.launch());
+  const browser = await launchBrowser(spec.type);
   try {
     const ctx = await browser.newContext(spec.options);
     const page = await ctx.newPage();

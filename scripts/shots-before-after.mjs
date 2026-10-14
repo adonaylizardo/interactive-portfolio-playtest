@@ -11,7 +11,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { installReadyWait } from './qa-ready.mjs';
+import { launchBrowser } from './qa-ready.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'artifacts', 'run39');
@@ -44,7 +44,7 @@ const VIEWS = [
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const hashFor = (cx, cy, z) => `#view=x=${(-cx).toFixed(1)}&y=${(-cy).toFixed(1)}&z=${z.toFixed(3)}`;
 
-const browser = installReadyWait(await chromium.launch());
+const browser = await launchBrowser(chromium);
 try {
   for (const [label, base] of [['before', beforeBase], ['after', afterBase]]) {
     fs.mkdirSync(path.join(OUT, label), { recursive: true });

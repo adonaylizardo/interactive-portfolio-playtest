@@ -11,7 +11,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright';
-import { installReadyWait } from './qa-ready.mjs';
+import { launchBrowser } from './qa-ready.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -398,7 +398,7 @@ async function testZoomWhileWalking(page, kind, errors, notes, cdp) {
  */
 export async function runRun42FollowSuite({ kind, base, errors, notes, only, video }) {
   const spec = RUN42_KINDS[kind];
-  const browser = installReadyWait(await spec.type.launch());
+  const browser = await launchBrowser(spec.type);
   const ctx = await browser.newContext({
     ...spec.options,
     ...(video ? { recordVideo: { dir: video, size: spec.options.viewport } } : {}),

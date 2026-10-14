@@ -1,4 +1,4 @@
-import { installReadyWait } from './qa-ready.mjs';
+import { launchBrowser } from './qa-ready.mjs';
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { runRun38InputSuite } from './qa-run38-input.mjs';
@@ -4064,7 +4064,7 @@ async function main() {
   const errors = [];
   const warnings = [];
   const routeReport = {};
-  const browser = installReadyWait(await chromium.launch());
+  const browser = await launchBrowser(chromium);
 
   try {
     const desktop = await browser.newPage({ viewport: { width: 1440, height: 900 } });

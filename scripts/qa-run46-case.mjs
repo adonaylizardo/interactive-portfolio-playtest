@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit, devices } from 'playwright';
-import { installReadyWait } from './qa-ready.mjs';
+import { launchBrowser } from './qa-ready.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -115,7 +115,7 @@ function compare(tag, got, want, errors) {
 export async function runRun46CaseSuite({ kind, base, errors, notes, shots }) {
   const spec = RUN46_KINDS[kind];
   const tag = `run46-${kind}-case`;
-  const browser = installReadyWait(await spec.type.launch());
+  const browser = await launchBrowser(spec.type);
   const ctx = await browser.newContext(spec.options);
   const page = await ctx.newPage();
   try {

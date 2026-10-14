@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright';
-import { installReadyWait } from './qa-ready.mjs';
+import { launchBrowser } from './qa-ready.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -185,7 +185,7 @@ async function tapThroughNpc(page, spec, tag, errors) {
 export async function runRun44NpcSuite({ kind, base, errors, notes, shots }) {
   const spec = RUN44_KINDS[kind];
   const tag = `run44-${kind}-npcs`;
-  const browser = installReadyWait(await spec.type.launch());
+  const browser = await launchBrowser(spec.type);
   try {
     const ctx = await browser.newContext(spec.options);
     const page = await ctx.newPage();
