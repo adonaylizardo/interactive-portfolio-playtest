@@ -70,9 +70,10 @@ function withQuery(base, q) {
   return u.toString();
 }
 
-async function openMap(page, url) {
+/** Without ?npcs=1 (`crowd` false) the strips are never fetched, so only the QA hooks are awaited. */
+async function openMap(page, url, crowd = true) {
   await page.goto(url, { waitUntil: 'networkidle' });
-  await page.waitForFunction(() => window.__playtestQa?.npcs?.().loaded, null, { timeout: 30000 });
+  await page.waitForFunction((c) => (c ? window.__playtestQa?.npcs?.().loaded : window.__playtestQa?.npcs), crowd, { timeout: 30000 });
   await wait(300);
 }
 
@@ -362,9 +363,14 @@ export async function runRun44NpcSuite({ kind, base, errors, notes, shots }) {
 
     const plainCtx = await browser.newContext(spec.options);
     const plain = await plainCtx.newPage();
-    await openMap(plain, base);
+    const fetched = [];
+    plain.on('request', (r) => {
+      if (r.url().includes('/sprites/personaje/npcs/')) fetched.push(r.url());
+    });
+    await openMap(plain, base, false);
     const off = await qa(plain, () => window.__playtestQa.npcs());
     if (off.enabled || off.npcs.some((n) => n.visible)) errors.push(`${tag}: automated browser without ?npcs=1 shows NPCs`);
+    if (fetched.length) errors.push(`${tag}: without ?npcs=1 the page still fetched ${fetched.length} NPC strip(s)`);
     await plainCtx.close();
 
     if (!spec.light) {
