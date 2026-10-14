@@ -1716,7 +1716,31 @@ export class IsoScene {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     const next = cameraFromPinchSession(this.pinchSession, dist, mid, sw, sh);
-    if (next) this.applyPinchCamera(next);
+    if (!next) return;
+    this.applyPinchCamera(next);
+    if (this.follow.engaged) {
+      // Follow zoomed about the character, not the fingers: restart the gesture from here so
+      // the pinch carries on smoothly if the walk ends before the fingers lift.
+      this.pinchSession = {
+        startDist: dist,
+        startZoom: this.zoom,
+        startCamX: this.cameraX,
+        startCamY: this.cameraY,
+        startMid: mid,
+      };
+    }
+  }
+
+  /** Follow moved the camera mid-gesture: move the gesture baselines with it. */
+  private shiftGestureBaselines(dx: number, dy: number): void {
+    if (this.pinchSession) {
+      this.pinchSession.startCamX += dx;
+      this.pinchSession.startCamY += dy;
+    }
+    if (this.webkitGestureSession) {
+      this.webkitGestureSession.startCamX += dx;
+      this.webkitGestureSession.startCamY += dy;
+    }
   }
 
   private bindInput(): void {
@@ -1788,6 +1812,15 @@ export class IsoScene {
       );
       next = stabilizeCameraAfterGesture(next, sw, sh);
       this.applyPinchCamera(next);
+      if (this.follow.engaged) {
+        this.webkitGestureSession = {
+          startScale: ge.scale || 1,
+          startZoom: this.zoom,
+          startCamX: this.cameraX,
+          startCamY: this.cameraY,
+          anchor,
+        };
+      }
     };
 
     const onGestureEnd = (e: Event) => {
@@ -2117,6 +2150,7 @@ export class IsoScene {
     this.cameraX = wantX;
     this.cameraY = wantY;
     this.applyCamera(false);
+    this.shiftGestureBaselines(this.cameraX - camBeforeX, this.cameraY - camBeforeY);
     // Map / room bounds held the camera back: drop the spring's speed on that axis (no wind-up).
     const heldX = Math.abs(this.cameraX - wantX) > 0.01;
     const heldY = Math.abs(this.cameraY - wantY) > 0.01;
