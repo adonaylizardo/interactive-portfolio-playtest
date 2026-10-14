@@ -230,9 +230,9 @@ async function routinesLive(page, spec, kind, tag, errors, shots) {
     }
     inside = npcs.filter((n) => n.inside);
     for (const n of inside) if (n.visible) errors.push(`${tag}: ${n.id} is inside ${n.task.replace('inside ', '')} but drawn`);
-    lines = town.owners.carts.map((l) => l.filter(Boolean).length);
+    lines = town.carts.map((c) => inLine.filter((n) => c.slots.some((q) => q.x === n.tx && q.y === n.ty)).length);
     if (lines.reduce((a, b) => a + b, 0) >= 2) break;
-    if (snap === 5) errors.push(`${tag}: cart lines never held 2+ people between 150 and 200 s (last ${lines.join('+')})`);
+    if (snap === 5) errors.push(`${tag}: nobody stood 2+ deep at the carts between 150 and 200 s (last ${lines.join('+')})`);
   }
   if (shots) {
     const frame = async (name, c, z) => {
@@ -242,7 +242,8 @@ async function routinesLive(page, spec, kind, tag, errors, shots) {
     };
     const z = spec.touch ? 0.9 : 1.2;
     await frame('mirador', { x: 52, y: 37 }, z);
-    await frame('carts', { x: 30, y: 39 }, z);
+    // Desktop: both carts, the cachapas line clear of the tutorial card; phones: the cachapas line.
+    await frame('carts', spec.touch ? { x: 28, y: 40 } : { x: 29.2, y: 40.1 }, spec.touch ? z : 1);
     const bench = sitters[0] && town.benches.find((x) => x.front.x === sitters[0].tx && x.front.y === sitters[0].ty);
     if (bench) await frame('bench', bench.front, z);
   }
