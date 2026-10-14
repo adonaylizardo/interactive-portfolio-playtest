@@ -6,7 +6,7 @@
  *    alone on the canvas and compared with the probe colours measured from the PNG
  *  - map data: street variants vs neighbours, door faces vs manifest `puerta.verificacion`,
  *    obelisco collision strip from the manifest `colision`
- *  - case interiors: walk grid == `mascara_caminable`, exit mat walkable, probes at cerca + lejos
+ *  - case interiors: walk grid == `mascara_caminable`, exit mat walkable, cerca probes down to room min zoom
  *  - `--shots`: writes artifacts/run39 screenshots (case interiors desktop + 375, exteriors)
  *
  * Usage: npm run qa:sprites [-- --shots]   (builds first; QA_BASE_URL skips the local preview server)
@@ -866,12 +866,13 @@ async function interiorChecks(browser) {
       if (layout.exit.x !== exit.x || layout.exit.y !== exit.y) fail(`interior ${c}: exit ${layout.exit.x},${layout.exit.y} != mask S ${exit.x},${exit.y}`);
       if (!got.has(`${exit.x},${exit.y}`)) fail(`interior ${c}: exit mat tile is not walkable`);
 
-      for (const [label, zoom] of [['cerca', null], ['lejos', await lejosZoom(page)]]) {
+      // Rooms clamp zoom to fit the room, which sits above the lejos band: detail at every zoom.
+      for (const [label, zoom] of [['cerca', null], ['min-zoom', 0.01]]) {
         if (zoom) {
           await page.evaluate((z) => window.__playtestQa.frameWorld(0, 0, z), zoom);
           await wait(120);
-          const lod = await page.evaluate(() => document.getElementById('game-canvas').dataset.lod);
-          if (lod !== 'lejos') fail(`interior ${c}: zoom ${zoom.toFixed(3)} should be in the lejos band but shows ${lod}`);
+          const d = await page.evaluate(() => ({ ...document.getElementById('game-canvas').dataset }));
+          if (d.lod !== 'cerca') fail(`interior ${c}: room min zoom ${Number(d.zoom).toFixed(3)} shows ${d.lod} (want cerca)`);
         }
         const pr = await page.evaluate(() => window.__playtestQa.interiorPixelProbes());
         if (!pr.length) {
@@ -890,7 +891,7 @@ async function interiorChecks(browser) {
       await page.evaluate(() => window.__playtestQa.exitInterior());
       await wait(300);
     }
-    notes.push(`interiors: ${CASES.join(', ')} walk grid == mascara_caminable; ${Object.keys(ART_ROOMS).join(', ')} == interior-rooms.json (all free cells reach the exit); exit mat walkable, probes cerca + lejos`);
+    notes.push(`interiors: ${CASES.join(', ')} walk grid == mascara_caminable; ${Object.keys(ART_ROOMS).join(', ')} == interior-rooms.json (all free cells reach the exit); exit mat walkable, cerca probes at default and room min zoom`);
 
     // Estudio noche: dark floor, amber only on lights (windows, monitor, lamp).
     await openMap(page);
