@@ -4,8 +4,9 @@
  *  - all 20 NPCs spawn, each on its own street tile, and only ever step onto street tiles
  *  - walking uses the facing's strip (walk_se / sw / ne / nw) and covers all four directions;
  *    some NPCs pause on the idle strip and set off again
- *  - feet do not skate: each walk frame moves exactly one stride (2 or 4 px in x, half in y) along
- *    the facing, on integer pixels, at ~10 fps
+ *  - characters draw at 2 world px per sheet px (64×100 world px cells) with nearest filtering
+ *  - feet do not skate: each walk frame moves exactly one stride (4 or 8 world px in x, half in y)
+ *    along the facing, on integer pixels, at ~10 fps
  *  - start frames differ, so the crowd does not walk in step
  *  - a tap on an NPC goes through to the map (the player walks); NPCs hide in interiors and under
  *    QA sprite isolation; automated browsers get no NPCs unless `?npcs=1`; reduced motion stands
@@ -156,7 +157,7 @@ async function tapThroughNpc(page, spec, tag, errors) {
     await qa(page, ([x, y, z]) => window.__playtestQa.frameWorld(x, y - 20, z), [n.x, n.y, spec.zoom]);
     await wait(80);
     const live = (await qa(page, () => window.__playtestQa.npcs().npcs)).find((s) => s.id === n.id);
-    const pt = await qa(page, ([x, y]) => window.__playtestQa.worldToClient(x, y - 22), [live.x, live.y]);
+    const pt = await qa(page, ([x, y]) => window.__playtestQa.worldToClient(x, y - 45), [live.x, live.y]);
     const onCanvas = await qa(page, ([x, y]) => document.elementFromPoint(x, y)?.id === 'game-canvas', [pt.x, pt.y]);
     if (!onCanvas) continue;
     await qa(page, () => {
@@ -192,6 +193,11 @@ export async function runRun44NpcSuite({ kind, base, errors, notes, shots }) {
     const first = await qa(page, () => window.__playtestQa.npcs());
     if (!first.enabled) errors.push(`${tag}: ?npcs=1 did not enable the crowd`);
     if (first.npcs.length !== NPC_COUNT) errors.push(`${tag}: ${first.npcs.length}/${NPC_COUNT} NPCs spawned`);
+    const badSize = first.npcs.filter((n) => n.worldW !== 64 || n.worldH !== 100 || n.filter !== 'nearest/nearest');
+    if (badSize.length) {
+      const b = badSize[0];
+      errors.push(`${tag}: ${badSize.length} NPC(s) not drawn at 64x100 world px with nearest filtering (${b.id}: ${b.worldW}x${b.worldH} ${b.filter})`);
+    }
     const walkers = first.npcs.filter((n) => n.mode === 'walk');
     const startFrames = new Set(walkers.map((n) => n.frame));
     if (walkers.length >= 8 && startFrames.size < 4) {
@@ -244,7 +250,7 @@ export async function runRun44NpcSuite({ kind, base, errors, notes, shots }) {
     }
 
     notes.push(
-      `${tag}: ${first.npcs.length} NPCs, ${startFrames.size} distinct start frames among ${walkers.length} walkers; ` +
+      `${tag}: ${first.npcs.length} NPCs at ${first.npcs[0]?.worldW}x${first.npcs[0]?.worldH} world px (${first.npcs[0]?.filter}), ${startFrames.size} distinct start frames among ${walkers.length} walkers; ` +
         `walked ${a.dirsWalked.join('/')}, ${a.transitions} walk/idle switches over ${a.samples} frames at ${a.fps.toFixed(1)} fps, ` +
         `${visible} on screen${extra}; off without ?npcs=1`,
     );

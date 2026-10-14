@@ -25,11 +25,16 @@ const DIR_STEP: Record<NpcDir, { dx: number; dy: number }> = {
 };
 const REVERSE: Record<NpcDir, NpcDir> = { se: 'nw', nw: 'se', sw: 'ne', ne: 'sw' };
 /**
- * World px per walk frame along x (y is half). The pack's walk cycle is drawn for 2 px @1x per
- * frame, or 4 px for a brisker pace; any other stride makes the feet skate.
+ * Pixel-art characters draw at 2 world px per sheet px (the @2x sheet 1:1), so a 50 px cell is
+ * 100 world px tall next to a 59 px bench.
  */
-const STRIDE_DEFAULT = 2;
-const STRIDE_BRISK = 4;
+export const CHARACTER_WORLD_SCALE = 2;
+/**
+ * World px per walk frame along x (y is half). The pack's walk cycle is drawn for 2 sheet px per
+ * frame, or 4 for a brisker pace; any other stride makes the feet skate.
+ */
+const STRIDE_DEFAULT = 2 * CHARACTER_WORLD_SCALE;
+const STRIDE_BRISK = 4 * CHARACTER_WORLD_SCALE;
 const BRISK_IDS = new Set(['corredora', 'repartidor']);
 /** Half a tile's width: a one-tile step moves 64 px in x and 32 px in y. */
 const TILE_STEP_X = 64;
@@ -53,6 +58,10 @@ export type NpcSnapshot = {
   visible: boolean;
   zIndex: number;
   texture: string;
+  /** Drawn frame size in world px, and the texture's sampling filters. */
+  worldW: number;
+  worldH: number;
+  filter: string;
 };
 
 type Npc = {
@@ -144,7 +153,7 @@ export class NpcCrowd {
             data: {
               autoGenerateMipmaps: true,
               magFilter: 'nearest',
-              minFilter: 'linear',
+              minFilter: 'nearest',
               mipmapFilter: 'linear',
             },
           });
@@ -180,6 +189,7 @@ export class NpcCrowd {
       const sprite = new Sprite();
       sprite.eventMode = 'none';
       sprite.anchor.set(def.ancla_pies.x / CELL_W, def.ancla_pies.y / CELL_H);
+      sprite.scale.set(CHARACTER_WORLD_SCALE);
       sprite.label = `npc:${def.id}`;
       const startIdle = this.rand() < 0.3;
       const npc: Npc = {
@@ -327,7 +337,7 @@ export class NpcCrowd {
     npc.sprite.visible =
       this.enabled &&
       !this.hidden &&
-      (!v || (npc.x >= v.minX && npc.x <= v.maxX && npc.y >= v.minY && npc.y <= v.maxY + CELL_H));
+      (!v || (npc.x >= v.minX && npc.x <= v.maxX && npc.y >= v.minY && npc.y <= v.maxY + CELL_H * CHARACTER_WORLD_SCALE));
   }
 
   setEnabled(on: boolean): void {
@@ -354,6 +364,9 @@ export class NpcCrowd {
         visible: n.sprite.visible,
         zIndex: n.sprite.zIndex,
         texture: `${n.mode}_${n.dir}`,
+        worldW: n.sprite.width,
+        worldH: n.sprite.height,
+        filter: `${n.sprite.texture.source.magFilter}/${n.sprite.texture.source.minFilter}`,
       };
     });
   }
