@@ -45,46 +45,71 @@ async function keyWalkTo(page, goal, keys, maxMs = 120000) {
   const t0 = Date.now();
   let stuck = 0;
   let last = '';
+  const trace = [];
+  const traced = (why) => `${why}; last steps: ${trace.slice(-10).join(' | ')}`;
+  for (const k of Object.values(keys)) await page.keyboard.up(k);
   while (Date.now() - t0 < maxMs) {
-    const { at, pos, path } = await qa(
+    const { at, pos, path, room } = await qa(
       page,
       (g) => {
         const q = window.__playtestQa;
         const t = q.getCharacterTile();
-        return { at: t, pos: q.getCharacterPos(), path: q.findPath(t.x, t.y, g.x, g.y) };
+        return { at: t, pos: q.getCharacterPos(), path: q.findPath(t.x, t.y, g.x, g.y), room: q.getInteriorId() };
       },
       goal,
     );
+    if (room) return traced(`walked into ${room} on the way (at ${at.x},${at.y})`);
     if (at.x === goal.x && at.y === goal.y) return '';
     const here = `${at.x},${at.y}`;
     stuck = here === last ? stuck + 1 : 0;
     last = here;
     const where = `at ${here} (${pos.x.toFixed(2)},${pos.y.toFixed(2)}) after ${((Date.now() - t0) / 1000).toFixed(1)} s`;
-    if (stuck >= 8) return `no progress ${where}`;
-    if (!path?.length) return `no path ${where}`;
+    if (stuck >= 8) return traced(`no progress ${where}`);
+    if (!path?.length) return traced(`no path ${where}`);
     const d = { x: path[0].x - at.x, y: path[0].y - at.y };
     let n = 0;
     while (n < path.length && path[n].x - (n ? path[n - 1].x : at.x) === d.x && path[n].y - (n ? path[n - 1].y : at.y) === d.y) n++;
     const end = path[n - 1];
     const key = keys[`${d.x},${d.y}`];
-    if (!key) return `no key for step ${d.x},${d.y} ${where}`;
-    await page.keyboard.down(key);
-    // Release as soon as the character enters the last tile of the run: software-GL runners move
-    // ~0.45 tile per frame and the key-up lands a frame or two later, so this keeps it in that tile.
-    await page
-      .waitForFunction(
-        ([e, dir]) => {
-          const p = window.__playtestQa.getCharacterPos();
-          return dir.x ? (p.x - e.x) * dir.x > -0.45 : (p.y - e.y) * dir.y > -0.45;
-        },
-        [end, d],
-        { polling: 'raf', timeout: 2000 + n * 1000 },
-      )
-      .catch(() => {});
-    await page.keyboard.up(key);
+    if (!key) return traced(`no key for step ${d.x},${d.y} ${where}`);
+    trace.push(`${pos.x.toFixed(2)},${pos.y.toFixed(2)} ${key}x${n}->${end.x},${end.y} @${((Date.now() - t0) / 1000).toFixed(1)}s`);
+    const axis = d.x ? 'x' : 'y';
+    const dir = d.x || d.y;
+    // Hold the key until ~1.5 tiles out, then nudge a frame at a time into the goal tile. On
+    // software-GL runners a frame moves ~0.45 tile and the key-up can land frames late, so a held key
+    // overshoots; a nudge moves less than a tile and so can never skip over the goal tile.
+    if (n > 1) {
+      await page.keyboard.down(key);
+      await page
+        .waitForFunction(
+          ([e, ax, dr]) => (window.__playtestQa.getCharacterPos()[ax] - e[ax]) * dr > -1.5,
+          [end, axis, dir],
+          { polling: 'raf', timeout: 2000 + n * 1000 },
+        )
+        .catch(() => {});
+      await page.keyboard.up(key);
+    }
+    for (let i = 0; i < 12; i++) {
+      const p0 = await qa(page, () => window.__playtestQa.getCharacterPos());
+      if (Math.round(p0[axis]) === end[axis] || (p0[axis] - end[axis]) * dir > 0.5) break;
+      await page.keyboard.down(key);
+      const moved = await page
+        .waitForFunction(
+          (a) => {
+            const p = window.__playtestQa.getCharacterPos();
+            return p.x !== a.x || p.y !== a.y;
+          },
+          p0,
+          { polling: 'raf', timeout: 3000 },
+        )
+        .then(() => true)
+        .catch(() => false);
+      await page.keyboard.up(key);
+      if (!moved) break;
+    }
     await wait(60);
   }
-  return `timed out after ${maxMs / 1000} s`;
+  return traced(`timed out after ${maxMs / 1000} s`);
 }
 
 async function testKeyboardEntry(ctx, kind, base, errors, notes) {
@@ -171,6 +196,10 @@ async function testKeyboardEntry(ctx, kind, base, errors, notes) {
       (b) => {
         const q = window.__playtestQa;
         const s = q.getCharacterTile();
+        // Facing the door from the tile in front of it: reaching that never steps onto the door.
+        const front = { x: b.door.x - b.inward.x, y: b.door.y - b.inward.y };
+        const fp = q.findPath(s.x, s.y, front.x, front.y);
+        if (fp) return { ...front, n: fp.length };
         let best = null;
         for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
           const t = { x: b.door.x + dx, y: b.door.y + dy };
