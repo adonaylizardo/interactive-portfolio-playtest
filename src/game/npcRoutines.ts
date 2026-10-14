@@ -57,14 +57,19 @@ type Range = readonly [number, number];
 const START_STAGGER_S: Range = [0, 6];
 const GAZE_S: Range = [45, 150];
 const GAZE_BREAK_S: Range = [4, 12];
+/** At the front, the vendor makes the order before the (short) purchase: this is what keeps the line slow. */
+const ORDER_S: Range = [10, 18];
 const BUY_S: Range = [2.5, 5];
 /** Pause before stepping up when the place ahead in the line opens. */
 const QUEUE_STEP_S: Range = [0.8, 2.2];
-const QUEUE_AWAY_S: Range = [6, 18];
+const QUEUE_AWAY_S: Range = [3, 8];
+/** Longest walk (tiles) from the cart to where a buyer stands with the snack. */
+const SNACK_WALK = 4;
 const SIT_S: Range = [20, 50];
 const BENCH_BREAK_S: Range = [3, 10];
 const END_PAUSE_S: Range = [2, 6];
-const INSIDE_S: Range = [20, 60];
+/** The stay leaves a few seconds for stepping out when the door is busy, within the 20-60 s visit. */
+const INSIDE_S: Range = [20, 55];
 const VISIT_BREAK_S: Range = [2, 8];
 const STROLL_PAUSE_S: Range = [2, 8];
 const BLOCKED_RETRY_S: Range = [0.3, 0.8];
@@ -393,8 +398,9 @@ export type Walker = {
   arrive: (() => void) | null;
   /** After stepping aside: picks the errand up again. */
   resume: (() => void) | null;
-  /** Role bookkeeping: queue cart + place, bench (and the last one sat on), deck spot, last door, stroll zone. */
+  /** Role bookkeeping: queue cart + place (and the cart usually queued at), bench (and the last one sat on), deck spot, last door, stroll zone. */
   cart: number;
+  homeCart: number;
   slot: number;
   bench: number;
   lastBench: number;
@@ -473,6 +479,7 @@ export class NpcRoutines {
       arrive: null,
       resume: null,
       cart: -1,
+      homeCart: 0,
       slot: -1,
       bench: -1,
       lastBench: -1,
@@ -562,8 +569,10 @@ export class NpcRoutines {
 
     const queuers = byRole('queue');
     const order: [number, number][] = [];
-    for (let s = 0; s < QUEUE_SLOTS; s++) for (let c = 0; c < this.town.carts.length; c++) if (s < this.town.carts[c].slots.length) order.push([c, s]);
+    for (let c = 0; c < this.town.carts.length; c++) for (let s = 0; s < Math.min(QUEUE_SLOTS, this.town.carts[c].slots.length); s++) order.push([c, s]);
     queuers.forEach((w, i) => {
+      // Most queue at the first cart, so it holds a proper line; the last one keeps the other cart busy.
+      w.homeCart = i < queuers.length - 1 || this.town.carts.length < 2 ? 0 : 1;
       const at = i < queuers.length - 1 ? order[i] : undefined;
       const cell = at && this.town.carts[at[0]].slots[at[1]];
       if (!at || !cell || !this.open(cell) || (at[1] > 0 && !this.queueOwners[at[0]][at[1] - 1])) {
@@ -576,7 +585,7 @@ export class NpcRoutines {
       w.slot = at[1];
       this.occupy(w, cell);
       this.inLine(w);
-      if (at[1] === 0) this.buy(w, this.range([0.5, BUY_S[1]]));
+      if (at[1] === 0) this.order(w, this.range([0.5, ORDER_S[1]]));
       else w.wait = this.range([0, 2]);
     });
 
@@ -657,6 +666,11 @@ export class NpcRoutines {
     w.phase = 'inLine';
     w.stepUp = false;
     this.stand(w, POLL_S, `queue ${w.slot + 1}`, this.town.carts[w.cart].faces[w.slot]);
+  }
+
+  private order(w: Walker, seconds: number): void {
+    w.phase = 'ordering';
+    this.stand(w, seconds, 'order', this.town.carts[w.cart].faces[0]);
   }
 
   private buy(w: Walker, seconds: number): void {
@@ -789,6 +803,9 @@ export class NpcRoutines {
 
   private thinkStargazer(w: Walker): void {
     if (w.phase === 'gazing') {
+      // Only one stretches their legs at a time, so the deck keeps two gazers.
+      const others = this.walkers.filter((o) => o !== w && o.role === 'stargazer' && o.phase === 'gazing').length;
+      if (others < 2) return this.gaze(w, this.range(GAZE_BREAK_S) * 2);
       this.releaseRole(w);
       const c = this.town.mirador[0];
       const p = c && this.spotNear(c, 2, 6);
@@ -811,9 +828,9 @@ export class NpcRoutines {
   private thinkQueue(w: Walker): void {
     if (w.phase === 'inLine') {
       const cart = this.town.carts[w.cart];
-      if (w.slot === 0) return this.buy(w, this.range(BUY_S));
+      if (w.slot === 0) return this.order(w, this.range(ORDER_S));
       const line = this.queueOwners[w.cart];
-      if (line[w.slot - 1]) {
+      if (this.placeTaken(w.cart, w.slot - 1)) {
         w.stepUp = false;
         w.wait = POLL_S;
         return;
@@ -829,18 +846,27 @@ export class NpcRoutines {
       if (!this.goTo(w, cart.slots[w.slot], `queue ${w.slot + 1}`, () => this.inLine(w))) this.abandon(w);
       return;
     }
+    if (w.phase === 'ordering') return this.buy(w, this.range(BUY_S));
     if (w.phase === 'buying') {
       const cart = this.town.carts[w.cart];
       this.releaseRole(w);
       w.phase = 'away';
-      const p = this.spotNear(cart.at, 4, 10) ?? this.spotNear({ x: w.tx, y: w.ty }, 3, 8);
+      // A few steps off, so the walk back to the line stays short.
+      const here = { x: w.tx, y: w.ty };
+      const close = (c: Cell) => {
+        if (cart.slots.some((q) => q.x === c.x && q.y === c.y)) return false;
+        const route = findPath(this.town, here, c, { avoid: this.avoidNow(w, 'still') });
+        return !!route && route.length >= 2 && route.length <= SNACK_WALK;
+      };
+      const p = this.spotNear(here, 2, SNACK_WALK, close) ?? this.spotNear(here, 3, 8);
       if (p && this.goTo(w, p, 'walk off with a snack', () => this.stand(w, this.range(QUEUE_AWAY_S), 'snack', dirBetween(p, cart.at)))) return;
       return this.retryLater(w);
     }
+    // Back to the usual cart; the other one only when that line is full.
     const choices = this.town.carts
-      .map((_, i) => ({ i, back: this.queueOwners[i].reduce((b, o, s) => (o ? s + 1 : b), 0) }))
+      .map((c, i) => ({ i, back: c.slots.reduce((b, _, s) => (this.placeTaken(i, s) ? s + 1 : b), 0) }))
       .filter(({ i, back }) => back < this.town.carts[i].slots.length);
-    const pick = this.pick(choices);
+    const pick = choices.find((c) => c.i === w.homeCart) ?? choices[0];
     if (!pick) return this.wander(w, 'away');
     this.queueOwners[pick.i][pick.back] = w;
     w.cart = pick.i;
@@ -851,6 +877,12 @@ export class NpcRoutines {
       w.phase = 'away';
       this.retryLater(w);
     }
+  }
+
+  /** A place in a cart's line is taken by its owner, or by the player standing there. */
+  private placeTaken(cart: number, slot: number): boolean {
+    const c = this.town.carts[cart].slots[slot];
+    return !!this.queueOwners[cart][slot] || this.host.blocked(c.x, c.y);
   }
 
   private thinkBench(w: Walker): void {
