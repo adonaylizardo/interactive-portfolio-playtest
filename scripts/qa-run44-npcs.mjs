@@ -5,13 +5,14 @@
  *  - all 20 NPCs spawn, each on its own walkable tile, never step onto a blocked one, and never
  *    stand still on a door, door front or the spawn (they pass through)
  *  - walking uses the facing's strip (walk_se / sw / ne / nw) and covers all four directions;
- *    standing uses idle_<facing> (also for the sit / lookUp poses until those strips exist)
+ *    standing uses idle_<facing>, the sit pose sentado_<facing> drawn on the bench (feet at the
+ *    bench anchor plus the strip's `asiento` offset, above the bench), lookUp estrellas_<facing>
  *  - characters draw at 2 world px per sheet px (64×100 world px cells) with nearest filtering
  *  - feet do not skate: each walk frame moves exactly one stride (4 or 8 world px in x, half in y)
  *    along the facing, on integer pixels, at ~10 fps (the rate is only asserted when the page
  *    draws at least TIMING_MIN_FPS; software GL on CI can draw ~4 fps)
  *  - start frames differ, so the crowd does not walk in step
- *  - routines live in the page (fast-forwarded 150 s): stargazers on the mirador deck facing up,
+ *  - routines live in the page (fast-forwarded 150 s): stargazers on the mirador deck facing se / sw,
  *    the cart lines served and facing forward, sitters at benches, visitors hidden inside
  *    (qa-run48-routines.mjs covers the routines in depth)
  *  - a tap on an NPC goes through to the map (the player walks); NPCs hide in interiors and under
@@ -40,10 +41,16 @@ for (const e of Object.values(mapa.edificios)) {
   if (e.cara_puerta === '+y') NO_STOP.add(`${ax},${ay + 1}`);
   if (e.cara_puerta === '+x') NO_STOP.add(`${ax + 1},${ay}`);
 }
-/** Strip an NPC standing in `pose` facing `dir` shows: the pose's own once the sheet has it, idle until then. */
+const POSE_STRIP = { sit: 'sentado', lookUp: 'estrellas' };
+/** Strip an NPC standing in `pose` facing `dir` shows: the pose's own when the sheet has it, else idle. */
 function standingStrip(id, pose, dir) {
   const def = manifest.npcs.find((n) => n.id === id);
-  return pose && def?.animaciones[`${pose}_${dir}`] ? `${pose}_${dir}` : `idle_${dir}`;
+  return pose && def?.animaciones[`${POSE_STRIP[pose]}_${dir}`] ? `${POSE_STRIP[pose]}_${dir}` : `idle_${dir}`;
+}
+/** Where a seated NPC's feet go: the bench sprite's anchor (its tile's south vertex) plus the strip's `asiento` offset. */
+function seatedFeet(id, strip, seat) {
+  const off = manifest.npcs.find((n) => n.id === id)?.animaciones[strip]?.asiento?.pies_desde_ancla_banco_mapa;
+  return off ? { x: (seat.x - seat.y) * 64 + off.dx, y: (seat.x + seat.y) * 32 + 32 + off.dy } : null;
 }
 
 export const RUN44_KINDS = {
@@ -69,7 +76,7 @@ async function openMap(page, url) {
   await wait(300);
 }
 
-/** One compact row per NPC per rendered frame: [id, tx, ty, x, y, dir, mode, frame, stride, texture, pose, inside]. */
+/** One compact row per NPC per rendered frame: [id, tx, ty, x, y, dir, mode, frame, stride, texture, pose, inside, seat]. */
 function sample(page, ms) {
   return qa(
     page,
@@ -83,7 +90,7 @@ function sample(page, ms) {
             t,
             n: window.__playtestQa
               .npcs()
-              .npcs.map((n) => [n.id, n.tx, n.ty, n.x, n.y, n.dir, n.mode, n.frame, n.stride, n.texture, n.pose, n.inside]),
+              .npcs.map((n) => [n.id, n.tx, n.ty, n.x, n.y, n.dir, n.mode, n.frame, n.stride, n.texture, n.pose, n.inside, n.seat]),
           });
           if (t < dur) requestAnimationFrame(tick);
           else resolve(out);
@@ -111,7 +118,7 @@ function analyse(frames, walk, tag, errors) {
   for (const { t, n } of frames) {
     const here = new Map();
     const targets = new Map();
-    for (const [id, tx, ty, x, y, dir, mode, frame, stride, texture, pose, inside] of n) {
+    for (const [id, tx, ty, x, y, dir, mode, frame, stride, texture, pose, inside, seat] of n) {
       if (inside) {
         prev.delete(id);
         continue;
@@ -124,8 +131,13 @@ function analyse(frames, walk, tag, errors) {
       const ox = x - (tx - ty) * 64;
       const oy = y - (tx + ty) * 32;
       const k = (dx - dy) !== 0 ? ox / ((dx - dy) * stride) : 0;
-      const along = mode === 'walk' ? Number.isInteger(k) && k >= 0 && k < 64 / stride && oy * 2 === (dx + dy) * k * stride : ox === 0 && oy === 0;
-      if (!along) flag(`along-${id}`, `${id} ${mode} ${dir} is ${ox},${oy} px off its tile centre, not on a stride of ${stride}`);
+      const onBench = seat && mode === 'idle' ? seatedFeet(id, texture, seat) : null;
+      if (onBench) {
+        if (x !== onBench.x || y !== onBench.y) flag(`seat-${id}`, `${id} seated on ${seat.x},${seat.y} is drawn at ${x},${y}, want ${onBench.x},${onBench.y}`);
+      } else {
+        const along = mode === 'walk' ? Number.isInteger(k) && k >= 0 && k < 64 / stride && oy * 2 === (dx + dy) * k * stride : ox === 0 && oy === 0;
+        if (!along) flag(`along-${id}`, `${id} ${mode} ${dir} is ${ox},${oy} px off its tile centre, not on a stride of ${stride}`);
+      }
       if (here.has(`${tx},${ty}`)) flag(`share-${tx},${ty}`, `${id} and ${here.get(`${tx},${ty}`)} share tile ${tx},${ty}`);
       here.set(`${tx},${ty}`, id);
       const cell = `${tx},${ty}`;
@@ -196,6 +208,7 @@ const key = (c) => `${c.x},${c.y}`;
  */
 async function routinesLive(page, spec, kind, tag, errors, shots) {
   await qa(page, () => window.__playtestQa.advanceNpcs(150));
+  const benchSprites = await qa(page, () => window.__playtestQa.spriteInstances().filter((s) => s.key.startsWith('prop/banco/')));
   let town;
   let npcs;
   let lines = [];
@@ -212,7 +225,7 @@ async function routinesLive(page, spec, kind, tag, errors, shots) {
     gazers = npcs.filter((n) => n.task === 'gaze');
     if (gazers.length < 2 || gazers.length > 3) errors.push(`${tag}: ${gazers.length} stargazers on the mirador after ${at} (want 2-3)`);
     for (const n of gazers) {
-      if (!deck.has(`${n.tx},${n.ty}`) || n.dir !== 'ne' || n.pose !== 'lookUp' || n.texture !== standingStrip(n.id, 'lookUp', 'ne')) {
+      if (!deck.has(`${n.tx},${n.ty}`) || !['se', 'sw'].includes(n.dir) || n.pose !== 'lookUp' || n.texture !== `estrellas_${n.dir}`) {
         errors.push(`${tag}: stargazer ${n.id} at ${n.tx},${n.ty} facing ${n.dir} pose ${n.pose} shows ${n.texture}`);
       }
     }
@@ -226,7 +239,17 @@ async function routinesLive(page, spec, kind, tag, errors, shots) {
     sitters = npcs.filter((n) => n.task === 'sit');
     for (const n of sitters) {
       const b = town.benches.find((x) => x.front.x === n.tx && x.front.y === n.ty);
-      if (!b || n.dir !== b.face || n.texture !== standingStrip(n.id, 'sit', b.face)) errors.push(`${tag}: sitter ${n.id} at ${n.tx},${n.ty} facing ${n.dir} shows ${n.texture}`);
+      if (!b || n.dir !== b.seatFace || n.texture !== `sentado_${b.seatFace}` || n.seat?.x !== b.seat.x || n.seat?.y !== b.seat.y) {
+        errors.push(`${tag}: sitter ${n.id} at ${n.tx},${n.ty} facing ${n.dir} shows ${n.texture}`);
+        continue;
+      }
+      const sprite = benchSprites.find((s) => s.id === b.id);
+      const anchor = sprite && { x: sprite.tl.x + 64, y: sprite.tl.y + 96 };
+      const off = b.variant === 'izq' ? { dx: -4, dy: -22 } : { dx: 4, dy: -22 };
+      if (!anchor || n.x !== anchor.x + off.dx || n.y !== anchor.y + off.dy) {
+        errors.push(`${tag}: sitter ${n.id} on ${b.id} (${b.variant}) has feet at ${n.x},${n.y}, want bench anchor ${anchor?.x},${anchor?.y} + ${off.dx},${off.dy}`);
+      }
+      if (!sprite || !(n.zIndex > sprite.zIndex)) errors.push(`${tag}: sitter ${n.id} draws at z ${n.zIndex}, not above ${b.id} (z ${sprite?.zIndex})`);
     }
     inside = npcs.filter((n) => n.inside);
     for (const n of inside) if (n.visible) errors.push(`${tag}: ${n.id} is inside ${n.task.replace('inside ', '')} but drawn`);
@@ -245,7 +268,7 @@ async function routinesLive(page, spec, kind, tag, errors, shots) {
     // Desktop: both carts, the cachapas line clear of the tutorial card; phones: the cachapas line.
     await frame('carts', spec.touch ? { x: 28, y: 40 } : { x: 29.2, y: 40.1 }, spec.touch ? z : 1);
     const bench = sitters[0] && town.benches.find((x) => x.front.x === sitters[0].tx && x.front.y === sitters[0].ty);
-    if (bench) await frame('bench', bench.front, z);
+    if (bench) await frame('bench', bench.seat, z);
   }
   return `${gazers.length} stargazers, lines ${lines.join('+')}, ${sitters.length} sitting, ${inside.length} inside after the fast-forward`;
 }
