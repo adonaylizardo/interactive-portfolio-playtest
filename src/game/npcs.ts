@@ -4,6 +4,7 @@ import { tileFootWorld, tileToWorld } from '../iso/math';
 import {
   DIR_STEP,
   mulberry32,
+  NPC_ROLES,
   NpcRoutines,
   POSE_STRIP,
   type AnimInfo,
@@ -38,6 +39,15 @@ type ManifestNpc = {
 
 /** Poses the routines ask for; the loader picks up their strips from the manifest when present. */
 export const NPC_POSES: readonly NpcPose[] = Object.keys(POSE_STRIP) as NpcPose[];
+/** The only role that takes each pose: other NPCs never need (or fetch) those strips. */
+const ROLE_POSE: Partial<Record<NpcRole, NpcPose>> = { bench: 'sit', stargazer: 'lookUp' };
+
+/** Strips an NPC can show: idle and walk, plus its role's pose strips. */
+function usedAnims(def: ManifestNpc): [string, AnimEntry][] {
+  const pose = ROLE_POSE[NPC_ROLES[def.id] ?? 'stroller'];
+  const strip = pose && POSE_STRIP[pose];
+  return Object.entries(def.animaciones).filter(([name]) => /^(idle|walk)_/.test(name) || (!!strip && name.startsWith(`${strip}_`)));
+}
 
 const CELL_W = manifest.celda.w;
 const CELL_H = manifest.celda.h;
@@ -145,7 +155,7 @@ export class NpcCrowd {
     const base = `${import.meta.env.BASE_URL}sprites/personaje/npcs/`;
     await Promise.all(
       defs.flatMap((def) =>
-        Object.entries(def.animaciones).map(async ([name, anim]) => {
+        usedAnims(def).map(async ([name, anim]) => {
           const tex = await Assets.load<Texture>({
             alias: `npc/${def.id}/${name}`,
             src: base + anim.archivo2x,
@@ -170,7 +180,7 @@ export class NpcCrowd {
         id: def.id,
         stride: BRISK_IDS.has(def.id) ? STRIDE_BRISK : STRIDE_DEFAULT,
         anims: Object.fromEntries(
-          Object.entries(def.animaciones).map(([name, a]): [string, AnimInfo] => [name, { count: playOrder(a).length, fps: a.fps }]),
+          usedAnims(def).map(([name, a]): [string, AnimInfo] => [name, { count: playOrder(a).length, fps: a.fps }]),
         ),
       })),
       this.host,
