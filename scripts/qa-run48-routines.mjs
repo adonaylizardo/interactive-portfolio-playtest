@@ -5,7 +5,8 @@
  * queue place, a bench front, a door front and the Estudio street. Checks:
  *  - roles: 2-3 stargazers, 3-4 in the cart queues, 3-4 on benches, 4-5 crossers, 3-4 building
  *    visitors, the rest strolling by the fountain and the dog park
- *  - stargazers stand on the mirador deck (x51-53, y35-37) facing up (lookUp pose, ne), 2-3 there
+ *  - stargazers stand on the mirador deck (x51-53, y35-37) on the stargaze strip (lookUp pose,
+ *    estrellas_se / _sw, head tilted back), 2-3 there
  *    nearly all the time (one stretches their legs at a time)
  *  - cart queues: the front person orders, buys (short pause) and walks away, the line steps up one
  *    place at a time with a pause, newcomers join at the back, everyone faces the person ahead / the
@@ -16,8 +17,9 @@
  *  - strollers stop by the fountain / dog park (walking between the two is fine); start times and frames are staggered
  *  - nobody shares a tile, steps onto the player's tile, stops on a door, door front, spawn or
  *    monument stop, or enters the climbing-wall clearance; nobody gets stuck
- *  - pose hooks: with a `sit_*` / `lookUp_*` strip in the sheet that strip is drawn, without it
- *    the idle strip facing the same way
+ *  - sitters hold the sit strip facing the way the bench looks (der: sentado_se, izq: sentado_sw)
+ *  - pose hooks: estrellas plays its 0,0,0,1 sequence at 1 fps; with the pose strips taken out of
+ *    the sheet, sitters stand at the bench front facing out and gazers stand on the idle strip
  * Usage: imported by qa-smoke.mjs (group `routines`); `node scripts/qa-run48-routines.mjs` runs it alone.
  */
 import fs from 'node:fs';
@@ -51,15 +53,17 @@ async function loadRoutines() {
   return mod;
 }
 
-function defs(extra = {}) {
+/** Routine defs from the manifest, as npcs.ts builds them; `poses: false` drops the pose strips. */
+function defs({ poses = true } = {}) {
   const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/data/npcs.json'), 'utf8'));
   return manifest.npcs.map((n) => ({
     id: n.id,
     stride: BRISK.has(n.id) ? 8 : 4,
-    anims: {
-      ...Object.fromEntries(Object.entries(n.animaciones).map(([k, a]) => [k, { count: a.frames.length, fps: a.fps }])),
-      ...(extra[n.id] ?? {}),
-    },
+    anims: Object.fromEntries(
+      Object.entries(n.animaciones)
+        .filter(([k]) => poses || /^(idle|walk)_/.test(k))
+        .map(([k, a]) => [k, { count: (a.secuencia ?? a.frames).length, fps: a.fps }]),
+    ),
   }));
 }
 
@@ -240,15 +244,17 @@ function simulate(R, seed, errors, tag) {
 
       if (w.role === 'stargazer' && w.task === 'gaze') {
         if (!deck.has(ck)) flag(`gaze-off-${w.id}`, `${w.id} gazes from ${ck}, off the deck`);
-        if (w.dir !== 'ne' || w.pose !== 'lookUp') flag(`gaze-face-${w.id}`, `${w.id} gazes facing ${w.dir} pose ${w.pose}`);
-        if (routines.animKey(w) !== 'idle_ne') flag(`gaze-tex-${w.id}`, `${w.id} gazing shows ${routines.animKey(w)} (want idle_ne until a lookUp strip exists)`);
+        if (!['se', 'sw'].includes(w.dir) || w.pose !== 'lookUp') flag(`gaze-face-${w.id}`, `${w.id} gazes facing ${w.dir} pose ${w.pose}`);
+        if (routines.animKey(w) !== `estrellas_${w.dir}`) flag(`gaze-tex-${w.id}`, `${w.id} gazing shows ${routines.animKey(w)} (want estrellas_${w.dir})`);
         gazing++;
       }
       if (w.role === 'bench' && w.task === 'sit') {
         const bench = town.benches.find((x) => key(x.front) === ck);
         if (!bench) flag(`sit-off-${w.id}`, `${w.id} sits at ${ck}, not at a bench`);
-        else if (w.dir !== bench.face || w.pose !== 'sit' || key(w.seat ?? {}) !== key(bench.seat)) flag(`sit-face-${w.id}`, `${w.id} sits facing ${w.dir} (want ${bench.face}) pose ${w.pose}`);
-        if (routines.animKey(w) !== `idle_${w.dir}`) flag(`sit-tex-${w.id}`, `${w.id} sitting shows ${routines.animKey(w)} (want idle until a sit strip exists)`);
+        else {
+          if (w.dir !== bench.seatFace || w.pose !== 'sit' || key(w.seat ?? {}) !== key(bench.seat)) flag(`sit-face-${w.id}`, `${w.id} sits on ${bench.id} (${bench.variant}) facing ${w.dir} (want ${bench.seatFace}) pose ${w.pose}`);
+          if (routines.animKey(w) !== `sentado_${bench.seatFace}`) flag(`sit-tex-${w.id}`, `${w.id} sitting shows ${routines.animKey(w)} (want sentado_${bench.seatFace})`);
+        }
       }
       if (w.role === 'queue' && (w.phase === 'inLine' || w.phase === 'ordering' || w.phase === 'buying') && w.mode === 'idle' && !w.path.length && w.task !== 'make way') {
         const cart = town.carts[w.cart];
@@ -336,25 +342,42 @@ function simulate(R, seed, errors, tag) {
 
 function poseHooks(R, errors) {
   const town = R.buildTown();
-  const withPoses = { 'abuelo-baston': { sit_se: { count: 2, fps: 2 }, sit_sw: { count: 2, fps: 2 } }, estudiante: { lookUp_ne: { count: 3, fps: 2 } } };
-  const r = new R.NpcRoutines(defs(withPoses), { blocked: () => false }, R.mulberry32(5), town);
-  let sat = false;
-  let looked = false;
-  for (let t = 0; t < 400 && !(sat && looked); t += DT) {
-    r.update(DT);
-    for (const w of r.walkers) {
-      if (w.id === 'abuelo-baston' && w.task === 'sit' && w.mode === 'idle') {
-        sat = true;
-        if (r.animKey(w) !== `sit_${w.dir}`) errors.push(`run48-poses: sitter with a sit strip shows ${r.animKey(w)}`);
+  const strips = new R.NpcRoutines(defs(), { blocked: () => false }, R.mulberry32(5), town);
+  const plain = new R.NpcRoutines(defs({ poses: false }), { blocked: () => false }, R.mulberry32(5), town);
+  const seen = { sat: false, looked: false, plainSat: false, plainLooked: false };
+  const gazeFrames = new Map();
+  for (let t = 0; t < 400 && !Object.values(seen).every(Boolean); t += DT) {
+    strips.update(DT);
+    plain.update(DT);
+    for (const w of strips.walkers) {
+      if (w.task !== 'gaze') continue;
+      seen.looked = true;
+      const shown = gazeFrames.get(w) ?? [];
+      if (shown.at(-1)?.frame !== w.frame) shown.push({ frame: w.frame, t });
+      gazeFrames.set(w, shown);
+    }
+    for (const w of strips.walkers) if (w.task === 'sit' && w.mode === 'idle') seen.sat = true;
+    for (const w of plain.walkers) {
+      if (w.task === 'sit' && w.mode === 'idle') {
+        seen.plainSat = true;
+        const b = town.benches[w.bench];
+        if (plain.animKey(w) !== `idle_${b.face}` || w.dir !== b.face) errors.push(`run48-poses: without a sit strip ${w.id} shows ${plain.animKey(w)} facing ${w.dir} (want idle_${b.face})`);
       }
-      if (w.id === 'estudiante' && w.task === 'gaze') {
-        looked = true;
-        if (r.animKey(w) !== 'lookUp_ne') errors.push(`run48-poses: stargazer with a lookUp strip shows ${r.animKey(w)}`);
+      if (w.task === 'gaze') {
+        seen.plainLooked = true;
+        if (plain.animKey(w) !== `idle_${w.dir}`) errors.push(`run48-poses: without a stargaze strip ${w.id} shows ${plain.animKey(w)}`);
       }
     }
   }
-  if (!sat || !looked) errors.push(`run48-poses: pose hooks not exercised (sat ${sat}, looked ${looked})`);
-  return 'run48-poses: sit_* / lookUp_* strips are drawn when the sheet has them, idle facing the same way otherwise';
+  for (const [k, v] of Object.entries(seen)) if (!v) errors.push(`run48-poses: ${k} never exercised`);
+  // estrellas: 4 steps (0,0,0,1) at 1 fps, so the play index ticks once a second through 0..3.
+  for (const [w, shown] of gazeFrames) {
+    const a = w.anims[strips.animKey(w)];
+    if (a.count !== 4 || a.fps !== 1) errors.push(`run48-poses: ${w.id} stargaze strip plays ${a.count} steps at ${a.fps} fps (want 4 at 1)`);
+    const steps = shown.slice(1).map((s, i) => s.t - shown[i].t);
+    if (steps.some((d) => Math.abs(d - 1) > 2 * DT)) errors.push(`run48-poses: ${w.id} stargaze steps ${steps.map((d) => d.toFixed(2)).join(', ')} s apart (want 1 s)`);
+  }
+  return 'run48-poses: sit and stargaze strips drawn from the manifest (estrellas 0,0,0,1 at 1 fps); without them, idle facing out of the bench / the gaze direction';
 }
 
 /** @param {{ errors: string[], notes: string[] }} args */

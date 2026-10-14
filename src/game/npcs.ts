@@ -1,10 +1,11 @@
 import { Assets, Container, Rectangle, Sprite, Texture } from 'pixi.js';
 import manifest from '../data/npcs.json';
-import { tileToWorld } from '../iso/math';
+import { tileFootWorld, tileToWorld } from '../iso/math';
 import {
   DIR_STEP,
   mulberry32,
   NpcRoutines,
+  POSE_STRIP,
   type AnimInfo,
   type NpcDir,
   type NpcPose,
@@ -15,20 +16,28 @@ import {
 
 export type { NpcDir, NpcPose, NpcRole };
 
-type AnimEntry = { archivo2x: string; frames: number[]; fps: number };
+type AnimEntry = {
+  archivo2x: string;
+  frames: number[];
+  fps: number;
+  /** Play order over `frames` at `fps` (estrellas: 0,0,0,1); `frames` in order without it. */
+  secuencia?: number[];
+  /** Sit strips: where the feet go, in world px from the bench sprite's anchor (null for ne / nw). */
+  asiento?: { pies_desde_ancla_banco_mapa: { dx: number; dy: number } | null };
+};
 type ManifestNpc = {
   id: string;
   ancla_pies: { x: number; y: number };
   /**
-   * `idle_<dir>` and `walk_<dir>` for every facing. Pose strips (`sit_<dir>`, `lookUp_<dir>`, see
-   * NPC_POSES) are optional: an NPC holding a pose shows the strip when its sheet has one, and the
-   * idle strip facing the same way until then.
+   * `idle_<dir>` and `walk_<dir>` for every facing, plus the pose strips (`sentado_<dir>`,
+   * `estrellas_<dir>`, see POSE_STRIP). Pose strips are optional: an NPC holding a pose shows the
+   * idle strip facing the same way when its sheet has none.
    */
   animaciones: Record<string, AnimEntry>;
 };
 
-/** Pose strips the loader picks up from the manifest when present (`<pose>_<dir>`). */
-export const NPC_POSES: readonly NpcPose[] = ['sit', 'lookUp'];
+/** Poses the routines ask for; the loader picks up their strips from the manifest when present. */
+export const NPC_POSES: readonly NpcPose[] = Object.keys(POSE_STRIP) as NpcPose[];
 
 const CELL_W = manifest.celda.w;
 const CELL_H = manifest.celda.h;
@@ -61,6 +70,8 @@ export type NpcSnapshot = {
   mode: 'walk' | 'idle';
   /** Pose the routine asks for; `texture` says whether its strip or the idle fallback is drawn. */
   pose: NpcPose | null;
+  /** Bench tile while sitting (drawn there when the sit strip exists), else null. */
+  seat: { x: number; y: number } | null;
   inside: boolean;
   /** Seconds in the current task. */
   since: number;
@@ -77,6 +88,10 @@ export type NpcSnapshot = {
   filter: string;
 };
 
+function playOrder(a: AnimEntry): number[] {
+  return a.secuencia ?? a.frames.map((_, i) => i);
+}
+
 export type NpcHost = RoutineHost & {
   /** Draw order for a walker standing at fractional tile (fx, fy). */
   zIndexAt(fx: number, fy: number): number;
@@ -92,6 +107,8 @@ export class NpcCrowd {
   private sprites = new Map<Walker, Sprite>();
   private pos = new Map<Walker, { x: number; y: number }>();
   private frames = new Map<string, Texture[]>();
+  /** `<id>/sentado_<dir>` → feet offset from the bench anchor (world px). */
+  private seatOffsets = new Map<string, { dx: number; dy: number }>();
   private seed: number;
   private loaded = false;
   private enabled: boolean;
@@ -134,12 +151,12 @@ export class NpcCrowd {
               mipmapFilter: 'linear',
             },
           });
-          this.frames.set(
-            `${def.id}/${name}`,
-            anim.frames.map(
-              (i) => new Texture({ source: tex.source, frame: new Rectangle(i * CELL_W, 0, CELL_W, CELL_H) }),
-            ),
+          const cells = anim.frames.map(
+            (i) => new Texture({ source: tex.source, frame: new Rectangle(i * CELL_W, 0, CELL_W, CELL_H) }),
           );
+          this.frames.set(`${def.id}/${name}`, playOrder(anim).map((i) => cells[i]));
+          const seat = anim.asiento?.pies_desde_ancla_banco_mapa;
+          if (seat) this.seatOffsets.set(`${def.id}/${name}`, { dx: seat.dx, dy: seat.dy });
         }),
       ),
     );
@@ -148,7 +165,7 @@ export class NpcCrowd {
         id: def.id,
         stride: BRISK_IDS.has(def.id) ? STRIDE_BRISK : STRIDE_DEFAULT,
         anims: Object.fromEntries(
-          Object.entries(def.animaciones).map(([name, a]): [string, AnimInfo] => [name, { count: a.frames.length, fps: a.fps }]),
+          Object.entries(def.animaciones).map(([name, a]): [string, AnimInfo] => [name, { count: playOrder(a).length, fps: a.fps }]),
         ),
       })),
       this.host,
@@ -190,17 +207,24 @@ export class NpcCrowd {
   private place(r: NpcRoutines, w: Walker): void {
     const sprite = this.sprites.get(w)!;
     const anim = r.animKey(w);
-    const posed = !!w.pose && w.mode === 'idle' && anim.startsWith(`${w.pose}_`);
-    const at = posed && w.seat ? w.seat : { x: w.tx, y: w.ty };
-    const foot = tileToWorld(at.x, at.y);
-    const s = DIR_STEP[w.dir];
-    const along = w.mode === 'walk' ? w.progress * w.stride : 0;
-    const p = { x: foot.x + (s.dx - s.dy) * along, y: foot.y + ((s.dx + s.dy) * along) / 2 };
+    const seatOffset = w.seat && w.mode === 'idle' ? this.seatOffsets.get(`${w.id}/${anim}`) : undefined;
+    let p: { x: number; y: number };
+    if (w.seat && seatOffset) {
+      // On the bench: feet at the bench sprite's anchor (its tile's south vertex) plus the strip's seat offset.
+      const a = tileFootWorld(w.seat.x, w.seat.y);
+      p = { x: a.x + seatOffset.dx, y: a.y + seatOffset.dy };
+    } else {
+      const foot = tileToWorld(w.tx, w.ty);
+      const s = DIR_STEP[w.dir];
+      const along = w.mode === 'walk' ? w.progress * w.stride : 0;
+      p = { x: foot.x + (s.dx - s.dy) * along, y: foot.y + ((s.dx + s.dy) * along) / 2 };
+    }
     this.pos.set(w, p);
     sprite.position.set(p.x, p.y);
     const frames = this.frames.get(`${w.id}/${anim}`)!;
     sprite.texture = frames[w.frame % frames.length];
-    const f = posed && w.seat ? w.seat : r.feet(w);
+    // A sitter sorts on the bench's own tile, which the bench never hides, so it draws over the bench.
+    const f = w.seat && seatOffset ? w.seat : r.feet(w);
     sprite.zIndex = this.host.zIndexAt(f.x, f.y);
     this.syncVisible(w);
   }
@@ -235,7 +259,14 @@ export class NpcCrowd {
   /** QA: the town the routines read (benches, cart lines, deck spots, doors, street ends, stroll zones) and who holds which place. */
   town(): {
     carts: { id: string; at: { x: number; y: number }; slots: { x: number; y: number }[]; faces: NpcDir[] }[];
-    benches: { id: string; seat: { x: number; y: number }; front: { x: number; y: number }; face: NpcDir }[];
+    benches: {
+      id: string;
+      variant: 'der' | 'izq';
+      seat: { x: number; y: number };
+      front: { x: number; y: number };
+      face: NpcDir;
+      seatFace: NpcDir;
+    }[];
     mirador: { x: number; y: number }[];
     doors: { name: string; door: { x: number; y: number } }[];
     ends: { x: number; y: number }[];
@@ -268,6 +299,7 @@ export class NpcCrowd {
         dir: w.dir,
         mode: w.mode,
         pose: w.pose,
+        seat: w.seat ? { ...w.seat } : null,
         inside: w.inside,
         since: w.since,
         path: w.path.map((c) => ({ ...c })),

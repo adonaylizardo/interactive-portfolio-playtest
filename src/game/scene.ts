@@ -3004,13 +3004,14 @@ export class IsoScene {
     w: number;
     h: number;
     kind: string;
+    zIndex?: number;
   }[] {
-    const out: { id: string; key: string; tl: { x: number; y: number }; w: number; h: number; kind: string }[] = [];
+    const out: { id: string; key: string; tl: { x: number; y: number }; w: number; h: number; kind: string; zIndex?: number }[] = [];
     for (const v of this.objectVisuals.values()) {
       const key = objectSpriteKey(v.obj, 'default', false)!;
       const tl = objectSpriteTopLeft(v.obj, key);
       const a = spriteAsset(key);
-      out.push({ id: v.obj.id, key, tl, w: a.w, h: a.h, kind: v.obj.name });
+      out.push({ id: v.obj.id, key, tl, w: a.w, h: a.h, kind: v.obj.name, zIndex: v.zIndex });
     }
     const seen = new Set<string>();
     for (const { tx, ty } of this.tileCullEntries) {

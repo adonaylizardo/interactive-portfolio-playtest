@@ -17,6 +17,8 @@ import { cells, keepClear, MAP_HEIGHT, MAP_WIDTH, nearMuroClearance, objects, ty
 
 export type NpcDir = 'se' | 'sw' | 'ne' | 'nw';
 export type NpcPose = 'sit' | 'lookUp';
+/** Manifest strip for each pose: `<strip>_<dir>` (sentado_se, estrellas_sw, ...). */
+export const POSE_STRIP: Record<NpcPose, string> = { sit: 'sentado', lookUp: 'estrellas' };
 export type NpcRole = 'stargazer' | 'queue' | 'bench' | 'crosser' | 'visitor' | 'stroller';
 export type Cell = { x: number; y: number };
 
@@ -57,6 +59,8 @@ type Range = readonly [number, number];
 const START_STAGGER_S: Range = [0, 6];
 const GAZE_S: Range = [45, 150];
 const GAZE_BREAK_S: Range = [4, 12];
+/** Gazers face the viewer: the stargaze strip tilts the head back in se / sw (from behind, ne / nw, it barely shows). */
+const GAZE_DIRS: NpcDir[] = ['se', 'sw'];
 /** At the front, the vendor makes the order before the (short) purchase: this is what keeps the line slow. */
 const ORDER_S: Range = [10, 18];
 const BUY_S: Range = [2.5, 5];
@@ -90,7 +94,11 @@ const STROLL_DETOUR = 4;
 /** Half a tile's width: a one-tile step moves 64 px in x and 32 px in y. */
 export const TILE_STEP_X = 64;
 
-export type Bench = { id: string; seat: Cell; front: Cell; face: NpcDir };
+/**
+ * `front` is where a sitter stands up to (facing `face`, away from the bench); seated, they face
+ * `seatFace`, the way the bench art looks: orientacion-der benches face se, izq benches sw.
+ */
+export type Bench = { id: string; variant: 'der' | 'izq'; seat: Cell; front: Cell; face: NpcDir; seatFace: NpcDir };
 /** A cart's line: `slots[0]` is served; each place faces the one ahead (the first faces the cart). */
 export type Cart = { id: string; at: Cell; slots: Cell[]; faces: NpcDir[] };
 export type Door = { name: string; door: Cell };
@@ -193,7 +201,8 @@ export function buildTown(): Town {
     if (!d) continue;
     const front = { x: seat.x + d.x, y: seat.y + d.y };
     owned.add(key(front.x, front.y));
-    benches.push({ id: o.id, seat, front, face: dirBetween(seat, front) });
+    const variant = o.variant === 'izq' ? 'izq' : 'der';
+    benches.push({ id: o.id, variant, seat, front, face: dirBetween(seat, front), seatFace: variant === 'izq' ? 'sw' : 'se' });
   }
 
   const doors: Door[] = objects
@@ -498,7 +507,7 @@ export class NpcRoutines {
   /** Strip shown now: the pose's strip when the sheet has one, the idle strip facing the same way otherwise. */
   animKey(w: Walker): string {
     if (w.mode === 'walk') return `walk_${w.dir}`;
-    if (w.pose && w.anims[`${w.pose}_${w.dir}`]) return `${w.pose}_${w.dir}`;
+    if (w.pose && w.anims[`${POSE_STRIP[w.pose]}_${w.dir}`]) return `${POSE_STRIP[w.pose]}_${w.dir}`;
     return `idle_${w.dir}`;
   }
 
@@ -659,7 +668,7 @@ export class NpcRoutines {
 
   private gaze(w: Walker, seconds: number): void {
     w.phase = 'gazing';
-    this.stand(w, seconds, 'gaze', 'ne', 'lookUp');
+    this.stand(w, seconds, 'gaze', this.pick(GAZE_DIRS), 'lookUp');
   }
 
   private inLine(w: Walker): void {
@@ -681,7 +690,9 @@ export class NpcRoutines {
   private sit(w: Walker, seconds: number): void {
     const b = this.town.benches[w.bench];
     w.phase = 'sitting';
-    this.stand(w, seconds, 'sit', b.face, 'sit');
+    // On the bench facing the way it looks; without a sit strip, standing at its front facing out.
+    const seated = !!w.anims[`${POSE_STRIP.sit}_${b.seatFace}`];
+    this.stand(w, seconds, 'sit', seated ? b.seatFace : b.face, 'sit');
     w.seat = { ...b.seat };
   }
 
