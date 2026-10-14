@@ -25,7 +25,7 @@ const PREVIEW_PORT = 4192;
 const BASE =
   process.env.QA_BASE_URL ?? `http://127.0.0.1:${PREVIEW_PORT}/interactive-portfolio-playtest/`;
 const SHOTS = process.argv.includes('--shots');
-/** QA_SPRITES_ONLY=map,picks runs a subset (placement, picks, map, diff, interiors); unset runs all. */
+/** QA_SPRITES_ONLY=map,picks runs a subset (placement, picks, map, diff, interiors, shots with --shots); unset runs all. */
 const ONLY = process.env.QA_SPRITES_ONLY?.split(',');
 const want = (part) => !ONLY || ONLY.includes(part);
 const OUT = path.join(ROOT, 'artifacts', 'run39');
@@ -1022,18 +1022,25 @@ for (let i = 0; i < 60; i++) {
   await wait(500);
 }
 
+/** Logs each part as it ends, so a CI step that times out still shows how far it got. */
+async function part(name, fn) {
+  const t = Date.now();
+  await fn();
+  console.log(`qa-sprites: ${name} ${((Date.now() - t) / 1000).toFixed(0)} s`);
+}
+
 const browser = installReadyWait(await chromium.launch());
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
   await openMap(page);
-  if (want('placement')) await placementChecks(page);
-  if (want('picks')) await pickChecks(page);
-  if (want('map')) await mapChecks(page);
-  if (want('diff')) await pixelDiffMap(page);
+  if (want('placement')) await part('placement', () => placementChecks(page));
+  if (want('picks')) await part('picks', () => pickChecks(page));
+  if (want('map')) await part('map', () => mapChecks(page));
+  if (want('diff')) await part('pixel-diff', () => pixelDiffMap(page));
   await page.close();
-  if (want('diff')) await fullFrameDiff(browser);
-  if (want('interiors')) await interiorChecks(browser);
-  if (SHOTS) await shots(browser);
+  if (want('diff')) await part('full-frame diff', () => fullFrameDiff(browser));
+  if (want('interiors')) await part('interiors', () => interiorChecks(browser));
+  if (SHOTS && want('shots')) await part('shots', () => shots(browser));
 } finally {
   await browser.close();
   preview?.kill('SIGKILL');

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Fast real-input smoke (deploy gate, ~5 min): Chromium desktop + phone and WebKit iPhone.
+ * Fast real-input smoke (deploy gate; ~20 min in one process, CI runs GROUPS as parallel shards): Chromium desktop + phone and WebKit iPhone.
  *  - first load: 1280×800 centred on the character, phones frame the Estudio and Volaris doors
  *  - a door tap walks there and enters only on arrival
  *  - one tap on the exit mat or the door gap leaves each of the 9 rooms without walking first
@@ -139,43 +139,80 @@ for (let i = 0; i < 60; i++) {
   await wait(500);
 }
 
+async function exits(kind, only) {
+  const before = errors.length;
+  await runRun38InputSuite({ kind, base: BASE, errors, only });
+  notes.push(`${kind}: ${only.join(' + ')} ${errors.length === before ? 'ok' : `${errors.length - before} failure(s)`}`);
+}
+
+const GROUPS = {
+  firstload: async () => {
+    for (const spec of FIRST_LOAD) await firstLoad(spec);
+  },
+  'exits-desktop': () => exits('chromium-desktop', ['exit', 'door']),
+  'exits-iphone': () => exits('webkit-iphone', ['exit', 'door']),
+  'exits-phone': () => exits('chromium-phone', ['exit']),
+  input: async () => {
+    for (const [kind, only] of [
+      ['chromium-1280', ['keys', 'wheel', 'interior']],
+      ['webkit-1280', ['keys', 'wheel']],
+      ['chromium-375', ['interior']],
+    ]) {
+      await runRun41InputSuite({ kind, base: BASE, errors, notes, only });
+    }
+  },
+  follow: async () => {
+    for (const [kind, only] of [
+      ['chromium-1280', ['walk', 'pan', 'zoom']],
+      ['chromium-375', ['walk', 'pan', 'zoom']],
+      ['webkit-1280', ['walk']],
+    ]) {
+      await runRun42FollowSuite({ kind, base: BASE, errors, notes, only });
+    }
+  },
+  logos: async () => {
+    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375', 'webkit-iphone']) {
+      await runRun43LogoSuite({ kind, base: BASE, errors, notes });
+    }
+  },
+  npcs: async () => {
+    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
+      await runRun44NpcSuite({ kind, base: BASE, errors, notes });
+    }
+  },
+  player: async () => {
+    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
+      await runRun45PlayerSuite({ kind, base: BASE, errors, notes });
+    }
+  },
+  case: async () => {
+    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375', 'webkit-iphone']) {
+      await runRun46CaseSuite({ kind, base: BASE, errors, notes });
+    }
+  },
+  fill: async () => {
+    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
+      await runRun46FillSuite({ kind, base: BASE, errors, notes });
+    }
+  },
+};
+/** QA_SMOKE_ONLY=firstload,exits runs a subset of GROUPS (CI runs them as parallel shards); unset runs all. */
+const ONLY = process.env.QA_SMOKE_ONLY?.split(',').filter(Boolean) ?? Object.keys(GROUPS);
+const unknown = ONLY.filter((g) => !GROUPS[g]);
+if (unknown.length) {
+  preview?.kill('SIGKILL');
+  console.error(`QA_SMOKE_ONLY: unknown group(s) ${unknown.join(', ')}; known: ${Object.keys(GROUPS).join(', ')}`);
+  process.exit(1);
+}
+
 const t0 = Date.now();
 try {
-  for (const spec of FIRST_LOAD) await firstLoad(spec);
-  for (const kind of ['chromium-desktop', 'webkit-iphone', 'chromium-phone']) {
+  for (const name of ONLY) {
+    const t = Date.now();
     const before = errors.length;
-    const only = kind === 'chromium-phone' ? ['exit'] : ['exit', 'door'];
-    await runRun38InputSuite({ kind, base: BASE, errors, only });
-    notes.push(`${kind}: ${only.join(' + ')} ${errors.length === before ? 'ok' : `${errors.length - before} failure(s)`}`);
-  }
-  for (const [kind, only] of [
-    ['chromium-1280', ['keys', 'wheel', 'interior']],
-    ['webkit-1280', ['keys', 'wheel']],
-    ['chromium-375', ['interior']],
-  ]) {
-    await runRun41InputSuite({ kind, base: BASE, errors, notes, only });
-  }
-  for (const [kind, only] of [
-    ['chromium-1280', ['walk', 'pan', 'zoom']],
-    ['chromium-375', ['walk', 'pan', 'zoom']],
-    ['webkit-1280', ['walk']],
-  ]) {
-    await runRun42FollowSuite({ kind, base: BASE, errors, notes, only });
-  }
-  for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375', 'webkit-iphone']) {
-    await runRun43LogoSuite({ kind, base: BASE, errors, notes });
-  }
-  for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
-    await runRun44NpcSuite({ kind, base: BASE, errors, notes });
-  }
-  for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
-    await runRun45PlayerSuite({ kind, base: BASE, errors, notes });
-  }
-  for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375', 'webkit-iphone']) {
-    await runRun46CaseSuite({ kind, base: BASE, errors, notes });
-  }
-  for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
-    await runRun46FillSuite({ kind, base: BASE, errors, notes });
+    await GROUPS[name]();
+    const failed = errors.length - before;
+    console.log(`qa-smoke: ${name} ${((Date.now() - t) / 1000).toFixed(0)} s${failed ? `, ${failed} failure(s)` : ''}`);
   }
 } finally {
   preview?.kill('SIGKILL');
