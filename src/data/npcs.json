@@ -135,6 +135,150 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "corredora/corredora__sentado_se@1x.png",
+     "archivo2x": "corredora/corredora__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "corredora/corredora__sentado_sw@1x.png",
+     "archivo2x": "corredora/corredora__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "corredora/corredora__sentado_ne@1x.png",
+     "archivo2x": "corredora/corredora__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "corredora/corredora__sentado_nw@1x.png",
+     "archivo2x": "corredora/corredora__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "corredora/corredora__estrellas_se@1x.png",
+     "archivo2x": "corredora/corredora__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "corredora/corredora__estrellas_sw@1x.png",
+     "archivo2x": "corredora/corredora__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "corredora/corredora__estrellas_ne@1x.png",
+     "archivo2x": "corredora/corredora__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "corredora/corredora__estrellas_nw@1x.png",
+     "archivo2x": "corredora/corredora__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
@@ -262,6 +406,150 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "senor-sombrero/senor-sombrero__sentado_se@1x.png",
+     "archivo2x": "senor-sombrero/senor-sombrero__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "senor-sombrero/senor-sombrero__sentado_sw@1x.png",
+     "archivo2x": "senor-sombrero/senor-sombrero__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "senor-sombrero/senor-sombrero__sentado_ne@1x.png",
+     "archivo2x": "senor-sombrero/senor-sombrero__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "senor-sombrero/senor-sombrero__sentado_nw@1x.png",
+     "archivo2x": "senor-sombrero/senor-sombrero__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "senor-sombrero/senor-sombrero__estrellas_se@1x.png",
+     "archivo2x": "senor-sombrero/senor-sombrero__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "senor-sombrero/senor-sombrero__estrellas_sw@1x.png",
+     "archivo2x": "senor-sombrero/senor-sombrero__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "senor-sombrero/senor-sombrero__estrellas_ne@1x.png",
+     "archivo2x": "senor-sombrero/senor-sombrero__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "senor-sombrero/senor-sombrero__estrellas_nw@1x.png",
+     "archivo2x": "senor-sombrero/senor-sombrero__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
@@ -389,6 +677,150 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "mujer-tote/mujer-tote__sentado_se@1x.png",
+     "archivo2x": "mujer-tote/mujer-tote__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "mujer-tote/mujer-tote__sentado_sw@1x.png",
+     "archivo2x": "mujer-tote/mujer-tote__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "mujer-tote/mujer-tote__sentado_ne@1x.png",
+     "archivo2x": "mujer-tote/mujer-tote__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "mujer-tote/mujer-tote__sentado_nw@1x.png",
+     "archivo2x": "mujer-tote/mujer-tote__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "mujer-tote/mujer-tote__estrellas_se@1x.png",
+     "archivo2x": "mujer-tote/mujer-tote__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "mujer-tote/mujer-tote__estrellas_sw@1x.png",
+     "archivo2x": "mujer-tote/mujer-tote__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "mujer-tote/mujer-tote__estrellas_ne@1x.png",
+     "archivo2x": "mujer-tote/mujer-tote__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "mujer-tote/mujer-tote__estrellas_nw@1x.png",
+     "archivo2x": "mujer-tote/mujer-tote__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
@@ -516,6 +948,150 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "chamo-audifonos/chamo-audifonos__sentado_se@1x.png",
+     "archivo2x": "chamo-audifonos/chamo-audifonos__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "chamo-audifonos/chamo-audifonos__sentado_sw@1x.png",
+     "archivo2x": "chamo-audifonos/chamo-audifonos__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "chamo-audifonos/chamo-audifonos__sentado_ne@1x.png",
+     "archivo2x": "chamo-audifonos/chamo-audifonos__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "chamo-audifonos/chamo-audifonos__sentado_nw@1x.png",
+     "archivo2x": "chamo-audifonos/chamo-audifonos__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "chamo-audifonos/chamo-audifonos__estrellas_se@1x.png",
+     "archivo2x": "chamo-audifonos/chamo-audifonos__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "chamo-audifonos/chamo-audifonos__estrellas_sw@1x.png",
+     "archivo2x": "chamo-audifonos/chamo-audifonos__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "chamo-audifonos/chamo-audifonos__estrellas_ne@1x.png",
+     "archivo2x": "chamo-audifonos/chamo-audifonos__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "chamo-audifonos/chamo-audifonos__estrellas_nw@1x.png",
+     "archivo2x": "chamo-audifonos/chamo-audifonos__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
@@ -643,6 +1219,150 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "senor-cafecito/senor-cafecito__sentado_se@1x.png",
+     "archivo2x": "senor-cafecito/senor-cafecito__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "senor-cafecito/senor-cafecito__sentado_sw@1x.png",
+     "archivo2x": "senor-cafecito/senor-cafecito__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "senor-cafecito/senor-cafecito__sentado_ne@1x.png",
+     "archivo2x": "senor-cafecito/senor-cafecito__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "senor-cafecito/senor-cafecito__sentado_nw@1x.png",
+     "archivo2x": "senor-cafecito/senor-cafecito__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "senor-cafecito/senor-cafecito__estrellas_se@1x.png",
+     "archivo2x": "senor-cafecito/senor-cafecito__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "senor-cafecito/senor-cafecito__estrellas_sw@1x.png",
+     "archivo2x": "senor-cafecito/senor-cafecito__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "senor-cafecito/senor-cafecito__estrellas_ne@1x.png",
+     "archivo2x": "senor-cafecito/senor-cafecito__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "senor-cafecito/senor-cafecito__estrellas_nw@1x.png",
+     "archivo2x": "senor-cafecito/senor-cafecito__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
@@ -770,6 +1490,150 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "mujer-rizos/mujer-rizos__sentado_se@1x.png",
+     "archivo2x": "mujer-rizos/mujer-rizos__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "mujer-rizos/mujer-rizos__sentado_sw@1x.png",
+     "archivo2x": "mujer-rizos/mujer-rizos__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "mujer-rizos/mujer-rizos__sentado_ne@1x.png",
+     "archivo2x": "mujer-rizos/mujer-rizos__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "mujer-rizos/mujer-rizos__sentado_nw@1x.png",
+     "archivo2x": "mujer-rizos/mujer-rizos__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "mujer-rizos/mujer-rizos__estrellas_se@1x.png",
+     "archivo2x": "mujer-rizos/mujer-rizos__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "mujer-rizos/mujer-rizos__estrellas_sw@1x.png",
+     "archivo2x": "mujer-rizos/mujer-rizos__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "mujer-rizos/mujer-rizos__estrellas_ne@1x.png",
+     "archivo2x": "mujer-rizos/mujer-rizos__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "mujer-rizos/mujer-rizos__estrellas_nw@1x.png",
+     "archivo2x": "mujer-rizos/mujer-rizos__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
@@ -897,6 +1761,150 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "senora-hijab/senora-hijab__sentado_se@1x.png",
+     "archivo2x": "senora-hijab/senora-hijab__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "senora-hijab/senora-hijab__sentado_sw@1x.png",
+     "archivo2x": "senora-hijab/senora-hijab__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "senora-hijab/senora-hijab__sentado_ne@1x.png",
+     "archivo2x": "senora-hijab/senora-hijab__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "senora-hijab/senora-hijab__sentado_nw@1x.png",
+     "archivo2x": "senora-hijab/senora-hijab__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "senora-hijab/senora-hijab__estrellas_se@1x.png",
+     "archivo2x": "senora-hijab/senora-hijab__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "senora-hijab/senora-hijab__estrellas_sw@1x.png",
+     "archivo2x": "senora-hijab/senora-hijab__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "senora-hijab/senora-hijab__estrellas_ne@1x.png",
+     "archivo2x": "senora-hijab/senora-hijab__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "senora-hijab/senora-hijab__estrellas_nw@1x.png",
+     "archivo2x": "senora-hijab/senora-hijab__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
@@ -1024,6 +2032,150 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "senor-calvo/senor-calvo__sentado_se@1x.png",
+     "archivo2x": "senor-calvo/senor-calvo__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "senor-calvo/senor-calvo__sentado_sw@1x.png",
+     "archivo2x": "senor-calvo/senor-calvo__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "senor-calvo/senor-calvo__sentado_ne@1x.png",
+     "archivo2x": "senor-calvo/senor-calvo__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "senor-calvo/senor-calvo__sentado_nw@1x.png",
+     "archivo2x": "senor-calvo/senor-calvo__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "senor-calvo/senor-calvo__estrellas_se@1x.png",
+     "archivo2x": "senor-calvo/senor-calvo__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "senor-calvo/senor-calvo__estrellas_sw@1x.png",
+     "archivo2x": "senor-calvo/senor-calvo__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "senor-calvo/senor-calvo__estrellas_ne@1x.png",
+     "archivo2x": "senor-calvo/senor-calvo__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "senor-calvo/senor-calvo__estrellas_nw@1x.png",
+     "archivo2x": "senor-calvo/senor-calvo__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
@@ -1151,6 +2303,150 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "chama-trenzas/chama-trenzas__sentado_se@1x.png",
+     "archivo2x": "chama-trenzas/chama-trenzas__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "chama-trenzas/chama-trenzas__sentado_sw@1x.png",
+     "archivo2x": "chama-trenzas/chama-trenzas__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "chama-trenzas/chama-trenzas__sentado_ne@1x.png",
+     "archivo2x": "chama-trenzas/chama-trenzas__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "chama-trenzas/chama-trenzas__sentado_nw@1x.png",
+     "archivo2x": "chama-trenzas/chama-trenzas__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "chama-trenzas/chama-trenzas__estrellas_se@1x.png",
+     "archivo2x": "chama-trenzas/chama-trenzas__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "chama-trenzas/chama-trenzas__estrellas_sw@1x.png",
+     "archivo2x": "chama-trenzas/chama-trenzas__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "chama-trenzas/chama-trenzas__estrellas_ne@1x.png",
+     "archivo2x": "chama-trenzas/chama-trenzas__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "chama-trenzas/chama-trenzas__estrellas_nw@1x.png",
+     "archivo2x": "chama-trenzas/chama-trenzas__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
@@ -1278,6 +2574,150 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "pana-gorra/pana-gorra__sentado_se@1x.png",
+     "archivo2x": "pana-gorra/pana-gorra__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "pana-gorra/pana-gorra__sentado_sw@1x.png",
+     "archivo2x": "pana-gorra/pana-gorra__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "pana-gorra/pana-gorra__sentado_ne@1x.png",
+     "archivo2x": "pana-gorra/pana-gorra__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "pana-gorra/pana-gorra__sentado_nw@1x.png",
+     "archivo2x": "pana-gorra/pana-gorra__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "pana-gorra/pana-gorra__estrellas_se@1x.png",
+     "archivo2x": "pana-gorra/pana-gorra__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "pana-gorra/pana-gorra__estrellas_sw@1x.png",
+     "archivo2x": "pana-gorra/pana-gorra__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "pana-gorra/pana-gorra__estrellas_ne@1x.png",
+     "archivo2x": "pana-gorra/pana-gorra__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "pana-gorra/pana-gorra__estrellas_nw@1x.png",
+     "archivo2x": "pana-gorra/pana-gorra__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
@@ -1405,6 +2845,150 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "senora-mono/senora-mono__sentado_se@1x.png",
+     "archivo2x": "senora-mono/senora-mono__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "senora-mono/senora-mono__sentado_sw@1x.png",
+     "archivo2x": "senora-mono/senora-mono__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "senora-mono/senora-mono__sentado_ne@1x.png",
+     "archivo2x": "senora-mono/senora-mono__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "senora-mono/senora-mono__sentado_nw@1x.png",
+     "archivo2x": "senora-mono/senora-mono__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "senora-mono/senora-mono__estrellas_se@1x.png",
+     "archivo2x": "senora-mono/senora-mono__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "senora-mono/senora-mono__estrellas_sw@1x.png",
+     "archivo2x": "senora-mono/senora-mono__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "senora-mono/senora-mono__estrellas_ne@1x.png",
+     "archivo2x": "senora-mono/senora-mono__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "senora-mono/senora-mono__estrellas_nw@1x.png",
+     "archivo2x": "senora-mono/senora-mono__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
@@ -1532,6 +3116,150 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "repartidor/repartidor__sentado_se@1x.png",
+     "archivo2x": "repartidor/repartidor__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "repartidor/repartidor__sentado_sw@1x.png",
+     "archivo2x": "repartidor/repartidor__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "repartidor/repartidor__sentado_ne@1x.png",
+     "archivo2x": "repartidor/repartidor__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "repartidor/repartidor__sentado_nw@1x.png",
+     "archivo2x": "repartidor/repartidor__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "repartidor/repartidor__estrellas_se@1x.png",
+     "archivo2x": "repartidor/repartidor__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "repartidor/repartidor__estrellas_sw@1x.png",
+     "archivo2x": "repartidor/repartidor__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "repartidor/repartidor__estrellas_ne@1x.png",
+     "archivo2x": "repartidor/repartidor__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "repartidor/repartidor__estrellas_nw@1x.png",
+     "archivo2x": "repartidor/repartidor__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
@@ -1659,6 +3387,150 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "estudiante/estudiante__sentado_se@1x.png",
+     "archivo2x": "estudiante/estudiante__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "estudiante/estudiante__sentado_sw@1x.png",
+     "archivo2x": "estudiante/estudiante__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "estudiante/estudiante__sentado_ne@1x.png",
+     "archivo2x": "estudiante/estudiante__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "estudiante/estudiante__sentado_nw@1x.png",
+     "archivo2x": "estudiante/estudiante__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "estudiante/estudiante__estrellas_se@1x.png",
+     "archivo2x": "estudiante/estudiante__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "estudiante/estudiante__estrellas_sw@1x.png",
+     "archivo2x": "estudiante/estudiante__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "estudiante/estudiante__estrellas_ne@1x.png",
+     "archivo2x": "estudiante/estudiante__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "estudiante/estudiante__estrellas_nw@1x.png",
+     "archivo2x": "estudiante/estudiante__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
@@ -1786,6 +3658,150 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "profesora/profesora__sentado_se@1x.png",
+     "archivo2x": "profesora/profesora__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "profesora/profesora__sentado_sw@1x.png",
+     "archivo2x": "profesora/profesora__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "profesora/profesora__sentado_ne@1x.png",
+     "archivo2x": "profesora/profesora__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "profesora/profesora__sentado_nw@1x.png",
+     "archivo2x": "profesora/profesora__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "profesora/profesora__estrellas_se@1x.png",
+     "archivo2x": "profesora/profesora__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "profesora/profesora__estrellas_sw@1x.png",
+     "archivo2x": "profesora/profesora__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "profesora/profesora__estrellas_ne@1x.png",
+     "archivo2x": "profesora/profesora__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "profesora/profesora__estrellas_nw@1x.png",
+     "archivo2x": "profesora/profesora__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
@@ -1913,6 +3929,150 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "abuelo-baston/abuelo-baston__sentado_se@1x.png",
+     "archivo2x": "abuelo-baston/abuelo-baston__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "abuelo-baston/abuelo-baston__sentado_sw@1x.png",
+     "archivo2x": "abuelo-baston/abuelo-baston__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "abuelo-baston/abuelo-baston__sentado_ne@1x.png",
+     "archivo2x": "abuelo-baston/abuelo-baston__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "abuelo-baston/abuelo-baston__sentado_nw@1x.png",
+     "archivo2x": "abuelo-baston/abuelo-baston__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "abuelo-baston/abuelo-baston__estrellas_se@1x.png",
+     "archivo2x": "abuelo-baston/abuelo-baston__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "abuelo-baston/abuelo-baston__estrellas_sw@1x.png",
+     "archivo2x": "abuelo-baston/abuelo-baston__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "abuelo-baston/abuelo-baston__estrellas_ne@1x.png",
+     "archivo2x": "abuelo-baston/abuelo-baston__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "abuelo-baston/abuelo-baston__estrellas_nw@1x.png",
+     "archivo2x": "abuelo-baston/abuelo-baston__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
@@ -2040,6 +4200,150 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "chica-telefono/chica-telefono__sentado_se@1x.png",
+     "archivo2x": "chica-telefono/chica-telefono__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "chica-telefono/chica-telefono__sentado_sw@1x.png",
+     "archivo2x": "chica-telefono/chica-telefono__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "chica-telefono/chica-telefono__sentado_ne@1x.png",
+     "archivo2x": "chica-telefono/chica-telefono__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "chica-telefono/chica-telefono__sentado_nw@1x.png",
+     "archivo2x": "chica-telefono/chica-telefono__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "chica-telefono/chica-telefono__estrellas_se@1x.png",
+     "archivo2x": "chica-telefono/chica-telefono__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "chica-telefono/chica-telefono__estrellas_sw@1x.png",
+     "archivo2x": "chica-telefono/chica-telefono__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "chica-telefono/chica-telefono__estrellas_ne@1x.png",
+     "archivo2x": "chica-telefono/chica-telefono__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "chica-telefono/chica-telefono__estrellas_nw@1x.png",
+     "archivo2x": "chica-telefono/chica-telefono__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
@@ -2167,6 +4471,150 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "senor-bigote/senor-bigote__sentado_se@1x.png",
+     "archivo2x": "senor-bigote/senor-bigote__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "senor-bigote/senor-bigote__sentado_sw@1x.png",
+     "archivo2x": "senor-bigote/senor-bigote__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "senor-bigote/senor-bigote__sentado_ne@1x.png",
+     "archivo2x": "senor-bigote/senor-bigote__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "senor-bigote/senor-bigote__sentado_nw@1x.png",
+     "archivo2x": "senor-bigote/senor-bigote__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "senor-bigote/senor-bigote__estrellas_se@1x.png",
+     "archivo2x": "senor-bigote/senor-bigote__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "senor-bigote/senor-bigote__estrellas_sw@1x.png",
+     "archivo2x": "senor-bigote/senor-bigote__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "senor-bigote/senor-bigote__estrellas_ne@1x.png",
+     "archivo2x": "senor-bigote/senor-bigote__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "senor-bigote/senor-bigote__estrellas_nw@1x.png",
+     "archivo2x": "senor-bigote/senor-bigote__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
@@ -2294,6 +4742,150 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "mujer-alta-rizos/mujer-alta-rizos__sentado_se@1x.png",
+     "archivo2x": "mujer-alta-rizos/mujer-alta-rizos__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "mujer-alta-rizos/mujer-alta-rizos__sentado_sw@1x.png",
+     "archivo2x": "mujer-alta-rizos/mujer-alta-rizos__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "mujer-alta-rizos/mujer-alta-rizos__sentado_ne@1x.png",
+     "archivo2x": "mujer-alta-rizos/mujer-alta-rizos__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "mujer-alta-rizos/mujer-alta-rizos__sentado_nw@1x.png",
+     "archivo2x": "mujer-alta-rizos/mujer-alta-rizos__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "mujer-alta-rizos/mujer-alta-rizos__estrellas_se@1x.png",
+     "archivo2x": "mujer-alta-rizos/mujer-alta-rizos__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "mujer-alta-rizos/mujer-alta-rizos__estrellas_sw@1x.png",
+     "archivo2x": "mujer-alta-rizos/mujer-alta-rizos__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "mujer-alta-rizos/mujer-alta-rizos__estrellas_ne@1x.png",
+     "archivo2x": "mujer-alta-rizos/mujer-alta-rizos__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "mujer-alta-rizos/mujer-alta-rizos__estrellas_nw@1x.png",
+     "archivo2x": "mujer-alta-rizos/mujer-alta-rizos__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
@@ -2421,6 +5013,150 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "obrero/obrero__sentado_se@1x.png",
+     "archivo2x": "obrero/obrero__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "obrero/obrero__sentado_sw@1x.png",
+     "archivo2x": "obrero/obrero__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "obrero/obrero__sentado_ne@1x.png",
+     "archivo2x": "obrero/obrero__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "obrero/obrero__sentado_nw@1x.png",
+     "archivo2x": "obrero/obrero__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "obrero/obrero__estrellas_se@1x.png",
+     "archivo2x": "obrero/obrero__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "obrero/obrero__estrellas_sw@1x.png",
+     "archivo2x": "obrero/obrero__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "obrero/obrero__estrellas_ne@1x.png",
+     "archivo2x": "obrero/obrero__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "obrero/obrero__estrellas_nw@1x.png",
+     "archivo2x": "obrero/obrero__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
@@ -2548,11 +5284,162 @@
      "fps": 10,
      "loop": true,
      "espejo_de": "ne"
+    },
+    "sentado_se": {
+     "archivo1x": "vendedora/vendedora__sentado_se@1x.png",
+     "archivo2x": "vendedora/vendedora__sentado_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "der",
+       "dx": 4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_sw": {
+     "archivo1x": "vendedora/vendedora__sentado_sw@1x.png",
+     "archivo2x": "vendedora/vendedora__sentado_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "se",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": {
+       "orientacion": "izq",
+       "dx": -4,
+       "dy": -22
+      },
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_ne": {
+     "archivo1x": "vendedora/vendedora__sentado_ne@1x.png",
+     "archivo2x": "vendedora/vendedora__sentado_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": null,
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "sentado_nw": {
+     "archivo1x": "vendedora/vendedora__sentado_nw@1x.png",
+     "archivo2x": "vendedora/vendedora__sentado_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 2,
+     "loop": true,
+     "espejo_de": "ne",
+     "asiento": {
+      "gluteos_fila_1x": 36,
+      "altura_asiento_mapa_px": 24,
+      "pies_desde_ancla_banco_mapa": null,
+      "nota": "se/sw: con el banco-exterior der/izq. ne/nw: de espaldas, sin piernas (las tapa el banco); no hay banco del kit que mire a −x/−y."
+     }
+    },
+    "estrellas_se": {
+     "archivo1x": "vendedora/vendedora__estrellas_se@1x.png",
+     "archivo2x": "vendedora/vendedora__estrellas_se@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_sw": {
+     "archivo1x": "vendedora/vendedora__estrellas_sw@1x.png",
+     "archivo2x": "vendedora/vendedora__estrellas_sw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "se",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_ne": {
+     "archivo1x": "vendedora/vendedora__estrellas_ne@1x.png",
+     "archivo2x": "vendedora/vendedora__estrellas_ne@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": null,
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "estrellas_nw": {
+     "archivo1x": "vendedora/vendedora__estrellas_nw@1x.png",
+     "archivo2x": "vendedora/vendedora__estrellas_nw@2x.png",
+     "frames": [
+      0,
+      1
+     ],
+     "fps": 1,
+     "loop": true,
+     "espejo_de": "ne",
+     "secuencia": [
+      0,
+      0,
+      0,
+      1
+     ]
     }
    },
    "_qa_suela_y": [
     48
    ]
   }
- ]
+ ],
+ "poses_nuevas": {
+  "fecha": "2026-10-14",
+  "pedido": "Forge",
+  "sentado": "2 frames a 2 fps (respira 1 px). Glúteos en la fila 36 @1x = 12 px sobre la suela = 24 px en el mapa (asiento del banco-exterior ≈ 23 px). Para sentar a alguien: dibuja el banco y luego el NPC @2x con sus pies (ancla 16,48) en ancla_banco + (dx, dy) en px del mapa: der → (+4, −22) mirando se; izq → (−4, −22) mirando sw. El NPC va después del banco (encima) y bloquea la casilla del banco.",
+  "estrellas": "2 frames, fps 1 con secuencia [0,0,0,1]: cabeza echada hacia atrás mirando arriba; el frame 1 es el movimiento ocasional (cuerpo 1 px atrás, cabeza un poco más).",
+  "script": "/workspace/portfolio/qa/personaje/npc_poses.py"
+ }
 }
