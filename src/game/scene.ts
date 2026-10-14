@@ -427,7 +427,9 @@ export class IsoScene {
         blocked: (tx, ty) => {
           if (Math.round(this.charTx) === tx && Math.round(this.charTy) === ty) return true;
           const dog = this.avatar.pantoneTile();
-          return dog.x === tx && dog.y === ty;
+          if (dog.x === tx && dog.y === ty) return true;
+          const noah = this.noah?.isLoaded() ? this.noah.tile() : null;
+          return !!noah && Math.round(noah.x) === tx && Math.round(noah.y) === ty;
         },
       },
       { enabled: npcsWanted(), seed: npcSeed(), stillPose: this.reducedMotion },
@@ -3159,6 +3161,14 @@ export class IsoScene {
 
   qaSetNpcs(on: boolean): void {
     this.npcs.setEnabled(on);
+  }
+
+  qaNpcTown(): ReturnType<NpcCrowd['town']> {
+    return this.npcs.town();
+  }
+
+  qaAdvanceNpcs(seconds: number): void {
+    this.npcs.advance(seconds);
   }
 
   /** QA: the on-screen player avatar (map or room) and the canvas resolution it was loaded for. */

@@ -157,6 +157,8 @@ async function main(): Promise<void> {
     npcs: () => scene.qaNpcs(),
     fill: () => scene.qaFill(),
     setNpcs: (on: boolean) => scene.qaSetNpcs(on),
+    npcTown: () => scene.qaNpcTown(),
+    advanceNpcs: (seconds: number) => scene.qaAdvanceNpcs(seconds),
     playerAvatar: () => scene.qaPlayerAvatar(),
     noah: () => scene.qaNoah(),
     pixiTargetAt: (x: number, y: number) => scene.qaPixiTargetAt(x, y),

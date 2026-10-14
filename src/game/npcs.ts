@@ -1,29 +1,37 @@
 import { Assets, Container, Rectangle, Sprite, Texture } from 'pixi.js';
-import { cells, MAP_HEIGHT, MAP_WIDTH } from '../data/map';
 import manifest from '../data/npcs.json';
 import { tileToWorld } from '../iso/math';
+import {
+  DIR_STEP,
+  mulberry32,
+  NpcRoutines,
+  type AnimInfo,
+  type NpcDir,
+  type NpcPose,
+  type NpcRole,
+  type RoutineHost,
+  type Walker,
+} from './npcRoutines';
 
-export type NpcDir = 'se' | 'sw' | 'ne' | 'nw';
-type AnimKind = 'idle' | 'walk';
+export type { NpcDir, NpcPose, NpcRole };
 
 type AnimEntry = { archivo2x: string; frames: number[]; fps: number };
 type ManifestNpc = {
   id: string;
   ancla_pies: { x: number; y: number };
+  /**
+   * `idle_<dir>` and `walk_<dir>` for every facing. Pose strips (`sit_<dir>`, `lookUp_<dir>`, see
+   * NPC_POSES) are optional: an NPC holding a pose shows the strip when its sheet has one, and the
+   * idle strip facing the same way until then.
+   */
   animaciones: Record<string, AnimEntry>;
 };
 
+/** Pose strips the loader picks up from the manifest when present (`<pose>_<dir>`). */
+export const NPC_POSES: readonly NpcPose[] = ['sit', 'lookUp'];
+
 const CELL_W = manifest.celda.w;
 const CELL_H = manifest.celda.h;
-const DIRS: NpcDir[] = ['se', 'sw', 'ne', 'nw'];
-/** Tile step per facing: se = +x, sw = +y, nw = −x, ne = −y. */
-const DIR_STEP: Record<NpcDir, { dx: number; dy: number }> = {
-  se: { dx: 1, dy: 0 },
-  sw: { dx: 0, dy: 1 },
-  nw: { dx: -1, dy: 0 },
-  ne: { dx: 0, dy: -1 },
-};
-const REVERSE: Record<NpcDir, NpcDir> = { se: 'nw', nw: 'se', sw: 'ne', ne: 'sw' };
 /**
  * Pixel-art characters draw at 2 world px per sheet px (the @2x sheet 1:1), so a 50 px cell is
  * 100 world px tall next to a 59 px bench.
@@ -36,15 +44,13 @@ export const CHARACTER_WORLD_SCALE = 2;
 const STRIDE_DEFAULT = 2 * CHARACTER_WORLD_SCALE;
 const STRIDE_BRISK = 4 * CHARACTER_WORLD_SCALE;
 const BRISK_IDS = new Set(['corredora', 'repartidor']);
-/** Half a tile's width: a one-tile step moves 64 px in x and 32 px in y. */
-const TILE_STEP_X = 64;
-const IDLE_CHANCE = 0.14;
-const IDLE_MIN_S = 1.5;
-const IDLE_MAX_S = 5;
-const KEEP_STRAIGHT = 0.65;
+/** Game-time step when QA fast-forwards the routines. */
+const QA_ADVANCE_STEP_S = 1 / 30;
 
 export type NpcSnapshot = {
   id: string;
+  role: NpcRole;
+  task: string;
   tx: number;
   ty: number;
   fx: number;
@@ -52,7 +58,14 @@ export type NpcSnapshot = {
   x: number;
   y: number;
   dir: NpcDir;
-  mode: AnimKind;
+  mode: 'walk' | 'idle';
+  /** Pose the routine asks for; `texture` says whether its strip or the idle fallback is drawn. */
+  pose: NpcPose | null;
+  inside: boolean;
+  /** Seconds in the current task. */
+  since: number;
+  /** Remaining route (next tile first). */
+  path: { x: number; y: number }[];
   frame: number;
   stride: number;
   visible: boolean;
@@ -64,58 +77,22 @@ export type NpcSnapshot = {
   filter: string;
 };
 
-type Npc = {
-  def: ManifestNpc;
-  sprite: Sprite;
-  tx: number;
-  ty: number;
-  dir: NpcDir;
-  mode: AnimKind;
-  /** Walk frames taken toward the next tile (0 … stepsPerTile). */
-  progress: number;
-  frame: number;
-  clock: number;
-  idleLeft: number;
-  stride: number;
-  x: number;
-  y: number;
-};
-
-export type NpcHost = {
+export type NpcHost = RoutineHost & {
   /** Draw order for a walker standing at fractional tile (fx, fy). */
   zIndexAt(fx: number, fy: number): number;
-  /** Tiles NPCs should not step onto (the player's tile). */
-  blocked(tx: number, ty: number): boolean;
 };
 
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-const key = (x: number, y: number) => y * MAP_WIDTH + x;
-
-export function isNpcStreet(x: number, y: number): boolean {
-  const c = cells[y]?.[x];
-  return !!c && c.walkable && c.groundId.includes('path/street');
-}
-
 /**
- * Ambient pedestrians that wander the streets one tile at a time, in four directions. Their sprites
+ * Draws the street crowd. Where everyone goes and what they do lives in npcRoutines.ts; sprites
  * are direct children of `layer` so they depth-sort with the map objects.
  */
 export class NpcCrowd {
   readonly layer: Container;
-  private npcs: Npc[] = [];
+  private routines: NpcRoutines | null = null;
+  private sprites = new Map<Walker, Sprite>();
+  private pos = new Map<Walker, { x: number; y: number }>();
   private frames = new Map<string, Texture[]>();
-  private reserved = new Map<number, Npc>();
-  private rand: () => number;
+  private seed: number;
   private loaded = false;
   private enabled: boolean;
   private stillPose: boolean;
@@ -129,7 +106,7 @@ export class NpcCrowd {
     this.host = host;
     this.enabled = opts.enabled;
     this.stillPose = opts.stillPose;
-    this.rand = mulberry32(opts.seed ?? (Date.now() ^ 0x5eed));
+    this.seed = opts.seed ?? (Date.now() ^ 0x5eed);
   }
 
   isLoaded(): boolean {
@@ -166,159 +143,66 @@ export class NpcCrowd {
         }),
       ),
     );
-    this.spawn(defs);
-    this.loaded = true;
-  }
-
-  private spawn(defs: ManifestNpc[]): void {
-    const streets: { x: number; y: number }[] = [];
-    for (let y = 0; y < MAP_HEIGHT; y++) {
-      for (let x = 0; x < MAP_WIDTH; x++) {
-        if (isNpcStreet(x, y) && !this.host.blocked(x, y)) streets.push({ x, y });
-      }
-    }
-    for (let i = streets.length - 1; i > 0; i--) {
-      const j = Math.floor(this.rand() * (i + 1));
-      [streets[i], streets[j]] = [streets[j], streets[i]];
-    }
-    const picked = defs.slice(0, streets.length);
-    const born: Npc[] = picked.map((def, i) => {
-      const { x, y } = streets[i];
-      const open = DIRS.filter((d) => isNpcStreet(x + DIR_STEP[d].dx, y + DIR_STEP[d].dy));
-      const dir = open.length ? open[Math.floor(this.rand() * open.length)] : DIRS[i % 4];
+    const routines = new NpcRoutines(
+      defs.map((def) => ({
+        id: def.id,
+        stride: BRISK_IDS.has(def.id) ? STRIDE_BRISK : STRIDE_DEFAULT,
+        anims: Object.fromEntries(
+          Object.entries(def.animaciones).map(([name, a]): [string, AnimInfo] => [name, { count: a.frames.length, fps: a.fps }]),
+        ),
+      })),
+      this.host,
+      mulberry32(this.seed),
+    );
+    for (const w of routines.walkers) {
+      const def = defs.find((d) => d.id === w.id)!;
       const sprite = new Sprite();
       sprite.eventMode = 'none';
       sprite.anchor.set(def.ancla_pies.x / CELL_W, def.ancla_pies.y / CELL_H);
       sprite.scale.set(CHARACTER_WORLD_SCALE);
       sprite.label = `npc:${def.id}`;
-      const startIdle = this.rand() < 0.3;
-      const npc: Npc = {
-        def,
-        sprite,
-        tx: x,
-        ty: y,
-        dir,
-        mode: startIdle ? 'idle' : 'walk',
-        progress: 0,
-        frame: 0,
-        clock: 0,
-        idleLeft: startIdle ? IDLE_MIN_S + this.rand() * (IDLE_MAX_S - IDLE_MIN_S) : 0,
-        stride: BRISK_IDS.has(def.id) ? STRIDE_BRISK : STRIDE_DEFAULT,
-        x: 0,
-        y: 0,
-      };
-      this.reserved.set(key(x, y), npc);
-      return npc;
-    });
-    for (const npc of born) {
-      if (npc.mode === 'walk' && !this.chooseNext(npc, false)) {
-        npc.mode = 'idle';
-        npc.idleLeft = IDLE_MIN_S;
-      }
-      const anim = this.anim(npc);
-      npc.frame = Math.floor(this.rand() * anim.frames.length);
-      npc.clock = this.rand() / anim.fps;
-      this.npcs.push(npc);
-      this.layer.addChild(npc.sprite);
-      this.place(npc);
+      this.sprites.set(w, sprite);
+      this.layer.addChild(sprite);
     }
-    this.applyVisibility();
-  }
-
-  private anim(npc: Npc): AnimEntry {
-    return npc.def.animaciones[`${npc.mode}_${npc.dir}`];
-  }
-
-  private stepsPerTile(npc: Npc): number {
-    return TILE_STEP_X / npc.stride;
-  }
-
-  /** Picks and reserves the next street tile; prefers going straight and avoids U-turns. */
-  private chooseNext(npc: Npc, allowReverse: boolean): boolean {
-    const free = (d: NpcDir) => {
-      const nx = npc.tx + DIR_STEP[d].dx;
-      const ny = npc.ty + DIR_STEP[d].dy;
-      return isNpcStreet(nx, ny) && !this.reserved.has(key(nx, ny)) && !this.host.blocked(nx, ny);
-    };
-    const open = DIRS.filter(free);
-    let options = open.filter((d) => d !== REVERSE[npc.dir]);
-    if (!options.length && allowReverse) options = open;
-    if (!options.length) return false;
-    const dir =
-      options.includes(npc.dir) && this.rand() < KEEP_STRAIGHT
-        ? npc.dir
-        : options[Math.floor(this.rand() * options.length)];
-    npc.dir = dir;
-    npc.progress = 0;
-    this.reserved.set(key(npc.tx + DIR_STEP[dir].dx, npc.ty + DIR_STEP[dir].dy), npc);
-    return true;
-  }
-
-  private startIdle(npc: Npc, seconds: number): void {
-    npc.mode = 'idle';
-    npc.idleLeft = seconds;
-    npc.frame = 0;
-    npc.clock = 0;
-  }
-
-  private arrive(npc: Npc): void {
-    const left = key(npc.tx, npc.ty);
-    if (this.reserved.get(left) === npc) this.reserved.delete(left);
-    npc.tx += DIR_STEP[npc.dir].dx;
-    npc.ty += DIR_STEP[npc.dir].dy;
-    npc.progress = 0;
-    if (this.rand() < IDLE_CHANCE) {
-      this.startIdle(npc, IDLE_MIN_S + this.rand() * (IDLE_MAX_S - IDLE_MIN_S));
-    } else if (!this.chooseNext(npc, true)) {
-      this.startIdle(npc, IDLE_MIN_S);
-    }
+    this.routines = routines;
+    this.loaded = true;
+    this.placeAll();
   }
 
   update(dt: number): void {
-    if (!this.loaded || !this.enabled || this.stillPose) return;
-    for (const npc of this.npcs) {
-      if (npc.mode === 'idle') {
-        npc.idleLeft -= dt;
-        if (npc.idleLeft <= 0) {
-          if (this.chooseNext(npc, true)) {
-            npc.mode = 'walk';
-            npc.frame = Math.floor(this.rand() * this.anim(npc).frames.length);
-            npc.clock = 0;
-          } else {
-            npc.idleLeft = 0.5 + this.rand();
-          }
-        }
-      }
-      const anim = this.anim(npc);
-      const period = 1 / anim.fps;
-      npc.clock += dt;
-      while (npc.clock >= period) {
-        npc.clock -= period;
-        npc.frame = (npc.frame + 1) % anim.frames.length;
-        if (npc.mode === 'walk') {
-          npc.progress += 1;
-          if (npc.progress >= this.stepsPerTile(npc)) {
-            this.arrive(npc);
-            if (npc.mode !== 'walk') break;
-          }
-        }
-      }
-      this.place(npc);
-    }
+    if (!this.routines || !this.enabled || this.stillPose) return;
+    this.routines.update(dt);
+    this.placeAll();
   }
 
-  private place(npc: Npc): void {
-    const foot = tileToWorld(npc.tx, npc.ty);
-    const s = DIR_STEP[npc.dir];
-    const along = npc.mode === 'walk' ? npc.progress * npc.stride : 0;
-    npc.x = foot.x + (s.dx - s.dy) * along;
-    npc.y = foot.y + ((s.dx + s.dy) * along) / 2;
-    npc.sprite.position.set(npc.x, npc.y);
-    const frames = this.frames.get(`${npc.def.id}/${npc.mode}_${npc.dir}`)!;
-    npc.sprite.texture = frames[npc.frame % frames.length];
-    const t = npc.mode === 'walk' ? npc.progress / this.stepsPerTile(npc) : 0;
-    npc.sprite.zIndex = this.host.zIndexAt(npc.tx + s.dx * t, npc.ty + s.dy * t);
-    this.syncVisible(npc);
+  /** QA: runs the routines `seconds` of game time ahead in small steps. */
+  advance(seconds: number): void {
+    if (!this.routines) return;
+    for (let t = 0; t < seconds; t += QA_ADVANCE_STEP_S) this.routines.update(Math.min(QA_ADVANCE_STEP_S, seconds - t));
+    this.placeAll();
+  }
+
+  private placeAll(): void {
+    if (!this.routines) return;
+    for (const w of this.routines.walkers) this.place(this.routines, w);
+  }
+
+  private place(r: NpcRoutines, w: Walker): void {
+    const sprite = this.sprites.get(w)!;
+    const anim = r.animKey(w);
+    const posed = !!w.pose && w.mode === 'idle' && anim.startsWith(`${w.pose}_`);
+    const at = posed && w.seat ? w.seat : { x: w.tx, y: w.ty };
+    const foot = tileToWorld(at.x, at.y);
+    const s = DIR_STEP[w.dir];
+    const along = w.mode === 'walk' ? w.progress * w.stride : 0;
+    const p = { x: foot.x + (s.dx - s.dy) * along, y: foot.y + ((s.dx + s.dy) * along) / 2 };
+    this.pos.set(w, p);
+    sprite.position.set(p.x, p.y);
+    const frames = this.frames.get(`${w.id}/${anim}`)!;
+    sprite.texture = frames[w.frame % frames.length];
+    const f = posed && w.seat ? w.seat : r.feet(w);
+    sprite.zIndex = this.host.zIndexAt(f.x, f.y);
+    this.syncVisible(w);
   }
 
   /** Shows only NPCs inside the padded view rectangle (world coords). */
@@ -329,15 +213,18 @@ export class NpcCrowd {
   }
 
   private applyVisibility(): void {
-    for (const npc of this.npcs) this.syncVisible(npc);
+    for (const w of this.sprites.keys()) this.syncVisible(w);
   }
 
-  private syncVisible(npc: Npc): void {
+  private syncVisible(w: Walker): void {
     const v = this.view;
-    npc.sprite.visible =
+    const p = this.pos.get(w);
+    this.sprites.get(w)!.visible =
       this.enabled &&
       !this.hidden &&
-      (!v || (npc.x >= v.minX && npc.x <= v.maxX && npc.y >= v.minY && npc.y <= v.maxY + CELL_H * CHARACTER_WORLD_SCALE));
+      !w.inside &&
+      !!p &&
+      (!v || (p.x >= v.minX && p.x <= v.maxX && p.y >= v.minY && p.y <= v.maxY + CELL_H * CHARACTER_WORLD_SCALE));
   }
 
   setEnabled(on: boolean): void {
@@ -345,28 +232,53 @@ export class NpcCrowd {
     this.applyVisibility();
   }
 
+  /** QA: the town the routines read (benches, cart lines, deck spots, doors, street ends, stroll zones) and who holds which place. */
+  town(): {
+    carts: { id: string; at: { x: number; y: number }; slots: { x: number; y: number }[]; faces: NpcDir[] }[];
+    benches: { id: string; seat: { x: number; y: number }; front: { x: number; y: number }; face: NpcDir }[];
+    mirador: { x: number; y: number }[];
+    doors: { name: string; door: { x: number; y: number } }[];
+    ends: { x: number; y: number }[];
+    zones: { name: string; cells: { x: number; y: number }[] }[];
+    owners: { carts: (string | null)[][]; benches: (string | null)[]; mirador: (string | null)[] };
+  } | null {
+    const r = this.routines;
+    if (!r) return null;
+    const { carts, benches, mirador, doors, ends, zones } = r.town;
+    return { carts, benches, mirador, doors, ends, zones, owners: r.owners() };
+  }
+
   snapshot(): NpcSnapshot[] {
-    return this.npcs.map((n) => {
-      const s = DIR_STEP[n.dir];
-      const t = n.mode === 'walk' ? n.progress / this.stepsPerTile(n) : 0;
+    const r = this.routines;
+    if (!r) return [];
+    return r.walkers.map((w) => {
+      const sprite = this.sprites.get(w)!;
+      const p = this.pos.get(w) ?? { x: 0, y: 0 };
+      const f = r.feet(w);
       return {
-        id: n.def.id,
-        tx: n.tx,
-        ty: n.ty,
-        fx: n.tx + s.dx * t,
-        fy: n.ty + s.dy * t,
-        x: n.x,
-        y: n.y,
-        dir: n.dir,
-        mode: n.mode,
-        frame: n.frame,
-        stride: n.stride,
-        visible: n.sprite.visible,
-        zIndex: n.sprite.zIndex,
-        texture: `${n.mode}_${n.dir}`,
-        worldW: n.sprite.width,
-        worldH: n.sprite.height,
-        filter: `${n.sprite.texture.source.magFilter}/${n.sprite.texture.source.minFilter}`,
+        id: w.id,
+        role: w.role,
+        task: w.task,
+        tx: w.tx,
+        ty: w.ty,
+        fx: f.x,
+        fy: f.y,
+        x: p.x,
+        y: p.y,
+        dir: w.dir,
+        mode: w.mode,
+        pose: w.pose,
+        inside: w.inside,
+        since: w.since,
+        path: w.path.map((c) => ({ ...c })),
+        frame: w.frame,
+        stride: w.stride,
+        visible: sprite.visible,
+        zIndex: sprite.zIndex,
+        texture: r.animKey(w),
+        worldW: sprite.width,
+        worldH: sprite.height,
+        filter: `${sprite.texture.source.magFilter}/${sprite.texture.source.minFilter}`,
       };
     });
   }
