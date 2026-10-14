@@ -39,35 +39,52 @@ async function waitFor(page, pred, maxMs) {
 /**
  * Walks the character to `goal` with held keys only: follows `findPath` one straight run at a time
  * and re-plans after every run, so a key released a frame late never derails the walk.
+ * Returns '' on arrival, otherwise why it gave up (for the failure message).
  */
-async function keyWalkTo(page, goal, keys, maxMs = 45000) {
+async function keyWalkTo(page, goal, keys, maxMs = 120000) {
   const t0 = Date.now();
+  let stuck = 0;
+  let last = '';
   while (Date.now() - t0 < maxMs) {
-    const at = await qa(page, () => window.__playtestQa.getCharacterTile());
-    if (at.x === goal.x && at.y === goal.y) return true;
-    const path = await qa(page, ([a, b]) => window.__playtestQa.findPath(a.x, a.y, b.x, b.y), [at, goal]);
-    if (!path?.length) return false;
+    const { at, pos, path } = await qa(
+      page,
+      (g) => {
+        const q = window.__playtestQa;
+        const t = q.getCharacterTile();
+        return { at: t, pos: q.getCharacterPos(), path: q.findPath(t.x, t.y, g.x, g.y) };
+      },
+      goal,
+    );
+    if (at.x === goal.x && at.y === goal.y) return '';
+    const here = `${at.x},${at.y}`;
+    stuck = here === last ? stuck + 1 : 0;
+    last = here;
+    const where = `at ${here} (${pos.x.toFixed(2)},${pos.y.toFixed(2)}) after ${((Date.now() - t0) / 1000).toFixed(1)} s`;
+    if (stuck >= 8) return `no progress ${where}`;
+    if (!path?.length) return `no path ${where}`;
     const d = { x: path[0].x - at.x, y: path[0].y - at.y };
     let n = 0;
     while (n < path.length && path[n].x - (n ? path[n - 1].x : at.x) === d.x && path[n].y - (n ? path[n - 1].y : at.y) === d.y) n++;
     const end = path[n - 1];
     const key = keys[`${d.x},${d.y}`];
-    if (!key) return false;
+    if (!key) return `no key for step ${d.x},${d.y} ${where}`;
     await page.keyboard.down(key);
+    // Release as soon as the character enters the last tile of the run: software-GL runners move
+    // ~0.45 tile per frame and the key-up lands a frame or two later, so this keeps it in that tile.
     await page
       .waitForFunction(
         ([e, dir]) => {
           const p = window.__playtestQa.getCharacterPos();
-          return dir.x ? (p.x - e.x) * dir.x > -0.2 : (p.y - e.y) * dir.y > -0.2;
+          return dir.x ? (p.x - e.x) * dir.x > -0.45 : (p.y - e.y) * dir.y > -0.45;
         },
         [end, d],
-        { polling: 'raf', timeout: 1500 + n * 600 },
+        { polling: 'raf', timeout: 2000 + n * 1000 },
       )
       .catch(() => {});
     await page.keyboard.up(key);
     await wait(60);
   }
-  return false;
+  return `timed out after ${maxMs / 1000} s`;
 }
 
 async function testKeyboardEntry(ctx, kind, base, errors, notes) {
@@ -111,12 +128,14 @@ async function testKeyboardEntry(ctx, kind, base, errors, notes) {
         },
         b,
       );
-      if (!stage || !(await keyWalkTo(page, stage, keys))) {
-        errors.push(`${tag}: could not walk away from the ${b.name} door to approach it`);
+      const awayWhy = stage ? await keyWalkTo(page, stage, keys) : 'no staging tile';
+      if (awayWhy) {
+        errors.push(`${tag}: could not walk away from the ${b.name} door to approach it: ${awayWhy}`);
         continue;
       }
-      if (!(await keyWalkTo(page, b.door, keys))) {
-        errors.push(`${tag}: could not walk to the ${b.name} door ${b.door.x},${b.door.y} with the keyboard`);
+      const doorWhy = await keyWalkTo(page, b.door, keys);
+      if (doorWhy) {
+        errors.push(`${tag}: could not walk to the ${b.name} door ${b.door.x},${b.door.y} with the keyboard: ${doorWhy}`);
         continue;
       }
       const inwardKey = keys[`${b.inward.x},${b.inward.y}`];
@@ -162,8 +181,9 @@ async function testKeyboardEntry(ctx, kind, base, errors, notes) {
       },
       third,
     );
-    if (!side || !(await keyWalkTo(page, side, ARROWS))) {
-      errors.push(`${tag}: could not walk next to the ${third.name} door`);
+    const sideWhy = side ? await keyWalkTo(page, side, ARROWS) : 'no free tile next to the door';
+    if (sideWhy) {
+      errors.push(`${tag}: could not walk next to the ${third.name} door: ${sideWhy}`);
     } else {
       await page.keyboard.press('Enter');
       const ok = await waitFor(page, () => inInterior(page), 5000);
@@ -355,6 +375,14 @@ export async function runRun41InputSuite({ kind, base, errors, notes, only }) {
   const spec = RUN41_KINDS[kind];
   const browser = installReadyWait(await spec.type.launch());
   const ctx = await browser.newContext(spec.options);
+  // QA_CPU_THROTTLE=8 slows Chromium pages to software-GL runner frame times to reproduce CI.
+  const throttle = Number(process.env.QA_CPU_THROTTLE);
+  if (throttle > 1 && spec.type === chromium) {
+    ctx.on('page', async (p) => {
+      const cdp = await ctx.newCDPSession(p);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
+    });
+  }
   const want = (n) => !only || only.includes(n);
   try {
     if (want('keys')) await testKeyboardEntry(ctx, kind, base, errors, notes);
