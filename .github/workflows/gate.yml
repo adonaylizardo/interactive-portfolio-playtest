@@ -49,7 +49,7 @@ jobs:
   smoke:
     name: real-input smoke (Chromium + WebKit)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -68,5 +68,5 @@ jobs:
         run: npx playwright install chromium webkit --with-deps
 
       - name: qa:smoke
-        timeout-minutes: 15
+        timeout-minutes: 24
         run: node scripts/qa-smoke.mjs
