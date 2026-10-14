@@ -38,7 +38,7 @@ async function main(): Promise<void> {
       const b = getBuildingByName(interiorId);
       if (b?.panelTitle) {
         checklist.setBuildingPanelOpen(true);
-        panel.showInterior(b.panelTitle);
+        panel.showInterior(b.panelTitle, interiorId);
       }
     } else {
       checklist.setBuildingPanelOpen(false);
@@ -119,6 +119,7 @@ async function main(): Promise<void> {
       panel.showOverlayForQa(title);
     },
     isBuildingPanelOpen: () => panel.isOpen(),
+    setWorkedWith: (logos: { name: string; file: string }[] | null) => panel.setWorkedWithForQa(logos),
     readWalkGoal: () => {
       const raw = document.getElementById('game-canvas')?.dataset.walkGoal;
       return raw ? JSON.parse(raw) : null;

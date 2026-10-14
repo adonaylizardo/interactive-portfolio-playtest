@@ -700,3 +700,98 @@ body.is-canvas-dragging * {
   user-select: text;
   -webkit-user-select: text;
 }
+
+/* "Worked with" logo strip (Estudio panel). */
+.worked-with {
+  --logo-h: 24px;
+  --logo-gap-x: 28px;
+  --logo-gap-y: 18px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #eee;
+}
+
+.worked-with[hidden] {
+  display: none;
+}
+
+.worked-with__title {
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #888;
+}
+
+.worked-with__logos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--logo-gap-y) var(--logo-gap-x);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.worked-with__item {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  height: var(--logo-h);
+}
+
+/*
+ * Every logo starts in the same gray (grayscale + brightness(0) flattens light and dark marks to
+ * black, opacity lifts it to a mid gray between the panel's #444 and #888 text) and shows its own
+ * colours on hover, keyboard focus or tap. The files themselves keep their original colours.
+ */
+.worked-with__logo {
+  display: block;
+  height: var(--logo-h);
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  border-radius: 2px;
+  filter: grayscale(1) brightness(0);
+  opacity: 0.55;
+  cursor: pointer;
+  transition:
+    filter 0.2s ease,
+    opacity 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.worked-with__logo:focus-visible,
+.worked-with__logo.is-revealed {
+  filter: grayscale(0) brightness(1);
+  opacity: 1;
+}
+
+/* Touch browsers keep :hover on the last tapped element; there the tap toggle (.is-revealed) rules. */
+@media (hover: hover) {
+  .worked-with__logo:hover {
+    filter: grayscale(0) brightness(1);
+    opacity: 1;
+  }
+}
+
+.worked-with__logo:focus-visible {
+  outline: 2px solid #888;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .worked-with__logo {
+    transition: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .worked-with {
+    --logo-h: 18px;
+    --logo-gap-x: 20px;
+    --logo-gap-y: 14px;
+  }
+}

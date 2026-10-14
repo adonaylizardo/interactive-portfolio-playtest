@@ -1,8 +1,13 @@
+import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
+
 /** Interior content — bottom sheet (mobile) / right rail (desktop). */
 export class BuildingPanel {
   private el: HTMLElement;
   private sheet: HTMLElement;
   private titleEl: HTMLElement;
+  private workedWithEl: HTMLElement;
+  private workedWithLogos: WorkedWithLogo[] = WORKED_WITH;
+  private interiorId: string | null = null;
   private onVisibilityChange: () => void;
   private onSalir: () => void;
   private mode: 'hidden' | 'interior' = 'hidden';
@@ -29,6 +34,10 @@ export class BuildingPanel {
         <div class="building-panel__body-wrap">
           <p class="building-panel__body">Caso de ejemplo [falta]</p>
           <p class="building-panel__hint">Contenido provisional — solo prueba de interacción.</p>
+          <section class="worked-with" aria-labelledby="worked-with-title" hidden>
+            <h3 class="worked-with__title" id="worked-with-title">Worked with</h3>
+            <ul class="worked-with__logos"></ul>
+          </section>
         </div>
         <button type="button" class="building-panel__salir" data-exit>Salir</button>
       </div>
@@ -36,6 +45,14 @@ export class BuildingPanel {
     container.appendChild(this.el);
     this.sheet = this.el.querySelector('.building-panel__sheet')!;
     this.titleEl = this.el.querySelector('.building-panel__title')!;
+    this.workedWithEl = this.el.querySelector('.worked-with')!;
+    // Touch has no hover: a tap shows that logo's colours until another logo (or the same one) is tapped.
+    this.workedWithEl.addEventListener('click', (e) => {
+      const hit = (e.target as HTMLElement).closest('.worked-with__logo');
+      for (const img of this.workedWithEl.querySelectorAll('.worked-with__logo')) {
+        img.classList.toggle('is-revealed', img === hit && !img.classList.contains('is-revealed'));
+      }
+    });
 
     this.el.querySelector('[data-exit]')!.addEventListener('click', () => this.salir());
     this.el.querySelector('[data-close]')!.addEventListener('click', () => {
@@ -109,9 +126,11 @@ export class BuildingPanel {
     this.dragStartY = 0;
   }
 
-  showInterior(title: string): void {
+  showInterior(title: string, interiorId: string | null = null): void {
     this.mode = 'interior';
     this.titleEl.textContent = title;
+    this.interiorId = interiorId;
+    this.renderWorkedWith();
     this.peekOnly = this.isMobile();
     this.el.hidden = false;
     const floatExit = this.el.querySelector('[data-float-exit]') as HTMLElement;
@@ -130,6 +149,33 @@ export class BuildingPanel {
     this.peekOnly = false;
     this.el.hidden = false;
     requestAnimationFrame(() => this.el.classList.add('building-panel--open'));
+  }
+
+  private renderWorkedWith(): void {
+    const logos = this.interiorId && WORKED_WITH_PANELS.has(this.interiorId) ? this.workedWithLogos : [];
+    const list = this.workedWithEl.querySelector('.worked-with__logos')!;
+    list.replaceChildren(
+      ...logos.map((logo) => {
+        const li = document.createElement('li');
+        li.className = 'worked-with__item';
+        const img = document.createElement('img');
+        img.className = 'worked-with__logo';
+        img.src = /^(data:|https?:|\/)/.test(logo.file) ? logo.file : `${import.meta.env.BASE_URL}logos/${logo.file}`;
+        img.alt = logo.name;
+        img.decoding = 'async';
+        img.loading = 'lazy';
+        img.tabIndex = 0;
+        li.appendChild(img);
+        return li;
+      }),
+    );
+    this.workedWithEl.hidden = logos.length === 0;
+  }
+
+  /** QA: render the strip with other logos (layout checks without the real files). */
+  setWorkedWithForQa(logos: WorkedWithLogo[] | null): void {
+    this.workedWithLogos = logos ?? WORKED_WITH;
+    this.renderWorkedWith();
   }
 
   hide(): void {
