@@ -1,1 +1,83 @@
-[]
+[
+  {
+    "name": "ADPList",
+    "file": "adplist.png",
+    "mono": true
+  },
+  {
+    "name": "Applaudo Studios",
+    "file": "applaudo-studios.png"
+  },
+  {
+    "name": "Bain & Company",
+    "file": "bain-company.png",
+    "mono": true
+  },
+  {
+    "name": "BMW",
+    "file": "bmw.png"
+  },
+  {
+    "name": "Cámara de Comercio de Santiago",
+    "file": "camara-comercio-santiago.png",
+    "mono": true
+  },
+  {
+    "name": "CareerFoundry",
+    "file": "careerfoundry.png",
+    "mono": true
+  },
+  {
+    "name": "Designlab",
+    "file": "designlab.png",
+    "mono": true
+  },
+  {
+    "name": "Finoa",
+    "file": "finoa.png",
+    "mono": true
+  },
+  {
+    "name": "Gobierno de El Salvador",
+    "file": "gobierno-el-salvador.png",
+    "mono": true
+  },
+  {
+    "name": "Google Cloud",
+    "file": "google-cloud.png",
+    "mono": true
+  },
+  {
+    "name": "P&G",
+    "file": "pg.png",
+    "mono": true
+  },
+  {
+    "name": "Santa Rita Estates",
+    "file": "santa-rita-estates.png"
+  },
+  {
+    "name": "Spaceflight Industries",
+    "file": "spaceflight-industries.png",
+    "mono": true
+  },
+  {
+    "name": "StratiFi",
+    "file": "stratifi.png",
+    "mono": true
+  },
+  {
+    "name": "Valmy",
+    "file": "valmy.png",
+    "mono": true
+  },
+  {
+    "name": "Volaris",
+    "file": "volaris.svg"
+  },
+  {
+    "name": "Xara",
+    "file": "xara.png",
+    "mono": true
+  }
+]

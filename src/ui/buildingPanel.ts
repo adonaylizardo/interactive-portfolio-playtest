@@ -223,7 +223,7 @@ export class BuildingPanel {
         const li = document.createElement('li');
         li.className = 'worked-with__item';
         const img = document.createElement('img');
-        img.className = 'worked-with__logo';
+        img.className = logo.mono ? 'worked-with__logo worked-with__logo--mono' : 'worked-with__logo';
         img.src = /^(data:|https?:|\/)/.test(logo.file) ? logo.file : `${import.meta.env.BASE_URL}logos/${logo.file}`;
         img.alt = logo.name;
         img.decoding = 'async';

@@ -888,6 +888,20 @@ body.is-canvas-dragging * {
   }
 }
 
+/* Monochrome marks (several are white) reveal as solid dark instead of their own colours. */
+.worked-with__logo--mono:focus-visible,
+.worked-with__logo--mono.is-revealed {
+  filter: grayscale(1) brightness(0);
+  opacity: 0.9;
+}
+
+@media (hover: hover) {
+  .worked-with__logo--mono:hover {
+    filter: grayscale(1) brightness(0);
+    opacity: 0.9;
+  }
+}
+
 @media (max-width: 767px) {
   .worked-with {
     --logo-h: 18px;

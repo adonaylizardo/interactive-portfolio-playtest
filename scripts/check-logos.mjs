@@ -134,7 +134,7 @@ for (const [i, e] of list.entries()) {
       errors.push(`${tag}: ${e.file} has no <svg> root`);
       continue;
     }
-    if (/<script|on\w+\s*=|javascript:/i.test(text)) errors.push(`${tag}: ${e.file} contains script`);
+    if (/<script|\son\w+\s*=|javascript:/i.test(text)) errors.push(`${tag}: ${e.file} contains script`);
     const colours = [...text.matchAll(/#([0-9a-f]{6}|[0-9a-f]{3})\b|rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/gi)].map((m) => {
       if (m[2]) return [+m[2], +m[3], +m[4]];
       const h = m[1].length === 3 ? [...m[1]].map((c) => c + c).join('') : m[1];
