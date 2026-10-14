@@ -779,10 +779,13 @@ export class IsoScene {
     void this.noah.load(this.app.renderer.resolution).then(() => this.cullVisibleTiles());
   }
 
+  /** Within talk range, or on any of the 8 tiles around his (his feet sit off the tile centre). */
   private playerNearNoah(): boolean {
     if (!this.noah?.isLoaded() || this.interiorActive) return false;
     const n = this.noah.tile();
-    return Math.hypot(this.charTx - n.x, this.charTy - n.y) <= NOAH_TALK_RANGE;
+    if (Math.hypot(this.charTx - n.x, this.charTy - n.y) <= NOAH_TALK_RANGE) return true;
+    const p = this.roundedCharTile();
+    return Math.max(Math.abs(p.x - Math.round(n.x)), Math.abs(p.y - Math.round(n.y))) <= 1;
   }
 
   /** Beside Noah: he starts his climb. Farther away: walk next to him first, then talk. */
