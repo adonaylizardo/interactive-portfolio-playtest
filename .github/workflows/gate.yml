@@ -31,6 +31,9 @@ jobs:
       - name: npm run typecheck
         run: npm run typecheck
 
+      - name: check:logos
+        run: node scripts/check-logos.mjs
+
       - name: Install Playwright Chromium
         run: npx playwright install chromium --with-deps
 
