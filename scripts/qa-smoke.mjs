@@ -7,6 +7,7 @@
  *    (<= 700 ms in-page, or <= 6 rendered frames and 1.5 s on software-GL runners)
  *  - LOD: detailed (cerca) sprites at every first load; lejos only in the last ×2 of zoom-out
  *  - keyboard door entry, wheel pan / pinch zoom, Sambil + Flor tap feel (qa-run41-input.mjs)
+ *  - camera follow: long walk stays centred at 1280 and 375, drag suspends, zoom mid-walk (qa-run42-follow.mjs)
  * Usage: npm run qa:smoke   (builds first; QA_BASE_URL skips the local preview server)
  */
 import { spawn } from 'node:child_process';
@@ -16,6 +17,7 @@ import { chromium, webkit, devices } from 'playwright';
 import { installReadyWait } from './qa-ready.mjs';
 import { runRun38InputSuite } from './qa-run38-input.mjs';
 import { runRun41InputSuite } from './qa-run41-input.mjs';
+import { runRun42FollowSuite } from './qa-run42-follow.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PREVIEW_PORT = 4194;
@@ -142,6 +144,13 @@ try {
     ['chromium-375', ['interior']],
   ]) {
     await runRun41InputSuite({ kind, base: BASE, errors, notes, only });
+  }
+  for (const [kind, only] of [
+    ['chromium-1280', ['walk', 'pan', 'zoom']],
+    ['chromium-375', ['walk', 'pan', 'zoom']],
+    ['webkit-1280', ['walk']],
+  ]) {
+    await runRun42FollowSuite({ kind, base: BASE, errors, notes, only });
   }
 } finally {
   preview?.kill('SIGKILL');
