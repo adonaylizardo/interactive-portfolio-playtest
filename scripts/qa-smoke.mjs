@@ -9,7 +9,8 @@
  *  - keyboard door entry, wheel pan / pinch zoom, Sambil + Flor tap feel (qa-run41-input.mjs)
  *  - camera follow: long walk stays centred at 1280 and 375, drag suspends, zoom mid-walk (qa-run42-follow.mjs)
  *  - "Worked with" logo strip: equal heights, wraps without overflow, gray by default and real colours on hover / focus / tap (qa-run43-logos.mjs)
- *  - street NPCs: street tiles only, four directions with idle pauses, no skating, desynced frames, taps pass through (qa-run44-npcs.mjs)
+ *  - NPCs live: walkable tiles only, never idle on door / spawn cells, no skating, desynced frames, gazers / queue / benches / visitors after a fast-forward, taps pass through (qa-run44-npcs.mjs)
+ *  - NPC routines: 15 simulated minutes x 4 seeds of stargazers, cart queue, benches, crossers, visitors and strollers around a parked player (qa-run48-routines.mjs)
  *  - pixel-art player: facing from movement, frames locked to distance, ~4.5 tiles/s, Pantone one tile behind, Noah's climb (qa-run45-player.mjs)
  *  - airline case panel: headline title, full text on desktop / short on phone, client never named, scrolls (qa-run46-case.mjs)
  *  - map fill: placements clear of streets, footprints and doors, nothing over the Estudio, props block only their cells (qa-run46-fill.mjs)
@@ -30,6 +31,7 @@ import { runRun45PlayerSuite } from './qa-run45-player.mjs';
 import { runRun46CaseSuite } from './qa-run46-case.mjs';
 import { runRun46FillSuite } from './qa-run46-fill.mjs';
 import { runRun47AboutSuite } from './qa-run47-about.mjs';
+import { runRun48RoutineSuite } from './qa-run48-routines.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PREVIEW_PORT = 4194;
@@ -202,6 +204,7 @@ const GROUPS = {
       await runRun47AboutSuite({ kind, base: BASE, errors, notes });
     }
   },
+  routines: () => runRun48RoutineSuite({ errors, notes }),
 };
 /** QA_SMOKE_ONLY=firstload,exits runs a subset of GROUPS (CI runs them as parallel shards); unset runs all. */
 const ONLY = process.env.QA_SMOKE_ONLY?.split(',').filter(Boolean) ?? Object.keys(GROUPS);

@@ -3,7 +3,7 @@ name: Gate
 # Fast checks that must pass before anything is deployed: build, typecheck, sprite
 # placement / picking / interiors, and the real-input smoke (first load framing, door
 # entry, single-tap exits, input, camera follow, logos, NPCs, player, case panel, map
-# fill) on Chromium and WebKit. Each suite runs as parallel shards so every job stays
+# fill) on Chromium and WebKit, plus the simulated NPC routines. Each suite runs as parallel shards so every job stays
 # well inside its timeout (~12 min wall clock); `gate passed` is the single check to require.
 on:
   workflow_call:
@@ -72,7 +72,7 @@ jobs:
           - exits-iphone
           - exits-desktop,exits-phone,about
           - firstload,input,case,fill
-          - follow,logos,npcs,player
+          - follow,logos,npcs,player,routines
     steps:
       - uses: actions/checkout@v4
 

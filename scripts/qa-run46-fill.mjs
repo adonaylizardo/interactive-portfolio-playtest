@@ -197,7 +197,7 @@ export async function runRun46FillSuite({ kind, base, errors, notes, shots }) {
       if (!Number.isFinite(o.zIndex)) errors.push(`${tag}: ${o.id} has no sprite`);
       else if (o.flat !== (o.zIndex === -10)) errors.push(`${tag}: ${o.id} flat=${o.flat} but zIndex ${o.zIndex}`);
     }
-    const wantActors = relleno.placements.filter((p) => p.kind === 'actor' || p.kind === 'npc').length + 1;
+    const wantActors = relleno.placements.filter((p) => p.kind === 'actor').length + 1;
     if (f.actors.length !== wantActors) errors.push(`${tag}: ${f.actors.length} fill actors, want ${wantActors} (with the golf ball)`);
 
     // Every drawn frame for 2.5 s: two snapshots can land on the same frame of a loop, more so when
