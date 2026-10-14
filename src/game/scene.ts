@@ -142,6 +142,11 @@ function noahScale(): number | undefined {
 
 /** Tiles within this distance of Noah can talk to him without walking. */
 const NOAH_TALK_RANGE = 1.6;
+/**
+ * A mouse or trackpad press on Noah may drift this far and still count as a click. The 4 px mouse
+ * pan threshold is easy to cross with a physical trackpad click (touch already allows 14 px).
+ */
+const NOAH_CLICK_SLOP_PX = 12;
 
 /**
  * Keyboard step on a tile grid: move on both axes if the target tile is walkable, otherwise slide
@@ -285,6 +290,8 @@ export class IsoScene {
   private panMoved = false;
   /** Screen pixels dragged during an active single-finger pan (pinch does not increment). */
   private panDragScreenPx = 0;
+  /** Farthest the single pointer of this gesture has strayed from where it went down, in screen px. */
+  private tapDriftPx = 0;
   private zoomChanged = false;
   private lastChecklistZoom = 0;
   private canvasEl: HTMLCanvasElement | null = null;
@@ -763,7 +770,7 @@ export class IsoScene {
       noahScale(),
     );
     this.noah.bindTap((e) => {
-      if (this.shouldBlockTap()) return;
+      if (this.shouldBlockTap(e.pointerType === 'touch' ? 0 : NOAH_CLICK_SLOP_PX)) return;
       e.stopPropagation();
       this.pixiTapGestureSerial = this.pointerGestureSerial;
       if (!this.prepareMapTap()) return;
@@ -1721,10 +1728,11 @@ export class IsoScene {
     }
   }
 
-  private shouldBlockTap(): boolean {
+  /** `panSlopPx`: a press that strayed no farther than this still taps, even if it nudged the camera. */
+  private shouldBlockTap(panSlopPx = 0): boolean {
     return (
       this.interiorActive ||
-      this.panMoved ||
+      (this.panMoved && (panSlopPx === 0 || this.tapDriftPx > panSlopPx)) ||
       this.pinchGestureActive ||
       this.hadMultiPointerGesture ||
       this.secondFingerArrived ||
@@ -2111,6 +2119,7 @@ export class IsoScene {
           this.panMoved = false;
           this.panDragScreenPx = 0;
         }
+        this.tapDriftPx = 0;
         this.lastPanPos = { x: e.clientX, y: e.clientY };
         this.tapStart = { x: e.clientX, y: e.clientY, t: performance.now() };
         this.tapDownStamp = e.timeStamp;
@@ -2153,6 +2162,7 @@ export class IsoScene {
           e.clientX - this.tapStart.x,
           e.clientY - this.tapStart.y,
         );
+        this.tapDriftPx = Math.max(this.tapDriftPx, totalFromTap);
         if (totalFromTap > panThreshold) {
           this.panMoved = true;
           document.body.classList.add('is-canvas-dragging');
@@ -3156,6 +3166,19 @@ export class IsoScene {
       scope: this.interiorActive ? 'room' : 'map',
       rendererResolution: this.app.renderer.resolution,
     };
+  }
+
+  /** QA: what Pixi's event boundary would deliver a mouse event at this client point to. */
+  qaPixiTargetAt(clientX: number, clientY: number): string | null {
+    const rect = this.canvasEl?.getBoundingClientRect();
+    if (!rect) return null;
+    const boundary = this.app.renderer.events.rootBoundary;
+    boundary.rootTarget ??= this.app.stage;
+    const t = boundary.hitTest(clientX - rect.left, clientY - rect.top);
+    if (!t) return null;
+    if (t === this.noah?.sprite) return 'noah';
+    for (const [id, v] of this.objectVisuals) if (v.sprite === t) return `object:${id}`;
+    return t.label || t.constructor.name;
   }
 
   qaNoah(): (NoahSnapshot & { client: { x: number; y: number } | null; talkRange: number }) | null {

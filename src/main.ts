@@ -159,6 +159,7 @@ async function main(): Promise<void> {
     setNpcs: (on: boolean) => scene.qaSetNpcs(on),
     playerAvatar: () => scene.qaPlayerAvatar(),
     noah: () => scene.qaNoah(),
+    pixiTargetAt: (x: number, y: number) => scene.qaPixiTargetAt(x, y),
   };
 }
 

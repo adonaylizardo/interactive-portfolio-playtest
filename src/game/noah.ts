@@ -1,4 +1,4 @@
-import { Container, Rectangle, Sprite, Texture } from 'pixi.js';
+import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
 import data from '../data/noah.json';
 import { CHARACTER_WORLD_SCALE } from './npcs';
 import { loadStrip, renderedVisible, sheetSuffix, worldToTileFrac } from './player';
@@ -26,6 +26,27 @@ const HIT_PAD = 4;
 /** Touch / phone layouts: the hit box grows 1.5x around the cell so a fingertip at map zoom finds him. */
 const TOUCH_HIT_SCALE = 1.5;
 const TOUCH_QUERY = '(pointer: coarse), (max-width: 767px)';
+const HOVER_QUERY = '(hover: hover)';
+/** The "…" bubble's tail tip, in art px from the feet anchor: just above his head. */
+const BUBBLE_TIP = { x: 3, y: -30 };
+const BUBBLE_Z = 2_000_000;
+
+/** Speech bubble with "…", drawn in art px; its tail tip sits at (0, 0). */
+function talkBubble(): Graphics {
+  const ink = 0x2b2b2b;
+  const g = new Graphics()
+    .roundRect(-3, -14, 15, 10, 2)
+    .fill(0xffffff)
+    .stroke({ width: 1, color: ink })
+    .poly([-1, -4.5, 0, 0, 3, -4.5])
+    .fill(0xffffff)
+    .stroke({ width: 1, color: ink });
+  for (const x of [0.5, 4, 7.5]) g.rect(x, -9.5, 1.5, 1.5).fill(ink);
+  g.eventMode = 'none';
+  g.zIndex = BUBBLE_Z;
+  g.visible = false;
+  return g;
+}
 
 /**
  * Walk back to the start: there is no south-west walk yet, so `caminar_ne` mirrored, at the pace of
@@ -68,6 +89,8 @@ export type NoahSnapshot = {
   worldH: number;
   /** Tap target in world px (axis-aligned; Noah is never rotated). */
   hit: { x: number; y: number; w: number; h: number };
+  /** The hover "…" bubble is showing. */
+  bubble: boolean;
   scale: number;
   filter: string;
   /** Waypoints reached this run, in order. */
@@ -79,6 +102,9 @@ export type NoahSnapshot = {
 /** Noah, the climbing kid by the muro. A talk (tap or Enter beside him) plays his route once. */
 export class Noah {
   readonly sprite = new Sprite();
+  /** Pointer-hover hint that he can be talked to (the cursor alone matches every walkable tile). */
+  private readonly bubble = talkBubble();
+  private hovered = false;
   private frames = new Map<string, Texture[]>();
   private loaded = false;
   private phase: NoahSnapshot['phase'] = 'idle';
@@ -110,6 +136,19 @@ export class Noah {
     this.syncHitArea();
     matchMedia(TOUCH_QUERY).addEventListener('change', () => this.syncHitArea());
     this.sprite.visible = false;
+    this.bubble.scale.set(scale);
+    this.sprite.on('pointerover', (e) => {
+      this.hovered = e.pointerType !== 'touch' && matchMedia(HOVER_QUERY).matches;
+      this.syncBubble();
+    });
+    this.sprite.on('pointerout', () => {
+      this.hovered = false;
+      this.syncBubble();
+    });
+  }
+
+  private syncBubble(): void {
+    this.bubble.visible = this.hovered && this.loaded && !this.hidden && this.phase === 'idle';
   }
 
   private syncHitArea(): void {
@@ -132,7 +171,7 @@ export class Noah {
       }),
     );
     this.loaded = true;
-    this.layer.addChild(this.sprite);
+    this.layer.addChild(this.sprite, this.bubble);
     this.goIdle();
   }
 
@@ -159,6 +198,7 @@ export class Noah {
   setHidden(hidden: boolean): void {
     this.hidden = hidden;
     this.sprite.visible = this.loaded && !hidden;
+    this.syncBubble();
   }
 
   /** Starts the route; false while it is already playing. */
@@ -238,6 +278,8 @@ export class Noah {
     if (list) this.sprite.texture = list[this.frame % list.length];
     this.syncDepth();
     this.sprite.visible = this.loaded && !this.hidden;
+    this.bubble.position.set(Math.round(x) + BUBBLE_TIP.x * this.scale, Math.round(y) + BUBBLE_TIP.y * this.scale);
+    this.syncBubble();
   }
 
   syncDepth(): void {
@@ -283,6 +325,7 @@ export class Noah {
       worldW: Math.abs(this.sprite.width),
       worldH: this.sprite.height,
       hit: this.hitWorld(),
+      bubble: renderedVisible(this.bubble),
       scale: this.scale,
       filter: `${src.magFilter}/${src.minFilter}`,
       reached: [...this.reached],
