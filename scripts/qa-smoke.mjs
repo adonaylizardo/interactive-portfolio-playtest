@@ -10,6 +10,7 @@
  *  - camera follow: long walk stays centred at 1280 and 375, drag suspends, zoom mid-walk (qa-run42-follow.mjs)
  *  - "Worked with" logo strip: equal heights, wraps without overflow, gray by default and real colours on hover / focus / tap (qa-run43-logos.mjs)
  *  - street NPCs: street tiles only, four directions with idle pauses, no skating, desynced frames, taps pass through (qa-run44-npcs.mjs)
+ *  - pixel-art player: facing from movement, frames locked to distance, ~4.5 tiles/s, Pantone one tile behind, Noah's climb (qa-run45-player.mjs)
  * Usage: npm run qa:smoke   (builds first; QA_BASE_URL skips the local preview server)
  */
 import { spawn } from 'node:child_process';
@@ -22,6 +23,7 @@ import { runRun41InputSuite } from './qa-run41-input.mjs';
 import { runRun42FollowSuite } from './qa-run42-follow.mjs';
 import { runRun43LogoSuite } from './qa-run43-logos.mjs';
 import { runRun44NpcSuite } from './qa-run44-npcs.mjs';
+import { runRun45PlayerSuite } from './qa-run45-player.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PREVIEW_PORT = 4194;
@@ -161,6 +163,9 @@ try {
   }
   for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
     await runRun44NpcSuite({ kind, base: BASE, errors, notes });
+  }
+  for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
+    await runRun45PlayerSuite({ kind, base: BASE, errors, notes });
   }
 } finally {
   preview?.kill('SIGKILL');
