@@ -7,14 +7,15 @@
  *  - every logo starts in the same gray; hover (mouse), keyboard focus and tap (touch) reveal its
  *    real colours with a ~200 ms transition (checked on screenshot pixels), and alt = company name
  *  - the strip only shows in the Estudio panel
- *  - the real list (src/data/worked-with.json) loads every file
+ *  - the real list (src/data/worked-with.json) is not empty, shows every entry in order with
+ *    alt = company name, and loads every file
  * Usage: imported by qa-smoke.mjs; `node scripts/qa-run43-logos.mjs [--shots] [url]` runs it alone.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit, devices } from 'playwright';
-import { installReadyWait } from './qa-ready.mjs';
+import { launchBrowser } from './qa-ready.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -163,7 +164,7 @@ async function testReveal(page, spec, tag, errors) {
 export async function runRun43LogoSuite({ kind, base, errors, notes, shots }) {
   const spec = RUN43_KINDS[kind];
   const tag = `run43-${kind}-logos`;
-  const browser = installReadyWait(await spec.type.launch());
+  const browser = await launchBrowser(spec.type);
   const ctx = await browser.newContext(spec.options);
   const page = await ctx.newPage();
   try {
@@ -171,7 +172,11 @@ export async function runRun43LogoSuite({ kind, base, errors, notes, shots }) {
     const real = await measure(page);
     const broken = real.imgs.filter((i) => !i.ok);
     if (broken.length) errors.push(`${tag}: real logos failed to load: ${broken.map((i) => i.alt).join(', ')}`);
-    if (real.imgs.length === 0 && !real.hidden) errors.push(`${tag}: empty strip is visible`);
+    const listed = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/data/worked-with.json'), 'utf8'));
+    if (!listed.length) errors.push(`${tag}: src/data/worked-with.json is empty`);
+    if (real.hidden) errors.push(`${tag}: the real strip is hidden in the Estudio panel`);
+    const alts = real.imgs.map((i) => i.alt).join(' | ');
+    if (alts !== listed.map((l) => l.name).join(' | ')) errors.push(`${tag}: real strip shows [${alts}], want the ${listed.length} names in worked-with.json`);
 
     const fixtures = fixtureLogos();
     await qa(page, (l) => window.__playtestQa.setWorkedWith(l), fixtures);
