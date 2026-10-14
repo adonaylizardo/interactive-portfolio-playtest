@@ -1,5 +1,49 @@
+import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
 import { CASES, type CaseBlock } from '../data/cases';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
+
+function aboutBlockNode(block: AboutBlock): HTMLElement {
+  if (block.kind === 'heading') {
+    const h = document.createElement(`h${block.level + 3}`);
+    h.className = `about__h${block.level}`;
+    h.textContent = block.text;
+    return h;
+  }
+  if (block.kind === 'image') {
+    const picture = document.createElement('picture');
+    picture.className = 'about__photo';
+    const webp = document.createElement('source');
+    webp.type = 'image/webp';
+    webp.srcset = `${import.meta.env.BASE_URL}about/${block.name}.webp`;
+    const img = document.createElement('img');
+    img.src = `${import.meta.env.BASE_URL}about/${block.fallback}`;
+    img.width = block.width;
+    img.height = block.height;
+    img.alt = block.alt;
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    picture.append(webp, img);
+    return picture;
+  }
+  const p = document.createElement('p');
+  p.className = 'about__text';
+  block.lines.forEach((line, i) => {
+    if (i > 0) p.appendChild(document.createElement('br'));
+    for (const part of line) {
+      if (!part.href) {
+        p.appendChild(document.createTextNode(part.text));
+        continue;
+      }
+      const a = document.createElement('a');
+      a.href = part.href;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = part.text;
+      p.appendChild(a);
+    }
+  });
+  return p;
+}
 
 function caseBlockNode(block: CaseBlock): HTMLElement {
   if (block.kind === 'closing') {
@@ -42,6 +86,7 @@ export class BuildingPanel {
   private titleEl: HTMLElement;
   private workedWithEl: HTMLElement;
   private caseEl: HTMLElement;
+  private aboutEl: HTMLElement;
   /** Building panel title as passed in: the identity scene code compares against (may differ from what is shown). */
   private openKey = '';
   private workedWithLogos: WorkedWithLogo[] = WORKED_WITH;
@@ -80,6 +125,9 @@ export class BuildingPanel {
             <h3 class="worked-with__title" id="worked-with-title">Worked with</h3>
             <ul class="worked-with__logos"></ul>
           </section>
+          <section class="about" lang="en" aria-labelledby="about-title" hidden>
+            <h3 class="about__title" id="about-title">About me</h3>
+          </section>
         </div>
         <button type="button" class="building-panel__salir" data-exit>Salir</button>
       </div>
@@ -89,6 +137,8 @@ export class BuildingPanel {
     this.titleEl = this.el.querySelector('.building-panel__title')!;
     this.workedWithEl = this.el.querySelector('.worked-with')!;
     this.caseEl = this.el.querySelector('.case')!;
+    this.aboutEl = this.el.querySelector('.about')!;
+    this.aboutEl.append(...ABOUT.map(aboutBlockNode));
     // Touch has no hover: a tap shows that logo's colours until another logo (or the same one) is tapped.
     this.workedWithEl.addEventListener('click', (e) => {
       const hit = (e.target as HTMLElement).closest('.worked-with__logo');
@@ -174,6 +224,7 @@ export class BuildingPanel {
     this.interiorId = interiorId;
     this.setTitle(title, this.renderCase());
     this.renderWorkedWith();
+    this.renderAbout();
     this.peekOnly = this.isMobile();
     this.el.hidden = false;
     const floatExit = this.el.querySelector('[data-float-exit]') as HTMLElement;
@@ -190,6 +241,7 @@ export class BuildingPanel {
     this.mode = 'hidden';
     this.interiorId = null;
     this.setTitle(title, this.renderCase());
+    this.renderAbout();
     this.peekOnly = false;
     this.el.hidden = false;
     requestAnimationFrame(() => this.el.classList.add('building-panel--open'));
@@ -213,6 +265,12 @@ export class BuildingPanel {
     full.replaceChildren(...(content ? content.full.map(caseBlockNode) : []));
     short.replaceChildren(...(content ? content.short.map(caseBlockNode) : []));
     return content?.headline ?? null;
+  }
+
+  private renderAbout(): void {
+    const about = !!this.interiorId && ABOUT_PANELS.has(this.interiorId);
+    this.aboutEl.hidden = !about;
+    this.el.classList.toggle('building-panel--about', about);
   }
 
   private renderWorkedWith(): void {
