@@ -21,6 +21,11 @@ const SEQUENCE: Step[] = data.secuencia.map((s) => ({
 /** Climbing anims draw just above the muro; everything else sorts with the walkers. */
 const ON_WALL = new Set(['subir', 'travesia_derecha', 'bajar', 'salto_aterrizaje']);
 const MURO_DEPTH_EPS = 0.25;
+/** Hit box padding around the frame cell, in art px. */
+const HIT_PAD = 4;
+/** Touch / phone layouts: the hit box grows 1.5x around the cell so a fingertip at map zoom finds him. */
+const TOUCH_HIT_SCALE = 1.5;
+const TOUCH_QUERY = '(pointer: coarse), (max-width: 767px)';
 
 /**
  * Walk back to the start: there is no south-west walk yet, so `caminar_ne` mirrored, at the pace of
@@ -61,6 +66,8 @@ export type NoahSnapshot = {
   visible: boolean;
   worldW: number;
   worldH: number;
+  /** Tap target in world px (axis-aligned; Noah is never rotated). */
+  hit: { x: number; y: number; w: number; h: number };
   scale: number;
   filter: string;
   /** Waypoints reached this run, in order. */
@@ -100,8 +107,18 @@ export class Noah {
     this.sprite.scale.set(scale);
     this.sprite.eventMode = 'static';
     this.sprite.cursor = 'pointer';
-    this.sprite.hitArea = new Rectangle(-ANCHOR.x - 4, -ANCHOR.y - 4, CELL_W + 8, CELL_H + 8);
+    this.syncHitArea();
+    matchMedia(TOUCH_QUERY).addEventListener('change', () => this.syncHitArea());
     this.sprite.visible = false;
+  }
+
+  private syncHitArea(): void {
+    const k = matchMedia(TOUCH_QUERY).matches ? TOUCH_HIT_SCALE : 1;
+    const w = (CELL_W + 2 * HIT_PAD) * k;
+    const h = (CELL_H + 2 * HIT_PAD) * k;
+    const cx = CELL_W / 2 - ANCHOR.x;
+    const cy = CELL_H / 2 - ANCHOR.y;
+    this.sprite.hitArea = new Rectangle(cx - w / 2, cy - h / 2, w, h);
   }
 
   async load(resolution: number): Promise<void> {
@@ -236,6 +253,14 @@ export class Noah {
     this.sprite.on('pointertap', handler);
   }
 
+  private hitWorld(): NoahSnapshot['hit'] {
+    const r = this.sprite.hitArea as Rectangle;
+    const sx = Math.abs(this.sprite.scale.x);
+    const sy = this.sprite.scale.y;
+    const x0 = this.mirrored ? -(r.x + r.width) : r.x;
+    return { x: this.sprite.x + x0 * sx, y: this.sprite.y + r.y * sy, w: r.width * sx, h: r.height * sy };
+  }
+
   snapshot(): NoahSnapshot {
     const f = worldToTileFrac(this.x, this.y);
     const src = this.sprite.texture.source;
@@ -257,6 +282,7 @@ export class Noah {
       visible: renderedVisible(this.sprite),
       worldW: Math.abs(this.sprite.width),
       worldH: this.sprite.height,
+      hit: this.hitWorld(),
       scale: this.scale,
       filter: `${src.magFilter}/${src.minFilter}`,
       reached: [...this.reached],
