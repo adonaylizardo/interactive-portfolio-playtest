@@ -200,11 +200,25 @@ export async function runRun46FillSuite({ kind, base, errors, notes, shots }) {
     const wantActors = relleno.placements.filter((p) => p.kind === 'actor' || p.kind === 'npc').length + 1;
     if (f.actors.length !== wantActors) errors.push(`${tag}: ${f.actors.length} fill actors, want ${wantActors} (with the golf ball)`);
 
-    const frames0 = Object.fromEntries(f.actors.map((a) => [a.id, a.frame]));
-    await wait(1300);
-    const f1 = await qa(page, () => window.__playtestQa.fill());
-    const still = f1.actors.filter((a) => /^(bot-|golf-golfista|fill\/golf-green)/.test(a.id) && a.frame === frames0[a.id]);
-    if (still.length) errors.push(`${tag}: not animating: ${still.map((a) => a.id).join(', ')}`);
+    // Every drawn frame for 2.5 s: two snapshots can land on the same frame of a loop, more so when
+    // a slow renderer (CI software GL, ~4 fps) runs game time slow.
+    const seen = await qa(
+      page,
+      (ms) =>
+        new Promise((resolve) => {
+          const out = {};
+          const t0 = performance.now();
+          const tick = () => {
+            for (const a of window.__playtestQa.fill().actors) (out[a.id] ??= new Set()).add(a.frame);
+            if (performance.now() - t0 < ms) requestAnimationFrame(tick);
+            else resolve(Object.fromEntries(Object.entries(out).map(([id, s]) => [id, s.size])));
+          };
+          requestAnimationFrame(tick);
+        }),
+      2500,
+    );
+    const still = Object.keys(seen).filter((id) => /^(bot-|golf-golfista|fill\/golf-green)/.test(id) && seen[id] < 2);
+    if (still.length) errors.push(`${tag}: not animating: ${still.join(', ')}`);
 
     if (shots) {
       const c = (x, y) => [(x - y) * 64, (x + y) * 32];
