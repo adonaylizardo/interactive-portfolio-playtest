@@ -58,11 +58,18 @@ function installReadyWait(browser) {
 }
 
 /**
- * Chromium's default software GL (SwiftShader) draws the map at ~4 fps on CI runners, far below the
- * frame rates the walk / animation / follow timings assume. Mesa llvmpipe through ANGLE's GL backend
- * is ~3.5x faster on the same CPU (needs Mesa's EGL/GL drivers installed). QA_GL=swiftshader opts out.
+ * Chromium's default software GL is SwiftShader. QA_GL=llvmpipe switches to Mesa llvmpipe through
+ * ANGLE's EGL backend (works without an X display; needs Mesa's EGL/GL drivers): about 3x the
+ * average frame rate, but it stalls for hundreds of ms now and then, which skews walk timings.
  */
-const CHROMIUM_GL_ARGS = process.env.QA_GL === 'swiftshader' ? [] : ['--use-angle=gl', '--ignore-gpu-blocklist'];
+const CHROMIUM_GL_ARGS = process.env.QA_GL === 'llvmpipe' ? ['--use-angle=gl-egl', '--ignore-gpu-blocklist'] : [];
+
+/**
+ * Pixi caps a frame's game time at 100 ms, so once frames take longer than that game time runs slow.
+ * When the 90th-percentile frame misses that (under 10 fps; software GL on CI draws ~4), checks
+ * that time walks, glides or animations report instead of failing.
+ */
+export const TIMING_MIN_FPS = 10;
 
 /** Launches a Playwright browser type with the QA GL backend and the QA-hook readiness wait. */
 export async function launchBrowser(type, options = {}) {

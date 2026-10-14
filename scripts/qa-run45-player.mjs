@@ -12,13 +12,15 @@
  *    waves, walks to the wall, climbs, traverses, descends, lands on every manifest waypoint in
  *    order at 8 fps, walks back mirrored and idles; taps while busy are ignored; Enter beside him
  *    starts another run
+ * Speeds, idle breathing, Noah's route time, his short wave and exact waypoints are only asserted
+ * when the recording drew at least TIMING_MIN_FPS (qa-ready.mjs).
  * Usage: imported by qa-smoke.mjs; `node scripts/qa-run45-player.mjs [--shots] [url]` runs it alone.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright';
-import { launchBrowser } from './qa-ready.mjs';
+import { launchBrowser, TIMING_MIN_FPS } from './qa-ready.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -39,6 +41,13 @@ export const RUN45_KINDS = {
     touch: true,
   },
 };
+
+/** Frame rate of a recording whose rows start with a timestamp, from its 90th-percentile interval. */
+function logFps(rows) {
+  const gaps = rows.slice(1).map((r, i) => r[0] - rows[i][0]).sort((a, b) => a - b);
+  return gaps.length ? 1000 / gaps[Math.floor(gaps.length * 0.9)] : 0;
+}
+const untimedNote = (what, fps) => ` (${what} not asserted: page drew ${fps.toFixed(1)} fps, under ${TIMING_MIN_FPS})`;
 
 function facing(dx, dy, prev) {
   const v = Math.abs(dy) < 1e-6 ? prev[0] : dy > 0 ? 's' : 'n';
@@ -186,11 +195,13 @@ async function walkChecks(page, spec, tag, errors) {
   const log = await stopRecorder(page);
   const s1 = await qa(page, () => window.__playtestQa.playerAvatar());
   const a = analyseWalk(log, tag, errors, s1.stride);
-  // Headless WebKit can render a few fps here; speed then reads low (frame time is capped), so
-  // light runs report speed instead of asserting it.
+  // Headless WebKit (and software GL on CI) can render a few fps here; speed then reads low (frame
+  // time is capped), so light or slow-drawing runs report speed instead of asserting it.
+  const fps = logFps(log);
+  const timed = !spec.light && fps >= TIMING_MIN_FPS;
   for (const m of ['key-se', 'key-sw', 'key-nw', 'key-ne', 'key-diag']) {
     const v = a.speeds[m] ?? 0;
-    if (!spec.light && Math.abs(v - WALK_PX_S) > WALK_PX_S * 0.15) {
+    if (timed && Math.abs(v - WALK_PX_S) > WALK_PX_S * 0.15) {
       errors.push(`${tag}: ${m} walks ${(v / TILE_STEP).toFixed(2)} tiles/s, want ~4.5`);
     }
   }
@@ -199,7 +210,7 @@ async function walkChecks(page, spec, tag, errors) {
   }
   const tail = log.filter((r) => r[12] === 'stop' && r[4] === 'idle');
   const idleFrames = new Set(tail.map((r) => r[5]));
-  if (idleFrames.size < 2) errors.push(`${tag}: idle never alternated its 2 frames in ${tail.length} samples`);
+  if (idleFrames.size < 2 && (timed || spec.light)) errors.push(`${tag}: idle never alternated its 2 frames in ${tail.length} samples`);
 
   // Tapped path: same speed, Pantone trots behind and settles one tile back.
   const from = await qa(page, () => window.__playtestQa.getCharacterTile());
@@ -234,16 +245,20 @@ async function walkChecks(page, spec, tag, errors) {
     const moving = tapLog.filter((r, i) => i > 0 && Math.hypot(r[1] - tapLog[i - 1][1], r[2] - tapLog[i - 1][2]) > 0.01);
     const dur = moving.length ? (moving[moving.length - 1][0] - moving[0][0]) / 1000 : 0;
     const tilesPerS = dur ? 4 / dur : 0;
-    if (!spec.light && Math.abs(tilesPerS - 4.5) > 4.5 * 0.15) errors.push(`${tag}: tapped 4-tile walk took ${dur.toFixed(2)} s (${tilesPerS.toFixed(2)} tiles/s, want ~4.5)`);
+    const tapFps = logFps(tapLog);
+    if (!spec.light && tapFps >= TIMING_MIN_FPS && Math.abs(tilesPerS - 4.5) > 4.5 * 0.15) errors.push(`${tag}: tapped 4-tile walk took ${dur.toFixed(2)} s (${tilesPerS.toFixed(2)} tiles/s, want ~4.5)`);
     const trotted = tapLog.some((r) => r[10] === 'walk');
     if (!trotted) errors.push(`${tag}: Pantone never trotted on the tapped walk`);
     const end = await qa(page, () => window.__playtestQa.playerAvatar());
     const gap = Math.hypot(end.adonay.x - end.pantone.x, end.adonay.y - end.pantone.y);
     if (Math.abs(gap - TILE_STEP) > 2) errors.push(`${tag}: Pantone settled ${gap.toFixed(1)} px from Adonay after a straight walk, want one tile`);
-    tapNote = `; tapped 4 tiles at ${tilesPerS.toFixed(2)} tiles/s`;
+    tapNote = `; tapped 4 tiles at ${tilesPerS.toFixed(2)} tiles/s${!spec.light && tapFps < TIMING_MIN_FPS ? untimedNote('speed', tapFps) : ''}`;
   }
   const fmt = Object.entries(a.speeds).map(([k, v]) => `${k.replace('key-', '')} ${(v / TILE_STEP).toFixed(2)}`).join(', ');
-  return `keys ${fmt} tiles/s (walk ${(WALK_PX_S / s1.stride).toFixed(0)} fps), faced ${a.dirsSeen.join('/')}, Pantone ≤ ${a.maxGap.toFixed(1)} px behind${tapNote}`;
+  return (
+    `keys ${fmt} tiles/s (walk ${(WALK_PX_S / s1.stride).toFixed(0)} fps)${!spec.light && !timed ? untimedNote('speeds and idle breathing', fps) : ''}, ` +
+    `faced ${a.dirsSeen.join('/')}, Pantone ≤ ${a.maxGap.toFixed(1)} px behind${tapNote}`
+  );
 }
 
 async function noahChecks(page, spec, tag, errors, shots, kind) {
@@ -283,7 +298,7 @@ async function noahChecks(page, spec, tag, errors, shots, kind) {
   else await page.mouse.click(Math.round(n1.client.x), Math.round(n1.client.y));
   const t0 = Date.now();
   const started = await page
-    .waitForFunction(() => window.__playtestQa.noah().phase !== 'idle', null, { timeout: 6000 })
+    .waitForFunction(() => window.__playtestQa.noah().phase !== 'idle', null, { timeout: 12000 })
     .then(() => true)
     .catch(() => false);
   if (!started) {
@@ -338,7 +353,11 @@ async function noahChecks(page, spec, tag, errors, shots, kind) {
   if (n2.reached.join('>') !== wantReached.join('>')) {
     errors.push(`${tag}: Noah reached ${n2.reached.join(' > ')}, want ${wantReached.join(' > ')}`);
   }
-  for (const wp of NOAH_ROUTE) {
+  // Sampled once per drawn frame: at a low draw rate whole manifest frames (the short wave, a
+  // waypoint) can fall between samples and game time runs slow, so those are reported only.
+  const noahFps = logFps(log);
+  const noahTimed = noahFps >= TIMING_MIN_FPS;
+  for (const wp of noahTimed ? NOAH_ROUTE : []) {
     const p = n2.waypoints[wp];
     if (!log.some((r) => Math.abs(r[4] - p.x) < 0.01 && Math.abs(r[5] - p.y) < 0.01)) {
       errors.push(`${tag}: Noah never stood exactly on ${wp} (${p.x}, ${p.y})`);
@@ -347,8 +366,10 @@ async function noahChecks(page, spec, tag, errors, shots, kind) {
   const anims = [];
   for (const r of log) if (anims[anims.length - 1] !== r[2] + (r[6] ? '~' : '')) anims.push(r[2] + (r[6] ? '~' : ''));
   const wantAnims = ['hablar', 'caminar_ne', 'subir', 'travesia_derecha', 'bajar', 'salto_aterrizaje', 'idle', 'caminar_ne~', 'idle'];
-  const seq = anims[0] === 'hablar' ? anims : anims.slice(anims.indexOf('hablar'));
-  if (seq.join(' ') !== wantAnims.slice(0, seq.length).join(' ') || seq.length < wantAnims.length - 1) {
+  const waved = anims.indexOf('hablar');
+  const seq = waved >= 0 ? anims.slice(waved) : anims;
+  const want = waved >= 0 || noahTimed ? wantAnims : wantAnims.slice(1);
+  if (seq.join(' ') !== want.slice(0, seq.length).join(' ') || seq.length < want.length - 1) {
     errors.push(`${tag}: Noah played ${anims.join(' > ')}, want ${wantAnims.join(' > ')}`);
   }
   const wallZ = log.filter((r) => r[7]).map((r) => r[8]);
@@ -359,7 +380,7 @@ async function noahChecks(page, spec, tag, errors, shots, kind) {
   }
   const seqEnd = log.find((r) => r[6]);
   const seqSecs = seqEnd ? seqEnd[0] / 1000 : 0;
-  if (Math.abs(seqSecs - NOAH_SEQUENCE_S) > NOAH_SEQUENCE_S * (spec.light ? 0.25 : 0.12)) {
+  if (noahTimed && Math.abs(seqSecs - NOAH_SEQUENCE_S) > NOAH_SEQUENCE_S * (spec.light ? 0.25 : 0.12)) {
     errors.push(`${tag}: Noah's route took ${seqSecs.toFixed(2)} s, want ~${NOAH_SEQUENCE_S.toFixed(2)} s at 8 fps`);
   }
   await shot(`noah-${kind}.png`);
@@ -374,7 +395,10 @@ async function noahChecks(page, spec, tag, errors, shots, kind) {
     await wait(250);
     await shot(`noah-climb-${kind}.png`);
   }
-  return `Noah ${n0.worldW}x${n0.worldH}: walked over in ${(walkedMs / 1000).toFixed(1)} s, route ${seqSecs.toFixed(2)} s through ${NOAH_ROUTE.length} waypoints, back mirrored; busy tap ignored; Enter restarts`;
+  return (
+    `Noah ${n0.worldW}x${n0.worldH}: walked over in ${(walkedMs / 1000).toFixed(1)} s, route ${seqSecs.toFixed(2)} s through ${NOAH_ROUTE.length} waypoints, back mirrored` +
+    `${noahTimed ? '' : untimedNote('route time, the wave and exact waypoints', noahFps)}; busy tap ignored; Enter restarts`
+  );
 }
 
 export async function runRun45PlayerSuite({ kind, base, errors, notes, shots }) {

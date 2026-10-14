@@ -5,13 +5,15 @@
  *    with no frame-to-frame jitter
  *  - dragging the map mid-walk suspends follow; the next tap glides back to centre without overshoot
  *  - ctrl+wheel (desktop) / two-finger pinch (phone) while walking zooms about the character
+ * Glide times and frame-to-frame steps are only asserted when the page draws at least
+ * TIMING_MIN_FPS (qa-ready.mjs).
  * Usage: imported by qa-smoke.mjs; `node scripts/qa-run42-follow.mjs [--video] [url]` runs it alone
  * (--video records artifacts/run42/*.webm).
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright';
-import { launchBrowser } from './qa-ready.mjs';
+import { launchBrowser, TIMING_MIN_FPS } from './qa-ready.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -199,6 +201,14 @@ async function walkRouteByTaps(page, touch, route, maxMs = 90000) {
   return { ok: false, taps, why: 'timed out' };
 }
 
+/** Frame rate of a recording, from its 90th-percentile frame interval. */
+function logFps(log) {
+  const gaps = log.slice(1).map((s, i) => s.t - log[i].t).sort((a, b) => a - b);
+  return gaps.length ? 1000 / gaps[Math.floor(gaps.length * 0.9)] : 0;
+}
+
+const untimedNote = (fps) => `; glide time and frame steps not asserted (page drew ${fps.toFixed(1)} fps, under ${TIMING_MIN_FPS})`;
+
 function summarise(log, from) {
   const s = log.slice(from);
   return s.length ? Math.max(...s.map(offCentre)) : 0;
@@ -229,8 +239,10 @@ async function testLongWalk(page, kind, errors, notes) {
     errors.push(`${tag}: the character never came within ${CENTRE_FRAC * 100}% of the centre`);
     return;
   }
+  const fps = logFps(log);
+  const timed = fps >= TIMING_MIN_FPS;
   const glideMs = log[firstIn].t - t0;
-  if (glideMs > GLIDE_MAX_MS) errors.push(`${tag}: camera took ${glideMs.toFixed(0)} ms to centre the character`);
+  if (timed && glideMs > GLIDE_MAX_MS) errors.push(`${tag}: camera took ${glideMs.toFixed(0)} ms to centre the character`);
   const after = log.slice(firstIn);
   const worst = after.reduce((m, s) => (offCentre(s) > offCentre(m) ? s : m), after[0]);
   if (offCentre(worst) > CENTRE_FRAC) {
@@ -245,11 +257,16 @@ async function testLongWalk(page, kind, errors, notes) {
   for (let i = Math.max(settled, 0) + 1; settled >= 0 && i < log.length; i++) {
     jitter = Math.max(jitter, Math.hypot(log[i].dx - log[i - 1].dx, log[i].dy - log[i - 1].dy));
   }
-  if (jitter > 3) errors.push(`${tag}: on-screen character jumped ${jitter.toFixed(1)} px between frames while followed`);
+  // The camera catches up per unit of time, so a longer frame shows a longer step: 3 px per 50 ms frame.
+  const maxStep = 3 * Math.max(1, 1000 / fps / 50);
+  if (timed && jitter > maxStep) {
+    errors.push(`${tag}: on-screen character jumped ${jitter.toFixed(1)} px between frames while followed (limit ${maxStep.toFixed(1)} px at ${fps.toFixed(1)} fps)`);
+  }
   notes.push(
     `${tag}: ${route.length}-tile walk in ${r.taps} taps, centred after ${glideMs.toFixed(0)} ms, ` +
       `max ${(summarise(log, firstIn) * 100).toFixed(1)}% off centre (${worst.dx.toFixed(0)},${worst.dy.toFixed(0)} px at ` +
-      `${worst.x.toFixed(1)},${worst.y.toFixed(1)}) over ${after.length} frames, max frame step ${jitter.toFixed(1)} px`,
+      `${worst.x.toFixed(1)},${worst.y.toFixed(1)}) over ${after.length} frames, max frame step ${jitter.toFixed(1)} px` +
+      (timed ? '' : untimedNote(fps)),
   );
 }
 
@@ -342,9 +359,12 @@ async function testPanSuspend(page, kind, errors, notes, cdp) {
     errors.push(`${tag}: a new tap did not resume follow`);
     return;
   }
+  const fps = logFps(log);
   const firstIn = log.findIndex((s, i) => i >= tapIdx && offCentre(s) <= CENTRE_FRAC);
   if (firstIn < 0) {
-    errors.push(`${tag}: glide back did not centre the character within ${GLIDE_MAX_MS} ms (still ${(offCentre(log.at(-1)) * 100).toFixed(0)}% off)`);
+    const msg = `glide back did not centre the character within ${GLIDE_MAX_MS} ms (still ${(offCentre(log.at(-1)) * 100).toFixed(0)}% off)`;
+    if (fps >= TIMING_MIN_FPS) errors.push(`${tag}: ${msg}`);
+    else notes.push(`${tag}: drag suspended follow; ${msg}${untimedNote(fps)}`);
     return;
   }
   const glideMs = log[firstIn].t - log[tapIdx].t;

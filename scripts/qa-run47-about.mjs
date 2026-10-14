@@ -196,7 +196,7 @@ async function noahTapCheck(page, spec, tag, errors) {
   const pt = await qa(page, ([x, y]) => window.__playtestQa.worldToClient(x, y), [wx, cy]);
   await page.touchscreen.tap(Math.round(pt.x), Math.round(pt.y));
   const started = await page
-    .waitForFunction(() => window.__playtestQa.noah().phase !== 'idle', null, { timeout: 8000 })
+    .waitForFunction(() => window.__playtestQa.noah().phase !== 'idle', null, { timeout: 12000 })
     .then(() => true)
     .catch(() => false);
   if (!started) errors.push(`${tag}: a tap ${(wx - cx).toFixed(0)} world px right of Noah (inside the 1.5x box) did not reach him`);
@@ -225,7 +225,7 @@ async function placePlayerByNoah(page, offsets) {
 
 const noahStarted = (page) =>
   page
-    .waitForFunction(() => window.__playtestQa.noah().phase !== 'idle', null, { timeout: 8000 })
+    .waitForFunction(() => window.__playtestQa.noah().phase !== 'idle', null, { timeout: 12000 })
     .then(() => true)
     .catch(() => false);
 

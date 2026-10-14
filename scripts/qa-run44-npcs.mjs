@@ -7,7 +7,8 @@
  *    some NPCs pause on the idle strip and set off again
  *  - characters draw at 2 world px per sheet px (64×100 world px cells) with nearest filtering
  *  - feet do not skate: each walk frame moves exactly one stride (4 or 8 world px in x, half in y)
- *    along the facing, on integer pixels, at ~10 fps
+ *    along the facing, on integer pixels, at ~10 fps (the rate is only asserted when the page
+ *    draws at least TIMING_MIN_FPS; software GL on CI can draw ~4 fps)
  *  - start frames differ, so the crowd does not walk in step
  *  - a tap on an NPC goes through to the map (the player walks); NPCs hide in interiors and under
  *    QA sprite isolation; automated browsers get no NPCs unless `?npcs=1`; reduced motion stands
@@ -18,7 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright';
-import { launchBrowser } from './qa-ready.mjs';
+import { launchBrowser, TIMING_MIN_FPS } from './qa-ready.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -134,8 +135,11 @@ function analyse(frames, streets, tag, errors) {
   if (!idleSamples) errors.push(`${tag}: no NPC paused on the idle strip`);
   if (!transitions) errors.push(`${tag}: no NPC switched between walking and idling`);
   const fps = walkTime ? (walkFrames / walkTime) * 1000 : 0;
-  if (pairs && (fps < 7 || fps > 12.5)) errors.push(`${tag}: walk cycle runs at ${fps.toFixed(1)} fps (want ~10)`);
-  return { dirsWalked: [...dirsWalked].sort(), idleSamples, transitions, fps, samples: frames.length };
+  const gaps = frames.slice(1).map((f, i) => f.t - frames[i].t).sort((a, b) => a - b);
+  const drawFps = gaps.length ? 1000 / gaps[Math.floor(gaps.length * 0.9)] : 0;
+  const timed = drawFps >= TIMING_MIN_FPS;
+  if (timed && pairs && (fps < 7 || fps > 12.5)) errors.push(`${tag}: walk cycle runs at ${fps.toFixed(1)} fps (want ~10)`);
+  return { dirsWalked: [...dirsWalked].sort(), idleSamples, transitions, fps, drawFps, timed, samples: frames.length };
 }
 
 /** Densest 5×5-tile patch of NPCs, for framing screenshots. */
@@ -259,7 +263,8 @@ export async function runRun44NpcSuite({ kind, base, errors, notes, shots }) {
 
     notes.push(
       `${tag}: ${first.npcs.length} NPCs at ${first.npcs[0]?.worldW}x${first.npcs[0]?.worldH} world px (${first.npcs[0]?.filter}), ${startFrames.size} distinct start frames among ${walkers.length} walkers; ` +
-        `walked ${a.dirsWalked.join('/')}, ${a.transitions} walk/idle switches over ${a.samples} frames at ${a.fps.toFixed(1)} fps, ` +
+        `walked ${a.dirsWalked.join('/')}, ${a.transitions} walk/idle switches over ${a.samples} frames, walk cycle ${a.fps.toFixed(1)} fps` +
+        `${a.timed ? '' : ` (not asserted: page drew ${a.drawFps.toFixed(1)} fps, under ${TIMING_MIN_FPS})`}, ` +
         `${visible} on screen${extra}; off without ?npcs=1`,
     );
   } catch (e) {
