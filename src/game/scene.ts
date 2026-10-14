@@ -32,7 +32,7 @@ import { OBELISCO_ACCESS, OBELISCO_SOLID_TILES } from '../data/world';
 import { mapWorldBounds, sortKey, tileFootWorld, tileToWorld, worldToTile } from '../iso/math';
 import { findPathOrNearest } from '../iso/pathfinding';
 import { C } from './colors';
-import { deskTopFillColor, drawCharacter, treeCanopyTrunkOverlap } from './draw';
+import { deskTopFillColor, treeCanopyTrunkOverlap } from './draw';
 import {
   buildingBodyHit,
   byDepthDesc,
@@ -86,7 +86,6 @@ import {
   interiorPickPoint,
   interiorPickTile,
   interiorPixelProbes,
-  syncInteriorCharacter,
   type InteriorCell,
   type InteriorDef,
 } from './interior';
@@ -112,6 +111,26 @@ import {
   smoothDampToZero,
 } from './cameraControl';
 import { NpcCrowd, type NpcSnapshot } from './npcs';
+import {
+  loadPlayerSheets,
+  PlayerAvatar,
+  SPRINT_TILES_PER_S,
+  TILE_STEP_WORLD,
+  WALK_TILES_PER_S,
+  type AvatarSnapshot,
+  type FacingDir,
+} from './player';
+
+/** World px the player covers this frame. */
+function walkStepWorld(sprint: boolean, deltaMS: number): number {
+  return (sprint ? SPRINT_TILES_PER_S : WALK_TILES_PER_S) * TILE_STEP_WORLD * (deltaMS / 1000);
+}
+
+/** World px length of a move of (dx, dy) tiles. */
+function tileMoveWorld(dx: number, dy: number): number {
+  return Math.hypot((dx - dy) * (TILE_W / 2), (dx + dy) * (TILE_H / 2));
+}
+
 
 /**
  * Keyboard step on a tile grid: move on both axes if the target tile is walkable, otherwise slide
@@ -158,8 +177,8 @@ export type SceneEvents = {
 /** Desktop first-load camera when the URL carries no #view. */
 const DESKTOP_FIRST_LOAD_BUILDINGS = ['estudio', 'volaris', 'mentoria', 'pg'] as const;
 const DESKTOP_ROOF_RISE = 160;
-/** World px from the character's foot up to the middle of its body (drawCharacter is ~62 tall). */
-const CHAR_BODY_CENTRE_RISE = 31;
+/** World px from the character's foot up to the middle of its body (Adonay is ~96 tall). */
+const CHAR_BODY_CENTRE_RISE = 48;
 /** Glide time when the camera catches up to the character (walk start, after a manual pan). */
 const FOLLOW_SMOOTH_S = 0.35;
 /** A per-frame character move longer than this (3 tiles) is a teleport, not walking. */
@@ -221,7 +240,8 @@ export class IsoScene {
   reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   private pathGfx = new Graphics();
-  private charGfx = new Graphics();
+  private avatar!: PlayerAvatar;
+  private interiorAvatar!: PlayerAvatar;
   private npcs!: NpcCrowd;
   private events: SceneEvents;
   private objectGraphics = new Map<string, Container>();
@@ -297,7 +317,6 @@ export class IsoScene {
   private interiorWallGfx = new Graphics();
   private interiorBottomSheet = false;
   private interiorPropGfx = new Graphics();
-  private interiorCharGfx = new Graphics();
   private mapReturnDoor: { x: number; y: number } | null = null;
   private outdoorCamBeforeInterior: { x: number; y: number; zoom: number } | null = null;
   private interiorHistoryEntries = 0;
@@ -344,12 +363,33 @@ export class IsoScene {
     this.interiorLayer.addChild(this.interiorFloorGfx);
     this.interiorLayer.addChild(this.interiorWallGfx);
     this.interiorLayer.addChild(this.interiorPropGfx);
-    this.interiorLayer.addChild(this.interiorCharGfx);
     this.bindInteriorPointerRouting();
 
     this.pathLayer.addChild(this.pathGfx);
     this.objectsLayer.sortableChildren = true;
-    this.objectsLayer.addChild(this.charGfx);
+    await loadPlayerSheets(this.app.renderer.resolution);
+    this.avatar = new PlayerAvatar(
+      this.objectsLayer,
+      {
+        zIndexAt: (fx, fy) => this.walkerZIndex(fx, fy),
+        walkableAt: (wx, wy) => {
+          const t = worldToTile(wx, wy);
+          return !!t && !!cells[t.y]?.[t.x]?.walkable;
+        },
+      },
+      this.reducedMotion,
+    );
+    this.interiorAvatar = new PlayerAvatar(
+      this.interiorLayer,
+      {
+        zIndexAt: (fx, fy) => sortKey(fx, fy, 500),
+        walkableAt: (wx, wy) => {
+          const p = interiorPickPoint(wx, wy);
+          return !!this.interiorGrid[Math.round(p.y)]?.[Math.round(p.x)]?.walkable;
+        },
+      },
+      this.reducedMotion,
+    );
 
     this.fadeEl = document.createElement('div');
     this.fadeEl.className = 'scene-fade';
@@ -362,7 +402,11 @@ export class IsoScene {
       this.objectsLayer,
       {
         zIndexAt: (fx, fy) => this.walkerZIndex(fx, fy),
-        blocked: (tx, ty) => Math.round(this.charTx) === tx && Math.round(this.charTy) === ty,
+        blocked: (tx, ty) => {
+          if (Math.round(this.charTx) === tx && Math.round(this.charTy) === ty) return true;
+          const dog = this.avatar.pantoneTile();
+          return dog.x === tx && dog.y === ty;
+        },
       },
       { enabled: npcsWanted(), seed: npcSeed(), stillPose: this.reducedMotion },
     );
@@ -680,8 +724,15 @@ export class IsoScene {
     return (Number.isFinite(zi) ? zi - 0.5 : 1_000_000) + (fx + fy) * 1e-4;
   }
 
-  private syncCharacterDepth(): void {
-    this.charGfx.zIndex = this.walkerZIndex(this.charTx, this.charTy);
+  /** Feeds the player's foot to whichever avatar is on screen; once per tick. */
+  private updateAvatars(dt: number): void {
+    if (this.interiorActive) {
+      const f = tileToWorld(this.interiorCharTx, this.interiorCharTy);
+      this.interiorAvatar.update(f.x, f.y, dt);
+      return;
+    }
+    const f = tileToWorld(this.charTx, this.charTy);
+    this.avatar.update(f.x, f.y, dt);
   }
 
   /** Screen coords (canvas pixels) ↔ world coords with world scaled under a fixed camera pivot. */
@@ -993,11 +1044,6 @@ export class IsoScene {
   }
 
   private syncCharacterGraphic(): void {
-    this.charGfx.clear();
-    drawCharacter(this.charGfx, this.charState);
-    const pos = tileFootWorld(this.charTx, this.charTy);
-    this.charGfx.position.set(pos.x, pos.y);
-    this.syncCharacterDepth();
     if (this.canvasEl) {
       this.canvasEl.dataset.charTile = JSON.stringify({
         x: Math.round(this.charTx),
@@ -1235,7 +1281,7 @@ export class IsoScene {
     const minY = Math.min(...corners.map((c) => c.y));
     const maxY = Math.max(...corners.map((c) => c.y));
     const iso = this.qaIsolation;
-    this.charGfx.visible = !iso;
+    this.avatar?.setVisible(!iso);
     this.npcs?.cull({ minX, maxX, minY, maxY }, !!iso || this.interiorActive);
     for (const { g, tx, ty } of this.tileCullEntries) {
       if (iso) {
@@ -2070,14 +2116,15 @@ export class IsoScene {
 
   private update(): void {
     this.updateMovement();
+    this.updateAvatars(Math.min(0.25, this.app.ticker.elapsedMS / 1000));
     this.updateCameraFollow();
     if (!this.interiorActive) this.npcs.update(Math.min(0.25, this.app.ticker.elapsedMS / 1000));
   }
 
   private followTargetWorld(): { x: number; y: number } {
     const foot = this.interiorActive
-      ? tileFootWorld(this.interiorCharTx, this.interiorCharTy)
-      : tileFootWorld(this.charTx, this.charTy);
+      ? tileToWorld(this.interiorCharTx, this.interiorCharTy)
+      : tileToWorld(this.charTx, this.charTy);
     return { x: foot.x, y: foot.y - CHAR_BODY_CENTRE_RISE };
   }
 
@@ -2184,23 +2231,17 @@ export class IsoScene {
           const sprint = this.shiftHeld;
           this.sprint = sprint;
           this.charState = sprint ? 'sprint' : 'walk';
-          const speed = (sprint ? 0.12 : 0.07) * (this.app.ticker.deltaMS / 16);
           const grid = this.interiorGrid;
-          const next = slideStep(
+          const next = this.keyboardStep(
             this.interiorCharTx,
             this.interiorCharTy,
-            dx * speed,
-            dy * speed,
+            dx,
+            dy,
+            sprint,
             (x, y) => !!grid[y]?.[x]?.walkable,
           );
           this.interiorCharTx = next.x;
           this.interiorCharTy = next.y;
-          syncInteriorCharacter(
-            this.interiorCharGfx,
-            this.interiorCharTx,
-            this.interiorCharTy,
-            this.charState,
-          );
           const def = this.interiorDef;
           const rt = { x: Math.round(this.interiorCharTx), y: Math.round(this.interiorCharTy) };
           // Only stepping onto the mat toward the door leaves; crossing the mat sideways does not.
@@ -2217,9 +2258,8 @@ export class IsoScene {
         const sprint = this.shiftHeld;
         this.sprint = sprint;
         this.charState = sprint ? 'sprint' : 'walk';
-        const speed = (sprint ? 0.12 : 0.07) * (this.app.ticker.deltaMS / 16);
         const tileBefore = this.roundedCharTile();
-        const next = slideStep(this.charTx, this.charTy, dx * speed, dy * speed, (x, y) => !!cells[y]?.[x]?.walkable);
+        const next = this.keyboardStep(this.charTx, this.charTy, dx, dy, sprint, (x, y) => !!cells[y]?.[x]?.walkable);
         this.charTx = next.x;
         this.charTy = next.y;
         const tileAfter = this.roundedCharTile();
@@ -2235,27 +2275,29 @@ export class IsoScene {
     }
 
     if (this.path.length > 0) {
-      const target = this.path[0];
-      const speed = (this.sprint ? 0.14 : 0.08) * (this.app.ticker.deltaMS / 16);
-      const dx = target.x - this.charTx;
-      const dy = target.y - this.charTy;
-      const dist = Math.hypot(dx, dy);
-      if (dist < speed) {
+      // Distance left over at a path node carries on toward the next one (steady speed at any fps).
+      let step = walkStepWorld(this.sprint, this.app.ticker.deltaMS);
+      while (this.path.length > 0 && step > 0) {
+        const target = this.path[0];
+        const dx = target.x - this.charTx;
+        const dy = target.y - this.charTy;
+        const dist = tileMoveWorld(dx, dy);
+        if (dist > step) {
+          this.charTx += (dx / dist) * step;
+          this.charTy += (dy / dist) * step;
+          this.charState = this.sprint ? 'sprint' : 'walk';
+          break;
+        }
+        step -= dist;
         this.charTx = target.x;
         this.charTy = target.y;
         this.path.shift();
         this.drawPathPreview();
-        const tx = Math.round(this.charTx);
-        const ty = Math.round(this.charTy);
         if (this.path.length === 0) {
           this.charState = 'idle';
           this.sprint = false;
-          this.tryArriveAtDoorTile(tx, ty);
+          this.tryArriveAtDoorTile(Math.round(this.charTx), Math.round(this.charTy));
         }
-      } else {
-        this.charTx += (dx / dist) * speed;
-        this.charTy += (dy / dist) * speed;
-        this.charState = this.sprint ? 'sprint' : 'walk';
       }
       this.syncCharacterGraphic();
     }
@@ -2266,6 +2308,30 @@ export class IsoScene {
   }
 
   private doorCooldown = 0;
+
+  /**
+   * One frame of keyboard walking: the same world speed in every direction, and a diagonal pushed
+   * into a wall slides along it at full speed.
+   */
+  private keyboardStep(
+    x: number,
+    y: number,
+    dx: number,
+    dy: number,
+    sprint: boolean,
+    walkable: (tx: number, ty: number) => boolean,
+  ): { x: number; y: number } {
+    const world = walkStepWorld(sprint, this.app.ticker.deltaMS);
+    const k = world / tileMoveWorld(dx, dy);
+    const next = slideStep(x, y, dx * k, dy * k, walkable);
+    if (dx !== 0 && dy !== 0 && (next.x === x) !== (next.y === y)) {
+      const ax = next.x !== x ? dx : 0;
+      const ay = next.y !== y ? dy : 0;
+      const ka = world / tileMoveWorld(ax, ay);
+      return slideStep(x, y, ax * ka, ay * ka, walkable);
+    }
+    return next;
+  }
 
   private roundedCharTile(): { x: number; y: number } {
     return { x: Math.round(this.charTx), y: Math.round(this.charTy) };
@@ -2428,7 +2494,6 @@ export class IsoScene {
       this.interiorFloorGfx.eventMode = 'none';
       this.interiorWallGfx.eventMode = 'none';
       this.interiorPropGfx.eventMode = 'none';
-      this.interiorCharGfx.eventMode = 'none';
       drawInteriorFloor(this.interiorFloorGfx, def);
       drawInteriorWalls(this.interiorWallGfx, def);
       drawInteriorProps(this.interiorPropGfx, def);
@@ -2445,8 +2510,8 @@ export class IsoScene {
         this.interiorLayer.addChild(sprite);
         this.interiorSprite = sprite;
       }
-      syncInteriorCharacter(this.interiorCharGfx, this.interiorCharTx, this.interiorCharTy, 'idle');
-      this.interiorCharGfx.zIndex = sortKey(this.interiorCharTx, this.interiorCharTy, 500);
+      const spawn = tileToWorld(this.interiorCharTx, this.interiorCharTy);
+      this.interiorAvatar.reset(spawn.x, spawn.y, this.interiorSpawnFacing(def));
       if (!this.mapReturnDoor) {
         this.mapReturnDoor = { x: door.x, y: door.y };
       }
@@ -2604,39 +2669,36 @@ export class IsoScene {
   }
 
   private updateInteriorWalk(): void {
-    const target = this.interiorPath[0];
-    const speed = (this.sprint ? 0.14 : 0.08) * (this.app.ticker.deltaMS / 16);
-    const dx = target.x - this.interiorCharTx;
-    const dy = target.y - this.interiorCharTy;
-    const dist = Math.hypot(dx, dy);
-    if (dist < speed) {
+    let step = walkStepWorld(this.sprint, this.app.ticker.deltaMS);
+    while (this.interiorPath.length > 0 && step > 0) {
+      const target = this.interiorPath[0];
+      const dx = target.x - this.interiorCharTx;
+      const dy = target.y - this.interiorCharTy;
+      const dist = tileMoveWorld(dx, dy);
+      if (dist > step) {
+        this.interiorCharTx += (dx / dist) * step;
+        this.interiorCharTy += (dy / dist) * step;
+        this.charState = this.sprint ? 'sprint' : 'walk';
+        return;
+      }
+      step -= dist;
       this.interiorCharTx = target.x;
       this.interiorCharTy = target.y;
       this.interiorPath.shift();
       if (this.interiorPath.length === 0) {
         this.charState = 'idle';
         this.sprint = false;
-        const tx = Math.round(this.interiorCharTx);
-        const ty = Math.round(this.interiorCharTy);
-        if (
-          this.interiorDef &&
-          tx === this.interiorDef.exit.x &&
-          ty === this.interiorDef.exit.y
-        ) {
+        const def = this.interiorDef;
+        if (def && Math.round(this.interiorCharTx) === def.exit.x && Math.round(this.interiorCharTy) === def.exit.y) {
           this.exitInterior();
         }
       }
-    } else {
-      this.interiorCharTx += (dx / dist) * speed;
-      this.interiorCharTy += (dy / dist) * speed;
-      this.charState = this.sprint ? 'sprint' : 'walk';
     }
-    syncInteriorCharacter(
-      this.interiorCharGfx,
-      this.interiorCharTx,
-      this.interiorCharTy,
-      this.charState,
-    );
+  }
+
+  /** On entering a room the player faces into it, away from the door behind. */
+  private interiorSpawnFacing(def: InteriorDef): FacingDir {
+    return def.exitFace === '+x' ? 'nw' : 'ne';
   }
 
   /** For QA — programmatic walk */
@@ -2729,8 +2791,8 @@ export class IsoScene {
 
   /** QA: synthetic map tap (scenery / ground) matching player pointer routing. */
   tapMapTileForQa(tx: number, ty: number): void {
-    const foot = tileFootWorld(tx, ty);
-    const scr = this.worldToScreen(foot.x, foot.y);
+    const c = tileToWorld(tx, ty);
+    const scr = this.worldToScreen(c.x, c.y);
     this.handleScreenTap(scr.x, scr.y, false);
   }
 
@@ -2917,6 +2979,16 @@ export class IsoScene {
 
   qaSetNpcs(on: boolean): void {
     this.npcs.setEnabled(on);
+  }
+
+  /** QA: the on-screen player avatar (map or room) and the canvas resolution it was loaded for. */
+  qaPlayerAvatar(): AvatarSnapshot & { scope: 'map' | 'room'; rendererResolution: number } {
+    const a = this.interiorActive ? this.interiorAvatar : this.avatar;
+    return {
+      ...a.snapshot(),
+      scope: this.interiorActive ? 'room' : 'map',
+      rendererResolution: this.app.renderer.resolution,
+    };
   }
 
   /** QA: which ground sprite each street cell uses, and its open sides (for neighbour checks). */

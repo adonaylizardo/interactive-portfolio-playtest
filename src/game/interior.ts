@@ -2,7 +2,6 @@ import { Graphics } from 'pixi.js';
 import roomData from '../data/interior-rooms.json';
 import { TILE_H, TILE_W } from '../data/world';
 import { tileFootWorld } from '../iso/math';
-import { drawCharacter } from './draw';
 import { cachedSpriteProbes, interiorSpriteKey, spriteAsset, spriteMeta } from './sprites';
 
 export const INTERIOR_BUILDING_IDS = [
@@ -589,18 +588,6 @@ export function interiorNearestReachable(
     }
   }
   return best;
-}
-
-export function syncInteriorCharacter(
-  g: Graphics,
-  tx: number,
-  ty: number,
-  state: 'idle' | 'walk' | 'sprint',
-): void {
-  g.clear();
-  drawCharacter(g, state);
-  const pos = tileFootWorld(tx, ty);
-  g.position.set(pos.x, pos.y);
 }
 
 /** Fractional tile coordinates of a world point (tile centers at integers). */

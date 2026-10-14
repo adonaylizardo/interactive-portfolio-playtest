@@ -32,9 +32,6 @@ export const C = {
   treeCanopyDarkHover: 0x657565,
   treeCanopyMidHover: 0x788878,
   treeCanopyLightHover: 0x95a595,
-  character: 0x555555,
-  characterWalk: 0x4a4a4a,
-  characterSprint: 0x404040,
   path: 0x6b8cae,
   door: 0x5c5c5c,
 } as const;

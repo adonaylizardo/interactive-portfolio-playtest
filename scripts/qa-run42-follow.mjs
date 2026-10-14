@@ -40,8 +40,8 @@ async function startRecorder(page) {
     const tick = () => {
       if (!window.__followLog) return;
       const p = q.getCharacterPos();
-      // tileFootWorld (TILE 128×64) lifted to the middle of the body, as the camera follow aims.
-      const s = q.worldToClient((p.x - p.y) * 64, (p.x + p.y) * 32 + 32 - 31);
+      // Tile centre (TILE 128×64) lifted to the middle of the body, as the camera follow aims.
+      const s = q.worldToClient((p.x - p.y) * 64, (p.x + p.y) * 32 - 48);
       const r = c.getBoundingClientRect();
       window.__followLog.push({
         t: performance.now(),

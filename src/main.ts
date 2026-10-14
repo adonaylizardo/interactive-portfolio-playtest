@@ -156,6 +156,7 @@ async function main(): Promise<void> {
     streetTiles: () => scene.qaStreetTiles(),
     npcs: () => scene.qaNpcs(),
     setNpcs: (on: boolean) => scene.qaSetNpcs(on),
+    playerAvatar: () => scene.qaPlayerAvatar(),
   };
 }
 

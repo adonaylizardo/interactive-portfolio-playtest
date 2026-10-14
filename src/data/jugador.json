@@ -1,0 +1,290 @@
+{
+ "unidades": "px @1x (x2 para @2x; en el mapa se usa @2x: humano 64x96, tile 128x64)",
+ "adonay": {
+  "celda": {
+   "w": 32,
+   "h": 50
+  },
+  "ancla_pies": {
+   "x": 16,
+   "y": 48
+  },
+  "rim": "contorno 1 px ámbar tenue #5C4628 en bordes superior y trasero",
+  "animaciones": {
+   "idle_se": {
+    "archivo1x": "adonay__idle_se@1x.png",
+    "archivo2x": "adonay__idle_se@2x.png",
+    "frames": [
+     0,
+     1
+    ],
+    "fps": 3,
+    "loop": true,
+    "espejo_de": null
+   },
+   "walk_se": {
+    "archivo1x": "adonay__walk_se@1x.png",
+    "archivo2x": "adonay__walk_se@2x.png",
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "fps": 10,
+    "loop": true,
+    "espejo_de": null
+   },
+   "idle_sw": {
+    "archivo1x": "adonay__idle_sw@1x.png",
+    "archivo2x": "adonay__idle_sw@2x.png",
+    "frames": [
+     0,
+     1
+    ],
+    "fps": 3,
+    "loop": true,
+    "espejo_de": "se"
+   },
+   "walk_sw": {
+    "archivo1x": "adonay__walk_sw@1x.png",
+    "archivo2x": "adonay__walk_sw@2x.png",
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "fps": 10,
+    "loop": true,
+    "espejo_de": "se"
+   },
+   "idle_ne": {
+    "archivo1x": "adonay__idle_ne@1x.png",
+    "archivo2x": "adonay__idle_ne@2x.png",
+    "frames": [
+     0,
+     1
+    ],
+    "fps": 3,
+    "loop": true,
+    "espejo_de": null
+   },
+   "walk_ne": {
+    "archivo1x": "adonay__walk_ne@1x.png",
+    "archivo2x": "adonay__walk_ne@2x.png",
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "fps": 10,
+    "loop": true,
+    "espejo_de": null
+   },
+   "idle_nw": {
+    "archivo1x": "adonay__idle_nw@1x.png",
+    "archivo2x": "adonay__idle_nw@2x.png",
+    "frames": [
+     0,
+     1
+    ],
+    "fps": 3,
+    "loop": true,
+    "espejo_de": "ne"
+   },
+   "walk_nw": {
+    "archivo1x": "adonay__walk_nw@1x.png",
+    "archivo2x": "adonay__walk_nw@2x.png",
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "fps": 10,
+    "loop": true,
+    "espejo_de": "ne"
+   }
+  },
+  "velocidad_sugerida": {
+   "px_por_frame_1x": "2 en x, 1 en y (diagonal iso); 20 px/s en x @1x a 10 fps",
+   "nota": "avanza en pasos enteros, uno por frame de caminata, para que los pies no patinen",
+   "mas_rapido": "sube los fps de walk o usa 4 px/frame @1x (2 en y) con el mismo ciclo; nunca aceleres solo el desplazamiento (los pies patinan)"
+  }
+ },
+ "pantone": {
+  "celda": {
+   "w": 26,
+   "h": 22
+  },
+  "ancla_pies": {
+   "x": 13,
+   "y": 20
+  },
+  "animaciones": {
+   "idle_se": {
+    "archivo1x": "pantone__idle_se@1x.png",
+    "archivo2x": "pantone__idle_se@2x.png",
+    "frames": [
+     0,
+     1
+    ],
+    "fps": 3,
+    "loop": true
+   },
+   "trot_se": {
+    "archivo1x": "pantone__trot_se@1x.png",
+    "archivo2x": "pantone__trot_se@2x.png",
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "fps": 10,
+    "loop": true
+   },
+   "idle_sw": {
+    "archivo1x": "pantone__idle_sw@1x.png",
+    "archivo2x": "pantone__idle_sw@2x.png",
+    "frames": [
+     0,
+     1
+    ],
+    "fps": 3,
+    "loop": true
+   },
+   "trot_sw": {
+    "archivo1x": "pantone__trot_sw@1x.png",
+    "archivo2x": "pantone__trot_sw@2x.png",
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "fps": 10,
+    "loop": true
+   },
+   "idle_ne": {
+    "archivo1x": "pantone__idle_ne@1x.png",
+    "archivo2x": "pantone__idle_ne@2x.png",
+    "frames": [
+     0,
+     1
+    ],
+    "fps": 3,
+    "loop": true
+   },
+   "trot_ne": {
+    "archivo1x": "pantone__trot_ne@1x.png",
+    "archivo2x": "pantone__trot_ne@2x.png",
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "fps": 10,
+    "loop": true
+   },
+   "idle_nw": {
+    "archivo1x": "pantone__idle_nw@1x.png",
+    "archivo2x": "pantone__idle_nw@2x.png",
+    "frames": [
+     0,
+     1
+    ],
+    "fps": 3,
+    "loop": true
+   },
+   "trot_nw": {
+    "archivo1x": "pantone__trot_nw@1x.png",
+    "archivo2x": "pantone__trot_nw@2x.png",
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "fps": 10,
+    "loop": true
+   }
+  },
+  "seguir": {
+   "distancia_celdas": 1,
+   "offset_detras_2x": {
+    "se": [
+     -64,
+     -32
+    ],
+    "sw": [
+     64,
+     -32
+    ],
+    "ne": [
+     -64,
+     32
+    ],
+    "nw": [
+     64,
+     32
+    ]
+   },
+   "offset_detras_1x": {
+    "se": [
+     -32,
+     -16
+    ],
+    "sw": [
+     32,
+     -16
+    ],
+    "ne": [
+     -32,
+     16
+    ],
+    "nw": [
+     32,
+     16
+    ]
+   },
+   "metodo": "cola de posiciones del jugador; Pantone toma la posición de hace N frames (N = 1 celda / velocidad ≈ 16 frames a 10 fps) y usa la dirección de ese tramo",
+   "correa": "opcional: línea 1 px #1E1410 de la mano izquierda de Adonay (≈ ancla+(-7,-18)) al collar (≈ ancla+(5,-9) en SE)"
+  }
+ }
+}

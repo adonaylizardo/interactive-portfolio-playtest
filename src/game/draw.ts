@@ -1,4 +1,3 @@
-import { Graphics } from 'pixi.js';
 import { C } from './colors';
 
 export const TREE_TRUNK_H = 20;
@@ -23,16 +22,4 @@ export function treeCanopyTrunkOverlap(): {
 
 export function deskTopFillColor(hover: boolean): number {
   return hover ? C.propTopHover : C.propTop;
-}
-
-export function drawCharacter(
-  g: Graphics,
-  state: 'idle' | 'walk' | 'sprint',
-): void {
-  const c =
-    state === 'sprint' ? C.characterSprint : state === 'walk' ? C.characterWalk : C.character;
-  g.roundRect(-14, -44, 28, 44, 6);
-  g.fill(c);
-  g.circle(0, -52, 10);
-  g.fill(c);
 }
