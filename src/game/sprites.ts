@@ -18,11 +18,17 @@ type Meta = Record<string, Record<string, any>>;
 const assets = spriteData.assets as Record<string, SpriteAsset>;
 const meta = spriteData.meta as unknown as Meta;
 
-/** Below this zoom the `lejos` variants replace the `cerca` ones (kit.zoomLejosBelow). */
+/** `lejos` never shows at or above this zoom (kit.zoomLejosBelow). */
 export const ZOOM_LEJOS_BELOW = tokens.kit.zoomLejosBelow;
+/** ...and only within this factor of the viewport's minimum zoom, so normal play keeps the detailed art. */
+export const LEJOS_ZOOM_MIN_FACTOR = 2;
 
-export function isLejosZoom(zoom: number): boolean {
-  return zoom < ZOOM_LEJOS_BELOW;
+export function lejosZoomThreshold(zoomMin: number): number {
+  return Math.min(ZOOM_LEJOS_BELOW, zoomMin * LEJOS_ZOOM_MIN_FACTOR);
+}
+
+export function isLejosZoom(zoom: number, zoomMin: number): boolean {
+  return zoom < lejosZoomThreshold(zoomMin);
 }
 
 export type BuildingSpriteId = 'estudio' | 'volaris' | 'bain' | 'mentoria' | 'finoa' | 'pg' | 'flor' | 'catedral' | 'sambil';
@@ -85,7 +91,7 @@ export function spriteResolution(): number {
 /** Landmark interiors are their @1x cutaway drawn at 2×: the @2x file is their 1:1 texture. */
 const SCALED_INTERIORS = /^int\/(flor|catedral|sambil)\//;
 
-/** `lejos` frames only show below zoom 0.4, so @1x is plenty and keeps texture memory a quarter. */
+/** `lejos` frames only show below zoom 0.25, so @1x is plenty and keeps texture memory a quarter. */
 function spriteUrl(key: string): string {
   const a = spriteAsset(key);
   const hi = (resolution >= 2 && !key.endsWith('/lejos')) || SCALED_INTERIORS.test(key);

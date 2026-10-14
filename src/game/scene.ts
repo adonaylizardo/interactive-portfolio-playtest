@@ -57,6 +57,7 @@ import {
 import {
   interiorSpriteKey,
   isLejosZoom,
+  lejosZoomThreshold,
   isSpriteInterior,
   loadInteriorSprite,
   loadMapSprites,
@@ -587,9 +588,13 @@ export class IsoScene {
     return 'default';
   }
 
+  private isLejos(): boolean {
+    return isLejosZoom(this.zoom, zoomMinForViewport(this.app.screen.width, this.app.screen.height));
+  }
+
   /** Applies the zoom variant (cerca / lejos) and building states to every object sprite. */
   private syncObjectSprites(force = false): void {
-    const lejos = isLejosZoom(this.zoom);
+    const lejos = this.isLejos();
     const lodChanged = lejos !== this.lodLejos;
     this.lodLejos = lejos;
     for (const v of this.objectVisuals.values()) {
@@ -609,7 +614,12 @@ export class IsoScene {
       const key = interiorSpriteKey(this.interiorDef.id, lejos);
       if (spritesLoaded(key)) this.interiorSprite.texture = spriteTexture(key);
     }
-    if (this.canvasEl) this.canvasEl.dataset.lod = lejos ? 'lejos' : 'cerca';
+    if (this.canvasEl) {
+      this.canvasEl.dataset.lod = lejos ? 'lejos' : 'cerca';
+      this.canvasEl.dataset.lodBelow = String(
+        lejosZoomThreshold(zoomMinForViewport(this.app.screen.width, this.app.screen.height)),
+      );
+    }
   }
 
   /** Player draws in front of everything except objects it stands behind (front-row ordering). */
@@ -2218,7 +2228,7 @@ export class IsoScene {
       this.interiorSprite?.destroy();
       this.interiorSprite = null;
       if (def.sprite) {
-        const key = interiorSpriteKey(def.id, isLejosZoom(this.zoom));
+        const key = interiorSpriteKey(def.id, this.isLejos());
         const sprite = new Sprite(spriteTexture(key));
         const tl = interiorSpriteTopLeft(def);
         sprite.position.set(tl.x, tl.y);
@@ -2535,7 +2545,7 @@ export class IsoScene {
   getInteriorPixelProbesClient(): { label: string; x: number; y: number; expect: number[] }[] {
     if (!this.interiorDef || !this.canvasEl) return [];
     const rect = this.canvasEl.getBoundingClientRect();
-    return interiorPixelProbes(this.interiorDef, isLejosZoom(this.zoom)).map((p) => {
+    return interiorPixelProbes(this.interiorDef, this.isLejos()).map((p) => {
       const s = this.worldToScreen(p.world.x, p.world.y);
       return { label: p.label, x: rect.left + s.x, y: rect.top + s.y, expect: p.expect };
     });
