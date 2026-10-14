@@ -22,12 +22,24 @@ function hashParams(): URLSearchParams {
   return new URLSearchParams(raw);
 }
 
+/** Building ids that name an NDA client get a neutral public id in the URL. */
+const PUBLIC_INTERIOR_IDS: Record<string, string> = { volaris: 'airline' };
+
+export function publicInteriorId(interiorId: string): string {
+  return PUBLIC_INTERIOR_IDS[interiorId] ?? interiorId;
+}
+
+function interiorIdFromPublic(id: string | null): string | null {
+  if (!id) return id;
+  return Object.keys(PUBLIC_INTERIOR_IDS).find((k) => PUBLIC_INTERIOR_IDS[k] === id) ?? id;
+}
+
 export function buildHash(view: CameraView): string {
   const params = new URLSearchParams();
   params.set('x', view.x.toFixed(1));
   params.set('y', view.y.toFixed(1));
   params.set('z', view.zoom.toFixed(3));
-  if (view.interiorId) params.set('in', view.interiorId);
+  if (view.interiorId) params.set('in', publicInteriorId(view.interiorId));
   return `#${HASH_PREFIX}${params.toString()}`;
 }
 
@@ -37,7 +49,7 @@ export function parseCameraFromHash(): CameraView | null {
   const x = num('x');
   const y = num('y');
   const zoom = num('z');
-  const interiorId = params.get('in');
+  const interiorId = interiorIdFromPublic(params.get('in'));
   if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(zoom)) {
     if (!interiorId) return null;
     return { x: 0, y: 0, zoom: 0.85, interiorId };
@@ -51,7 +63,7 @@ export function parseCameraFromHash(): CameraView | null {
 }
 
 export function parseInteriorFromHash(): string | null {
-  return hashParams().get('in');
+  return interiorIdFromPublic(hashParams().get('in'));
 }
 
 let writeTimer: ReturnType<typeof setTimeout> | null = null;

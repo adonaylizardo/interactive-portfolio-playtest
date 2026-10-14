@@ -1,4 +1,39 @@
+import { CASES, type CaseBlock } from '../data/cases';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
+
+function caseBlockNode(block: CaseBlock): HTMLElement {
+  if (block.kind === 'closing') {
+    const p = document.createElement('p');
+    p.className = 'case__closing';
+    const em = document.createElement('em');
+    em.textContent = block.text;
+    p.appendChild(em);
+    return p;
+  }
+  const section = document.createElement('section');
+  section.className = 'case__section';
+  const h = document.createElement('h3');
+  h.className = 'case__heading';
+  h.textContent = block.heading;
+  section.appendChild(h);
+  for (const text of block.paragraphs) {
+    const p = document.createElement('p');
+    p.className = 'case__text';
+    p.textContent = text;
+    section.appendChild(p);
+  }
+  if (block.bullets) {
+    const ul = document.createElement('ul');
+    ul.className = 'case__list';
+    for (const text of block.bullets) {
+      const li = document.createElement('li');
+      li.textContent = text;
+      ul.appendChild(li);
+    }
+    section.appendChild(ul);
+  }
+  return section;
+}
 
 /** Interior content — bottom sheet (mobile) / right rail (desktop). */
 export class BuildingPanel {
@@ -6,6 +41,9 @@ export class BuildingPanel {
   private sheet: HTMLElement;
   private titleEl: HTMLElement;
   private workedWithEl: HTMLElement;
+  private caseEl: HTMLElement;
+  /** Building panel title as passed in: the identity scene code compares against (may differ from what is shown). */
+  private openKey = '';
   private workedWithLogos: WorkedWithLogo[] = WORKED_WITH;
   private interiorId: string | null = null;
   private onVisibilityChange: () => void;
@@ -32,8 +70,12 @@ export class BuildingPanel {
         <button type="button" class="building-panel__close" data-close aria-label="Cerrar">×</button>
         <h2 class="building-panel__title"></h2>
         <div class="building-panel__body-wrap">
-          <p class="building-panel__body">Caso de ejemplo [falta]</p>
-          <p class="building-panel__hint">Contenido provisional — solo prueba de interacción.</p>
+          <p class="building-panel__body" data-placeholder>Caso de ejemplo [falta]</p>
+          <p class="building-panel__hint" data-placeholder>Contenido provisional — solo prueba de interacción.</p>
+          <article class="case" lang="en" hidden>
+            <div class="case__version case__version--full"></div>
+            <div class="case__version case__version--short"></div>
+          </article>
           <section class="worked-with" aria-labelledby="worked-with-title" hidden>
             <h3 class="worked-with__title" id="worked-with-title">Worked with</h3>
             <ul class="worked-with__logos"></ul>
@@ -46,6 +88,7 @@ export class BuildingPanel {
     this.sheet = this.el.querySelector('.building-panel__sheet')!;
     this.titleEl = this.el.querySelector('.building-panel__title')!;
     this.workedWithEl = this.el.querySelector('.worked-with')!;
+    this.caseEl = this.el.querySelector('.case')!;
     // Touch has no hover: a tap shows that logo's colours until another logo (or the same one) is tapped.
     this.workedWithEl.addEventListener('click', (e) => {
       const hit = (e.target as HTMLElement).closest('.worked-with__logo');
@@ -128,8 +171,8 @@ export class BuildingPanel {
 
   showInterior(title: string, interiorId: string | null = null): void {
     this.mode = 'interior';
-    this.titleEl.textContent = title;
     this.interiorId = interiorId;
+    this.setTitle(title, this.renderCase());
     this.renderWorkedWith();
     this.peekOnly = this.isMobile();
     this.el.hidden = false;
@@ -145,10 +188,31 @@ export class BuildingPanel {
   /** QA: overlay open while still on the map (dismiss consume test). */
   showOverlayForQa(title: string): void {
     this.mode = 'hidden';
-    this.titleEl.textContent = title;
+    this.interiorId = null;
+    this.setTitle(title, this.renderCase());
     this.peekOnly = false;
     this.el.hidden = false;
     requestAnimationFrame(() => this.el.classList.add('building-panel--open'));
+  }
+
+  private setTitle(key: string, shown: string | null): void {
+    this.openKey = key;
+    this.el.dataset.panelKey = key;
+    this.titleEl.textContent = shown ?? key;
+    this.sheet.scrollTop = 0;
+  }
+
+  /** Fills the case article for the current interior; returns its headline, or null when there is no case. */
+  private renderCase(): string | null {
+    const content = this.interiorId ? CASES[this.interiorId] : undefined;
+    this.caseEl.hidden = !content;
+    this.el.classList.toggle('building-panel--case', !!content);
+    for (const p of this.el.querySelectorAll<HTMLElement>('[data-placeholder]')) p.hidden = !!content;
+    const full = this.caseEl.querySelector('.case__version--full')!;
+    const short = this.caseEl.querySelector('.case__version--short')!;
+    full.replaceChildren(...(content ? content.full.map(caseBlockNode) : []));
+    short.replaceChildren(...(content ? content.short.map(caseBlockNode) : []));
+    return content?.headline ?? null;
   }
 
   private renderWorkedWith(): void {
@@ -206,7 +270,7 @@ export class BuildingPanel {
   }
 
   openTitle(): string {
-    return this.isOpen() ? this.titleEl.textContent ?? '' : '';
+    return this.isOpen() ? this.openKey : '';
   }
 
   /** Peek / sheet inset for interior camera fit. */

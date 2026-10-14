@@ -701,6 +701,106 @@ body.is-canvas-dragging * {
   -webkit-user-select: text;
 }
 
+/* Case-study panel copy: the full text from 768 px up, the short version below. */
+.case[hidden] {
+  display: none;
+}
+
+.case {
+  color: #2b2b2b;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.case__version--short {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .case__version--full {
+    display: none;
+  }
+
+  .case__version--short {
+    display: block;
+  }
+}
+
+.case__section {
+  margin: 0 0 18px;
+}
+
+.case__heading {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b6b6b;
+}
+
+.case__text,
+.case__list {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.case__text + .case__text,
+.case__text + .case__list {
+  margin-top: 8px;
+}
+
+.case__list {
+  padding-left: 20px;
+}
+
+.case__list li + li {
+  margin-top: 4px;
+}
+
+.case__closing {
+  margin: 4px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid #eee;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #444;
+}
+
+.building-panel--case .building-panel__title {
+  line-height: 1.25;
+}
+
+@media (min-width: 768px) {
+  .building-panel__sheet {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+@media (max-width: 767px) {
+  .case__text,
+  .case__list {
+    font-size: 16px;
+  }
+
+  .building-panel--case.building-panel--expanded .building-panel__sheet {
+    max-height: 82vh;
+    max-height: 82dvh;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .building-panel--case.building-panel--peek .building-panel__title {
+    padding: 0 8px;
+    font-size: 15px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+
 /* "Worked with" logo strip (Estudio panel). */
 .worked-with {
   --logo-h: 24px;

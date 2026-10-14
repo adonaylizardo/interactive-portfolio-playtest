@@ -1266,8 +1266,9 @@ async function testRun30AllInteriorsClick(page, errors) {
     }
     await wait(400);
     const hash = await page.evaluate(() => location.hash);
-    if (!hash.includes(`in=${b.name}`)) {
-      errors.push(`run30-interiors: hash missing in=${b.name} (${hash})`);
+    const publicId = b.name === 'volaris' ? 'airline' : b.name;
+    if (!hash.includes(`in=${publicId}`)) {
+      errors.push(`run30-interiors: hash missing in=${publicId} (${hash})`);
     }
     await page.keyboard.press('Escape');
     await wait(600);
@@ -2824,9 +2825,9 @@ async function testTouchBuildingEntry(browser, errors, warnings) {
         else errors.push(msg);
         continue;
       }
-      const title = await page.locator('.building-panel__title').textContent();
-      if (!title?.includes(house.title.split(' ').slice(-1)[0])) {
-        errors.push(`touch-house: ${house.id} unexpected title (${title ?? 'none'})`);
+      const key = await page.locator('.building-panel').getAttribute('data-panel-key');
+      if (key !== house.title) {
+        errors.push(`touch-house: ${house.id} unexpected panel (${key ?? 'none'})`);
       }
       await page.keyboard.press('Escape');
       await wait(500);
@@ -3617,9 +3618,9 @@ async function testMap64EnterablePanels(page, errors) {
       errors.push(`map64-panels: ${b.name} panel did not open`);
       continue;
     }
-    const title = await page.locator('.building-panel__title').textContent();
-    if (!title?.includes(b.panelTitle.split(' ')[0])) {
-      errors.push(`map64-panels: ${b.name} title mismatch (${title ?? 'none'})`);
+    const key = await page.locator('.building-panel').getAttribute('data-panel-key');
+    if (key !== b.panelTitle) {
+      errors.push(`map64-panels: ${b.name} panel mismatch (${key ?? 'none'})`);
     }
     await page.locator('[data-exit]').first().click().catch(() => {});
     await wait(250);
