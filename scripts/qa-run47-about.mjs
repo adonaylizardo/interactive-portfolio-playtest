@@ -7,6 +7,8 @@
  *  - readable at 390 and 1280 (font sizes, no sideways scroll) and the panel scrolls to the last line
  *  - the section only shows in the Estudio
  *  - phones: Noah's tap box is 1.5x his frame (plus padding), and a tap in the added margin reaches him
+ *  - desktop (Chromium and WebKit, real mouse and keyboard): hovering Noah shows his "…" bubble and
+ *    the pointer cursor, a click that drifts 8 px starts his climb, and so do Enter and Space beside him
  * Usage: imported by qa-smoke.mjs; `node scripts/qa-run47-about.mjs [--shots] [url]` runs it alone.
  */
 import fs from 'node:fs';
@@ -201,6 +203,83 @@ async function noahTapCheck(page, spec, tag, errors) {
   return `Noah tap box ${n1.hit.w}x${n1.hit.h} (1.5x), tap in the added margin ${started ? 'reaches him' : 'MISSES'}`;
 }
 
+async function placePlayerByNoah(page, offsets) {
+  return qa(
+    page,
+    (offsets) => {
+      const q = window.__playtestQa;
+      const n = q.noah();
+      for (const [dx, dy] of offsets) {
+        const x = Math.round(n.fx) + dx;
+        const y = Math.round(n.fy) + dy;
+        if (q.findPath(x, y, x, y) && q.findPath(x, y, Math.round(n.fx) + 1, Math.round(n.fy) + 1)) {
+          q.setCharacterTile(x, y);
+          return { x, y };
+        }
+      }
+      return null;
+    },
+    offsets,
+  );
+}
+
+const noahStarted = (page) =>
+  page
+    .waitForFunction(() => window.__playtestQa.noah().phase !== 'idle', null, { timeout: 8000 })
+    .then(() => true)
+    .catch(() => false);
+
+/**
+ * Desktop, real mouse and keyboard (Adonay's Mac report): hovering Noah shows the "…" bubble and the
+ * pointer cursor; a click whose press drifts a few px (a trackpad click) still walks over and starts
+ * his climb; Enter and Space beside him start it too.
+ */
+async function noahDesktopCheck(page, base, tag, errors) {
+  const parts = [];
+  const far = await placePlayerByNoah(page, [[4, 2], [3, 3], [5, 1], [2, 4]]);
+  if (!far) {
+    errors.push(`${tag}: no walkable tile a few tiles from Noah`);
+    return '';
+  }
+  await wait(1500);
+  const n = await qa(page, () => window.__playtestQa.noah());
+  const x = Math.round(n.client.x);
+  const y = Math.round(n.client.y);
+  await page.mouse.move(x - 160, y + 40);
+  await page.mouse.move(x, y, { steps: 8 });
+  await wait(200);
+  const hover = await qa(page, () => ({
+    bubble: window.__playtestQa.noah().bubble,
+    cursor: getComputedStyle(document.getElementById('game-canvas')).cursor,
+  }));
+  if (!hover.bubble) errors.push(`${tag}: hovering Noah does not show his "…" bubble`);
+  if (hover.cursor !== 'pointer') errors.push(`${tag}: cursor over Noah is ${hover.cursor}, want pointer`);
+  await page.mouse.down();
+  await page.mouse.move(x + 7, y + 4, { steps: 3 });
+  await wait(60);
+  await page.mouse.up();
+  const clicked = await noahStarted(page);
+  const c = await qa(page, () => window.__playtestQa.getCharacterPos());
+  if (!clicked) errors.push(`${tag}: a mouse click on Noah that drifts 8 px did not start his climb (player at ${c.x.toFixed(2)},${c.y.toFixed(2)})`);
+  else if (Math.hypot(c.x - n.fx, c.y - n.fy) > n.talkRange + 0.05) errors.push(`${tag}: Noah started while the player was ${Math.hypot(c.x - n.fx, c.y - n.fy).toFixed(2)} tiles away`);
+  const bubbleAfter = await qa(page, () => window.__playtestQa.noah().bubble);
+  if (bubbleAfter) errors.push(`${tag}: the "…" bubble stays up while Noah climbs`);
+  parts.push(`hover bubble + pointer ${hover.bubble && hover.cursor === 'pointer' ? 'ok' : 'MISSING'}, 8 px-drift click from ${far.x},${far.y} ${clicked ? 'starts his climb' : 'FAILS'}`);
+
+  for (const key of ['Enter', 'Space']) {
+    await page.goto(base, { waitUntil: 'networkidle' });
+    await page.waitForFunction(() => window.__playtestQa.noah?.()?.loaded, null, { timeout: 20000 });
+    await wait(400);
+    const near = await placePlayerByNoah(page, [[1, 1], [1, 0], [0, 1], [1, -1], [-1, 1]]);
+    await wait(300);
+    await page.keyboard.press(key);
+    const ok = near ? await noahStarted(page) : false;
+    if (!ok) errors.push(`${tag}: ${key} beside Noah${near ? ` (player at ${near.x},${near.y})` : ''} did not start his climb`);
+    parts.push(`${key} beside him ${ok ? 'starts it' : 'FAILS'}`);
+  }
+  return parts.join(', ');
+}
+
 /**
  * @param {{ kind: keyof typeof RUN47_KINDS, base: string, errors: string[], notes: string[], shots?: string }} args
  */
@@ -220,7 +299,8 @@ export async function runRun47AboutSuite({ kind, base, errors, notes, shots }) {
     await page.goto(base, { waitUntil: 'networkidle' });
     await wait(600);
     await page.waitForFunction(() => window.__playtestQa.noah?.()?.loaded, null, { timeout: 20000 }).catch(() => {});
-    const noah = await noahTapCheck(page, spec, tag, errors);
+    let noah = await noahTapCheck(page, spec, tag, errors);
+    if (!spec.phone) noah += `; ${await noahDesktopCheck(page, base, tag, errors)}`;
 
     await qa(page, () => window.__playtestQa.enterInterior('estudio'));
     await page.waitForFunction(() => window.__playtestQa.isBuildingPanelOpen(), null, { timeout: 15000 });
