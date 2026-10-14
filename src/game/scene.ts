@@ -81,6 +81,8 @@ import {
   interiorWorldBounds,
   interiorForwardTile,
   interiorHitExit,
+  interiorNearestReachable,
+  interiorPickPoint,
   interiorPickTile,
   interiorPixelProbes,
   syncInteriorCharacter,
@@ -2345,12 +2347,20 @@ export class IsoScene {
       this.exitInteriorFromTap();
       return;
     }
-    const tile = interiorPickTile(this.interiorDef, wx, wy);
-    if (!tile) return;
-    if (!this.interiorGrid[tile.y]?.[tile.x]?.walkable) return;
+    const def = this.interiorDef;
+    const pick = interiorPickPoint(wx, wy);
+    if (pick.x < -1.5 || pick.y < -1.5 || pick.x > def.w + 0.5 || pick.y > def.h + 0.5) return;
     const sx0 = Math.round(this.interiorCharTx);
     const sy0 = Math.round(this.interiorCharTy);
-    const path = findPathInterior(this.interiorGrid, sx0, sy0, tile.x, tile.y);
+    let tile = interiorPickTile(def, wx, wy);
+    if (!tile || !this.interiorGrid[tile.y]?.[tile.x]?.walkable || (tile.x === def.exit.x && tile.y === def.exit.y)) {
+      tile = interiorNearestReachable(this.interiorGrid, def, pick.x, pick.y, { x: sx0, y: sy0 });
+    }
+    if (!tile) return;
+    const path = findPathInterior(this.interiorGrid, sx0, sy0, tile.x, tile.y, {
+      x: this.interiorCharTx,
+      y: this.interiorCharTy,
+    });
     if (!path) {
       this.events.onUnreachable?.();
       return;

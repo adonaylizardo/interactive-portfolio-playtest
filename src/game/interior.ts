@@ -434,68 +434,161 @@ export function interiorWorldBounds(def: InteriorDef, tightSides = false): {
   };
 }
 
-export function findPathInterior(
+const isWalkable = (grid: InteriorCell[][], x: number, y: number) => !!grid[y]?.[x]?.walkable;
+
+/**
+ * Grid path (8 directions; a diagonal step needs both side cells free, so it never clips a corner).
+ * Returns the cells after the start, ending at the goal.
+ */
+function gridPathInterior(
   grid: InteriorCell[][],
   sx: number,
   sy: number,
   gx: number,
   gy: number,
 ): { x: number; y: number }[] | null {
-  const h = grid.length;
-  const wd = grid[0]?.length ?? 0;
-  if (gy < 0 || gx < 0 || gy >= h || gx >= wd) return null;
-  if (!grid[gy][gx].walkable) return null;
+  if (!isWalkable(grid, gx, gy)) return null;
   if (sx === gx && sy === gy) return [];
-
   type Node = { x: number; y: number; g: number; f: number; parent?: Node };
   const open: Node[] = [];
+  const best = new Map<string, number>();
   const closed = new Set<string>();
-  const heur = (ax: number, ay: number, bx: number, by: number) => Math.abs(ax - bx) + Math.abs(ay - by);
-  open.push({ x: sx, y: sy, g: 0, f: heur(sx, sy, gx, gy) });
-  const dirs = [
-    [1, 0],
-    [-1, 0],
-    [0, 1],
-    [0, -1],
-  ];
-
+  const heur = (x: number, y: number) => {
+    const ax = Math.abs(x - gx);
+    const ay = Math.abs(y - gy);
+    return Math.max(ax, ay) + (Math.SQRT2 - 1) * Math.min(ax, ay);
+  };
+  open.push({ x: sx, y: sy, g: 0, f: heur(sx, sy) });
   while (open.length > 0) {
-    open.sort((a, b) => a.f - b.f);
-    const cur = open.shift()!;
+    let bi = 0;
+    for (let i = 1; i < open.length; i++) if (open[i].f < open[bi].f) bi = i;
+    const cur = open.splice(bi, 1)[0];
     const ck = `${cur.x},${cur.y}`;
     if (closed.has(ck)) continue;
     closed.add(ck);
     if (cur.x === gx && cur.y === gy) {
       const path: { x: number; y: number }[] = [];
-      let n: Node | undefined = cur;
-      while (n?.parent) {
-        path.push({ x: n.x, y: n.y });
-        n = n.parent;
-      }
-      path.reverse();
-      return path;
+      for (let n: Node | undefined = cur; n?.parent; n = n.parent) path.push({ x: n.x, y: n.y });
+      return path.reverse();
     }
-    for (const [dx, dy] of dirs) {
-      const nx = cur.x + dx;
-      const ny = cur.y + dy;
-      if (nx < 0 || ny < 0 || nx >= wd || ny >= h) continue;
-      if (!grid[ny][nx].walkable) continue;
-      const nk = `${nx},${ny}`;
-      if (closed.has(nk)) continue;
-      const gCost = cur.g + 1;
-      const f = gCost + heur(nx, ny, gx, gy);
-      const ex = open.find((n) => n.x === nx && n.y === ny);
-      if (ex && ex.g <= gCost) continue;
-      if (ex) {
-        ex.g = gCost;
-        ex.f = f;
-        ex.parent = cur;
-      } else {
-        open.push({ x: nx, y: ny, g: gCost, f, parent: cur });
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const nx = cur.x + dx;
+        const ny = cur.y + dy;
+        if (!isWalkable(grid, nx, ny)) continue;
+        if (dx !== 0 && dy !== 0 && (!isWalkable(grid, cur.x + dx, cur.y) || !isWalkable(grid, cur.x, cur.y + dy))) {
+          continue;
+        }
+        const nk = `${nx},${ny}`;
+        if (closed.has(nk)) continue;
+        const g = cur.g + (dx !== 0 && dy !== 0 ? Math.SQRT2 : 1);
+        if ((best.get(nk) ?? Infinity) <= g) continue;
+        best.set(nk, g);
+        open.push({ x: nx, y: ny, g, f: g + heur(nx, ny), parent: cur });
       }
     }
   }
   return null;
+}
+
+/** Half-width of the character's footprint (tiles) kept clear of blocked cells on straightened segments. */
+const WALK_CLEARANCE = 0.3;
+
+/** True when a straight walk from a to b keeps the character's footprint on walkable cells. */
+export function interiorLineClear(
+  grid: InteriorCell[][],
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): boolean {
+  const len = Math.hypot(bx - ax, by - ay);
+  const steps = Math.max(1, Math.ceil(len / 0.1));
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const x = ax + (bx - ax) * t;
+    const y = ay + (by - ay) * t;
+    for (const [ox, oy] of [
+      [-WALK_CLEARANCE, -WALK_CLEARANCE],
+      [WALK_CLEARANCE, -WALK_CLEARANCE],
+      [-WALK_CLEARANCE, WALK_CLEARANCE],
+      [WALK_CLEARANCE, WALK_CLEARANCE],
+    ]) {
+      if (!isWalkable(grid, Math.round(x + ox), Math.round(y + oy))) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Walk path as straight-line waypoints: the 8-direction grid path with every corner the character
+ * can see past removed, so it walks diagonally across open floor instead of in a staircase.
+ */
+export function findPathInterior(
+  grid: InteriorCell[][],
+  sx: number,
+  sy: number,
+  gx: number,
+  gy: number,
+  from: { x: number; y: number } = { x: sx, y: sy },
+): { x: number; y: number }[] | null {
+  const cellsPath = gridPathInterior(grid, sx, sy, gx, gy);
+  if (!cellsPath) return null;
+  if (cellsPath.length === 0) return [];
+  const out: { x: number; y: number }[] = [];
+  let anchor = from;
+  let i = 0;
+  while (i < cellsPath.length) {
+    let j = cellsPath.length - 1;
+    while (j > i && !interiorLineClear(grid, anchor.x, anchor.y, cellsPath[j].x, cellsPath[j].y)) j--;
+    out.push(cellsPath[j]);
+    anchor = cellsPath[j];
+    i = j + 1;
+  }
+  return out;
+}
+
+/**
+ * Tap on floor that isn't walkable (furniture, void, outside the art): the reachable cell nearest to
+ * the tap point. The exit mat is skipped so a near-miss never leaves the room.
+ */
+export function interiorNearestReachable(
+  grid: InteriorCell[][],
+  def: InteriorDef,
+  px: number,
+  py: number,
+  from: { x: number; y: number },
+): { x: number; y: number } | null {
+  const reach = new Set<string>([`${from.x},${from.y}`]);
+  const queue = [from];
+  while (queue.length) {
+    const c = queue.shift()!;
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const k = `${c.x + dx},${c.y + dy}`;
+      if (reach.has(k) || !isWalkable(grid, c.x + dx, c.y + dy)) continue;
+      reach.add(k);
+      queue.push({ x: c.x + dx, y: c.y + dy });
+    }
+  }
+  let best: { x: number; y: number } | null = null;
+  let bestD = Infinity;
+  for (let y = 0; y < def.h; y++) {
+    for (let x = 0; x < def.w; x++) {
+      if (!reach.has(`${x},${y}`) || (x === def.exit.x && y === def.exit.y)) continue;
+      const d = Math.hypot(x - px, y - py);
+      if (d < bestD) {
+        bestD = d;
+        best = { x, y };
+      }
+    }
+  }
+  return best;
 }
 
 export function syncInteriorCharacter(
@@ -510,16 +603,23 @@ export function syncInteriorCharacter(
   g.position.set(pos.x, pos.y);
 }
 
+/** Fractional tile coordinates of a world point (tile centers at integers). */
+export function interiorPickPoint(worldX: number, worldY: number): { x: number; y: number } {
+  return {
+    x: (worldX / (TILE_W / 2) + worldY / (TILE_H / 2)) / 2,
+    y: (worldY / (TILE_H / 2) - worldX / (TILE_W / 2)) / 2,
+  };
+}
+
 /** Interior tile whose drawn diamond contains the world point (null outside the floor). */
 export function interiorPickTile(
   def: InteriorDef,
   worldX: number,
   worldY: number,
 ): { x: number; y: number } | null {
-  const gx = (worldX / (TILE_W / 2) + worldY / (TILE_H / 2)) / 2;
-  const gy = (worldY / (TILE_H / 2) - worldX / (TILE_W / 2)) / 2;
-  const x = Math.round(gx);
-  const y = Math.round(gy);
+  const p = interiorPickPoint(worldX, worldY);
+  const x = Math.round(p.x);
+  const y = Math.round(p.y);
   if (x < 0 || y < 0 || x >= def.w || y >= def.h) return null;
   return { x, y };
 }
