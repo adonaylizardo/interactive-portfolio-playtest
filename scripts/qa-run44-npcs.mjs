@@ -189,36 +189,51 @@ function busiest(npcs) {
 
 const key = (c) => `${c.x},${c.y}`;
 
-/** Fast-forwards the routines and checks each activity in the page; frames a screenshot of each with `shots`. */
+/**
+ * Fast-forwards the routines and checks each activity in the page: every snapshot for faces, strips
+ * and hidden visitors, 2-3 gazers in each, and a line of 2+ at a cart within a minute (the line
+ * thins out between customers). Frames a screenshot of each activity with `shots`.
+ */
 async function routinesLive(page, spec, kind, tag, errors, shots) {
   await qa(page, () => window.__playtestQa.advanceNpcs(150));
-  await wait(100);
-  const town = await qa(page, () => window.__playtestQa.npcTown());
-  const npcs = await qa(page, () => window.__playtestQa.npcs().npcs);
-  const deck = new Set(town.mirador.map(key));
-  const gazers = npcs.filter((n) => n.task === 'gaze');
-  if (gazers.length < 2 || gazers.length > 3) errors.push(`${tag}: ${gazers.length} stargazers on the mirador after 150 s (want 2-3)`);
-  for (const n of gazers) {
-    if (!deck.has(`${n.tx},${n.ty}`) || n.dir !== 'ne' || n.pose !== 'lookUp' || n.texture !== standingStrip(n.id, 'lookUp', 'ne')) {
-      errors.push(`${tag}: stargazer ${n.id} at ${n.tx},${n.ty} facing ${n.dir} pose ${n.pose} shows ${n.texture}`);
+  let town;
+  let npcs;
+  let lines = [];
+  let gazers = [];
+  let sitters = [];
+  let inside = [];
+  for (let snap = 0; snap < 6; snap++) {
+    if (snap) await qa(page, () => window.__playtestQa.advanceNpcs(10));
+    await wait(100);
+    const at = `${150 + snap * 10} s`;
+    town = await qa(page, () => window.__playtestQa.npcTown());
+    npcs = await qa(page, () => window.__playtestQa.npcs().npcs);
+    const deck = new Set(town.mirador.map(key));
+    gazers = npcs.filter((n) => n.task === 'gaze');
+    if (gazers.length < 2 || gazers.length > 3) errors.push(`${tag}: ${gazers.length} stargazers on the mirador after ${at} (want 2-3)`);
+    for (const n of gazers) {
+      if (!deck.has(`${n.tx},${n.ty}`) || n.dir !== 'ne' || n.pose !== 'lookUp' || n.texture !== standingStrip(n.id, 'lookUp', 'ne')) {
+        errors.push(`${tag}: stargazer ${n.id} at ${n.tx},${n.ty} facing ${n.dir} pose ${n.pose} shows ${n.texture}`);
+      }
     }
+    const inLine = npcs.filter((n) => n.role === 'queue' && /^(queue \d|order|buy)$/.test(n.task) && n.mode === 'idle');
+    for (const n of inLine) {
+      const cart = town.carts.find((c) => c.slots.some((s) => s.x === n.tx && s.y === n.ty));
+      const i = cart ? cart.slots.findIndex((s) => s.x === n.tx && s.y === n.ty) : -1;
+      if (!cart) errors.push(`${tag}: ${n.id} queues at ${n.tx},${n.ty}, not in a cart line`);
+      else if (n.dir !== cart.faces[i]) errors.push(`${tag}: ${n.id} in place ${i + 1} of ${cart.id} faces ${n.dir} (want ${cart.faces[i]})`);
+    }
+    sitters = npcs.filter((n) => n.task === 'sit');
+    for (const n of sitters) {
+      const b = town.benches.find((x) => x.front.x === n.tx && x.front.y === n.ty);
+      if (!b || n.dir !== b.face || n.texture !== standingStrip(n.id, 'sit', b.face)) errors.push(`${tag}: sitter ${n.id} at ${n.tx},${n.ty} facing ${n.dir} shows ${n.texture}`);
+    }
+    inside = npcs.filter((n) => n.inside);
+    for (const n of inside) if (n.visible) errors.push(`${tag}: ${n.id} is inside ${n.task.replace('inside ', '')} but drawn`);
+    lines = town.owners.carts.map((l) => l.filter(Boolean).length);
+    if (lines.reduce((a, b) => a + b, 0) >= 2) break;
+    if (snap === 5) errors.push(`${tag}: cart lines never held 2+ people between 150 and 200 s (last ${lines.join('+')})`);
   }
-  const inLine = npcs.filter((n) => n.role === 'queue' && /^(queue \d|buy)$/.test(n.task) && n.mode === 'idle');
-  for (const n of inLine) {
-    const cart = town.carts.find((c) => c.slots.some((s) => s.x === n.tx && s.y === n.ty));
-    const i = cart ? cart.slots.findIndex((s) => s.x === n.tx && s.y === n.ty) : -1;
-    if (!cart) errors.push(`${tag}: ${n.id} queues at ${n.tx},${n.ty}, not in a cart line`);
-    else if (n.dir !== cart.faces[i]) errors.push(`${tag}: ${n.id} in place ${i + 1} of ${cart.id} faces ${n.dir} (want ${cart.faces[i]})`);
-  }
-  const lines = town.owners.carts.map((l) => l.filter(Boolean).length);
-  if (lines.reduce((a, b) => a + b, 0) < 2) errors.push(`${tag}: cart lines hold ${lines.join('+')} people after 150 s`);
-  const sitters = npcs.filter((n) => n.task === 'sit');
-  for (const n of sitters) {
-    const b = town.benches.find((x) => x.front.x === n.tx && x.front.y === n.ty);
-    if (!b || n.dir !== b.face || n.texture !== standingStrip(n.id, 'sit', b.face)) errors.push(`${tag}: sitter ${n.id} at ${n.tx},${n.ty} facing ${n.dir} shows ${n.texture}`);
-  }
-  const inside = npcs.filter((n) => n.inside);
-  for (const n of inside) if (n.visible) errors.push(`${tag}: ${n.id} is inside ${n.task.replace('inside ', '')} but drawn`);
   if (shots) {
     const frame = async (name, c, z) => {
       await qa(page, ([x, y, zz]) => window.__playtestQa.frameWorld(x, y, zz), [(c.x - c.y) * 64, (c.x + c.y) * 32 - 40, z]);
@@ -231,7 +246,7 @@ async function routinesLive(page, spec, kind, tag, errors, shots) {
     const bench = sitters[0] && town.benches.find((x) => x.front.x === sitters[0].tx && x.front.y === sitters[0].ty);
     if (bench) await frame('bench', bench.front, z);
   }
-  return `${gazers.length} stargazers, lines ${lines.join('+')}, ${sitters.length} sitting, ${inside.length} inside after 150 s`;
+  return `${gazers.length} stargazers, lines ${lines.join('+')}, ${sitters.length} sitting, ${inside.length} inside after the fast-forward`;
 }
 
 async function tapThroughNpc(page, spec, tag, errors) {

@@ -6,12 +6,14 @@
  *  - roles: 2-3 stargazers, 3-4 in the cart queues, 3-4 on benches, 4-5 crossers, 3-4 building
  *    visitors, the rest strolling by the fountain and the dog park
  *  - stargazers stand on the mirador deck (x51-53, y35-37) facing up (lookUp pose, ne), 2-3 there
- *  - cart queues: the front person buys (short pause) and walks away, the line steps up one place
- *    at a time with a pause, newcomers join at the back, everyone faces the person ahead / the cart
+ *    nearly all the time (one stretches their legs at a time)
+ *  - cart queues: the front person orders, buys (short pause) and walks away, the line steps up one
+ *    place at a time with a pause, newcomers join at the back, everyone faces the person ahead / the
+ *    cart; 2+ people in line most of the time, rarely nobody
  *  - benches: walk to a bench, sit (sit pose, facing out) 20-50 s, stand up and leave
  *  - crossers walk end to end along the main streets; visitors vanish on a door for 20-60 s and
  *    come out of the same door
- *  - strollers keep to the fountain / dog park; start times and frames are staggered
+ *  - strollers stop by the fountain / dog park (walking between the two is fine); start times and frames are staggered
  *  - nobody shares a tile, steps onto the player's tile, stops on a door, door front, spawn or
  *    monument stop, or enters the climbing-wall clearance; nobody gets stuck
  *  - pose hooks: with a `sit_*` / `lookUp_*` strip in the sheet that strip is drawn, without it
@@ -137,7 +139,7 @@ function simulate(R, seed, errors, tag) {
       },
     ]),
   );
-  const ev = { buys: [], joins: 0, steps: 0, sits: [], ends: 0, visits: [], emerges: 0, gazeSamples: [], stuck: 0, rethinks: 0 };
+  const ev = { buys: [], joins: 0, steps: 0, sits: [], ends: 0, visits: [], emerges: 0, gazeSamples: [], queueSamples: [], stuck: 0, rethinks: 0 };
   const lineSeen = town.carts.map(() => new Set());
 
   let planI = 0;
@@ -156,6 +158,7 @@ function simulate(R, seed, errors, tag) {
 
     const here = new Map();
     let gazing = 0;
+    let queued = 0;
     for (const w of W) {
       const s = st.get(w);
       const b = before.get(w);
@@ -247,21 +250,22 @@ function simulate(R, seed, errors, tag) {
         else if (w.dir !== bench.face || w.pose !== 'sit' || key(w.seat ?? {}) !== key(bench.seat)) flag(`sit-face-${w.id}`, `${w.id} sits facing ${w.dir} (want ${bench.face}) pose ${w.pose}`);
         if (routines.animKey(w) !== `idle_${w.dir}`) flag(`sit-tex-${w.id}`, `${w.id} sitting shows ${routines.animKey(w)} (want idle until a sit strip exists)`);
       }
-      if (w.role === 'queue' && (w.phase === 'inLine' || w.phase === 'buying') && w.mode === 'idle' && !w.path.length && w.task !== 'make way') {
+      if (w.role === 'queue' && (w.phase === 'inLine' || w.phase === 'ordering' || w.phase === 'buying') && w.mode === 'idle' && !w.path.length && w.task !== 'make way') {
         const cart = town.carts[w.cart];
         const slot = cart.slots.findIndex((c) => key(c) === ck);
         if (slot < 0) flag(`line-off-${w.id}`, `${w.id} queues at ${ck}, not a place in ${cart.id}'s line`);
         else {
           if (w.dir !== cart.faces[slot]) flag(`line-face-${w.id}`, `${w.id} in place ${slot + 1} faces ${w.dir} (want ${cart.faces[slot]})`);
           lineSeen[w.cart].add(slot);
-          if (w.phase === 'buying' && slot !== 0) flag(`buy-slot-${w.id}`, `${w.id} buys from place ${slot + 1}`);
+          queued++;
+          if ((w.phase === 'buying' || w.phase === 'ordering') && slot !== 0) flag(`buy-slot-${w.id}`, `${w.id} ${w.phase} at place ${slot + 1}`);
         }
       }
       if (b.phase === 'inLine' && w.phase === 'inLine' && b.slot === w.slot + 1) {
         ev.steps++;
         if (b.slot >= 1 && routines.owners().carts[w.cart][b.slot] === w.id) flag(`step-${w.id}`, `${w.id} still owns its old place after stepping up`);
       }
-      if (w.role === 'stroller' && !s.far && !town.zones.some((z) => z.cells.some((c) => dist(c, cell) <= STROLL_REACH))) s.far = ck;
+      if (w.role === 'stroller' && w.mode === 'idle' && !w.path.length && !s.far && !town.zones.some((z) => z.cells.some((c) => dist(c, cell) <= STROLL_REACH))) s.far = ck;
       if (w.role === 'crosser') {
         if (w.mode === 'walk' && w.task === 'cross the map' && !town.street(player.x, player.y)) {
           s.crossCells++;
@@ -279,7 +283,10 @@ function simulate(R, seed, errors, tag) {
         }
       }
     }
-    if (t > 8) ev.gazeSamples.push(gazing);
+    if (t > 8) {
+      ev.gazeSamples.push(gazing);
+      ev.queueSamples.push(queued);
+    }
   }
 
   for (const w of W) {
@@ -297,7 +304,11 @@ function simulate(R, seed, errors, tag) {
   if (strollZones.size < Math.min(2, town.zones.length)) flag('zones', `strollers only visited ${[...strollZones].join(', ')}`);
   const g = ev.gazeSamples;
   const ok = g.filter((n) => n >= 2 && n <= 3).length / g.length;
-  if (ok < 0.75) flag('gaze-n', `2-3 stargazers on the deck only ${Math.round(ok * 100)}% of the time`);
+  if (ok < 0.95) flag('gaze-n', `2-3 stargazers on the deck only ${Math.round(ok * 100)}% of the time`);
+  const lined = ev.queueSamples.filter((n) => n >= 2).length / ev.queueSamples.length;
+  if (lined < 0.55) flag('queue-n', `2+ people standing in the cart lines only ${Math.round(lined * 100)}% of the time`);
+  const empty = ev.queueSamples.filter((n) => n === 0).length / ev.queueSamples.length;
+  if (empty > 0.15) flag('queue-empty', `nobody standing at either cart ${Math.round(empty * 100)}% of the time`);
   if (g.some((n) => n > 3)) flag('gaze-max', `more than 3 stargazers at once`);
   if (ev.buys.length < 12) flag('buys', `only ${ev.buys.length} purchases in ${SIM_S} s`);
   for (let i = 0; i < town.carts.length; i++) {
@@ -319,7 +330,7 @@ function simulate(R, seed, errors, tag) {
     `${ev.buys.length} purchases (avg ${avg(ev.buys.map((b) => b.dur)).toFixed(1)} s), ${ev.joins} joins, ${ev.steps} step-ups; ` +
     `${ev.sits.length} bench sessions (avg ${avg(ev.sits.map((b) => b.dur)).toFixed(0)} s); ${ev.ends} street ends; ` +
     `${ev.visits.length} visits (avg ${avg(ev.visits.map((b) => b.dur)).toFixed(0)} s inside); ` +
-    `deck 2-3 stargazers ${Math.round(ok * 100)}% of the time; ${ev.rethinks} dropped errands; strollers by ${[...strollZones].join(' + ')}`
+    `deck 2-3 stargazers ${Math.round(ok * 100)}% of the time; in line 0/1/2/3+ ${[0, 1, 2, 3].map((n) => Math.round((100 * ev.queueSamples.filter((q) => (n === 3 ? q >= 3 : q === n)).length) / ev.queueSamples.length)).join('/')}%; ${ev.rethinks} dropped errands; strollers by ${[...strollZones].join(' + ')}`
   );
 }
 
