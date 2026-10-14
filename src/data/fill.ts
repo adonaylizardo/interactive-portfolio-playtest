@@ -1,5 +1,4 @@
 import alphaJson from './sprite-alpha.json';
-import npcsJson from './npcs.json';
 import relleno from './relleno.json';
 import spritesJson from './sprites.json';
 import type { MapCell, MapObject } from './world';
@@ -31,7 +30,7 @@ type ActorPlacement = { id: string; kind: 'actor'; anim: string; cell: Cell; gro
 type NpcPlacement = { id: string; kind: 'npc'; npc: string; anim: string; cell: Cell; group?: string };
 type LampPlacement = { id: string; kind: 'lamp'; cell: Cell };
 type PathPlacement = { id: string; kind: 'path'; cells: Cell[]; group?: string };
-type Placement = PropPlacement | ActorPlacement | NpcPlacement | LampPlacement | PathPlacement;
+type Placement = PropPlacement | ActorPlacement | LampPlacement | PathPlacement;
 
 export type FillAnim = {
   f1: string;
@@ -91,9 +90,12 @@ const data = relleno as unknown as {
   assets: Record<string, { w: number; h: number; vfs: { x: number; y: number }; bbox: { x0: number; y0: number; x1: number; y1: number } }>;
   anims: Record<string, FillAnim>;
   masks: Record<string, Mask>;
-  placements: Placement[];
+  placements: (Placement | NpcPlacement)[];
   replaced: Cell[];
 };
+
+/** The plan's still pedestrians (mirador line, cachapas queue) are live NPC routines now (src/game/npcRoutines.ts). */
+const placements = data.placements.filter((p): p is Placement => p.kind !== 'npc');
 
 export const FILL_ASSETS = data.assets;
 export const FILL_ANIMS = data.anims;
@@ -151,9 +153,6 @@ const maskOf = (key: string) => {
   return m;
 };
 
-type NpcDef = { id: string; ancla_pies: { x: number; y: number } };
-const npcDefs = (npcsJson as unknown as { celda: { w: number; h: number }; npcs: NpcDef[] });
-
 /** One placement moved by (dx, dy): the cells it blocks, the flat cells it covers, and its sprite's world hit test. */
 type Member = {
   p: Placement;
@@ -191,22 +190,6 @@ function member(p: Placement): Member {
         overEstudio: (dx, dy, est) => {
           const c = centre(p.cell[0] + dx, p.cell[1] + dy);
           return maskHits(maskOf(p.anim), { x: c.x - 2 * a.anchor!.x, y: c.y - 2 * a.anchor!.y }, est);
-        },
-      };
-    }
-    case 'npc': {
-      const def = npcDefs.npcs.find((n) => n.id === p.npc);
-      return {
-        p,
-        anchor: p.cell,
-        solid: (dx, dy) => shift([p.cell], dx, dy),
-        flat: () => [],
-        overEstudio: (dx, dy, est) => {
-          if (!def) return false;
-          const c = centre(p.cell[0] + dx, p.cell[1] + dy);
-          const x0 = c.x - 2 * def.ancla_pies.x;
-          const y0 = c.y - 2 * def.ancla_pies.y;
-          return rectHits({ x0, y0, x1: x0 + 2 * npcDefs.celda.w, y1: y0 + 2 * npcDefs.celda.h }, est);
         },
       };
     }
@@ -254,7 +237,7 @@ export function placeFill(ctx: FillContext): FillResult {
   const lampAt = new Set(ctx.objects.filter((o) => o.name === 'lamp').map((o) => k(o.x, o.y)));
 
   const groups = new Map<string, Placement[]>();
-  for (const p of data.placements) {
+  for (const p of placements) {
     const g = ('group' in p && p.group) || p.id;
     if (!groups.has(g)) groups.set(g, []);
     groups.get(g)!.push(p);
@@ -399,9 +382,6 @@ export function placeFill(ctx: FillContext): FillResult {
       }
       case 'actor':
         result.actors.push({ id: p.id, sprite: p.anim, x: p.cell[0] + dx, y: p.cell[1] + dy });
-        break;
-      case 'npc':
-        result.actors.push({ id: p.id, sprite: `npc:${p.npc}/${p.anim}`, x: p.cell[0] + dx, y: p.cell[1] + dy });
         break;
       case 'lamp': {
         const [x, y] = [p.cell[0] + dx, p.cell[1] + dy];

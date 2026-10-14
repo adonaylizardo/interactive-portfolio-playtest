@@ -12,6 +12,7 @@ import {
   TILE_H,
   TILE_W,
   anchorForBuilding,
+  nearMuroClearance,
   type MapCell,
   type MapObject,
 } from './world';
@@ -25,6 +26,7 @@ export {
   TILE_H,
   TILE_W,
   anchorForBuilding,
+  nearMuroClearance,
 };
 
 export type { MapCell, MapObject };
@@ -33,6 +35,7 @@ const built = buildWorld();
 export const cells = built.cells;
 export const objects = built.objects;
 export const fill = built.fill;
+export const keepClear = built.keepClear;
 
 function footprintCells(o: MapObject): { x: number; y: number }[] {
   const fx = o.footprintX ?? o.x;

@@ -121,7 +121,7 @@ export const MURO_FOOTPRINT_TILES: { x: number; y: number }[] = footprintTiles(
   MURO_FOOTPRINT.h,
 );
 
-function nearMuroClearance(tx: number, ty: number): boolean {
+export function nearMuroClearance(tx: number, ty: number): boolean {
   if (tx === MURO_APPROACH[0] && ty === MURO_APPROACH[1]) return false;
   for (let dy = 0; dy < MURO_FOOTPRINT.h; dy++) {
     for (let dx = 0; dx < MURO_FOOTPRINT.w; dx++) {
@@ -208,7 +208,13 @@ function sideFacingStreet(cells: MapCell[][], x: number, y: number): 'izq' | 'de
   return (x + y) % 2 === 0 ? 'izq' : 'der';
 }
 
-export function buildWorld(): { cells: MapCell[][]; objects: MapObject[]; fill: FillResult } {
+export function buildWorld(): {
+  cells: MapCell[][];
+  objects: MapObject[];
+  fill: FillResult;
+  /** Door accesses, the cell in front of each door, the spawn and the monument stop (`x,y` keys). */
+  keepClear: ReadonlySet<string>;
+} {
   const cells: MapCell[][] = [];
   for (let y = 0; y < MAP_HEIGHT; y++) {
     cells[y] = [];
@@ -384,5 +390,5 @@ export function buildWorld(): { cells: MapCell[][]; objects: MapObject[]; fill: 
   });
   objects.push(...fill.objects);
 
-  return { cells, objects, fill };
+  return { cells, objects, fill, keepClear };
 }
