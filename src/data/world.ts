@@ -320,20 +320,21 @@ export function buildWorld(): { cells: MapCell[][]; objects: MapObject[] } {
     [0, 1],
     [0, -1],
   ];
+  // Dead ends come from the carved layout, not from cells cleared earlier in this pass;
+  // otherwise one stub unzips the whole street behind it.
+  const street = cells.map((row) => row.map((c) => c.groundId.includes('path/street')));
+  const deadEnds: [number, number][] = [];
   for (let ty = 0; ty < MAP_HEIGHT; ty++) {
     for (let tx = 0; tx < MAP_WIDTH; tx++) {
-      const cell = cells[ty][tx];
-      if (!cell.groundId.includes('path/street')) continue;
+      if (!street[ty][tx]) continue;
       let pathNeighbors = 0;
       for (const [dx, dy] of pathDirs) {
-        const n = cells[ty + dy]?.[tx + dx];
-        if (n?.groundId.includes('path/street')) pathNeighbors++;
+        if (street[ty + dy]?.[tx + dx]) pathNeighbors++;
       }
-      if (pathNeighbors < 2) {
-        cell.groundId = 'tile/ground/default';
-      }
+      if (pathNeighbors < 2) deadEnds.push([tx, ty]);
     }
   }
+  for (const [tx, ty] of deadEnds) cells[ty][tx].groundId = 'tile/ground/default';
 
   for (const f of FILLER_PROPS) {
     if (f.x < 0 || f.y < 0 || f.x >= MAP_WIDTH || f.y >= MAP_HEIGHT) continue;
