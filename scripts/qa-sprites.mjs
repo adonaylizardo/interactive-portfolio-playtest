@@ -223,8 +223,15 @@ async function diffSprite(page, { key, tlx, tly, zoom, id, state }) {
   const thin = !probes[key]?.length;
   if (thin) {
     const BG = [11, 12, 14];
-    const drawn = cols.filter((c) => c && Math.abs(c.r - BG[0]) + Math.abs(c.g - BG[1]) + Math.abs(c.b - BG[2]) > 12).length;
-    if (drawn < pr.length * 0.7) fail(`pixel: ${key} thin sprite drawn at only ${drawn}/${pr.length} opaque points`);
+    // Dark art (lejos tree canopies) can sit within a few levels of the background, so a
+    // sample also counts when it matches the probe's own colour.
+    const drawn = cols.filter(
+      (c, i) => c && (Math.abs(c.r - BG[0]) + Math.abs(c.g - BG[1]) + Math.abs(c.b - BG[2]) > 12 || dist(c, pr[i]) <= 24),
+    ).length;
+    if (drawn < pr.length * 0.7) {
+      const seen = pr.slice(0, 4).map((p, i) => `(${p[0]},${p[1]}) got ${cols[i] ? `${cols[i].r},${cols[i].g},${cols[i].b}` : 'offscreen'} want ${p[2]},${p[3]},${p[4]}`);
+      fail(`pixel: ${key} thin sprite drawn at only ${drawn}/${pr.length} opaque points: ${seen.join(' | ')}`);
+    }
     return;
   }
   const tol = zoom >= 1 ? 30 : 60;
