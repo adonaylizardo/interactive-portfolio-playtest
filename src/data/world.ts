@@ -1,3 +1,4 @@
+import { placeFill, type FillResult } from './fill';
 import mapData from './mapa_datos.json';
 import spritesJson from './sprites.json';
 
@@ -24,6 +25,10 @@ export type MapObject = {
   acceso?: { x: number; y: number };
   /** Sprite variant: tree species (redondo|cipres|araguaney) or bench/lamp side (izq|der). */
   variant?: string;
+  /** Map-fill sprite base key (`fill/...`), drawn from src/data/relleno.json. */
+  sprite?: string;
+  /** Ground-level art (court, deck, green): drawn under walkers and never hides them. */
+  flat?: boolean;
 };
 
 export const MAP_WIDTH = 64;
@@ -143,8 +148,6 @@ const FILLER_PROPS: { kind: 'tree' | 'bench' | 'lamp' | 'plaza'; x: number; y: n
   { kind: 'plaza', x: 31, y: 38 },
   { kind: 'plaza', x: 32, y: 38 },
   { kind: 'plaza', x: 33, y: 38 },
-  { kind: 'tree', x: 27, y: 38 },
-  { kind: 'tree', x: 34, y: 38 },
   { kind: 'tree', x: 26, y: 37 },
   { kind: 'tree', x: 35, y: 37 },
   { kind: 'bench', x: 30, y: 39 },
@@ -205,7 +208,7 @@ function sideFacingStreet(cells: MapCell[][], x: number, y: number): 'izq' | 'de
   return (x + y) % 2 === 0 ? 'izq' : 'der';
 }
 
-export function buildWorld(): { cells: MapCell[][]; objects: MapObject[] } {
+export function buildWorld(): { cells: MapCell[][]; objects: MapObject[]; fill: FillResult } {
   const cells: MapCell[][] = [];
   for (let y = 0; y < MAP_HEIGHT; y++) {
     cells[y] = [];
@@ -364,5 +367,22 @@ export function buildWorld(): { cells: MapCell[][]; objects: MapObject[] } {
     });
   }
 
-  return { cells, objects };
+  const keepClear = new Set<string>([`${INICIO[0]},${INICIO[1]}`, `${OBELISCO_ACCESS.x},${OBELISCO_ACCESS.y}`]);
+  for (const ed of Object.values(mapData.edificios) as EdificioJson[]) {
+    const [ax, ay] = ed.acceso;
+    keepClear.add(`${ax},${ay}`);
+    if (ed.cara_puerta === '+y') keepClear.add(`${ax},${ay + 1}`);
+    if (ed.cara_puerta === '+x') keepClear.add(`${ax + 1},${ay}`);
+  }
+  const fill = placeFill({
+    cells,
+    objects,
+    keepClear,
+    nearMuro: nearMuroClearance,
+    lampVariant: sideFacingStreet,
+    start: INICIO,
+  });
+  objects.push(...fill.objects);
+
+  return { cells, objects, fill };
 }

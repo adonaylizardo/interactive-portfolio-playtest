@@ -2,6 +2,7 @@ import { Application, Container, Graphics, Point, Polygon, Rectangle, Sprite } f
 import {
   cells,
   doorInwardStep,
+  fill,
   getBuildingAt,
   getBuildingAtDoor,
   getBuildingByName,
@@ -28,7 +29,7 @@ import {
   type HistoryNavigationState,
 } from '../camera/hash';
 import { isTouchPrimary, type ChecklistStepId } from '../checklist/storage';
-import { OBELISCO_ACCESS, OBELISCO_SOLID_TILES } from '../data/world';
+import { muroWallTiles, OBELISCO_ACCESS, OBELISCO_SOLID_TILES } from '../data/world';
 import { mapWorldBounds, sortKey, tileFootWorld, tileToWorld, worldToTile } from '../iso/math';
 import { findPathOrNearest } from '../iso/pathfinding';
 import { C } from './colors';
@@ -110,6 +111,7 @@ import {
   zoomAtScreenAnchor,
   smoothDampToZero,
 } from './cameraControl';
+import { FillActors, type FillActorSnapshot } from './fillActors';
 import { NpcCrowd, type NpcSnapshot } from './npcs';
 import { Noah, type NoahSnapshot } from './noah';
 import {
@@ -255,6 +257,7 @@ export class IsoScene {
   /** Set by a tap on Noah from afar: talk to him once the walk there ends. */
   private pendingNoahTalk = false;
   private npcs!: NpcCrowd;
+  private fillActors!: FillActors;
   private events: SceneEvents;
   private objectGraphics = new Map<string, Container>();
   private objectVisuals = new Map<
@@ -423,6 +426,14 @@ export class IsoScene {
       { enabled: npcsWanted(), seed: npcSeed(), stillPose: this.reducedMotion },
     );
     void this.npcs.load().then(() => this.cullVisibleTiles());
+    this.fillActors = new FillActors(
+      this.objectsLayer,
+      fill.actors,
+      fill.overlays,
+      (fx, fy) => this.walkerZIndex(fx, fy),
+      this.reducedMotion,
+    );
+    void this.fillActors.load(this.app.renderer.resolution).then(() => this.cullVisibleTiles());
     this.buildNoah();
     this.syncCharacterGraphic();
 
@@ -619,9 +630,10 @@ export class IsoScene {
                 a.bbox.x1 - a.bbox.x0,
                 a.bbox.y1 - a.bbox.y0,
               );
-        const flat = obj.name === 'redoma';
+        const flat = obj.name === 'redoma' || !!obj.flat;
         const zIndex = flat ? -10 : objectDepth(obj) + (obj.x - obj.y) * 0.0001;
         g.zIndex = zIndex;
+        if (obj.flat) g.eventMode = 'none';
         const spriteBox = {
           x0: tlw.x - 8,
           y0: tlw.y - 8,
@@ -1366,6 +1378,7 @@ export class IsoScene {
     this.avatar?.setVisible(!iso);
     this.noah?.setHidden(!!iso || this.interiorActive);
     this.npcs?.cull({ minX, maxX, minY, maxY }, !!iso || this.interiorActive);
+    this.fillActors?.cull({ minX, maxX, minY, maxY }, !!iso || this.interiorActive);
     for (const { g, tx, ty } of this.tileCullEntries) {
       if (iso) {
         g.visible = iso.has(`tile:${tx},${ty}`);
@@ -2205,7 +2218,11 @@ export class IsoScene {
     this.updateMovement();
     this.updateAvatars(Math.min(0.25, this.app.ticker.elapsedMS / 1000));
     this.updateCameraFollow();
-    if (!this.interiorActive) this.npcs.update(Math.min(0.25, this.app.ticker.elapsedMS / 1000));
+    if (!this.interiorActive) {
+      const dt = Math.min(0.25, this.app.ticker.elapsedMS / 1000);
+      this.npcs.update(dt);
+      this.fillActors?.update(dt);
+    }
   }
 
   private followTargetWorld(): { x: number; y: number } {
@@ -3063,6 +3080,64 @@ export class IsoScene {
     const rect = this.canvasEl?.getBoundingClientRect();
     const s = this.worldToScreen(wx, wy);
     return { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y };
+  }
+
+  qaFill(): {
+    loaded: boolean;
+    report: typeof fill.report;
+    actors: FillActorSnapshot[];
+    objects: { id: string; key: string; tl: { x: number; y: number }; w: number; h: number; flat: boolean; zIndex: number; cells: [number, number][] }[];
+    pathCells: [number, number][];
+    solidCells: [number, number][];
+    flatCells: [number, number][];
+    owned: [number, number][];
+    walk: string[];
+  } {
+    const objectsOut = fill.objects.map((o) => {
+      const key = objectSpriteKey(o, 'default', false)!;
+      const a = spriteAsset(key);
+      const cellsOut: [number, number][] = [];
+      for (let dy = 0; dy < (o.h ?? 1); dy++) {
+        for (let dx = 0; dx < (o.w ?? 1); dx++) cellsOut.push([(o.footprintX ?? o.x) + dx, (o.footprintY ?? o.y) + dy]);
+      }
+      return {
+        id: o.id,
+        key,
+        tl: objectSpriteTopLeft(o, key),
+        w: a.w,
+        h: a.h,
+        flat: !!o.flat,
+        zIndex: this.objectVisuals.get(o.id)?.zIndex ?? NaN,
+        cells: cellsOut,
+      };
+    });
+    const owned: [number, number][] = [...fill.solidCells];
+    for (const o of objects) {
+      if (o.flat) continue;
+      for (let dy = 0; dy < (o.h ?? 1); dy++) {
+        for (let dx = 0; dx < (o.w ?? 1); dx++) owned.push([(o.footprintX ?? o.x) + dx, (o.footprintY ?? o.y) + dy]);
+      }
+    }
+    for (const [x, y] of OBELISCO_SOLID_TILES) owned.push([x, y]);
+    for (const key of muroWallTiles()) owned.push(key.split(',').map(Number) as [number, number]);
+    const walk = cells.map((row) =>
+      row
+        .map((c) =>
+          c.groundId.includes('borde') ? 'x' : !c.walkable ? '#' : c.groundId.includes('street') ? '=' : c.groundId.includes('park') ? ':' : '.',
+        )
+        .join(''),
+    );
+    return {
+      loaded: this.fillActors?.isLoaded() ?? false,
+      report: fill.report,
+      actors: this.fillActors?.snapshot() ?? [],
+      objects: objectsOut,
+      pathCells: fill.pathCells,
+      solidCells: fill.solidCells,
+      flatCells: fill.flatCells,
+      owned,
+      walk,
+    };
   }
 
   qaNpcs(): { enabled: boolean; loaded: boolean; npcs: NpcSnapshot[] } {

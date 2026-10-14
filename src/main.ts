@@ -155,6 +155,7 @@ async function main(): Promise<void> {
     obeliscoSilhouettes: () => scene.qaObeliscoSilhouettes(),
     streetTiles: () => scene.qaStreetTiles(),
     npcs: () => scene.qaNpcs(),
+    fill: () => scene.qaFill(),
     setNpcs: (on: boolean) => scene.qaSetNpcs(on),
     playerAvatar: () => scene.qaPlayerAvatar(),
     noah: () => scene.qaNoah(),

@@ -49,6 +49,7 @@ export function frontCell(o: MapObject): { x: number; y: number } {
 }
 
 export function objectSpriteBase(o: MapObject): string | null {
+  if (o.sprite) return o.sprite;
   if (o.type === 'building') return `ext/${o.name}`;
   if (o.name === 'tree') return `prop/arbol/${o.variant ?? 'redondo'}`;
   if (o.name === 'bench') return `prop/banco/${o.variant ?? 'izq'}`;
@@ -89,10 +90,10 @@ export type OccluderBox = { x0: number; y0: number; x1: number; y1: number };
 
 /**
  * Cells (cell-centre coordinates, edges at ±0.5) whose mass can hide the player from behind.
- * The redoma island is flat and never hides anyone; the obelisco only occludes with its solid strip.
+ * The redoma island and flat fill (court, deck, green) never hide anyone; the obelisco only occludes with its solid strip.
  */
 export function objectOccluder(o: MapObject): OccluderBox | null {
-  if (o.name === 'redoma') return null;
+  if (o.name === 'redoma' || o.flat) return null;
   if (o.name === 'obelisco') {
     const xs = OBELISCO_SOLID_TILES.map(([x]) => x);
     const ys = OBELISCO_SOLID_TILES.map(([, y]) => y);

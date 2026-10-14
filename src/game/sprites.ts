@@ -1,4 +1,5 @@
 import { Assets, Sprite, Texture } from 'pixi.js';
+import { FILL_ASSETS } from '../data/fill';
 import spriteData from '../data/sprites.json';
 import { tokens } from '../tokens';
 
@@ -15,7 +16,7 @@ export type SpriteAsset = {
 
 type Meta = Record<string, Record<string, any>>;
 
-const assets = spriteData.assets as Record<string, SpriteAsset>;
+const assets = { ...spriteData.assets, ...FILL_ASSETS } as Record<string, SpriteAsset>;
 const meta = spriteData.meta as unknown as Meta;
 
 /** `lejos` never shows at or above this zoom (kit.zoomLejosBelow). */

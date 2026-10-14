@@ -32,6 +32,7 @@ export type { MapCell, MapObject };
 const built = buildWorld();
 export const cells = built.cells;
 export const objects = built.objects;
+export const fill = built.fill;
 
 function footprintCells(o: MapObject): { x: number; y: number }[] {
   const fx = o.footprintX ?? o.x;
