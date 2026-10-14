@@ -126,6 +126,30 @@ async function visibleWaypoint(page, route, from) {
   );
 }
 
+/** A reachable street tile on screen (clear of buildings, over the canvas), furthest from the character. */
+async function visibleStreetTile(page) {
+  const area = await safeArea(page);
+  return qa(
+    page,
+    (a) => {
+      const q = window.__playtestQa;
+      const s = q.getCharacterTile();
+      let best = null;
+      for (const t of q.streetTiles()) {
+        const p = q.worldToClient((t.x - t.y) * 64, (t.x + t.y) * 32);
+        if (p.x < a.l || p.x > a.r || p.y < a.t || p.y > a.b) continue;
+        if (document.elementFromPoint(p.x, p.y)?.id !== 'game-canvas') continue;
+        const pick = q.pickAt(p.x, p.y);
+        if (pick.door || pick.building) continue;
+        const n = q.findPath(s.x, s.y, t.x, t.y)?.length ?? 0;
+        if (n > 1 && (!best || n > best.n)) best = { x: p.x, y: p.y, tile: t, n };
+      }
+      return best;
+    },
+    area,
+  );
+}
+
 /** A street tile 24-60 steps away whose route stays off the map edge. */
 async function planLongRoute(page) {
   return qa(page, () => {
@@ -302,11 +326,10 @@ async function testPanSuspend(page, kind, errors, notes, cdp) {
   if (offCentre(susp) < 0.12) errors.push(`${tag}: drag mid-walk did not move the view away from the character`);
   await wait(800);
   await qa(page, () => new Promise((r) => requestAnimationFrame(r)));
-  // New walk: tap a clear tile a few tiles along a fresh route.
+  // New walk: tap a clear, reachable street tile that is on screen now.
   await takeLog(page);
   await mark(page, 'resume');
-  const route = await planLongRoute(page);
-  const wp = route ? await visibleWaypoint(page, route, 0) : null;
+  const wp = await visibleStreetTile(page);
   if (!wp) {
     errors.push(`${tag}: nothing tappable on screen after the drag`);
     return;
@@ -347,8 +370,8 @@ async function testZoomWhileWalking(page, kind, errors, notes, cdp) {
     return;
   }
   const area = await safeArea(page);
+  const z0 = await qa(page, () => +document.getElementById('game-canvas').dataset.zoom);
   await takeLog(page);
-  const z0 = (await qa(page, () => window.__followLog.at(-1)))?.zoom ?? 0;
   if (touch) {
     await pinch(cdp, (area.l + area.r) / 2 + 30, (area.t + area.b) / 2 + 40, 50, 110);
   } else {
