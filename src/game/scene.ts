@@ -111,6 +111,7 @@ import {
   zoomAtScreenAnchor,
   smoothDampToZero,
 } from './cameraControl';
+import { NpcCrowd, type NpcSnapshot } from './npcs';
 
 /**
  * Keyboard step on a tile grid: move on both axes if the target tile is walkable, otherwise slide
@@ -164,6 +165,18 @@ const FOLLOW_SMOOTH_S = 0.35;
 /** A per-frame character move longer than this (3 tiles) is a teleport, not walking. */
 const FOLLOW_TELEPORT_WORLD = 3 * Math.hypot(TILE_W / 2, TILE_H / 2);
 
+/** `?npcs=0|1` forces the street crowd; automated browsers get an empty street unless asked. */
+function npcsWanted(): boolean {
+  const flag = new URLSearchParams(location.search).get('npcs');
+  if (flag === '0' || flag === '1') return flag === '1';
+  return !navigator.webdriver;
+}
+
+function npcSeed(): number | undefined {
+  const raw = new URLSearchParams(location.search).get('npcSeed');
+  return raw && /^\d+$/.test(raw) ? Number(raw) : undefined;
+}
+
 export class IsoScene {
   app!: Application;
   world = new Container();
@@ -209,6 +222,7 @@ export class IsoScene {
 
   private pathGfx = new Graphics();
   private charGfx = new Graphics();
+  private npcs!: NpcCrowd;
   private events: SceneEvents;
   private objectGraphics = new Map<string, Container>();
   private objectVisuals = new Map<
@@ -344,6 +358,15 @@ export class IsoScene {
     this.buildTiles();
     this.buildVoidClickLayer();
     this.buildObjects();
+    this.npcs = new NpcCrowd(
+      this.objectsLayer,
+      {
+        zIndexAt: (fx, fy) => this.walkerZIndex(fx, fy),
+        blocked: (tx, ty) => Math.round(this.charTx) === tx && Math.round(this.charTy) === ty,
+      },
+      { enabled: npcsWanted(), seed: npcSeed(), stillPose: this.reducedMotion },
+    );
+    void this.npcs.load().then(() => this.cullVisibleTiles());
     this.syncCharacterGraphic();
 
     const bootInteriorId = parseInteriorFromHash();
@@ -644,14 +667,21 @@ export class IsoScene {
     }
   }
 
-  /** Player draws in front of everything except objects it stands behind (front-row ordering). */
-  private syncCharacterDepth(): void {
+  /**
+   * Walkers (player and NPCs) draw in front of everything except objects they stand behind
+   * (front-row ordering); among themselves the one further down the screen draws on top.
+   */
+  private walkerZIndex(fx: number, fy: number): number {
     let zi = Infinity;
     for (const v of this.objectVisuals.values()) {
       if (!v.occluder || v.zIndex >= zi) continue;
-      if (playerBehind(v.occluder, this.charTx, this.charTy)) zi = v.zIndex;
+      if (playerBehind(v.occluder, fx, fy)) zi = v.zIndex;
     }
-    this.charGfx.zIndex = Number.isFinite(zi) ? zi - 0.5 : 1_000_000;
+    return (Number.isFinite(zi) ? zi - 0.5 : 1_000_000) + (fx + fy) * 1e-4;
+  }
+
+  private syncCharacterDepth(): void {
+    this.charGfx.zIndex = this.walkerZIndex(this.charTx, this.charTy);
   }
 
   /** Screen coords (canvas pixels) ↔ world coords with world scaled under a fixed camera pivot. */
@@ -1206,6 +1236,7 @@ export class IsoScene {
     const maxY = Math.max(...corners.map((c) => c.y));
     const iso = this.qaIsolation;
     this.charGfx.visible = !iso;
+    this.npcs?.cull({ minX, maxX, minY, maxY }, !!iso);
     for (const { g, tx, ty } of this.tileCullEntries) {
       if (iso) {
         g.visible = iso.has(`tile:${tx},${ty}`);
@@ -2007,6 +2038,7 @@ export class IsoScene {
   private update(): void {
     this.updateMovement();
     this.updateCameraFollow();
+    if (!this.interiorActive) this.npcs.update(Math.min(0.25, this.app.ticker.elapsedMS / 1000));
   }
 
   private followTargetWorld(): { x: number; y: number } {
@@ -2841,6 +2873,14 @@ export class IsoScene {
     const rect = this.canvasEl?.getBoundingClientRect();
     const s = this.worldToScreen(wx, wy);
     return { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y };
+  }
+
+  qaNpcs(): { enabled: boolean; loaded: boolean; npcs: NpcSnapshot[] } {
+    return { enabled: this.npcs.isEnabled(), loaded: this.npcs.isLoaded(), npcs: this.npcs.snapshot() };
+  }
+
+  qaSetNpcs(on: boolean): void {
+    this.npcs.setEnabled(on);
   }
 
   /** QA: which ground sprite each street cell uses, and its open sides (for neighbour checks). */

@@ -154,6 +154,8 @@ async function main(): Promise<void> {
     pickAt: (x: number, y: number) => scene.qaPickAt(x, y),
     obeliscoSilhouettes: () => scene.qaObeliscoSilhouettes(),
     streetTiles: () => scene.qaStreetTiles(),
+    npcs: () => scene.qaNpcs(),
+    setNpcs: (on: boolean) => scene.qaSetNpcs(on),
   };
 }
 
