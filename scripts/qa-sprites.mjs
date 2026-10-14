@@ -36,7 +36,9 @@ const CASES = ['volaris', 'bain', 'mentoria', 'finoa', 'pg'];
 const ART_ROOMS = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/data/interior-rooms.json'), 'utf8'));
 const sprites = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/data/sprites.json'), 'utf8'));
 const probes = JSON.parse(fs.readFileSync(path.join(ROOT, 'public/sprites/probes.json'), 'utf8'));
-const A = sprites.assets;
+/** Map-fill frames (src/data/relleno.json) share the registry and the public/sprites root. */
+const relleno = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/data/relleno.json'), 'utf8'));
+const A = { ...sprites.assets, ...relleno.assets };
 
 /** Thin props have no 7x7 uniform patch in the pack, so derive opaque 3x3 patches from the PNG itself. */
 function derivedProbes(key) {
