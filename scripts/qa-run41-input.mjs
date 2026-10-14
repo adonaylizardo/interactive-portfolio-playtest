@@ -46,8 +46,18 @@ async function keyWalkTo(page, goal, keys, maxMs = 120000) {
   let stuck = 0;
   let last = '';
   const trace = [];
-  const traced = (why) => `${why}; last steps: ${trace.slice(-10).join(' | ')}`;
+  const traced = (why) => `${why}; ${frameMs.toFixed(0)} ms/frame; last steps: ${trace.slice(-10).join(' | ')}`;
   for (const k of Object.values(keys)) await page.keyboard.up(k);
+  const frameMs = await qa(
+    page,
+    () =>
+      new Promise((r) => {
+        let n = 0;
+        const t = performance.now();
+        const f = () => (++n === 8 ? r((performance.now() - t) / 8) : requestAnimationFrame(f));
+        requestAnimationFrame(f);
+      }),
+  );
   while (Date.now() - t0 < maxMs) {
     const { at, pos, path, room } = await qa(
       page,
@@ -58,8 +68,8 @@ async function keyWalkTo(page, goal, keys, maxMs = 120000) {
       },
       goal,
     );
-    if (room) return traced(`walked into ${room} on the way (at ${at.x},${at.y})`);
     if (at.x === goal.x && at.y === goal.y) return '';
+    if (room) return traced(`walked into ${room} on the way (at ${at.x},${at.y})`);
     const here = `${at.x},${at.y}`;
     stuck = here === last ? stuck + 1 : 0;
     last = here;
@@ -75,37 +85,35 @@ async function keyWalkTo(page, goal, keys, maxMs = 120000) {
     trace.push(`${pos.x.toFixed(2)},${pos.y.toFixed(2)} ${key}x${n}->${end.x},${end.y} @${((Date.now() - t0) / 1000).toFixed(1)}s`);
     const axis = d.x ? 'x' : 'y';
     const dir = d.x || d.y;
-    // Hold the key until ~1.5 tiles out, then nudge a frame at a time into the goal tile. On
-    // software-GL runners a frame moves ~0.45 tile and the key-up can land frames late, so a held key
-    // overshoots; a nudge moves less than a tile and so can never skip over the goal tile.
+    const slow = frameMs > 50;
+    // Hold the key to a few tiles out, then nudge into the goal tile with fixed-length holds. A
+    // release sent after seeing the move lands 2-3 frames late on software-GL runners (~0.45 tile
+    // per frame), which oscillates around a corner; a timed down/up pair moves at most 1-2 frames.
     if (n > 1) {
       await page.keyboard.down(key);
       await page
         .waitForFunction(
-          ([e, ax, dr]) => (window.__playtestQa.getCharacterPos()[ax] - e[ax]) * dr > -1.5,
-          [end, axis, dir],
+          ([e, ax, dr, m]) => (window.__playtestQa.getCharacterPos()[ax] - e[ax]) * dr > -m,
+          [end, axis, dir, slow ? 2.2 : 1.0],
           { polling: 'raf', timeout: 2000 + n * 1000 },
         )
         .catch(() => {});
       await page.keyboard.up(key);
+      await wait(slow ? frameMs * 3 : 80);
     }
-    for (let i = 0; i < 12; i++) {
+    let gap = 0;
+    for (let i = 0; i < 24; i++) {
       const p0 = await qa(page, () => window.__playtestQa.getCharacterPos());
-      if (Math.round(p0[axis]) === end[axis] || (p0[axis] - end[axis]) * dir > 0.5) break;
+      const remaining = (end[axis] - p0[axis]) * dir;
+      if (Math.round(p0[axis]) === end[axis] || remaining < -0.5) break;
+      const tilesPerMs = (0.07 * Math.min(frameMs, 100)) / 16 / frameMs;
+      gap = gap || (slow ? frameMs * 0.6 : Math.min(300, Math.max(8, (0.7 * remaining) / tilesPerMs)));
       await page.keyboard.down(key);
-      const moved = await page
-        .waitForFunction(
-          (a) => {
-            const p = window.__playtestQa.getCharacterPos();
-            return p.x !== a.x || p.y !== a.y;
-          },
-          p0,
-          { polling: 'raf', timeout: 3000 },
-        )
-        .then(() => true)
-        .catch(() => false);
+      await wait(gap);
       await page.keyboard.up(key);
-      if (!moved) break;
+      await wait(slow ? frameMs * 3 : 50);
+      const p1 = await qa(page, () => window.__playtestQa.getCharacterPos());
+      gap = p1.x === p0.x && p1.y === p0.y ? gap * 1.6 : slow ? frameMs * 0.6 : 0;
     }
     await wait(60);
   }
