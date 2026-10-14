@@ -1,6 +1,7 @@
 /**
  * Run #44 street NPCs (deploy gate). Loads the map with `?npcs=1` and samples every NPC on each
  * animation frame for a few seconds, then checks:
+ *  - the Estudio street (y=36, x=18..44, door 31,36) is drawn with street tiles
  *  - all 20 NPCs spawn, each on its own street tile, and only ever step onto street tiles
  *  - walking uses the facing's strip (walk_se / sw / ne / nw) and covers all four directions;
  *    some NPCs pause on the idle strip and set off again
@@ -189,7 +190,14 @@ export async function runRun44NpcSuite({ kind, base, errors, notes, shots }) {
     const ctx = await browser.newContext(spec.options);
     const page = await ctx.newPage();
     await openMap(page, withQuery(base, { npcs: '1' }));
-    const streets = new Set((await qa(page, () => window.__playtestQa.streetTiles())).map((s) => `${s.x},${s.y}`));
+    const streetList = await qa(page, () => window.__playtestQa.streetTiles());
+    const streets = new Set(streetList.map((s) => `${s.x},${s.y}`));
+    const estudioStreet = [];
+    for (let x = 18; x <= 44; x++) {
+      const s = streetList.find((t) => t.x === x && t.y === 36);
+      if (!s || !s.key.startsWith('tile/calle/')) estudioStreet.push(x);
+    }
+    if (estudioStreet.length) errors.push(`${tag}: street y=36 is not street at x=${estudioStreet.join(',')} (Estudio door 31,36)`);
     const first = await qa(page, () => window.__playtestQa.npcs());
     if (!first.enabled) errors.push(`${tag}: ?npcs=1 did not enable the crowd`);
     if (first.npcs.length !== NPC_COUNT) errors.push(`${tag}: ${first.npcs.length}/${NPC_COUNT} NPCs spawned`);
