@@ -109,6 +109,7 @@ import {
   zoomMinForInteriorBounds,
   zoomMinForViewport,
   zoomAtScreenAnchor,
+  smoothDampToZero,
 } from './cameraControl';
 
 /**
@@ -156,6 +157,12 @@ export type SceneEvents = {
 /** Desktop first-load camera when the URL carries no #view. */
 const DESKTOP_FIRST_LOAD_BUILDINGS = ['estudio', 'volaris', 'mentoria', 'pg'] as const;
 const DESKTOP_ROOF_RISE = 160;
+/** World px from the character's foot up to the middle of its body (drawCharacter is ~62 tall). */
+const CHAR_BODY_CENTRE_RISE = 31;
+/** Glide time when the camera catches up to the character (walk start, after a manual pan). */
+const FOLLOW_SMOOTH_S = 0.35;
+/** A per-frame character move longer than this (3 tiles) is a teleport, not walking. */
+const FOLLOW_TELEPORT_WORLD = 3 * Math.hypot(TILE_W / 2, TILE_H / 2);
 
 export class IsoScene {
   app!: Application;
@@ -181,6 +188,21 @@ export class IsoScene {
   cameraX = 0;
   cameraY = 0;
   zoom = 0.85;
+
+  /**
+   * Camera follow. `engaged` while the character moves (and until the glide settles); `suspended`
+   * after a manual pan until the next walk starts. The camera moves with the character each frame
+   * and a critically damped spring removes whatever offset is left.
+   */
+  private follow = {
+    engaged: false,
+    suspended: false,
+    vx: 0,
+    vy: 0,
+    prevX: NaN,
+    prevY: NaN,
+    scope: '',
+  };
 
   hoveredObject: MapObject | null = null;
   reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -706,6 +728,7 @@ export class IsoScene {
     this.path = result.path;
     this.sprint = sprint;
     this.charState = sprint ? 'sprint' : 'walk';
+    this.startCameraFollow();
     this.events.onChecklist('walk-around');
     this.drawPathPreview();
     if (this.path.length === 0) {
@@ -1127,6 +1150,11 @@ export class IsoScene {
       this.canvasEl.dataset.zoomSource = this.zoomSource;
       this.canvasEl.dataset.anchorWx = String(-this.cameraX);
       this.canvasEl.dataset.anchorWy = String(-this.cameraY);
+      const charScreen = this.followTargetScreen();
+      this.canvasEl.dataset.charScreen = JSON.stringify({
+        x: Math.round(charScreen.x * 10) / 10,
+        y: Math.round(charScreen.y * 10) / 10,
+      });
       this.canvasEl.dataset.charTile = JSON.stringify({
         x: Math.round(this.charTx),
         y: Math.round(this.charTy),
@@ -1378,6 +1406,7 @@ export class IsoScene {
   /** Wheel / two-finger scroll: move the view by screen pixels (content follows the fingers). */
   private panByScreen(dx: number, dy: number): void {
     if (dx === 0 && dy === 0) return;
+    this.suspendCameraFollow();
     this.cameraX += dx / this.zoom;
     this.cameraY += dy / this.zoom;
     this.panDragScreenPx += Math.hypot(dx, dy);
@@ -1387,6 +1416,7 @@ export class IsoScene {
   private setZoom(next: number, anchorScreen?: { x: number; y: number }): void {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
+    if (this.follow.engaged) anchorScreen = this.followTargetScreen();
     const camPx = sw / 2 + this.cameraX * this.zoom;
     const camPy = sh / 2 + this.cameraY * this.zoom;
     if (anchorScreen) {
@@ -1473,6 +1503,18 @@ export class IsoScene {
   private applyPinchCamera(next: { cameraX: number; cameraY: number; zoom: number }): void {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
+    if (this.follow.engaged) {
+      // While following, pinch only zooms, about the character, so it stays where it is on screen.
+      next = zoomAtScreenAnchor(
+        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+        sw,
+        sh,
+        0,
+        0,
+        next.zoom,
+        this.followTargetScreen(),
+      );
+    }
     this.cameraX = next.cameraX;
     this.cameraY = next.cameraY;
     this.zoom = clampZoom(next.zoom, sw, sh);
@@ -1736,6 +1778,7 @@ export class IsoScene {
     window.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
       if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
+        if (!e.repeat && !this.keys.has(k)) this.startCameraFollow();
         this.keys.add(k);
         e.preventDefault();
       }
@@ -1903,6 +1946,7 @@ export class IsoScene {
         if (totalFromTap > panThreshold) {
           this.panMoved = true;
           document.body.classList.add('is-canvas-dragging');
+          this.suspendCameraFollow();
           this.cameraX += dx / this.zoom;
           this.cameraY += dy / this.zoom;
           this.lastPanPos = { x: e.clientX, y: e.clientY };
@@ -1961,6 +2005,102 @@ export class IsoScene {
   }
 
   private update(): void {
+    this.updateMovement();
+    this.updateCameraFollow();
+  }
+
+  private followTargetWorld(): { x: number; y: number } {
+    const foot = this.interiorActive
+      ? tileFootWorld(this.interiorCharTx, this.interiorCharTy)
+      : tileFootWorld(this.charTx, this.charTy);
+    return { x: foot.x, y: foot.y - CHAR_BODY_CENTRE_RISE };
+  }
+
+  private followTargetScreen(): { x: number; y: number } {
+    const t = this.followTargetWorld();
+    return this.worldToScreen(t.x, t.y);
+  }
+
+  private startCameraFollow(): void {
+    this.follow.suspended = false;
+    this.follow.engaged = true;
+  }
+
+  private suspendCameraFollow(): void {
+    this.follow.suspended = true;
+    this.follow.engaged = false;
+    this.follow.vx = 0;
+    this.follow.vy = 0;
+  }
+
+  private updateCameraFollow(): void {
+    const f = this.follow;
+    const t = this.followTargetWorld();
+    const scope = this.interiorActive ? `room:${this.interiorDef?.id ?? ''}` : 'map';
+    const jumped =
+      f.scope !== scope ||
+      !Number.isFinite(f.prevX) ||
+      Math.hypot(t.x - f.prevX, t.y - f.prevY) > FOLLOW_TELEPORT_WORLD;
+    const stepX = jumped ? 0 : t.x - f.prevX;
+    const stepY = jumped ? 0 : t.y - f.prevY;
+    f.prevX = t.x;
+    f.prevY = t.y;
+    f.scope = scope;
+    if (jumped) {
+      // Entering / leaving a room or a teleport places its own camera; follow resumes on the next walk.
+      f.engaged = false;
+      f.vx = 0;
+      f.vy = 0;
+    }
+    if (this.canvasEl) {
+      this.canvasEl.dataset.follow = f.suspended ? 'suspended' : f.engaged ? 'engaged' : 'idle';
+    }
+    if (jumped || f.suspended) return;
+    const moved = Math.hypot(stepX, stepY) > 1e-4;
+    const walking = this.interiorActive ? this.interiorPath.length > 0 : this.path.length > 0;
+    if (moved || walking) f.engaged = true;
+    if (!f.engaged) return;
+
+    const dt = Math.min(0.1, this.app.ticker.deltaMS / 1000);
+    const camBeforeX = this.cameraX;
+    const camBeforeY = this.cameraY;
+    // Offset of the character from screen centre, in world px, after moving with it this frame.
+    let ox = this.cameraX - stepX + t.x;
+    let oy = this.cameraY - stepY + t.y;
+    if (this.reducedMotion) {
+      ox = 0;
+      oy = 0;
+      f.vx = 0;
+      f.vy = 0;
+    } else {
+      const sx = smoothDampToZero(ox, f.vx, FOLLOW_SMOOTH_S, dt);
+      const sy = smoothDampToZero(oy, f.vy, FOLLOW_SMOOTH_S, dt);
+      ox = sx.offset;
+      oy = sy.offset;
+      f.vx = sx.velocity;
+      f.vy = sy.velocity;
+    }
+    const wantX = ox - t.x;
+    const wantY = oy - t.y;
+    this.cameraX = wantX;
+    this.cameraY = wantY;
+    this.applyCamera(false);
+    // Map / room bounds held the camera back: drop the spring's speed on that axis (no wind-up).
+    const heldX = Math.abs(this.cameraX - wantX) > 0.01;
+    const heldY = Math.abs(this.cameraY - wantY) > 0.01;
+    if (heldX) f.vx = 0;
+    if (heldY) f.vy = 0;
+    const camMoved = Math.hypot(this.cameraX - camBeforeX, this.cameraY - camBeforeY);
+    const residual = Math.hypot(heldX ? 0 : ox, heldY ? 0 : oy);
+    if (!moved && !walking && camMoved < 0.05 && residual < 0.5) {
+      f.engaged = false;
+      f.vx = 0;
+      f.vy = 0;
+      this.applyCamera(true);
+    }
+  }
+
+  private updateMovement(): void {
     this.syncObjectSprites();
     if (this.doorCooldown > 0) {
       this.doorCooldown -= this.app.ticker.deltaMS;
@@ -2378,6 +2518,7 @@ export class IsoScene {
     this.interiorPath = path;
     this.sprint = sprint;
     this.charState = sprint ? 'sprint' : 'walk';
+    this.startCameraFollow();
   }
 
   /** One tap on the exit mat / door gap leaves right away, from anywhere the exit is reachable. */
@@ -2671,6 +2812,7 @@ export class IsoScene {
 
   /** QA: put a world point at the canvas centre at an exact zoom. */
   qaFrameWorld(wx: number, wy: number, zoom: number): void {
+    this.suspendCameraFollow();
     this.zoom = zoom;
     this.cameraX = -wx;
     this.cameraY = -wy;

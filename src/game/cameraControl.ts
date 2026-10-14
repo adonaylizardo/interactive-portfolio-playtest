@@ -106,6 +106,26 @@ export function zoomAtScreenAnchor(
   return { cameraX: nextCamX, cameraY: nextCamY, zoom: clamped };
 }
 
+/**
+ * One step of a critically damped spring pulling `offset` to 0 (never overshoots; stable for any
+ * frame time). `smoothTime` is roughly the time to cover most of the distance.
+ */
+export function smoothDampToZero(
+  offset: number,
+  velocity: number,
+  smoothTime: number,
+  dt: number,
+): { offset: number; velocity: number } {
+  const omega = 2 / Math.max(1e-4, smoothTime);
+  const x = omega * dt;
+  const decay = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+  const temp = (velocity + omega * offset) * dt;
+  return {
+    offset: (offset + temp) * decay,
+    velocity: (velocity - omega * temp) * decay,
+  };
+}
+
 export type MapScreenRect = {
   left: number;
   top: number;
