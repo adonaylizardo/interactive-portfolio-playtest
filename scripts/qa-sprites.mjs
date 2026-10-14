@@ -906,9 +906,21 @@ async function interiorChecks(browser) {
     const est = await page.evaluate(() => window.__playtestQa.interiorLayout());
     const floorPts = [];
     const ch = await page.evaluate(() => window.__playtestQa.interiorCharTile());
+    // Adonay and Pantone stand on the floor; skip whatever they cover.
+    const avatarBoxes = await page.evaluate(() => {
+      const q = window.__playtestQa;
+      const a = q.playerAvatar();
+      return [a.adonay, a.pantone].map((w) => {
+        const p0 = q.worldToClient(w.x - w.worldW / 2, w.y - w.worldH);
+        const p1 = q.worldToClient(w.x + w.worldW / 2, w.y + 6);
+        return { x0: p0.x - 2, y0: p0.y - 2, x1: p1.x + 2, y1: p1.y + 2 };
+      });
+    });
     for (const t of est.walkable) {
       if ((t.x === est.exit.x && t.y === est.exit.y) || t.x + t.y < 4 || (t.x === ch.x && t.y === ch.y)) continue;
-      floorPts.push(await page.evaluate(([x, y]) => window.__playtestQa.interiorTileScreenPoint(x, y), [t.x, t.y]));
+      const pt = await page.evaluate(([x, y]) => window.__playtestQa.interiorTileScreenPoint(x, y), [t.x, t.y]);
+      if (avatarBoxes.some((b) => pt.x >= b.x0 && pt.x <= b.x1 && pt.y >= b.y0 && pt.y <= b.y1)) continue;
+      floorPts.push(pt);
     }
     const fc = await page.evaluate((p) => window.__playtestQa.sampleCanvasColors(p), floorPts);
     const NOCHE = [0x1a1c20, 0x1d1f24, 0x2a2d33];
