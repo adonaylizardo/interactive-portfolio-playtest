@@ -92,23 +92,47 @@ async function testKeyboardEntry(ctx, kind, base, errors, notes) {
     const entered = [];
     for (const [i, b] of targets.slice(0, 2).entries()) {
       const keys = i === 0 ? ARROWS : WASD;
+      // Approach every door from a few tiles out (the spawn tile is the Estudio door itself).
+      const stage = await qa(
+        page,
+        (bb) => {
+          const q = window.__playtestQa;
+          for (const k of [5, 4, 3]) {
+            for (const lat of [0, 2, -2]) {
+              const t = {
+                x: bb.door.x - bb.inward.x * k + (bb.inward.x ? 0 : lat),
+                y: bb.door.y - bb.inward.y * k + (bb.inward.y ? 0 : lat),
+              };
+              const n = q.findPath(t.x, t.y, bb.door.x, bb.door.y)?.length ?? 0;
+              if (n >= 3) return { ...t, n };
+            }
+          }
+          return null;
+        },
+        b,
+      );
+      if (!stage || !(await keyWalkTo(page, stage, keys))) {
+        errors.push(`${tag}: could not walk away from the ${b.name} door to approach it`);
+        continue;
+      }
       if (!(await keyWalkTo(page, b.door, keys))) {
         errors.push(`${tag}: could not walk to the ${b.name} door ${b.door.x},${b.door.y} with the keyboard`);
         continue;
       }
-      if (await inInterior(page)) {
-        errors.push(`${tag}: ${b.name} entered while walking along its door row (not toward the door)`);
-      }
       const inwardKey = keys[`${b.inward.x},${b.inward.y}`];
-      await page.keyboard.down(inwardKey);
-      const ok = await waitFor(page, () => inInterior(page), 2500);
-      await page.keyboard.up(inwardKey);
+      // Walking straight at the door enters on arrival; otherwise step toward it from the access tile.
+      const onArrival = await waitFor(page, () => inInterior(page), 1500);
+      if (!onArrival) {
+        await page.keyboard.down(inwardKey);
+        await waitFor(page, () => inInterior(page), 2500);
+        await page.keyboard.up(inwardKey);
+      }
       const id = await qa(page, () => window.__playtestQa.getInteriorId());
-      if (!ok || id !== b.name) {
+      if (id !== b.name) {
         errors.push(`${tag}: walking into the ${b.name} door with ${inwardKey} did not enter (interior ${id})`);
         continue;
       }
-      entered.push(b.name);
+      entered.push(`${b.name} (walked ${stage.n} tiles${onArrival ? ', entered on arrival' : `, then ${inwardKey}`})`);
       await wait(700);
       const face = await qa(page, () => window.__playtestQa.interiorLayout().exitFace);
       const outKey = keys[face === '+x' ? '1,0' : '0,1'];
