@@ -68,8 +68,8 @@ export class StudioAudio {
   }
 
   toggleMute(): boolean {
-    this.unlock();
     this.setMuted(!this.muted);
+    this.unlock();
     if (!this.muted) this.playClick();
     return this.muted;
   }
@@ -80,15 +80,18 @@ export class StudioAudio {
       return;
     }
     this.unlocked = true;
-    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctx) return;
-    this.ctx = new Ctx();
-    this.master = this.ctx.createGain();
-    this.master.gain.value = this.muted ? 0 : 1;
-    this.master.connect(this.ctx.destination);
-    void this.ctx.resume();
-    this.startAmbience();
-    this.emit();
+    try {
+      const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Ctx) return;
+      this.ctx = new Ctx();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 1;
+      this.master.connect(this.ctx.destination);
+      void this.ctx.resume();
+      this.startAmbience();
+    } catch {
+      /* autoplay / context limits: mute state still flips */
+    }
   }
 
   setInterior(open: boolean): void {

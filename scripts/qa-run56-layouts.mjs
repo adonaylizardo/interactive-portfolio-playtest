@@ -211,7 +211,7 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
       });
       if (sound0.muted) errors.push(`${tag}: sound starts muted`);
       if (sound0.pressed !== 'true') errors.push(`${tag}: Sonido aria-pressed is ${sound0.pressed}, want true`);
-      await page.locator('[aria-label="Sonido"]').first().click();
+      await page.locator('.chrome__rail [aria-label="Sonido"]').click();
       await wait(150);
       const sound1 = await qa(page, () => ({
         muted: window.__playtestQa.audioMuted(),
@@ -234,8 +234,8 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
         errors.push(`${tag}: mute did not survive reload (muted=${sound2.muted} stored=${sound2.stored})`);
       }
       if (sound2.pressed !== 'false') errors.push(`${tag}: reloaded Sonido aria-pressed is ${sound2.pressed}, want false`);
-      await page.locator('[aria-label="Sonido"]').first().click();
-      await wait(150);
+      await page.locator('.chrome__rail [aria-label="Sonido"]').click();
+      await wait(200);
       const sound3 = await qa(page, () => window.__playtestQa.audioMuted());
       if (sound3) errors.push(`${tag}: second Sonido click did not unmute`);
       await qa(page, () => {
