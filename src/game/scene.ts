@@ -3291,11 +3291,15 @@ export class IsoScene {
     const spanY = Math.abs(doorW.y - charW.y) + TILE_H * 4;
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
-    const zoomX = sw / spanX;
-    const zoomY = sh / spanY;
+    this.updateCameraFitMargins();
+    const m = cameraFitMargins();
+    const innerW = Math.max(1, sw - m.left - m.right);
+    const innerH = Math.max(1, sh - m.top - m.bottom);
+    const zoomX = innerW / spanX;
+    const zoomY = innerH / spanY;
     this.zoom = clampZoom(Math.min(zoomX, zoomY) * 0.88, sw, sh);
-    this.cameraX = -mid.x;
-    this.cameraY = -mid.y + 40;
+    const aim = this.freeRectCenter();
+    this.placeWorldAtScreen(mid.x, mid.y - 40, aim.x, aim.y);
     this.applyCamera(false);
   }
 
