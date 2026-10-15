@@ -1,5 +1,9 @@
 name: Deploy to GitHub Pages
 
+# Live Pages for day-to-day candidates is the gh-pages branch /preview/ path
+# (`npm run deploy:preview`). This workflow only runs on main and must not be
+# used to ship unapproved playtest builds over the live root.
+
 on:
   push:
     branches: [main]

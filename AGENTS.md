@@ -26,3 +26,15 @@ If the PR changes anything visible in the game or checklist UI:
 - Fill in `.github/pull_request_template.md` **Verification** table with the **actual** command, exit/result, and a one-line summary — not placeholders.
 - List anything not covered by automation under **Not verified** (e.g. real-iPhone touch, pinch on physical device).
 - Keep PRs **draft** until the author explicitly asks for review; CI on `cursor/**` must be green before requesting review.
+
+### GitHub Pages
+
+Never deploy a candidate to the live gh-pages root. After CI is green, publish to **preview** and report that URL:
+
+`https://adonaylizardo.github.io/interactive-portfolio-playtest/preview/`
+
+```bash
+DEPLOY_GATE_PASSED=1 npm run deploy:preview
+```
+
+Do not run `DEPLOY_TARGET=live` / `npm run deploy:live` unless the user has explicitly said QA approved promoting that preview. Live is `https://adonaylizardo.github.io/interactive-portfolio-playtest/`.

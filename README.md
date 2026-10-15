@@ -2,7 +2,8 @@
 
 Prototipo de interacción (bloques grises) para un futuro portafolio isométrico. Sin arte final ni contenido real.
 
-**Vista previa en producción:** [https://adonaylizardo.github.io/interactive-portfolio-playtest/](https://adonaylizardo.github.io/interactive-portfolio-playtest/)
+**Live:** [https://adonaylizardo.github.io/interactive-portfolio-playtest/](https://adonaylizardo.github.io/interactive-portfolio-playtest/)
+**Candidate preview:** [https://adonaylizardo.github.io/interactive-portfolio-playtest/preview/](https://adonaylizardo.github.io/interactive-portfolio-playtest/preview/)
 
 ## Desarrollo local
 
@@ -43,10 +44,24 @@ Después de cambiar el mapa, recarga la app; no hace falta tocar el renderer sal
 
 El progreso del tutorial se guarda en `localStorage` (`playtest-checklist-v3`). En **touch** son **4 pasos** (0/4→4/4): caminar (toca; doble toque para correr), cámara, zoom, edificio — sin paso de teclado. En **escritorio**, **5 pasos** incluyen WASD/flechas. En móvil la checklist llega **cerrada** (anillo + contador abajo); toca el anillo para abrir. La cámara (pan + zoom) se sincroniza con el hash de la URL (`#view=x=…&y=…&z=…`).
 
-## Vista previa en rama `gh-pages` (sin merge a main)
+## GitHub Pages: preview vs live
+
+Candidates never go to the live root. They publish under `/preview/` on the `gh-pages` branch.
+
+| | URL |
+|---|---|
+| Live | https://adonaylizardo.github.io/interactive-portfolio-playtest/ |
+| Preview | https://adonaylizardo.github.io/interactive-portfolio-playtest/preview/ |
 
 ```bash
-npm run deploy:gh-pages
+# after CI is green — updates /preview/ only
+DEPLOY_GATE_PASSED=1 npm run deploy:preview
 ```
 
-Publica `dist/` en la rama huérfana `gh-pages` (con `.nojekyll`) para apuntar GitHub Pages ahí mientras tanto.
+Promote to live only after explicit QA approval:
+
+```bash
+DEPLOY_TARGET=live DEPLOY_LIVE_APPROVED=1 DEPLOY_GATE_PASSED=1 npm run deploy:live
+```
+
+`npm run deploy:gh-pages` is the same as `deploy:preview`. Without `DEPLOY_LIVE_APPROVED=1`, a live deploy exits without touching the root.

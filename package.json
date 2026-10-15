@@ -14,7 +14,9 @@
     "qa:smoke": "npm run build && node scripts/qa-smoke.mjs",
     "qa:gate": "npm run build && npm run typecheck && node scripts/check-logos.mjs && node scripts/qa-sprites.mjs && node scripts/qa-smoke.mjs",
     "check:logos": "node scripts/check-logos.mjs",
-    "deploy:gh-pages": "node scripts/deploy-gh-pages.mjs"
+    "deploy:gh-pages": "node scripts/deploy-gh-pages.mjs",
+    "deploy:preview": "node scripts/deploy-gh-pages.mjs",
+    "deploy:live": "DEPLOY_TARGET=live node scripts/deploy-gh-pages.mjs"
   },
   "devDependencies": {
     "playwright": "^1.64.0",
