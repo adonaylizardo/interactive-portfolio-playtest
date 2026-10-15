@@ -291,7 +291,10 @@ let sheetResolution = 1;
 let framesLoading: Promise<void> | null = null;
 let restLoading: Promise<void> | null = null;
 let restLoaded = false;
-/** Walking strips load with the map; sit / lie strips on first need. `meditar_*` ships unused for now. */
+/**
+ * Walking strips load with the map; sit / lie strips once the first load settles (or on first need,
+ * if sooner). `meditar_*` ships unused for now.
+ */
 const WALK_ANIM = /^(idle|walk|trot)_/;
 const UNUSED_ANIM = /^meditar_/;
 
@@ -328,6 +331,13 @@ export function loadRestSheets(): Promise<void> {
     () => void (restLoading = null),
   );
   return restLoading;
+}
+
+/** Fetches the rest strips once the page is idle after the first load, so the first sit never waits on them. */
+export function prefetchRestSheets(): void {
+  const go = () => void loadRestSheets();
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(go, { timeout: 3000 });
+  else setTimeout(go, 1000);
 }
 
 /**

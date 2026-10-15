@@ -120,6 +120,7 @@ import {
   loadPlayerSheets,
   loadRestSheets,
   PlayerAvatar,
+  prefetchRestSheets,
   SPRINT_TILES_PER_S,
   TILE_STEP_WORLD,
   WALK_TILES_PER_S,
@@ -471,8 +472,8 @@ export class IsoScene {
       (fx, fy) => this.walkerZIndex(fx, fy),
       this.reducedMotion,
     );
-    void this.fillActors.load(this.app.renderer.resolution).then(() => this.cullVisibleTiles());
-    this.buildNoah();
+    const fillLoad = this.fillActors.load(this.app.renderer.resolution).then(() => this.cullVisibleTiles());
+    void Promise.allSettled([fillLoad, this.buildNoah()]).then(prefetchRestSheets);
     this.syncCharacterGraphic();
 
     const bootInteriorId = parseInteriorFromHash();
@@ -791,9 +792,9 @@ export class IsoScene {
     return (Number.isFinite(zi) ? zi - 0.5 : 1_000_000) + (fx + fy) * 1e-4;
   }
 
-  private buildNoah(): void {
+  private buildNoah(): Promise<void> | undefined {
     const muro = objects.find((o) => o.name === 'muro');
-    if (!muro) return;
+    if (!muro) return undefined;
     const muroKey = objectSpriteKey(muro, 'default', false)!;
     this.noah = new Noah(
       this.objectsLayer,
@@ -811,7 +812,7 @@ export class IsoScene {
       if (!this.prepareMapTap()) return;
       this.talkToNoahOrWalkThere(this.shiftHeld);
     });
-    void this.noah.load(this.app.renderer.resolution).then(() => this.cullVisibleTiles());
+    return this.noah.load(this.app.renderer.resolution).then(() => this.cullVisibleTiles());
   }
 
   /** Within talk range, or on any of the 8 tiles around his (his feet sit off the tile centre). */
