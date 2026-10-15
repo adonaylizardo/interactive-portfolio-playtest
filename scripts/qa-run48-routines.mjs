@@ -78,7 +78,7 @@ function playerPlan(town) {
   if (bench) plan.push({ at: bench.front, s: 60, what: `in front of ${bench.id}` });
   plan.push({ at: { x: 39, y: 37 }, s: 40, what: 'Volaris door front' });
   plan.push({ at: { x: 28, y: 36 }, s: 60, what: 'the Estudio street' });
-  plan.push({ at: { x: 31, y: 36 }, s: 40, what: 'the spawn / Estudio door' });
+  plan.push({ at: { x: 31, y: 36 }, s: 40, what: 'the Estudio door (spawn is 31,37 in front)' });
   return plan;
 }
 

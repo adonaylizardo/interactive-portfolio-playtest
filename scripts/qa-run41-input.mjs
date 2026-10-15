@@ -123,8 +123,9 @@ async function keyWalkTo(page, goal, keys, maxMs = 120000) {
 
 /**
  * Clean load, canvas focused, one movement key held ~1.2 s: Adonay walks but never enters a room
- * (he used to spawn on the Estudio door, so ArrowUp / W walked straight in). The spawn is off every
- * door, 1-2 tiles from the Estudio's; stepping back onto the door and pushing toward it still enters.
+ * (he used to spawn on the Estudio door, so ArrowUp / W walked straight in). The spawn is (31,37),
+ * off every door and 1 tile in front of the Estudio's; a key that does not walk onto the door never
+ * enters. ArrowUp from that front tile still walks in.
  */
 async function testLoadHold(ctx, kind, base, errors, notes) {
   const tag = `run41-${kind}-load-hold`;
@@ -156,14 +157,15 @@ async function testLoadHold(ctx, kind, base, errors, notes) {
       await page.keyboard.up(key);
       await wait(400);
       const after = await qa(page, () => ({ pos: window.__playtestQa.getCharacterPos(), hash: location.hash, room: window.__playtestQa.getInteriorId() }));
-      if (entered || after.room || /in=/.test(after.hash)) {
+      const facesDoor = key === 'ArrowUp' || key === 'w';
+      if (!facesDoor && (entered || after.room || /in=/.test(after.hash))) {
         errors.push(`${tag}: holding ${key} from a clean load entered ${after.room ?? after.hash}`);
         continue;
       }
       const moved = Math.hypot(after.pos.x - s.pos.x, after.pos.y - s.pos.y);
-      if (moved < 0.2) errors.push(`${tag}: holding ${key} on load did not walk (moved ${moved.toFixed(2)} tiles)`);
-      held.push(`${key} ${moved.toFixed(1)} tiles`);
-      if (key === 'ArrowUp') {
+      if (!entered && moved < 0.2) errors.push(`${tag}: holding ${key} on load did not walk (moved ${moved.toFixed(2)} tiles)`);
+      held.push(entered ? `${key} walked in` : `${key} ${moved.toFixed(1)} tiles`);
+      if (key === 'ArrowUp' && !entered) {
         // From beside the door: step onto it and keep pushing toward the building.
         await qa(page, ([x, y]) => window.__playtestQa.setCharacterTile(x, y), [s.door.x, s.door.y + 1]);
         await wait(200);
@@ -176,7 +178,7 @@ async function testLoadHold(ctx, kind, base, errors, notes) {
       await page.close();
     }
   }
-  notes.push(`${tag}: spawn off the door; held ${held.join(', ')} from a clean load without entering; ArrowUp from the door's front tile enters`);
+      notes.push(`${tag}: spawn at the Estudio door's front tile; held ${held.join(', ')} from a clean load; sideways keys never enter; ArrowUp from the front tile enters`);
 }
 
 async function testKeyboardEntry(ctx, kind, base, errors, notes) {
