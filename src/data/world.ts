@@ -172,7 +172,6 @@ const FILLER_PROPS: { kind: 'tree' | 'bench' | 'lamp' | 'plaza'; x: number; y: n
   { kind: 'plaza', x: 34, y: 37 },
   { kind: 'bench', x: 29, y: 40 },
   { kind: 'bench', x: 33, y: 40 },
-  { kind: 'lamp', x: 31, y: 40 },
   { kind: 'lamp', x: 36, y: 39 },
   { kind: 'tree', x: 25, y: 35 },
   { kind: 'tree', x: 37, y: 35 },
@@ -380,10 +379,14 @@ export function buildWorld(): {
     if (ed.cara_puerta === '+y') keepClear.add(`${ax},${ay + 1}`);
     if (ed.cara_puerta === '+x') keepClear.add(`${ax + 1},${ay}`);
   }
+  const benchFronts = new Set(
+    objects.filter((o) => o.name === 'bench').map((o) => (o.variant === 'izq' ? `${o.x},${o.y + 1}` : `${o.x + 1},${o.y}`)),
+  );
   const fill = placeFill({
     cells,
     objects,
     keepClear,
+    benchFronts,
     nearMuro: nearMuroClearance,
     lampVariant: sideFacingStreet,
     start: INICIO,

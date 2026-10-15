@@ -7,7 +7,7 @@ import type { MapCell, MapObject } from './world';
  * Map fill (forge-paquete/relleno, placed by mapa/plan-relleno.json). The plan was drawn against an
  * older copy of the map, so every placement is checked against the live grid here and moved to the
  * nearest free spot (whole group by one offset) when it lands on a street, a footprint, a door or
- * the cell in front of one, the plaza, another prop, or over the Estudio sprite.
+ * the cell in front of one, a bench's seat cell, the plaza, another prop, or over a building sprite.
  */
 
 type Cell = [number, number];
@@ -56,8 +56,8 @@ export type FillReportEntry = {
   id: string;
   planned: Cell;
   placed: Cell | null;
-  /** Why the planned spot was refused (empty when it was used as is). */
-  conflicts: string[];
+  /** Why the planned spot was refused (empty when it was used as is); the placed spot is always clear. */
+  plannedConflicts: string[];
   note?: string;
 };
 
@@ -79,6 +79,8 @@ export type FillContext = {
   objects: MapObject[];
   /** Cells that must stay open: door accesses, the cell in front of each door, spawn, monument stops. */
   keepClear: Set<string>;
+  /** The cell each bench faces, where a sitter steps on and off. */
+  benchFronts: Set<string>;
   /** Cells next to the climbing wall that stay open for Noah's route. */
   nearMuro: (x: number, y: number) => boolean;
   lampVariant: (cells: MapCell[][], x: number, y: number) => 'izq' | 'der';
@@ -115,20 +117,44 @@ function decode(m: Mask): Bits {
 const on = (m: Bits, cx: number, cy: number) =>
   cx >= 0 && cy >= 0 && cx < m.w && cy < m.h && (m.bits[(cy * m.w + cx) >> 3] & (1 << ((cy * m.w + cx) & 7))) !== 0;
 
-/** World-space opaque cells of the Estudio (union of every state and zoom frame). */
-function estudioMask(objects: MapObject[]): ((wx: number, wy: number) => boolean) | null {
-  const est = objects.find((o) => o.type === 'building' && o.name === 'estudio');
-  const raw = (alphaJson as Record<string, Mask>)['ext/estudio'];
-  const asset = (spritesJson.assets as Record<string, { vfs: { x: number; y: number } }>)['ext/estudio/default/cerca'];
-  if (!est || !raw || !asset) return null;
-  const m = decode(raw);
-  const s = foot((est.footprintX ?? est.x) + (est.w ?? 1) - 1, (est.footprintY ?? est.y) + (est.h ?? 1) - 1);
-  const tl = { x: s.x - asset.vfs.x, y: s.y - asset.vfs.y };
-  return (wx, wy) => on(m, Math.floor((wx - tl.x) / m.cell), Math.floor((wy - tl.y) / m.cell));
+type BuildingMask = { name: string; x0: number; y0: number; x1: number; y1: number; hit: (wx: number, wy: number) => boolean };
+
+/**
+ * Buildings no fill sprite may touch. Elsewhere a prop in front of a facade hides part of it, as
+ * anything in an iso town does; the Estudio frames the spawn and stays whole.
+ */
+const SPRITE_CLEAR = new Set(['estudio']);
+
+/** World-space opaque cells of each SPRITE_CLEAR building (union of every state and zoom frame). */
+function buildingMasks(objects: MapObject[]): BuildingMask[] {
+  const out: BuildingMask[] = [];
+  for (const b of objects) {
+    if (b.type !== 'building' || !SPRITE_CLEAR.has(b.name)) continue;
+    const raw = (alphaJson as Record<string, Mask>)[`ext/${b.name}`];
+    const asset = (spritesJson.assets as Record<string, { vfs: { x: number; y: number } }>)[`ext/${b.name}/default/cerca`];
+    if (!raw || !asset) continue;
+    const m = decode(raw);
+    const s = foot((b.footprintX ?? b.x) + (b.w ?? 1) - 1, (b.footprintY ?? b.y) + (b.h ?? 1) - 1);
+    const tl = { x: s.x - asset.vfs.x, y: s.y - asset.vfs.y };
+    out.push({
+      name: b.name,
+      x0: tl.x,
+      y0: tl.y,
+      x1: tl.x + m.w * m.cell,
+      y1: tl.y + m.h * m.cell,
+      hit: (wx, wy) => on(m, Math.floor((wx - tl.x) / m.cell), Math.floor((wy - tl.y) / m.cell)),
+    });
+  }
+  return out;
 }
 
+const boxesMeet = (a: { x0: number; y0: number; x1: number; y1: number }, b: { x0: number; y0: number; x1: number; y1: number }) =>
+  a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+
 /** Opaque world cells of one fill sprite placed with its frame top-left at `tl`. */
-function maskHits(m: Bits, tl: { x: number; y: number }, hit: (wx: number, wy: number) => boolean): boolean {
+function maskHits(m: Bits, tl: { x: number; y: number }, b: BuildingMask): boolean {
+  if (!boxesMeet({ x0: tl.x, y0: tl.y, x1: tl.x + m.w * m.cell, y1: tl.y + m.h * m.cell }, b)) return false;
+  const hit = b.hit;
   for (let cy = 0; cy < m.h; cy++) {
     for (let cx = 0; cx < m.w; cx++) {
       if (!on(m, cx, cy)) continue;
@@ -141,8 +167,9 @@ function maskHits(m: Bits, tl: { x: number; y: number }, hit: (wx: number, wy: n
   return false;
 }
 
-function rectHits(r: { x0: number; y0: number; x1: number; y1: number }, hit: (wx: number, wy: number) => boolean): boolean {
-  for (let y = r.y0; y < r.y1; y += 4) for (let x = r.x0; x < r.x1; x += 4) if (hit(x, y)) return true;
+function rectHits(r: { x0: number; y0: number; x1: number; y1: number }, b: BuildingMask): boolean {
+  if (!boxesMeet(r, b)) return false;
+  for (let y = r.y0; y < r.y1; y += 4) for (let x = r.x0; x < r.x1; x += 4) if (b.hit(x, y)) return true;
   return false;
 }
 
@@ -158,7 +185,7 @@ type Member = {
   p: Placement;
   solid: (dx: number, dy: number) => Cell[];
   flat: (dx: number, dy: number) => Cell[];
-  overEstudio: (dx: number, dy: number, est: (wx: number, wy: number) => boolean) => boolean;
+  over: (dx: number, dy: number, b: BuildingMask) => boolean;
   anchor: Cell;
 };
 
@@ -174,9 +201,9 @@ function member(p: Placement): Member {
         anchor: p.front,
         solid: (dx, dy) => shift(solid, dx, dy),
         flat: (dx, dy) => shift(flat, dx, dy),
-        overEstudio: (dx, dy, est) => {
+        over: (dx, dy, b) => {
           const s = foot(p.front[0] + dx, p.front[1] + dy);
-          return maskHits(maskOf(p.sprite), { x: s.x - a.vfs.x, y: s.y - a.vfs.y }, est);
+          return maskHits(maskOf(p.sprite), { x: s.x - a.vfs.x, y: s.y - a.vfs.y }, b);
         },
       };
     }
@@ -187,9 +214,9 @@ function member(p: Placement): Member {
         anchor: p.cell,
         solid: (dx, dy) => shift([p.cell], dx, dy),
         flat: () => [],
-        overEstudio: (dx, dy, est) => {
+        over: (dx, dy, b) => {
           const c = centre(p.cell[0] + dx, p.cell[1] + dy);
-          return maskHits(maskOf(p.anim), { x: c.x - 2 * a.anchor!.x, y: c.y - 2 * a.anchor!.y }, est);
+          return maskHits(maskOf(p.anim), { x: c.x - 2 * a.anchor!.x, y: c.y - 2 * a.anchor!.y }, b);
         },
       };
     }
@@ -200,10 +227,10 @@ function member(p: Placement): Member {
         anchor: p.cell,
         solid: (dx, dy) => shift([p.cell], dx, dy),
         flat: () => [],
-        overEstudio: (dx, dy, est) => {
+        over: (dx, dy, b) => {
           const s = foot(p.cell[0] + dx, p.cell[1] + dy);
           const tl = { x: s.x - a.vfs.x, y: s.y - a.vfs.y };
-          return rectHits({ x0: tl.x + a.bbox.x0, y0: tl.y + a.bbox.y0, x1: tl.x + a.bbox.x1, y1: tl.y + a.bbox.y1 }, est);
+          return rectHits({ x0: tl.x + a.bbox.x0, y0: tl.y + a.bbox.y0, x1: tl.x + a.bbox.x1, y1: tl.y + a.bbox.y1 }, b);
         },
       };
     }
@@ -213,7 +240,7 @@ function member(p: Placement): Member {
         anchor: p.cells[0],
         solid: () => [],
         flat: (dx, dy) => shift(p.cells, dx, dy),
-        overEstudio: () => false,
+        over: () => false,
       };
   }
 }
@@ -230,7 +257,7 @@ const OFFSETS: Cell[] = (() => {
 
 export function placeFill(ctx: FillContext): FillResult {
   const { cells } = ctx;
-  const est = estudioMask(ctx.objects);
+  const buildings = buildingMasks(ctx.objects);
   const taken = new Set<string>();
   const flatTaken = new Set<string>();
   const result: FillResult = { objects: [], actors: [], overlays: [], pathCells: [], solidCells: [], flatCells: [], report: [] };
@@ -243,13 +270,15 @@ export function placeFill(ctx: FillContext): FillResult {
     groups.get(g)!.push(p);
   }
 
-  const groundConflict = (x: number, y: number): string | null => {
+  /** `moved`: a relocated prop also keeps off bench seat cells (the plan may cover one on purpose, like the bus stop). */
+  const groundConflict = (x: number, y: number, moved: boolean): string | null => {
     const c = cells[y]?.[x];
     if (!c) return 'off the map';
     if (c.groundId.includes('borde')) return 'map edge';
     if (c.groundId.includes('path/street')) return 'street';
     if (c.groundId.includes('building/footprint')) return 'building footprint';
     if (ctx.keepClear.has(k(x, y))) return 'door / door front / stop cell';
+    if (moved && ctx.benchFronts.has(k(x, y))) return 'bench seat cell';
     if (taken.has(k(x, y))) return 'another fill prop';
     if (!c.walkable) return 'blocked cell (footprint, wall or prop)';
     return null;
@@ -292,7 +321,7 @@ export function placeFill(ctx: FillContext): FillResult {
       const flats = new Set<string>();
       for (const m of ms) {
         for (const [x, y] of m.flat(dx, dy)) {
-          const g = groundConflict(x, y);
+          const g = groundConflict(x, y, dx !== 0 || dy !== 0);
           if (g) why.add(`${g} at (${x},${y})`);
           else if (flatTaken.has(k(x, y))) why.add(`another fill area at (${x},${y})`);
           flats.add(k(x, y));
@@ -300,7 +329,7 @@ export function placeFill(ctx: FillContext): FillResult {
       }
       for (const m of ms) {
         for (const [x, y] of m.solid(dx, dy)) {
-          const g = groundConflict(x, y);
+          const g = groundConflict(x, y, dx !== 0 || dy !== 0);
           if (g) why.add(`${g} at (${x},${y})`);
           else if (flatTaken.has(k(x, y))) why.add(`another fill area at (${x},${y})`);
           else if (cells[y][x].groundId.includes('park')) why.add(`plaza at (${x},${y})`);
@@ -308,7 +337,7 @@ export function placeFill(ctx: FillContext): FillResult {
           if (solids.has(k(x, y))) why.add(`two props on (${x},${y})`);
           solids.add(k(x, y));
         }
-        if (est && m.overEstudio(dx, dy, est)) why.add(`${m.p.id} sprite over the Estudio`);
+        for (const b of buildings) if (m.over(dx, dy, b)) why.add(`${m.p.id} sprite over the ${b.name}`);
         if (m.p.kind === 'prop' && m.p.doorFront) {
           const [fx, fy] = [m.p.doorFront[0] + dx, m.p.doorFront[1] + dy];
           const c = cells[fy]?.[fx];
@@ -323,7 +352,7 @@ export function placeFill(ctx: FillContext): FillResult {
     };
 
     if (list.length === 1 && list[0].kind === 'lamp' && lampAt.has(k(...list[0].cell))) {
-      result.report.push({ id: gid, planned: list[0].cell, placed: list[0].cell, conflicts: [], note: 'a lamp already stands here; kept the existing one' });
+      result.report.push({ id: gid, planned: list[0].cell, placed: list[0].cell, plannedConflicts: [], note: 'a lamp already stands here; kept the existing one' });
       continue;
     }
 
@@ -339,7 +368,7 @@ export function placeFill(ctx: FillContext): FillResult {
     }
     for (const m of ms) {
       const at: Cell | null = offset ? [m.anchor[0] + offset[0], m.anchor[1] + offset[1]] : null;
-      result.report.push({ id: m.p.id, planned: m.anchor, placed: at, conflicts: planned });
+      result.report.push({ id: m.p.id, planned: m.anchor, placed: at, plannedConflicts: planned });
     }
     if (!offset) continue;
     const [dx, dy] = offset;

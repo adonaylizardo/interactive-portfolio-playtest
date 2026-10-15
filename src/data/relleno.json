@@ -1009,30 +1009,30 @@
    "sprite": "fill/fuente",
    "footprint": {
     "x": 30,
-    "y": 41,
+    "y": 42,
     "w": 2,
     "h": 2
    },
    "front": [
     31,
-    42
+    43
    ],
    "cells": [
     [
      30,
-     41
+     42
     ],
     [
      30,
-     42
-    ],
-    [
-     31,
-     41
+     43
     ],
     [
      31,
      42
+    ],
+    [
+     31,
+     43
     ]
    ]
   },
@@ -1084,18 +1084,18 @@
    "kind": "prop",
    "sprite": "fill/puesto-jugos/izq",
    "footprint": {
-    "x": 34,
+    "x": 37,
     "y": 38,
     "w": 1,
     "h": 1
    },
    "front": [
-    34,
+    37,
     38
    ],
    "cells": [
     [
-     34,
+     37,
      38
     ]
    ]
@@ -1641,18 +1641,18 @@
    "kind": "prop",
    "sprite": "fill/rincon-meditacion",
    "footprint": {
-    "x": 26,
+    "x": 24,
     "y": 32,
     "w": 1,
     "h": 1
    },
    "front": [
-    26,
+    24,
     32
    ],
    "cells": [
     [
-     26,
+     24,
      32
     ]
    ]
@@ -1960,7 +1960,7 @@
    "kind": "actor",
    "anim": "anim/bots/forge-se",
    "cell": [
-    34,
+    35,
     31
    ]
   },
@@ -1978,7 +1978,7 @@
    "kind": "actor",
    "anim": "anim/bots/tars-se",
    "cell": [
-    34,
+    35,
     34
    ]
   },

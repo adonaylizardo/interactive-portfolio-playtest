@@ -1,7 +1,9 @@
 /**
  * Run #46 map fill (deploy gate). Checks the relleno placements against the live map:
- *  - every plan item is placed; nothing sits on a street, a building footprint, a door access or the
- *    cell in front of a door; the facades keep their own door cell open
+ *  - every plan item is placed where relleno.json says (the report lists no refused spot); no prop
+ *    footprint or actor cell sits on a street, a building footprint, a door access or the cell in
+ *    front of a door; every door cell is reachable; the facades keep their own door cell open
+ *  - every bench seat cell is reachable from the spawn without a long way round
  *  - no fill sprite (bots included) overlaps the Estudio sprite's opaque pixels
  *  - props block only their own cells, the plaza stays walkable, no walkable pocket is sealed off
  *  - the replaced FILLER trees are gone; actors load, animate and sort in front of the Estudio
@@ -66,9 +68,13 @@ function overlapCount(mask, tl, hit) {
   return n;
 }
 
-function dataChecks(f, streets, instances, tag, errors, notes) {
+function dataChecks(f, streets, instances, benches, tag, errors, notes) {
   const missing = f.report.filter((r) => !r.placed);
-  for (const r of missing) errors.push(`${tag}: ${r.id} was not placed (${r.conflicts.join('; ')})`);
+  for (const r of missing) errors.push(`${tag}: ${r.id} was not placed (${r.plannedConflicts.join('; ')})`);
+  // The report is what a reviewer reads: a planned spot that had to be refused means relleno.json is stale.
+  for (const r of f.report.filter((r) => r.placed && r.plannedConflicts.length)) {
+    errors.push(`${tag}: ${r.id} planned at (${r.planned}) was moved to (${r.placed}): ${r.plannedConflicts.join('; ')}`);
+  }
 
   const footprint = new Map();
   const doors = new Set();
@@ -89,6 +95,16 @@ function dataChecks(f, streets, instances, tag, errors, notes) {
     if (street.has(c)) errors.push(`${tag}: fill on street (${c})`);
     if (footprint.has(c)) errors.push(`${tag}: fill on the ${footprint.get(c)} footprint (${c})`);
     if (doors.has(c)) errors.push(`${tag}: fill on a door access / door front (${c})`);
+  }
+  // Each prop's whole declared footprint and every actor's cell, not only the cells that block.
+  const occupied = [
+    ...f.objects.flatMap((o) => o.cells.map(([x, y]) => ({ id: o.id, x, y }))),
+    ...f.actors.filter((a) => !a.id.endsWith(':overlay')).map((a) => ({ id: a.id, x: a.tx, y: a.ty })),
+  ];
+  for (const { id, x, y } of occupied) {
+    const c = key(x, y);
+    if (footprint.has(c)) errors.push(`${tag}: ${id} overlaps the ${footprint.get(c)} footprint at (${c})`);
+    if (doors.has(c)) errors.push(`${tag}: ${id} stands on a door access / door front (${c})`);
   }
   for (const c of doors) {
     const [x, y] = c.split(',').map(Number);
@@ -136,6 +152,13 @@ function dataChecks(f, streets, instances, tag, errors, notes) {
       const c = key(x + dx, y + dy);
       if ('=.:'.includes(walkAt(x + dx, y + dy) ?? '#') && !seen.has(c)) errors.push(`${tag}: (${c}) next to fill cannot be reached from the spawn`);
     }
+  }
+  for (const c of doors) if (!seen.has(c)) errors.push(`${tag}: door cell (${c}) cannot be reached from the spawn`);
+  // A seat cell boxed in by props is reachable only the long way round (the fountain once left
+  // (30,40), bench 29-40's seat, 18 steps from a spawn 5 away).
+  for (const b of benches) {
+    if (b.path == null) errors.push(`${tag}: ${b.id} seat cell (${b.front.x},${b.front.y}) cannot be reached from the spawn`);
+    else if (b.path > b.direct + 4) errors.push(`${tag}: ${b.id} seat cell (${b.front.x},${b.front.y}) is ${b.path} steps from the spawn, ${b.direct} as the crow walks`);
   }
 
   const hit = estudioHit();
@@ -188,7 +211,17 @@ export async function runRun46FillSuite({ kind, base, errors, notes, shots }) {
     const f = await qa(page, () => window.__playtestQa.fill());
     const streets = await qa(page, () => window.__playtestQa.streetTiles());
     const instances = await qa(page, () => window.__playtestQa.spriteInstances());
-    if (kind === 'chromium-1280') dataChecks(f, streets, instances, tag, errors, notes);
+    const benches = await qa(page, () => {
+      const q = window.__playtestQa;
+      const [sx, sy] = q.inicio;
+      return q.benches().benches.map((b) => ({
+        id: b.id,
+        front: b.front,
+        path: q.findPath(sx, sy, b.front.x, b.front.y)?.length ?? null,
+        direct: Math.abs(b.front.x - sx) + Math.abs(b.front.y - sy),
+      }));
+    });
+    if (kind === 'chromium-1280') dataChecks(f, streets, instances, benches, tag, errors, notes);
 
     const placedProps = relleno.placements.filter((p) => p.kind === 'prop').length;
     const fillObjects = f.objects.filter((o) => o.key.startsWith('fill/'));
