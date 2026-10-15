@@ -62,6 +62,31 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
       if (load.canvasVis !== 'visible') errors.push(`${tag}: map hidden on split`);
       if (load.view !== 'isometrica') errors.push(`${tag}: default view is ${load.view}`);
 
+      const passthrough = await qa(page, () => {
+        const sound = document.querySelector('.chrome__sound');
+        const sub = document.querySelector('.chrome__subtitle');
+        const r = sound?.getBoundingClientRect();
+        const at =
+          r && r.width > 8
+            ? document.elementFromPoint(Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2))
+            : null;
+        return {
+          soundPe: sound ? getComputedStyle(sound).pointerEvents : 'missing',
+          subPe: sub ? getComputedStyle(sub).pointerEvents : 'missing',
+          hit: at ? at.id || at.className : 'none',
+          canvas: !!at?.closest?.('#game-canvas') || at?.id === 'game-canvas',
+        };
+      });
+      if (passthrough.soundPe !== 'none') {
+        errors.push(`${tag}: sound note pointer-events is ${passthrough.soundPe}, want none`);
+      }
+      if (passthrough.subPe !== 'none') {
+        errors.push(`${tag}: subtitle pointer-events is ${passthrough.subPe}, want none`);
+      }
+      if (passthrough.soundPe === 'none' && !passthrough.canvas) {
+        errors.push(`${tag}: sound note still intercepts map taps (${passthrough.hit})`);
+      }
+
       await qa(page, () => window.__playtestQa.setLayout('map'));
       await wait(200);
       const map = await qa(page, () => {

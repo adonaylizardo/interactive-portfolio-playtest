@@ -149,7 +149,17 @@
   color: #edeef0;
 }
 
-.chrome > * {
+/* Only the widgets capture input. Wrappers, the sound note, and subtitles
+   stay out of the hit tree so map / room taps reach the canvas. */
+.chrome__rail,
+.chrome__column,
+.chrome__tab,
+.chrome__tools-phone,
+.chrome__intro,
+.chrome__dock,
+.chrome__lang,
+.chrome__view-btns,
+.chrome__locate {
   pointer-events: auto;
 }
 
@@ -538,6 +548,7 @@ body[data-interior='1'] .chrome__column {
   font-weight: 500;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.45);
   z-index: 4;
+  pointer-events: none;
 }
 
 .chrome--split .chrome__sound {
@@ -821,15 +832,10 @@ body[data-layout='panel'] #game-canvas {
 
 .chrome--interior .chrome__intro,
 .chrome--interior .chrome__dock,
-.chrome--interior .chrome__tools-phone {
+.chrome--interior .chrome__tools-phone,
+.chrome--interior .chrome__sound,
+.chrome--interior .chrome__subtitle,
+.chrome--interior .chrome__lang,
+.chrome--interior .chrome__views {
   display: none;
-}
-
-@media (max-width: 767px) {
-  .chrome--interior .chrome__sound,
-  .chrome--interior .chrome__subtitle,
-  .chrome--interior .chrome__lang,
-  .chrome--interior .chrome__views {
-    display: none;
-  }
 }

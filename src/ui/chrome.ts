@@ -117,8 +117,10 @@ export class ChromeUI {
   }
 
   layoutInsets(): { left: number; top: number; right: number; bottom: number } {
+    if (this.interiorOpen) {
+      return this.mobile ? { left: 0, top: 0, right: 0, bottom: 0 } : { left: 64, top: 0, right: 0, bottom: 0 };
+    }
     if (this.mobile) {
-      if (this.interiorOpen) return { left: 0, top: 0, right: 0, bottom: 0 };
       if (this.mobileSheet) {
         const sheet = this.root.querySelector('.chrome__intro')?.getBoundingClientRect();
         const bottom = sheet ? Math.ceil(window.innerHeight - sheet.top + 8) : 280;

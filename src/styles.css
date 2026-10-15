@@ -75,9 +75,10 @@ body.is-canvas-dragging * {
   pointer-events: auto;
 }
 
-/* Phones: the checklist ring would peek over the room sheet, right beside its Salir button. */
-#ui-root:has(> .building-panel--open) > .checklist--mobile {
+/* The room sheet / Salir own the chrome; the tutorial must not steal exit-mat taps. */
+#ui-root:has(> .building-panel--open) > .checklist {
   visibility: hidden;
+  pointer-events: none;
 }
 
 /* Checklist — floating Getting started pill (Layouts v2) */
