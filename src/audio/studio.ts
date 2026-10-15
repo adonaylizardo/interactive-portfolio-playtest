@@ -51,6 +51,8 @@ export class StudioAudio {
   private readonly played = new Set<string>();
   private readonly listeners = new Set<() => void>();
   private preferOgg: boolean | null = null;
+  /** First gesture owns the intro; other lines wait until it has started. */
+  private introLock = false;
 
   constructor() {
     const unlock = () => this.unlock();
@@ -114,9 +116,9 @@ export class StudioAudio {
     } catch {
       /* autoplay / context limits: mute state still flips */
     }
-    queueMicrotask(() => {
-      if (!this.voice && !this.muted) this.playLine('01-intro');
-    });
+    this.introLock = true;
+    this.playLine('01-intro');
+    if (this.muted || !this.played.has('01-intro')) this.introLock = false;
   }
 
   setInterior(open: boolean): void {
@@ -158,6 +160,7 @@ export class StudioAudio {
   playLine(id: string): void {
     const line = VOICE_LINES[id];
     if (!line || this.played.has(id) || this.muted) return;
+    if ((id === '07-achievement' || id === '11-contact') && this.introLock) return;
     this.unlock();
     this.stopVoice();
     this.played.add(id);
@@ -181,6 +184,7 @@ export class StudioAudio {
   }
 
   private finishVoice(): void {
+    this.introLock = false;
     this.stopVoice();
     this.syncAmbience();
     this.emit();
