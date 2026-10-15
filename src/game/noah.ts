@@ -190,6 +190,14 @@ export class Noah {
     return { x: o.x + x, y: o.y + y };
   }
 
+  /** Fractional tiles of every point his route passes (start, wall base, holds, landing). */
+  routeTiles(): { x: number; y: number }[] {
+    return (Object.keys(WAYPOINTS) as Waypoint[]).map((name) => {
+      const p = this.waypoint(name);
+      return worldToTileFrac(p.x, p.y);
+    });
+  }
+
   /** Fractional tile of Noah's feet. */
   tile(): { x: number; y: number } {
     return worldToTileFrac(this.x, this.y);

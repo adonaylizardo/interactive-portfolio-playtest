@@ -143,6 +143,11 @@ function noahScale(): number | undefined {
 /** Tiles within this distance of Noah can talk to him without walking. */
 const NOAH_TALK_RANGE = 1.6;
 /**
+ * A talk spot in front of (lower on screen than) a point of Noah's route must sit at least this far
+ * to its side in world px, so the player never covers him (both characters are 64 world px wide).
+ */
+const NOAH_CLEAR_WORLD_X = 64;
+/**
  * A mouse or trackpad press on Noah may drift this far and still count as a click. The 4 px mouse
  * pan threshold is easy to cross with a physical trackpad click (touch already allows 14 px).
  */
@@ -261,6 +266,8 @@ export class IsoScene {
   private noah!: Noah;
   /** Set by a tap on Noah from afar: talk to him once the walk there ends. */
   private pendingNoahTalk = false;
+  /** Where that walk ends; arriving there always starts the talk. */
+  private noahTalkSpot: { x: number; y: number } | null = null;
   private npcs!: NpcCrowd;
   private fillActors!: FillActors;
   private events: SceneEvents;
@@ -798,7 +805,24 @@ export class IsoScene {
       this.startNoahTalk();
       return;
     }
+    const spot = this.noahTalkSpots()[0];
+    if (!spot) return;
+    this.requestWalk(spot.x, spot.y, sprint);
+    this.noahTalkSpot = spot;
+    this.pendingNoahTalk = this.path.length > 0 || this.playerNearNoah();
+    if (this.path.length === 0 && this.pendingNoahTalk) {
+      this.pendingNoahTalk = false;
+      this.startNoahTalk();
+    }
+  }
+
+  /**
+   * Walkable tiles within talk range, best first. Never a tile his route passes over, nor one in
+   * front of a route point close enough to cover him (the wall base right below him included).
+   */
+  private noahTalkSpots(): { x: number; y: number }[] {
     const n = this.noah.tile();
+    const route = this.noah.routeTiles();
     const spots: { x: number; y: number; d: number }[] = [];
     for (let dy = -2; dy <= 2; dy++) {
       for (let dx = -2; dx <= 2; dx++) {
@@ -806,19 +830,15 @@ export class IsoScene {
         const y = Math.round(n.y) + dy;
         const d = Math.hypot(x - n.x, y - n.y);
         if (d < 0.6 || d > NOAH_TALK_RANGE || !cells[y]?.[x]?.walkable) continue;
+        if (route.some((r) => Math.round(r.x) === x && Math.round(r.y) === y)) continue;
+        const covers = (r: { x: number; y: number }) =>
+          x + y > r.x + r.y && Math.abs(x - y - (r.x - r.y)) * (TILE_W / 2) < NOAH_CLEAR_WORLD_X;
+        if (route.some(covers)) continue;
         // In front of him (lower on screen) first, so the player never stands over the NOAH letters.
         spots.push({ x, y, d: d + (x + y > n.x + n.y ? 0 : 10) });
       }
     }
-    spots.sort((a, b) => a.d - b.d);
-    const spot = spots[0];
-    if (!spot) return;
-    this.requestWalk(spot.x, spot.y, sprint);
-    this.pendingNoahTalk = this.path.length > 0 || this.playerNearNoah();
-    if (this.path.length === 0 && this.pendingNoahTalk) {
-      this.pendingNoahTalk = false;
-      this.startNoahTalk();
-    }
+    return spots.sort((a, b) => a.d - b.d);
   }
 
   private startNoahTalk(): void {
@@ -2420,7 +2440,9 @@ export class IsoScene {
           this.tryArriveAtDoorTile(Math.round(this.charTx), Math.round(this.charTy));
           if (this.pendingNoahTalk) {
             this.pendingNoahTalk = false;
-            if (this.playerNearNoah()) this.startNoahTalk();
+            const s = this.noahTalkSpot;
+            const onSpot = !!s && Math.round(this.charTx) === s.x && Math.round(this.charTy) === s.y;
+            if (onSpot || this.playerNearNoah()) this.startNoahTalk();
           }
         }
       }

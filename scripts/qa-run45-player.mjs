@@ -347,6 +347,12 @@ async function noahChecks(page, spec, tag, errors, shots, kind) {
   };
   const last = log[log.length - 1];
   if (last[1] !== 'idle') errors.push(`${tag}: Noah still ${last[1]} (${last[2]}) after 16 s`);
+  // Standing in front of (lower than) Noah within a sprite width to his side hides him behind the player.
+  const cover = log.find((r) => {
+    const sum = r[5] / 32;
+    return c.x + c.y > sum && Math.abs((c.x - c.y) * 64 - r[4]) < 64;
+  });
+  if (cover) errors.push(`${tag}: the player at ${c.x},${c.y} covers Noah during ${cover[2]} (talk spot must be off his route)`);
   const n2 = await qa(page, () => window.__playtestQa.noah());
   const wantReached = [...NOAH_ROUTE, 'aterrizaje', 'inicio_idle'];
   if (n2.runs !== 1) errors.push(`${tag}: Noah ran his route ${n2.runs} times; a tap while busy must not restart it`);
@@ -396,7 +402,7 @@ async function noahChecks(page, spec, tag, errors, shots, kind) {
     await shot(`noah-climb-${kind}.png`);
   }
   return (
-    `Noah ${n0.worldW}x${n0.worldH}: walked over in ${(walkedMs / 1000).toFixed(1)} s, route ${seqSecs.toFixed(2)} s through ${NOAH_ROUTE.length} waypoints, back mirrored` +
+    `Noah ${n0.worldW}x${n0.worldH}: walked over to ${c.x},${c.y} (clear of his route) in ${(walkedMs / 1000).toFixed(1)} s, route ${seqSecs.toFixed(2)} s through ${NOAH_ROUTE.length} waypoints, back mirrored` +
     `${noahTimed ? '' : untimedNote('route time, the wave and exact waypoints', noahFps)}; busy tap ignored; Enter restarts`
   );
 }
