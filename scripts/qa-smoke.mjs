@@ -15,6 +15,8 @@
  *  - airline case panel: headline title, full text on desktop / short on phone, client never named, scrolls (qa-run46-case.mjs)
  *  - map fill: placements clear of streets, footprints and doors, nothing over the Estudio, props block only their cells (qa-run46-fill.mjs)
  *  - Estudio "About me": about.md line for line after the logo strip, lazy WebP photos within the panel; Noah's 1.5x tap box on phones (qa-run47-about.mjs)
+ *  - bench sit: a tap (or Enter beside it) sits Adonay with Pantone at the manifest offsets, movement gets both up, the
+ *    30 s / +15 s rest timer, NPCs keep off the player's bench (qa-run50-bench.mjs)
  * Usage: npm run qa:smoke   (builds first; QA_BASE_URL skips the local preview server)
  */
 import { spawn } from 'node:child_process';
@@ -32,6 +34,7 @@ import { runRun46CaseSuite } from './qa-run46-case.mjs';
 import { runRun46FillSuite } from './qa-run46-fill.mjs';
 import { runRun47AboutSuite } from './qa-run47-about.mjs';
 import { runRun48RoutineSuite } from './qa-run48-routines.mjs';
+import { runRun50BenchSuite, RUN50_KINDS } from './qa-run50-bench.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PREVIEW_PORT = 4194;
@@ -205,6 +208,9 @@ const GROUPS = {
     }
   },
   routines: () => runRun48RoutineSuite({ errors, notes }),
+  bench: async () => {
+    for (const kind of Object.keys(RUN50_KINDS)) await runRun50BenchSuite({ kind, base: BASE, errors, notes });
+  },
 };
 /** QA_SMOKE_ONLY=firstload,exits runs a subset of GROUPS (CI runs them as parallel shards); unset runs all. */
 const ONLY = process.env.QA_SMOKE_ONLY?.split(',').filter(Boolean) ?? Object.keys(GROUPS);
