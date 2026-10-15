@@ -246,6 +246,7 @@ export class BuildingPanel {
     this.el.hidden = false;
     this.el.style.visibility = '';
     this.el.style.pointerEvents = '';
+    this.aboutEl.style.contentVisibility = '';
     this.el.removeAttribute('inert');
     this.el.classList.remove('building-panel--snap');
     this.setTitle(title, this.renderCase());
@@ -334,32 +335,18 @@ export class BuildingPanel {
 
   hide(opts?: { snap?: boolean; silent?: boolean }): void {
     // Snap out of the hit tree on this frame (same as the mat). A transforming sheet still
-    // intercepts iOS taps even with pointer-events:none; --snap kills the transition, then
-    // visibility/pointer-events drop the sheet without display:none on the long case DOM.
+    // intercepts iOS taps even with pointer-events:none, so Salir waited ~250 ms for map input.
     this.el.classList.add('building-panel--snap');
     this.el.classList.remove('building-panel--open', 'building-panel--peek', 'building-panel--expanded');
     this.el.setAttribute('inert', '');
     this.el.style.visibility = 'hidden';
     this.el.style.pointerEvents = 'none';
+    this.aboutEl.style.contentVisibility = 'hidden';
+    this.el.hidden = true;
     this.mode = 'hidden';
+    this.el.classList.remove('building-panel--snap');
     if (!opts?.silent) this.onVisibilityChange();
-    const finish = () => {
-      if (this.mode !== 'hidden') {
-        this.el.style.visibility = '';
-        this.el.style.pointerEvents = '';
-        return;
-      }
-      this.el.hidden = true;
-      this.el.style.visibility = '';
-      this.el.style.pointerEvents = '';
-      this.el.classList.remove('building-panel--snap');
-      this.releaseCaseDom();
-    };
-    if (opts?.snap) {
-      requestAnimationFrame(finish);
-      return;
-    }
-    finish();
+    if (opts?.snap) requestAnimationFrame(() => this.releaseCaseDom());
   }
 
   /** Drop case nodes after the sheet is off the hit tree. Safe if the panel reopened. */
