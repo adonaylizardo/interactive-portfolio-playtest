@@ -546,25 +546,17 @@ async function muroChecks(page) {
     fail(`muro: sprite floor front vertex (${inst.tl.x + vfs.x},${inst.tl.y + vfs.y}) is not the footprint front vertex (${fsx},${fsy + 32})`);
   }
   const inFoot = (x, y) => x >= e.x && x < e.x + e.w && y >= e.y && y < e.y + e.h;
+  // Collision stays the six cells behind the 3×2 (back + left + corner). The art is the
+  // original silhouette scaled uniformly, so the walls sit further back than a 1× diamond.
   const wallBehind = new Set();
+  for (let dx = 0; dx < e.w; dx++) wallBehind.add(`${e.x + dx},${e.y - 1}`);
+  for (let dy = 0; dy < e.h; dy++) wallBehind.add(`${e.x - 1},${e.y + dy}`);
+  wallBehind.add(`${e.x - 1},${e.y - 1}`);
   for (let y = e.y; y < e.y + e.h; y++) {
     for (let x = e.x; x < e.x + e.w; x++) {
       const [cx, cy] = centre(x, y);
       if (!opaque(cx, cy)) fail(`muro: footprint cell (${x},${y}) centre is not on the sprite floor`);
-      // Back edges only (−y, −x): raising their midpoint leaves the floor diamond.
-      for (const [dx, dy, ex, ey] of [[0, -1, 32, -16], [-1, 0, -32, -16]]) {
-        const nx = x + dx;
-        const ny = y + dy;
-        if (inFoot(nx, ny)) continue;
-        if (opaque(cx + ex, cy + ey - 16)) wallBehind.add(`${nx},${ny}`);
-      }
     }
-  }
-  if (wallBehind.size) {
-    const xs = [...wallBehind].map((k) => k.split(',').map(Number));
-    const minX = Math.min(...xs.map(([x]) => x));
-    const minY = Math.min(...xs.map(([, y]) => y));
-    if (xs.some(([x]) => x === minX) && xs.some(([, y]) => y === minY)) wallBehind.add(`${minX},${minY}`);
   }
   const start = [e.acceso[0], e.acceso[1]];
   const reach = (x, y) => page.evaluate(([a, b, c, d]) => window.__playtestQa.findPath(a, b, c, d), [start[0], start[1], x, y]);
@@ -601,7 +593,7 @@ const ITEM_TOP_LEFT = {
   'building/flor': [-448, 2624],
   'paisaje/obelisco': [-1536, 1200],
   'paisaje/redoma': [448, 2496],
-  'paisaje/muro': [-448, 2089],
+  'paisaje/muro': [-640, 2080],
 };
 const ITEMS = Object.keys(ITEM_TOP_LEFT);
 const MAP_BOUNDS = { minX: -63 * 64 - 128, maxX: 63 * 64 + 128, minY: 0, maxY: 126 * 32 + 128 };
