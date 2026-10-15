@@ -93,6 +93,12 @@ function scanPixels(info) {
 const grayOnly = (tag, file) =>
   `${tag}: ${file} has no colour (pre-tinted?). Use the original-colour file, or mark the entry "mono": true if the brand is black and white`;
 
+/** `mono` turns the hover reveal into solid dark, so on a coloured file it hides the brand's colours. */
+const monoColoured = (tag, file) => `${tag}: ${file} has colour but the entry says "mono": true (hover would stay dark); drop "mono"`;
+const colourNote = (coloured) => (coloured === false ? 'gray in the source' : coloured ? 'colour' : 'colour not checked');
+/** Entries whose file has no colour at all (each must be `mono`). */
+const graySources = [];
+
 const seen = new Set();
 for (const [i, e] of list.entries()) {
   const tag = `entry ${i} (${e?.name ?? '?'})`;
@@ -126,8 +132,10 @@ for (const [i, e] of list.entries()) {
     if (share !== null && share < 0.15) errors.push(`${tag}: ${e.file} is only ${(share * 100).toFixed(0)}% transparent (background not removed?)`);
     const coloured = px ? px.coloured : info.colorType === 3 ? paletteHasColour(info) : info.colorType === 2;
     if (coloured === false && !e.mono) errors.push(grayOnly(tag, e.file));
+    if (coloured && e.mono) errors.push(monoColoured(tag, e.file));
+    if (coloured === false) graySources.push(e.name);
     if (Math.min(w, h) < 16) errors.push(`${tag}: ${e.file} is tiny (${w}×${h})`);
-    notes.push(`${e.file}: PNG ${w}×${h}${share !== null ? `, ${(share * 100).toFixed(0)}% transparent` : ''}`);
+    notes.push(`${e.file}: PNG ${w}×${h}${share !== null ? `, ${(share * 100).toFixed(0)}% transparent` : ''}, ${colourNote(coloured)}`);
   } else if (ext === '.svg') {
     const text = buf.toString('utf8');
     if (!/<svg[\s>]/i.test(text)) {
@@ -140,14 +148,17 @@ for (const [i, e] of list.entries()) {
       const h = m[1].length === 3 ? [...m[1]].map((c) => c + c).join('') : m[1];
       return [0, 2, 4].map((o) => parseInt(h.slice(o, o + 2), 16));
     });
-    if (!colours.some(([r, g, b]) => chroma(r, g, b) > 24) && !e.mono) errors.push(grayOnly(tag, e.file));
+    const coloured = colours.some(([r, g, b]) => chroma(r, g, b) > 24);
+    if (!coloured && !e.mono) errors.push(grayOnly(tag, e.file));
+    if (coloured && e.mono) errors.push(monoColoured(tag, e.file));
+    if (!coloured) graySources.push(e.name);
     const vb = text.match(/viewBox\s*=\s*["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)/i);
     const ww = text.match(/<svg[^>]*\swidth\s*=\s*["']([\d.]+)/i);
     const hh = text.match(/<svg[^>]*\sheight\s*=\s*["']([\d.]+)/i);
     w = vb ? +vb[1] : ww ? +ww[1] : 0;
     h = vb ? +vb[2] : hh ? +hh[1] : 0;
     if (!w || !h) errors.push(`${tag}: ${e.file} has no viewBox or width/height (cannot size it)`);
-    notes.push(`${e.file}: SVG ${w}×${h}`);
+    notes.push(`${e.file}: SVG ${w}×${h}, ${colourNote(coloured)}`);
   } else {
     errors.push(`${tag}: ${e.file} is not .png or .svg`);
     continue;
@@ -159,6 +170,7 @@ if (fs.existsSync(DIR)) {
 }
 
 for (const n of notes) console.log(`note: ${n}`);
+if (graySources.length) console.log(`note: gray in the source (shown dark, never in colour): ${graySources.join(', ')}`);
 for (const e of errors) console.error(`FAIL ${e}`);
 console.log(`check-logos: ${list.length} logo(s), ${errors.length} problem(s)`);
 process.exit(errors.length ? 1 : 0);

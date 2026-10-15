@@ -177,6 +177,29 @@ export async function runRun43LogoSuite({ kind, base, errors, notes, shots }) {
     if (real.hidden) errors.push(`${tag}: the real strip is hidden in the Estudio panel`);
     const alts = real.imgs.map((i) => i.alt).join(' | ');
     if (alts !== listed.map((l) => l.name).join(' | ')) errors.push(`${tag}: real strip shows [${alts}], want the ${listed.length} names in worked-with.json`);
+    const bain = real.imgs.findIndex((i) => i.alt === 'Bain & Company');
+    if (bain < 0) errors.push(`${tag}: Bain & Company is missing from the real strip`);
+    else {
+      const logo = page.locator('.worked-with__logo').nth(bain);
+      await logo.scrollIntoViewIfNeeded();
+      if (spec.touch) {
+        const b = await logo.boundingBox();
+        await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
+      } else await logo.hover();
+      await wait(320);
+      const c = await logoChroma(page, bain);
+      if (c < 60) errors.push(`${tag}: Bain & Company does not show its colours on ${spec.touch ? 'tap' : 'hover'} (spread ${c})`);
+      else notes.push(`${tag}: Bain & Company reveals in colour on ${spec.touch ? 'tap' : 'hover'} (spread ${c})`);
+      if (shots) {
+        fs.mkdirSync(shots, { recursive: true });
+        await page.screenshot({ path: path.join(shots, `logos-bain-${kind}-${spec.touch ? 'tap' : 'hover'}.png`) });
+      }
+      if (spec.touch) {
+        const b = await logo.boundingBox();
+        await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
+      } else await page.mouse.move(5, 5);
+      await wait(320);
+    }
 
     const fixtures = fixtureLogos();
     await qa(page, (l) => window.__playtestQa.setWorkedWith(l), fixtures);
