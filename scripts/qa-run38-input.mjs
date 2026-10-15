@@ -174,6 +174,9 @@ async function leaveRoom(page, kind, method) {
     if (RUN38_KINDS[kind].touch) await exit.tap();
     else await exit.click();
   } else {
+    // Peek first: the expanded case sheet covers the mat.
+    await page.evaluate(() => window.__playtestQa.collapseInteriorSheetToPeek?.());
+    await wait(250);
     const L = await page.evaluate(() => window.__playtestQa.interiorLayout());
     const pt = await page.evaluate(([x, y]) => window.__playtestQa.interiorTileScreenPoint(x, y), [L.exit.x, L.exit.y]);
     await tapAt(page, kind, pt.x, pt.y);
