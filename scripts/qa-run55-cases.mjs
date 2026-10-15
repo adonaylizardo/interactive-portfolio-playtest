@@ -351,7 +351,9 @@ export async function runRun55CaseSuite({ kind, base, errors, notes, shots }) {
       await wait(200);
       notes.push(`${tag}: ok`);
     }
-    const empty = voiceHits.filter((u) => !/\/(0[2-6]|08-flor-de-venezuela|09-cathedral|10-sambil)\S*\.(ogg|mp3)$/.test(u));
+    const empty = voiceHits.filter(
+      (u) => !/\/(01-intro|0[2-6]|08-flor-de-venezuela|09-cathedral|10-sambil)\S*\.(ogg|mp3)$/.test(u),
+    );
     if (empty.length) {
       errors.push(`run55-${kind}: fetched empty voice slot(s) ${empty.join(' | ')}`);
     }

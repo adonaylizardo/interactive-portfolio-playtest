@@ -282,7 +282,7 @@ export class ChromeUI {
         ${iconSvg('info')}
         <span>No sound? Check silent mode</span>
       </div>
-      <p class="chrome__subtitle" hidden></p>
+      <p class="chrome__subtitle"></p>
       <div class="chrome__views" data-views>
         <div class="chrome__minimap-wrap">
           <canvas class="chrome__minimap" width="248" height="161" aria-hidden="true"></canvas>
@@ -385,9 +385,7 @@ export class ChromeUI {
   private syncSubtitle(): void {
     const sub = this.root.querySelector('.chrome__subtitle') as HTMLElement | null;
     if (!sub) return;
-    const text = studio.subtitle();
-    sub.textContent = text;
-    sub.hidden = !text;
+    sub.textContent = studio.subtitle();
   }
 
   private syncSound(): void {

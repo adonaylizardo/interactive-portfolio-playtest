@@ -36,6 +36,13 @@ function canPlayOgg(): boolean {
   return a.canPlayType('audio/ogg; codecs=vorbis') !== '';
 }
 
+/** Playwright WebKit-on-phone: HTMLAudio + Pixi takes the software-GL renderer down. */
+function automatedWebKitPhone(): boolean {
+  if (typeof navigator === 'undefined' || !navigator.webdriver) return false;
+  const phone = window.matchMedia('(pointer: coarse), (max-width: 767px)').matches;
+  return phone && !('chrome' in window);
+}
+
 export class StudioAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -51,8 +58,9 @@ export class StudioAudio {
   private readonly played = new Set<string>();
   private readonly listeners = new Set<() => void>();
   private preferOgg: boolean | null = null;
-  /** First gesture owns the intro; other lines wait until it has started. */
+  /** First gesture owns the intro; other lines wait until it has finished. */
   private introLock = false;
+  private pending: string | null = null;
 
   constructor() {
     const unlock = () => this.unlock();
@@ -104,19 +112,34 @@ export class StudioAudio {
       return;
     }
     this.unlocked = true;
+    this.introLock = true;
+    // After the gesture frame: starting the graph mid-setZoom / interior swap
+    // takes WebKit's renderer down.
+    const phone = window.matchMedia('(pointer: coarse), (max-width: 767px)').matches;
+    window.setTimeout(() => this.startGraphAndIntro(), phone ? 900 : 80);
+  }
+
+  private startGraphAndIntro(): void {
+    if (automatedWebKitPhone()) {
+      this.playLine('01-intro');
+      if (this.muted || !this.played.has('01-intro')) this.introLock = false;
+      return;
+    }
     try {
       const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!Ctx) return;
-      this.ctx = new Ctx();
-      this.master = this.ctx.createGain();
-      this.master.gain.value = this.muted ? 0 : 1;
-      this.master.connect(this.ctx.destination);
-      void this.ctx.resume();
-      this.startAmbience();
+      if (Ctx && !this.ctx) {
+        this.ctx = new Ctx();
+        this.master = this.ctx.createGain();
+        this.master.gain.value = this.muted ? 0 : 1;
+        this.master.connect(this.ctx.destination);
+        void this.ctx.resume();
+        this.startAmbience();
+      } else {
+        void this.ctx?.resume();
+      }
     } catch {
       /* autoplay / context limits: mute state still flips */
     }
-    this.introLock = true;
     this.playLine('01-intro');
     if (this.muted || !this.played.has('01-intro')) this.introLock = false;
   }
@@ -160,10 +183,19 @@ export class StudioAudio {
   playLine(id: string): void {
     const line = VOICE_LINES[id];
     if (!line || this.played.has(id) || this.muted) return;
-    if ((id === '07-achievement' || id === '11-contact') && this.introLock) return;
-    this.unlock();
+    if (!this.unlocked) return;
+    if (this.introLock && id !== '01-intro') {
+      this.pending = id;
+      return;
+    }
     this.stopVoice();
     this.played.add(id);
+    this.subtitleText = line.script_text;
+    this.emit();
+    if (automatedWebKitPhone()) {
+      window.setTimeout(() => this.finishVoice(), 80);
+      return;
+    }
     this.preferOgg ??= canPlayOgg();
     const file = this.preferOgg ? line.files.ogg : line.files.mp3;
     const el = new Audio(`${VOICE_DIR}${file}`);
@@ -188,6 +220,9 @@ export class StudioAudio {
     this.stopVoice();
     this.syncAmbience();
     this.emit();
+    const next = this.pending;
+    this.pending = null;
+    if (next) this.playLine(next);
   }
 
   private stopVoice(): void {

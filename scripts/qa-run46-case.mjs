@@ -182,7 +182,7 @@ export async function runRun46CaseSuite({ kind, base, errors, notes, shots }) {
     if (!(await closingInView(page))) errors.push(`${tag}: the closing line cannot be scrolled into view`);
     if (shots && scrolls) await page.screenshot({ path: path.join(shots, `case-panel-${kind}-end.png`) });
 
-    const empty = voiceHits.filter((u) => !/\/02-volaris\.(ogg|mp3)$/.test(u));
+    const empty = voiceHits.filter((u) => !/\/(01-intro|02-volaris)\.(ogg|mp3)$/.test(u));
     if (empty.length) {
       errors.push(`${tag}: fetched empty voice slot(s) ${empty.join(' | ')}`);
     }

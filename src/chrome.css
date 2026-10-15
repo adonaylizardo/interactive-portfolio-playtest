@@ -578,6 +578,10 @@ body[data-interior='1'] .chrome__column {
   pointer-events: none;
 }
 
+.chrome__subtitle:empty {
+  visibility: hidden;
+}
+
 .chrome--split .chrome__subtitle {
   left: calc(496px + (100% - 496px - 264px) / 2);
   width: min(520px, calc(100% - 496px - 280px));
@@ -842,4 +846,11 @@ body[data-layout='panel'] #game-canvas {
 .chrome--interior .chrome__lang,
 .chrome--interior .chrome__views {
   display: none;
+}
+
+.chrome--interior .chrome__subtitle:not(:empty) {
+  display: block;
+  visibility: visible;
+  bottom: 24px;
+  top: auto;
 }
