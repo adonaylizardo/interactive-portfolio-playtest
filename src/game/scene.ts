@@ -40,6 +40,7 @@ import {
   doorHit,
   doorTapPoint,
   footprintCorners,
+  hasSpriteMask,
   obeliscoMonumentHit,
   obeliscoSilhouettes,
   spriteAlphaHit,
@@ -147,6 +148,11 @@ const NOAH_TALK_RANGE = 1.6;
  * to its side in world px, so the player never covers him (both characters are 64 world px wide).
  */
 const NOAH_CLEAR_WORLD_X = 64;
+/**
+ * Props tapped by their opaque pixels, so a bench under a lamp's or a mural's bounding box still gets
+ * its taps (the wall, obelisco and redoma keep their own tap rules).
+ */
+const ALPHA_TAP_PROPS = new Set(['tree', 'bench', 'lamp', 'fill']);
 /**
  * A mouse or trackpad press on Noah may drift this far and still count as a click. The 4 px mouse
  * pan threshold is easy to cross with a physical trackpad click (touch already allows 14 px).
@@ -272,6 +278,8 @@ export class IsoScene {
   private fillActors!: FillActors;
   private events: SceneEvents;
   private objectGraphics = new Map<string, Container>();
+  /** Opaque bounding box of each non-building object's sprite, relative to its container. */
+  private objectTapBoxes = new Map<string, Rectangle>();
   private objectVisuals = new Map<
     string,
     {
@@ -638,15 +646,14 @@ export class IsoScene {
         g.addChild(sprite);
         const a = spriteAsset(key);
         const tlw = { x: tl.x, y: tl.y };
+        const box = new Rectangle(tlw.x + a.bbox.x0 - pos.x, tlw.y + a.bbox.y0 - pos.y, a.bbox.x1 - a.bbox.x0, a.bbox.y1 - a.bbox.y0);
+        this.objectTapBoxes.set(obj.id, box);
         g.hitArea =
           obj.type === 'building'
             ? this.buildingHitArea(obj)
-            : new Rectangle(
-                tlw.x + a.bbox.x0 - pos.x,
-                tlw.y + a.bbox.y0 - pos.y,
-                a.bbox.x1 - a.bbox.x0,
-                a.bbox.y1 - a.bbox.y0,
-              );
+            : ALPHA_TAP_PROPS.has(obj.name) && hasSpriteMask(obj)
+              ? { contains: (x: number, y: number) => box.contains(x, y) && spriteAlphaHit(obj, pos.x + x, pos.y + y) }
+              : box;
         const flat = obj.name === 'redoma' || !!obj.flat;
         const zIndex = flat ? -10 : objectDepth(obj) + (obj.x - obj.y) * 0.0001;
         g.zIndex = zIndex;
@@ -3220,6 +3227,7 @@ export class IsoScene {
     if (!t) return null;
     if (t === this.noah?.sprite) return 'noah';
     for (const [id, v] of this.objectVisuals) if (v.sprite === t) return `object:${id}`;
+    for (const [id, g] of this.objectGraphics) if (g === t) return `object:${id}`;
     return t.label || t.constructor.name;
   }
 

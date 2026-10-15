@@ -133,7 +133,9 @@ function uniformProbes(png, count, skip) {
 }
 
 const MASK_CELL = 4;
-const MASKED = /^(ext\/[^/]+|prop\/(muro|obelisco|redoma))\//;
+const MASKED = /^(ext\/[^/]+|prop\/(muro|obelisco|redoma)|prop\/(arbol|banco|farol)\/[^/]+)\//;
+/** Mask id shared by a sprite's variants: buildings by name (all states), props by name + variant. */
+const maskBase = (key) => key.split('/').slice(0, key.startsWith('ext/') ? 2 : -1).join('/');
 
 /** Tap mask: a cell is solid when any pixel in it is clearly opaque (union over all states/zooms). */
 function orAlphaMask(masks, baseId, png) {
@@ -213,7 +215,7 @@ for (const g of GROUPS) {
         ? (x, y) => Math.abs(x - 300) < 90 && y > 380
         : undefined;
     probes[key] = uniformProbes(png1, 12, skip);
-    if (MASKED.test(key)) orAlphaMask(masks, key.split('/').slice(0, 2).join('/'), png1);
+    if (MASKED.test(key)) orAlphaMask(masks, maskBase(key), png1);
   }
 }
 

@@ -1,4 +1,5 @@
 import alphaJson from '../data/sprite-alpha.json';
+import rellenoJson from '../data/relleno.json';
 import spritesJson from '../data/sprites.json';
 import type { MapObject } from '../data/world';
 import { TILE_H, TILE_W } from '../data/world';
@@ -10,7 +11,10 @@ type Rect = { x0: number; y0: number; x1: number; y1: number };
 
 type AlphaMask = { w: number; h: number; cell: number; bits: Uint8Array };
 
-const rawMasks = alphaJson as Record<string, { w: number; h: number; cell: number; bits: string }>;
+const rawMasks = {
+  ...(alphaJson as Record<string, { w: number; h: number; cell: number; bits: string }>),
+  ...(rellenoJson.masks as Record<string, { w: number; h: number; cell: number; bits: string }>),
+};
 const masks = new Map<string, AlphaMask>();
 
 function mask(base: string): AlphaMask | null {
@@ -63,6 +67,11 @@ function maskKey(o: MapObject): string | null {
   const base = objectSpriteBase(o);
   if (!base) return null;
   return o.type === 'building' ? `${base}/default/cerca` : `${base}/cerca`;
+}
+
+export function hasSpriteMask(o: MapObject): boolean {
+  const base = objectSpriteBase(o);
+  return !!base && !!mask(base);
 }
 
 /** Opaque pixel of the object's sprite (any state or zoom variant) under the world point. */
