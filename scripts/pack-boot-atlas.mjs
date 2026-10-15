@@ -11,7 +11,7 @@ import { PNG } from 'pngjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'public/sprites/atlas');
-const MAX = 4080;
+const MAX = 4096;
 const PAD = 2;
 
 const sprites = JSON.parse(readFileSync(path.join(ROOT, 'src/data/sprites.json'), 'utf8'));
@@ -91,7 +91,15 @@ mkdirSync(OUT, { recursive: true });
 
 const mapItems = [];
 for (const [key, a] of Object.entries(assets)) {
-  if (key.startsWith('int/') || key.includes('/hover/') || key.includes('/resaltado/') || key.endsWith('/lejos')) continue;
+  if (
+    key.startsWith('int/') ||
+    key.startsWith('prop/muro') ||
+    key.includes('/hover/') ||
+    key.includes('/resaltado/') ||
+    key.endsWith('/lejos')
+  ) {
+    continue;
+  }
   mapItems.push({ key, png: readPng(a.f1) });
 }
 const mapPages = pack(mapItems);

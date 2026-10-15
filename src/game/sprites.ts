@@ -111,6 +111,8 @@ async function loadBootAtlas(): Promise<void> {
   const image = await loadPngOrWebp('atlas/boot-1x', `${base}${file}`, TEX_DATA);
   for (const [key, f] of Object.entries(spec.frames)) {
     if (textures.has(key)) continue;
+    // Boot atlas still has the pre-scale muro frame; load the scaled wall as its own texture.
+    if (key.startsWith('prop/muro')) continue;
     textures.set(
       key,
       new Texture({ source: image.source, frame: new Rectangle(f.x, f.y, f.w, f.h) }),
