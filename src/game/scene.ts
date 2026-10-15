@@ -3364,8 +3364,10 @@ export class IsoScene {
    */
   leaveInteriorNow(): void {
     if (!this.interiorActive) return;
+    const t0 = performance.now();
     this.interiorPath = [];
     this.exitInterior({ immediate: true });
+    if (this.canvasEl) this.canvasEl.dataset.exitWorkMs = String(Math.round(performance.now() - t0));
   }
 
   /** One tap on the exit mat / door gap leaves right away, from anywhere the exit is reachable. */

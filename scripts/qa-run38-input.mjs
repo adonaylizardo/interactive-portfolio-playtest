@@ -172,8 +172,16 @@ async function testExitSalir(ctx, kind, base, errors) {
       await page.waitForSelector('.building-panel--open [data-exit]', { state: 'visible', timeout: 5000 });
       await armExitTimer(page);
       const exit = page.locator('.building-panel [data-exit]').first();
-      if (RUN38_KINDS[kind].touch) await exit.tap();
-      else await exit.click();
+      if (RUN38_KINDS[kind].touch) {
+        const box = await exit.boundingBox();
+        if (!box) {
+          errors.push(`${tag}: Salir has no box`);
+          continue;
+        }
+        await tapAt(page, kind, box.x + box.width / 2, box.y + box.height / 2);
+      } else {
+        await exit.click();
+      }
       const r = await readExitTimer(page);
       if (!r) {
         errors.push(`${tag}: Salir did not leave`);

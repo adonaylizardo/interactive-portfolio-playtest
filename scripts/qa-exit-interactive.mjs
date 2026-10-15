@@ -28,7 +28,9 @@ async function tapMat(page) {
 
 async function tapSalir(page) {
   await page.waitForSelector('.building-panel--open [data-exit]', { state: 'visible', timeout: 5000 });
-  await page.locator('.building-panel [data-exit]').first().tap();
+  const box = await page.locator('.building-panel [data-exit]').first().boundingBox();
+  if (!box) throw new Error('Salir has no box');
+  await page.touchscreen.tap(Math.round(box.x + box.width / 2), Math.round(box.y + box.height / 2));
 }
 
 async function main() {

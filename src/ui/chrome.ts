@@ -104,7 +104,7 @@ export class ChromeUI {
     this.interiorOpen = open;
     if (open && this.mobile) this.mobileSheet = false;
     if (open && !this.mobile && this.layout === 'map') this.layout = 'split';
-    this.sync();
+    this.sync({ deferColumn: !!opts?.skipLayout && !open });
     if (!opts?.skipLayout) this.callbacks.onLayoutChange();
   }
 
@@ -394,7 +394,7 @@ export class ChromeUI {
     });
   }
 
-  sync(): void {
+  sync(opts?: { deferColumn?: boolean }): void {
     this.mobile = isMobileLayout();
     const layout = this.mobile ? (this.mobileSheet ? 'split' : 'map') : this.layout;
     document.body.dataset.layout = layout;
@@ -409,6 +409,7 @@ export class ChromeUI {
     this.root.classList.toggle('chrome--panel', !this.mobile && this.layout === 'panel');
     this.root.classList.toggle('chrome--split', !this.mobile && this.layout === 'split');
     this.syncSound();
+    if (opts?.deferColumn) return;
     const col = this.root.querySelector('.chrome__column') as HTMLElement | null;
     if (col) {
       // Inline display wins over `.chrome--split { display:block }`, so innerText
