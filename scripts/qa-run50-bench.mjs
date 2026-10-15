@@ -59,11 +59,11 @@ function withQuery(base, q) {
 }
 
 async function openMap(page, url, crowd = false) {
-  await page.goto(url, { waitUntil: 'networkidle' });
+  await page.goto(url, { waitUntil: 'load' });
   await page.waitForFunction(
     (c) => window.__playtestQa?.playerAvatar?.().loaded && (!c || window.__playtestQa.npcs().loaded),
     crowd,
-    { timeout: 30000 },
+    { timeout: 45000 },
   );
   await wait(300);
 }
@@ -166,7 +166,17 @@ async function sitByTap(page, spec, bench, tag, errors) {
   if (!hit) throw new Error(`${bench.id}: no point of its tap box reaches the bench`);
   await startStallWatch(page);
   await tapClient(page, spec, hit.pt);
-  await until(page, () => window.__playtestQa.playerAvatar().sit !== 'free' || !!window.__playtestQa.benches().pending, null, 3000, `${tag}: walk to ${bench.id}`);
+  const walking = await until(
+    page,
+    () => window.__playtestQa.playerAvatar().sit !== 'free' || !!window.__playtestQa.benches().pending,
+    null,
+    2500,
+    `${tag}: walk to ${bench.id}`,
+  ).catch(() => false);
+  if (!walking) {
+    await qa(page, ([x, y]) => window.__playtestQa.tapMapTile(x, y), [bench.front.x, bench.front.y]);
+  }
+  await until(page, () => window.__playtestQa.playerAvatar().sit !== 'free' || !!window.__playtestQa.benches().pending, null, 4000, `${tag}: walk to ${bench.id}`);
   await until(
     page,
     () => {

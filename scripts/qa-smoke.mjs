@@ -94,8 +94,9 @@ async function firstLoad({ tag, type, options, minZoom, centred }) {
   const ctx = await browser.newContext(options);
   const page = await ctx.newPage();
   try {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
-    await wait(1200);
+    await page.goto(BASE, { waitUntil: 'load' });
+    await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, { timeout: 45000 });
+    await wait(400);
     const m = await page.evaluate(() => {
       const qa = window.__playtestQa;
       const d = document.getElementById('game-canvas')?.dataset ?? {};
@@ -114,6 +115,9 @@ async function firstLoad({ tag, type, options, minZoom, centred }) {
         volaris: qa.doorScreenPoint('volaris'),
       };
     });
+    if (m.tile.x !== 31 || m.tile.y !== 37) {
+      errors.push(`firstload-${tag}: spawn tile ${m.tile.x},${m.tile.y} (want 31,37)`);
+    }
     if (!(m.zoom >= minZoom && m.zoom <= 1.0)) errors.push(`firstload-${tag}: zoom ${m.zoom} outside ${minZoom}..1`);
     const mapLeft = m.w >= 768 ? 496 : 0;
     const mapW = Math.max(1, m.w - mapLeft);

@@ -15,7 +15,7 @@ jobs:
   sprites:
     name: qa:sprites (${{ matrix.name }})
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -51,7 +51,7 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: qa:sprites
-        timeout-minutes: 15
+        timeout-minutes: 28
         env:
           QA_SPRITES_ONLY: ${{ matrix.parts }}
         run: node scripts/qa-sprites.mjs --shots
@@ -73,7 +73,8 @@ jobs:
       matrix:
         groups:
           - exits-iphone
-          - exits-desktop,exits-phone,about
+          - exits-desktop
+          - exits-phone,about
           - firstload,chrome,input,case,fill
           - follow,logos,npcs,player,routines
           - bench

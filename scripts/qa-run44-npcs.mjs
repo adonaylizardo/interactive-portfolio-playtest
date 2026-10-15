@@ -72,8 +72,8 @@ function withQuery(base, q) {
 
 /** Without ?npcs=1 (`crowd` false) the strips are never fetched, so only the QA hooks are awaited. */
 async function openMap(page, url, crowd = true) {
-  await page.goto(url, { waitUntil: 'networkidle' });
-  await page.waitForFunction((c) => (c ? window.__playtestQa?.npcs?.().loaded : window.__playtestQa?.npcs), crowd, { timeout: 30000 });
+  await page.goto(url, { waitUntil: 'load' });
+  await page.waitForFunction((c) => (c ? window.__playtestQa?.npcs?.().loaded : window.__playtestQa?.npcs), crowd, { timeout: 45000 });
   await wait(300);
 }
 

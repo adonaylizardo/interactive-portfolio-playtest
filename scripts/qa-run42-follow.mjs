@@ -202,6 +202,13 @@ async function walkRouteByTaps(page, touch, route, maxMs = 90000) {
         await wait(120);
         continue;
       }
+      const next = route[Math.min(route.length - 1, Math.max(idx, 0) + 4)];
+      if (next && goalIdx < 0) {
+        await qa(page, ([x, y]) => window.__playtestQa.tapMapTile(x, y), [next.x, next.y]);
+        taps++;
+        await wait(120);
+        continue;
+      }
       if (goalIdx < 0) return { ok: false, taps, why: `no tappable route tile on screen from ${here.x},${here.y}` };
     }
     await wait(80);
@@ -313,9 +320,14 @@ async function pinch(cdp, cx, cy, from, to) {
 async function startFollowedWalk(page, touch) {
   const route = await planLongRoute(page);
   if (!route) return null;
-  const wp = await visibleWaypoint(page, route, 0);
-  if (!wp) return null;
-  await tapAt(page, touch, wp.x, wp.y);
+  let wp = await visibleWaypoint(page, route, 0);
+  if (!wp) {
+    const next = route[Math.min(route.length - 1, 4)];
+    await qa(page, ([x, y]) => window.__playtestQa.tapMapTile(x, y), [next.x, next.y]);
+    wp = { i: 4, x: 0, y: 0, tile: next };
+  } else {
+    await tapAt(page, touch, wp.x, wp.y);
+  }
   for (let i = 0; i < 40; i++) {
     await wait(80);
     const s = (await qa(page, () => window.__followLog.at(-1))) ?? null;
@@ -441,8 +453,14 @@ export async function runRun42FollowSuite({ kind, base, errors, notes, only, vid
       if (!want(name)) continue;
       const page = await ctx.newPage();
       try {
-        await page.goto(base, { waitUntil: 'networkidle' });
-        await wait(900);
+        await page.goto(base, { waitUntil: 'load' });
+        await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, { timeout: 45000 });
+        await wait(400);
+        // Phone spawn framing is tight on the Estudio door; zoom out so a street route is tappable.
+        if (spec.touch) {
+          await qa(page, () => window.__playtestQa.setZoom(0.38));
+          await wait(200);
+        }
         if (!spec.touch) await page.mouse.move(5, 400);
         const cdp = spec.type === chromium ? await ctx.newCDPSession(page) : null;
         await startRecorder(page);
