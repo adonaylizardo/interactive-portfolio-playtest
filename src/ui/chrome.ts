@@ -36,7 +36,6 @@ const CASES_ROWS: { id: string; label: string; nda?: boolean }[] = [
 
 const CV_HREF = 'https://adonaylizardo.com';
 const CONTACT_HREF = 'mailto:hello@adonaylizardo.com';
-const SUBTITLE = "Hey, I'm Adonay. Welcome to my studio. Take a walk around.";
 
 function roundBtn(icon: IconName, label: string, extra = ''): string {
   return `<button type="button" class="ui-round ${extra}" data-icon="${icon}" aria-label="${label}">${iconSvg(icon)}</button>`;
@@ -68,7 +67,10 @@ export class ChromeUI {
     this.minimap = this.root.querySelector('.chrome__minimap') as HTMLCanvasElement;
     this.bind();
     this.sync();
-    studio.onChange(() => this.syncSound());
+    studio.onChange(() => {
+      this.syncSound();
+      this.syncSubtitle();
+    });
     window.matchMedia('(max-width: 767px)').addEventListener('change', () => {
       this.mobile = isMobileLayout();
       this.sync();
@@ -280,7 +282,7 @@ export class ChromeUI {
         ${iconSvg('info')}
         <span>No sound? Check silent mode</span>
       </div>
-      <p class="chrome__subtitle">${SUBTITLE}</p>
+      <p class="chrome__subtitle" hidden></p>
       <div class="chrome__views" data-views>
         <div class="chrome__minimap-wrap">
           <canvas class="chrome__minimap" width="248" height="161" aria-hidden="true"></canvas>
@@ -347,6 +349,7 @@ export class ChromeUI {
       this.setLayout('split');
     });
     this.root.querySelector('.chrome__dock [aria-label="Contacto"]')?.addEventListener('click', () => {
+      studio.playLine('11-contact');
       this.callbacks.onLocate('contacto');
     });
     this.root.querySelector('.chrome__dock [aria-label="Map"]')?.addEventListener('click', () => this.setLayout('map'));
@@ -359,6 +362,7 @@ export class ChromeUI {
       this.scrollTo('#chrome-logros');
     });
     this.root.querySelector('.chrome__rail [aria-label="Contacto"]')?.addEventListener('click', () => {
+      studio.playLine('11-contact');
       this.callbacks.onLocate('contacto');
     });
     this.root.querySelector('[aria-label="Página completa"]')?.addEventListener('click', () => {
@@ -372,6 +376,18 @@ export class ChromeUI {
       });
     });
     this.syncSound();
+    this.root.querySelectorAll(`a[href="${CONTACT_HREF}"]`).forEach((a) => {
+      a.addEventListener('click', () => studio.playLine('11-contact'));
+    });
+    this.syncSubtitle();
+  }
+
+  private syncSubtitle(): void {
+    const sub = this.root.querySelector('.chrome__subtitle') as HTMLElement | null;
+    if (!sub) return;
+    const text = studio.subtitle();
+    sub.textContent = text;
+    sub.hidden = !text;
   }
 
   private syncSound(): void {

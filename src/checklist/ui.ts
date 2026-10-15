@@ -1,3 +1,4 @@
+import { studio } from '../audio/studio';
 import {
   countCompleted,
   isChecklistHidden,
@@ -216,6 +217,7 @@ export class ChecklistUI {
     this.state.completed[step] = true;
     saveChecklist(this.state);
     this.render();
+    studio.playLine('07-achievement');
   }
 
   isSkippedOrDone(): boolean {

@@ -559,6 +559,10 @@ body[data-interior='1'] .chrome__column {
   left: 512px;
 }
 
+.chrome__subtitle[hidden] {
+  display: none !important;
+}
+
 .chrome__subtitle {
   position: absolute;
   left: 50%;
@@ -838,8 +842,13 @@ body[data-layout='panel'] #game-canvas {
 .chrome--interior .chrome__dock,
 .chrome--interior .chrome__tools-phone,
 .chrome--interior .chrome__sound,
-.chrome--interior .chrome__subtitle,
 .chrome--interior .chrome__lang,
 .chrome--interior .chrome__views {
   display: none;
+}
+
+.chrome--interior .chrome__subtitle {
+  display: block;
+  bottom: 24px;
+  top: auto;
 }

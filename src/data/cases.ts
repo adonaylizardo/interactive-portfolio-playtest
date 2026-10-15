@@ -39,11 +39,11 @@ const AIRLINE_RESULT =
 const AIRLINE_RULE = 'Design and code never sync directly. Both pass through the sealed contract first.';
 const AIRLINE_CLOSING = "The goal wasn't zero defects. It was zero guessing.";
 
-function landmarkPlaceholder(name: string): CaseContent {
+function landmarkPlaceholder(name: string, voice: string | null = null): CaseContent {
   const paragraphs = [`${name} — a landmark of the map. More coming soon.`];
   return {
     headline: name,
-    voice: null,
+    voice,
     full: [{ kind: 'section', paragraphs }],
     short: [{ kind: 'section', paragraphs }],
   };
@@ -52,7 +52,7 @@ function landmarkPlaceholder(name: string): CaseContent {
 export const CASES: Record<string, CaseContent> = {
   volaris: {
     headline: "A contract engineering couldn't misread",
-    voice: null,
+    voice: '02-volaris',
     full: [
       { kind: 'section', heading: 'Problem', paragraphs: [AIRLINE_PROBLEM] },
       { kind: 'section', heading: 'What I did', paragraphs: [`${AIRLINE_DID} ${AIRLINE_DELIVERED}`] },
@@ -89,7 +89,7 @@ export const CASES: Record<string, CaseContent> = {
   bain: {
     headline: 'Leading 9 designers across Bain, while still shipping the work',
     shortHeadline: 'Leading 9 designers across Bain',
-    voice: null,
+    voice: '03-bain',
     full: [
       {
         kind: 'section',
@@ -148,7 +148,7 @@ export const CASES: Record<string, CaseContent> = {
   },
   pg: {
     headline: 'An app panelists actually want to open',
-    voice: null,
+    voice: '06-pg',
     full: [
       {
         kind: 'section',
@@ -190,7 +190,7 @@ export const CASES: Record<string, CaseContent> = {
   mentoria: {
     headline: 'Mentoring with the same rigor as client work',
     shortHeadline: 'Mentoring as a system',
-    voice: null,
+    voice: '04-mentoring',
     full: [
       {
         kind: 'section',
@@ -246,7 +246,7 @@ export const CASES: Record<string, CaseContent> = {
   finoa: {
     headline: 'A custody platform institutions can trust at a glance',
     shortHeadline: 'A custody platform institutions can trust',
-    voice: null,
+    voice: '05-finoa',
     full: [
       {
         kind: 'section',
@@ -291,7 +291,7 @@ export const CASES: Record<string, CaseContent> = {
       { kind: 'closing', text: "Institutions don't need more features. They need to trust what they're looking at." },
     ],
   },
-  sambil: landmarkPlaceholder('Sambil'),
-  catedral: landmarkPlaceholder('Catedral'),
-  flor: landmarkPlaceholder('Flor de Venezuela'),
+  sambil: landmarkPlaceholder('Sambil', '10-sambil'),
+  catedral: landmarkPlaceholder('Catedral', '09-cathedral'),
+  flor: landmarkPlaceholder('Flor de Venezuela', '08-flor-de-venezuela'),
 };
