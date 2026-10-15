@@ -233,7 +233,6 @@ async function measure(spec) {
     requestsAtTti: spec._atTti?.requests ?? reqs.length,
     bytesAtTti: spec._atTti?.bytes ?? headerBytes,
     requestsUntilClose: reqs.length,
-    spriteRequests,
     qa,
     pageErrors: errors,
     error: navError,
