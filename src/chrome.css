@@ -232,7 +232,8 @@
   width: auto;
 }
 
-.chrome--interior .chrome__column {
+.chrome--interior .chrome__column,
+body[data-interior='1'] .chrome__column {
   display: none !important;
 }
 
@@ -782,10 +783,9 @@ body[data-layout='panel'] #game-canvas {
 }
 
 .chrome--sheet .chrome__subtitle {
+  display: block;
   top: auto;
-  bottom: auto;
-  /* Sit just above the intro card. */
-  display: none;
+  bottom: 280px;
 }
 
 .chrome--mobile .chrome__views {

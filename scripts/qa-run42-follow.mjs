@@ -45,12 +45,16 @@ async function startRecorder(page) {
       // Tile centre (TILE 128×64) lifted to the middle of the body, as the camera follow aims.
       const s = q.worldToClient((p.x - p.y) * 64, (p.x + p.y) * 32 - 48);
       const r = c.getBoundingClientRect();
+      const fl = Number(c.dataset.fitLeft || 0);
+      const fr = Number(c.dataset.fitRight || r.width);
+      const ft = Number(c.dataset.fitTop || 0);
+      const fb = Number(c.dataset.fitBottom || r.height);
       window.__followLog.push({
         t: performance.now(),
-        dx: s.x - (r.left + r.width / 2),
-        dy: s.y - (r.top + r.height / 2),
-        w: r.width,
-        h: r.height,
+        dx: s.x - (r.left + (fl + fr) / 2),
+        dy: s.y - (r.top + (ft + fb) / 2),
+        w: Math.max(1, fr - fl),
+        h: Math.max(1, fb - ft),
         follow: c.dataset.follow ?? '',
         zoom: +c.dataset.zoom,
         mark: window.__followMark,
@@ -78,11 +82,15 @@ async function safeArea(page) {
     const c = document.getElementById('game-canvas');
     const r = c.getBoundingClientRect();
     const d = c.dataset;
+    const fl = Number(d.fitLeft || 0);
+    const fr = Number(d.fitRight || r.width);
+    const ft = Number(d.fitTop || 0);
+    const fb = Number(d.fitBottom || r.height);
     return {
-      l: r.left + r.width * 0.12,
-      r: r.left + r.width * 0.88,
-      t: r.top + Math.max(+d.fitTop || 0, 60) + 20,
-      b: r.top + Math.min(+d.fitBottom || r.height, r.height - 40) - 20,
+      l: r.left + Math.max(fl + 16, 8),
+      r: r.left + Math.min(fr - 16, r.width - 8),
+      t: r.top + Math.max(ft, 60) + 20,
+      b: r.top + Math.min(fb, r.height - 40) - 20,
     };
   });
 }

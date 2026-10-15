@@ -76,6 +76,7 @@ export class ChromeUI {
       this.drawMinimap();
       this.syncViewButtons();
       this.placeLang();
+      this.placeSubtitle();
       requestAnimationFrame(draw);
     };
     requestAnimationFrame(draw);
@@ -385,6 +386,14 @@ export class ChromeUI {
     this.root.classList.toggle('chrome--map', !this.mobile && this.layout === 'map');
     this.root.classList.toggle('chrome--panel', !this.mobile && this.layout === 'panel');
     this.root.classList.toggle('chrome--split', !this.mobile && this.layout === 'split');
+    const col = this.root.querySelector('.chrome__column') as HTMLElement | null;
+    if (col) {
+      // Inline display wins over `.chrome--split { display:block }`, so innerText
+      // cannot leak the airline's name from the intro list while a case is open.
+      col.style.display = this.interiorOpen ? 'none' : '';
+      col.hidden = this.interiorOpen;
+      col.setAttribute('aria-hidden', this.interiorOpen ? 'true' : 'false');
+    }
   }
 
   private syncViewButtons(): void {
@@ -394,6 +403,22 @@ export class ChromeUI {
       if (key !== 'rotate' && key !== 'map') btn.classList.toggle('is-active', key === v.mode);
       if (key === 'map') btn.classList.toggle('is-active', v.overview);
     });
+  }
+
+  private placeSubtitle(): void {
+    const sub = this.root.querySelector('.chrome__subtitle') as HTMLElement | null;
+    if (!sub) return;
+    if (this.mobile && this.mobileSheet && !this.interiorOpen) {
+      const intro = this.root.querySelector('.chrome__intro') as HTMLElement | null;
+      const r = intro?.getBoundingClientRect();
+      if (r && r.height > 8) {
+        sub.style.bottom = `${Math.max(12, window.innerHeight - r.top + 8)}px`;
+        sub.style.top = 'auto';
+        return;
+      }
+    }
+    sub.style.bottom = '';
+    sub.style.top = '';
   }
 
   private placeLang(): void {

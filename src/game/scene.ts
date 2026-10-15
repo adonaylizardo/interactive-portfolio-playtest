@@ -197,6 +197,7 @@ export type ChecklistBridge = {
 
 export type ChromeBridge = {
   layoutInsets?: () => { left: number; top: number; right: number; bottom: number };
+  onMapInteract?: () => void;
 };
 
 export type SceneEvents = {
@@ -1187,6 +1188,7 @@ export class IsoScene {
   ): void {
     this.pendingNoahTalk = false;
     this.dropBenchWalk();
+    if (!this.interiorActive) this.events.chrome?.onMapInteract?.();
     if (!opts?.buildingEntry) {
       const bench = this.benchAtSeat(tx, ty);
       if (bench && this.sitOnBench(bench, sprint)) return;
@@ -1494,10 +1496,28 @@ export class IsoScene {
     this.centerOnCharacter(false);
   }
 
+  private freeRectCenter(): { x: number; y: number } {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const m = cameraFitMargins();
+    return {
+      x: m.left + (sw - m.left - m.right) / 2,
+      y: m.top + (sh - m.top - m.bottom) / 2,
+    };
+  }
+
+  private placeWorldAtScreen(wx: number, wy: number, sx: number, sy: number): void {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    this.cameraX = (sx - sw / 2) / this.zoom - wx;
+    this.cameraY = (sy - sh / 2) / this.zoom - wy;
+  }
+
   private centerOnCharacter(animate: boolean): void {
-    const pos = tileToWorld(this.charTx, this.charTy);
-    this.cameraX = -pos.x;
-    this.cameraY = -pos.y + 40;
+    this.updateCameraFitMargins();
+    const t = this.followTargetWorld();
+    const aim = this.freeRectCenter();
+    this.placeWorldAtScreen(t.x, t.y, aim.x, aim.y);
     if (!animate || this.reducedMotion) this.applyCamera();
   }
 
@@ -1547,18 +1567,12 @@ export class IsoScene {
           checklist.classList.contains('checklist--mobile') ||
           box.bottom >= sh - 96 ||
           centerY > sh * 0.58;
-        if (bottomAnchored) {
+        // Layouts v2: the tutorial is a top-right overlay. Never treat it as a left
+        // sidebar — that used to steal the map hole and shove the character off-screen.
+        if (bottomAnchored && box.left < sw * 0.45) {
           bottom = Math.max(bottom, Math.ceil(sh - box.top + pad));
-        } else if (box.top <= sh * 0.5) {
-          const tallSidebar =
-            sw > 900 &&
-            !checklist.classList.contains('checklist--collapsed') &&
-            box.height > sh * 0.42;
-          if (tallSidebar) {
-            left = Math.max(left, Math.ceil(box.right + pad));
-          } else {
-            top = Math.max(top, Math.ceil(box.bottom + pad));
-          }
+        } else if (box.left < sw * 0.35 && box.top <= sh * 0.5) {
+          left = Math.max(left, Math.ceil(box.right + pad));
         }
       }
     }
@@ -1669,6 +1683,8 @@ export class IsoScene {
       const margins = cameraFitMargins();
       this.canvasEl.dataset.mapTop = String(mapRect.top);
       this.canvasEl.dataset.mapBottom = String(mapRect.bottom);
+      this.canvasEl.dataset.fitLeft = String(margins.left);
+      this.canvasEl.dataset.fitRight = String(sw - margins.right);
       this.canvasEl.dataset.fitTop = String(margins.top);
       this.canvasEl.dataset.fitBottom = String(sh - margins.bottom);
       this.canvasEl.dataset.mapCovW = String(cov.covW);
@@ -1858,11 +1874,10 @@ export class IsoScene {
       }
     }
     const fit = Math.min(innerW / (2 * (hw + 60)), innerH / (2 * (hh + 40)));
-    this.zoom = clampZoom(Math.min(1, Math.max(0.4, fit)), sw, sh);
+    this.zoom = clampZoom(Math.min(1, Math.max(0.45, fit)), sw, sh);
     const cx = margins.left + innerW / 2;
     const cy = margins.top + innerH / 2;
-    this.cameraX = (cx - sw / 2) / this.zoom - char.x;
-    this.cameraY = (cy - sh / 2) / this.zoom - char.y;
+    this.placeWorldAtScreen(char.x, char.y, cx, cy);
     const hardened = stabilizeCameraAfterGesture(
       { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
       sw,
@@ -1918,8 +1933,7 @@ export class IsoScene {
     const cy = (minY - roofRise + maxY) / 2;
     setCameraFitMargins({ left: ml, right: mr, top: mt, bottom: mb });
     this.zoom = zoom;
-    this.cameraX = -cx;
-    this.cameraY = -cy + (sh * 0.42 - sh / 2) / zoom;
+    this.placeWorldAtScreen(cx, cy, ml + (sw - ml - mr) / 2, mt + (sh - mt - mb) / 2);
     const hardened = stabilizeCameraAfterGesture(
       { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
       sw,
@@ -1928,7 +1942,6 @@ export class IsoScene {
     this.cameraX = hardened.cameraX;
     this.cameraY = hardened.cameraY;
     this.zoom = hardened.zoom;
-    setCameraFitMargins({ left: MAP_FIT_MARGIN_PX, right: MAP_FIT_MARGIN_PX, top: MAP_FIT_MARGIN_PX, bottom: MAP_FIT_MARGIN_PX });
   }
 
   private frameMobileDefaultView(): void {
@@ -2672,9 +2685,14 @@ export class IsoScene {
     const dt = Math.min(0.1, this.app.ticker.deltaMS / 1000);
     const camBeforeX = this.cameraX;
     const camBeforeY = this.cameraY;
-    // Offset of the character from screen centre, in world px, after moving with it this frame.
-    let ox = this.cameraX - stepX + t.x;
-    let oy = this.cameraY - stepY + t.y;
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const aim = this.freeRectCenter();
+    const aimWx = (aim.x - sw / 2) / this.zoom;
+    const aimWy = (aim.y - sh / 2) / this.zoom;
+    // Offset of the character from the map hole (free-rect) centre, in world px.
+    let ox = this.cameraX - stepX + t.x - aimWx;
+    let oy = this.cameraY - stepY + t.y - aimWy;
     if (this.reducedMotion) {
       ox = 0;
       oy = 0;
@@ -2688,8 +2706,8 @@ export class IsoScene {
       f.vx = sx.velocity;
       f.vy = sy.velocity;
     }
-    const wantX = ox - t.x;
-    const wantY = oy - t.y;
+    const wantX = ox - t.x + aimWx;
+    const wantY = oy - t.y + aimWy;
     this.cameraX = wantX;
     this.cameraY = wantY;
     this.applyCamera(false);
@@ -3485,8 +3503,9 @@ export class IsoScene {
   qaFrameWorld(wx: number, wy: number, zoom: number): void {
     this.suspendCameraFollow();
     this.zoom = zoom;
-    this.cameraX = -wx;
-    this.cameraY = -wy;
+    this.updateCameraFitMargins();
+    const aim = this.freeRectCenter();
+    this.placeWorldAtScreen(wx, wy, aim.x, aim.y);
     this.applyCamera(false);
     this.app.render();
   }

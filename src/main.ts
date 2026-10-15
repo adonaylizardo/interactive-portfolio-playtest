@@ -40,9 +40,10 @@ async function main(): Promise<void> {
   const panel = new BuildingPanel(
     uiRoot,
     () => {
-      checklist.setBuildingPanelOpen(false);
-      chrome.setInteriorOpen(false);
-      scene.applyCameraFromUi();
+      const open = panel.isInteriorMode();
+      checklist.setBuildingPanelOpen(open);
+      chrome.setInteriorOpen(open);
+      scene?.applyCameraFromUi();
     },
     () => scene.leaveInteriorNow(),
   );
@@ -93,6 +94,9 @@ async function main(): Promise<void> {
     },
     chrome: {
       layoutInsets: () => chrome.layoutInsets(),
+      onMapInteract: () => {
+        if (chrome.isMobileSheetOpen()) chrome.setLayout('map');
+      },
     },
   });
 
