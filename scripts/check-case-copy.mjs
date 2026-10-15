@@ -46,8 +46,8 @@ if (bainStart < 0 || pgStart < 0 || pgStart < bainStart) {
 if (!src.includes('${name} — a landmark of the map. More coming soon.')) {
   errors.push('landmark copy missing: <Name> — a landmark of the map. More coming soon.');
 }
-for (const id of ["sambil: landmarkPlaceholder('Sambil')", "catedral: landmarkPlaceholder('Catedral')", "flor: landmarkPlaceholder('Flor de Venezuela')"]) {
-  if (!src.includes(id)) errors.push(`landmark room missing: ${id}`);
+for (const id of ["sambil: landmarkPlaceholder('Sambil'", "catedral: landmarkPlaceholder('Catedral'", "flor: landmarkPlaceholder('Flor de Venezuela'"]) {
+  if (!src.includes(id)) errors.push(`landmark room missing: ${id})`);
 }
 
 function walk(dir, out = []) {

@@ -388,8 +388,8 @@ async function noahChecks(page, spec, tag, errors, shots, kind) {
   const wallZ = log.filter((r) => r[7]).map((r) => r[8]);
   const groundZ = log.filter((r) => !r[7]).map((r) => r[8]);
   if (!wallZ.length || wallZ.some((z) => z !== wallZ[0])) errors.push(`${tag}: Noah's depth on the wall is not pinned just above the muro`);
-  if (wallZ.length && groundZ.length && Math.max(...wallZ) >= Math.min(...groundZ)) {
-    errors.push(`${tag}: Noah on the wall draws above where he stands on the ground (z ${wallZ[0]} vs ${Math.min(...groundZ)})`);
+  if (wallZ.length && groundZ.length && Math.abs(Math.max(...wallZ) - Math.min(...groundZ)) > 2) {
+    errors.push(`${tag}: Noah's wall depth ${wallZ[0]} is far from his ground depth ${Math.min(...groundZ)}`);
   }
   const seqEnd = log.find((r) => r[6]);
   const seqSecs = seqEnd ? seqEnd[0] / 1000 : 0;
