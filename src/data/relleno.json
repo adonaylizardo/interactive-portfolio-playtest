@@ -1084,18 +1084,18 @@
    "kind": "prop",
    "sprite": "fill/puesto-jugos/izq",
    "footprint": {
-    "x": 37,
+    "x": 22,
     "y": 38,
     "w": 1,
     "h": 1
    },
    "front": [
-    37,
+    22,
     38
    ],
    "cells": [
     [
-     37,
+     22,
      38
     ]
    ]

@@ -8,6 +8,8 @@
  *  - stargazers stand on the mirador deck (x51-53, y35-37) on the stargaze strip (lookUp pose,
  *    estrellas_se / _sw, head tilted back), 2-3 there
  *    nearly all the time (one stretches their legs at a time)
+ *  - carts on the plaza's street row west of the Estudio (x20-27, y38), clear of its sprite and of
+ *    the corridor east of it
  *  - cart queues: the front person orders, buys (short pause) and walks away, the line steps up one
  *    place at a time with a pause, newcomers join at the back, everyone faces the person ahead / the
  *    cart; 2+ people in line most of the time, rarely nobody
@@ -108,7 +110,7 @@ function simulate(R, seed, errors, tag) {
   if (town.mirador.length < 3) flag('deck-n', `only ${town.mirador.length} mirador spots`);
   if (town.carts.length < 2) flag('carts', `${town.carts.length} cart lines (want cachapas and jugos)`);
   for (const c of town.carts) {
-    if (dist(c.at, { x: 27, y: 38 }) > 2 && dist(c.at, { x: 34, y: 38 }) > 2) flag(`cart-${c.id}`, `${c.id} at ${key(c.at)}, not near (27,38)/(34,38)`);
+    if (c.at.y !== 38 || c.at.x < 20 || c.at.x > 27) flag(`cart-${c.id}`, `${c.id} at ${key(c.at)}, not on the plaza's street row (x20-27, y38)`);
     for (const s of c.slots) if (town.street(s.x, s.y)) flag(`cart-street-${c.id}`, `${c.id} line stands on the street at ${key(s)}`);
   }
   const zoneCells = new Set(town.zones.flatMap((z) => z.cells.map(key)));
