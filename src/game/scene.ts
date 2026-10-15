@@ -114,9 +114,11 @@ import {
 } from './cameraControl';
 import { FillActors, type FillActorSnapshot } from './fillActors';
 import { NpcCrowd, type NpcSnapshot } from './npcs';
+import { buildTown, type Bench } from './npcRoutines';
 import { Noah, type NoahSnapshot } from './noah';
 import {
   loadPlayerSheets,
+  loadRestSheets,
   PlayerAvatar,
   SPRINT_TILES_PER_S,
   TILE_STEP_WORLD,
@@ -274,6 +276,16 @@ export class IsoScene {
   private pendingNoahTalk = false;
   /** Where that walk ends; arriving there always starts the talk. */
   private noahTalkSpot: { x: number; y: number } | null = null;
+  /** Benches the player can sit on (the routines' town benches, with their front cells). */
+  private benchList: Bench[] | null = null;
+  /** Bench the player sits on or is walking to; NPCs keep off it. */
+  private claimedBench: Bench | null = null;
+  /** Walking to `claimedBench`: sit once the walk ends on its front cell. */
+  private pendingBench: Bench | null = null;
+  /** On the bench, from stepping onto it until back on the front cell; movement waits meanwhile. */
+  private seatedBench: Bench | null = null;
+  /** What to do once the player is back on their feet (a tap's walk; held keys resume on their own). */
+  private afterStand: (() => void) | null = null;
   private npcs!: NpcCrowd;
   private fillActors!: FillActors;
   private events: SceneEvents;
@@ -446,6 +458,7 @@ export class IsoScene {
           const noah = this.noah?.isLoaded() ? this.noah.tile() : null;
           return !!noah && Math.round(noah.x) === tx && Math.round(noah.y) === ty;
         },
+        playerBench: () => this.claimedBench?.id ?? null,
       },
       { enabled: npcsWanted(), seed: npcSeed(), stillPose: this.reducedMotion },
     );
@@ -698,6 +711,11 @@ export class IsoScene {
         }
         this.pendingBuildingEntry = null;
         const pos = e.getLocalPosition(this.world);
+        const bench = obj.name === 'bench' ? this.benchAtSeat(obj.x, obj.y) : obj.type !== 'building' ? this.pickBenchAtWorld(pos.x, pos.y) : undefined;
+        if (bench) {
+          if (!this.prepareMapTap(undefined, bench.seat.x, bench.seat.y)) return;
+          if (this.sitOnBench(bench, sprint)) return;
+        }
         const tile = this.resolveGroundTap(pos.x, pos.y);
         const scenery = obj.name === 'obelisco' || obj.name === 'redoma' || obj.name === 'muro';
         if (tile && (scenery || cells[tile.y][tile.x].walkable)) {
@@ -849,11 +867,122 @@ export class IsoScene {
   }
 
   private startNoahTalk(): void {
+    if (this.seatedBench) {
+      this.standThen(() => this.startNoahTalk());
+      return;
+    }
     if (!this.noah.talk()) return;
     const n = this.noah.tile();
     this.avatar.setFacing(
       (n.y + n.x >= this.charTx + this.charTy ? 's' : 'n') + (n.x - n.y >= this.charTx - this.charTy ? 'e' : 'w') as FacingDir,
     );
+  }
+
+  private townBenches(): Bench[] {
+    this.benchList ??= buildTown().benches;
+    return this.benchList;
+  }
+
+  private benchAtSeat(tx: number, ty: number): Bench | undefined {
+    return this.townBenches().find((b) => b.seat.x === tx && b.seat.y === ty);
+  }
+
+  /** Bench whose drawn sprite (its tap box) is under a screen point. */
+  private pickBenchAtScreen(sx: number, sy: number): Bench | undefined {
+    const { x: wx, y: wy } = this.screenToWorld(sx, sy);
+    return this.pickBenchAtWorld(wx, wy);
+  }
+
+  /** Bench with an opaque pixel at a world point, even under a prop drawn over it (the bus stop's). */
+  private pickBenchAtWorld(wx: number, wy: number): Bench | undefined {
+    return this.townBenches()
+      .filter((b) => {
+        const g = this.objectGraphics.get(b.id);
+        return !!g?.hitArea?.contains(wx - g.x, wy - g.y);
+      })
+      .sort((a, b) => sortKey(b.seat.x, b.seat.y) - sortKey(a.seat.x, a.seat.y))[0];
+  }
+
+  /**
+   * Walks to the bench's front cell and sits (Pantone beside it). False when an NPC is already
+   * sitting there, so the tap falls back to an ordinary walk.
+   */
+  private sitOnBench(bench: Bench, sprint: boolean): boolean {
+    if (this.interiorActive) return false;
+    if (this.seatedBench) {
+      if (this.seatedBench.id !== bench.id) this.standThen(() => this.sitOnBench(bench, sprint));
+      return true;
+    }
+    if (this.claimedBench?.id !== bench.id && !this.npcs.yieldBenchToPlayer(bench.id)) return false;
+    this.claimedBench = bench;
+    void loadRestSheets();
+    this.pendingBuildingEntry = null;
+    this.pendingNoahTalk = false;
+    this.walkToTile(bench.front.x, bench.front.y, sprint);
+    this.pendingBench = bench;
+    if (this.path.length === 0) this.arriveAtBench();
+    return true;
+  }
+
+  /** Enter / Space next to a bench (around its seat, or on its front cell) sits on the nearest one. */
+  private sitOnNearbyBench(): boolean {
+    if (this.interiorActive) return false;
+    const t = this.roundedCharTile();
+    const near = this.townBenches()
+      .filter(
+        (b) =>
+          Math.max(Math.abs(b.seat.x - t.x), Math.abs(b.seat.y - t.y)) <= 1 ||
+          (b.front.x === t.x && b.front.y === t.y),
+      )
+      .sort((a, b) => Math.hypot(a.seat.x - t.x, a.seat.y - t.y) - Math.hypot(b.seat.x - t.x, b.seat.y - t.y));
+    return near.some((b) => this.sitOnBench(b, false));
+  }
+
+  private arriveAtBench(): void {
+    const b = this.pendingBench;
+    this.pendingBench = null;
+    if (!b) return;
+    if (this.charTx !== b.front.x || this.charTy !== b.front.y) {
+      this.claimedBench = null;
+      return;
+    }
+    this.seatedBench = b;
+    this.avatar.sitOn({
+      variant: b.variant,
+      anchor: tileFootWorld(b.seat.x, b.seat.y),
+      front: tileToWorld(b.front.x, b.front.y),
+      tile: { ...b.seat },
+      benchZ: this.objectVisuals.get(b.id)?.zIndex ?? objectDepth(objects.find((o) => o.id === b.id)!),
+    });
+  }
+
+  /** A walk elsewhere (tap or keys) drops the bench the player was heading for. */
+  private dropBenchWalk(): void {
+    if (this.seatedBench) return;
+    this.pendingBench = null;
+    this.claimedBench = null;
+  }
+
+  /** Gets up off the bench, then runs `next` (or nothing: held movement keys carry on by themselves). */
+  private standThen(next: (() => void) | null): void {
+    this.afterStand = next;
+    this.avatar.standUp();
+  }
+
+  /** Back on the front cell: the bench is free again and the queued action runs. */
+  private leaveBenchIfStood(): void {
+    if (!this.seatedBench || !this.avatar.isFree()) return;
+    this.seatedBench = null;
+    this.claimedBench = null;
+    const next = this.afterStand;
+    this.afterStand = null;
+    next?.();
+  }
+
+  /** Any key, press or wheel: restarts Pantone's rest timer and wakes him. */
+  private noteAvatarInput(): void {
+    this.avatar?.noteInput();
+    this.interiorAvatar?.noteInput();
   }
 
   /** Feeds the player's foot to whichever avatar is on screen; once per tick. */
@@ -896,6 +1025,11 @@ export class IsoScene {
     opts?: { buildingEntry?: { panelTitle: string; door: { x: number; y: number } } },
   ): void {
     this.pendingNoahTalk = false;
+    this.dropBenchWalk();
+    if (!opts?.buildingEntry) {
+      const bench = this.benchAtSeat(tx, ty);
+      if (bench && this.sitOnBench(bench, sprint)) return;
+    }
     const walkTx = tx;
     const walkTy = ty;
     const entry =
@@ -913,6 +1047,10 @@ export class IsoScene {
   }
 
   walkToTile(tx: number, ty: number, sprint: boolean): void {
+    if (this.seatedBench && !this.interiorActive) {
+      this.standThen(() => this.walkToTile(tx, ty, sprint));
+      return;
+    }
     if (OBELISCO_SOLID_TILES.some(([ox, oy]) => ox === tx && oy === ty)) {
       tx = OBELISCO_ACCESS.x;
       ty = OBELISCO_ACCESS.y;
@@ -1118,6 +1256,11 @@ export class IsoScene {
         buildingEntry: { panelTitle: building.panelTitle, door: building.door },
       });
       return;
+    }
+    const bench = this.pickBenchAtScreen(sx, sy);
+    if (bench) {
+      if (!this.prepareMapTap(undefined, bench.seat.x, bench.seat.y)) return;
+      if (this.sitOnBench(bench, sprint)) return;
     }
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
     const tile = this.resolveGroundTap(wx, wy);
@@ -2023,6 +2166,7 @@ export class IsoScene {
       t instanceof HTMLElement &&
       (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(t.tagName));
     window.addEventListener('keydown', (e) => {
+      this.noteAvatarInput();
       const k = e.key.toLowerCase();
       if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
         if (!e.repeat && !this.keys.has(k)) this.startCameraFollow();
@@ -2031,11 +2175,14 @@ export class IsoScene {
       }
       if (e.key === 'Shift') this.shiftHeld = true;
       if ((e.key === 'Enter' || e.key === ' ') && !e.repeat && !isTypingTarget(e.target)) {
-        if (this.enterNearbyDoorFromKeyboard()) e.preventDefault();
+        if (this.seatedBench && !this.interiorActive) {
+          this.standThen(null);
+          e.preventDefault();
+        } else if (this.enterNearbyDoorFromKeyboard()) e.preventDefault();
         else if (this.playerNearNoah() && !this.noah.busy()) {
           this.startNoahTalk();
           e.preventDefault();
-        }
+        } else if (this.sitOnNearbyBench()) e.preventDefault();
       }
     });
     window.addEventListener('keyup', (e) => {
@@ -2047,6 +2194,7 @@ export class IsoScene {
       'wheel',
       (e) => {
         e.preventDefault();
+        this.noteAvatarInput();
         if (this.pinchGestureActive || this.zoomSource === 'pointer' || this.zoomSource === 'gesture') {
           return;
         }
@@ -2240,6 +2388,7 @@ export class IsoScene {
     };
 
     canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointerdown', () => this.noteAvatarInput());
     canvas.addEventListener('pointermove', onPointerMove);
     canvas.addEventListener('pointerup', endPointerGesture);
     canvas.addEventListener('pointercancel', endPointerGesture);
@@ -2365,6 +2514,7 @@ export class IsoScene {
     if (this.doorCooldown > 0) {
       this.doorCooldown -= this.app.ticker.deltaMS;
     }
+    this.leaveBenchIfStood();
     if (this.keys.size > 0) {
       let dx = 0;
       let dy = 0;
@@ -2399,13 +2549,17 @@ export class IsoScene {
         }
         return;
       }
-      if (dx !== 0 || dy !== 0) {
+      if ((dx !== 0 || dy !== 0) && this.seatedBench) {
+        // Keys held through the stand-up walk on once the player is back on the front cell.
+        this.standThen(null);
+      } else if (dx !== 0 || dy !== 0) {
         this.path = [];
         this.drawPathPreview();
         const sprint = this.shiftHeld;
         this.sprint = sprint;
         this.charState = sprint ? 'sprint' : 'walk';
         this.pendingNoahTalk = false;
+        this.dropBenchWalk();
         const tileBefore = this.roundedCharTile();
         const next = this.keyboardStep(this.charTx, this.charTy, dx, dy, sprint, (x, y) => !!cells[y]?.[x]?.walkable);
         this.charTx = next.x;
@@ -2451,6 +2605,7 @@ export class IsoScene {
             const onSpot = !!s && Math.round(this.charTx) === s.x && Math.round(this.charTy) === s.y;
             if (onSpot || this.playerNearNoah()) this.startNoahTalk();
           }
+          if (this.pendingBench) this.arriveAtBench();
         }
       }
       this.syncCharacterGraphic();
@@ -3215,6 +3370,59 @@ export class IsoScene {
       scope: this.interiorActive ? 'room' : 'map',
       rendererResolution: this.app.renderer.resolution,
     };
+  }
+
+  /** QA: benches the player can sit on (anchor, draw order, a client point inside the tap box) and which one they hold. */
+  qaBenches(): {
+    claimed: string | null;
+    pending: string | null;
+    seated: string | null;
+    benches: (Bench & {
+      anchor: { x: number; y: number };
+      benchZ: number | null;
+      tapWorld: { x: number; y: number };
+      client: { x: number; y: number } | null;
+    })[];
+  } {
+    const rect = this.canvasEl?.getBoundingClientRect();
+    return {
+      claimed: this.claimedBench?.id ?? null,
+      pending: this.pendingBench?.id ?? null,
+      seated: this.seatedBench?.id ?? null,
+      benches: this.townBenches().map((b) => {
+        const anchor = tileFootWorld(b.seat.x, b.seat.y);
+        const g = this.objectGraphics.get(b.id);
+        const box = this.objectTapBoxes.get(b.id);
+        let tapWorld = anchor;
+        if (g && box) {
+          const c = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+          let best = Infinity;
+          for (let y = box.y; y < box.y + box.height; y += 4) {
+            for (let x = box.x; x < box.x + box.width; x += 4) {
+              const d = Math.hypot(x - c.x, y - c.y);
+              if (d < best && g.hitArea?.contains(x, y)) {
+                best = d;
+                tapWorld = { x: g.x + x, y: g.y + y };
+              }
+            }
+          }
+        }
+        const scr = this.worldToScreen(tapWorld.x, tapWorld.y);
+        return {
+          ...b,
+          anchor,
+          benchZ: this.objectVisuals.get(b.id)?.zIndex ?? null,
+          tapWorld,
+          client: rect ? { x: rect.left + scr.x, y: rect.top + scr.y } : null,
+        };
+      }),
+    };
+  }
+
+  /** QA: as if `seconds` more passed without input (Pantone's rest timer). */
+  qaSkipQuiet(seconds: number): void {
+    this.avatar.qaSkipQuiet(seconds);
+    this.interiorAvatar.qaSkipQuiet(seconds);
   }
 
   /** QA: what Pixi's event boundary would deliver a mouse event at this client point to. */

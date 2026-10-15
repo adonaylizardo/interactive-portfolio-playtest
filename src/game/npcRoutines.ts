@@ -12,6 +12,7 @@ import { cells, keepClear, MAP_HEIGHT, MAP_WIDTH, nearMuroClearance, objects, ty
  *    one only after reserving every cell up to the next ordinary cell, so it never waits, pauses
  *    or turns up on one (a building visitor vanishes on its own door the moment it arrives)
  *  - the climbing wall's clearance stays free for Noah
+ *  - the bench the player sits on (or is walking to) is nobody else's
  *  - start times, pauses and start frames are random so nobody moves in step
  */
 
@@ -374,6 +375,8 @@ export type NpcDefInfo = { id: string; stride: number; anims: Record<string, Ani
 export type RoutineHost = {
   /** Tiles NPCs must not step onto right now (the player's, Pantone's, Noah's). */
   blocked(x: number, y: number): boolean;
+  /** Bench the player sits on or is walking to sit on (nobody else takes it). */
+  playerBench?(): string | null;
 };
 
 export type Walker = {
@@ -601,7 +604,7 @@ export class NpcRoutines {
     const sitters = byRole('bench');
     const seats = [...this.town.benches.keys()].sort(() => this.rand() - 0.5);
     sitters.forEach((w, i) => {
-      const b = i < sitters.length - 1 ? seats.find((s) => !this.benchOwners[s] && this.open(this.town.benches[s].front)) : undefined;
+      const b = i < sitters.length - 1 ? seats.find((s) => this.benchFree(s)) : undefined;
       if (b === undefined) {
         fallback(w);
         w.phase = 'break';
@@ -890,6 +893,25 @@ export class NpcRoutines {
     }
   }
 
+  /** Nobody holds the bench, the player has not claimed it, and its front cell is clear. */
+  private benchFree(i: number): boolean {
+    const b = this.town.benches[i];
+    return !this.benchOwners[i] && this.host.playerBench?.() !== b.id && this.open(b.front);
+  }
+
+  /**
+   * The player wants bench `id`: false when an NPC already sits on it; one only walking there gives
+   * it up. Call before the player claims it through `RoutineHost.playerBench`.
+   */
+  yieldBenchToPlayer(id: string): boolean {
+    const i = this.town.benches.findIndex((b) => b.id === id);
+    const owner = i >= 0 ? this.benchOwners[i] : null;
+    if (!owner) return true;
+    if (owner.phase === 'sitting') return false;
+    this.abandon(owner);
+    return true;
+  }
+
   /** A place in a cart's line is taken by its owner, or by the player standing there. */
   private placeTaken(cart: number, slot: number): boolean {
     const c = this.town.carts[cart].slots[slot];
@@ -906,7 +928,7 @@ export class NpcRoutines {
       if (p && this.goTo(w, p, 'leave the bench', () => this.stand(w, this.range(BENCH_BREAK_S), 'look around'))) return;
       return this.retryLater(w);
     }
-    const free = [...this.town.benches.keys()].filter((i) => !this.benchOwners[i] && i !== w.lastBench && this.open(this.town.benches[i].front));
+    const free = [...this.town.benches.keys()].filter((i) => i !== w.lastBench && this.benchFree(i));
     const i = this.pick(free);
     if (i === undefined) return this.wander(w, 'break');
     this.benchOwners[i] = w;

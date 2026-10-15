@@ -160,6 +160,8 @@ async function main(): Promise<void> {
     npcTown: () => scene.qaNpcTown(),
     advanceNpcs: (seconds: number) => scene.qaAdvanceNpcs(seconds),
     playerAvatar: () => scene.qaPlayerAvatar(),
+    benches: () => scene.qaBenches(),
+    skipQuiet: (seconds: number) => scene.qaSkipQuiet(seconds),
     noah: () => scene.qaNoah(),
     pixiTargetAt: (x: number, y: number) => scene.qaPixiTargetAt(x, y),
   };

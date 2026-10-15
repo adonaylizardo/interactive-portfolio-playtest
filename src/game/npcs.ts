@@ -271,6 +271,11 @@ export class NpcCrowd {
     this.applyVisibility();
   }
 
+  /** The player wants bench `id`: false when an NPC already sits there (see `NpcRoutines.yieldBenchToPlayer`). */
+  yieldBenchToPlayer(id: string): boolean {
+    return this.routines?.yieldBenchToPlayer(id) ?? true;
+  }
+
   /** QA: the town the routines read (benches, cart lines, deck spots, doors, street ends, stroll zones) and who holds which place. */
   town(): {
     carts: { id: string; at: { x: number; y: number }; slots: { x: number; y: number }[]; faces: NpcDir[] }[];
