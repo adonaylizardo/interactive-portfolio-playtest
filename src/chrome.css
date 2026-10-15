@@ -564,7 +564,13 @@ body[data-interior='1'] .chrome__column {
 }
 
 .chrome--split .chrome__subtitle {
-  left: calc(496px + (100% - 496px) / 2);
+  left: calc(496px + (100% - 496px - 264px) / 2);
+  width: min(520px, calc(100% - 496px - 280px));
+}
+
+.chrome--map .chrome__subtitle {
+  left: calc((100% - 264px) / 2);
+  width: min(560px, calc(100% - 280px));
 }
 
 .chrome--panel .chrome__sound,
@@ -779,7 +785,7 @@ body[data-layout='panel'] #game-canvas {
 
 .chrome--dock .chrome__subtitle {
   top: auto;
-  bottom: 76px;
+  bottom: 132px;
 }
 
 .chrome--sheet .chrome__subtitle {
