@@ -136,7 +136,7 @@ const CASES = {
       ['h3', 'Result'],
       [
         'p',
-        'The program moved from an informal Notion log in 2023 to a measured system with quarterly goals, set up in January 2024. It tracks 51 designers across 11 countries, with 32 who attended at least one logged session. Program-wide, 247 attended sessions have been logged, from January 2024 to February 2026. Global attendance held at 82 to 95% every measured quarter from 2024 to Q1 2025, above the 80% goal.',
+        'The program moved from an informal Notion log in 2023 to a measured system with quarterly goals, set up in January 2024. It tracks 51 designers across 11 countries, with 32 who attended at least one logged session. Program-wide, 247 attended sessions have been logged, from January 2024 to February 2026. Global attendance held at 82 to 95% every measured quarter from 2024 to Q1 2025, above the 80% goal. The program also ran 10 group events, each drawing 11 to 21 designers.',
       ],
       ['h3', 'Beyond Applaudo'],
       [
@@ -158,7 +158,7 @@ const CASES = {
       ],
       [
         'li',
-        'Result: 51 designers across 11 countries, 247 attended sessions logged (Jan 2024 to Feb 2026), and attendance of 82 to 95% every measured quarter, above the 80% goal.',
+        'Result: 51 designers across 11 countries, 247 attended sessions logged (Jan 2024 to Feb 2026), attendance of 82 to 95% every measured quarter above the 80% goal, and 10 group events with 11 to 21 designers each.',
       ],
       ['li', "Career-wide: I've mentored 200+ designers across Applaudo, DesignLab, CareerFoundry, ADPList, and others."],
       ['em', "Mentoring is not softer, it's more developmental."],
