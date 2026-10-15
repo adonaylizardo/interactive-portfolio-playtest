@@ -4,6 +4,7 @@
  *    leave each room by walking onto the mat, and Enter next to a third door walks in
  *  - wheel: plain wheel / two-finger scroll pans in the scroll direction without zooming;
  *    ctrl+wheel (trackpad pinch) and cmd+wheel zoom anchored on the cursor
+ *  - min zoom: fully zoomed out and panned to each edge, the screen border is ground, not the void
  *  - Sambil / Flor interiors: a tap on furniture walks to the nearest reachable floor cell,
  *    and long walks are a few straight segments instead of a grid staircase
  */
@@ -365,6 +366,65 @@ async function testWheel(ctx, kind, base, errors, notes) {
   }
 }
 
+/**
+ * Fully zoomed out, and panned as far as the camera allows each way, the screen border shows ground
+ * (the outskirts pattern), never the bare #0B0C0E page behind the canvas. The UI overlay is hidden
+ * for the shot so only the canvas is sampled.
+ */
+async function testMinZoom(ctx, kind, base, errors, notes) {
+  const tag = `run41-${kind}-minzoom`;
+  const { PNG } = await import('pngjs');
+  const page = await ctx.newPage();
+  try {
+    await page.goto(base, { waitUntil: 'networkidle' });
+    await wait(900);
+    await qa(page, () => window.__playtestQa.setZoom(0.01));
+    await wait(400);
+    const { zoom, zoomMin } = await qa(page, () => ({ ...document.getElementById('game-canvas').dataset }));
+    if (Math.abs(+zoom - +zoomMin) > +zoomMin * 0.01) errors.push(`${tag}: setZoom(0.01) left zoom at ${zoom} (min ${zoomMin})`);
+    await page.addStyleTag({ content: '#ui-root{visibility:hidden!important}' });
+    const vp = page.viewportSize();
+    await page.mouse.move(vp.width / 2, vp.height / 2);
+    const worst = [];
+    for (const [where, dx, dy] of [['centre', 0, 0], ['left', -1, 0], ['right', 1, 0], ['top', 0, -1], ['bottom', 0, 1]]) {
+      for (let i = 0; i < (dx || dy ? 12 : 0); i++) {
+        await page.mouse.wheel(dx * 600, dy * 600);
+        await wait(40);
+      }
+      await wait(400);
+      const png = PNG.sync.read(await page.screenshot());
+      const s = png.width / vp.width;
+      let voidPx = 0;
+      let n = 0;
+      const sample = (x, y) => {
+        const i = (Math.round(y * s) * png.width + Math.round(x * s)) * 4;
+        const [r, g, b] = [png.data[i], png.data[i + 1], png.data[i + 2]];
+        n++;
+        if (Math.abs(r - 0x0b) <= 4 && Math.abs(g - 0x0c) <= 4 && Math.abs(b - 0x0e) <= 4) voidPx++;
+      };
+      for (let t = 0; t <= 1; t += 1 / 40) {
+        for (const inset of [2, 24]) {
+          sample(t * (vp.width - 1), inset);
+          sample(t * (vp.width - 1), vp.height - 1 - inset);
+          sample(inset, t * (vp.height - 1));
+          sample(vp.width - 1 - inset, t * (vp.height - 1));
+        }
+      }
+      worst.push(`${where} ${voidPx}/${n}`);
+      if (voidPx > 0) errors.push(`${tag}: at min zoom (${(+zoomMin).toFixed(3)}) panned ${where}, ${voidPx}/${n} screen-edge samples are the bare void colour`);
+      if (dx || dy) {
+        for (let i = 0; i < 12; i++) {
+          await page.mouse.wheel(-dx * 600, -dy * 600);
+          await wait(40);
+        }
+      }
+    }
+    notes.push(`${tag}: min zoom ${(+zoomMin).toFixed(3)}, void samples on the screen edge: ${worst.join(', ')}`);
+  } finally {
+    await page.close();
+  }
+}
+
 async function tapAt(page, kind, x, y) {
   if (RUN41_KINDS[kind].touch) await page.touchscreen.tap(Math.round(x), Math.round(y));
   else await page.mouse.click(Math.round(x), Math.round(y));
@@ -485,6 +545,7 @@ export async function runRun41InputSuite({ kind, base, errors, notes, only }) {
       await testKeyboardEntry(ctx, kind, base, errors, notes);
     }
     if (want('wheel')) await testWheel(ctx, kind, base, errors, notes);
+    if (want('minzoom')) await testMinZoom(ctx, kind, base, errors, notes);
     if (want('interior')) await testInteriorFeel(ctx, kind, base, errors, notes);
   } finally {
     await ctx.close();

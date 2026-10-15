@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Point, Polygon, Rectangle, Sprite } from 'pixi.js';
+import { Application, Container, Graphics, Point, Polygon, Rectangle, Sprite, Texture, TilingSprite } from 'pixi.js';
 import {
   cells,
   doorInwardStep,
@@ -447,6 +447,7 @@ export class IsoScene {
 
     this.buildTiles();
     this.buildVoidClickLayer();
+    this.buildOutskirts();
     this.buildObjects();
     this.npcs = new NpcCrowd(
       this.objectsLayer,
@@ -576,6 +577,51 @@ export class IsoScene {
       const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
       this.handleScreenTap(clientX - rect.left, clientY - rect.top, sprint);
     });
+  }
+
+  /**
+   * Ground beyond the 64×64 town, in the same tile art and a shade darker, so zooming all the way
+   * out shows the town on open ground instead of floating in a black void. Drawing only: taps out
+   * there still reach the void layer under it.
+   */
+  private buildOutskirts(): void {
+    const tile = spriteTexture('tile/suelo/si-no').source;
+    // One diamond centred in a 128×64 cell plus the four quarters at its corners tiles the iso grid.
+    // A canvas (power-of-two at @2x) so the pattern gets mipmaps like the tiles: no moiré far out.
+    const res = 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = TILE_W * res;
+    canvas.height = TILE_H * res;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    for (const [cx, cy] of [[64, 32], [0, 0], [128, 0], [0, 64], [128, 64]]) {
+      ctx.drawImage(tile.resource as CanvasImageSource, (cx - TILE_W / 2) * res, (cy - TILE_H / 2) * res, TILE_W * res, TILE_H * res);
+    }
+    const pattern = Texture.from({ resource: canvas, resolution: res, autoGenerateMipmaps: true, scaleMode: 'linear' });
+    const ground = new TilingSprite({ texture: pattern, width: TILE_W, height: TILE_H });
+    ground.alpha = 0.7;
+    ground.eventMode = 'none';
+    this.outskirts = ground;
+    this.world.addChildAt(ground, 1);
+  }
+
+  private outskirts: TilingSprite | null = null;
+
+  /**
+   * Stretches the outskirts over exactly what the camera sees (a tall phone at the 0.04 zoom floor
+   * sees ~20 000 px of world), starting on a whole cell from the origin so the pattern's corner
+   * diamonds stay on the tile centres ((x − y)·64, (x + y)·32) and continue the town's grid.
+   */
+  private fitOutskirts(sw: number, sh: number): void {
+    const g = this.outskirts;
+    if (!g) return;
+    const x0 = Math.floor((-sw / 2 / this.zoom - this.cameraX) / TILE_W - 1) * TILE_W;
+    const y0 = Math.floor((-sh / 2 / this.zoom - this.cameraY) / TILE_H - 1) * TILE_H;
+    const x1 = Math.ceil((sw / 2 / this.zoom - this.cameraX) / TILE_W + 1) * TILE_W;
+    const y1 = Math.ceil((sh / 2 / this.zoom - this.cameraY) / TILE_H + 1) * TILE_H;
+    g.position.set(x0, y0);
+    g.width = x1 - x0;
+    g.height = y1 - y0;
   }
 
   private buildVoidClickLayer(): void {
@@ -1459,6 +1505,7 @@ export class IsoScene {
     this.camera.scale.set(1);
     this.world.position.set(this.cameraX * this.zoom, this.cameraY * this.zoom);
     this.world.scale.set(this.zoom);
+    this.fitOutskirts(sw, sh);
     if (this.canvasEl) {
       const vis = mapVisibleFractions(
         { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
@@ -2820,6 +2867,7 @@ export class IsoScene {
       this.drawPathPreview();
       this.tilesLayer.visible = false;
       this.objectsLayer.visible = false;
+      if (this.outskirts) this.outskirts.visible = false;
       this.cullVisibleTiles();
       this.pathLayer.visible = false;
       this.characterLayer.visible = false;
@@ -2900,6 +2948,7 @@ export class IsoScene {
       this.interiorPath = [];
       this.tilesLayer.visible = true;
       this.objectsLayer.visible = true;
+      if (this.outskirts) this.outskirts.visible = true;
       this.cullVisibleTiles();
       this.pathLayer.visible = true;
       this.characterLayer.visible = true;
