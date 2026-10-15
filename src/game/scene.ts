@@ -611,14 +611,29 @@ export class IsoScene {
    * Stretches the outskirts over exactly what the camera sees (a tall phone at the 0.04 zoom floor
    * sees ~20 000 px of world), starting on a whole cell from the origin so the pattern's corner
    * diamonds stay on the tile centres ((x − y)·64, (x + y)·32) and continue the town's grid.
+   * Hidden while the town covers the whole screen: a full-screen blended quad costs software-GL
+   * phones ~4 ms a frame.
    */
   private fitOutskirts(sw: number, sh: number): void {
     const g = this.outskirts;
     if (!g) return;
-    const x0 = Math.floor((-sw / 2 / this.zoom - this.cameraX) / TILE_W - 1) * TILE_W;
-    const y0 = Math.floor((-sh / 2 / this.zoom - this.cameraY) / TILE_H - 1) * TILE_H;
-    const x1 = Math.ceil((sw / 2 / this.zoom - this.cameraX) / TILE_W + 1) * TILE_W;
-    const y1 = Math.ceil((sh / 2 / this.zoom - this.cameraY) / TILE_H + 1) * TILE_H;
+    const left = -sw / 2 / this.zoom - this.cameraX;
+    const right = sw / 2 / this.zoom - this.cameraX;
+    const top = -sh / 2 / this.zoom - this.cameraY;
+    const bottom = sh / 2 / this.zoom - this.cameraY;
+    // Screen corners in tile coordinates, one tile in from the edge to clear the slab's side faces.
+    const inTown = (wx: number, wy: number) => {
+      const tx = wx / TILE_W + wy / TILE_H;
+      const ty = wy / TILE_H - wx / TILE_W;
+      return tx >= 0.5 && ty >= 0.5 && tx <= MAP_WIDTH - 1.5 && ty <= MAP_HEIGHT - 1.5;
+    };
+    const covered = inTown(left, top) && inTown(right, top) && inTown(left, bottom) && inTown(right, bottom);
+    g.visible = !this.interiorActive && !covered;
+    if (!g.visible) return;
+    const x0 = Math.floor(left / TILE_W - 1) * TILE_W;
+    const y0 = Math.floor(top / TILE_H - 1) * TILE_H;
+    const x1 = Math.ceil(right / TILE_W + 1) * TILE_W;
+    const y1 = Math.ceil(bottom / TILE_H + 1) * TILE_H;
     g.position.set(x0, y0);
     g.width = x1 - x0;
     g.height = y1 - y0;
@@ -2948,7 +2963,7 @@ export class IsoScene {
       this.interiorPath = [];
       this.tilesLayer.visible = true;
       this.objectsLayer.visible = true;
-      if (this.outskirts) this.outskirts.visible = true;
+      this.fitOutskirts(this.app.screen.width, this.app.screen.height);
       this.cullVisibleTiles();
       this.pathLayer.visible = true;
       this.characterLayer.visible = true;
