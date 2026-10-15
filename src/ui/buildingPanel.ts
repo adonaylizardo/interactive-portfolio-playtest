@@ -115,8 +115,6 @@ export class BuildingPanel {
         <button type="button" class="building-panel__close" data-close aria-label="Cerrar">×</button>
         <h2 class="building-panel__title"></h2>
         <div class="building-panel__body-wrap">
-          <p class="building-panel__body" data-placeholder>Caso de ejemplo [falta]</p>
-          <p class="building-panel__hint" data-placeholder>Contenido provisional — solo prueba de interacción.</p>
           <article class="case" lang="en" hidden>
             <div class="case__version case__version--full"></div>
             <div class="case__version case__version--short"></div>
@@ -259,7 +257,6 @@ export class BuildingPanel {
     const content = this.interiorId ? CASES[this.interiorId] : undefined;
     this.caseEl.hidden = !content;
     this.el.classList.toggle('building-panel--case', !!content);
-    for (const p of this.el.querySelectorAll<HTMLElement>('[data-placeholder]')) p.hidden = !!content;
     const full = this.caseEl.querySelector('.case__version--full')!;
     const short = this.caseEl.querySelector('.case__version--short')!;
     full.replaceChildren(...(content ? content.full.map(caseBlockNode) : []));

@@ -1,6 +1,7 @@
 /**
  * Run #47 Estudio panel (deploy gate):
- *  - "About me" follows the intro and the "Worked with" strip, and shows about.md line for line
+ *  - no placeholder copy ("Caso de ejemplo [falta]", "Contenido provisional …") in the panel
+ *  - "About me" follows the "Worked with" strip, and shows about.md line for line
  *    (headings, paragraphs, emoji, links), with the two typos fixed
  *  - photos 01-05 in page order, lazy-loaded WebP (transparent PNGs keep their alpha), never wider
  *    than the panel; links open the absolute URLs in a new tab
@@ -86,7 +87,6 @@ async function readPanel(page) {
     const sheet = document.querySelector('.building-panel__sheet');
     const about = document.querySelector('.about');
     const strip = document.querySelector('.worked-with');
-    const intro = [...document.querySelectorAll('[data-placeholder]')].filter(shown);
     const lines = [...(about?.querySelectorAll('h4, h5, h6, p.about__text, picture img') ?? [])].filter(shown).map((el) =>
       el.tagName === 'IMG'
         ? ['img', /about\/(\d+)\./.exec(el.getAttribute('src'))?.[1] ?? el.getAttribute('src')]
@@ -103,7 +103,7 @@ async function readPanel(page) {
     const cs = about ? getComputedStyle(about) : null;
     return {
       shown: shown(about),
-      introBottom: intro.length ? Math.max(...intro.map((el) => box(el).bottom)) : null,
+      sheetText: sheet?.innerText ?? '',
       stripShown: shown(strip),
       stripLogos: strip?.querySelectorAll('img').length ?? 0,
       stripBottom: box(strip)?.bottom ?? 0,
@@ -315,7 +315,7 @@ export async function runRun47AboutSuite({ kind, base, errors, notes, shots }) {
     if (!m.shown) errors.push(`${tag}: "About me" is not shown in the Estudio panel`);
     if (!m.stripShown || m.stripLogos === 0) errors.push(`${tag}: the "Worked with" strip is missing (${m.stripLogos} logos)`);
     if (m.aboutTop < m.stripBottom - 0.5) errors.push(`${tag}: "About me" starts above the end of the logo strip`);
-    if (m.introBottom !== null && m.aboutTop < m.introBottom) errors.push(`${tag}: "About me" starts above the intro`);
+    if (/\[falta\]|Caso de ejemplo|Contenido provisional/.test(m.sheetText)) errors.push(`${tag}: placeholder copy still in the Estudio panel`);
     const okText = compare(tag, m.lines, expectedLines(), errors);
     if (/entrepeneur|\bI countered\b/.test(m.text)) errors.push(`${tag}: a typo from about.md is still shown`);
     if (!m.text.includes('my entrepreneur background') || !m.text.includes('I encountered a community')) errors.push(`${tag}: the fixed sentences are missing`);
