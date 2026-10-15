@@ -194,7 +194,7 @@ export const CASES: Record<string, CaseContent> = {
         kind: 'section',
         heading: 'Result',
         paragraphs: [
-          'The program moved from an informal Notion log in 2023 to a measured system with quarterly goals, set up in January 2024. It now tracks participation, attendance health, and deferral rate every quarter.',
+          'The program moved from an informal Notion log in 2023 to a measured system with quarterly goals, set up in January 2024. It tracks **51 designers** across **11 countries**, with **32** who attended at least one logged session. Program-wide, **247 attended sessions** have been logged, from January 2024 to February 2026. Global attendance held at **82 to 95%** every measured quarter from 2024 to Q1 2025, above the 80% goal.',
         ],
       },
       {
@@ -220,7 +220,7 @@ export const CASES: Record<string, CaseContent> = {
         bullets: [
           "**Problem:** The design team's growth was hard to see and had no structure behind it, limiting its impact on clients and on Applaudo's own goals.",
           '**What I did:** Co-created and help lead a measured mentoring program: 1:1 coaching, consultations, scouted invites, team workshops, all tagged to a competencies library with quarterly goals.',
-          '**Result:** The program moved from a Notion log in 2023 to a measured system with quarterly goals, tracking participation, attendance health, and deferral rate every quarter.',
+          '**Result:** 51 designers across 11 countries, 247 attended sessions logged (Jan 2024 to Feb 2026), and attendance of 82 to 95% every measured quarter, above the 80% goal.',
           "**Career-wide:** I've mentored 200+ designers across Applaudo, DesignLab, CareerFoundry, ADPList, and others.",
         ],
       },
