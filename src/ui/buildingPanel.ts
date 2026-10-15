@@ -1,18 +1,6 @@
 import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
-import { CASES, type CaseBlock, type CaseContent } from '../data/cases';
+import { CASES, type CaseBlock } from '../data/cases';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
-
-/** Every interior except Estudio shows the airline case (Volaris holds the copy). */
-const CASE_PANEL_IDS = new Set([
-  'volaris',
-  'bain',
-  'mentoria',
-  'finoa',
-  'pg',
-  'sambil',
-  'catedral',
-  'flor',
-]);
 
 function aboutBlockNode(block: AboutBlock): HTMLElement {
   if (block.kind === 'heading') {
@@ -109,8 +97,6 @@ export class BuildingPanel {
   private peekOnly = true;
   private dragStartY = 0;
   private leaveArmed = false;
-  /** Last interior whose case/about/logo DOM was filled. Kept across hide so re-entry can reopen it. */
-  private renderedInteriorId: string | null = null;
 
   constructor(
     container: HTMLElement,
@@ -240,17 +226,9 @@ export class BuildingPanel {
     this.el.hidden = false;
     this.el.removeAttribute('inert');
     this.el.classList.remove('building-panel--snap');
-    // Unhide first, then fill: replacing children while `hidden` (display:none) leaves the
-    // body blank on WebKit after re-entry. Same room: keep the DOM from the last visit.
-    if (this.renderedInteriorId !== interiorId || this.bodyIsEmpty()) {
-      this.setTitle(title, this.renderCase());
-      this.renderWorkedWith();
-      this.renderAbout();
-      this.renderedInteriorId = interiorId;
-    } else {
-      this.setTitle(title, this.caseHeadline());
-    }
-    void this.el.offsetHeight;
+    this.setTitle(title, this.renderCase());
+    this.renderWorkedWith();
+    this.renderAbout();
     this.el.classList.add('building-panel--open');
     this.syncPeekClass();
     this.onVisibilityChange();
@@ -282,25 +260,9 @@ export class BuildingPanel {
     this.el.classList.toggle('building-panel--scrolled', this.sheet.scrollTop > 4);
   }
 
-  private caseContent(): CaseContent | undefined {
-    if (!this.interiorId) return undefined;
-    return CASES[this.interiorId] ?? (CASE_PANEL_IDS.has(this.interiorId) ? CASES.volaris : undefined);
-  }
-
-  private caseHeadline(): string | null {
-    // Volaris uses the headline as the title (run46). Other rooms keep the building name.
-    return this.interiorId === 'volaris' ? (this.caseContent()?.headline ?? null) : null;
-  }
-
-  private bodyIsEmpty(): boolean {
-    const wrap = this.el.querySelector('.building-panel__body-wrap');
-    if (!wrap) return true;
-    return !wrap.textContent?.replace(/\s+/g, '').length;
-  }
-
   /** Fills the case article for the current interior; returns its headline, or null when there is no case. */
   private renderCase(): string | null {
-    const content = this.caseContent();
+    const content = this.interiorId ? CASES[this.interiorId] : undefined;
     this.caseEl.hidden = !content;
     this.el.classList.toggle('building-panel--case', !!content);
     const full = this.caseEl.querySelector('.case__version--full')!;
@@ -346,7 +308,6 @@ export class BuildingPanel {
   hide(_opts?: { snap?: boolean }): void {
     // Snap out of the hit tree on this frame (same as the mat). A transforming sheet still
     // intercepts iOS taps even with pointer-events:none, so Salir waited ~250 ms for map input.
-    // Do not empty case/about/logo DOM — showInterior reopens it on re-entry.
     this.el.classList.add('building-panel--snap');
     this.el.classList.remove('building-panel--open', 'building-panel--peek', 'building-panel--expanded');
     this.el.setAttribute('inert', '');
@@ -361,34 +322,6 @@ export class BuildingPanel {
     if (this.leaveArmed) return;
     this.leaveArmed = true;
     this.onSalir();
-  }
-
-  /** Visible sheet body after peek/expand, for enter-leave-reenter checks. */
-  sheetBodySnapshot(): {
-    display: string;
-    text: string;
-    childCount: number;
-    peek: boolean;
-    expanded: boolean;
-    hidden: boolean;
-    open: boolean;
-  } {
-    const wrap = this.el.querySelector('.building-panel__body-wrap') as HTMLElement | null;
-    const cs = wrap ? getComputedStyle(wrap) : null;
-    const nodes = [...(wrap?.querySelectorAll('h3, p, li, img, em, .about__text, .case__text') ?? [])];
-    const visible = nodes.filter((el) => {
-      const s = getComputedStyle(el);
-      return s.display !== 'none' && s.visibility !== 'hidden' && el.getClientRects().length > 0;
-    });
-    return {
-      display: cs?.display ?? 'none',
-      text: wrap?.innerText.replace(/\s+/g, ' ').trim() ?? '',
-      childCount: visible.length,
-      peek: this.el.classList.contains('building-panel--peek'),
-      expanded: this.el.classList.contains('building-panel--expanded'),
-      hidden: this.el.hidden,
-      open: this.isOpen(),
-    };
   }
 
   isOpen(): boolean {
