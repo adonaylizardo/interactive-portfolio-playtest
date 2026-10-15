@@ -94,7 +94,9 @@ export const CASES: Record<string, CaseContent> = {
       {
         kind: 'section',
         heading: 'Result',
-        paragraphs: ['The Bain team rated the Applaudo designers who worked with them 9.5/10 CSAT (self-reported).'],
+        paragraphs: [
+          "The Bain team's CSAT rating of the Applaudo designers who worked with them rose from about 8.5 to 9.5 across 2025 to 2026, reaching 10 in some quarters.",
+        ],
       },
       {
         kind: 'section',
@@ -102,7 +104,7 @@ export const CASES: Record<string, CaseContent> = {
         paragraphs: [],
         bullets: [
           "**Signal (Product Designer):** I built a new design process, with documentation and testing, behind several shipped features. The biggest was a Gantt view, Signal's largest release to date. I also ran a team feedback workshop on Gantt enhancements, and Signal's product team adopted the remote video collaboration method I introduced.",
-          '**Case Wrap MVP** (around June to August 2026, Senior Product Designer / Product Strategist): I reframed case wrap-up as review-and-approve instead of one-click acceptance: AI drafts, humans decide, no "approve all." Three coded directions in Bain\'s design system turned the choice into a team decision. The deliverable was a validated MVP direction. I did not "win" a concept; I made the trade-off cheap to see.',
+          '**Case Wrap MVP** (around June to August 2026, Senior Product Designer / Product Strategist): I reframed case wrap-up as review-and-approve instead of one-click acceptance: AI drafts, humans decide, no "approve all." Three coded directions in Bain\'s design system turned the choice into a team decision. The deliverable was a validated MVP direction. I did not win a concept; I made the trade-off cheap to see.',
           '**NPS Prism, Instrument Management** (around April to June 2026, sole designer): what the admin called "instruments" were really presets, with real ownership and refresh data scattered in spreadsheets outside the platform. I designed a two-entity model with an in-platform refresh calendar and notifications. Product and engineering approved it for build.',
           '**PEG:** Product Designer on the account.',
           "**PAS:** product design on Bain's live Partner Assessment System.",
@@ -120,7 +122,7 @@ export const CASES: Record<string, CaseContent> = {
         bullets: [
           '**Problem:** Bain designers were scattered across teams with no shared space, so overlaps and misalignment stayed invisible.',
           '**What I did:** Squad lead and mentor for 9 designers; ran a weekly ceremony (Visual Status, Experiment Tracker, Red Flags).',
-          '**Result:** Bain rated the designers 9.5/10 CSAT (self-reported).',
+          '**Result:** Bain\'s CSAT rating of the designers rose from about 8.5 to 9.5 across 2025 to 2026, reaching 10 in some quarters.',
           "**Hands-on:** Signal's Gantt view, its largest release; Case Wrap moved to review-and-approve with AI drafts; NPS Prism moved ownership data off spreadsheets and into the product.",
         ],
       },
@@ -144,7 +146,7 @@ export const CASES: Record<string, CaseContent> = {
         kind: 'section',
         heading: 'What I did',
         paragraphs: [
-          'I was the UX/UI Designer in a small cross-functional team (a PM, a science team, and a UI & motion designer), and together we co-created the app in about 8 weeks. The first 2 to 3 weeks were strategy: 4 user profiles, a competitive benchmark, feature focus maps, user flows, and wireframes. Interviews, heuristic tests, and design thinking sessions showed navigation needed to differ across profiles, which shaped a quick-access logging pattern around the calendar, the cycle wheel, and a single add button. From there we built the design system and UI, covering symptom tracking, gamification, a news feed, and "Diary," a survey and product-testing system tied into gamification.',
+          'As UX/UI Designer at Talpor, I worked in a small cross-functional team (a PM, a science team, and a UI & motion designer), and together we co-created the app in about 8 weeks. The first 2 to 3 weeks were strategy: 4 user profiles, a competitive benchmark, feature focus maps, user flows, and wireframes. Interviews, heuristic tests, and design thinking sessions showed navigation needed to differ across profiles, which shaped a quick-access logging pattern around the calendar, the cycle wheel, and a single add button. From there we built the design system and UI, covering symptom tracking, gamification, a news feed, and "Diary," a survey and product-testing system tied into gamification.',
         ],
       },
       {
@@ -162,7 +164,7 @@ export const CASES: Record<string, CaseContent> = {
         paragraphs: [],
         bullets: [
           '**Problem:** P&G needed panelists to log their cycle, answer surveys, and test products in one app built to handle sensitive health data securely.',
-          '**What I did:** UX/UI design over about 8 weeks, from research and user flows to a full design system and a gamified "Diary" feature.',
+          '**What I did:** As UX/UI Designer at Talpor, I worked over about 8 weeks, from research and user flows to a full design system and a gamified "Diary" feature.',
           '**Result:** Launched in 3 languages for panelists in Brazil, Mexico, and the US, beating the agreed time and quality bar.',
           '**Extra:** The logging flow (calendar, cycle wheel, add button) was shaped directly by interviews and heuristic testing across user profiles.',
         ],
@@ -192,7 +194,7 @@ export const CASES: Record<string, CaseContent> = {
         kind: 'section',
         heading: 'Result',
         paragraphs: [
-          'The program moved from an informal Notion log in 2023 to a measured system built with quarterly goals for coverage and completed sessions, set up in January 2024. It now tracks participation, attendance health, and deferral rate every quarter, running on four session formats, gamified events, and tied into my seat on the Design Senior Council.',
+          'The program moved from an informal Notion log in 2023 to a measured system with quarterly goals, set up in January 2024. It now tracks participation, attendance health, and deferral rate every quarter.',
         ],
       },
       {
@@ -218,7 +220,7 @@ export const CASES: Record<string, CaseContent> = {
         bullets: [
           "**Problem:** The design team's growth was hard to see and had no structure behind it, limiting its impact on clients and on Applaudo's own goals.",
           '**What I did:** Co-created and help lead a measured mentoring program: 1:1 coaching, consultations, scouted invites, team workshops, all tagged to a competencies library with quarterly goals.',
-          '**Result:** The program moved from a Notion log in 2023 to a measured system with quarterly goals, tracking participation, attendance health, and deferral rate, across four session formats and gamified events.',
+          '**Result:** The program moved from a Notion log in 2023 to a measured system with quarterly goals, tracking participation, attendance health, and deferral rate every quarter.',
           "**Career-wide:** I've mentored 200+ designers across Applaudo, DesignLab, CareerFoundry, ADPList, and others.",
         ],
       },
@@ -240,7 +242,7 @@ export const CASES: Record<string, CaseContent> = {
         kind: 'section',
         heading: 'What I did',
         paragraphs: [
-          'As UX Designer, I joined a small cross-functional team, a Design Director, Finoa\'s product manager, and two UI designers, for an eight-week co-creation. I led the research side: customer interviews, friction points, user stories, story mapping, a feature focus map, and the information architecture. From there, flows and wireframes for the core screens.',
+          "As UX Designer at LoremLabs, I joined a small cross-functional team, a Design Director, Finoa's product manager, and two UI designers, for an eight-week co-creation. I led the research side: customer interviews, friction points, user stories, story mapping, a feature focus map, and the information architecture. From there, flows and wireframes for the core screens.",
         ],
       },
       {
@@ -265,7 +267,7 @@ export const CASES: Record<string, CaseContent> = {
         paragraphs: [],
         bullets: [
           "**Problem:** Finoa's platform worked, but institutional users needed more than it allowed, under a high bar for security and reliability.",
-          '**What I did:** Led research and IA in an eight-week co-creation: interviews, user stories, flows, wireframes.',
+          '**What I did:** As UX Designer at LoremLabs, led research and IA in an eight-week co-creation: interviews, user stories, flows, wireframes.',
           '**Result:** Clearer portfolio tracking, one place for pending actions, simpler permissions, plus a mobile prototype. Qualitative work; no metrics measured.',
         ],
       },

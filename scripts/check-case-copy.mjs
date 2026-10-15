@@ -72,8 +72,8 @@ if (!fs.existsSync(path.join(DIST, 'index.html'))) {
   }
   const volarisInCases = /Leading 9 designers[\s\S]{0,200}Volaris|Volaris[\s\S]{0,80}booking app/;
   if (volarisInCases.test(distText)) errors.push('dist case copy names Volaris');
-  const nines = [...distText.matchAll(/9\.5\/10/g)];
-  if (!nines.length) errors.push('dist is missing Bain 9.5/10');
+  if (!/8\.5 to 9\.5/.test(distText)) errors.push('dist is missing Bain CSAT 8.5 to 9.5');
+  if (/9\.5\/10/.test(distText)) errors.push('dist still has the old Bain 9.5/10 line');
 }
 
 if (errors.length) {

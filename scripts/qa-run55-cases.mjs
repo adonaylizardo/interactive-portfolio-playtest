@@ -37,7 +37,10 @@ const CASES = {
         'I was squad lead and mentor for 9 Applaudo designers distributed across several Bain accounts. I ran a weekly team ceremony to connect them, built around three blocks: a Visual Status review where designers look at work in progress side by side (to build horizontal visibility across the portfolio and surface overlaps, not to critique), a shared Experiment Tracker for portfolio initiatives, and a Red Flags block to raise risks early.',
       ],
       ['h3', 'Result'],
-      ['p', 'The Bain team rated the Applaudo designers who worked with them 9.5/10 CSAT (self-reported).'],
+      [
+        'p',
+        "The Bain team's CSAT rating of the Applaudo designers who worked with them rose from about 8.5 to 9.5 across 2025 to 2026, reaching 10 in some quarters.",
+      ],
       ['h3', 'Hands-on work'],
       [
         'li',
@@ -45,7 +48,7 @@ const CASES = {
       ],
       [
         'li',
-        'Case Wrap MVP (around June to August 2026, Senior Product Designer / Product Strategist): I reframed case wrap-up as review-and-approve instead of one-click acceptance: AI drafts, humans decide, no "approve all." Three coded directions in Bain\'s design system turned the choice into a team decision. The deliverable was a validated MVP direction. I did not "win" a concept; I made the trade-off cheap to see.',
+        'Case Wrap MVP (around June to August 2026, Senior Product Designer / Product Strategist): I reframed case wrap-up as review-and-approve instead of one-click acceptance: AI drafts, humans decide, no "approve all." Three coded directions in Bain\'s design system turned the choice into a team decision. The deliverable was a validated MVP direction. I did not win a concept; I made the trade-off cheap to see.',
       ],
       [
         'li',
@@ -61,7 +64,10 @@ const CASES = {
     short: [
       ['li', 'Problem: Bain designers were scattered across teams with no shared space, so overlaps and misalignment stayed invisible.'],
       ['li', 'What I did: Squad lead and mentor for 9 designers; ran a weekly ceremony (Visual Status, Experiment Tracker, Red Flags).'],
-      ['li', 'Result: Bain rated the designers 9.5/10 CSAT (self-reported).'],
+      [
+        'li',
+        "Result: Bain's CSAT rating of the designers rose from about 8.5 to 9.5 across 2025 to 2026, reaching 10 in some quarters.",
+      ],
       [
         'li',
         "Hands-on: Signal's Gantt view, its largest release; Case Wrap moved to review-and-approve with AI drafts; NPS Prism moved ownership data off spreadsheets and into the product.",
@@ -82,7 +88,7 @@ const CASES = {
       ['h3', 'What I did'],
       [
         'p',
-        'I was the UX/UI Designer in a small cross-functional team (a PM, a science team, and a UI & motion designer), and together we co-created the app in about 8 weeks. The first 2 to 3 weeks were strategy: 4 user profiles, a competitive benchmark, feature focus maps, user flows, and wireframes. Interviews, heuristic tests, and design thinking sessions showed navigation needed to differ across profiles, which shaped a quick-access logging pattern around the calendar, the cycle wheel, and a single add button. From there we built the design system and UI, covering symptom tracking, gamification, a news feed, and "Diary," a survey and product-testing system tied into gamification.',
+        'As UX/UI Designer at Talpor, I worked in a small cross-functional team (a PM, a science team, and a UI & motion designer), and together we co-created the app in about 8 weeks. The first 2 to 3 weeks were strategy: 4 user profiles, a competitive benchmark, feature focus maps, user flows, and wireframes. Interviews, heuristic tests, and design thinking sessions showed navigation needed to differ across profiles, which shaped a quick-access logging pattern around the calendar, the cycle wheel, and a single add button. From there we built the design system and UI, covering symptom tracking, gamification, a news feed, and "Diary," a survey and product-testing system tied into gamification.',
       ],
       ['h3', 'Result'],
       [
@@ -98,7 +104,7 @@ const CASES = {
       ],
       [
         'li',
-        'What I did: UX/UI design over about 8 weeks, from research and user flows to a full design system and a gamified "Diary" feature.',
+        'What I did: As UX/UI Designer at Talpor, I worked over about 8 weeks, from research and user flows to a full design system and a gamified "Diary" feature.',
       ],
       [
         'li',
@@ -130,7 +136,7 @@ const CASES = {
       ['h3', 'Result'],
       [
         'p',
-        'The program moved from an informal Notion log in 2023 to a measured system built with quarterly goals for coverage and completed sessions, set up in January 2024. It now tracks participation, attendance health, and deferral rate every quarter, running on four session formats, gamified events, and tied into my seat on the Design Senior Council.',
+        'The program moved from an informal Notion log in 2023 to a measured system with quarterly goals, set up in January 2024. It now tracks participation, attendance health, and deferral rate every quarter.',
       ],
       ['h3', 'Beyond Applaudo'],
       [
@@ -152,7 +158,7 @@ const CASES = {
       ],
       [
         'li',
-        'Result: The program moved from a Notion log in 2023 to a measured system with quarterly goals, tracking participation, attendance health, and deferral rate, across four session formats and gamified events.',
+        'Result: The program moved from a Notion log in 2023 to a measured system with quarterly goals, tracking participation, attendance health, and deferral rate every quarter.',
       ],
       ['li', "Career-wide: I've mentored 200+ designers across Applaudo, DesignLab, CareerFoundry, ADPList, and others."],
       ['em', "Mentoring is not softer, it's more developmental."],
@@ -172,7 +178,7 @@ const CASES = {
       ['h3', 'What I did'],
       [
         'p',
-        "As UX Designer, I joined a small cross-functional team, a Design Director, Finoa's product manager, and two UI designers, for an eight-week co-creation. I led the research side: customer interviews, friction points, user stories, story mapping, a feature focus map, and the information architecture. From there, flows and wireframes for the core screens.",
+        "As UX Designer at LoremLabs, I joined a small cross-functional team, a Design Director, Finoa's product manager, and two UI designers, for an eight-week co-creation. I led the research side: customer interviews, friction points, user stories, story mapping, a feature focus map, and the information architecture. From there, flows and wireframes for the core screens.",
       ],
       ['h3', 'Result'],
       [
@@ -196,7 +202,7 @@ const CASES = {
       ],
       [
         'li',
-        'What I did: Led research and IA in an eight-week co-creation: interviews, user stories, flows, wireframes.',
+        'What I did: As UX Designer at LoremLabs, led research and IA in an eight-week co-creation: interviews, user stories, flows, wireframes.',
       ],
       [
         'li',
