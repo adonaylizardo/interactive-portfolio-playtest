@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Restore the original muro-escalada art (pre-grow) and scale that silhouette
- * uniformly so the frame is ~2.5× Adonay (100 world px). Nearest-neighbour;
- * no plywood slab.
+ * uniformly to ~2× the original L (overhang, JOYS / ADO NOAH, base).
+ * Nearest-neighbour; no plywood slab.
  *
  *   node scripts/scale-muro.mjs
  */
@@ -13,9 +13,9 @@ import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-/** 5/4: 320×224 → 400×280. Opaque height ~251 px ≈ 2.5 × Adonay. */
-const NUM = 5;
-const DEN = 4;
+/** 2/1: 320×224 → 640×448. Clearly taller than the original; ~4× Adonay. */
+const NUM = 2;
+const DEN = 1;
 const ORIGIN = 'b4f9b71^';
 
 const FILES = [
@@ -182,10 +182,16 @@ for (const [name, p] of Object.entries(origWp)) {
   noah.waypoints_marco_muro[name]['2x'] = [p1[0] * 2, p1[1] * 2];
 }
 noah.geometria_muro_principal =
-  `cara de madera (~2.5× Adonay): original silhouette ×${NUM}/${DEN}; ` +
+  `cara de madera (~2× original L): original silhouette ×${NUM}/${DEN}; ` +
   `borde superior y = ${(66 * NUM) / DEN} + 0.5*(x-${(200 * NUM) / DEN}), ` +
   `base y = ${(101 * NUM) / DEN} + 0.5*(x-${(200 * NUM) / DEN}), marco @1x ${w}×${h}`;
 writeFileSync(noahPath, JSON.stringify(noah, null, 1) + '\n');
+
+for (const name of FILES) {
+  const png = path.join(dir, name);
+  const webp = png.replace(/\.png$/i, '.webp');
+  execFileSync('convert', [png, '-define', 'webp:lossless=true', '-define', 'webp:method=4', webp]);
+}
 
 console.log(`muro: sprites.json ${w}x${h} vfs=${JSON.stringify(vfs)} bbox=${JSON.stringify(bbox)}`);
 console.log(`muro: alpha ${maskC.w}x${maskC.h} cell 4`);

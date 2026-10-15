@@ -518,7 +518,7 @@ async function groundTapChecks(page, solidKeys, front) {
 }
 
 /**
- * Muro: sprite floor == the 3×2 footprint, and collision == the cells behind the walls the sprite
+ * Muro: sprite floor == the 6×4 footprint, and collision == the cells behind the walls the sprite
  * actually draws. A footprint edge carries a wall when the point 16 px above its midpoint is opaque
  * in the sprite's alpha mask and lies outside the floor diamond.
  */
@@ -546,7 +546,7 @@ async function muroChecks(page) {
     fail(`muro: sprite floor front vertex (${inst.tl.x + vfs.x},${inst.tl.y + vfs.y}) is not the footprint front vertex (${fsx},${fsy + 32})`);
   }
   const inFoot = (x, y) => x >= e.x && x < e.x + e.w && y >= e.y && y < e.y + e.h;
-  // Collision stays the six cells behind the 3×2 (back + left + corner). The art is the
+  // Collision is the cells behind the 6×4 (back + left + corner). The art is the
   // original silhouette scaled uniformly, so the walls sit further back than a 1× diamond.
   const wallBehind = new Set();
   for (let dx = 0; dx < e.w; dx++) wallBehind.add(`${e.x + dx},${e.y - 1}`);
@@ -572,7 +572,9 @@ async function muroChecks(page) {
   const want = [...wallBehind].sort().join(' ');
   const got = blocked.filter((k) => !inFoot(...k.split(',').map(Number))).sort().join(' ');
   if (want !== got) fail(`muro: collision cells [${got}] != cells behind the sprite's walls [${want}]`);
-  if (wallBehind.size !== 6) fail(`muro: expected the back wall (3) + left wall (2) + corner, found ${wallBehind.size} cells`);
+  if (wallBehind.size !== e.w + e.h + 1) {
+    fail(`muro: expected the back wall (${e.w}) + left wall (${e.h}) + corner, found ${wallBehind.size} cells`);
+  }
   notes.push(`muro: checked sprite floor vs footprint (${e.x}-${e.x + e.w - 1}, ${e.y}-${e.y + e.h - 1}) and collision vs the ${wallBehind.size} cells behind the walls found in the sprite alpha`);
 }
 
@@ -593,7 +595,7 @@ const ITEM_TOP_LEFT = {
   'building/flor': [-448, 2624],
   'paisaje/obelisco': [-1536, 1200],
   'paisaje/redoma': [448, 2496],
-  'paisaje/muro': [-496, 2248],
+  'paisaje/muro': [-640, 2080],
 };
 const ITEMS = Object.keys(ITEM_TOP_LEFT);
 const MAP_BOUNDS = { minX: -63 * 64 - 128, maxX: 63 * 64 + 128, minY: 0, maxY: 126 * 32 + 128 };

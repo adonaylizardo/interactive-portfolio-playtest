@@ -116,62 +116,62 @@
  "waypoints_marco_muro": {
   "inicio_idle": {
    "1x": [
-    305,
-    185
+    488,
+    296
    ],
    "2x": [
-    610,
-    370
+    976,
+    592
    ]
   },
   "base_muro": {
    "1x": [
-    330,
-    173
+    528,
+    276
    ],
    "2x": [
-    660,
-    346
+    1056,
+    552
    ]
   },
   "presa_arriba_izq": {
    "1x": [
-    330,
-    156
+    528,
+    250
    ],
    "2x": [
-    660,
-    312
+    1056,
+    500
    ]
   },
   "presa_arriba_der": {
    "1x": [
-    373,
-    178
+    596,
+    284
    ],
    "2x": [
-    746,
-    356
+    1192,
+    568
    ]
   },
   "abajo_der": {
    "1x": [
-    373,
-    186
+    596,
+    298
    ],
    "2x": [
-    746,
-    372
+    1192,
+    596
    ]
   },
   "aterrizaje": {
    "1x": [
-    381,
-    200
+    610,
+    320
    ],
    "2x": [
-    762,
-    400
+    1220,
+    640
    ]
   }
  },
@@ -227,6 +227,6 @@
   }
  ],
  "profundidad": "en el muro dibujar justo después de muro-escalada; en el suelo ordenar por fila (x+y) normal",
- "geometria_muro_principal": "cara de madera (~2.5× Adonay): original silhouette ×5/4; borde superior y = 82.5 + 0.5*(x-250), base y = 126.25 + 0.5*(x-250), marco @1x 400×280",
+ "geometria_muro_principal": "cara de madera (~2× original L): original silhouette ×2/1; borde superior y = 132 + 0.5*(x-400), base y = 202 + 0.5*(x-400), marco @1x 640×448",
  "letras_NOAH": "x 195-246 aprox.; la ruta usa x >= 252 para no taparlas"
 }

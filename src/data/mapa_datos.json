@@ -364,7 +364,7 @@
   },
   {
    "id": "muro",
-   "casillas": "x 35–37, y 40–41",
+   "casillas": "x 32–37, y 38–41",
    "acceso": [
     38,
     41
@@ -374,7 +374,7 @@
    "casa_mas_cercana": "estudio",
    "desde_casa": 6,
    "tipo": "paisaje (sin interior)",
-   "huella": "3×2",
+   "huella": "6×4",
    "hueco_min_a_edificio": 4
   }
  ],
@@ -541,10 +541,10 @@
    "interior": false
   },
   "muro": {
-   "x": 35,
-   "y": 40,
-   "w": 3,
-   "h": 2,
+   "x": 32,
+   "y": 38,
+   "w": 6,
+   "h": 4,
    "cara_puerta": null,
    "acceso": [
     38,

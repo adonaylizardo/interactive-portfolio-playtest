@@ -34,7 +34,7 @@ const ITEMS = [
   ['flor', 'ext/flor/default/cerca', -448, 2624],
   ['obelisco', 'prop/obelisco/cerca', -1536, 1200],
   ['redoma', 'prop/redoma/cerca', 448, 2496],
-  ['muro', 'prop/muro/cerca', -496, 2248],
+  ['muro', 'prop/muro/cerca', -640, 2080],
 ];
 const VIEWS = [
   { tag: 'desk', width: 1280, height: 800, dpr: 1, zoom: 1, mapZoom: 0.15 },

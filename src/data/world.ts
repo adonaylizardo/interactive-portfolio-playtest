@@ -78,8 +78,8 @@ export function anchorForBuilding(x: number, y: number, w: number, h: number): {
   return { x: x + Math.floor(w / 2), y: y + h - 1 };
 }
 
-/** Front-edge frame only: x=63 (se), y=63 (sw), corner (63,63). Back edges x=0/y=0 have no frame tile. */
-const MURO_FOOTPRINT = { x: 35, y: 40, w: 3, h: 2 };
+/** Front cell stays (37, 41); 2× original L grows the diamond to 6×4. Access (38, 41). */
+const MURO_FOOTPRINT = { x: 32, y: 38, w: 6, h: 4 };
 const MURO_APPROACH: [number, number] = [38, 41];
 
 type ObeliscoManifest = {
@@ -102,9 +102,9 @@ export function obeliscoSolidTiles(): Set<string> {
 }
 
 /**
- * The muro sprite stands its two walls on the back (−y) and left (−x) edges of the 3×2 footprint and
+ * The muro sprite stands its two walls on the back (−y) and left (−x) edges of the 6×4 footprint and
  * draws them upward over the row and column behind, so those cells (and the corner) carry the
- * collision. All six footprint cells are open floor the player can stand on, as the manifest says.
+ * collision. All footprint cells are open floor the player can stand on.
  */
 export function muroWallTiles(): Set<string> {
   const { x, y, w, h } = MURO_FOOTPRINT;

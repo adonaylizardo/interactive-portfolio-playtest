@@ -1152,18 +1152,18 @@
    "sprite": "fill/bicis-estacionadas/izq",
    "footprint": {
     "x": 36,
-    "y": 37,
+    "y": 36,
     "w": 1,
     "h": 1
    },
    "front": [
     36,
-    37
+    36
    ],
    "cells": [
     [
      36,
-     37
+     36
     ]
    ]
   },
