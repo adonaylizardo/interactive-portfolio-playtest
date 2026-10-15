@@ -28,8 +28,8 @@ const qa = (page, fn, arg) => page.evaluate(fn, arg);
 const TILE_STEP = Math.hypot(64, 32);
 const WALK_PX_S = 4.5 * TILE_STEP;
 const NOAH_ROUTE = ['inicio_idle', 'base_muro', 'presa_arriba_izq', 'presa_arriba_der', 'abajo_der', 'aterrizaje'];
-/** Manifest frames at 8 fps: hablar 4 + caminar 10 + subir 8 + travesía 12 + bajar 6 + salto 3 + idle 8. */
-const NOAH_SEQUENCE_S = 51 / 8;
+/** Manifest frames at 8 fps: hablar 4 + caminar 10 + subir 20 + travesía 12 + bajar 16 + salto 3 + idle 8. */
+const NOAH_SEQUENCE_S = 73 / 8;
 
 export const RUN45_KINDS = {
   'chromium-1280': { type: chromium, options: { viewport: { width: 1280, height: 800 } }, zoom: 1.6 },
@@ -333,7 +333,7 @@ async function noahChecks(page, spec, tag, errors, shots, kind) {
         };
         requestAnimationFrame(tick);
       }),
-    16000,
+    22000,
   );
   await wait(150);
   const turned = await qa(page, () => window.__playtestQa.playerAvatar().adonay);
@@ -353,7 +353,7 @@ async function noahChecks(page, spec, tag, errors, shots, kind) {
     await page.screenshot({ path: path.join(shots, name) });
   };
   const last = log[log.length - 1];
-  if (last[1] !== 'idle') errors.push(`${tag}: Noah still ${last[1]} (${last[2]}) after 16 s`);
+  if (last[1] !== 'idle') errors.push(`${tag}: Noah still ${last[1]} (${last[2]}) after 22 s`);
   // Standing in front of (lower than) Noah within a sprite width to his side hides him behind the player.
   const cover = log.find((r) => {
     const sum = r[5] / 32;
@@ -404,7 +404,7 @@ async function noahChecks(page, spec, tag, errors, shots, kind) {
   const n3 = await qa(page, () => window.__playtestQa.noah());
   if (n3.runs !== 2 || n3.phase !== 'sequence') errors.push(`${tag}: Enter beside Noah did not start another run (runs ${n3.runs}, ${n3.phase})`);
   if (shots) {
-    await page.waitForFunction(() => window.__playtestQa.noah().anim === 'travesia_derecha', null, { timeout: 6000 }).catch(() => {});
+    await page.waitForFunction(() => window.__playtestQa.noah().anim === 'travesia_derecha', null, { timeout: 9000 }).catch(() => {});
     await wait(250);
     await shot(`noah-climb-${kind}.png`);
   }

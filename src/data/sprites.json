@@ -1346,32 +1346,32 @@
   },
   "prop/muro/cerca": {
    "w": 320,
-   "h": 224,
+   "h": 439,
    "vfs": {
     "x": 192,
-    "y": 224
+    "y": 439
    },
    "bbox": {
     "x0": 0,
     "y0": 23,
     "x1": 320,
-    "y1": 224
+    "y1": 439
    },
    "f1": "paisaje/muro-escalada/muro-escalada__vista-cerca@1x.png",
    "f2": "paisaje/muro-escalada/muro-escalada__vista-cerca@2x.png"
   },
   "prop/muro/lejos": {
    "w": 320,
-   "h": 224,
+   "h": 439,
    "vfs": {
     "x": 192,
-    "y": 224
+    "y": 439
    },
    "bbox": {
     "x0": 0,
     "y0": 23,
     "x1": 320,
-    "y1": 224
+    "y1": 439
    },
    "f1": "paisaje/muro-escalada/muro-escalada__vista-lejos@1x.png",
    "f2": "paisaje/muro-escalada/muro-escalada__vista-lejos@2x.png"

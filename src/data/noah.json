@@ -117,61 +117,61 @@
   "inicio_idle": {
    "1x": [
     244,
-    148
+    363
    ],
    "2x": [
     488,
-    296
+    726
    ]
   },
   "base_muro": {
    "1x": [
     264,
-    138
+    353
    ],
    "2x": [
     528,
-    276
+    706
    ]
   },
   "presa_arriba_izq": {
    "1x": [
     264,
-    125
+    143
    ],
    "2x": [
     528,
-    250
+    286
    ]
   },
   "presa_arriba_der": {
    "1x": [
     298,
-    142
+    160
    ],
    "2x": [
     596,
-    284
+    320
    ]
   },
   "abajo_der": {
    "1x": [
     298,
-    149
+    364
    ],
    "2x": [
     596,
-    298
+    728
    ]
   },
   "aterrizaje": {
    "1x": [
     305,
-    160
+    375
    ],
    "2x": [
     610,
-    320
+    750
    ]
   }
  },
@@ -194,8 +194,8 @@
    "anim": "subir",
    "desde": "base_muro",
    "hasta": "presa_arriba_izq",
-   "frames_totales": 8,
-   "duracion_s": 1.0
+   "frames_totales": 20,
+   "duracion_s": 2.5
   },
   {
    "anim": "travesia_derecha",
@@ -208,8 +208,8 @@
    "anim": "bajar",
    "desde": "presa_arriba_der",
    "hasta": "abajo_der",
-   "frames_totales": 6,
-   "duracion_s": 0.75
+   "frames_totales": 16,
+   "duracion_s": 2.0
   },
   {
    "anim": "salto_aterrizaje",
@@ -227,6 +227,6 @@
   }
  ],
  "profundidad": "en el muro dibujar justo después de muro-escalada; en el suelo ordenar por fila (x+y) normal",
- "geometria_muro_principal": "cara de madera: borde superior y = 66 + 0.5*(x-200), base y = 101 + 0.5*(x-200), x 150-312 (marco @1x)",
+ "geometria_muro_principal": "cara de madera (~2.5× Adonay): borde superior y = 66 + 0.5*(x-200), base y = 316 + 0.5*(x-200), x 150-312 (marco @1x, +215 px de altura)",
  "letras_NOAH": "x 195-246 aprox.; la ruta usa x >= 252 para no taparlas"
 }
