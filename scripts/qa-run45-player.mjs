@@ -109,12 +109,14 @@ function analyseWalk(log, tag, errors, stride) {
   const dirsSeen = new Set();
   let maxGap = 0;
   const gapsAtTurns = [];
+  let legMoved = 0;
   for (let i = 1; i < log.length; i++) {
     const [t0, x0, y0] = log[i - 1];
     const [t, x, y, dir, mode, frame, walked, px, py, , pmode, , m] = log[i];
     const dx = x - x0;
     const dy = y - y0;
     const d = Math.hypot(dx, dy);
+    if (m === log[i - 1][12]) legMoved += d;
     maxGap = Math.max(maxGap, Math.hypot(x - px, y - py));
     if (d > 0.5) {
       const want = facing(dx, dy, prevDir);
@@ -138,15 +140,20 @@ function analyseWalk(log, tag, errors, stride) {
         flag('skate', `walk counted ${(walked - runStart).toFixed(1)} px but the sprite moved ${runMoved.toFixed(1)} px (feet skate)`);
       }
     } else runStart = null;
-    if (m !== log[i - 1][12] && log[i - 1][12]) gapsAtTurns.push({ m: log[i - 1][12], gap: Math.hypot(x0 - log[i - 1][7], y0 - log[i - 1][8]), pmode });
+    if (m !== log[i - 1][12] && log[i - 1][12]) {
+      gapsAtTurns.push({ m: log[i - 1][12], gap: Math.hypot(x0 - log[i - 1][7], y0 - log[i - 1][8]), pmode, legMoved });
+    }
+    if (m !== log[i - 1][12]) legMoved = 0;
   }
   for (const msg of bad.values()) errors.push(`${tag}: ${msg}`);
   const missing = ['se', 'sw', 'nw', 'ne'].filter((d) => !dirsSeen.has(d));
   if (missing.length) errors.push(`${tag}: never faced ${missing.join(', ')} while walking`);
   if (maxGap > TILE_STEP + 1.5) errors.push(`${tag}: Pantone fell ${maxGap.toFixed(1)} px behind (one tile is ${TILE_STEP.toFixed(1)})`);
   for (const g of gapsAtTurns) {
-    // Releasing two diagonal keys a frame apart bends the trail; the axis keys turn cleanly.
-    if (g.m.startsWith('key-') && g.m !== 'key-diag' && Math.abs(g.gap - TILE_STEP) > 2) {
+    // Releasing two diagonal keys a frame apart bends the trail; the axis keys turn cleanly. A leg
+    // shorter than 1.5 tiles (a few fps with capped frame time) leaves the last turn's corner within
+    // Pantone's tile, so the straight-line gap reads short.
+    if (g.m.startsWith('key-') && g.m !== 'key-diag' && g.legMoved >= TILE_STEP * 1.5 && Math.abs(g.gap - TILE_STEP) > 2) {
       errors.push(`${tag}: after ${g.m} Pantone is ${g.gap.toFixed(1)} px from Adonay, want one tile (${TILE_STEP.toFixed(1)})`);
     }
   }

@@ -194,12 +194,24 @@ async function noahTapCheck(page, spec, tag, errors) {
   const half1x = ((NOAH_CELL.w + 2 * NOAH_PAD) / 2) * n1.scale;
   const wx = cx + (half1x + n1.hit.w / 2) / 2;
   const pt = await qa(page, ([x, y]) => window.__playtestQa.worldToClient(x, y), [wx, cy]);
+  const target = await qa(page, ([x, y]) => window.__playtestQa.pixiTargetAt(x, y), [Math.round(pt.x), Math.round(pt.y)]);
   await page.touchscreen.tap(Math.round(pt.x), Math.round(pt.y));
   const started = await page
-    .waitForFunction(() => window.__playtestQa.noah().phase !== 'idle', null, { timeout: 12000 })
+    // The walk to his talk tile runs at a few fps on software-GL WebKit at DPR 3 (CI).
+    .waitForFunction(() => window.__playtestQa.noah().phase !== 'idle', null, { timeout: 30000 })
     .then(() => true)
     .catch(() => false);
-  if (!started) errors.push(`${tag}: a tap ${(wx - cx).toFixed(0)} world px right of Noah (inside the 1.5x box) did not reach him`);
+  if (!started) {
+    const s = await qa(page, () => ({
+      tile: window.__playtestQa.getCharacterTile(),
+      goal: document.getElementById('game-canvas')?.dataset.walkGoal,
+      phase: window.__playtestQa.noah().phase,
+    }));
+    errors.push(
+      `${tag}: a tap ${(wx - cx).toFixed(0)} world px right of Noah (inside the 1.5x box) did not reach him ` +
+        `(Pixi target ${target}, player ${far.x},${far.y} -> ${s.tile.x},${s.tile.y}, walk goal ${s.goal || 'none'}, Noah ${s.phase})`,
+    );
+  }
   return `Noah tap box ${n1.hit.w}x${n1.hit.h} (1.5x), tap in the added margin ${started ? 'reaches him' : 'MISSES'}`;
 }
 
