@@ -100,12 +100,12 @@ export class ChromeUI {
     return this.mobile && this.mobileSheet && !this.interiorOpen;
   }
 
-  setInteriorOpen(open: boolean): void {
+  setInteriorOpen(open: boolean, opts?: { skipLayout?: boolean }): void {
     this.interiorOpen = open;
     if (open && this.mobile) this.mobileSheet = false;
     if (open && !this.mobile && this.layout === 'map') this.layout = 'split';
     this.sync();
-    this.callbacks.onLayoutChange();
+    if (!opts?.skipLayout) this.callbacks.onLayoutChange();
   }
 
   setLayout(next: DesktopLayout): void {

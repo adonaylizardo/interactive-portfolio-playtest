@@ -73,8 +73,8 @@ async function main(): Promise<void> {
     },
     onExitInterior: () => {
       checklist.setBuildingPanelOpen(false);
-      chrome.setInteriorOpen(false);
-      panel.hide({ snap: true });
+      chrome.setInteriorOpen(false, { skipLayout: true });
+      panel.hide({ snap: true, silent: true });
     },
     onInteriorIdChange: (id) => {
       hideToast();

@@ -396,6 +396,8 @@ export class IsoScene {
   private outdoorCamBeforeInterior: { x: number; y: number; zoom: number } | null = null;
   private interiorHistoryEntries = 0;
   private historySyncInProgress = false;
+  /** Cancels a deferred Salir cleanup if the player re-enters before the next frame. */
+  private interiorExitGen = 0;
   private suppressMapTapOnce = false;
   constructor(events: SceneEvents) {
     this.events = events;
@@ -3116,6 +3118,18 @@ export class IsoScene {
     }
   }
 
+  /** Camera numbers onto the Pixi world, without layout reads, tile cull, or hash writes. */
+  private syncOutdoorTransform(): void {
+    this.syncViewTransform();
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    this.camera.position.set(sw / 2, sh / 2);
+    this.camera.scale.set(this.viewSx, this.viewSy);
+    this.camera.rotation = this.viewRot;
+    this.world.position.set(this.cameraX * this.zoom, this.cameraY * this.zoom);
+    this.world.scale.set(this.zoom);
+  }
+
   enterInterior(
     buildingId: string,
     opts?: { skipFade?: boolean; fromHash?: boolean },
@@ -3139,6 +3153,7 @@ export class IsoScene {
     }
 
     const finish = () => {
+      this.interiorExitGen += 1;
       this.interiorActive = true;
       this.interiorDef = def;
       this.interiorGrid = buildInteriorGrid(def);
@@ -3225,52 +3240,71 @@ export class IsoScene {
       this.interiorHistoryEntries = 0;
     }
     const door = this.mapReturnDoor;
+    const dyingSprite = this.interiorSprite;
+    const fromHash = !!opts?.fromHash;
+    const immediate = !!opts?.immediate;
     const finish = () => {
       this.interiorActive = false;
       this.interiorDef = null;
       this.interiorGrid = [];
       this.interiorPath = [];
+      this.interiorSprite = null;
       // Sheet off first, before the outdoor restore, so leave is visible and timed without the close transition.
       this.events.onExitInterior?.();
       this.tilesLayer.visible = true;
       this.objectsLayer.visible = true;
-      this.fitOutskirts(this.app.screen.width, this.app.screen.height);
-      this.cullVisibleTiles();
       this.pathLayer.visible = true;
       this.characterLayer.visible = true;
       this.interiorLayer.visible = false;
-      this.interiorFloorGfx.clear();
-      this.interiorWallGfx.clear();
-      this.interiorPropGfx.clear();
-      this.interiorSprite?.destroy({ children: false, texture: false, textureSource: false });
-      this.interiorSprite = null;
       if (door) {
         this.charTx = door.x;
         this.charTy = door.y;
         this.syncCharacterGraphic();
       }
       this.restoreOutdoorCameraAfterExit(opts?.outdoorCam);
+      this.syncOutdoorTransform();
       if (this.canvasEl) {
         this.canvasEl.dataset.interior = '';
         this.canvasEl.dataset.interiorW = '';
         this.canvasEl.dataset.interiorH = '';
       }
-      if (!opts?.fromHash) {
-        replaceOutdoorHash({
-          x: this.cameraX,
-          y: this.cameraY,
-          zoom: this.zoom,
+      const cleanup = () => {
+        dyingSprite?.destroy({ children: false, texture: false, textureSource: false });
+        if (this.interiorActive) return;
+        this.fitOutskirts(this.app.screen.width, this.app.screen.height);
+        this.cullVisibleTiles();
+        this.interiorFloorGfx.clear();
+        this.interiorWallGfx.clear();
+        this.interiorPropGfx.clear();
+        if (!fromHash) {
+          replaceOutdoorHash({
+            x: this.cameraX,
+            y: this.cameraY,
+            zoom: this.zoom,
+          });
+        }
+        this.outdoorCamBeforeInterior = null;
+        if (fromHash) {
+          this.interiorHistoryEntries = Math.max(0, this.interiorHistoryEntries - 1);
+          this.historySyncInProgress = false;
+        }
+        this.events.onInteriorIdChange?.(null);
+        this.applyCamera(!fromHash);
+        studio.setInterior(false);
+        if (!fromHash) studio.playDoor();
+      };
+      if (immediate) {
+        const gen = ++this.interiorExitGen;
+        requestAnimationFrame(() => {
+          if (gen !== this.interiorExitGen) {
+            dyingSprite?.destroy({ children: false, texture: false, textureSource: false });
+            return;
+          }
+          cleanup();
         });
+        return;
       }
-      this.outdoorCamBeforeInterior = null;
-      if (opts?.fromHash) {
-        this.interiorHistoryEntries = Math.max(0, this.interiorHistoryEntries - 1);
-        this.historySyncInProgress = false;
-      }
-      this.events.onInteriorIdChange?.(null);
-      this.applyCamera(!opts?.fromHash);
-      studio.setInterior(false);
-      if (!opts?.fromHash) studio.playDoor();
+      cleanup();
     };
 
     finish();

@@ -703,6 +703,11 @@ body[data-layout='panel'] .checklist {
   pointer-events: none;
 }
 
+/* Skip layout/paint of the long case (Volaris) the instant Salir drops --open. */
+.building-panel:not(.building-panel--open) .building-panel__body-wrap {
+  content-visibility: hidden;
+}
+
 .building-panel--snap .building-panel__backdrop,
 .building-panel--snap .building-panel__sheet {
   transition: none;

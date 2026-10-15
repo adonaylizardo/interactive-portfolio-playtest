@@ -327,7 +327,7 @@ export class BuildingPanel {
     this.renderWorkedWith();
   }
 
-  hide(_opts?: { snap?: boolean }): void {
+  hide(opts?: { snap?: boolean; silent?: boolean }): void {
     // Snap out of the hit tree on this frame (same as the mat). A transforming sheet still
     // intercepts iOS taps even with pointer-events:none, so Salir waited ~250 ms for map input.
     this.el.classList.add('building-panel--snap');
@@ -336,7 +336,22 @@ export class BuildingPanel {
     this.el.hidden = true;
     this.mode = 'hidden';
     this.el.classList.remove('building-panel--snap');
-    this.onVisibilityChange();
+    // Skip camera/layout work on Salir so leaveInteriorNow can finish this frame.
+    // Tear down the long case DOM (Volaris) after the exit frame — replaceChildren
+    // and image decode are not needed for the map to take a pointer.
+    if (!opts?.silent) this.onVisibilityChange();
+    if (opts?.snap) {
+      const release = () => this.releaseCaseDom();
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(release);
+      else release();
+    }
+  }
+
+  /** Drop case nodes after the sheet is off the hit tree. Safe if the panel reopened. */
+  private releaseCaseDom(): void {
+    if (this.mode !== 'hidden') return;
+    this.caseEl.querySelector('.case__version--full')?.replaceChildren();
+    this.caseEl.querySelector('.case__version--short')?.replaceChildren();
   }
 
   /** Same leave as the mat: `onSalir` → `leaveInteriorNow()`. */
