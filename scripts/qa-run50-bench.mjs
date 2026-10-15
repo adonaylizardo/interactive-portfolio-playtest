@@ -140,10 +140,31 @@ async function benchTapPoint(page, bench) {
   return over;
 }
 
-async function sitByTap(page, spec, bench, tag) {
+/** Time Adonay stands at the seat waiting for the sit strips (stepIn on an idle frame). */
+const startStallWatch = (page) =>
+  qa(page, () => {
+    const w = (window.__seatWait = { ms: 0, last: performance.now(), on: true });
+    const tick = () => {
+      if (!w.on) return;
+      const now = performance.now();
+      const a = window.__playtestQa.playerAvatar();
+      if (a.sit === 'stepIn' && a.adonay.texture.startsWith('idle_')) w.ms += now - w.last;
+      w.last = now;
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+const stopStallWatch = (page) =>
+  qa(page, () => {
+    window.__seatWait.on = false;
+    return Math.round(window.__seatWait.ms);
+  });
+
+async function sitByTap(page, spec, bench, tag, errors) {
   await approach(page, spec, bench);
   const hit = await benchTapPoint(page, bench);
   if (!hit) throw new Error(`${bench.id}: no point of its tap box reaches the bench`);
+  await startStallWatch(page);
   await tapClient(page, spec, hit.pt);
   await until(page, () => window.__playtestQa.playerAvatar().sit !== 'free' || !!window.__playtestQa.benches().pending, null, 3000, `${tag}: walk to ${bench.id}`);
   await until(
@@ -156,6 +177,8 @@ async function sitByTap(page, spec, bench, tag) {
     15000,
     `${tag}: Adonay and Pantone seated at ${bench.id}`,
   );
+  const waited = await stopStallWatch(page);
+  if (errors && waited > 250) errors.push(`${tag}: Adonay stood ${waited} ms at ${bench.id}'s seat waiting for the sit strips`);
   return hit.via;
 }
 
@@ -343,17 +366,27 @@ export async function runRun50BenchSuite({ kind, base, errors, notes, shots }) {
       if (/\/sprites\/personaje\/(adonay|pantone)\//.test(r.url())) fetched.push(r.url());
     });
     await openMap(page, base);
-    const early = fetched.filter((u) => REST_STRIP.test(u));
-    if (early.length) errors.push(`${tag}: first load fetched ${early.length} sit/rest strip(s) (${path.basename(early[0])})`);
-    if ((await avatar(page)).restLoaded) errors.push(`${tag}: rest strips marked loaded before any need`);
-    const firstLoad = fetched.length;
+    const firstLoad = fetched.filter((u) => !REST_STRIP.test(u)).length;
+    const prefetched = await until(page, () => window.__playtestQa.playerAvatar().restLoaded, null, 8000, `${tag}: rest strips prefetched`)
+      .then(() => true)
+      .catch((e) => (errors.push(`${tag}: no input yet and the sit/rest strips never arrived (${e.message})`), false));
+    // Off the critical path: no first-load sprite may still be downloading when the first rest strip is requested.
+    const overlap = await qa(page, (src) => {
+      const rest = new RegExp(src);
+      const all = performance.getEntriesByType('resource').filter((r) => r.name.includes('/sprites/'));
+      const starts = all.filter((r) => rest.test(r.name)).map((r) => r.startTime);
+      if (!starts.length) return null;
+      const t = Math.min(...starts);
+      return all.filter((r) => !rest.test(r.name) && r.startTime < t && r.responseEnd > t).map((r) => r.name.split('/').pop());
+    }, REST_STRIP.source);
+    if (overlap?.length) errors.push(`${tag}: sit/rest strips requested while ${overlap.length} first-load sprite(s) still loading (${overlap[0]})`);
 
     const { benches } = await qa(page, () => window.__playtestQa.benches());
     if (benches.length < 2) throw new Error(`only ${benches.length} benches to sit on`);
     const der = benches.find((b) => b.variant === 'der');
     const izq = benches.find((b) => b.variant === 'izq');
     const first = der ?? benches[0];
-    const firstVia = await sitByTap(page, spec, first, tag);
+    const firstVia = await sitByTap(page, spec, first, tag, errors);
     checkSeated(await avatar(page), await qa(page, () => window.__playtestQa.benches()), first, tag, errors);
     const meditar = fetched.filter((u) => u.includes('__meditar_'));
     if (meditar.length) errors.push(`${tag}: fetched ${meditar.length} meditar strip(s), which nothing uses`);
@@ -368,7 +401,7 @@ export async function runRun50BenchSuite({ kind, base, errors, notes, shots }) {
     let second = '';
     const other = first === der ? izq : der;
     if (other) {
-      const via = await sitByTap(page, spec, other, tag);
+      const via = await sitByTap(page, spec, other, tag, errors);
       checkSeated(await avatar(page), await qa(page, () => window.__playtestQa.benches()), other, tag, errors);
       if (shots) await page.screenshot({ path: path.join(shots, `bench-${other.variant}-${kind}.png`) });
       if (spec.keys) await page.keyboard.press('ArrowUp');
@@ -405,7 +438,7 @@ export async function runRun50BenchSuite({ kind, base, errors, notes, shots }) {
     }
 
     notes.push(
-      `${tag}: first load ${firstLoad} player strips, no sit/rest strips; sat on ${first.id} (${first.variant}, tapped via ${firstVia})${second} at the manifest offsets, Pantone drawn after the bench, ` +
+      `${tag}: first load ${firstLoad} player strips, sit/rest strips ${prefetched ? 'prefetched once it settled' : 'NOT prefetched'}; sat on ${first.id} (${first.variant}, tapped via ${firstVia})${second} at the manifest offsets, Pantone drawn after the bench, ` +
         `lay down after 15 s, both got up on ${spec.keys ? 'an arrow key' : 'a tap'}; idle timer sit 30 s / lie 45 s / up on input; ${enter}${reserve}`,
     );
   } catch (e) {
