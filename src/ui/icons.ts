@@ -13,6 +13,7 @@ export type IconName =
   | 'search'
   | 'download'
   | 'sound'
+  | 'soundOn'
   | 'expand'
   | 'close'
   | 'collapse'
@@ -33,6 +34,7 @@ const PATHS: Record<IconName, string> = {
   search: `<circle ${STROKE} cx="6.5" cy="6.5" r="4"/><path ${STROKE} d="m9.5 9.5 3.5 3.5"/>`,
   download: `<path ${STROKE} d="M7.5 2v8M4.5 7.5 7.5 10.5 10.5 7.5M3 13h9"/>`,
   sound: `<path ${STROKE} d="M3 6h2.5L8.5 3.5v8L5.5 9H3z"/><path ${STROKE} d="M10.5 5.5a3 3 0 0 1 0 4"/><path ${STROKE} d="m2 2 11 11"/>`,
+  soundOn: `<path ${STROKE} d="M3 6h2.5L8.5 3.5v8L5.5 9H3z"/><path ${STROKE} d="M10.5 5.5a3 3 0 0 1 0 4"/><path ${STROKE} d="M12 4.5a5 5 0 0 1 0 6"/>`,
   expand: `<path ${STROKE} d="M9 3h3v3M6 12H3V9M12 3 9 6M3 12l3-3"/>`,
   close: `<path ${STROKE} d="m3.5 3.5 8 8M11.5 3.5l-8 8"/>`,
   collapse: `<path ${STROKE} d="M3 6h3V3M12 9H9v3M6 3 3 6M9 12l3-3"/>`,

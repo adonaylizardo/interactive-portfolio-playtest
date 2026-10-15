@@ -1,3 +1,4 @@
+import { studio } from '../audio/studio';
 import { getEnterableBuildings } from '../data/map';
 import { tileToWorld } from '../iso/math';
 import { isMobileLayout } from '../checklist/ui';
@@ -67,6 +68,7 @@ export class ChromeUI {
     this.minimap = this.root.querySelector('.chrome__minimap') as HTMLCanvasElement;
     this.bind();
     this.sync();
+    studio.onChange(() => this.syncSound());
     window.matchMedia('(max-width: 767px)').addEventListener('change', () => {
       this.mobile = isMobileLayout();
       this.sync();
@@ -113,6 +115,7 @@ export class ChromeUI {
       this.layout = next;
     }
     this.sync();
+    studio.playClick();
     this.callbacks.onLayoutChange();
   }
 
@@ -362,6 +365,23 @@ export class ChromeUI {
       if (this.layout === 'panel') this.setLayout('split');
       else this.setLayout('panel');
     });
+    this.root.querySelectorAll('[aria-label="Sonido"]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        studio.toggleMute();
+      });
+    });
+    this.syncSound();
+  }
+
+  private syncSound(): void {
+    const muted = studio.isMuted();
+    this.root.querySelectorAll('[aria-label="Sonido"]').forEach((btn) => {
+      const el = btn as HTMLElement;
+      el.setAttribute('aria-pressed', muted ? 'false' : 'true');
+      el.dataset.icon = muted ? 'sound' : 'soundOn';
+      el.innerHTML = iconSvg(muted ? 'sound' : 'soundOn');
+    });
   }
 
   private scrollTo(sel: string): void {
@@ -388,6 +408,7 @@ export class ChromeUI {
     this.root.classList.toggle('chrome--map', !this.mobile && this.layout === 'map');
     this.root.classList.toggle('chrome--panel', !this.mobile && this.layout === 'panel');
     this.root.classList.toggle('chrome--split', !this.mobile && this.layout === 'split');
+    this.syncSound();
     const col = this.root.querySelector('.chrome__column') as HTMLElement | null;
     if (col) {
       // Inline display wins over `.chrome--split { display:block }`, so innerText

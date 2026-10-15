@@ -1,3 +1,4 @@
+import { studio } from '../audio/studio';
 import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
 import { CASES, type CaseBlock } from '../data/cases';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
@@ -250,6 +251,8 @@ export class BuildingPanel {
     this.el.classList.add('building-panel--open');
     this.syncPeekClass();
     this.onVisibilityChange();
+    studio.playClick();
+    studio.playCaseVoice(interiorId);
   }
 
   /** QA: overlay open while still on the map (dismiss consume test). */

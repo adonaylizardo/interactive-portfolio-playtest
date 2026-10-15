@@ -1,3 +1,4 @@
+import { studio } from './audio/studio';
 import { ChecklistUI } from './checklist/ui';
 import {
   doorInwardStep,
@@ -26,8 +27,8 @@ async function main(): Promise<void> {
   let scene!: IsoScene;
   const chrome = new ChromeUI(uiRoot, {
     onLayoutChange: () => {
-      if (chrome.getLayout() === 'map') checklist.setCollapsed(true);
-      else checklist.setCollapsed(false);
+      const layout = chrome.getLayout();
+      checklist.setCollapsed(layout === 'map' || layout === 'panel');
       scene?.applyCameraFromUi();
     },
     onView: (mode: Camera) => scene?.setViewMode(mode),
@@ -200,6 +201,9 @@ async function main(): Promise<void> {
     rotateView: () => scene.rotateView(),
     toggleMapOverview: () => scene.toggleMapOverview(),
     isMobileSheetOpen: () => chrome.isMobileSheetOpen(),
+    audioMuted: () => studio.isMuted(),
+    audioUnlocked: () => studio.isUnlocked(),
+    setAudioMuted: (muted: boolean) => studio.setMuted(muted),
   };
 }
 

@@ -113,6 +113,7 @@ import {
   zoomAtScreenAnchor,
   smoothDampToZero,
 } from './cameraControl';
+import { studio } from '../audio/studio';
 import { FillActors, type FillActorSnapshot } from './fillActors';
 import { NpcCrowd, type NpcSnapshot } from './npcs';
 import { buildTown, type Bench } from './npcRoutines';
@@ -1066,11 +1067,15 @@ export class IsoScene {
     if (this.interiorActive) {
       const f = tileToWorld(this.interiorCharTx, this.interiorCharTy);
       this.interiorAvatar.update(f.x, f.y, dt);
+      const snap = this.interiorAvatar.snapshot();
+      studio.noteWalk(snap.adonay.mode === 'walk', snap.adonay.walked, snap.stride);
       return;
     }
     const f = tileToWorld(this.charTx, this.charTy);
     this.avatar.update(f.x, f.y, dt);
     this.noah?.update(dt);
+    const snap = this.avatar.snapshot();
+    studio.noteWalk(snap.adonay.mode === 'walk', snap.adonay.walked, snap.stride);
   }
 
   /** Screen coords (canvas pixels) ↔ world coords with world scaled under a fixed camera pivot. */
@@ -3077,6 +3082,8 @@ export class IsoScene {
         this.interiorHistoryEntries += 1;
       }
       this.events.onInteriorIdChange?.(buildingId);
+      studio.setInterior(true);
+      if (!opts?.fromHash && !opts?.skipFade) studio.playDoor();
     };
 
     if (opts?.skipFade) {
@@ -3150,6 +3157,8 @@ export class IsoScene {
       }
       this.events.onInteriorIdChange?.(null);
       this.applyCamera(!opts?.fromHash);
+      studio.setInterior(false);
+      if (!opts?.fromHash) studio.playDoor();
     };
 
     finish();

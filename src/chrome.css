@@ -149,6 +149,10 @@
   color: #edeef0;
 }
 
+.chrome--panel {
+  z-index: 13;
+}
+
 /* Only the widgets capture input. Wrappers, the sound note, and subtitles
    stay out of the hit tree so map / room taps reach the canvas. */
 .chrome__rail,

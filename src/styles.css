@@ -81,6 +81,12 @@ body.is-canvas-dragging * {
   pointer-events: none;
 }
 
+/* Panel-only is full-bleed chrome; the tutorial pill sat on Hide panel. */
+body[data-layout='panel'] .checklist {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* Checklist — floating Getting started pill (Layouts v2) */
 .checklist {
   position: absolute;
