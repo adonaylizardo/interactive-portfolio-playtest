@@ -2170,7 +2170,10 @@ export class IsoScene {
       this.noteAvatarInput();
       const k = e.key.toLowerCase();
       if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
-        if (!e.repeat && !this.keys.has(k)) this.startCameraFollow();
+        if (!e.repeat && !this.keys.has(k)) {
+          this.startCameraFollow();
+          this.armDoorPush();
+        }
         this.keys.add(k);
         // A press shorter than a frame never reaches updateMovement on slow devices.
         if (this.seatedBench && !this.interiorActive) this.standThen(null);
@@ -2568,11 +2571,13 @@ export class IsoScene {
         this.charTx = next.x;
         this.charTy = next.y;
         const tileAfter = this.roundedCharTile();
-        if (tileBefore.x !== tileAfter.x || tileBefore.y !== tileAfter.y) {
+        const stepped = tileBefore.x !== tileAfter.x || tileBefore.y !== tileAfter.y;
+        if (stepped) {
+          this.doorPushArmed = null;
           this.events.onChecklist('walk-keys');
         }
         this.syncCharacterGraphic();
-        this.tryEnterDoorFromKeyboard(dx, dy);
+        this.tryEnterDoorFromKeyboard(dx, dy, stepped);
       } else if (this.path.length === 0) {
         this.charState = 'idle';
         this.syncCharacterGraphic();
@@ -2688,10 +2693,26 @@ export class IsoScene {
     this.events.onChecklist('enter-building');
   }
 
-  /** Arrow/WASD: walking onto a door's access tile toward the building, or pushing into it from there, enters. */
-  private tryEnterDoorFromKeyboard(dx: number, dy: number): void {
+  /**
+   * Door access tile on which a movement key went down. Standing on a door (after leaving the room,
+   * or a tap that stopped there) only lets a fresh press walk in, never a key held from before.
+   */
+  private doorPushArmed: string | null = null;
+
+  private armDoorPush(): void {
+    if (this.interiorActive) return;
+    const t = this.roundedCharTile();
+    this.doorPushArmed = getBuildingAtDoor(t.x, t.y)?.panelTitle ? `${t.x},${t.y}` : null;
+  }
+
+  /**
+   * Arrow/WASD: stepping onto a door's access tile toward the building enters, and so does a key
+   * pressed toward it while already standing there.
+   */
+  private tryEnterDoorFromKeyboard(dx: number, dy: number, stepped: boolean): void {
     if (this.interiorActive || this.doorCooldown > 0) return;
     const t = this.roundedCharTile();
+    if (!stepped && this.doorPushArmed !== `${t.x},${t.y}`) return;
     const building = getBuildingAtDoor(t.x, t.y);
     if (!building?.panelTitle) return;
     const inward = doorInwardStep(building);

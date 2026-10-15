@@ -120,6 +120,64 @@ async function keyWalkTo(page, goal, keys, maxMs = 120000) {
   return traced(`timed out after ${maxMs / 1000} s`);
 }
 
+/**
+ * Clean load, canvas focused, one movement key held ~1.2 s: Adonay walks but never enters a room
+ * (he used to spawn on the Estudio door, so ArrowUp / W walked straight in). The spawn is off every
+ * door, 1-2 tiles from the Estudio's; stepping back onto the door and pushing toward it still enters.
+ */
+async function testLoadHold(ctx, kind, base, errors, notes) {
+  const tag = `run41-${kind}-load-hold`;
+  const held = [];
+  for (const key of ['ArrowUp', 'w', 'ArrowLeft', 'd']) {
+    const page = await ctx.newPage();
+    try {
+      await page.goto(base, { waitUntil: 'networkidle' });
+      await page.waitForFunction(() => window.__playtestQa?.getCharacterTile, null, { timeout: 20000 });
+      await wait(600);
+      await page.locator('#game-canvas').focus();
+      const s = await qa(page, () => {
+        const q = window.__playtestQa;
+        const t = q.getCharacterTile();
+        const est = q.getEnterableBuildings().find((b) => b.name === 'estudio');
+        return { t, pos: q.getCharacterPos(), door: est.door, onDoor: q.getEnterableBuildings().some((b) => b.door?.x === t.x && b.door?.y === t.y) };
+      });
+      if (key === 'ArrowUp') {
+        const gap = Math.max(Math.abs(s.t.x - s.door.x), Math.abs(s.t.y - s.door.y));
+        if (s.onDoor) errors.push(`${tag}: spawn (${s.t.x},${s.t.y}) is a door access tile`);
+        if (gap < 1 || gap > 2) errors.push(`${tag}: spawn (${s.t.x},${s.t.y}) is ${gap} tiles from the Estudio door, want 1-2`);
+      }
+      await page.keyboard.down(key);
+      let entered = false;
+      for (let t = 0; t < 1200 && !entered; t += 100) {
+        await wait(100);
+        entered = (await inInterior(page)) || /in=/.test(await page.evaluate(() => location.hash));
+      }
+      await page.keyboard.up(key);
+      await wait(400);
+      const after = await qa(page, () => ({ pos: window.__playtestQa.getCharacterPos(), hash: location.hash, room: window.__playtestQa.getInteriorId() }));
+      if (entered || after.room || /in=/.test(after.hash)) {
+        errors.push(`${tag}: holding ${key} from a clean load entered ${after.room ?? after.hash}`);
+        continue;
+      }
+      const moved = Math.hypot(after.pos.x - s.pos.x, after.pos.y - s.pos.y);
+      if (moved < 0.2) errors.push(`${tag}: holding ${key} on load did not walk (moved ${moved.toFixed(2)} tiles)`);
+      held.push(`${key} ${moved.toFixed(1)} tiles`);
+      if (key === 'ArrowUp') {
+        // From beside the door: step onto it and keep pushing toward the building.
+        await qa(page, ([x, y]) => window.__playtestQa.setCharacterTile(x, y), [s.door.x, s.door.y + 1]);
+        await wait(200);
+        await page.keyboard.down('ArrowUp');
+        const ok = await waitFor(page, () => inInterior(page), 4000);
+        await page.keyboard.up('ArrowUp');
+        if (!ok) errors.push(`${tag}: ArrowUp from the tile in front of the Estudio door did not walk in`);
+      }
+    } finally {
+      await page.close();
+    }
+  }
+  notes.push(`${tag}: spawn off the door; held ${held.join(', ')} from a clean load without entering; ArrowUp from the door's front tile enters`);
+}
+
 async function testKeyboardEntry(ctx, kind, base, errors, notes) {
   const tag = `run41-${kind}-keys`;
   const page = await ctx.newPage();
@@ -142,7 +200,7 @@ async function testKeyboardEntry(ctx, kind, base, errors, notes) {
     const entered = [];
     for (const [i, b] of targets.slice(0, 2).entries()) {
       const keys = i === 0 ? ARROWS : WASD;
-      // Approach every door from a few tiles out (the spawn tile is the Estudio door itself).
+      // Approach every door straight on from a few tiles out.
       const stage = await qa(
         page,
         (bb) => {
@@ -422,7 +480,10 @@ export async function runRun41InputSuite({ kind, base, errors, notes, only }) {
   }
   const want = (n) => !only || only.includes(n);
   try {
-    if (want('keys')) await testKeyboardEntry(ctx, kind, base, errors, notes);
+    if (want('keys')) {
+      await testLoadHold(ctx, kind, base, errors, notes);
+      await testKeyboardEntry(ctx, kind, base, errors, notes);
+    }
     if (want('wheel')) await testWheel(ctx, kind, base, errors, notes);
     if (want('interior')) await testInteriorFeel(ctx, kind, base, errors, notes);
   } finally {
