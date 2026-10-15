@@ -1,8 +1,8 @@
-import { Sprite, Texture } from 'pixi.js';
+import { Rectangle, Sprite, Texture } from 'pixi.js';
 import { FILL_ASSETS } from '../data/fill';
 import spriteData from '../data/sprites.json';
 import { tokens } from '../tokens';
-import { loadPngOrWebp } from './assetUrl';
+import { canUseWebp, loadPngOrWebp } from './assetUrl';
 
 export type SpriteAsset = {
   w: number;
@@ -102,6 +102,23 @@ function spriteUrl(key: string): string {
   return `${import.meta.env.BASE_URL}sprites/${hi ? a.f2 : a.f1}`;
 }
 
+type AtlasSpec = { image: string; png: string; frames: Record<string, { x: number; y: number; w: number; h: number }> };
+
+async function loadBootAtlas(): Promise<void> {
+  const base = `${import.meta.env.BASE_URL}sprites/atlas/`;
+  const spec = (await (await fetch(`${base}boot-1x.json`)).json()) as AtlasSpec;
+  const file = canUseWebp() ? spec.image : spec.png;
+  const image = await loadPngOrWebp('atlas/boot-1x', `${base}${file}`, TEX_DATA);
+  for (const [key, f] of Object.entries(spec.frames)) {
+    if (textures.has(key)) continue;
+    textures.set(
+      key,
+      new Texture({ source: image.source, frame: new Rectangle(f.x, f.y, f.w, f.h) }),
+    );
+    loading.set(key, Promise.resolve());
+  }
+}
+
 export async function loadKeys(keys: string[]): Promise<void> {
   const todo = keys.filter((k) => !textures.has(k));
   await Promise.all(
@@ -165,8 +182,13 @@ export function buildingStateKeys(state: BuildingSpriteState): string[] {
  */
 export async function loadMapSprites(rendererResolution: number, keys?: string[]): Promise<void> {
   resolution = keys ? 1 : rendererResolution >= 1.5 ? 2 : 1;
+  try {
+    await loadBootAtlas();
+  } catch {
+    /* atlas missing in an old deploy: fall through to individual files */
+  }
   if (keys) {
-    await loadKeys(keys);
+    await loadKeys(keys.filter((k) => !textures.has(k)));
     return;
   }
   const stateFrames = new Set([...buildingStateKeys('hover'), ...buildingStateKeys('resaltado')]);

@@ -1,6 +1,6 @@
 import { Container, Rectangle, Sprite, Texture } from 'pixi.js';
 import manifest from '../data/jugador.json';
-import { loadPngOrWebp } from './assetUrl';
+import { canUseWebp, loadPngOrWebp } from './assetUrl';
 import { CHARACTER_WORLD_SCALE } from './npcs';
 
 export type FacingDir = 'se' | 'sw' | 'ne' | 'nw';
@@ -299,6 +299,33 @@ let restLoaded = false;
 const WALK_ANIM = /^(idle|walk|trot)_/;
 const UNUSED_ANIM = /^meditar_/;
 
+async function loadPlayerAtlas(): Promise<void> {
+  const base = `${import.meta.env.BASE_URL}sprites/atlas/`;
+  const spec = (await (await fetch(`${base}player-1x.json`)).json()) as {
+    image: string;
+    png: string;
+    frames: Record<string, { x: number; y: number; w: number; h: number }>;
+  };
+  const file = canUseWebp() ? spec.image : spec.png;
+  const image = await loadPngOrWebp('atlas/player-1x', `${base}${file}`, {
+    autoGenerateMipmaps: false,
+    magFilter: 'nearest',
+    minFilter: 'nearest',
+  });
+  for (const [key, f] of Object.entries(spec.frames)) {
+    const who = key.startsWith('pantone/') ? 'pantone' : 'adonay';
+    const cellW = manifest[who].celda.w;
+    const n = Math.max(1, Math.round(f.w / cellW));
+    sharedFrames.set(
+      key,
+      Array.from(
+        { length: n },
+        (_, i) => new Texture({ source: image.source, frame: new Rectangle(f.x + i * cellW, f.y, cellW, f.h) }),
+      ),
+    );
+  }
+}
+
 function loadSheets(pick: (name: string) => boolean): Promise<void> {
   const suffix = sheetSuffix(sheetResolution);
   const base = `${import.meta.env.BASE_URL}sprites/personaje/`;
@@ -321,7 +348,13 @@ function loadSheets(pick: (name: string) => boolean): Promise<void> {
 export function loadPlayerSheets(resolution: number): Promise<void> {
   sheetResolution = resolution;
   if (framesLoading) return framesLoading;
-  framesLoading = loadSheets((name) => WALK_ANIM.test(name));
+  framesLoading = (async () => {
+    try {
+      await loadPlayerAtlas();
+    } catch {
+      await loadSheets((name) => WALK_ANIM.test(name));
+    }
+  })();
   return framesLoading;
 }
 

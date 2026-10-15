@@ -145,7 +145,18 @@ async function measure(spec) {
   try {
     await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: spec.timeout });
     const deadline = Date.now() + spec.timeout;
+    let ttiSeen = false;
+    let atTti = null;
     while (Date.now() < deadline) {
+      const m = await page.evaluate(() => window.__bootMetrics).catch(() => null);
+      if (m?.tti != null && !ttiSeen) {
+        ttiSeen = true;
+        atTti = {
+          requests: reqs.length,
+          bytes: reqs.reduce((n, r) => n + (r.bytes || 0), 0),
+          spriteRequests: reqs.filter((r) => classify(r.url) === 'sprite').length,
+        };
+      }
       if (ttfMs == null) {
         const handle = await page.$('#game-canvas');
         const buf = handle
@@ -153,10 +164,10 @@ async function measure(spec) {
           : await page.screenshot({ type: 'png', animations: 'disabled' });
         if (pngHasMapPixels(buf, mapLeftFrac)) ttfMs = Date.now() - t0;
       }
-      const m = await page.evaluate(() => window.__bootMetrics).catch(() => null);
-      if (ttfMs != null && m?.tti != null) break;
+      if (m?.tti != null && (ttfMs != null || Date.now() - t0 > m.tti + 800)) break;
       await page.waitForTimeout(50);
     }
+    spec._atTti = atTti;
   } catch (err) {
     navError = String(err);
   }
@@ -218,6 +229,10 @@ async function measure(spec) {
     resourceEncoded: rtEncoded,
     resourceTransfer: rtTransfer,
     resourceByType: rtBy,
+    spriteRequests: spec._atTti?.spriteRequests ?? spriteRequests,
+    requestsAtTti: spec._atTti?.requests ?? reqs.length,
+    bytesAtTti: spec._atTti?.bytes ?? headerBytes,
+    requestsUntilClose: reqs.length,
     spriteRequests,
     qa,
     pageErrors: errors,
@@ -232,11 +247,12 @@ for (const spec of SPECS) {
   console.log(`measuring ${spec.tag}…`);
   const r = await measure(spec);
   results.push(r);
-  const mb = (r.encodedBytes / 1024 / 1024).toFixed(2);
+  const reqN = r.requestsAtTti ?? r.requests;
+  const mb = ((r.bytesAtTti ?? r.encodedBytes) / 1024 / 1024).toFixed(2);
   console.log(
     `  TTF ${r.ttfMs == null ? '—' : `${(r.ttfMs / 1000).toFixed(2)}s`}  TTI ${
       r.ttiMs == null ? '—' : `${(r.ttiMs / 1000).toFixed(2)}s`
-    }  req ${r.requests}  ${mb} MB  sprites ${r.spriteRequests}${r.error ? `  ERR ${r.error}` : ''}${
+    }  req ${reqN}  ${mb} MB  sprites ${r.spriteRequests}${r.error ? `  ERR ${r.error}` : ''}${
       r.pageErrors?.length ? `  PAGE ${r.pageErrors[0]}` : ''
     }`,
   );
