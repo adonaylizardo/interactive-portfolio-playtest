@@ -57,6 +57,8 @@ import {
   type OccluderBox,
 } from './mapSprites';
 import {
+  allSpriteKeys,
+  hasSprite,
   interiorSpriteKey,
   isLejosZoom,
   lejosZoomThreshold,
@@ -67,12 +69,16 @@ import {
   loadKeys,
   loadAllSprites,
   loadSpriteProbes,
+  remainingMapKeys,
+  loadedSpriteKeys,
+  upgradeLoadedSprites,
   spriteAsset,
   spritesLoaded,
   spriteTexture,
   worldBackgroundColor,
   type BuildingSpriteState,
 } from './sprites';
+import { dismissBootScreen } from './assetUrl';
 import {
   buildInteriorGrid,
   drawInteriorFloor,
@@ -123,6 +129,7 @@ import {
   loadRestSheets,
   PlayerAvatar,
   prefetchRestSheets,
+  upgradePlayerSheets,
   SPRINT_TILES_PER_S,
   TILE_STEP_WORLD,
   WALK_TILES_PER_S,
@@ -364,7 +371,10 @@ export class IsoScene {
   private touchOnlyPinch = false;
   private pendingBuildingEntry: { panelTitle: string; door: { x: number; y: number } } | null =
     null;
-  private tileCullEntries: { g: Container; tx: number; ty: number }[] = [];
+  private tileCullEntries: { g: Sprite; tx: number; ty: number }[] = [];
+  private tileByCell = new Map<string, { g: Sprite; tx: number; ty: number }>();
+  private readonly tileHit = new Polygon(TILE_DIAMOND);
+  private tilesBackfilled = false;
   private pointerGestureSerial = 0;
   private pixiTapGestureSerial = -1;
   private firstPointerDownAt = 0;
@@ -404,14 +414,6 @@ export class IsoScene {
       preserveDrawingBuffer: true,
     });
 
-    await loadMapSprites(this.app.renderer.resolution);
-    void loadSpriteProbes();
-    const bootInterior = parseInteriorFromHash();
-    if (bootInterior && isSpriteInterior(bootInterior)) await loadInteriorSprite(bootInterior);
-    window.setTimeout(() => {
-      void loadBuildingStateSprites().then(() => this.syncObjectSprites(true));
-    }, 2500);
-
     this.app.stage.addChild(this.camera);
     this.camera.addChild(this.world);
     this.world.addChild(this.tilesLayer);
@@ -429,10 +431,25 @@ export class IsoScene {
     this.interiorLayer.addChild(this.interiorWallGfx);
     this.interiorLayer.addChild(this.interiorPropGfx);
     this.bindInteriorPointerRouting();
-
     this.pathLayer.addChild(this.pathGfx);
     this.objectsLayer.sortableChildren = true;
-    await loadPlayerSheets(this.app.renderer.resolution);
+
+    const bootInterior = parseInteriorFromHash();
+    const fromHash = parseCameraFromHash();
+    if (fromHash) {
+      this.cameraX = fromHash.x;
+      this.cameraY = fromHash.y;
+      this.zoom = clampZoom(fromHash.zoom);
+    } else if (this.shouldUseMobileFraming()) {
+      this.frameMobileFirstLoadView();
+    } else {
+      this.frameDesktopFirstLoadView();
+    }
+    this.syncViewTransform();
+
+    await loadMapSprites(this.app.renderer.resolution, this.firstPaintKeys());
+    if (bootInterior && isSpriteInterior(bootInterior)) await loadInteriorSprite(bootInterior);
+    await loadPlayerSheets(1);
     this.avatar = new PlayerAvatar(
       this.objectsLayer,
       {
@@ -460,7 +477,7 @@ export class IsoScene {
     this.fadeEl.className = 'scene-fade';
     document.getElementById('app')?.appendChild(this.fadeEl);
 
-    this.buildTiles();
+    this.ensureVisibleTiles();
     this.buildVoidClickLayer();
     this.buildOutskirts();
     this.buildObjects();
@@ -479,8 +496,6 @@ export class IsoScene {
       },
       { enabled: npcsWanted(), seed: npcSeed(), stillPose: this.reducedMotion },
     );
-    // 300+ strips: only fetched once the crowd is on, so automated runs without ?npcs=1 skip them.
-    if (this.npcs.isEnabled()) this.loadNpcs();
     this.fillActors = new FillActors(
       this.objectsLayer,
       fill.actors,
@@ -488,22 +503,9 @@ export class IsoScene {
       (fx, fy) => this.walkerZIndex(fx, fy),
       this.reducedMotion,
     );
-    const fillLoad = this.fillActors.load(this.app.renderer.resolution).then(() => this.cullVisibleTiles());
-    void Promise.allSettled([fillLoad, this.buildNoah()]).then(prefetchRestSheets);
     this.syncCharacterGraphic();
 
-    const bootInteriorId = parseInteriorFromHash();
-    const fromHash = parseCameraFromHash();
-    if (fromHash) {
-      this.cameraX = fromHash.x;
-      this.cameraY = fromHash.y;
-      this.zoom = clampZoom(fromHash.zoom);
-    } else if (this.shouldUseMobileFraming()) {
-      this.frameMobileFirstLoadView();
-    } else {
-      this.frameDesktopFirstLoadView();
-    }
-    if (bootInteriorId) {
+    if (bootInterior) {
       this.outdoorCamBeforeInterior = {
         x: this.cameraX,
         y: this.cameraY,
@@ -530,12 +532,15 @@ export class IsoScene {
       this.applyHashNavigation((ev.state as HistoryNavigationState | null) ?? null);
     });
 
-    if (bootInteriorId) {
+    if (bootInterior) {
       replaceOutdoorHash(this.outdoorCamBeforeInterior ?? { x: this.cameraX, y: this.cameraY, zoom: this.zoom });
-      this.enterInterior(bootInteriorId, { skipFade: true });
+      this.enterInterior(bootInterior, { skipFade: true });
     }
     setHashWriteSuppressed(false);
     this.applyCamera(true);
+    this.app.render();
+    dismissBootScreen();
+    this.hydrateMap();
   }
 
   private applyHashNavigation(state: HistoryNavigationState | null): void {
@@ -686,30 +691,147 @@ export class IsoScene {
     this.world.addChildAt(g, 0);
   }
 
-  private buildTiles(): void {
-    const diamond = new Polygon(TILE_DIAMOND);
+  /** Unique cerca keys whose art overlaps the current camera (plus the outskirts tile). */
+  private firstPaintKeys(): string[] {
+    const keys = new Set<string>(['tile/suelo/si-no']);
+    const { minX, maxX, minY, maxY } = this.viewWorldAabb(TILE_W * 2);
     for (let ty = 0; ty < MAP_HEIGHT; ty++) {
       for (let tx = 0; tx < MAP_WIDTH; tx++) {
-        const cell = cells[ty][tx];
-        const key = tileSpriteKey(cells, tx, ty);
-        const g = new Sprite(spriteTexture(key));
         const foot = tileFootWorld(tx, ty);
-        const a = spriteAsset(key);
-        g.position.set(foot.x - a.vfs.x, foot.y - a.vfs.y);
-        g.hitArea = diamond;
-        g.eventMode = 'static';
-        g.cursor = cell.walkable ? 'pointer' : 'default';
-        g.on('pointertap', (e) => {
-          if (this.shouldBlockTap()) return;
-          this.pixiTapGestureSerial = this.pointerGestureSerial;
-          if (!this.prepareMapTap(undefined, tx, ty)) return;
-          const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
-          this.requestWalk(tx, ty, sprint);
-        });
-        this.tilesLayer.addChild(g);
-        this.tileCullEntries.push({ g, tx, ty });
+        if (foot.x < minX - TILE_W || foot.x > maxX + TILE_W || foot.y < minY - TILE_H || foot.y > maxY + TILE_H) {
+          continue;
+        }
+        keys.add(tileSpriteKey(cells, tx, ty));
       }
     }
+    for (const obj of objects) {
+      const key = objectSpriteKey(obj, 'default', false);
+      if (!key || !hasSprite(key) || key.endsWith('/lejos')) continue;
+      const tl = objectSpriteTopLeft(obj, key);
+      const a = spriteAsset(key);
+      if (tl.x + a.w < minX || tl.x > maxX || tl.y + a.h < minY || tl.y > maxY) continue;
+      keys.add(key);
+    }
+    return [...keys];
+  }
+
+  private viewWorldAabb(pad: number): { minX: number; maxX: number; minY: number; maxY: number } {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const corners = [
+      this.screenToWorld(-pad, -pad),
+      this.screenToWorld(sw + pad, -pad),
+      this.screenToWorld(-pad, sh + pad),
+      this.screenToWorld(sw + pad, sh + pad),
+    ];
+    return {
+      minX: Math.min(...corners.map((c) => c.x)),
+      maxX: Math.max(...corners.map((c) => c.x)),
+      minY: Math.min(...corners.map((c) => c.y)),
+      maxY: Math.max(...corners.map((c) => c.y)),
+    };
+  }
+
+  private ensureTile(tx: number, ty: number): Sprite | null {
+    const id = `${tx},${ty}`;
+    const existing = this.tileByCell.get(id);
+    if (existing) return existing.g;
+    const key = tileSpriteKey(cells, tx, ty);
+    if (!spritesLoaded(key)) {
+      void loadKeys([key]).then(() => this.ensureTile(tx, ty));
+      return null;
+    }
+    const cell = cells[ty][tx];
+    const g = new Sprite(spriteTexture(key));
+    const foot = tileFootWorld(tx, ty);
+    const a = spriteAsset(key);
+    g.position.set(foot.x - a.vfs.x, foot.y - a.vfs.y);
+    g.hitArea = this.tileHit;
+    g.eventMode = 'static';
+    g.cursor = cell.walkable ? 'pointer' : 'default';
+    g.on('pointertap', (e) => {
+      if (this.shouldBlockTap()) return;
+      this.pixiTapGestureSerial = this.pointerGestureSerial;
+      if (!this.prepareMapTap(undefined, tx, ty)) return;
+      const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
+      this.requestWalk(tx, ty, sprint);
+    });
+    this.tilesLayer.addChild(g);
+    const entry = { g, tx, ty };
+    this.tileByCell.set(id, entry);
+    this.tileCullEntries.push(entry);
+    return g;
+  }
+
+  private ensureVisibleTiles(): void {
+    if (!this.app?.screen) return;
+    const { minX, maxX, minY, maxY } = this.viewWorldAabb(TILE_W * 1.5);
+    for (let ty = 0; ty < MAP_HEIGHT; ty++) {
+      for (let tx = 0; tx < MAP_WIDTH; tx++) {
+        const foot = tileFootWorld(tx, ty);
+        if (foot.x < minX - TILE_W || foot.x > maxX + TILE_W || foot.y < minY - TILE_H || foot.y > maxY + TILE_H) {
+          continue;
+        }
+        this.ensureTile(tx, ty);
+      }
+    }
+  }
+
+  private ensureAllTiles(): void {
+    for (let ty = 0; ty < MAP_HEIGHT; ty++) {
+      for (let tx = 0; tx < MAP_WIDTH; tx++) this.ensureTile(tx, ty);
+    }
+    this.tilesBackfilled = true;
+  }
+
+  private refreshTileTextures(): void {
+    for (const { g, tx, ty } of this.tileCullEntries) {
+      const key = tileSpriteKey(cells, tx, ty);
+      if (spritesLoaded(key)) g.texture = spriteTexture(key);
+    }
+  }
+
+  /** After first paint: rest of the town, @2x swap, then interiors/hover stay on demand. */
+  private hydrateMap(): void {
+    const hi = this.app.renderer.resolution;
+    void (async () => {
+      await upgradeLoadedSprites(hi);
+      await upgradePlayerSheets(hi);
+      this.refreshTileTextures();
+      this.syncObjectSprites(true);
+      await loadKeys(remainingMapKeys(loadedSpriteKeys()));
+      this.ensureVisibleTiles();
+      this.syncObjectSprites(true);
+      this.queueTileBackfill();
+    })();
+    window.setTimeout(() => {
+      void loadKeys(allSpriteKeys().filter((k) => k.endsWith('/lejos'))).then(() => this.syncObjectSprites(true));
+    }, 800);
+    window.setTimeout(() => {
+      void loadBuildingStateSprites().then(() => this.syncObjectSprites(true));
+    }, 2500);
+    void loadSpriteProbes();
+    if (this.npcs.isEnabled()) this.loadNpcs();
+    const fillLoad = this.fillActors.load(hi).then(() => this.cullVisibleTiles());
+    void Promise.allSettled([fillLoad, this.buildNoah()]).then(prefetchRestSheets);
+  }
+
+  private queueTileBackfill(): void {
+    if (this.tilesBackfilled) return;
+    let i = 0;
+    const total = MAP_WIDTH * MAP_HEIGHT;
+    const step = () => {
+      const end = Math.min(i + 96, total);
+      for (; i < end; i++) this.ensureTile(i % MAP_WIDTH, (i / MAP_WIDTH) | 0);
+      if (i < total) {
+        if (typeof requestIdleCallback === 'function') requestIdleCallback(step, { timeout: 80 });
+        else requestAnimationFrame(step);
+      } else {
+        this.tilesBackfilled = true;
+      }
+    };
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(step, { timeout: 80 });
+    else requestAnimationFrame(step);
   }
 
   private buildingHitArea(obj: MapObject): { contains(x: number, y: number): boolean } {
@@ -729,8 +851,9 @@ export class IsoScene {
       g.eventMode = 'static';
       g.cursor = 'pointer';
       const key = objectSpriteKey(obj, 'default', false);
-      if (key) {
-        const sprite = new Sprite(spriteTexture(key));
+      if (key && hasSprite(key)) {
+        const ready = spritesLoaded(key);
+        const sprite = new Sprite(ready ? spriteTexture(key) : Texture.EMPTY);
         const tl = objectSpriteTopLeft(obj, key);
         sprite.position.set(tl.x - pos.x, tl.y - pos.y);
         g.addChild(sprite);
@@ -757,12 +880,13 @@ export class IsoScene {
         this.objectVisuals.set(obj.id, {
           obj,
           sprite,
-          key,
+          key: ready ? key : '',
           state: 'default',
           cull: spriteBox,
           occluder: objectOccluder(obj),
           zIndex,
         });
+        if (!ready) void loadKeys([key]).then(() => this.syncObjectSprites(true));
       }
       g.on('pointerover', () => {
         if (matchMedia('(hover: hover)').matches) {
@@ -1746,19 +1870,8 @@ export class IsoScene {
 
   private cullVisibleTiles(): void {
     if (!this.app?.screen) return;
-    const sw = this.app.screen.width;
-    const sh = this.app.screen.height;
-    const pad = TILE_W * 1.5;
-    const corners = [
-      this.screenToWorld(-pad, -pad),
-      this.screenToWorld(sw + pad, -pad),
-      this.screenToWorld(-pad, sh + pad),
-      this.screenToWorld(sw + pad, sh + pad),
-    ];
-    const minX = Math.min(...corners.map((c) => c.x));
-    const maxX = Math.max(...corners.map((c) => c.x));
-    const minY = Math.min(...corners.map((c) => c.y));
-    const maxY = Math.max(...corners.map((c) => c.y));
+    this.ensureVisibleTiles();
+    const { minX, maxX, minY, maxY } = this.viewWorldAabb(TILE_W * 1.5);
     const iso = this.qaIsolation;
     this.avatar?.setVisible(!iso);
     this.noah?.setHidden(!!iso || this.interiorActive);
@@ -1789,8 +1902,7 @@ export class IsoScene {
   /** QA: tile vs building foot global positions must match at every zoom. */
   private updateFootAnchorProbe(): void {
     if (!this.canvasEl) return;
-    const tileIdx = INICIO[1] * MAP_WIDTH + INICIO[0];
-    const tileG = this.tilesLayer.children[tileIdx] as Container | undefined;
+    const tileG = this.tileByCell.get(`${INICIO[0]},${INICIO[1]}`)?.g;
     const buildG = this.objectGraphics.get('building/estudio');
     if (!tileG || !buildG) return;
     const foot = tileFootWorld(INICIO[0], INICIO[1]);
@@ -3481,6 +3593,12 @@ export class IsoScene {
 
   /** QA: draw only the given sprite ids (objects by id, tiles as `tile:x,y`), no character. */
   qaIsolateSprites(ids: string[] | null): void {
+    if (ids) {
+      for (const id of ids) {
+        const m = /^tile:(\d+),(\d+)$/.exec(id);
+        if (m) this.ensureTile(Number(m[1]), Number(m[2]));
+      }
+    }
     this.qaIsolation = ids ? new Set(ids) : null;
     this.applyCamera(false);
   }
@@ -3510,6 +3628,9 @@ export class IsoScene {
 
   async qaLoadAllSprites(): Promise<void> {
     await loadAllSprites();
+    this.ensureAllTiles();
+    this.syncObjectSprites(true);
+    this.refreshTileTextures();
   }
 
   /** QA: put a world point at the canvas centre at an exact zoom. */

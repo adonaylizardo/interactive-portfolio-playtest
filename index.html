@@ -14,6 +14,8 @@
     <link
       href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@500&family=Inter+Tight:wght@600&family=Inter:wght@400;500;600&display=swap"
       rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
     />
     <link rel="stylesheet" href="/src/styles.css" />
     <link rel="stylesheet" href="/src/chrome.css" />
@@ -22,6 +24,10 @@
     <div id="app">
       <canvas id="game-canvas" aria-label="Mundo isométrico de prueba"></canvas>
       <div id="ui-root"></div>
+      <div id="boot" class="boot" aria-live="polite">
+        <p class="boot__label">Cargando el mapa</p>
+        <div class="boot__bar" aria-hidden="true"><i></i></div>
+      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

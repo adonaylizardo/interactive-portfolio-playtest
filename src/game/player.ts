@@ -1,5 +1,6 @@
-import { Assets, Container, Rectangle, Sprite, Texture } from 'pixi.js';
+import { Container, Rectangle, Sprite, Texture } from 'pixi.js';
 import manifest from '../data/jugador.json';
+import { loadPngOrWebp } from './assetUrl';
 import { CHARACTER_WORLD_SCALE } from './npcs';
 
 export type FacingDir = 'se' | 'sw' | 'ne' | 'nw';
@@ -72,10 +73,10 @@ export async function loadStrip(
   cellH: number,
   count: number,
 ): Promise<Texture[]> {
-  const tex = await Assets.load<Texture>({
-    alias,
-    src,
-    data: { autoGenerateMipmaps: true, magFilter: 'nearest', minFilter: 'nearest', mipmapFilter: 'linear' },
+  const tex = await loadPngOrWebp(alias, src, {
+    autoGenerateMipmaps: false,
+    magFilter: 'nearest',
+    minFilter: 'nearest',
   });
   return Array.from(
     { length: count },
@@ -308,7 +309,7 @@ function loadSheets(pick: (name: string) => boolean): Promise<void> {
       if (!pick(name)) continue;
       const file = anim.archivo1x.replace('@1x', suffix);
       jobs.push(
-        loadStrip(`${base}${who}/${file}`, `player/${who}/${name}`, m.celda.w, m.celda.h, anim.frames.length).then(
+        loadStrip(`${base}${who}/${file}`, `player/${who}/${name}${suffix}`, m.celda.w, m.celda.h, anim.frames.length).then(
           (frames) => void sharedFrames.set(`${who}/${name}`, frames),
         ),
       );
@@ -318,10 +319,19 @@ function loadSheets(pick: (name: string) => boolean): Promise<void> {
 }
 
 export function loadPlayerSheets(resolution: number): Promise<void> {
-  if (framesLoading) return framesLoading;
   sheetResolution = resolution;
+  if (framesLoading) return framesLoading;
   framesLoading = loadSheets((name) => WALK_ANIM.test(name));
   return framesLoading;
+}
+
+/** After the first frame, replace @1x walk strips with @2x on retina. */
+export function upgradePlayerSheets(resolution: number): Promise<void> | undefined {
+  if (resolution < 1.5 || sheetResolution >= 2) return undefined;
+  sheetResolution = resolution;
+  const job = loadSheets((name) => WALK_ANIM.test(name));
+  framesLoading = job;
+  return job;
 }
 
 /** Sit / lie / stand-up strips for both characters; fetched once, retried on the next need if it fails. */

@@ -1,6 +1,7 @@
-import { Assets, Container, Rectangle, Sprite, Texture } from 'pixi.js';
+import { Container, Rectangle, Sprite, Texture } from 'pixi.js';
 import { FILL_ANIMS, type FillActor, type FillOverlay } from '../data/fill';
 import npcsJson from '../data/npcs.json';
+import { loadPngOrWebp } from './assetUrl';
 import { tileFootWorld, tileToWorld } from '../iso/math';
 import { CHARACTER_WORLD_SCALE } from './npcs';
 
@@ -34,7 +35,7 @@ type Live = {
   frame: number;
 };
 
-const PIXEL = { magFilter: 'nearest', minFilter: 'nearest', mipmapFilter: 'linear', autoGenerateMipmaps: true } as const;
+const PIXEL = { magFilter: 'nearest', minFilter: 'nearest', autoGenerateMipmaps: false } as const;
 
 /** Small stable per-id phase so neighbouring bots do not animate in lockstep. */
 function phaseOf(id: string): number {
@@ -82,7 +83,7 @@ export class FillActors {
   async load(resolution: number): Promise<void> {
     const base = import.meta.env.BASE_URL;
     const strip = async (alias: string, src: string, cell: { w: number; h: number }, frames: number[], pixel: boolean) => {
-      const tex = await Assets.load<Texture>({ alias, src, data: pixel ? PIXEL : { autoGenerateMipmaps: true, scaleMode: 'linear' } });
+      const tex = await loadPngOrWebp(alias, src, pixel ? PIXEL : { autoGenerateMipmaps: false, scaleMode: 'linear' });
       return frames.map((i) => new Texture({ source: tex.source, frame: new Rectangle(i * cell.w, 0, cell.w, cell.h) }));
     };
     const animFor = async (key: string): Promise<Anim> => {

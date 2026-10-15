@@ -46,6 +46,36 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const errors = [];
 const notes = [];
 
+/** Spawn view must not fetch interiors, hover/resaltado, lejos, NPC strips, or voice audio. */
+async function firstPaintBudget({ tag, type, options }) {
+  const browser = await launchBrowser(type);
+  const ctx = await browser.newContext(options);
+  const page = await ctx.newPage();
+  const early = [];
+  const onReq = (req) => {
+    const u = req.url();
+    if (/\/sprites\/interiores\//.test(u) || /estado-hover|estado-resaltado|_zoom-lejos/.test(u) || /\/sprites\/personaje\/npcs\//.test(u) || /\/audio\//.test(u)) {
+      early.push(u);
+    }
+  };
+  try {
+    page.on('request', onReq);
+    await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, { timeout: 45000 });
+    page.off('request', onReq);
+    if (early.length) {
+      errors.push(`load-${tag}: fetched ${early.length} deferred asset(s) before interactive (${early.slice(0, 3).join(' | ')})`);
+    } else {
+      notes.push(`load ${tag}: spawn view did not fetch interiors / hover / lejos / npcs / audio`);
+    }
+  } catch (err) {
+    errors.push(`load-${tag}: ${err}`);
+  } finally {
+    await ctx.close();
+    await browser.close();
+  }
+}
+
 const FIRST_LOAD = [
   { tag: 'chromium-1280', type: chromium, options: { viewport: { width: 1280, height: 800 } }, minZoom: 0.45, centred: true },
   { tag: 'webkit-1280', type: webkit, options: { viewport: { width: 1280, height: 800 } }, minZoom: 0.45, centred: true },
@@ -160,6 +190,7 @@ async function exits(kind, only) {
 
 const GROUPS = {
   firstload: async () => {
+    await firstPaintBudget({ tag: 'chromium-1280', type: chromium, options: { viewport: { width: 1280, height: 800 } } });
     for (const spec of FIRST_LOAD) await firstLoad(spec);
   },
   chrome: async () => {

@@ -1,5 +1,6 @@
-import { Assets, Container, Rectangle, Sprite, Texture } from 'pixi.js';
+import { Container, Rectangle, Sprite, Texture } from 'pixi.js';
 import manifest from '../data/npcs.json';
+import { loadPngOrWebp } from './assetUrl';
 import { tileFootWorld, tileToWorld } from '../iso/math';
 import {
   DIR_STEP,
@@ -156,15 +157,10 @@ export class NpcCrowd {
     await Promise.all(
       defs.flatMap((def) =>
         usedAnims(def).map(async ([name, anim]) => {
-          const tex = await Assets.load<Texture>({
-            alias: `npc/${def.id}/${name}`,
-            src: base + anim.archivo2x,
-            data: {
-              autoGenerateMipmaps: true,
-              magFilter: 'nearest',
-              minFilter: 'nearest',
-              mipmapFilter: 'linear',
-            },
+          const tex = await loadPngOrWebp(`npc/${def.id}/${name}`, base + anim.archivo2x, {
+            autoGenerateMipmaps: false,
+            magFilter: 'nearest',
+            minFilter: 'nearest',
           });
           const cells = anim.frames.map(
             (i) => new Texture({ source: tex.source, frame: new Rectangle(i * CELL_W, 0, CELL_W, CELL_H) }),

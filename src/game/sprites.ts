@@ -1,7 +1,8 @@
-import { Assets, Sprite, Texture } from 'pixi.js';
+import { Sprite, Texture } from 'pixi.js';
 import { FILL_ASSETS } from '../data/fill';
 import spriteData from '../data/sprites.json';
 import { tokens } from '../tokens';
+import { loadPngOrWebp } from './assetUrl';
 
 export type SpriteAsset = {
   w: number;
@@ -92,6 +93,8 @@ export function spriteResolution(): number {
 /** Landmark interiors are their @1x cutaway drawn at 2×: the @2x file is their 1:1 texture. */
 const SCALED_INTERIORS = /^int\/(flor|catedral|sambil)\//;
 
+const TEX_DATA = { autoGenerateMipmaps: false, scaleMode: 'linear' as const };
+
 /** `lejos` frames only show below zoom 0.25, so @1x is plenty and keeps texture memory a quarter. */
 function spriteUrl(key: string): string {
   const a = spriteAsset(key);
@@ -106,11 +109,7 @@ export async function loadKeys(keys: string[]): Promise<void> {
       let p = loading.get(k);
       if (!p) {
         p = (async () => {
-          const tex = await Assets.load<Texture>({
-            alias: k,
-            src: spriteUrl(k),
-            data: { autoGenerateMipmaps: true, scaleMode: 'linear' },
-          });
+          const tex = await loadPngOrWebp(k, spriteUrl(k), TEX_DATA);
           textures.set(k, tex);
         })();
         loading.set(k, p);
@@ -120,17 +119,56 @@ export async function loadKeys(keys: string[]): Promise<void> {
   );
 }
 
+export function loadedSpriteKeys(): string[] {
+  return [...textures.keys()];
+}
+
+/** Hover / resaltado / interiors / lejos — not needed for the spawn view. */
+export function deferredMapKeys(): string[] {
+  const stateFrames = new Set([...buildingStateKeys('hover'), ...buildingStateKeys('resaltado')]);
+  return allSpriteKeys().filter((k) => k.startsWith('int/') || stateFrames.has(k) || k.endsWith('/lejos'));
+}
+
+/** Outdoor cerca frames that are not in `except` (the rest of the town after first paint). */
+export function remainingMapKeys(except: Iterable<string>): string[] {
+  const skip = new Set([...except, ...deferredMapKeys()]);
+  return allSpriteKeys().filter((k) => !skip.has(k));
+}
+
+/**
+ * Decode @2x under a fresh alias, then swap. The @1x frame stays on screen until the
+ * retina textures are ready, so the map never blanks.
+ */
+export async function upgradeLoadedSprites(rendererResolution: number): Promise<string[]> {
+  if (rendererResolution < 1.5 || resolution >= 2) return [];
+  const keys = [...textures.keys()];
+  resolution = 2;
+  await Promise.all(
+    keys.map(async (k) => {
+      const alias = `${k}@@2`;
+      const tex = await loadPngOrWebp(alias, spriteUrl(k), TEX_DATA);
+      textures.set(k, tex);
+      loading.set(k, Promise.resolve());
+    }),
+  );
+  return keys;
+}
+
 /** Building sprite keys for one state (both zoom variants). */
 export function buildingStateKeys(state: BuildingSpriteState): string[] {
   return allSpriteKeys().filter((k) => k.startsWith('ext/') && k.includes(`/${state}/`));
 }
 
 /**
- * What the map needs on first paint: ground, props and every building's default frames.
- * Hover / resaltado frames and interiors are fetched later so phones keep a small texture budget.
+ * Decode `keys` (spawn view) at @1x so the first frame is small. Pass nothing to load every
+ * outdoor default frame (QA / `loadAllSprites` still want the old set).
  */
-export async function loadMapSprites(rendererResolution: number): Promise<void> {
-  resolution = rendererResolution >= 1.5 ? 2 : 1;
+export async function loadMapSprites(rendererResolution: number, keys?: string[]): Promise<void> {
+  resolution = keys ? 1 : rendererResolution >= 1.5 ? 2 : 1;
+  if (keys) {
+    await loadKeys(keys);
+    return;
+  }
   const stateFrames = new Set([...buildingStateKeys('hover'), ...buildingStateKeys('resaltado')]);
   await loadKeys(allSpriteKeys().filter((k) => !k.startsWith('int/') && !stateFrames.has(k)));
 }
