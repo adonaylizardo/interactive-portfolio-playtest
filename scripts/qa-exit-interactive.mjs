@@ -60,17 +60,31 @@ async function main() {
   }
   await browser.close();
 
+  const nums = (arr) => arr.map((r) => r?.ms).filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
+  const median = (arr) => {
+    const ms = nums(arr);
+    if (!ms.length) return null;
+    const mid = Math.floor(ms.length / 2);
+    return ms.length % 2 ? ms[mid] : Math.round((ms[mid - 1] + ms[mid]) / 2);
+  };
   const band = (arr) => {
-    const ms = arr.map((r) => r?.ms).filter((n) => Number.isFinite(n));
+    const ms = nums(arr);
     if (!ms.length) return '—';
-    return `${Math.min(...ms)}–${Math.max(...ms)}`;
+    const med = median(arr);
+    return `${ms[0]}–${ms[ms.length - 1]} (med ${med})`;
   };
   console.log('\nroom\tmat (ms)\tSalir (ms)');
   let fail = 0;
+  const allMat = [];
+  const allSalir = [];
   for (const rec of rows) {
     console.log(`${rec.room}\t${band(rec.mat)}\t${band(rec.salir)}`);
+    allMat.push(...rec.mat);
+    allSalir.push(...rec.salir);
     for (const r of [...rec.mat, ...rec.salir]) if (!exitIsImmediate(r)) fail++;
   }
+  console.log(`ALL\t${band(allMat)}\t${band(allSalir)}`);
+  console.log(`median mat ${median(allMat)} ms; median Salir ${median(allSalir)} ms`);
   if (fail) {
     console.error(`${fail} run(s) over 150 ms (or walked first)`);
     process.exit(1);
