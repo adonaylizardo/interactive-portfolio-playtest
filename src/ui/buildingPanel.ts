@@ -116,6 +116,9 @@ export class BuildingPanel {
   private peekOnly = true;
   private dragStartY = 0;
   private leaveArmed = false;
+  /** Press on Salir: leave only on lift, and only if the finger stayed within ~10 px. */
+  private exitPress: { x: number; y: number; drift: number } | null = null;
+  private exitFromPointer = false;
 
   constructor(
     container: HTMLElement,
@@ -166,16 +169,68 @@ export class BuildingPanel {
     });
 
     const exitBtn = this.el.querySelector('[data-exit]') as HTMLButtonElement;
-    // touchstart/pointerdown: same moment as a mat tap. The exit timer (and iOS) start on
-    // touchstart; waiting for pointerdown or click added ~150 ms on WebKit.
-    const onExit = (e: Event) => {
+    // Leave on lift, not press: a sheet drag that starts on Salir must not exit.
+    // Slop 10 px. Touchend/pointerup (not click) so iOS does not wait ~300 ms.
+    const point = (e: Event): { x: number; y: number } | null => {
+      if ('changedTouches' in e) {
+        const t = (e as TouchEvent).changedTouches[0];
+        return t ? { x: t.clientX, y: t.clientY } : null;
+      }
+      if ('clientX' in e) return { x: (e as PointerEvent).clientX, y: (e as PointerEvent).clientY };
+      return null;
+    };
+    const onExitDown = (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
-      this.salir();
+      const p = point(e);
+      if (!p) return;
+      this.exitPress = { x: p.x, y: p.y, drift: 0 };
+      this.exitFromPointer = false;
+      if ('pointerId' in e) {
+        try {
+          (e.target as HTMLElement).setPointerCapture((e as PointerEvent).pointerId);
+        } catch {
+          /* capture is optional */
+        }
+      }
     };
-    exitBtn.addEventListener('touchstart', onExit, { passive: false });
-    exitBtn.addEventListener('pointerdown', onExit);
-    exitBtn.addEventListener('click', onExit);
+    const onExitMove = (e: Event) => {
+      const g = this.exitPress;
+      const p = point(e);
+      if (!g || !p) return;
+      g.drift = Math.max(g.drift, Math.hypot(p.x - g.x, p.y - g.y));
+    };
+    const onExitUp = (e: Event) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const g = this.exitPress;
+      this.exitPress = null;
+      if (!g) return;
+      const p = point(e) ?? g;
+      const drift = Math.max(g.drift, Math.hypot(p.x - g.x, p.y - g.y));
+      this.exitFromPointer = true;
+      if (drift < 10) this.salir();
+    };
+    const onExitCancel = (e: Event) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.exitPress = null;
+      this.exitFromPointer = true;
+    };
+    exitBtn.addEventListener('touchstart', onExitDown, { passive: false });
+    exitBtn.addEventListener('touchmove', onExitMove, { passive: false });
+    exitBtn.addEventListener('touchend', onExitUp, { passive: false });
+    exitBtn.addEventListener('touchcancel', onExitCancel, { passive: false });
+    exitBtn.addEventListener('pointerdown', onExitDown);
+    exitBtn.addEventListener('pointermove', onExitMove);
+    exitBtn.addEventListener('pointerup', onExitUp);
+    exitBtn.addEventListener('pointercancel', onExitCancel);
+    exitBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (this.exitFromPointer) return;
+      this.salir();
+    });
     this.el.querySelector('[data-backdrop]')!.addEventListener('click', () => {
       if (this.isMobile() && this.mode === 'interior') this.setPeek(true);
     });
@@ -240,6 +295,8 @@ export class BuildingPanel {
 
   showInterior(title: string, interiorId: string | null = null): void {
     this.leaveArmed = false;
+    this.exitPress = null;
+    this.exitFromPointer = false;
     this.mode = 'interior';
     this.interiorId = interiorId;
     this.peekOnly = this.isMobile();
