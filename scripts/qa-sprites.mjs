@@ -950,11 +950,11 @@ async function interiorChecks(browser) {
       await armExitTimer(page);
       await page.mouse.click(pt.x, pt.y);
       const r = await readExitTimer(page, 3000);
-      if (!exitIsImmediate(r)) fail(`interior ${c}: click on exit mat was not immediate (${describeExit(r)}; need no walk and <= 700 ms, or <= 6 frames and 2.5 s)`);
+      if (!exitIsImmediate(r)) fail(`interior ${c}: click on exit mat was not immediate (${describeExit(r)}; need no walk and <= 150 ms, or <= 6 frames and 2.5 s)`);
       if (!r) await page.evaluate(() => window.__playtestQa.exitInterior());
       await wait(300);
     }
-    notes.push('interiors: one click on the exit mat leaves each of the 9 rooms without walking (<= 700 ms, or <= 6 frames and 1.5 s on slow renderers)');
+    notes.push('interiors: one click on the exit mat leaves each of the 9 rooms without walking (<= 150 ms, or <= 6 frames and 2.5 s on slow renderers)');
   } finally {
     await page.close();
   }

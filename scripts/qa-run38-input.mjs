@@ -1,6 +1,7 @@
 /**
  * Run #38 real-input suite, shared by Chromium (phone + desktop) and WebKit (iPhone emulation):
- * single-tap exit on the mat / door gap in all 9 rooms (≤300 ms, or ≤6 frames on a slow renderer),
+ * single-tap exit on the mat / door gap / Salir in all 9 rooms (≤150 ms until the map is
+ * interactive, or ≤6 frames on a slow renderer),
  * floor walks, interior camera lock,
  * door entry only on arrival, and near-edge taps.
  */
@@ -131,11 +132,38 @@ async function testExitSingleTap(ctx, kind, base, errors) {
         if (!r) {
           errors.push(`${tag}: one tap on the ${target} from the far tile did not exit`);
         } else if (!exitIsImmediate(r)) {
-          errors.push(`${tag}: exit was not immediate (${describeExit(r)}, want ≤300 ms or ≤6 frames)`);
+          errors.push(`${tag}: exit was not immediate (${describeExit(r)}, want ≤150 ms or ≤6 frames)`);
         }
       } finally {
         await page.close();
       }
+    }
+  }
+}
+
+async function testExitSalir(ctx, kind, base, errors) {
+  for (const name of ROOMS) {
+    const tag = `run38-${kind}-exit-salir-${name}`;
+    const page = await ctx.newPage();
+    try {
+      await openRoom(page, base, name);
+      if (!(await inInterior(page))) {
+        errors.push(`${tag}: room did not open`);
+        continue;
+      }
+      await page.waitForSelector('.building-panel--open [data-exit]', { state: 'visible', timeout: 5000 });
+      await armExitTimer(page);
+      const exit = page.locator('.building-panel [data-exit]').first();
+      if (RUN38_KINDS[kind].touch) await exit.tap();
+      else await exit.click();
+      const r = await readExitTimer(page);
+      if (!r) {
+        errors.push(`${tag}: Salir did not leave`);
+      } else if (!exitIsImmediate(r)) {
+        errors.push(`${tag}: Salir was not immediate (${describeExit(r)}, want ≤150 ms or ≤6 frames)`);
+      }
+    } finally {
+      await page.close();
     }
   }
 }
@@ -367,7 +395,10 @@ export async function runRun38InputSuite({ kind, base, errors, only }) {
   const ctx = await browser.newContext(spec.options);
   const want = (n) => !only || only.includes(n);
   try {
-    if (want('exit')) await testExitSingleTap(ctx, kind, base, errors);
+    if (want('exit')) {
+      await testExitSingleTap(ctx, kind, base, errors);
+      await testExitSalir(ctx, kind, base, errors);
+    }
     if (want('neighbours')) await testExitNeighboursDoNotExit(ctx, kind, base, errors);
     if (want('walk')) await testFloorWalks(ctx, kind, base, errors);
     if (want('camlock')) await testInteriorCameraLock(ctx, kind, base, errors);
