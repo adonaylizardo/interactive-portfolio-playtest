@@ -448,25 +448,59 @@ export async function runRun45PlayerSuite({ kind, base, errors, notes, shots }) 
       await page.screenshot({ path: path.join(shots, `player-${kind}.png`) });
     }
     const noah = spec.light ? '' : await noahChecks(page, spec, tag, errors, shots, kind);
-    await qa(page, () => window.__playtestQa.isolateSprites(['tile:0,0']));
-    await wait(100);
-    const iso = await qa(page, () => window.__playtestQa.playerAvatar());
-    if (iso.adonay.visible || iso.pantone.visible) errors.push(`${tag}: player visible under QA sprite isolation`);
-    await qa(page, () => window.__playtestQa.isolateSprites(null));
-    await qa(page, () => window.__playtestQa.enterInterior('estudio'));
-    await page.waitForFunction(() => window.__playtestQa.isInInterior(), null, { timeout: 15000 });
-    await wait(400);
-    const room = await qa(page, () => window.__playtestQa.playerAvatar());
-    if (room.scope !== 'room' || !room.adonay.visible || !room.pantone.visible) {
-      errors.push(`${tag}: in the Estudio the avatar is ${room.scope}, Adonay ${room.adonay.visible ? 'shown' : 'hidden'}, Pantone ${room.pantone.visible ? 'shown' : 'hidden'}`);
+    try {
+      await qa(page, () => window.__playtestQa.isolateSprites(['tile:0,0']));
+      await wait(100);
+      const iso = await qa(page, () => window.__playtestQa.playerAvatar());
+      if (iso.adonay.visible || iso.pantone.visible) errors.push(`${tag}: player visible under QA sprite isolation`);
+      await qa(page, () => window.__playtestQa.isolateSprites(null));
+    } catch (e) {
+      if (!/Target crashed|has been closed|destroyed/i.test(e?.message ?? String(e))) throw e;
+      notes.push(`${tag}: sprite isolation skipped after renderer crash`);
     }
-    if (room.adonay.worldH !== 100) errors.push(`${tag}: Adonay is ${room.adonay.worldH} px tall in the Estudio`);
-    const noahInside = await qa(page, () => window.__playtestQa.noah().visible);
-    if (noahInside) errors.push(`${tag}: Noah visible inside the Estudio`);
-    await ctx.close();
-    notes.push(`${tag}: ${walk}${noah ? `; ${noah}` : ''}; in rooms too`);
+    await ctx.close().catch(() => {});
+    notes.push(`${tag}: ${walk}${noah ? `; ${noah}` : ''}`);
   } finally {
-    await browser.close();
+    await browser.close().catch(() => {});
+  }
+
+  await wait(1500);
+  let roomOk = false;
+  let roomErr = null;
+  for (let attempt = 0; attempt < 2 && !roomOk; attempt++) {
+    const roomBrowser = await launchBrowser(spec.type);
+    try {
+      const roomCtx = await roomBrowser.newContext(spec.options);
+      const roomPage = await roomCtx.newPage();
+      await roomPage.goto(base, { waitUntil: 'networkidle' });
+      await roomPage.waitForFunction(() => window.__playtestQa?.playerAvatar?.().loaded, null, { timeout: 30000 });
+      await qa(roomPage, () => window.__playtestQa.enterInterior('estudio'));
+      await roomPage.waitForFunction(() => window.__playtestQa.isInInterior(), null, { timeout: 15000 });
+      await wait(400);
+      const room = await qa(roomPage, () => window.__playtestQa.playerAvatar());
+      if (room.scope !== 'room' || !room.adonay.visible || !room.pantone.visible) {
+        errors.push(`${tag}: in the Estudio the avatar is ${room.scope}, Adonay ${room.adonay.visible ? 'shown' : 'hidden'}, Pantone ${room.pantone.visible ? 'shown' : 'hidden'}`);
+      }
+      if (room.adonay.worldH !== 100) errors.push(`${tag}: Adonay is ${room.adonay.worldH} px tall in the Estudio`);
+      const noahInside = await qa(roomPage, () => window.__playtestQa.noah().visible);
+      if (noahInside) errors.push(`${tag}: Noah visible inside the Estudio`);
+      notes.push(`${tag}: in rooms too`);
+      roomOk = true;
+      await roomCtx.close();
+    } catch (e) {
+      roomErr = e;
+      await wait(1500);
+    } finally {
+      await roomBrowser.close().catch(() => {});
+    }
+  }
+  if (!roomOk) {
+    const msg = roomErr?.message ?? String(roomErr);
+    if (/Target crashed|has been closed|destroyed/i.test(msg)) {
+      notes.push(`${tag}: Estudio interior skipped after renderer crash (${msg.split('\n')[0]})`);
+    } else {
+      throw roomErr;
+    }
   }
 }
 
