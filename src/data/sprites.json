@@ -1345,33 +1345,33 @@
    "f2": "paisaje/farol-exterior/farol-exterior__orientacion-der_vista-lejos@2x.png"
   },
   "prop/muro/cerca": {
-   "w": 640,
-   "h": 448,
+   "w": 400,
+   "h": 280,
    "vfs": {
-    "x": 384,
-    "y": 448
+    "x": 240,
+    "y": 280
    },
    "bbox": {
     "x0": 0,
-    "y0": 46,
-    "x1": 640,
-    "y1": 448
+    "y0": 29,
+    "x1": 400,
+    "y1": 280
    },
    "f1": "paisaje/muro-escalada/muro-escalada__vista-cerca@1x.png",
    "f2": "paisaje/muro-escalada/muro-escalada__vista-cerca@2x.png"
   },
   "prop/muro/lejos": {
-   "w": 640,
-   "h": 448,
+   "w": 400,
+   "h": 280,
    "vfs": {
-    "x": 384,
-    "y": 448
+    "x": 240,
+    "y": 280
    },
    "bbox": {
     "x0": 0,
-    "y0": 46,
-    "x1": 640,
-    "y1": 448
+    "y0": 29,
+    "x1": 400,
+    "y1": 280
    },
    "f1": "paisaje/muro-escalada/muro-escalada__vista-lejos@1x.png",
    "f2": "paisaje/muro-escalada/muro-escalada__vista-lejos@2x.png"

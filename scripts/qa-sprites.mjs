@@ -593,7 +593,7 @@ const ITEM_TOP_LEFT = {
   'building/flor': [-448, 2624],
   'paisaje/obelisco': [-1536, 1200],
   'paisaje/redoma': [448, 2496],
-  'paisaje/muro': [-640, 2080],
+  'paisaje/muro': [-496, 2248],
 };
 const ITEMS = Object.keys(ITEM_TOP_LEFT);
 const MAP_BOUNDS = { minX: -63 * 64 - 128, maxX: 63 * 64 + 128, minY: 0, maxY: 126 * 32 + 128 };

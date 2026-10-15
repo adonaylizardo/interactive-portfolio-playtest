@@ -11,7 +11,7 @@ import { PNG } from 'pngjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'public/sprites/atlas');
-const MAX = 4096;
+const MAX = 4080;
 const PAD = 2;
 
 const sprites = JSON.parse(readFileSync(path.join(ROOT, 'src/data/sprites.json'), 'utf8'));

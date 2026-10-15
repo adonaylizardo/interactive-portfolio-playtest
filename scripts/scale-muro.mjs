@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Restore the original muro-escalada art (pre-grow) and scale that silhouette
- * uniformly to the taller height (~2× the original 224 px frame ≈ 448, the
- * size of the resized wall). Nearest-neighbour; no new plywood.
+ * uniformly so the frame is ~2.5× Adonay (100 world px). Nearest-neighbour;
+ * no plywood slab.
  *
  *   node scripts/scale-muro.mjs
  */
@@ -13,9 +13,9 @@ import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-/** 2× original: 320×224 → 640×448, same angles/holds/base, grounded on the same south vertex. */
-const NUM = 2;
-const DEN = 1;
+/** 5/4: 320×224 → 400×280. Opaque height ~251 px ≈ 2.5 × Adonay. */
+const NUM = 5;
+const DEN = 4;
 const ORIGIN = 'b4f9b71^';
 
 const FILES = [
