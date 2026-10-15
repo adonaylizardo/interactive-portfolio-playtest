@@ -210,7 +210,7 @@ async function testSheetRehydrate(ctx, kind, base, errors) {
           errors.push(`${tag}: first open: ${firstErr}`);
           continue;
         }
-        if ((name === 'estudio' || name === 'volaris') && !(first.text && first.childCount > 0)) {
+        if (!(first.text && first.childCount > 0)) {
           errors.push(`${tag}: first open body is empty`);
           continue;
         }
@@ -229,7 +229,7 @@ async function testSheetRehydrate(ctx, kind, base, errors) {
           errors.push(`${tag}: re-open: ${secondErr}`);
           continue;
         }
-        if ((first.text || first.childCount) && !(second.text || second.childCount)) {
+        if (!(second.text && second.childCount > 0)) {
           errors.push(`${tag}: re-open body is empty`);
           continue;
         }

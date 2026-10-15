@@ -2,6 +2,18 @@ import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
 import { CASES, type CaseBlock, type CaseContent } from '../data/cases';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
 
+/** Every interior except Estudio shows the airline case (Volaris holds the copy). */
+const CASE_PANEL_IDS = new Set([
+  'volaris',
+  'bain',
+  'mentoria',
+  'finoa',
+  'pg',
+  'sambil',
+  'catedral',
+  'flor',
+]);
+
 function aboutBlockNode(block: AboutBlock): HTMLElement {
   if (block.kind === 'heading') {
     const h = document.createElement(`h${block.level + 3}`);
@@ -271,11 +283,13 @@ export class BuildingPanel {
   }
 
   private caseContent(): CaseContent | undefined {
-    return this.interiorId ? CASES[this.interiorId] : undefined;
+    if (!this.interiorId) return undefined;
+    return CASES[this.interiorId] ?? (CASE_PANEL_IDS.has(this.interiorId) ? CASES.volaris : undefined);
   }
 
   private caseHeadline(): string | null {
-    return this.caseContent()?.headline ?? null;
+    // Volaris uses the headline as the title (run46). Other rooms keep the building name.
+    return this.interiorId === 'volaris' ? (this.caseContent()?.headline ?? null) : null;
   }
 
   private bodyIsEmpty(): boolean {
