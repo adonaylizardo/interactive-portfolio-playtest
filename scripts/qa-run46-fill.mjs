@@ -155,7 +155,7 @@ function dataChecks(f, streets, instances, benches, tag, errors, notes) {
   }
   for (const c of doors) if (!seen.has(c)) errors.push(`${tag}: door cell (${c}) cannot be reached from the spawn`);
   // A seat cell boxed in by props is reachable only the long way round (the fountain once left
-  // (30,40), bench 29-40's seat, 18 steps from a spawn 5 away).
+  // (30,40) used to sit between two benches and the fountain; the fountain's front is (31,43).
   for (const b of benches) {
     if (b.path == null) errors.push(`${tag}: ${b.id} seat cell (${b.front.x},${b.front.y}) cannot be reached from the spawn`);
     else if (b.path > b.direct + 4) errors.push(`${tag}: ${b.id} seat cell (${b.front.x},${b.front.y}) is ${b.path} steps from the spawn, ${b.direct} as the crow walks`);

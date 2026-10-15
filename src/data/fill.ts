@@ -8,6 +8,8 @@ import type { MapCell, MapObject } from './world';
  * older copy of the map, so every placement is checked against the live grid here and moved to the
  * nearest free spot (whole group by one offset) when it lands on a street, a footprint, a door or
  * the cell in front of one, a bench's seat cell, the plaza, another prop, or over a building sprite.
+ * Report `planned` / `placed` is the member's anchor: a prop's `front` (the fountain is (31,43);
+ * its 2×2 footprint is 30–31 × 42–43).
  */
 
 type Cell = [number, number];
