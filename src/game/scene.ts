@@ -2171,6 +2171,8 @@ export class IsoScene {
       if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
         if (!e.repeat && !this.keys.has(k)) this.startCameraFollow();
         this.keys.add(k);
+        // A press shorter than a frame never reaches updateMovement on slow devices.
+        if (this.seatedBench && !this.interiorActive) this.standThen(null);
         e.preventDefault();
       }
       if (e.key === 'Shift') this.shiftHeld = true;
