@@ -70,12 +70,21 @@ async function openMap(page, url, crowd = false) {
 
 const avatar = (page) => qa(page, () => window.__playtestQa.playerAvatar());
 
+/** Software-GL WebKit on CI draws a few fps with capped frame time, so game time runs several times slower. */
+const SLOW_WAIT = 3;
+
 async function until(page, fn, arg, timeout, what) {
   try {
-    await page.waitForFunction(fn, arg, { timeout, polling: 50 });
+    await page.waitForFunction(fn, arg, { timeout: timeout * SLOW_WAIT, polling: 50 });
     return true;
   } catch {
-    throw new Error(`timed out waiting for ${what}`);
+    const s = await qa(page, () => {
+      const a = window.__playtestQa.playerAvatar();
+      const b = window.__playtestQa.benches();
+      const t = window.__playtestQa.getCharacterTile();
+      return `sit ${a.sit}, Pantone ${a.rest}, bench claimed ${b.claimed} pending ${b.pending} seated ${b.seated}, player ${t.x},${t.y}`;
+    }).catch(() => 'state unavailable');
+    throw new Error(`timed out waiting for ${what} (${s})`);
   }
 }
 
