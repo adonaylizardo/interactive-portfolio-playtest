@@ -291,20 +291,23 @@ export class BuildingPanel {
     this.renderWorkedWith();
   }
 
-  hide(): void {
-    this.el.classList.remove('building-panel--open', 'building-panel--peek');
-    const delay = this.reducedMotion() ? 0 : 200;
-    setTimeout(() => {
-      if (!this.el.classList.contains('building-panel--open')) {
-        this.el.hidden = true;
-        this.mode = 'hidden';
-      }
-    }, delay);
+  hide(opts?: { snap?: boolean }): void {
+    const snap = !!opts?.snap || this.reducedMotion();
+    this.el.classList.toggle('building-panel--snap', snap);
+    this.el.classList.remove('building-panel--open', 'building-panel--peek', 'building-panel--expanded');
+    const finish = () => {
+      if (this.el.classList.contains('building-panel--open')) return;
+      this.el.hidden = true;
+      this.mode = 'hidden';
+      this.el.classList.remove('building-panel--snap');
+    };
+    if (snap) finish();
+    else setTimeout(finish, 200);
     this.onVisibilityChange();
   }
 
   salir(): void {
-    this.hide();
+    this.hide({ snap: true });
     this.onSalir();
   }
 

@@ -2096,7 +2096,9 @@ export class IsoScene {
     };
 
     // Always async so a Pixi pointertap dispatched by this same pointerup can claim the tap first.
-    const waitMs = Math.max(0, this.firstPointerDownAt + 120 - performance.now());
+    // Rooms have no pinch: fire on the next turn so a tap on the mat leaves without the 120 ms
+    // map wait (that wait plus the sheet close was the ~650 ms iPhone exit).
+    const waitMs = this.interiorActive ? 0 : Math.max(0, this.firstPointerDownAt + 120 - performance.now());
     this.deferredTapTimer = setTimeout(fire, waitMs);
   }
 
@@ -2961,6 +2963,8 @@ export class IsoScene {
       this.interiorDef = null;
       this.interiorGrid = [];
       this.interiorPath = [];
+      // Sheet off first, before the outdoor restore, so leave is visible and timed without the close transition.
+      this.events.onExitInterior?.();
       this.tilesLayer.visible = true;
       this.objectsLayer.visible = true;
       this.fitOutskirts(this.app.screen.width, this.app.screen.height);
@@ -2979,7 +2983,6 @@ export class IsoScene {
         this.syncCharacterGraphic();
       }
       this.restoreOutdoorCameraAfterExit(opts?.outdoorCam);
-      this.events.onExitInterior?.();
       if (this.canvasEl) {
         this.canvasEl.dataset.interior = '';
         this.canvasEl.dataset.interiorW = '';
@@ -3002,7 +3005,8 @@ export class IsoScene {
     };
 
     finish();
-    if (opts?.skipFade || opts?.fromHash || this.reducedMotion) return;
+    // Tap / Salir: the room is already gone. Fade afterwards so the leave itself stays under 300 ms.
+    if (opts?.skipFade || opts?.fromHash || opts?.immediate || this.reducedMotion) return;
     void this.runFade(true).then(() => void this.runFade(false));
   }
 

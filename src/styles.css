@@ -604,6 +604,12 @@ body.is-canvas-dragging * {
   transform: translateY(0);
 }
 
+/* Leave: hide the sheet on this frame, then the close animation can run on a later hide. */
+.building-panel--snap .building-panel__backdrop,
+.building-panel--snap .building-panel__sheet {
+  transition: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .building-panel__backdrop,
   .building-panel__sheet {

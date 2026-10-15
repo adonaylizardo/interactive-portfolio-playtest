@@ -29,7 +29,7 @@ async function main(): Promise<void> {
       scene.applyCameraFromUi();
     },
     () => {
-      if (scene.isInInterior()) scene.exitInterior();
+      if (scene.isInInterior()) scene.exitInterior({ immediate: true });
     },
   );
 
@@ -42,7 +42,7 @@ async function main(): Promise<void> {
       }
     } else {
       checklist.setBuildingPanelOpen(false);
-      panel.hide();
+      panel.hide({ snap: true });
     }
     scene.applyCameraFromUi();
   };
@@ -55,7 +55,7 @@ async function main(): Promise<void> {
     },
     onExitInterior: () => {
       checklist.setBuildingPanelOpen(false);
-      panel.hide();
+      panel.hide({ snap: true });
     },
     onInteriorIdChange: (id) => {
       hideToast();

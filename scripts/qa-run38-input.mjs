@@ -1,6 +1,7 @@
 /**
  * Run #38 real-input suite, shared by Chromium (phone + desktop) and WebKit (iPhone emulation):
- * single-tap exit on the mat / door gap in all 9 rooms, floor walks, interior camera lock,
+ * single-tap exit on the mat / door gap in all 9 rooms (≤300 ms, or ≤6 frames on a slow renderer),
+ * floor walks, interior camera lock,
  * door entry only on arrival, and near-edge taps.
  */
 import { chromium, webkit, devices } from 'playwright';
@@ -130,7 +131,7 @@ async function testExitSingleTap(ctx, kind, base, errors) {
         if (!r) {
           errors.push(`${tag}: one tap on the ${target} from the far tile did not exit`);
         } else if (!exitIsImmediate(r)) {
-          errors.push(`${tag}: exit was not immediate (${describeExit(r)})`);
+          errors.push(`${tag}: exit was not immediate (${describeExit(r)}, want ≤300 ms or ≤6 frames)`);
         }
       } finally {
         await page.close();
