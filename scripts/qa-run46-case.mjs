@@ -118,7 +118,12 @@ export async function runRun46CaseSuite({ kind, base, errors, notes, shots }) {
   const browser = await launchBrowser(spec.type);
   const ctx = await browser.newContext(spec.options);
   const page = await ctx.newPage();
+  const voiceHits = [];
+  const onVoice = (req) => {
+    if (/\/audio\/voice\//.test(req.url())) voiceHits.push(req.url());
+  };
   try {
+    page.on('request', onVoice);
     await page.goto(base, { waitUntil: 'networkidle' });
     await wait(600);
     await qa(page, () => window.__playtestQa.enterInterior('volaris'));
@@ -176,6 +181,10 @@ export async function runRun46CaseSuite({ kind, base, errors, notes, shots }) {
     }
     if (!(await closingInView(page))) errors.push(`${tag}: the closing line cannot be scrolled into view`);
     if (shots && scrolls) await page.screenshot({ path: path.join(shots, `case-panel-${kind}-end.png`) });
+
+    if (voiceHits.length) {
+      errors.push(`${tag}: fetched empty voice slot(s) ${voiceHits.join(' | ')}`);
+    }
 
     notes.push(
       `${tag}: "${m.title}", ${m.lines.length} ${spec.phone ? 'short' : 'full'} lines ${okText ? 'match' : 'DIFFER'}, ` +

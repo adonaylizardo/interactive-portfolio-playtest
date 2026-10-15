@@ -277,7 +277,12 @@ export async function runRun55CaseSuite({ kind, base, errors, notes, shots }) {
   const browser = await launchBrowser(spec.type);
   const ctx = await browser.newContext(spec.options);
   const page = await ctx.newPage();
+  const voiceHits = [];
+  const onVoice = (req) => {
+    if (/\/audio\/voice\//.test(req.url())) voiceHits.push(req.url());
+  };
   try {
+    page.on('request', onVoice);
     await page.goto(base, { waitUntil: 'networkidle' });
     await wait(500);
 
@@ -345,6 +350,9 @@ export async function runRun55CaseSuite({ kind, base, errors, notes, shots }) {
       await qa(page, () => window.__playtestQa.leaveInteriorNow());
       await wait(200);
       notes.push(`${tag}: ok`);
+    }
+    if (voiceHits.length) {
+      errors.push(`run55-${kind}: fetched empty voice slot(s) ${voiceHits.join(' | ')}`);
     }
   } finally {
     await ctx.close();

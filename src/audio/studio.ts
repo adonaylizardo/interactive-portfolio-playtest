@@ -3,6 +3,8 @@
  * voice file if Adonay has recorded one. Autoplay-safe: the graph starts on the first
  * user gesture. Mute persists in localStorage.
  */
+import { caseVoiceFile } from '../data/cases';
+
 const MUTE_KEY = 'studio-audio-muted';
 const VOICE_DIR = `${import.meta.env.BASE_URL}audio/voice/`;
 
@@ -122,9 +124,10 @@ export class StudioAudio {
 
   playCaseVoice(id: string | null | undefined): void {
     this.stopVoice();
-    if (!id || this.muted) return;
+    const file = caseVoiceFile(id);
+    if (!file || this.muted) return;
     this.unlock();
-    const el = new Audio(`${VOICE_DIR}${id}.mp3`);
+    const el = new Audio(`${VOICE_DIR}${file}.mp3`);
     el.preload = 'auto';
     el.addEventListener('error', () => {
       if (this.voice === el) this.voice = null;

@@ -11,11 +11,22 @@ export type CaseContent = {
   headline: string;
   /** Phone peek / short-version title when it differs from the desktop headline. */
   shortHeadline?: string;
+  /**
+   * Basename under `audio/voice/` (no extension). `null` = this slot has no file;
+   * callers must not request `audio/voice/*.mp3`.
+   */
+  voice: string | null;
   /** Desktop (>= 768 px): the full text. */
   full: CaseBlock[];
   /** Phone (< 768 px): the short version. */
   short: CaseBlock[];
 };
+
+/** `null` when the room has no case, or the case has no recorded voice file. */
+export function caseVoiceFile(id: string | null | undefined): string | null {
+  if (!id) return null;
+  return CASES[id]?.voice ?? null;
+}
 
 const AIRLINE_PROBLEM =
   "On a Latin American airline's booking app (Android and iOS), Figma, specs, and code each told a different story about the same component in a booking flow. Several design systems overlapped, so nobody could tell which one was the source of truth. Every gap got reinterpreted downstream, and reworked.";
@@ -32,6 +43,7 @@ function landmarkPlaceholder(name: string): CaseContent {
   const paragraphs = [`${name} — a landmark of the map. More coming soon.`];
   return {
     headline: name,
+    voice: null,
     full: [{ kind: 'section', paragraphs }],
     short: [{ kind: 'section', paragraphs }],
   };
@@ -40,6 +52,7 @@ function landmarkPlaceholder(name: string): CaseContent {
 export const CASES: Record<string, CaseContent> = {
   volaris: {
     headline: "A contract engineering couldn't misread",
+    voice: null,
     full: [
       { kind: 'section', heading: 'Problem', paragraphs: [AIRLINE_PROBLEM] },
       { kind: 'section', heading: 'What I did', paragraphs: [`${AIRLINE_DID} ${AIRLINE_DELIVERED}`] },
@@ -76,6 +89,7 @@ export const CASES: Record<string, CaseContent> = {
   bain: {
     headline: 'Leading 9 designers across Bain, while still shipping the work',
     shortHeadline: 'Leading 9 designers across Bain',
+    voice: null,
     full: [
       {
         kind: 'section',
@@ -134,6 +148,7 @@ export const CASES: Record<string, CaseContent> = {
   },
   pg: {
     headline: 'An app panelists actually want to open',
+    voice: null,
     full: [
       {
         kind: 'section',
@@ -175,6 +190,7 @@ export const CASES: Record<string, CaseContent> = {
   mentoria: {
     headline: 'Mentoring with the same rigor as client work',
     shortHeadline: 'Mentoring as a system',
+    voice: null,
     full: [
       {
         kind: 'section',
@@ -230,6 +246,7 @@ export const CASES: Record<string, CaseContent> = {
   finoa: {
     headline: 'A custody platform institutions can trust at a glance',
     shortHeadline: 'A custody platform institutions can trust',
+    voice: null,
     full: [
       {
         kind: 'section',
