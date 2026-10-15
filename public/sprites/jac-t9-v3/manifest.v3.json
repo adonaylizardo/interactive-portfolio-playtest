@@ -1,0 +1,371 @@
+{
+  "asset": "jac-t9",
+  "version": "v3",
+  "estado": "BORRADOR",
+  "aprobado_para_mapa": false,
+  "aprobaciones": {
+    "forma_y_4_direcciones": "aprobado por Adonay (renders pixel-art, 15 oct 2026)",
+    "colocacion_en_mapa": "NO aprobada"
+  },
+  "reemplaza_a": "v2 (manifest.json, superseded)",
+  "origen": {
+    "tipo": "renders pixel-art aprobados (1280x720 jpg, fondo magenta) → chroma key + despill + downscale BOX + snap a paleta de 56 colores",
+    "scripts": "/workspace/portfolio/qa/relleno/jac-t9-v3-src/",
+    "fecha": "2026-10-15"
+  },
+  "unidades": "px; el mapa usa @2x (tiles iso 128x64)",
+  "celda": {
+    "@2x": {
+      "w": 560,
+      "h": 384
+    },
+    "@1x": {
+      "w": 280,
+      "h": 192
+    }
+  },
+  "ancla": {
+    "@2x": {
+      "x": 280,
+      "y": 180
+    },
+    "@1x": {
+      "x": 140,
+      "y": 90
+    },
+    "significado": "centro de la huella 4x2 a nivel del suelo (común a las 4 direcciones). El vértice sur de la huella está en ancla + vertice_sur_huella_offset de cada dirección."
+  },
+  "huella": {
+    "x": 4,
+    "y": 2
+  },
+  "escala": {
+    "criterio": "largo real 5,0 m / Adonay 1,78 m = 2,8x; Adonay 96 px @2x → ≈54 px/m; largo en pantalla a lo largo del eje iso ≈270 px @2x (≈3,8 tiles de 71,6 px) → huella 4x2",
+    "factor_vs_anterior": 1.41,
+    "alto_techo@2x_px": "≈145 (más que 1,85 m×54; la camioneta se escaló entera para respetar el largo)"
+  },
+  "direcciones": {
+    "SW": {
+      "descripcion": "frente hacia abajo-izquierda",
+      "hoja@2x": "v3/jac-t9-v3__hoja_sw@2x.png",
+      "hoja@1x": "v3/jac-t9-v3__hoja_sw@1x.png",
+      "filas": [
+        "apagado",
+        "luces",
+        "freno"
+      ],
+      "columnas": "frames rueda 0-3",
+      "fijos": {
+        "apagado": {
+          "@2x": "v3/jac-t9-v3__apagado_sw@2x.png",
+          "@1x": "v3/jac-t9-v3__apagado_sw@1x.png"
+        },
+        "luces": {
+          "@2x": "v3/jac-t9-v3__luces_sw@2x.png",
+          "@1x": "v3/jac-t9-v3__luces_sw@1x.png"
+        },
+        "freno": {
+          "@2x": "v3/jac-t9-v3__freno_sw@2x.png",
+          "@1x": "v3/jac-t9-v3__freno_sw@1x.png"
+        }
+      },
+      "capas_luz": {
+        "cono_suelo": "v3/capas/jac-t9-v3__capa_cono_suelo_sw@2x.png",
+        "faros_nucleo": "v3/capas/jac-t9-v3__capa_faros_nucleo_sw@2x.png",
+        "faros_halo": "v3/capas/jac-t9-v3__capa_faros_halo_sw@2x.png",
+        "cola_nucleo": "v3/capas/jac-t9-v3__capa_cola_nucleo_sw@2x.png",
+        "cola_halo": "v3/capas/jac-t9-v3__capa_cola_halo_sw@2x.png",
+        "freno_nucleo": "v3/capas/jac-t9-v3__capa_freno_nucleo_sw@2x.png",
+        "freno_halo": "v3/capas/jac-t9-v3__capa_freno_halo_sw@2x.png",
+        "haz_salida": "v3/capas/jac-t9-v3__capa_haz_salida_sw@2x.png"
+      },
+      "vertice_sur_huella_offset@2x": [
+        -64,
+        96
+      ],
+      "eje_largo_pantalla": [
+        -2,
+        1
+      ],
+      "luces_principales": "faros delanteros + cono en suelo"
+    },
+    "SE": {
+      "descripcion": "frente hacia abajo-derecha",
+      "hoja@2x": "v3/jac-t9-v3__hoja_se@2x.png",
+      "hoja@1x": "v3/jac-t9-v3__hoja_se@1x.png",
+      "filas": [
+        "apagado",
+        "luces",
+        "freno"
+      ],
+      "columnas": "frames rueda 0-3",
+      "fijos": {
+        "apagado": {
+          "@2x": "v3/jac-t9-v3__apagado_se@2x.png",
+          "@1x": "v3/jac-t9-v3__apagado_se@1x.png"
+        },
+        "luces": {
+          "@2x": "v3/jac-t9-v3__luces_se@2x.png",
+          "@1x": "v3/jac-t9-v3__luces_se@1x.png"
+        },
+        "freno": {
+          "@2x": "v3/jac-t9-v3__freno_se@2x.png",
+          "@1x": "v3/jac-t9-v3__freno_se@1x.png"
+        }
+      },
+      "capas_luz": {
+        "cono_suelo": "v3/capas/jac-t9-v3__capa_cono_suelo_se@2x.png",
+        "faros_nucleo": "v3/capas/jac-t9-v3__capa_faros_nucleo_se@2x.png",
+        "faros_halo": "v3/capas/jac-t9-v3__capa_faros_halo_se@2x.png",
+        "cola_nucleo": "v3/capas/jac-t9-v3__capa_cola_nucleo_se@2x.png",
+        "cola_halo": "v3/capas/jac-t9-v3__capa_cola_halo_se@2x.png",
+        "freno_nucleo": "v3/capas/jac-t9-v3__capa_freno_nucleo_se@2x.png",
+        "freno_halo": "v3/capas/jac-t9-v3__capa_freno_halo_se@2x.png",
+        "haz_salida": "v3/capas/jac-t9-v3__capa_haz_salida_se@2x.png"
+      },
+      "vertice_sur_huella_offset@2x": [
+        64,
+        96
+      ],
+      "eje_largo_pantalla": [
+        2,
+        1
+      ],
+      "luces_principales": "faros delanteros + cono en suelo"
+    },
+    "NE": {
+      "descripcion": "trasera; frente hacia arriba-derecha",
+      "hoja@2x": "v3/jac-t9-v3__hoja_ne@2x.png",
+      "hoja@1x": "v3/jac-t9-v3__hoja_ne@1x.png",
+      "filas": [
+        "apagado",
+        "luces",
+        "freno"
+      ],
+      "columnas": "frames rueda 0-3",
+      "fijos": {
+        "apagado": {
+          "@2x": "v3/jac-t9-v3__apagado_ne@2x.png",
+          "@1x": "v3/jac-t9-v3__apagado_ne@1x.png"
+        },
+        "luces": {
+          "@2x": "v3/jac-t9-v3__luces_ne@2x.png",
+          "@1x": "v3/jac-t9-v3__luces_ne@1x.png"
+        },
+        "freno": {
+          "@2x": "v3/jac-t9-v3__freno_ne@2x.png",
+          "@1x": "v3/jac-t9-v3__freno_ne@1x.png"
+        }
+      },
+      "capas_luz": {
+        "cono_suelo": "v3/capas/jac-t9-v3__capa_cono_suelo_ne@2x.png",
+        "faros_nucleo": "v3/capas/jac-t9-v3__capa_faros_nucleo_ne@2x.png",
+        "faros_halo": "v3/capas/jac-t9-v3__capa_faros_halo_ne@2x.png",
+        "cola_nucleo": "v3/capas/jac-t9-v3__capa_cola_nucleo_ne@2x.png",
+        "cola_halo": "v3/capas/jac-t9-v3__capa_cola_halo_ne@2x.png",
+        "freno_nucleo": "v3/capas/jac-t9-v3__capa_freno_nucleo_ne@2x.png",
+        "freno_halo": "v3/capas/jac-t9-v3__capa_freno_halo_ne@2x.png",
+        "haz_salida": "v3/capas/jac-t9-v3__capa_haz_salida_ne@2x.png"
+      },
+      "vertice_sur_huella_offset@2x": [
+        -64,
+        96
+      ],
+      "eje_largo_pantalla": [
+        -2,
+        1
+      ],
+      "luces_principales": "calaveras rojas (cola/freno); faro lejano tenue en la esquina"
+    },
+    "NW": {
+      "descripcion": "trasera; frente hacia arriba-izquierda",
+      "hoja@2x": "v3/jac-t9-v3__hoja_nw@2x.png",
+      "hoja@1x": "v3/jac-t9-v3__hoja_nw@1x.png",
+      "filas": [
+        "apagado",
+        "luces",
+        "freno"
+      ],
+      "columnas": "frames rueda 0-3",
+      "fijos": {
+        "apagado": {
+          "@2x": "v3/jac-t9-v3__apagado_nw@2x.png",
+          "@1x": "v3/jac-t9-v3__apagado_nw@1x.png"
+        },
+        "luces": {
+          "@2x": "v3/jac-t9-v3__luces_nw@2x.png",
+          "@1x": "v3/jac-t9-v3__luces_nw@1x.png"
+        },
+        "freno": {
+          "@2x": "v3/jac-t9-v3__freno_nw@2x.png",
+          "@1x": "v3/jac-t9-v3__freno_nw@1x.png"
+        }
+      },
+      "capas_luz": {
+        "cono_suelo": "v3/capas/jac-t9-v3__capa_cono_suelo_nw@2x.png",
+        "faros_nucleo": "v3/capas/jac-t9-v3__capa_faros_nucleo_nw@2x.png",
+        "faros_halo": "v3/capas/jac-t9-v3__capa_faros_halo_nw@2x.png",
+        "cola_nucleo": "v3/capas/jac-t9-v3__capa_cola_nucleo_nw@2x.png",
+        "cola_halo": "v3/capas/jac-t9-v3__capa_cola_halo_nw@2x.png",
+        "freno_nucleo": "v3/capas/jac-t9-v3__capa_freno_nucleo_nw@2x.png",
+        "freno_halo": "v3/capas/jac-t9-v3__capa_freno_halo_nw@2x.png",
+        "haz_salida": "v3/capas/jac-t9-v3__capa_haz_salida_nw@2x.png"
+      },
+      "vertice_sur_huella_offset@2x": [
+        64,
+        96
+      ],
+      "eje_largo_pantalla": [
+        2,
+        1
+      ],
+      "luces_principales": "calaveras rojas (cola/freno); faro lejano tenue en la esquina"
+    }
+  },
+  "animaciones": {
+    "rueda": {
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "fps": 10,
+      "loop": true,
+      "metodo": "rotación de 15°/frame de los rayos dentro de la máscara elíptica del rin (6 rayos → loop sin salto); cauchos intactos"
+    },
+    "idle": {
+      "frames": [
+        0
+      ],
+      "nota": "usar frame 0 de la fila que toque"
+    }
+  },
+  "capas_luz": {
+    "modo": "las filas luces/freno ya traen todo horneado; las capas sueltas sirven para componer en motor",
+    "orden": [
+      "cono_suelo (debajo del carro)",
+      "sprite",
+      "haz_salida (inicio del haz sobre el faro)",
+      "*_nucleo",
+      "*_halo"
+    ],
+    "colores": {
+      "faro": "#FFF8E4",
+      "halo_faro": "#FFEEC8",
+      "cono": "#FFECC8 → #FFDAA8 (ámbar solo como caída lejana, muy sutil)",
+      "cola": "#EC2E28",
+      "freno": "#FF5C48"
+    },
+    "conos": "dos conos, uno por faro (bloque inferior + tira LED de cada esquina), siguen el rumbo iso y abren ±~6°"
+  },
+  "colocacion": {
+    "activa": false,
+    "propuesta": {
+      "celda_S": [
+        27,
+        18
+      ],
+      "huella": {
+        "x": 4,
+        "y": 2
+      },
+      "dir": "SE",
+      "nota": "solo propuesta; con huella 4x2 revisar que (27,18) siga libre; NO activar hasta que Adonay apruebe la colocación"
+    }
+  },
+  "qa": {
+    "hoja": "/workspace/portfolio/qa/relleno/jac-t9-v3-hoja.png",
+    "gif": "/workspace/portfolio/qa/relleno/jac-t9-v3-ruedas.gif"
+  },
+  "archivos": [
+    "v3/jac-t9-v3__apagado_sw@2x.png",
+    "v3/jac-t9-v3__luces_sw@2x.png",
+    "v3/jac-t9-v3__freno_sw@2x.png",
+    "v3/jac-t9-v3__hoja_sw@2x.png",
+    "v3/capas/jac-t9-v3__capa_faros_nucleo_sw@2x.png",
+    "v3/capas/jac-t9-v3__capa_faros_halo_sw@2x.png",
+    "v3/capas/jac-t9-v3__capa_cola_nucleo_sw@2x.png",
+    "v3/capas/jac-t9-v3__capa_cola_halo_sw@2x.png",
+    "v3/capas/jac-t9-v3__capa_freno_nucleo_sw@2x.png",
+    "v3/capas/jac-t9-v3__capa_freno_halo_sw@2x.png",
+    "v3/capas/jac-t9-v3__capa_cono_suelo_sw@2x.png",
+    "v3/capas/jac-t9-v3__capa_haz_salida_sw@2x.png",
+    "v3/jac-t9-v3__apagado_sw@1x.png",
+    "v3/jac-t9-v3__luces_sw@1x.png",
+    "v3/jac-t9-v3__freno_sw@1x.png",
+    "v3/jac-t9-v3__hoja_sw@1x.png",
+    "v3/capas/jac-t9-v3__capa_faros_nucleo_sw@1x.png",
+    "v3/capas/jac-t9-v3__capa_faros_halo_sw@1x.png",
+    "v3/capas/jac-t9-v3__capa_cola_nucleo_sw@1x.png",
+    "v3/capas/jac-t9-v3__capa_cola_halo_sw@1x.png",
+    "v3/capas/jac-t9-v3__capa_freno_nucleo_sw@1x.png",
+    "v3/capas/jac-t9-v3__capa_freno_halo_sw@1x.png",
+    "v3/capas/jac-t9-v3__capa_cono_suelo_sw@1x.png",
+    "v3/capas/jac-t9-v3__capa_haz_salida_sw@1x.png",
+    "v3/jac-t9-v3__apagado_se@2x.png",
+    "v3/jac-t9-v3__luces_se@2x.png",
+    "v3/jac-t9-v3__freno_se@2x.png",
+    "v3/jac-t9-v3__hoja_se@2x.png",
+    "v3/capas/jac-t9-v3__capa_faros_nucleo_se@2x.png",
+    "v3/capas/jac-t9-v3__capa_faros_halo_se@2x.png",
+    "v3/capas/jac-t9-v3__capa_cola_nucleo_se@2x.png",
+    "v3/capas/jac-t9-v3__capa_cola_halo_se@2x.png",
+    "v3/capas/jac-t9-v3__capa_freno_nucleo_se@2x.png",
+    "v3/capas/jac-t9-v3__capa_freno_halo_se@2x.png",
+    "v3/capas/jac-t9-v3__capa_cono_suelo_se@2x.png",
+    "v3/capas/jac-t9-v3__capa_haz_salida_se@2x.png",
+    "v3/jac-t9-v3__apagado_se@1x.png",
+    "v3/jac-t9-v3__luces_se@1x.png",
+    "v3/jac-t9-v3__freno_se@1x.png",
+    "v3/jac-t9-v3__hoja_se@1x.png",
+    "v3/capas/jac-t9-v3__capa_faros_nucleo_se@1x.png",
+    "v3/capas/jac-t9-v3__capa_faros_halo_se@1x.png",
+    "v3/capas/jac-t9-v3__capa_cola_nucleo_se@1x.png",
+    "v3/capas/jac-t9-v3__capa_cola_halo_se@1x.png",
+    "v3/capas/jac-t9-v3__capa_freno_nucleo_se@1x.png",
+    "v3/capas/jac-t9-v3__capa_freno_halo_se@1x.png",
+    "v3/capas/jac-t9-v3__capa_cono_suelo_se@1x.png",
+    "v3/capas/jac-t9-v3__capa_haz_salida_se@1x.png",
+    "v3/jac-t9-v3__apagado_ne@2x.png",
+    "v3/jac-t9-v3__luces_ne@2x.png",
+    "v3/jac-t9-v3__freno_ne@2x.png",
+    "v3/jac-t9-v3__hoja_ne@2x.png",
+    "v3/capas/jac-t9-v3__capa_faros_nucleo_ne@2x.png",
+    "v3/capas/jac-t9-v3__capa_faros_halo_ne@2x.png",
+    "v3/capas/jac-t9-v3__capa_cola_nucleo_ne@2x.png",
+    "v3/capas/jac-t9-v3__capa_cola_halo_ne@2x.png",
+    "v3/capas/jac-t9-v3__capa_freno_nucleo_ne@2x.png",
+    "v3/capas/jac-t9-v3__capa_freno_halo_ne@2x.png",
+    "v3/jac-t9-v3__apagado_ne@1x.png",
+    "v3/jac-t9-v3__luces_ne@1x.png",
+    "v3/jac-t9-v3__freno_ne@1x.png",
+    "v3/jac-t9-v3__hoja_ne@1x.png",
+    "v3/capas/jac-t9-v3__capa_faros_nucleo_ne@1x.png",
+    "v3/capas/jac-t9-v3__capa_faros_halo_ne@1x.png",
+    "v3/capas/jac-t9-v3__capa_cola_nucleo_ne@1x.png",
+    "v3/capas/jac-t9-v3__capa_cola_halo_ne@1x.png",
+    "v3/capas/jac-t9-v3__capa_freno_nucleo_ne@1x.png",
+    "v3/capas/jac-t9-v3__capa_freno_halo_ne@1x.png",
+    "v3/jac-t9-v3__apagado_nw@2x.png",
+    "v3/jac-t9-v3__luces_nw@2x.png",
+    "v3/jac-t9-v3__freno_nw@2x.png",
+    "v3/jac-t9-v3__hoja_nw@2x.png",
+    "v3/capas/jac-t9-v3__capa_faros_nucleo_nw@2x.png",
+    "v3/capas/jac-t9-v3__capa_faros_halo_nw@2x.png",
+    "v3/capas/jac-t9-v3__capa_cola_nucleo_nw@2x.png",
+    "v3/capas/jac-t9-v3__capa_cola_halo_nw@2x.png",
+    "v3/capas/jac-t9-v3__capa_freno_nucleo_nw@2x.png",
+    "v3/capas/jac-t9-v3__capa_freno_halo_nw@2x.png",
+    "v3/jac-t9-v3__apagado_nw@1x.png",
+    "v3/jac-t9-v3__luces_nw@1x.png",
+    "v3/jac-t9-v3__freno_nw@1x.png",
+    "v3/jac-t9-v3__hoja_nw@1x.png",
+    "v3/capas/jac-t9-v3__capa_faros_nucleo_nw@1x.png",
+    "v3/capas/jac-t9-v3__capa_faros_halo_nw@1x.png",
+    "v3/capas/jac-t9-v3__capa_cola_nucleo_nw@1x.png",
+    "v3/capas/jac-t9-v3__capa_cola_halo_nw@1x.png",
+    "v3/capas/jac-t9-v3__capa_freno_nucleo_nw@1x.png",
+    "v3/capas/jac-t9-v3__capa_freno_halo_nw@1x.png"
+  ]
+}
