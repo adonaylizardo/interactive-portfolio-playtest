@@ -1,9 +1,9 @@
 /**
- * Case-study panel copy, keyed by building id. The building id is internal only: case panels show
- * the headline as their title, and the copy never names the client.
+ * Panel copy, keyed by building id. Case-study rooms show the headline as their title and never
+ * name the client. Landmark rooms keep the place name as the title and use a short placeholder.
  */
 export type CaseBlock =
-  | { kind: 'section'; heading: string; paragraphs: string[]; bullets?: string[] }
+  | { kind: 'section'; heading?: string; paragraphs: string[]; bullets?: string[] }
   | { kind: 'closing'; text: string };
 
 export type CaseContent = {
@@ -24,6 +24,15 @@ const AIRLINE_RESULT =
   '10 sealed contracts shipped to engineering on Oct 1, 2026. Full flow: before, 1 to 2 days to about 2 hours, on both Android and iOS. Engineering has already implemented it: what used to take a couple of weeks took just days with the contracts. Leadership gave it the green light as a standard process for projects facing similar problems.';
 const AIRLINE_RULE = 'Design and code never sync directly. Both pass through the sealed contract first.';
 const AIRLINE_CLOSING = "The goal wasn't zero defects. It was zero guessing.";
+
+function landmarkPlaceholder(name: string): CaseContent {
+  const paragraphs = [`${name} is a landmark of the map. More coming soon.`];
+  return {
+    headline: name,
+    full: [{ kind: 'section', paragraphs }],
+    short: [{ kind: 'section', paragraphs }],
+  };
+}
 
 export const CASES: Record<string, CaseContent> = {
   volaris: {
@@ -61,4 +70,7 @@ export const CASES: Record<string, CaseContent> = {
       { kind: 'closing', text: AIRLINE_CLOSING },
     ],
   },
+  sambil: landmarkPlaceholder('Sambil'),
+  catedral: landmarkPlaceholder('Catedral'),
+  flor: landmarkPlaceholder('Flor de Venezuela'),
 };

@@ -56,10 +56,12 @@ function caseBlockNode(block: CaseBlock): HTMLElement {
   }
   const section = document.createElement('section');
   section.className = 'case__section';
-  const h = document.createElement('h3');
-  h.className = 'case__heading';
-  h.textContent = block.heading;
-  section.appendChild(h);
+  if (block.heading) {
+    const h = document.createElement('h3');
+    h.className = 'case__heading';
+    h.textContent = block.heading;
+    section.appendChild(h);
+  }
   for (const text of block.paragraphs) {
     const p = document.createElement('p');
     p.className = 'case__text';
