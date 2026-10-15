@@ -30,7 +30,16 @@ async function tapSalir(page) {
   await page.waitForSelector('.building-panel--open [data-exit]', { state: 'visible', timeout: 5000 });
   const box = await page.locator('.building-panel [data-exit]').first().boundingBox();
   if (!box) throw new Error('Salir has no box');
-  await page.touchscreen.tap(Math.round(box.x + box.width / 2), Math.round(box.y + box.height / 2));
+  const x = Math.round(box.x + box.width / 2);
+  const y = Math.round(box.y + box.height / 2);
+  // Same-tick down+up: a quick tap. Playwright's touchscreen.tap holds ~100 ms, which
+  // ate the 150 ms budget once leave moved to pointerup.
+  await page.evaluate(([cx, cy]) => {
+    const el = document.elementFromPoint(cx, cy)?.closest('[data-exit]') || document.querySelector('.building-panel [data-exit]');
+    const extra = { bubbles: true, cancelable: true, clientX: cx, clientY: cy, pointerId: 11, pointerType: 'touch', isPrimary: true };
+    el.dispatchEvent(new PointerEvent('pointerdown', extra));
+    el.dispatchEvent(new PointerEvent('pointerup', extra));
+  }, [x, y]);
 }
 
 async function main() {

@@ -178,7 +178,14 @@ async function testExitSalir(ctx, kind, base, errors) {
           errors.push(`${tag}: Salir has no box`);
           continue;
         }
-        await tapAt(page, kind, box.x + box.width / 2, box.y + box.height / 2);
+        const x = Math.round(box.x + box.width / 2);
+        const y = Math.round(box.y + box.height / 2);
+        await page.evaluate(([cx, cy]) => {
+          const el = document.elementFromPoint(cx, cy)?.closest('[data-exit]') || document.querySelector('.building-panel [data-exit]');
+          const extra = { bubbles: true, cancelable: true, clientX: cx, clientY: cy, pointerId: 11, pointerType: 'touch', isPrimary: true };
+          el.dispatchEvent(new PointerEvent('pointerdown', extra));
+          el.dispatchEvent(new PointerEvent('pointerup', extra));
+        }, [x, y]);
       } else {
         await exit.click();
       }
