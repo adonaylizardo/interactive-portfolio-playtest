@@ -1,0 +1,999 @@
+{
+  "asset": "jac-t9",
+  "origen": {
+    "tipo": "programatico",
+    "script": "/workspace/portfolio/qa/relleno/generar_jac_t9.py",
+    "figma": null,
+    "fecha": "2026-10-15",
+    "refs": "/workspace/portfolio/personaje-refs/jac-t9/{silver-front,front,rear,side-moscow}.jpg"
+  },
+  "tipo": "vehículo controlable (sprite pixel)",
+  "unidades": "px @1x (×2 para @2x; en el mapa se usa @2x)",
+  "nota": "JAC T9 de Adonay en Graphite Grey / plateado-gris de fábrica (no carbón inventado). Doble cabina, caja corta, sports bar negra, parrilla hexagonal con barra cromada y DRL LED, faros cuadrados bajos, llantas 18\" bicolor, pasos laterales, flares negros. Celda 160×100, ancla (80,88)=piso bajo el centro de la cabina / entre ejes. Huella 3×2. Alto visible ≈ 58 px @1x = 116 px @2x (1,21× Adonay). Largo ≈ 2,5–3 casillas. sw/nw = espejo de se/ne.",
+  "tokens": {
+    "Graphite Grey": "carrocería G0–G4",
+    "negro plástico": "parrilla, flares, bumper, sports bar",
+    "cromo": "barra de parrilla, rieles, manijas, steps",
+    "world/glow #FFB547": "faros, DRL, overlay glow"
+  },
+  "colocacion": {
+    "default": {
+      "celda_S": [
+        27,
+        18
+      ],
+      "huella": {
+        "x": 3,
+        "y": 2
+      },
+      "dir": "se",
+      "nota": "x 25–27, y 17–18, césped al NE del Estudio / cerca del café; libre de FILLER_PROPS y del plan"
+    },
+    "ancla": "pon el ancla (80,88)@1x / (160,176)@2x sobre el centro de la casilla S; el vehículo ocupa S y las 5 casillas hacia −x/−y"
+  },
+  "jugabilidad": {
+    "entrar": "Interactuar con la T9: Adonay y Pantone se ocultan (o silueta en cabina). Controlas la camioneta.",
+    "mover": "Más rápida que caminar; solo por casillas de calle/paso (PASO). No atraviesa ocupado ni props que bloquean.",
+    "salir": "Al salir, la T9 queda donde paró (idle). Adonay aparece en la casilla libre más cercana al lado del conductor (+y en se/sw).",
+    "luces": "De noche: faros + glow auto. De día: toggle opcional. Al girar: intermitente L/R 2 fr a 4 fps. Al frenar/parar: freno.",
+    "capas": "Orden de dibujo: glow (si faros) → carrocería (idle|andar|faros|…) → Adonay/Pantone si van a pie."
+  },
+  "animaciones": [
+    {
+      "anim": "idle_se",
+      "archivo1x": "jac-t9__idle_se@1x.png",
+      "archivo2x": "jac-t9__idle_se@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 2,
+      "loop": true,
+      "espejo_de": null,
+      "ambar_pct": 0.0,
+      "nota": "estacionado; frame 1 = destello de cromo"
+    },
+    {
+      "anim": "idle_sw",
+      "archivo1x": "jac-t9__idle_sw@1x.png",
+      "archivo2x": "jac-t9__idle_sw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 2,
+      "loop": true,
+      "espejo_de": "se",
+      "ambar_pct": 0.0,
+      "nota": "estacionado; frame 1 = destello de cromo"
+    },
+    {
+      "anim": "idle_ne",
+      "archivo1x": "jac-t9__idle_ne@1x.png",
+      "archivo2x": "jac-t9__idle_ne@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 2,
+      "loop": true,
+      "espejo_de": null,
+      "ambar_pct": 0.0,
+      "nota": "estacionado; frame 1 = destello de cromo"
+    },
+    {
+      "anim": "idle_nw",
+      "archivo1x": "jac-t9__idle_nw@1x.png",
+      "archivo2x": "jac-t9__idle_nw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 2,
+      "loop": true,
+      "espejo_de": "ne",
+      "ambar_pct": 0.0,
+      "nota": "estacionado; frame 1 = destello de cromo"
+    },
+    {
+      "anim": "andar_se",
+      "archivo1x": "jac-t9__andar_se@1x.png",
+      "archivo2x": "jac-t9__andar_se@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 6,
+      "loop": true,
+      "espejo_de": null,
+      "ambar_pct": 0.0,
+      "nota": "rueda gira + carrocería sube 1 px"
+    },
+    {
+      "anim": "andar_sw",
+      "archivo1x": "jac-t9__andar_sw@1x.png",
+      "archivo2x": "jac-t9__andar_sw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 6,
+      "loop": true,
+      "espejo_de": "se",
+      "ambar_pct": 0.0,
+      "nota": "rueda gira + carrocería sube 1 px"
+    },
+    {
+      "anim": "andar_ne",
+      "archivo1x": "jac-t9__andar_ne@1x.png",
+      "archivo2x": "jac-t9__andar_ne@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 6,
+      "loop": true,
+      "espejo_de": null,
+      "ambar_pct": 0.0,
+      "nota": "rueda gira + carrocería sube 1 px"
+    },
+    {
+      "anim": "andar_nw",
+      "archivo1x": "jac-t9__andar_nw@1x.png",
+      "archivo2x": "jac-t9__andar_nw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 6,
+      "loop": true,
+      "espejo_de": "ne",
+      "ambar_pct": 0.0,
+      "nota": "rueda gira + carrocería sube 1 px"
+    },
+    {
+      "anim": "faros_se",
+      "archivo1x": "jac-t9__faros_se@1x.png",
+      "archivo2x": "jac-t9__faros_se@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 2,
+      "loop": true,
+      "espejo_de": null,
+      "ambar_pct": 1.26,
+      "nota": "faros y DRL encendidos, estacionado"
+    },
+    {
+      "anim": "faros_sw",
+      "archivo1x": "jac-t9__faros_sw@1x.png",
+      "archivo2x": "jac-t9__faros_sw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 2,
+      "loop": true,
+      "espejo_de": "se",
+      "ambar_pct": 1.26,
+      "nota": "faros y DRL encendidos, estacionado"
+    },
+    {
+      "anim": "faros_ne",
+      "archivo1x": "jac-t9__faros_ne@1x.png",
+      "archivo2x": "jac-t9__faros_ne@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 2,
+      "loop": true,
+      "espejo_de": null,
+      "ambar_pct": 0.51,
+      "nota": "faros y DRL encendidos, estacionado"
+    },
+    {
+      "anim": "faros_nw",
+      "archivo1x": "jac-t9__faros_nw@1x.png",
+      "archivo2x": "jac-t9__faros_nw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 2,
+      "loop": true,
+      "espejo_de": "ne",
+      "ambar_pct": 0.51,
+      "nota": "faros y DRL encendidos, estacionado"
+    },
+    {
+      "anim": "andar_faros_se",
+      "archivo1x": "jac-t9__andar_faros_se@1x.png",
+      "archivo2x": "jac-t9__andar_faros_se@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 6,
+      "loop": true,
+      "espejo_de": null,
+      "ambar_pct": 1.26,
+      "nota": "andando de noche"
+    },
+    {
+      "anim": "andar_faros_sw",
+      "archivo1x": "jac-t9__andar_faros_sw@1x.png",
+      "archivo2x": "jac-t9__andar_faros_sw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 6,
+      "loop": true,
+      "espejo_de": "se",
+      "ambar_pct": 1.26,
+      "nota": "andando de noche"
+    },
+    {
+      "anim": "andar_faros_ne",
+      "archivo1x": "jac-t9__andar_faros_ne@1x.png",
+      "archivo2x": "jac-t9__andar_faros_ne@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 6,
+      "loop": true,
+      "espejo_de": null,
+      "ambar_pct": 0.51,
+      "nota": "andando de noche"
+    },
+    {
+      "anim": "andar_faros_nw",
+      "archivo1x": "jac-t9__andar_faros_nw@1x.png",
+      "archivo2x": "jac-t9__andar_faros_nw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 6,
+      "loop": true,
+      "espejo_de": "ne",
+      "ambar_pct": 0.51,
+      "nota": "andando de noche"
+    },
+    {
+      "anim": "freno_se",
+      "archivo1x": "jac-t9__freno_se@1x.png",
+      "archivo2x": "jac-t9__freno_se@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0
+      ],
+      "fps": 0,
+      "loop": false,
+      "espejo_de": null,
+      "ambar_pct": 0.11,
+      "nota": "luces de freno"
+    },
+    {
+      "anim": "freno_sw",
+      "archivo1x": "jac-t9__freno_sw@1x.png",
+      "archivo2x": "jac-t9__freno_sw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0
+      ],
+      "fps": 0,
+      "loop": false,
+      "espejo_de": "se",
+      "ambar_pct": 0.11,
+      "nota": "luces de freno"
+    },
+    {
+      "anim": "freno_ne",
+      "archivo1x": "jac-t9__freno_ne@1x.png",
+      "archivo2x": "jac-t9__freno_ne@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0
+      ],
+      "fps": 0,
+      "loop": false,
+      "espejo_de": null,
+      "ambar_pct": 2.46,
+      "nota": "luces de freno"
+    },
+    {
+      "anim": "freno_nw",
+      "archivo1x": "jac-t9__freno_nw@1x.png",
+      "archivo2x": "jac-t9__freno_nw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0
+      ],
+      "fps": 0,
+      "loop": false,
+      "espejo_de": "ne",
+      "ambar_pct": 2.46,
+      "nota": "luces de freno"
+    },
+    {
+      "anim": "freno_faros_se",
+      "archivo1x": "jac-t9__freno_faros_se@1x.png",
+      "archivo2x": "jac-t9__freno_faros_se@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0
+      ],
+      "fps": 0,
+      "loop": false,
+      "espejo_de": null,
+      "ambar_pct": 1.37,
+      "nota": "freno + faros"
+    },
+    {
+      "anim": "freno_faros_sw",
+      "archivo1x": "jac-t9__freno_faros_sw@1x.png",
+      "archivo2x": "jac-t9__freno_faros_sw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0
+      ],
+      "fps": 0,
+      "loop": false,
+      "espejo_de": "se",
+      "ambar_pct": 1.37,
+      "nota": "freno + faros"
+    },
+    {
+      "anim": "freno_faros_ne",
+      "archivo1x": "jac-t9__freno_faros_ne@1x.png",
+      "archivo2x": "jac-t9__freno_faros_ne@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0
+      ],
+      "fps": 0,
+      "loop": false,
+      "espejo_de": null,
+      "ambar_pct": 2.96,
+      "nota": "freno + faros"
+    },
+    {
+      "anim": "freno_faros_nw",
+      "archivo1x": "jac-t9__freno_faros_nw@1x.png",
+      "archivo2x": "jac-t9__freno_faros_nw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0
+      ],
+      "fps": 0,
+      "loop": false,
+      "espejo_de": "ne",
+      "ambar_pct": 2.96,
+      "nota": "freno + faros"
+    },
+    {
+      "anim": "intermitente_L_se",
+      "archivo1x": "jac-t9__intermitente_L_se@1x.png",
+      "archivo2x": "jac-t9__intermitente_L_se@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 4,
+      "loop": true,
+      "espejo_de": null,
+      "ambar_pct": 0.9,
+      "nota": "intermitente izquierdo"
+    },
+    {
+      "anim": "intermitente_L_sw",
+      "archivo1x": "jac-t9__intermitente_L_sw@1x.png",
+      "archivo2x": "jac-t9__intermitente_L_sw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 4,
+      "loop": true,
+      "espejo_de": "se",
+      "ambar_pct": 0.9,
+      "nota": "intermitente izquierdo"
+    },
+    {
+      "anim": "intermitente_L_ne",
+      "archivo1x": "jac-t9__intermitente_L_ne@1x.png",
+      "archivo2x": "jac-t9__intermitente_L_ne@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 4,
+      "loop": true,
+      "espejo_de": null,
+      "ambar_pct": 0.89,
+      "nota": "intermitente izquierdo"
+    },
+    {
+      "anim": "intermitente_L_nw",
+      "archivo1x": "jac-t9__intermitente_L_nw@1x.png",
+      "archivo2x": "jac-t9__intermitente_L_nw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 4,
+      "loop": true,
+      "espejo_de": "ne",
+      "ambar_pct": 0.89,
+      "nota": "intermitente izquierdo"
+    },
+    {
+      "anim": "intermitente_R_se",
+      "archivo1x": "jac-t9__intermitente_R_se@1x.png",
+      "archivo2x": "jac-t9__intermitente_R_se@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 4,
+      "loop": true,
+      "espejo_de": null,
+      "ambar_pct": 0.9,
+      "nota": "intermitente derecho"
+    },
+    {
+      "anim": "intermitente_R_sw",
+      "archivo1x": "jac-t9__intermitente_R_sw@1x.png",
+      "archivo2x": "jac-t9__intermitente_R_sw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 4,
+      "loop": true,
+      "espejo_de": "se",
+      "ambar_pct": 0.9,
+      "nota": "intermitente derecho"
+    },
+    {
+      "anim": "intermitente_R_ne",
+      "archivo1x": "jac-t9__intermitente_R_ne@1x.png",
+      "archivo2x": "jac-t9__intermitente_R_ne@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 4,
+      "loop": true,
+      "espejo_de": null,
+      "ambar_pct": 1.02,
+      "nota": "intermitente derecho"
+    },
+    {
+      "anim": "intermitente_R_nw",
+      "archivo1x": "jac-t9__intermitente_R_nw@1x.png",
+      "archivo2x": "jac-t9__intermitente_R_nw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 4,
+      "loop": true,
+      "espejo_de": "ne",
+      "ambar_pct": 1.02,
+      "nota": "intermitente derecho"
+    },
+    {
+      "anim": "intermitente_L_faros_se",
+      "archivo1x": "jac-t9__intermitente_L_faros_se@1x.png",
+      "archivo2x": "jac-t9__intermitente_L_faros_se@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 4,
+      "loop": true,
+      "espejo_de": null,
+      "ambar_pct": 2.16,
+      "nota": null
+    },
+    {
+      "anim": "intermitente_L_faros_sw",
+      "archivo1x": "jac-t9__intermitente_L_faros_sw@1x.png",
+      "archivo2x": "jac-t9__intermitente_L_faros_sw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 4,
+      "loop": true,
+      "espejo_de": "se",
+      "ambar_pct": 2.16,
+      "nota": null
+    },
+    {
+      "anim": "intermitente_L_faros_ne",
+      "archivo1x": "jac-t9__intermitente_L_faros_ne@1x.png",
+      "archivo2x": "jac-t9__intermitente_L_faros_ne@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 4,
+      "loop": true,
+      "espejo_de": null,
+      "ambar_pct": 1.21,
+      "nota": null
+    },
+    {
+      "anim": "intermitente_L_faros_nw",
+      "archivo1x": "jac-t9__intermitente_L_faros_nw@1x.png",
+      "archivo2x": "jac-t9__intermitente_L_faros_nw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 4,
+      "loop": true,
+      "espejo_de": "ne",
+      "ambar_pct": 1.21,
+      "nota": null
+    },
+    {
+      "anim": "intermitente_R_faros_se",
+      "archivo1x": "jac-t9__intermitente_R_faros_se@1x.png",
+      "archivo2x": "jac-t9__intermitente_R_faros_se@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 4,
+      "loop": true,
+      "espejo_de": null,
+      "ambar_pct": 2.15,
+      "nota": null
+    },
+    {
+      "anim": "intermitente_R_faros_sw",
+      "archivo1x": "jac-t9__intermitente_R_faros_sw@1x.png",
+      "archivo2x": "jac-t9__intermitente_R_faros_sw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 4,
+      "loop": true,
+      "espejo_de": "se",
+      "ambar_pct": 2.15,
+      "nota": null
+    },
+    {
+      "anim": "intermitente_R_faros_ne",
+      "archivo1x": "jac-t9__intermitente_R_faros_ne@1x.png",
+      "archivo2x": "jac-t9__intermitente_R_faros_ne@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 4,
+      "loop": true,
+      "espejo_de": null,
+      "ambar_pct": 1.53,
+      "nota": null
+    },
+    {
+      "anim": "intermitente_R_faros_nw",
+      "archivo1x": "jac-t9__intermitente_R_faros_nw@1x.png",
+      "archivo2x": "jac-t9__intermitente_R_faros_nw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0,
+        1
+      ],
+      "fps": 4,
+      "loop": true,
+      "espejo_de": "ne",
+      "ambar_pct": 1.53,
+      "nota": null
+    },
+    {
+      "anim": "glow_se",
+      "archivo1x": "jac-t9__glow_se@1x.png",
+      "archivo2x": "jac-t9__glow_se@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0
+      ],
+      "fps": 0,
+      "loop": false,
+      "espejo_de": null,
+      "ambar_pct": 100.0,
+      "nota": "overlay nocturno del haz; dibuja encima de faros/andar_faros. 100 % ámbar del sprite (es solo luz); el cuerpo lit queda ≤2,5 %"
+    },
+    {
+      "anim": "glow_sw",
+      "archivo1x": "jac-t9__glow_sw@1x.png",
+      "archivo2x": "jac-t9__glow_sw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0
+      ],
+      "fps": 0,
+      "loop": false,
+      "espejo_de": "se",
+      "ambar_pct": 100.0,
+      "nota": "overlay nocturno del haz; dibuja encima de faros/andar_faros. 100 % ámbar del sprite (es solo luz); el cuerpo lit queda ≤2,5 %"
+    },
+    {
+      "anim": "glow_ne",
+      "archivo1x": "jac-t9__glow_ne@1x.png",
+      "archivo2x": "jac-t9__glow_ne@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0
+      ],
+      "fps": 0,
+      "loop": false,
+      "espejo_de": null,
+      "ambar_pct": 100.0,
+      "nota": "overlay nocturno del haz; dibuja encima de faros/andar_faros. 100 % ámbar del sprite (es solo luz); el cuerpo lit queda ≤2,5 %"
+    },
+    {
+      "anim": "glow_nw",
+      "archivo1x": "jac-t9__glow_nw@1x.png",
+      "archivo2x": "jac-t9__glow_nw@2x.png",
+      "celda": {
+        "w": 160,
+        "h": 100
+      },
+      "ancla": {
+        "x": 80,
+        "y": 88
+      },
+      "frames": [
+        0
+      ],
+      "fps": 0,
+      "loop": false,
+      "espejo_de": "ne",
+      "ambar_pct": 100.0,
+      "nota": "overlay nocturno del haz; dibuja encima de faros/andar_faros. 100 % ámbar del sprite (es solo luz); el cuerpo lit queda ≤2,5 %"
+    }
+  ]
+}
