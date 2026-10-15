@@ -6,6 +6,8 @@
  *  - photos 01-05 in page order, lazy-loaded WebP (transparent PNGs keep their alpha), never wider
  *    than the panel; links open the absolute URLs in a new tab
  *  - readable at 390 and 1280 (font sizes, no sideways scroll) and the panel scrolls to the last line
+ *  - one close control ("Salir") on desktop and phones, at the sheet's top and uncovered both before
+ *    and after scrolling to the end; a real click / tap on it there leaves the room
  *  - the section only shows in the Estudio
  *  - phones: Noah's tap box is 1.5x his frame (plus padding), and a tap in the added margin reaches him
  *  - desktop (Chromium and WebKit, real mouse and keyboard): hovering Noah shows his "…" bubble and
@@ -156,6 +158,34 @@ async function lastLineInView(page) {
 }
 
 /** Phones: a tap just inside the 1.5x box, outside the old 1x box, still reaches Noah. */
+/**
+ * The room sheet's way out: one visible control on desktop and phones alike, near the sheet's top
+ * and under the pointer (not covered) wherever the text is scrolled.
+ */
+async function exitControl(page) {
+  return qa(page, () => {
+    const shown = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+    const buttons = [...document.querySelectorAll('.building-panel button')].filter(shown);
+    const exit = document.querySelector('.building-panel [data-exit]');
+    const r = exit?.getBoundingClientRect();
+    const s = document.querySelector('.building-panel__sheet').getBoundingClientRect();
+    const hit = r && document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return {
+      labels: buttons.map((b) => b.textContent.trim()),
+      fromTop: r ? Math.round(r.top - Math.max(s.top, 0)) : null,
+      inSheet: !!r && r.left >= s.left && r.right <= s.right + 0.5,
+      onTop: !!hit && exit.contains(hit),
+    };
+  });
+}
+
+function exitControlErrors(tag, where, c, errors) {
+  if (c.labels.length !== 1 || c.labels[0] !== 'Salir') errors.push(`${tag}: ${where}: visible panel controls ${JSON.stringify(c.labels)}, want just "Salir"`);
+  if (c.fromTop == null || c.fromTop < 0 || c.fromTop > 48) errors.push(`${tag}: ${where}: Salir is ${c.fromTop}px below the sheet top, want it at the top`);
+  if (!c.inSheet) errors.push(`${tag}: ${where}: Salir is outside the sheet`);
+  if (!c.onTop) errors.push(`${tag}: ${where}: something covers Salir`);
+}
+
 async function noahTapCheck(page, spec, tag, errors) {
   const n0 = await qa(page, () => window.__playtestQa.noah());
   if (!n0?.loaded) {
@@ -322,6 +352,7 @@ export async function runRun47AboutSuite({ kind, base, errors, notes, shots }) {
       await wait(500);
     }
     await shot(`estudio-${kind}.png`);
+    exitControlErrors(tag, 'panel top', await exitControl(page), errors);
 
     const m = await readPanel(page);
     if (!m.shown) errors.push(`${tag}: "About me" is not shown in the Estudio panel`);
@@ -363,8 +394,20 @@ export async function runRun47AboutSuite({ kind, base, errors, notes, shots }) {
     await wait(300);
     if (!(await lastLineInView(page))) errors.push(`${tag}: the last line cannot be scrolled into view`);
     await shot(`estudio-${kind}-end.png`);
+    exitControlErrors(tag, 'scrolled to the end', await exitControl(page), errors);
 
-    await qa(page, () => window.__playtestQa.exitInterior());
+    const exit = page.locator('.building-panel [data-exit]').first();
+    const pressed = await (spec.phone ? exit.tap({ timeout: 3000 }) : exit.click({ timeout: 3000 })).then(() => true, () => false);
+    const left =
+      pressed &&
+      (await page
+        .waitForFunction(() => !window.__playtestQa.isInInterior() && !window.__playtestQa.isBuildingPanelOpen(), null, { timeout: 5000 })
+        .then(() => true)
+        .catch(() => false));
+    if (!left) {
+      errors.push(`${tag}: ${spec.phone ? 'tapping' : 'clicking'} Salir at the end of the text did not leave the Estudio`);
+      await qa(page, () => window.__playtestQa.exitInterior());
+    }
     await wait(500);
     await qa(page, () => window.__playtestQa.enterInterior('volaris'));
     await page.waitForFunction(() => window.__playtestQa.isBuildingPanelOpen(), null, { timeout: 15000 });
@@ -374,7 +417,8 @@ export async function runRun47AboutSuite({ kind, base, errors, notes, shots }) {
 
     notes.push(
       `${tag}: after the logo strip (${m.stripLogos} logos), ${m.lines.length} lines ${okText ? 'match about.md' : 'DIFFER'}, ` +
-        `${loaded.filter((p) => p.natural).length}/5 lazy WebP photos <= ${m.contentW}px, body ${m.minFont}px, scrolls to the last line; ${noah}` +
+        `${loaded.filter((p) => p.natural).length}/5 lazy WebP photos <= ${m.contentW}px, body ${m.minFont}px, scrolls to the last line ` +
+        `with the one Salir still at the top and working; ${noah}` +
         (files ? `; files ${files}` : ''),
     );
   } finally {

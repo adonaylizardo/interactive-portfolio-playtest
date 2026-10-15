@@ -70,9 +70,13 @@ body.is-canvas-dragging * {
   pointer-events: none;
 }
 
-#ui-root > .building-panel.building-panel--open .building-panel__sheet,
-#ui-root > .building-panel.building-panel--open .building-panel__float-exit {
+#ui-root > .building-panel.building-panel--open .building-panel__sheet {
   pointer-events: auto;
+}
+
+/* Phones: the checklist ring would peek over the room sheet, right beside its Salir button. */
+#ui-root:has(> .building-panel--open) > .checklist--mobile {
+  visibility: hidden;
 }
 
 /* Checklist */
@@ -501,36 +505,51 @@ body.is-canvas-dragging * {
   background: #ccc;
 }
 
-.building-panel__float-exit {
-  position: fixed;
-  top: max(12px, env(safe-area-inset-top));
-  right: max(12px, env(safe-area-inset-right));
-  z-index: 22;
-  pointer-events: auto;
-  min-width: 62px;
+/* The one way out on every screen: a zero-height sticky bar, so the button stays at the sheet's top
+   right while the text scrolls under it, and sits in the peek row on phones. */
+.building-panel__bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 0;
+}
+
+.building-panel__exit {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 68px;
   min-height: 36px;
-  padding: 10px 16px;
-  border: none;
+  padding: 8px 16px;
+  border: 1px solid #e2e2e2;
   border-radius: 999px;
-  background: rgb(255 255 255 / 92%);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 15%);
+  background: #fff;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 10%);
   font-size: 14px;
   font-weight: 600;
   color: #333;
   cursor: pointer;
 }
 
-.building-panel__salir {
-  display: block;
-  width: 100%;
-  margin-top: 16px;
-  padding: 12px 16px;
-  border: 1px solid #ccc;
-  border-radius: 10px;
+/* Once the text scrolls, a white band behind the button keeps it from floating over the copy. */
+.building-panel--scrolled .building-panel__bar::before {
+  content: '';
+  position: absolute;
+  top: -24px;
+  left: -24px;
+  right: -24px;
+  height: 80px;
+  background: linear-gradient(#fff 75%, rgb(255 255 255 / 0%));
+  pointer-events: none;
+}
+
+.building-panel__exit:hover {
   background: #f5f5f5;
-  color: #333;
-  font-size: 15px;
-  cursor: pointer;
+}
+
+.building-panel__exit:focus-visible {
+  outline: 2px solid #333;
+  outline-offset: 2px;
 }
 
 .building-panel__body-wrap {
@@ -562,21 +581,9 @@ body.is-canvas-dragging * {
     opacity: 1;
     pointer-events: auto;
   }
-
-  .building-panel--interior-only .building-panel__close {
-    display: none;
-  }
-
-  .building-panel--interior-only .building-panel__salir {
-    display: none;
-  }
 }
 
 @media (min-width: 768px) {
-  .building-panel--interior-only .building-panel__salir {
-    display: none;
-  }
-
   .building-panel--interior-only.building-panel--open .building-panel__backdrop {
     opacity: 0;
     pointer-events: none;
@@ -617,7 +624,6 @@ body.is-canvas-dragging * {
     width: min(400px, 90vw);
     transform: translateX(100%);
     box-shadow: -4px 0 32px rgb(0 0 0 / 10%);
-    padding-top: 48px;
   }
 
   .building-panel--open .building-panel__sheet {
@@ -651,35 +657,33 @@ body.is-canvas-dragging * {
     transform: translateY(calc(100% - 72px));
   }
 
-  .building-panel--peek .building-panel__body-wrap,
-  .building-panel--peek .building-panel__salir {
+  .building-panel--peek .building-panel__body-wrap {
     display: none;
   }
 
   .building-panel--peek .building-panel__title {
     margin: 0;
     font-size: 17px;
-    text-align: center;
+    line-height: 24px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     cursor: pointer;
   }
-}
 
-.building-panel__close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 36px;
-  height: 36px;
-  border: none;
-  background: #f0f0f0;
-  border-radius: 8px;
-  font-size: 24px;
-  line-height: 1;
-  cursor: pointer;
+  .building-panel__exit {
+    top: -6px;
+  }
+
+  .building-panel--scrolled .building-panel__bar::before {
+    top: -12px;
+    height: 60px;
+  }
 }
 
 .building-panel__title {
   margin: 0 0 12px;
+  padding-right: 84px;
   font-size: 22px;
   user-select: text;
   -webkit-user-select: text;
@@ -777,11 +781,7 @@ body.is-canvas-dragging * {
   }
 
   .building-panel--case.building-panel--peek .building-panel__title {
-    padding: 0 8px;
     font-size: 15px;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
   }
 }
 

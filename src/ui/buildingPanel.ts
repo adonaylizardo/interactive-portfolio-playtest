@@ -108,11 +108,12 @@ export class BuildingPanel {
     this.el.className = 'building-panel building-panel--interior-only';
     this.el.hidden = true;
     this.el.innerHTML = `
-      <button type="button" class="building-panel__float-exit" data-float-exit hidden>Salir</button>
       <div class="building-panel__backdrop" data-backdrop></div>
       <div class="building-panel__sheet" role="dialog" aria-modal="true">
         <div class="building-panel__drag" data-drag aria-hidden="true"></div>
-        <button type="button" class="building-panel__close" data-close aria-label="Cerrar">×</button>
+        <div class="building-panel__bar">
+          <button type="button" class="building-panel__exit" data-exit>Salir</button>
+        </div>
         <h2 class="building-panel__title"></h2>
         <div class="building-panel__body-wrap">
           <article class="case" lang="en" hidden>
@@ -127,7 +128,6 @@ export class BuildingPanel {
             <h3 class="about__title" id="about-title">About me</h3>
           </section>
         </div>
-        <button type="button" class="building-panel__salir" data-exit>Salir</button>
       </div>
     `;
     container.appendChild(this.el);
@@ -146,19 +146,10 @@ export class BuildingPanel {
     });
 
     this.el.querySelector('[data-exit]')!.addEventListener('click', () => this.salir());
-    this.el.querySelector('[data-close]')!.addEventListener('click', () => {
-      if (this.isMobile() && this.mode === 'interior' && !this.peekOnly) {
-        this.setPeek(true);
-        return;
-      }
-      if (!this.isMobile() || this.mode !== 'interior') {
-        this.salir();
-      }
-    });
-    this.el.querySelector('[data-float-exit]')!.addEventListener('click', () => this.salir());
     this.el.querySelector('[data-backdrop]')!.addEventListener('click', () => {
       if (this.isMobile() && this.mode === 'interior') this.setPeek(true);
     });
+    this.sheet.addEventListener('scroll', () => this.syncScrolled(), { passive: true });
     this.sheet.addEventListener('click', (e) => e.stopPropagation());
     this.sheet.addEventListener('pointerdown', (e) => e.stopPropagation());
 
@@ -225,8 +216,6 @@ export class BuildingPanel {
     this.renderAbout();
     this.peekOnly = this.isMobile();
     this.el.hidden = false;
-    const floatExit = this.el.querySelector('[data-float-exit]') as HTMLElement;
-    floatExit.hidden = !this.isMobile();
     requestAnimationFrame(() => {
       this.el.classList.add('building-panel--open');
       this.syncPeekClass();
@@ -250,6 +239,11 @@ export class BuildingPanel {
     this.el.dataset.panelKey = key;
     this.titleEl.textContent = shown ?? key;
     this.sheet.scrollTop = 0;
+    this.syncScrolled();
+  }
+
+  private syncScrolled(): void {
+    this.el.classList.toggle('building-panel--scrolled', this.sheet.scrollTop > 4);
   }
 
   /** Fills the case article for the current interior; returns its headline, or null when there is no case. */
@@ -298,8 +292,6 @@ export class BuildingPanel {
   }
 
   hide(): void {
-    const floatExit = this.el.querySelector('[data-float-exit]') as HTMLElement;
-    floatExit.hidden = true;
     this.el.classList.remove('building-panel--open', 'building-panel--peek');
     const delay = this.reducedMotion() ? 0 : 200;
     setTimeout(() => {
@@ -337,28 +329,13 @@ export class BuildingPanel {
     if (this.isMobile()) {
       const peek = this.el.classList.contains('building-panel--peek');
       const bottom = peek ? Math.min(88, sheet.height) : sheet.height;
-      const floatExit = this.el.querySelector('[data-float-exit]') as HTMLElement | null;
-      const pill = floatExit && !floatExit.hidden ? floatExit.getBoundingClientRect() : null;
-      const top = pill && pill.height > 0 ? Math.ceil(pill.bottom + 6) : 0;
-      return { left: 0, top, right: 0, bottom: Math.ceil(bottom + 8) };
+      return { left: 0, top: 0, right: 0, bottom: Math.ceil(bottom + 8) };
     }
     return { left: 0, top: 0, right: Math.ceil(sheet.width + 32), bottom: 0 };
   }
 
   containsSheetPoint(clientX: number, clientY: number): boolean {
     if (!this.isOpen()) return false;
-    const floatExit = this.el.querySelector('[data-float-exit]') as HTMLElement;
-    if (!floatExit.hidden) {
-      const fr = floatExit.getBoundingClientRect();
-      if (
-        clientX >= fr.left &&
-        clientX <= fr.right &&
-        clientY >= fr.top &&
-        clientY <= fr.bottom
-      ) {
-        return true;
-      }
-    }
     const sheet = this.sheet.getBoundingClientRect();
     return (
       clientX >= sheet.left &&
