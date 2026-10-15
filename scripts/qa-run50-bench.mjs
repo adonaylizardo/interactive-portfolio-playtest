@@ -174,9 +174,13 @@ async function sitByTap(page, spec, bench, tag, errors) {
     `${tag}: walk to ${bench.id}`,
   ).catch(() => false);
   if (!walking) {
-    await qa(page, ([x, y]) => window.__playtestQa.tapMapTile(x, y), [bench.front.x, bench.front.y]);
+    await qa(page, ([x, y, z]) => window.__playtestQa.frameWorld(x, y - 10, z), [bench.tapWorld.x, bench.tapWorld.y, spec.zoom]);
+    await wait(150);
+    const fresh = (await qa(page, () => window.__playtestQa.benches())).benches.find((b) => b.id === bench.id);
+    if (fresh?.client) await qa(page, ([x, y]) => window.__playtestQa.tapScreen(x, y), [fresh.client.x, fresh.client.y]);
+    else await qa(page, ([x, y]) => window.__playtestQa.tapMapTile(x, y), [bench.front.x, bench.front.y]);
   }
-  await until(page, () => window.__playtestQa.playerAvatar().sit !== 'free' || !!window.__playtestQa.benches().pending, null, 4000, `${tag}: walk to ${bench.id}`);
+  await until(page, () => window.__playtestQa.playerAvatar().sit !== 'free' || !!window.__playtestQa.benches().pending, null, 8000, `${tag}: walk to ${bench.id}`);
   await until(
     page,
     () => {
