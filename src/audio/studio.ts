@@ -1,12 +1,18 @@
 /**
- * Sound v1: tiny Web Audio synthesis (no bundled samples) plus an optional per-case
- * voice file if Adonay has recorded one. Autoplay-safe: the graph starts on the first
- * user gesture. Mute persists in localStorage.
+ * Sound: tiny Web Audio synthesis plus Adonay's recorded voice lines.
+ * Autoplay-safe: the graph starts on the first user gesture. Mute persists.
  */
 import { caseVoiceFile } from '../data/cases';
+import { VOICE_LINES } from '../data/voice-lines';
 
 const MUTE_KEY = 'studio-audio-muted';
 const VOICE_DIR = `${import.meta.env.BASE_URL}audio/voice/`;
+/** −12 dB vs the previous 0.16 foot gain (0.16 × 10^(−12/20) ≈ 0.040). */
+const FOOT_GAIN = 0.04;
+const FOOT_MIN_MS_WALK = 140;
+const FOOT_MIN_MS_SPRINT = 95;
+/** Walk-cycle frames where a foot plants (8-frame strip, two contacts). */
+const FOOT_CONTACT = new Set([0, 4]);
 
 function readMute(): boolean {
   try {
@@ -24,6 +30,12 @@ function writeMute(muted: boolean): void {
   }
 }
 
+function canPlayOgg(): boolean {
+  if (typeof Audio === 'undefined') return false;
+  const a = new Audio();
+  return a.canPlayType('audio/ogg; codecs=vorbis') !== '';
+}
+
 export class StudioAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -32,9 +44,13 @@ export class StudioAudio {
   private unlocked = false;
   private muted = readMute();
   private interior = false;
-  private lastFoot = -1;
+  private lastFootFrame = -1;
+  private lastFootAt = 0;
   private voice: HTMLAudioElement | null = null;
+  private subtitleText = '';
+  private readonly played = new Set<string>();
   private readonly listeners = new Set<() => void>();
+  private preferOgg: boolean | null = null;
 
   constructor() {
     const unlock = () => this.unlock();
@@ -49,6 +65,10 @@ export class StudioAudio {
 
   isUnlocked(): boolean {
     return this.unlocked;
+  }
+
+  subtitle(): string {
+    return this.subtitleText;
   }
 
   onChange(fn: () => void): () => void {
@@ -94,23 +114,30 @@ export class StudioAudio {
     } catch {
       /* autoplay / context limits: mute state still flips */
     }
+    queueMicrotask(() => {
+      if (!this.voice && !this.muted) this.playLine('01-intro');
+    });
   }
 
   setInterior(open: boolean): void {
     this.interior = open;
     if (!open) this.stopVoice();
     this.syncAmbience();
+    this.emit();
   }
 
-  noteWalk(walking: boolean, walked: number, stride = 8.94): void {
+  noteWalk(walking: boolean, frame = 0, sprint = false): void {
     if (!walking) {
-      this.lastFoot = -1;
+      this.lastFootFrame = -1;
       return;
     }
-    const step = Math.floor(walked / Math.max(1, stride));
-    if (step === this.lastFoot || step < 0) return;
-    this.lastFoot = step;
-    this.playFoot(step % 2 === 0);
+    if (!FOOT_CONTACT.has(frame) || frame === this.lastFootFrame) return;
+    const now = performance.now();
+    const minMs = sprint ? FOOT_MIN_MS_SPRINT : FOOT_MIN_MS_WALK;
+    if (now - this.lastFootAt < minMs) return;
+    this.lastFootFrame = frame;
+    this.lastFootAt = now;
+    this.playFoot(sprint, frame === 0);
   }
 
   playDoor(): void {
@@ -123,26 +150,49 @@ export class StudioAudio {
   }
 
   playCaseVoice(id: string | null | undefined): void {
-    this.stopVoice();
     const file = caseVoiceFile(id);
-    if (!file || this.muted) return;
+    if (!file) return;
+    this.playLine(file);
+  }
+
+  playLine(id: string): void {
+    const line = VOICE_LINES[id];
+    if (!line || this.played.has(id) || this.muted) return;
     this.unlock();
-    const el = new Audio(`${VOICE_DIR}${file}.mp3`);
+    this.stopVoice();
+    this.played.add(id);
+    this.preferOgg ??= canPlayOgg();
+    const file = this.preferOgg ? line.files.ogg : line.files.mp3;
+    const el = new Audio(`${VOICE_DIR}${file}`);
     el.preload = 'auto';
     el.addEventListener('error', () => {
-      if (this.voice === el) this.voice = null;
+      if (this.voice === el) this.finishVoice();
+    });
+    el.addEventListener('ended', () => {
+      if (this.voice === el) this.finishVoice();
     });
     this.voice = el;
+    this.subtitleText = line.script_text;
+    this.duckAmbience(true);
+    this.emit();
     void el.play().catch(() => {
-      if (this.voice === el) this.voice = null;
+      if (this.voice === el) this.finishVoice();
     });
   }
 
+  private finishVoice(): void {
+    this.stopVoice();
+    this.syncAmbience();
+    this.emit();
+  }
+
   private stopVoice(): void {
-    if (!this.voice) return;
-    this.voice.pause();
-    this.voice.src = '';
-    this.voice = null;
+    if (this.voice) {
+      this.voice.pause();
+      this.voice.src = '';
+      this.voice = null;
+    }
+    this.subtitleText = '';
   }
 
   private startAmbience(): void {
@@ -176,20 +226,32 @@ export class StudioAudio {
     this.syncAmbience();
   }
 
+  private ambienceTarget(): number {
+    if (this.muted || !this.unlocked) return 0;
+    if (this.voice) return this.interior ? 0.004 : 0.012;
+    return this.interior ? 0.012 : 0.04;
+  }
+
   private syncAmbience(): void {
+    this.duckAmbience(!!this.voice);
+  }
+
+  private duckAmbience(on: boolean): void {
     const gain = this.ambienceGain;
     const ctx = this.ctx;
     if (!gain || !ctx) return;
-    const target = this.muted || !this.unlocked ? 0 : this.interior ? 0.012 : 0.04;
+    void on;
+    const target = this.ambienceTarget();
     gain.gain.cancelScheduledValues(ctx.currentTime);
-    gain.gain.setTargetAtTime(target, ctx.currentTime, 0.25);
+    gain.gain.setTargetAtTime(target, ctx.currentTime, 0.18);
   }
 
-  private playFoot(left: boolean): void {
+  private playFoot(sprint: boolean, left: boolean): void {
     const ctx = this.ctx;
     const master = this.master;
     if (!ctx || !master || this.muted) return;
-    const dur = 0.06;
+    const variant = Math.floor(Math.random() * 4);
+    const dur = sprint ? 0.045 : 0.055;
     const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < data.length; i++) {
@@ -198,12 +260,13 @@ export class StudioAudio {
     }
     const src = ctx.createBufferSource();
     src.buffer = buffer;
+    src.playbackRate.value = (sprint ? 1.08 : 1) * (0.92 + variant * 0.05);
     const filter = ctx.createBiquadFilter();
     filter.type = 'bandpass';
-    filter.frequency.value = left ? 420 : 560;
-    filter.Q.value = 1.2;
+    filter.frequency.value = (left ? 380 : 470) + variant * 18;
+    filter.Q.value = 1.1;
     const gain = ctx.createGain();
-    gain.gain.value = 0.16;
+    gain.gain.value = FOOT_GAIN * (sprint ? 0.85 : 1) * (0.82 + variant * 0.08);
     src.connect(filter);
     filter.connect(gain);
     gain.connect(master);

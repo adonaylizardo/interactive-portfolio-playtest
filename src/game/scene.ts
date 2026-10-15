@@ -1075,6 +1075,7 @@ export class IsoScene {
       return;
     }
     if (!this.noah.talk()) return;
+    studio.playLine('12-climbing-wall');
     const n = this.noah.tile();
     this.avatar.setFacing(
       (n.y + n.x >= this.charTx + this.charTy ? 's' : 'n') + (n.x - n.y >= this.charTx - this.charTy ? 'e' : 'w') as FacingDir,
@@ -1194,14 +1195,14 @@ export class IsoScene {
       const f = tileToWorld(this.interiorCharTx, this.interiorCharTy);
       this.interiorAvatar.update(f.x, f.y, dt);
       const snap = this.interiorAvatar.snapshot();
-      studio.noteWalk(snap.adonay.mode === 'walk', snap.adonay.walked, snap.stride);
+      studio.noteWalk(snap.adonay.mode === 'walk', snap.adonay.frame, this.sprint);
       return;
     }
     const f = tileToWorld(this.charTx, this.charTy);
     this.avatar.update(f.x, f.y, dt);
     this.noah?.update(dt);
     const snap = this.avatar.snapshot();
-    studio.noteWalk(snap.adonay.mode === 'walk', snap.adonay.walked, snap.stride);
+    studio.noteWalk(snap.adonay.mode === 'walk', snap.adonay.frame, this.sprint);
   }
 
   /** Screen coords (canvas pixels) ↔ world coords with world scaled under a fixed camera pivot. */
