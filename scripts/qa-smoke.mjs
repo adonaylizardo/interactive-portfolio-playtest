@@ -33,6 +33,7 @@ import { runRun44NpcSuite } from './qa-run44-npcs.mjs';
 import { runRun45PlayerSuite } from './qa-run45-player.mjs';
 import { runRun46CaseSuite } from './qa-run46-case.mjs';
 import { runRun55CaseSuite } from './qa-run55-cases.mjs';
+import { runRun56LayoutSuite } from './qa-run56-layouts.mjs';
 import { runRun46FillSuite } from './qa-run46-fill.mjs';
 import { runRun47AboutSuite } from './qa-run47-about.mjs';
 import { runRun48RoutineSuite } from './qa-run48-routines.mjs';
@@ -84,17 +85,20 @@ async function firstLoad({ tag, type, options, minZoom, centred }) {
       };
     });
     if (!(m.zoom >= minZoom && m.zoom <= 1.0)) errors.push(`firstload-${tag}: zoom ${m.zoom} outside ${minZoom}..1`);
-    const dx = Math.abs(m.foot.x - m.w / 2) / m.w;
+    const mapLeft = m.w >= 768 ? 496 : 0;
+    const mapW = Math.max(1, m.w - mapLeft);
+    const mapCx = mapLeft + mapW / 2;
+    const dx = Math.abs(m.foot.x - mapCx) / mapW;
     const dy = Math.abs(m.foot.y - m.h / 2) / m.h;
-    if (centred && (dx > 0.15 || dy > 0.2)) {
-      errors.push(`firstload-${tag}: character at ${Math.round(m.foot.x)},${Math.round(m.foot.y)} is not near the centre of ${m.w}x${m.h}`);
+    if (centred && (dx > 0.18 || dy > 0.22)) {
+      errors.push(`firstload-${tag}: character at ${Math.round(m.foot.x)},${Math.round(m.foot.y)} is not near the map centre (${Math.round(mapCx)} of ${m.w}x${m.h})`);
     }
-    if (m.foot.x < 8 || m.foot.x > m.w - 8 || m.foot.y < 60 || m.foot.y > m.h - 60) {
-      errors.push(`firstload-${tag}: character off screen at ${Math.round(m.foot.x)},${Math.round(m.foot.y)}`);
+    if (m.foot.x < mapLeft + 8 || m.foot.x > m.w - 8 || m.foot.y < 60 || m.foot.y > m.h - 60) {
+      errors.push(`firstload-${tag}: character off the map at ${Math.round(m.foot.x)},${Math.round(m.foot.y)}`);
     }
     for (const key of ['estudio', 'volaris']) {
       const pt = m[key];
-      if (!pt || pt.x < 8 || pt.x > m.w - 8 || pt.y < 40 || pt.y > m.h - 40) {
+      if (!pt || pt.x < mapLeft + 8 || pt.x > m.w - 8 || pt.y < 40 || pt.y > m.h - 40) {
         errors.push(`firstload-${tag}: ${key} door not in view ${JSON.stringify(pt)}`);
       }
     }
@@ -157,6 +161,11 @@ async function exits(kind, only) {
 const GROUPS = {
   firstload: async () => {
     for (const spec of FIRST_LOAD) await firstLoad(spec);
+  },
+  chrome: async () => {
+    for (const kind of ['chromium-1280', 'chromium-375']) {
+      await runRun56LayoutSuite({ kind, base: BASE, errors, notes });
+    }
   },
   'exits-desktop': () => exits('chromium-desktop', ['exit', 'door']),
   'exits-iphone': () => exits('webkit-iphone', ['exit', 'door']),

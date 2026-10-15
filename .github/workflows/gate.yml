@@ -74,7 +74,7 @@ jobs:
         groups:
           - exits-iphone
           - exits-desktop,exits-phone,about
-          - firstload,input,case,fill
+          - firstload,chrome,input,case,fill
           - follow,logos,npcs,player,routines
           - bench
     steps:

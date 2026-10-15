@@ -366,7 +366,7 @@ export class BuildingPanel {
       const bottom = peek ? Math.min(88, sheet.height) : sheet.height;
       return { left: 0, top: 0, right: 0, bottom: Math.ceil(bottom + 8) };
     }
-    return { left: 0, top: 0, right: Math.ceil(sheet.width + 32), bottom: 0 };
+    return { left: Math.ceil(sheet.width + 64), top: 0, right: 0, bottom: 0 };
   }
 
   containsSheetPoint(clientX: number, clientY: number): boolean {

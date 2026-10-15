@@ -13,7 +13,9 @@ import { getInteriorDef, interiorBlockedTilesHaveProps } from './game/interior';
 import { IsoScene } from './game/scene';
 import { findPath } from './iso/pathfinding';
 import { BuildingPanel } from './ui/buildingPanel';
+import { ChromeUI, type DesktopLayout } from './ui/chrome';
 import { hideToast, showToast } from './ui/toast';
+import type { Camera } from './tokens';
 
 async function main(): Promise<void> {
   const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -22,10 +24,24 @@ async function main(): Promise<void> {
   const checklist = new ChecklistUI(uiRoot, { onSkip: () => {}, onDismiss: () => {} });
 
   let scene!: IsoScene;
+  const chrome = new ChromeUI(uiRoot, {
+    onLayoutChange: () => {
+      if (chrome.getLayout() === 'map') checklist.setCollapsed(true);
+      else checklist.setCollapsed(false);
+      scene?.applyCameraFromUi();
+    },
+    onView: (mode: Camera) => scene?.setViewMode(mode),
+    onRotate: () => scene?.rotateView(),
+    onMapOverview: () => scene?.toggleMapOverview(),
+    onCenter: () => scene?.recenterOnCharacter(),
+    onLocate: (id) => scene?.walkToBuildingForQa(id),
+  });
+
   const panel = new BuildingPanel(
     uiRoot,
     () => {
       checklist.setBuildingPanelOpen(false);
+      chrome.setInteriorOpen(false);
       scene.applyCameraFromUi();
     },
     () => scene.leaveInteriorNow(),
@@ -36,10 +52,12 @@ async function main(): Promise<void> {
       const b = getBuildingByName(interiorId);
       if (b?.panelTitle) {
         checklist.setBuildingPanelOpen(true);
+        chrome.setInteriorOpen(true);
         panel.showInterior(b.panelTitle, interiorId);
       }
     } else {
       checklist.setBuildingPanelOpen(false);
+      chrome.setInteriorOpen(false);
       panel.hide({ snap: true });
     }
     scene.applyCameraFromUi();
@@ -53,6 +71,7 @@ async function main(): Promise<void> {
     },
     onExitInterior: () => {
       checklist.setBuildingPanelOpen(false);
+      chrome.setInteriorOpen(false);
       panel.hide({ snap: true });
     },
     onInteriorIdChange: (id) => {
@@ -72,8 +91,15 @@ async function main(): Promise<void> {
       isMobileExpanded: () => checklist.isMobileExpanded(),
       collapseMobile: () => checklist.collapseMobile(),
     },
+    chrome: {
+      layoutInsets: () => chrome.layoutInsets(),
+    },
   });
 
+  chrome.bindScene({
+    getCharTile: () => scene.getCharacterTile(),
+    getView: () => scene.getViewMode(),
+  });
   await scene.init(canvas);
 
   const bootInterior = parseInteriorFromHash();
@@ -163,6 +189,13 @@ async function main(): Promise<void> {
     skipQuiet: (seconds: number) => scene.qaSkipQuiet(seconds),
     noah: () => scene.qaNoah(),
     pixiTargetAt: (x: number, y: number) => scene.qaPixiTargetAt(x, y),
+    getLayout: () => chrome.getLayout(),
+    setLayout: (m: DesktopLayout) => chrome.setLayout(m),
+    getViewMode: () => scene.getViewMode(),
+    setViewMode: (m: Camera) => scene.setViewMode(m),
+    rotateView: () => scene.rotateView(),
+    toggleMapOverview: () => scene.toggleMapOverview(),
+    isMobileSheetOpen: () => chrome.isMobileSheetOpen(),
   };
 }
 

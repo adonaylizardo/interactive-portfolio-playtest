@@ -21,7 +21,7 @@ type StepCopy = {
 const STEP_COPY: Record<ChecklistStepId, StepCopy> = {
   'walk-around': {
     id: 'walk-around',
-    title: 'Camina por ahí',
+    title: 'Camina por el mundo',
     detailDesktop: 'Haz clic en un tile para ir allí. Doble clic o Shift para correr.',
     detailTouch: 'Toca un tile para ir allí. Doble toque en un tile para correr.',
   },
@@ -83,16 +83,16 @@ export class ChecklistUI {
     this.root.innerHTML = `
       <header class="checklist__header">
         <div class="checklist__header-text">
-          <span class="checklist__label">Primeros pasos</span>
+          <span class="checklist__label">Getting started</span>
           <h2 class="checklist__active-title"></h2>
         </div>
         <div class="checklist__progress-wrap">
           <span class="checklist__counter checklist__counter--label"></span>
           <button type="button" class="checklist__ring-btn" aria-label="Abrir o cerrar lista de pasos">
-            <svg class="checklist__ring" viewBox="0 0 56 56" width="56" height="56" aria-hidden="true">
-              <circle class="checklist__ring-bg" cx="28" cy="28" r="24" fill="none" stroke-width="2.5"/>
-              <circle class="checklist__ring-fg" cx="28" cy="28" r="24" fill="none" stroke-width="3"
-                stroke-dasharray="150.8" stroke-dashoffset="150.8" transform="rotate(-90 28 28)"/>
+            <svg class="checklist__ring" viewBox="0 0 28 28" width="28" height="28" aria-hidden="true">
+              <circle class="checklist__ring-bg" cx="14" cy="14" r="11" fill="none" stroke-width="2"/>
+              <circle class="checklist__ring-fg" cx="14" cy="14" r="11" fill="none" stroke-width="2.5"
+                stroke-dasharray="69.12" stroke-dashoffset="69.12" transform="rotate(-90 14 14)"/>
             </svg>
             <span class="checklist__counter checklist__counter--in-ring"></span>
           </button>
@@ -185,6 +185,13 @@ export class ChecklistUI {
     this.applyLayoutClasses();
   }
 
+  setCollapsed(collapsed: boolean): void {
+    if (this.mobile) return;
+    this.state.collapsed = collapsed;
+    saveChecklist(this.state);
+    this.applyLayoutClasses();
+  }
+
   private applyLayoutClasses(): void {
     this.mobile = isMobileLayout();
     const total = totalStepsForPlatform(this.compactSteps);
@@ -225,7 +232,7 @@ export class ChecklistUI {
     const counterText = `${done} / ${total}`;
     this.counterEl.textContent = counterText;
     this.counterInRing.textContent = counterText;
-    const circumference = 150.8;
+    const circumference = 69.12;
     const offset = circumference * (1 - done / total);
     this.ringEl.style.strokeDashoffset = String(offset);
 

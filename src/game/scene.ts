@@ -91,6 +91,7 @@ import {
   type InteriorCell,
   type InteriorDef,
 } from './interior';
+import type { Camera } from '../tokens';
 import {
   cameraFitMargins,
   cameraFromPinchSession,
@@ -194,6 +195,10 @@ export type ChecklistBridge = {
   collapseMobile: () => void;
 };
 
+export type ChromeBridge = {
+  layoutInsets?: () => { left: number; top: number; right: number; bottom: number };
+};
+
 export type SceneEvents = {
   onChecklist: (step: ChecklistStepId) => void;
   onEnterBuilding: (buildingId: string, panelTitle: string) => void;
@@ -202,6 +207,7 @@ export type SceneEvents = {
   onUnreachable?: () => void;
   buildingPanel?: BuildingPanelBridge;
   checklist?: ChecklistBridge;
+  chrome?: ChromeBridge;
 };
 
 /** Desktop first-load camera when the URL carries no #view. */
@@ -250,6 +256,13 @@ export class IsoScene {
   cameraX = 0;
   cameraY = 0;
   zoom = 0.85;
+  private viewMode: Camera = 'isometrica';
+  private yaw = 0;
+  private viewRot = 0;
+  private viewSx = 1;
+  private viewSy = 1;
+  private mapOverview = false;
+  private savedCam: { x: number; y: number; zoom: number } | null = null;
 
   /**
    * Camera follow. `engaged` while the character moves (and until the glide settles); `suspended`
@@ -1064,9 +1077,15 @@ export class IsoScene {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     const z = this.zoom;
+    const dx = sx - sw / 2;
+    const dy = sy - sh / 2;
+    const cos = Math.cos(this.viewRot);
+    const sin = Math.sin(this.viewRot);
+    const lx = (dx * cos + dy * sin) / this.viewSx;
+    const ly = (-dx * sin + dy * cos) / this.viewSy;
     return {
-      x: (sx - sw / 2) / z - this.cameraX,
-      y: (sy - sh / 2) / z - this.cameraY,
+      x: lx / z - this.cameraX,
+      y: ly / z - this.cameraY,
     };
   }
 
@@ -1074,10 +1093,90 @@ export class IsoScene {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     const z = this.zoom;
+    const lx = (this.cameraX + wx) * z;
+    const ly = (this.cameraY + wy) * z;
+    const cos = Math.cos(this.viewRot);
+    const sin = Math.sin(this.viewRot);
     return {
-      x: sw / 2 + (this.cameraX + wx) * z,
-      y: sh / 2 + (this.cameraY + wy) * z,
+      x: sw / 2 + lx * this.viewSx * cos - ly * this.viewSy * sin,
+      y: sh / 2 + lx * this.viewSx * sin + ly * this.viewSy * cos,
     };
+  }
+
+  private syncViewTransform(): void {
+    if (this.interiorActive) {
+      this.viewRot = 0;
+      this.viewSx = 1;
+      this.viewSy = 1;
+      return;
+    }
+    const yaw = (this.yaw % 4) * (Math.PI / 2);
+    if (this.viewMode === 'cenital') {
+      this.viewRot = yaw + Math.PI / 4;
+      this.viewSx = 1;
+      this.viewSy = 2;
+    } else if (this.viewMode === 'perspectiva') {
+      this.viewRot = yaw;
+      this.viewSx = 1;
+      this.viewSy = 1.38;
+    } else {
+      this.viewRot = yaw;
+      this.viewSx = 1;
+      this.viewSy = 1;
+    }
+  }
+
+  getViewMode(): { mode: Camera; yaw: number; overview: boolean; rot: number; sy: number } {
+    return {
+      mode: this.viewMode,
+      yaw: this.yaw,
+      overview: this.mapOverview,
+      rot: this.viewRot,
+      sy: this.viewSy,
+    };
+  }
+
+  setViewMode(mode: Camera): void {
+    if (this.interiorActive) return;
+    this.viewMode = mode;
+    this.mapOverview = false;
+    this.centerOnCharacter(false);
+    this.applyCamera(true);
+  }
+
+  rotateView(): void {
+    if (this.interiorActive) return;
+    this.yaw = (this.yaw + 1) % 4;
+    this.centerOnCharacter(false);
+    this.applyCamera(true);
+  }
+
+  toggleMapOverview(): void {
+    if (this.interiorActive) return;
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    if (this.mapOverview) {
+      this.mapOverview = false;
+      if (this.savedCam) {
+        this.cameraX = this.savedCam.x;
+        this.cameraY = this.savedCam.y;
+        this.zoom = this.savedCam.zoom;
+      }
+      this.applyCamera(true);
+      return;
+    }
+    this.savedCam = { x: this.cameraX, y: this.cameraY, zoom: this.zoom };
+    this.mapOverview = true;
+    this.zoom = zoomMinForViewport(sw, sh);
+    const fitted = clampPanMapFullyInView(
+      { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+      sw,
+      sh,
+    );
+    this.cameraX = fitted.cameraX;
+    this.cameraY = fitted.cameraY;
+    this.zoom = fitted.zoom;
+    this.applyCamera(true);
   }
 
   requestWalk(
@@ -1391,6 +1490,10 @@ export class IsoScene {
     }
   }
 
+  recenterOnCharacter(): void {
+    this.centerOnCharacter(false);
+  }
+
   private centerOnCharacter(animate: boolean): void {
     const pos = tileToWorld(this.charTx, this.charTy);
     this.cameraX = -pos.x;
@@ -1406,6 +1509,13 @@ export class IsoScene {
     let right = 16;
     let bottom = 16;
     const pad = 10;
+    const chromeInsets = this.events.chrome?.layoutInsets?.();
+    if (chromeInsets) {
+      left = Math.max(left, chromeInsets.left);
+      top = Math.max(top, chromeInsets.top);
+      right = Math.max(right, chromeInsets.right);
+      bottom = Math.max(bottom, chromeInsets.bottom);
+    }
     const panelInsets = this.events.buildingPanel?.layoutInsets?.();
     const bottomSheet =
       !!panelInsets && this.interiorActive && panelInsets.bottom > 0 && panelInsets.right === 0;
@@ -1516,8 +1626,10 @@ export class IsoScene {
         this.zoom = fitted.zoom;
       }
     }
+    this.syncViewTransform();
     this.camera.position.set(sw / 2, sh / 2);
-    this.camera.scale.set(1);
+    this.camera.scale.set(this.viewSx, this.viewSy);
+    this.camera.rotation = this.viewRot;
     this.world.position.set(this.cameraX * this.zoom, this.cameraY * this.zoom);
     this.world.scale.set(this.zoom);
     this.fitOutskirts(sw, sh);
@@ -1566,6 +1678,12 @@ export class IsoScene {
       this.canvasEl.dataset.zoomSource = this.zoomSource;
       this.canvasEl.dataset.anchorWx = String(-this.cameraX);
       this.canvasEl.dataset.anchorWy = String(-this.cameraY);
+      this.canvasEl.dataset.viewMode = this.viewMode;
+      this.canvasEl.dataset.yaw = String(this.yaw);
+      this.canvasEl.dataset.viewSy = String(this.viewSy);
+      this.canvasEl.dataset.viewRot = String(this.viewRot);
+      this.canvasEl.dataset.mapOverview = this.mapOverview ? '1' : '0';
+      this.canvasEl.dataset.layout = document.body.dataset.layout ?? '';
       const charScreen = this.followTargetScreen();
       this.canvasEl.dataset.charScreen = JSON.stringify({
         x: Math.round(charScreen.x * 10) / 10,
@@ -1712,8 +1830,12 @@ export class IsoScene {
    * (Volaris, Mentoría, P&G, roofs included) fit around it.
    */
   private frameDesktopFirstLoadView(): void {
+    this.updateCameraFitMargins();
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
+    const margins = cameraFitMargins();
+    const innerW = Math.max(1, sw - margins.left - margins.right);
+    const innerH = Math.max(1, sh - margins.top - margins.bottom);
     const char = tileToWorld(this.charTx, this.charTy);
     let hw = 0;
     let hh = 0;
@@ -1735,10 +1857,12 @@ export class IsoScene {
         hh = Math.max(hh, Math.abs(c.y - DESKTOP_ROOF_RISE - char.y), Math.abs(c.y - char.y));
       }
     }
-    const fit = Math.min(sw / (2 * (hw + 60)), sh / (2 * (hh + 40)));
+    const fit = Math.min(innerW / (2 * (hw + 60)), innerH / (2 * (hh + 40)));
     this.zoom = clampZoom(Math.min(1, Math.max(0.4, fit)), sw, sh);
-    this.cameraX = -char.x;
-    this.cameraY = -char.y;
+    const cx = margins.left + innerW / 2;
+    const cy = margins.top + innerH / 2;
+    this.cameraX = (cx - sw / 2) / this.zoom - char.x;
+    this.cameraY = (cy - sh / 2) / this.zoom - char.y;
     const hardened = stabilizeCameraAfterGesture(
       { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
       sw,
@@ -1751,6 +1875,7 @@ export class IsoScene {
 
   /** Phone first load: Estudio and the first house (Volaris) fill the width, character at the door. */
   private frameMobileFirstLoadView(): void {
+    this.updateCameraFitMargins();
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     const estudio = getBuildingByName('estudio');
@@ -1783,10 +1908,15 @@ export class IsoScene {
     }
     const roofRise = 140;
     const side = 12;
-    const zoom = clampZoom((sw - side * 2) / (maxX - minX), sw, sh);
+    const chrome = this.events.chrome?.layoutInsets?.();
+    const ml = Math.max(side, chrome?.left ?? 0);
+    const mr = Math.max(side, chrome?.right ?? 0);
+    const mt = Math.max(48, chrome?.top ?? 0);
+    const mb = Math.max(96, chrome?.bottom ?? 0);
+    const zoom = clampZoom((sw - ml - mr) / (maxX - minX), sw, sh);
     const cx = (minX + maxX) / 2;
     const cy = (minY - roofRise + maxY) / 2;
-    setCameraFitMargins({ left: 20, right: 20, top: 48, bottom: 96 });
+    setCameraFitMargins({ left: ml, right: mr, top: mt, bottom: mb });
     this.zoom = zoom;
     this.cameraX = -cx;
     this.cameraY = -cy + (sh * 0.42 - sh / 2) / zoom;
