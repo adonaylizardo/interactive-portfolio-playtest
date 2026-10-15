@@ -1,0 +1,9 @@
+node_modules
+dist
+.gh-pages-stage
+.gh-pages-push
+artifacts/qa-screenshots/*
+!artifacts/qa-screenshots/.gitkeep
+.DS_Store
+*.local
+.env

@@ -1,0 +1,2453 @@
+{
+ "assets": {
+  "ext/flor/default/cerca": {
+   "w": 512,
+   "h": 384,
+   "vfs": {
+    "x": 256,
+    "y": 384
+   },
+   "bbox": {
+    "x0": 108,
+    "y0": 52,
+    "x1": 404,
+    "y1": 330
+   },
+   "f1": "exteriores/flor-de-venezuela/flor-de-venezuela__estado-default_zoom-cerca@1x.png",
+   "f2": "exteriores/flor-de-venezuela/flor-de-venezuela__estado-default_zoom-cerca@2x.png"
+  },
+  "ext/flor/hover/cerca": {
+   "w": 512,
+   "h": 384,
+   "vfs": {
+    "x": 256,
+    "y": 384
+   },
+   "bbox": {
+    "x0": 106,
+    "y0": 43,
+    "x1": 406,
+    "y1": 332
+   },
+   "f1": "exteriores/flor-de-venezuela/flor-de-venezuela__estado-hover_zoom-cerca@1x.png",
+   "f2": "exteriores/flor-de-venezuela/flor-de-venezuela__estado-hover_zoom-cerca@2x.png"
+  },
+  "ext/flor/resaltado/cerca": {
+   "w": 512,
+   "h": 384,
+   "vfs": {
+    "x": 256,
+    "y": 384
+   },
+   "bbox": {
+    "x0": 106,
+    "y0": 50,
+    "x1": 406,
+    "y1": 332
+   },
+   "f1": "exteriores/flor-de-venezuela/flor-de-venezuela__estado-resaltado_zoom-cerca@1x.png",
+   "f2": "exteriores/flor-de-venezuela/flor-de-venezuela__estado-resaltado_zoom-cerca@2x.png"
+  },
+  "ext/flor/default/lejos": {
+   "w": 512,
+   "h": 384,
+   "vfs": {
+    "x": 256,
+    "y": 384
+   },
+   "bbox": {
+    "x0": 110,
+    "y0": 54,
+    "x1": 402,
+    "y1": 303
+   },
+   "f1": "exteriores/flor-de-venezuela/flor-de-venezuela__estado-default_zoom-lejos@1x.png",
+   "f2": "exteriores/flor-de-venezuela/flor-de-venezuela__estado-default_zoom-lejos@2x.png"
+  },
+  "ext/flor/hover/lejos": {
+   "w": 512,
+   "h": 384,
+   "vfs": {
+    "x": 256,
+    "y": 384
+   },
+   "bbox": {
+    "x0": 110,
+    "y0": 54,
+    "x1": 402,
+    "y1": 303
+   },
+   "f1": "exteriores/flor-de-venezuela/flor-de-venezuela__estado-hover_zoom-lejos@1x.png",
+   "f2": "exteriores/flor-de-venezuela/flor-de-venezuela__estado-hover_zoom-lejos@2x.png"
+  },
+  "ext/flor/resaltado/lejos": {
+   "w": 512,
+   "h": 384,
+   "vfs": {
+    "x": 256,
+    "y": 384
+   },
+   "bbox": {
+    "x0": 108,
+    "y0": 52,
+    "x1": 404,
+    "y1": 306
+   },
+   "f1": "exteriores/flor-de-venezuela/flor-de-venezuela__estado-resaltado_zoom-lejos@1x.png",
+   "f2": "exteriores/flor-de-venezuela/flor-de-venezuela__estado-resaltado_zoom-lejos@2x.png"
+  },
+  "ext/catedral/default/cerca": {
+   "w": 640,
+   "h": 576,
+   "vfs": {
+    "x": 320,
+    "y": 576
+   },
+   "bbox": {
+    "x0": 152,
+    "y0": 34,
+    "x1": 488,
+    "y1": 500
+   },
+   "f1": "exteriores/catedral-de-barquisimeto/catedral-de-barquisimeto__estado-default_zoom-cerca@1x.png",
+   "f2": "exteriores/catedral-de-barquisimeto/catedral-de-barquisimeto__estado-default_zoom-cerca@2x.png"
+  },
+  "ext/catedral/hover/cerca": {
+   "w": 640,
+   "h": 576,
+   "vfs": {
+    "x": 320,
+    "y": 576
+   },
+   "bbox": {
+    "x0": 150,
+    "y0": 33,
+    "x1": 490,
+    "y1": 502
+   },
+   "f1": "exteriores/catedral-de-barquisimeto/catedral-de-barquisimeto__estado-hover_zoom-cerca@1x.png",
+   "f2": "exteriores/catedral-de-barquisimeto/catedral-de-barquisimeto__estado-hover_zoom-cerca@2x.png"
+  },
+  "ext/catedral/resaltado/cerca": {
+   "w": 640,
+   "h": 576,
+   "vfs": {
+    "x": 320,
+    "y": 576
+   },
+   "bbox": {
+    "x0": 150,
+    "y0": 33,
+    "x1": 490,
+    "y1": 502
+   },
+   "f1": "exteriores/catedral-de-barquisimeto/catedral-de-barquisimeto__estado-resaltado_zoom-cerca@1x.png",
+   "f2": "exteriores/catedral-de-barquisimeto/catedral-de-barquisimeto__estado-resaltado_zoom-cerca@2x.png"
+  },
+  "ext/catedral/default/lejos": {
+   "w": 640,
+   "h": 576,
+   "vfs": {
+    "x": 320,
+    "y": 576
+   },
+   "bbox": {
+    "x0": 152,
+    "y0": 35,
+    "x1": 488,
+    "y1": 500
+   },
+   "f1": "exteriores/catedral-de-barquisimeto/catedral-de-barquisimeto__estado-default_zoom-lejos@1x.png",
+   "f2": "exteriores/catedral-de-barquisimeto/catedral-de-barquisimeto__estado-default_zoom-lejos@2x.png"
+  },
+  "ext/catedral/hover/lejos": {
+   "w": 640,
+   "h": 576,
+   "vfs": {
+    "x": 320,
+    "y": 576
+   },
+   "bbox": {
+    "x0": 152,
+    "y0": 35,
+    "x1": 488,
+    "y1": 500
+   },
+   "f1": "exteriores/catedral-de-barquisimeto/catedral-de-barquisimeto__estado-hover_zoom-lejos@1x.png",
+   "f2": "exteriores/catedral-de-barquisimeto/catedral-de-barquisimeto__estado-hover_zoom-lejos@2x.png"
+  },
+  "ext/catedral/resaltado/lejos": {
+   "w": 640,
+   "h": 576,
+   "vfs": {
+    "x": 320,
+    "y": 576
+   },
+   "bbox": {
+    "x0": 150,
+    "y0": 33,
+    "x1": 490,
+    "y1": 502
+   },
+   "f1": "exteriores/catedral-de-barquisimeto/catedral-de-barquisimeto__estado-resaltado_zoom-lejos@1x.png",
+   "f2": "exteriores/catedral-de-barquisimeto/catedral-de-barquisimeto__estado-resaltado_zoom-lejos@2x.png"
+  },
+  "ext/sambil/default/cerca": {
+   "w": 768,
+   "h": 448,
+   "vfs": {
+    "x": 512,
+    "y": 448
+   },
+   "bbox": {
+    "x0": 81,
+    "y0": 29,
+    "x1": 709,
+    "y1": 428
+   },
+   "f1": "exteriores/sambil-barquisimeto/sambil-barquisimeto__estado-default_zoom-cerca@1x.png",
+   "f2": "exteriores/sambil-barquisimeto/sambil-barquisimeto__estado-default_zoom-cerca@2x.png"
+  },
+  "ext/sambil/hover/cerca": {
+   "w": 768,
+   "h": 448,
+   "vfs": {
+    "x": 512,
+    "y": 448
+   },
+   "bbox": {
+    "x0": 79,
+    "y0": 27,
+    "x1": 711,
+    "y1": 429
+   },
+   "f1": "exteriores/sambil-barquisimeto/sambil-barquisimeto__estado-hover_zoom-cerca@1x.png",
+   "f2": "exteriores/sambil-barquisimeto/sambil-barquisimeto__estado-hover_zoom-cerca@2x.png"
+  },
+  "ext/sambil/resaltado/cerca": {
+   "w": 768,
+   "h": 448,
+   "vfs": {
+    "x": 512,
+    "y": 448
+   },
+   "bbox": {
+    "x0": 79,
+    "y0": 27,
+    "x1": 711,
+    "y1": 429
+   },
+   "f1": "exteriores/sambil-barquisimeto/sambil-barquisimeto__estado-resaltado_zoom-cerca@1x.png",
+   "f2": "exteriores/sambil-barquisimeto/sambil-barquisimeto__estado-resaltado_zoom-cerca@2x.png"
+  },
+  "ext/sambil/default/lejos": {
+   "w": 768,
+   "h": 448,
+   "vfs": {
+    "x": 512,
+    "y": 448
+   },
+   "bbox": {
+    "x0": 81,
+    "y0": 32,
+    "x1": 721,
+    "y1": 424
+   },
+   "f1": "exteriores/sambil-barquisimeto/sambil-barquisimeto__estado-default_zoom-lejos@1x.png",
+   "f2": "exteriores/sambil-barquisimeto/sambil-barquisimeto__estado-default_zoom-lejos@2x.png"
+  },
+  "ext/sambil/hover/lejos": {
+   "w": 768,
+   "h": 448,
+   "vfs": {
+    "x": 512,
+    "y": 448
+   },
+   "bbox": {
+    "x0": 81,
+    "y0": 32,
+    "x1": 721,
+    "y1": 424
+   },
+   "f1": "exteriores/sambil-barquisimeto/sambil-barquisimeto__estado-hover_zoom-lejos@1x.png",
+   "f2": "exteriores/sambil-barquisimeto/sambil-barquisimeto__estado-hover_zoom-lejos@2x.png"
+  },
+  "ext/sambil/resaltado/lejos": {
+   "w": 768,
+   "h": 448,
+   "vfs": {
+    "x": 512,
+    "y": 448
+   },
+   "bbox": {
+    "x0": 79,
+    "y0": 30,
+    "x1": 723,
+    "y1": 426
+   },
+   "f1": "exteriores/sambil-barquisimeto/sambil-barquisimeto__estado-resaltado_zoom-lejos@1x.png",
+   "f2": "exteriores/sambil-barquisimeto/sambil-barquisimeto__estado-resaltado_zoom-lejos@2x.png"
+  },
+  "ext/estudio/default/cerca": {
+   "w": 768,
+   "h": 520,
+   "vfs": {
+    "x": 384,
+    "y": 520
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 7,
+    "x1": 768,
+    "y1": 520
+   },
+   "f1": "exteriores/estudio-6x6/estudio-6x6__estado-exterior_zoom-cerca@1x.png",
+   "f2": "exteriores/estudio-6x6/estudio-6x6__estado-exterior_zoom-cerca@2x.png"
+  },
+  "ext/estudio/hover/cerca": {
+   "w": 768,
+   "h": 520,
+   "vfs": {
+    "x": 384,
+    "y": 520
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 7,
+    "x1": 768,
+    "y1": 520
+   },
+   "f1": "exteriores/estudio-6x6/estudio-6x6__estado-hover_zoom-cerca@1x.png",
+   "f2": "exteriores/estudio-6x6/estudio-6x6__estado-hover_zoom-cerca@2x.png"
+  },
+  "ext/estudio/resaltado/cerca": {
+   "w": 768,
+   "h": 520,
+   "vfs": {
+    "x": 384,
+    "y": 520
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 1,
+    "x1": 768,
+    "y1": 520
+   },
+   "f1": "exteriores/estudio-6x6/estudio-6x6__estado-resaltado_zoom-cerca@1x.png",
+   "f2": "exteriores/estudio-6x6/estudio-6x6__estado-resaltado_zoom-cerca@2x.png"
+  },
+  "ext/estudio/default/lejos": {
+   "w": 768,
+   "h": 520,
+   "vfs": {
+    "x": 384,
+    "y": 520
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 7,
+    "x1": 768,
+    "y1": 520
+   },
+   "f1": "exteriores/estudio-6x6/estudio-6x6__estado-exterior_zoom-lejos@1x.png",
+   "f2": "exteriores/estudio-6x6/estudio-6x6__estado-exterior_zoom-lejos@2x.png"
+  },
+  "ext/estudio/hover/lejos": {
+   "w": 768,
+   "h": 520,
+   "vfs": {
+    "x": 384,
+    "y": 520
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 7,
+    "x1": 768,
+    "y1": 520
+   },
+   "f1": "exteriores/estudio-6x6/estudio-6x6__estado-hover_zoom-lejos@1x.png",
+   "f2": "exteriores/estudio-6x6/estudio-6x6__estado-hover_zoom-lejos@2x.png"
+  },
+  "ext/estudio/resaltado/lejos": {
+   "w": 768,
+   "h": 520,
+   "vfs": {
+    "x": 384,
+    "y": 520
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 1,
+    "x1": 768,
+    "y1": 520
+   },
+   "f1": "exteriores/estudio-6x6/estudio-6x6__estado-resaltado_zoom-lejos@1x.png",
+   "f2": "exteriores/estudio-6x6/estudio-6x6__estado-resaltado_zoom-lejos@2x.png"
+  },
+  "ext/volaris/resaltado/cerca": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 69,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/volaris/casa-volaris__caso-volaris_estado-resaltado_zoom-cerca@1x.png",
+   "f2": "exteriores/casas-caso/volaris/casa-volaris__caso-volaris_estado-resaltado_zoom-cerca@2x.png"
+  },
+  "ext/volaris/default/lejos": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 73,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/volaris/casa-volaris__caso-volaris_estado-exterior_zoom-lejos@1x.png",
+   "f2": "exteriores/casas-caso/volaris/casa-volaris__caso-volaris_estado-exterior_zoom-lejos@2x.png"
+  },
+  "ext/volaris/resaltado/lejos": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 69,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/volaris/casa-volaris__caso-volaris_estado-resaltado_zoom-lejos@1x.png",
+   "f2": "exteriores/casas-caso/volaris/casa-volaris__caso-volaris_estado-resaltado_zoom-lejos@2x.png"
+  },
+  "ext/volaris/default/cerca": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 73,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/volaris/casa-volaris__caso-volaris_estado-exterior_zoom-cerca@1x.png",
+   "f2": "exteriores/casas-caso/volaris/casa-volaris__caso-volaris_estado-exterior_zoom-cerca@2x.png"
+  },
+  "ext/volaris/hover/cerca": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 72,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/volaris/casa-volaris__caso-volaris_estado-hover_zoom-cerca@1x.png",
+   "f2": "exteriores/casas-caso/volaris/casa-volaris__caso-volaris_estado-hover_zoom-cerca@2x.png"
+  },
+  "ext/volaris/hover/lejos": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 73,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/volaris/casa-volaris__caso-volaris_estado-hover_zoom-lejos@1x.png",
+   "f2": "exteriores/casas-caso/volaris/casa-volaris__caso-volaris_estado-hover_zoom-lejos@2x.png"
+  },
+  "ext/bain/default/lejos": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 39,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/bain/casa-bain__caso-bain_estado-exterior_zoom-lejos@1x.png",
+   "f2": "exteriores/casas-caso/bain/casa-bain__caso-bain_estado-exterior_zoom-lejos@2x.png"
+  },
+  "ext/bain/resaltado/cerca": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 37,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/bain/casa-bain__caso-bain_estado-resaltado_zoom-cerca@1x.png",
+   "f2": "exteriores/casas-caso/bain/casa-bain__caso-bain_estado-resaltado_zoom-cerca@2x.png"
+  },
+  "ext/bain/default/cerca": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 39,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/bain/casa-bain__caso-bain_estado-exterior_zoom-cerca@1x.png",
+   "f2": "exteriores/casas-caso/bain/casa-bain__caso-bain_estado-exterior_zoom-cerca@2x.png"
+  },
+  "ext/bain/hover/cerca": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 39,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/bain/casa-bain__caso-bain_estado-hover_zoom-cerca@1x.png",
+   "f2": "exteriores/casas-caso/bain/casa-bain__caso-bain_estado-hover_zoom-cerca@2x.png"
+  },
+  "ext/bain/resaltado/lejos": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 37,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/bain/casa-bain__caso-bain_estado-resaltado_zoom-lejos@1x.png",
+   "f2": "exteriores/casas-caso/bain/casa-bain__caso-bain_estado-resaltado_zoom-lejos@2x.png"
+  },
+  "ext/bain/hover/lejos": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 39,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/bain/casa-bain__caso-bain_estado-hover_zoom-lejos@1x.png",
+   "f2": "exteriores/casas-caso/bain/casa-bain__caso-bain_estado-hover_zoom-lejos@2x.png"
+  },
+  "ext/mentoria/resaltado/cerca": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 75,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/mentoria/casa-mentoria__caso-mentoria_estado-resaltado_zoom-cerca@1x.png",
+   "f2": "exteriores/casas-caso/mentoria/casa-mentoria__caso-mentoria_estado-resaltado_zoom-cerca@2x.png"
+  },
+  "ext/mentoria/resaltado/lejos": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 75,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/mentoria/casa-mentoria__caso-mentoria_estado-resaltado_zoom-lejos@1x.png",
+   "f2": "exteriores/casas-caso/mentoria/casa-mentoria__caso-mentoria_estado-resaltado_zoom-lejos@2x.png"
+  },
+  "ext/mentoria/default/cerca": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 77,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/mentoria/casa-mentoria__caso-mentoria_estado-exterior_zoom-cerca@1x.png",
+   "f2": "exteriores/casas-caso/mentoria/casa-mentoria__caso-mentoria_estado-exterior_zoom-cerca@2x.png"
+  },
+  "ext/mentoria/default/lejos": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 77,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/mentoria/casa-mentoria__caso-mentoria_estado-exterior_zoom-lejos@1x.png",
+   "f2": "exteriores/casas-caso/mentoria/casa-mentoria__caso-mentoria_estado-exterior_zoom-lejos@2x.png"
+  },
+  "ext/mentoria/hover/cerca": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 77,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/mentoria/casa-mentoria__caso-mentoria_estado-hover_zoom-cerca@1x.png",
+   "f2": "exteriores/casas-caso/mentoria/casa-mentoria__caso-mentoria_estado-hover_zoom-cerca@2x.png"
+  },
+  "ext/mentoria/hover/lejos": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 77,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/mentoria/casa-mentoria__caso-mentoria_estado-hover_zoom-lejos@1x.png",
+   "f2": "exteriores/casas-caso/mentoria/casa-mentoria__caso-mentoria_estado-hover_zoom-lejos@2x.png"
+  },
+  "ext/finoa/hover/cerca": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 69,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/finoa/casa-finoa__caso-finoa_estado-hover_zoom-cerca@1x.png",
+   "f2": "exteriores/casas-caso/finoa/casa-finoa__caso-finoa_estado-hover_zoom-cerca@2x.png"
+  },
+  "ext/finoa/resaltado/cerca": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 68,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/finoa/casa-finoa__caso-finoa_estado-resaltado_zoom-cerca@1x.png",
+   "f2": "exteriores/casas-caso/finoa/casa-finoa__caso-finoa_estado-resaltado_zoom-cerca@2x.png"
+  },
+  "ext/finoa/default/lejos": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 70,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/finoa/casa-finoa__caso-finoa_estado-exterior_zoom-lejos@1x.png",
+   "f2": "exteriores/casas-caso/finoa/casa-finoa__caso-finoa_estado-exterior_zoom-lejos@2x.png"
+  },
+  "ext/finoa/default/cerca": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 70,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/finoa/casa-finoa__caso-finoa_estado-exterior_zoom-cerca@1x.png",
+   "f2": "exteriores/casas-caso/finoa/casa-finoa__caso-finoa_estado-exterior_zoom-cerca@2x.png"
+  },
+  "ext/finoa/resaltado/lejos": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 68,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/finoa/casa-finoa__caso-finoa_estado-resaltado_zoom-lejos@1x.png",
+   "f2": "exteriores/casas-caso/finoa/casa-finoa__caso-finoa_estado-resaltado_zoom-lejos@2x.png"
+  },
+  "ext/finoa/hover/lejos": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 70,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/finoa/casa-finoa__caso-finoa_estado-hover_zoom-lejos@1x.png",
+   "f2": "exteriores/casas-caso/finoa/casa-finoa__caso-finoa_estado-hover_zoom-lejos@2x.png"
+  },
+  "ext/pg/resaltado/cerca": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 22,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/pg/casa-pg__caso-pg_estado-resaltado_zoom-cerca@1x.png",
+   "f2": "exteriores/casas-caso/pg/casa-pg__caso-pg_estado-resaltado_zoom-cerca@2x.png"
+  },
+  "ext/pg/resaltado/lejos": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 22,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/pg/casa-pg__caso-pg_estado-resaltado_zoom-lejos@1x.png",
+   "f2": "exteriores/casas-caso/pg/casa-pg__caso-pg_estado-resaltado_zoom-lejos@2x.png"
+  },
+  "ext/pg/hover/cerca": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 24,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/pg/casa-pg__caso-pg_estado-hover_zoom-cerca@1x.png",
+   "f2": "exteriores/casas-caso/pg/casa-pg__caso-pg_estado-hover_zoom-cerca@2x.png"
+  },
+  "ext/pg/default/lejos": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 24,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/pg/casa-pg__caso-pg_estado-exterior_zoom-lejos@1x.png",
+   "f2": "exteriores/casas-caso/pg/casa-pg__caso-pg_estado-exterior_zoom-lejos@2x.png"
+  },
+  "ext/pg/default/cerca": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 24,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/pg/casa-pg__caso-pg_estado-exterior_zoom-cerca@1x.png",
+   "f2": "exteriores/casas-caso/pg/casa-pg__caso-pg_estado-exterior_zoom-cerca@2x.png"
+  },
+  "ext/pg/hover/lejos": {
+   "w": 384,
+   "h": 352,
+   "vfs": {
+    "x": 192,
+    "y": 352
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 24,
+    "x1": 384,
+    "y1": 352
+   },
+   "f1": "exteriores/casas-caso/pg/casa-pg__caso-pg_estado-hover_zoom-lejos@1x.png",
+   "f2": "exteriores/casas-caso/pg/casa-pg__caso-pg_estado-hover_zoom-lejos@2x.png"
+  },
+  "int/volaris/cerca": {
+   "w": 800,
+   "h": 604,
+   "vfs": {
+    "x": 400,
+    "y": 580
+   },
+   "bbox": {
+    "x0": 10,
+    "y0": 47,
+    "x1": 790,
+    "y1": 604
+   },
+   "f1": "interiores/casas-caso/volaris/interior-volaris__caso-volaris_zoom-cerca@1x.png",
+   "f2": "interiores/casas-caso/volaris/interior-volaris__caso-volaris_zoom-cerca@2x.png"
+  },
+  "int/volaris/lejos": {
+   "w": 800,
+   "h": 604,
+   "vfs": {
+    "x": 400,
+    "y": 580
+   },
+   "bbox": {
+    "x0": 10,
+    "y0": 47,
+    "x1": 790,
+    "y1": 604
+   },
+   "f1": "interiores/casas-caso/volaris/interior-volaris__caso-volaris_zoom-lejos@1x.png",
+   "f2": "interiores/casas-caso/volaris/interior-volaris__caso-volaris_zoom-lejos@2x.png"
+  },
+  "int/bain/cerca": {
+   "w": 800,
+   "h": 604,
+   "vfs": {
+    "x": 400,
+    "y": 580
+   },
+   "bbox": {
+    "x0": 10,
+    "y0": 50,
+    "x1": 790,
+    "y1": 604
+   },
+   "f1": "interiores/casas-caso/bain/interior-bain__caso-bain_zoom-cerca@1x.png",
+   "f2": "interiores/casas-caso/bain/interior-bain__caso-bain_zoom-cerca@2x.png"
+  },
+  "int/bain/lejos": {
+   "w": 800,
+   "h": 604,
+   "vfs": {
+    "x": 400,
+    "y": 580
+   },
+   "bbox": {
+    "x0": 10,
+    "y0": 50,
+    "x1": 790,
+    "y1": 604
+   },
+   "f1": "interiores/casas-caso/bain/interior-bain__caso-bain_zoom-lejos@1x.png",
+   "f2": "interiores/casas-caso/bain/interior-bain__caso-bain_zoom-lejos@2x.png"
+  },
+  "int/mentoria/cerca": {
+   "w": 800,
+   "h": 604,
+   "vfs": {
+    "x": 400,
+    "y": 580
+   },
+   "bbox": {
+    "x0": 10,
+    "y0": 50,
+    "x1": 790,
+    "y1": 604
+   },
+   "f1": "interiores/casas-caso/mentoria/interior-mentoria__caso-mentoria_zoom-cerca@1x.png",
+   "f2": "interiores/casas-caso/mentoria/interior-mentoria__caso-mentoria_zoom-cerca@2x.png"
+  },
+  "int/mentoria/lejos": {
+   "w": 800,
+   "h": 604,
+   "vfs": {
+    "x": 400,
+    "y": 580
+   },
+   "bbox": {
+    "x0": 10,
+    "y0": 50,
+    "x1": 790,
+    "y1": 604
+   },
+   "f1": "interiores/casas-caso/mentoria/interior-mentoria__caso-mentoria_zoom-lejos@1x.png",
+   "f2": "interiores/casas-caso/mentoria/interior-mentoria__caso-mentoria_zoom-lejos@2x.png"
+  },
+  "int/finoa/cerca": {
+   "w": 800,
+   "h": 604,
+   "vfs": {
+    "x": 400,
+    "y": 580
+   },
+   "bbox": {
+    "x0": 10,
+    "y0": 4,
+    "x1": 790,
+    "y1": 604
+   },
+   "f1": "interiores/casas-caso/finoa/interior-finoa__caso-finoa_zoom-cerca@1x.png",
+   "f2": "interiores/casas-caso/finoa/interior-finoa__caso-finoa_zoom-cerca@2x.png"
+  },
+  "int/finoa/lejos": {
+   "w": 800,
+   "h": 604,
+   "vfs": {
+    "x": 400,
+    "y": 580
+   },
+   "bbox": {
+    "x0": 10,
+    "y0": 4,
+    "x1": 790,
+    "y1": 604
+   },
+   "f1": "interiores/casas-caso/finoa/interior-finoa__caso-finoa_zoom-lejos@1x.png",
+   "f2": "interiores/casas-caso/finoa/interior-finoa__caso-finoa_zoom-lejos@2x.png"
+  },
+  "int/pg/cerca": {
+   "w": 800,
+   "h": 604,
+   "vfs": {
+    "x": 400,
+    "y": 580
+   },
+   "bbox": {
+    "x0": 10,
+    "y0": 11,
+    "x1": 790,
+    "y1": 604
+   },
+   "f1": "interiores/casas-caso/pg/interior-pg__caso-pg_zoom-cerca@1x.png",
+   "f2": "interiores/casas-caso/pg/interior-pg__caso-pg_zoom-cerca@2x.png"
+  },
+  "int/pg/lejos": {
+   "w": 800,
+   "h": 604,
+   "vfs": {
+    "x": 400,
+    "y": 580
+   },
+   "bbox": {
+    "x0": 10,
+    "y0": 7,
+    "x1": 790,
+    "y1": 604
+   },
+   "f1": "interiores/casas-caso/pg/interior-pg__caso-pg_zoom-lejos@1x.png",
+   "f2": "interiores/casas-caso/pg/interior-pg__caso-pg_zoom-lejos@2x.png"
+  },
+  "int/flor/cerca": {
+   "w": 512,
+   "h": 384,
+   "vfs": {
+    "x": 256,
+    "y": 384
+   },
+   "bbox": {
+    "x0": 93,
+    "y0": 33,
+    "x1": 419,
+    "y1": 330
+   },
+   "f1": "interiores/flor-de-venezuela/flor-de-venezuela-interior__estado-interior_zoom-cerca@1x.png",
+   "f2": "interiores/flor-de-venezuela/flor-de-venezuela-interior__estado-interior_zoom-cerca@2x.png"
+  },
+  "int/flor/lejos": {
+   "w": 512,
+   "h": 384,
+   "vfs": {
+    "x": 256,
+    "y": 384
+   },
+   "bbox": {
+    "x0": 110,
+    "y0": 54,
+    "x1": 402,
+    "y1": 303
+   },
+   "f1": "interiores/flor-de-venezuela/flor-de-venezuela-interior__estado-interior_zoom-lejos@1x.png",
+   "f2": "interiores/flor-de-venezuela/flor-de-venezuela-interior__estado-interior_zoom-lejos@2x.png"
+  },
+  "int/catedral/cerca": {
+   "w": 640,
+   "h": 576,
+   "vfs": {
+    "x": 320,
+    "y": 576
+   },
+   "bbox": {
+    "x0": 152,
+    "y0": 34,
+    "x1": 488,
+    "y1": 500
+   },
+   "f1": "interiores/catedral-de-barquisimeto/catedral-de-barquisimeto-interior__estado-interior_zoom-cerca@1x.png",
+   "f2": "interiores/catedral-de-barquisimeto/catedral-de-barquisimeto-interior__estado-interior_zoom-cerca@2x.png"
+  },
+  "int/catedral/lejos": {
+   "w": 640,
+   "h": 576,
+   "vfs": {
+    "x": 320,
+    "y": 576
+   },
+   "bbox": {
+    "x0": 152,
+    "y0": 35,
+    "x1": 488,
+    "y1": 500
+   },
+   "f1": "interiores/catedral-de-barquisimeto/catedral-de-barquisimeto-interior__estado-interior_zoom-lejos@1x.png",
+   "f2": "interiores/catedral-de-barquisimeto/catedral-de-barquisimeto-interior__estado-interior_zoom-lejos@2x.png"
+  },
+  "int/sambil/cerca": {
+   "w": 768,
+   "h": 448,
+   "vfs": {
+    "x": 512,
+    "y": 448
+   },
+   "bbox": {
+    "x0": 81,
+    "y0": 30,
+    "x1": 709,
+    "y1": 428
+   },
+   "f1": "interiores/sambil-barquisimeto/sambil-barquisimeto-interior__estado-interior_zoom-cerca@1x.png",
+   "f2": "interiores/sambil-barquisimeto/sambil-barquisimeto-interior__estado-interior_zoom-cerca@2x.png"
+  },
+  "int/sambil/lejos": {
+   "w": 768,
+   "h": 448,
+   "vfs": {
+    "x": 512,
+    "y": 448
+   },
+   "bbox": {
+    "x0": 81,
+    "y0": 32,
+    "x1": 721,
+    "y1": 424
+   },
+   "f1": "interiores/sambil-barquisimeto/sambil-barquisimeto-interior__estado-interior_zoom-lejos@1x.png",
+   "f2": "interiores/sambil-barquisimeto/sambil-barquisimeto-interior__estado-interior_zoom-lejos@2x.png"
+  },
+  "prop/arbol/redondo/cerca": {
+   "w": 128,
+   "h": 208,
+   "vfs": {
+    "x": 64,
+    "y": 208
+   },
+   "bbox": {
+    "x0": 17,
+    "y0": 42,
+    "x1": 111,
+    "y1": 190
+   },
+   "f1": "paisaje/arbol/arbol__especie-redondo_vista-cerca@1x.png",
+   "f2": "paisaje/arbol/arbol__especie-redondo_vista-cerca@2x.png"
+  },
+  "prop/arbol/cipres/cerca": {
+   "w": 128,
+   "h": 208,
+   "vfs": {
+    "x": 64,
+    "y": 208
+   },
+   "bbox": {
+    "x0": 45,
+    "y0": 10,
+    "x1": 83,
+    "y1": 185
+   },
+   "f1": "paisaje/arbol/arbol__especie-cipres_vista-cerca@1x.png",
+   "f2": "paisaje/arbol/arbol__especie-cipres_vista-cerca@2x.png"
+  },
+  "prop/arbol/araguaney/cerca": {
+   "w": 128,
+   "h": 208,
+   "vfs": {
+    "x": 64,
+    "y": 208
+   },
+   "bbox": {
+    "x0": 19,
+    "y0": 80,
+    "x1": 115,
+    "y1": 190
+   },
+   "f1": "paisaje/arbol/arbol__especie-araguaney_vista-cerca@1x.png",
+   "f2": "paisaje/arbol/arbol__especie-araguaney_vista-cerca@2x.png"
+  },
+  "prop/arbol/redondo/lejos": {
+   "w": 128,
+   "h": 208,
+   "vfs": {
+    "x": 64,
+    "y": 208
+   },
+   "bbox": {
+    "x0": 19,
+    "y0": 41,
+    "x1": 109,
+    "y1": 177
+   },
+   "f1": "paisaje/arbol/arbol__especie-redondo_vista-lejos@1x.png",
+   "f2": "paisaje/arbol/arbol__especie-redondo_vista-lejos@2x.png"
+  },
+  "prop/arbol/cipres/lejos": {
+   "w": 128,
+   "h": 208,
+   "vfs": {
+    "x": 64,
+    "y": 208
+   },
+   "bbox": {
+    "x0": 45,
+    "y0": 10,
+    "x1": 83,
+    "y1": 177
+   },
+   "f1": "paisaje/arbol/arbol__especie-cipres_vista-lejos@1x.png",
+   "f2": "paisaje/arbol/arbol__especie-cipres_vista-lejos@2x.png"
+  },
+  "prop/arbol/araguaney/lejos": {
+   "w": 128,
+   "h": 208,
+   "vfs": {
+    "x": 64,
+    "y": 208
+   },
+   "bbox": {
+    "x0": 18,
+    "y0": 83,
+    "x1": 116,
+    "y1": 177
+   },
+   "f1": "paisaje/arbol/arbol__especie-araguaney_vista-lejos@1x.png",
+   "f2": "paisaje/arbol/arbol__especie-araguaney_vista-lejos@2x.png"
+  },
+  "prop/banco/izq/cerca": {
+   "w": 128,
+   "h": 96,
+   "vfs": {
+    "x": 64,
+    "y": 96
+   },
+   "bbox": {
+    "x0": 34,
+    "y0": 18,
+    "x1": 96,
+    "y1": 77
+   },
+   "f1": "paisaje/banco-exterior/banco-exterior__orientacion-izq_vista-cerca@1x.png",
+   "f2": "paisaje/banco-exterior/banco-exterior__orientacion-izq_vista-cerca@2x.png"
+  },
+  "prop/banco/izq/lejos": {
+   "w": 128,
+   "h": 96,
+   "vfs": {
+    "x": 64,
+    "y": 96
+   },
+   "bbox": {
+    "x0": 34,
+    "y0": 18,
+    "x1": 96,
+    "y1": 77
+   },
+   "f1": "paisaje/banco-exterior/banco-exterior__orientacion-izq_vista-lejos@1x.png",
+   "f2": "paisaje/banco-exterior/banco-exterior__orientacion-izq_vista-lejos@2x.png"
+  },
+  "prop/banco/der/cerca": {
+   "w": 128,
+   "h": 96,
+   "vfs": {
+    "x": 64,
+    "y": 96
+   },
+   "bbox": {
+    "x0": 32,
+    "y0": 18,
+    "x1": 94,
+    "y1": 77
+   },
+   "f1": "paisaje/banco-exterior/banco-exterior__orientacion-der_vista-cerca@1x.png",
+   "f2": "paisaje/banco-exterior/banco-exterior__orientacion-der_vista-cerca@2x.png"
+  },
+  "prop/banco/der/lejos": {
+   "w": 128,
+   "h": 96,
+   "vfs": {
+    "x": 64,
+    "y": 96
+   },
+   "bbox": {
+    "x0": 32,
+    "y0": 18,
+    "x1": 94,
+    "y1": 77
+   },
+   "f1": "paisaje/banco-exterior/banco-exterior__orientacion-der_vista-lejos@1x.png",
+   "f2": "paisaje/banco-exterior/banco-exterior__orientacion-der_vista-lejos@2x.png"
+  },
+  "prop/farol/izq/cerca": {
+   "w": 128,
+   "h": 152,
+   "vfs": {
+    "x": 64,
+    "y": 152
+   },
+   "bbox": {
+    "x0": 43,
+    "y0": 11,
+    "x1": 71,
+    "y1": 124
+   },
+   "f1": "paisaje/farol-exterior/farol-exterior__orientacion-izq_vista-cerca@1x.png",
+   "f2": "paisaje/farol-exterior/farol-exterior__orientacion-izq_vista-cerca@2x.png"
+  },
+  "prop/farol/izq/lejos": {
+   "w": 128,
+   "h": 152,
+   "vfs": {
+    "x": 64,
+    "y": 152
+   },
+   "bbox": {
+    "x0": 47,
+    "y0": 9,
+    "x1": 67,
+    "y1": 121
+   },
+   "f1": "paisaje/farol-exterior/farol-exterior__orientacion-izq_vista-lejos@1x.png",
+   "f2": "paisaje/farol-exterior/farol-exterior__orientacion-izq_vista-lejos@2x.png"
+  },
+  "prop/farol/der/cerca": {
+   "w": 128,
+   "h": 152,
+   "vfs": {
+    "x": 64,
+    "y": 152
+   },
+   "bbox": {
+    "x0": 57,
+    "y0": 11,
+    "x1": 85,
+    "y1": 124
+   },
+   "f1": "paisaje/farol-exterior/farol-exterior__orientacion-der_vista-cerca@1x.png",
+   "f2": "paisaje/farol-exterior/farol-exterior__orientacion-der_vista-cerca@2x.png"
+  },
+  "prop/farol/der/lejos": {
+   "w": 128,
+   "h": 152,
+   "vfs": {
+    "x": 64,
+    "y": 152
+   },
+   "bbox": {
+    "x0": 61,
+    "y0": 9,
+    "x1": 81,
+    "y1": 121
+   },
+   "f1": "paisaje/farol-exterior/farol-exterior__orientacion-der_vista-lejos@1x.png",
+   "f2": "paisaje/farol-exterior/farol-exterior__orientacion-der_vista-lejos@2x.png"
+  },
+  "prop/muro/cerca": {
+   "w": 320,
+   "h": 224,
+   "vfs": {
+    "x": 192,
+    "y": 224
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 23,
+    "x1": 320,
+    "y1": 224
+   },
+   "f1": "paisaje/muro-escalada/muro-escalada__vista-cerca@1x.png",
+   "f2": "paisaje/muro-escalada/muro-escalada__vista-cerca@2x.png"
+  },
+  "prop/muro/lejos": {
+   "w": 320,
+   "h": 224,
+   "vfs": {
+    "x": 192,
+    "y": 224
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 23,
+    "x1": 320,
+    "y1": 224
+   },
+   "f1": "paisaje/muro-escalada/muro-escalada__vista-lejos@1x.png",
+   "f2": "paisaje/muro-escalada/muro-escalada__vista-lejos@2x.png"
+  },
+  "prop/obelisco/cerca": {
+   "w": 384,
+   "h": 528,
+   "vfs": {
+    "x": 192,
+    "y": 528
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 11,
+    "x1": 384,
+    "y1": 528
+   },
+   "f1": "paisaje/obelisco/obelisco__vista-cerca@1x.png",
+   "f2": "paisaje/obelisco/obelisco__vista-cerca@2x.png"
+  },
+  "prop/obelisco/lejos": {
+   "w": 384,
+   "h": 528,
+   "vfs": {
+    "x": 192,
+    "y": 528
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 11,
+    "x1": 384,
+    "y1": 528
+   },
+   "f1": "paisaje/obelisco/obelisco__vista-lejos@1x.png",
+   "f2": "paisaje/obelisco/obelisco__vista-lejos@2x.png"
+  },
+  "prop/redoma/cerca": {
+   "w": 384,
+   "h": 224,
+   "vfs": {
+    "x": 192,
+    "y": 224
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 31,
+    "x1": 384,
+    "y1": 224
+   },
+   "f1": "paisaje/redoma/redoma__vista-cerca@1x.png",
+   "f2": "paisaje/redoma/redoma__vista-cerca@2x.png"
+  },
+  "prop/redoma/lejos": {
+   "w": 384,
+   "h": 224,
+   "vfs": {
+    "x": 192,
+    "y": 224
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 31,
+    "x1": 384,
+    "y1": 224
+   },
+   "f1": "paisaje/redoma/redoma__vista-lejos@1x.png",
+   "f2": "paisaje/redoma/redoma__vista-lejos@2x.png"
+  },
+  "tile/suelo/si-no": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/suelo/tile-suelo__caminable-si_borde-no@1x.png",
+   "f2": "tiles/suelo/tile-suelo__caminable-si_borde-no@2x.png"
+  },
+  "tile/suelo/no-no": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/suelo/tile-suelo__caminable-no_borde-no@1x.png",
+   "f2": "tiles/suelo/tile-suelo__caminable-no_borde-no@2x.png"
+  },
+  "tile/suelo/no-se": {
+   "w": 128,
+   "h": 88,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 88
+   },
+   "f1": "tiles/suelo/tile-suelo__caminable-no_borde-se@1x.png",
+   "f2": "tiles/suelo/tile-suelo__caminable-no_borde-se@2x.png"
+  },
+  "tile/suelo/no-sw": {
+   "w": 128,
+   "h": 88,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 88
+   },
+   "f1": "tiles/suelo/tile-suelo__caminable-no_borde-sw@1x.png",
+   "f2": "tiles/suelo/tile-suelo__caminable-no_borde-sw@2x.png"
+  },
+  "tile/suelo/no-esquina-s": {
+   "w": 128,
+   "h": 88,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 88
+   },
+   "f1": "tiles/suelo/tile-suelo__caminable-no_borde-esquina-s@1x.png",
+   "f2": "tiles/suelo/tile-suelo__caminable-no_borde-esquina-s@2x.png"
+  },
+  "tile/calle/ne-sw": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/calle/tile-calle__caminable-si_forma-recta_abre-ne-sw@1x.png",
+   "f2": "tiles/calle/tile-calle__caminable-si_forma-recta_abre-ne-sw@2x.png"
+  },
+  "tile/calle/se-nw": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/calle/tile-calle__caminable-si_forma-recta_abre-se-nw@1x.png",
+   "f2": "tiles/calle/tile-calle__caminable-si_forma-recta_abre-se-nw@2x.png"
+  },
+  "tile/calle/ne-se-sw-nw": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/calle/tile-calle__caminable-si_forma-cruce_abre-ne-se-sw-nw@1x.png",
+   "f2": "tiles/calle/tile-calle__caminable-si_forma-cruce_abre-ne-se-sw-nw@2x.png"
+  },
+  "tile/calle/ne-se-sw": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/calle/tile-calle__caminable-si_forma-t_abre-ne-se-sw@1x.png",
+   "f2": "tiles/calle/tile-calle__caminable-si_forma-t_abre-ne-se-sw@2x.png"
+  },
+  "tile/calle/se-sw-nw": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/calle/tile-calle__caminable-si_forma-t_abre-se-sw-nw@1x.png",
+   "f2": "tiles/calle/tile-calle__caminable-si_forma-t_abre-se-sw-nw@2x.png"
+  },
+  "tile/calle/ne-sw-nw": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/calle/tile-calle__caminable-si_forma-t_abre-ne-sw-nw@1x.png",
+   "f2": "tiles/calle/tile-calle__caminable-si_forma-t_abre-ne-sw-nw@2x.png"
+  },
+  "tile/calle/ne-se-nw": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/calle/tile-calle__caminable-si_forma-t_abre-ne-se-nw@1x.png",
+   "f2": "tiles/calle/tile-calle__caminable-si_forma-t_abre-ne-se-nw@2x.png"
+  },
+  "tile/calle/ne-se": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/calle/tile-calle__caminable-si_forma-esquina_abre-ne-se@1x.png",
+   "f2": "tiles/calle/tile-calle__caminable-si_forma-esquina_abre-ne-se@2x.png"
+  },
+  "tile/calle/se-sw": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/calle/tile-calle__caminable-si_forma-esquina_abre-se-sw@1x.png",
+   "f2": "tiles/calle/tile-calle__caminable-si_forma-esquina_abre-se-sw@2x.png"
+  },
+  "tile/calle/sw-nw": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/calle/tile-calle__caminable-si_forma-esquina_abre-sw-nw@1x.png",
+   "f2": "tiles/calle/tile-calle__caminable-si_forma-esquina_abre-sw-nw@2x.png"
+  },
+  "tile/calle/ne-nw": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/calle/tile-calle__caminable-si_forma-esquina_abre-ne-nw@1x.png",
+   "f2": "tiles/calle/tile-calle__caminable-si_forma-esquina_abre-ne-nw@2x.png"
+  },
+  "tile/calle/ne": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/calle/tile-calle__caminable-si_forma-final_abre-ne@1x.png",
+   "f2": "tiles/calle/tile-calle__caminable-si_forma-final_abre-ne@2x.png"
+  },
+  "tile/calle/se": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/calle/tile-calle__caminable-si_forma-final_abre-se@1x.png",
+   "f2": "tiles/calle/tile-calle__caminable-si_forma-final_abre-se@2x.png"
+  },
+  "tile/calle/sw": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/calle/tile-calle__caminable-si_forma-final_abre-sw@1x.png",
+   "f2": "tiles/calle/tile-calle__caminable-si_forma-final_abre-sw@2x.png"
+  },
+  "tile/calle/nw": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/calle/tile-calle__caminable-si_forma-final_abre-nw@1x.png",
+   "f2": "tiles/calle/tile-calle__caminable-si_forma-final_abre-nw@2x.png"
+  },
+  "tile/parque/si-no-no": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/parque/tile-parque__caminable-si_sendero-no_borde-no@1x.png",
+   "f2": "tiles/parque/tile-parque__caminable-si_sendero-no_borde-no@2x.png"
+  },
+  "tile/parque/no-no-no": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/parque/tile-parque__caminable-no_sendero-no_borde-no@1x.png",
+   "f2": "tiles/parque/tile-parque__caminable-no_sendero-no_borde-no@2x.png"
+  },
+  "tile/parque/si-ne-sw-no": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/parque/tile-parque__caminable-si_sendero-ne-sw_borde-no@1x.png",
+   "f2": "tiles/parque/tile-parque__caminable-si_sendero-ne-sw_borde-no@2x.png"
+  },
+  "tile/parque/si-se-nw-no": {
+   "w": 128,
+   "h": 64,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 64
+   },
+   "f1": "tiles/parque/tile-parque__caminable-si_sendero-se-nw_borde-no@1x.png",
+   "f2": "tiles/parque/tile-parque__caminable-si_sendero-se-nw_borde-no@2x.png"
+  },
+  "tile/parque/no-no-se": {
+   "w": 128,
+   "h": 88,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 88
+   },
+   "f1": "tiles/parque/tile-parque__caminable-no_sendero-no_borde-se@1x.png",
+   "f2": "tiles/parque/tile-parque__caminable-no_sendero-no_borde-se@2x.png"
+  },
+  "tile/parque/no-no-sw": {
+   "w": 128,
+   "h": 88,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 88
+   },
+   "f1": "tiles/parque/tile-parque__caminable-no_sendero-no_borde-sw@1x.png",
+   "f2": "tiles/parque/tile-parque__caminable-no_sendero-no_borde-sw@2x.png"
+  },
+  "tile/parque/no-no-esquina-s": {
+   "w": 128,
+   "h": 88,
+   "vfs": {
+    "x": 64,
+    "y": 64
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 0,
+    "x1": 128,
+    "y1": 88
+   },
+   "f1": "tiles/parque/tile-parque__caminable-no_sendero-no_borde-esquina-s@1x.png",
+   "f2": "tiles/parque/tile-parque__caminable-no_sendero-no_borde-esquina-s@2x.png"
+  }
+ },
+ "meta": {
+  "ext/volaris": {
+   "puerta": {
+    "x": 96,
+    "y": 304,
+    "nota": "centro inferior de la puerta en el frame = punto medio del lado de la casilla de acceso que toca la casa",
+    "ancho_casilla": 0.48,
+    "alto_px": 54,
+    "verificacion": {
+     "cara_puerta_mapa": "+y",
+     "acceso_mapa": [
+      39,
+      36
+     ],
+     "casilla_frente_a_la_puerta": [
+      39,
+      36
+     ],
+     "punto_medio_borde_acceso_frame": [
+      96,
+      304
+     ],
+     "coincide": true
+    }
+   },
+   "punto_lejos": {
+    "x": 96,
+    "y": 282,
+    "radio": 4,
+    "nota": "sobre la puerta"
+   }
+  },
+  "ext/bain": {
+   "puerta": {
+    "x": 96,
+    "y": 304,
+    "nota": "centro inferior de la puerta en el frame = punto medio del lado de la casilla de acceso que toca la casa",
+    "ancho_casilla": 0.48,
+    "alto_px": 54,
+    "verificacion": {
+     "cara_puerta_mapa": "+y",
+     "acceso_mapa": [
+      39,
+      26
+     ],
+     "casilla_frente_a_la_puerta": [
+      39,
+      26
+     ],
+     "punto_medio_borde_acceso_frame": [
+      96,
+      304
+     ],
+     "coincide": true
+    }
+   },
+   "punto_lejos": {
+    "x": 96,
+    "y": 282,
+    "radio": 4,
+    "nota": "sobre la puerta"
+   }
+  },
+  "ext/mentoria": {
+   "puerta": {
+    "x": 128,
+    "y": 288,
+    "nota": "centro inferior de la puerta en el frame (sobre el deck del porche, 4 px arriba del suelo)",
+    "ancho_casilla": 0.48,
+    "alto_px": 54,
+    "verificacion": {
+     "cara_puerta_mapa": "+y",
+     "acceso_mapa": [
+      32,
+      26
+     ],
+     "casilla_frente_a_la_puerta": [
+      32,
+      26
+     ],
+     "punto_medio_borde_acceso_frame": [
+      96,
+      304
+     ],
+     "coincide": true
+    }
+   },
+   "llegada": {
+    "x": 96,
+    "y": 304,
+    "nota": "Mentoría tiene porche: la puerta está 0,5 casilla adentro (b = 2,5). Este punto es el medio del borde del porche (b = 3), el que toca la casilla de acceso (32, 26)."
+   },
+   "punto_lejos": {
+    "x": 128,
+    "y": 262,
+    "radio": 4,
+    "nota": "sobre la puerta"
+   }
+  },
+  "ext/finoa": {
+   "puerta": {
+    "x": 288,
+    "y": 304,
+    "nota": "centro inferior de la puerta en el frame = punto medio del lado de la casilla de acceso que toca la casa",
+    "ancho_casilla": 0.56,
+    "alto_px": 74,
+    "verificacion": {
+     "cara_puerta_mapa": "+x",
+     "acceso_mapa": [
+      24,
+      24
+     ],
+     "casilla_frente_a_la_puerta": [
+      24,
+      24
+     ],
+     "punto_medio_borde_acceso_frame": [
+      288,
+      304
+     ],
+     "coincide": true
+    }
+   },
+   "punto_lejos": {
+    "x": 280.32,
+    "y": 253.16,
+    "radio": 4,
+    "nota": "sobre la puerta"
+   }
+  },
+  "ext/pg": {
+   "puerta": {
+    "x": 288,
+    "y": 304,
+    "nota": "centro inferior de la puerta en el frame = punto medio del lado de la casilla de acceso que toca la casa",
+    "ancho_casilla": 0.56,
+    "alto_px": 74,
+    "verificacion": {
+     "cara_puerta_mapa": "+x",
+     "acceso_mapa": [
+      24,
+      31
+     ],
+     "casilla_frente_a_la_puerta": [
+      24,
+      31
+     ],
+     "punto_medio_borde_acceso_frame": [
+      288,
+      304
+     ],
+     "coincide": true
+    }
+   },
+   "punto_lejos": {
+    "x": 288,
+    "y": 267,
+    "radio": 4,
+    "nota": "sobre la puerta"
+   }
+  },
+  "int/volaris": {
+   "mascara_caminable": {
+    "filas_y0_a_y5": [
+     "##...#",
+     "......",
+     "#.###.",
+     "#.###.",
+     "#..E..",
+     "...S.."
+    ],
+    "leyenda": "'.' libre, '#' mueble, 'E' spawn (3, 4), 'S' salida (3, 5); fila = y, columna = x",
+    "nota": "Sale de las huellas de los muebles horneados (celda bloqueada si un mueble cubre ≥ 10 % de ella o si el centro del mueble cae en ella). Los interiores existentes no traían máscara: es un extra para que lo cruces con buildInteriorGrid, que hoy bloquea todo el anillo del borde salvo la salida. Todas las celdas libres se conectan con la salida."
+   },
+   "puerta": {
+    "cara": "+y",
+    "vano": "lado v = 6 de la celda (3, 5), u entre 3 y 4",
+    "celda_salida": [
+     3,
+     5
+    ],
+    "spawn": [
+     3,
+     4
+    ],
+    "umbral_frame": {
+     "x": 240,
+     "y": 580
+    },
+    "nota": "Punto medio del lado de la celda (3, 5) que toca el borde del cuarto. Es la salida del build (exit = (3, 5)); igual en los 5 casos, también en finoa y pg, que por fuera abren en +x: adentro la sala usa la convención del build."
+   },
+   "tapete_salida": {
+    "celda": [
+     3,
+     5
+    ],
+    "centro_frame": {
+     "x": 273.28,
+     "y": 483.36
+    },
+    "nota": "world/wood con borde prop-line de 3 px y dos franjas paralelas al vano; en lejos es el rombo más claro de la sala (prop-line)."
+   }
+  },
+  "int/bain": {
+   "mascara_caminable": {
+    "filas_y0_a_y5": [
+     ".....#",
+     ".####.",
+     ".####.",
+     "..##..",
+     "...E.#",
+     "...S.."
+    ],
+    "leyenda": "'.' libre, '#' mueble, 'E' spawn (3, 4), 'S' salida (3, 5); fila = y, columna = x",
+    "nota": "Sale de las huellas de los muebles horneados (celda bloqueada si un mueble cubre ≥ 10 % de ella o si el centro del mueble cae en ella). Los interiores existentes no traían máscara: es un extra para que lo cruces con buildInteriorGrid, que hoy bloquea todo el anillo del borde salvo la salida. Todas las celdas libres se conectan con la salida."
+   },
+   "puerta": {
+    "cara": "+y",
+    "vano": "lado v = 6 de la celda (3, 5), u entre 3 y 4",
+    "celda_salida": [
+     3,
+     5
+    ],
+    "spawn": [
+     3,
+     4
+    ],
+    "umbral_frame": {
+     "x": 240,
+     "y": 580
+    },
+    "nota": "Punto medio del lado de la celda (3, 5) que toca el borde del cuarto. Es la salida del build (exit = (3, 5)); igual en los 5 casos, también en finoa y pg, que por fuera abren en +x: adentro la sala usa la convención del build."
+   },
+   "tapete_salida": {
+    "celda": [
+     3,
+     5
+    ],
+    "centro_frame": {
+     "x": 273.28,
+     "y": 483.36
+    },
+    "nota": "world/wood con borde prop-line de 3 px y dos franjas paralelas al vano; en lejos es el rombo más claro de la sala (prop-line)."
+   }
+  },
+  "int/mentoria": {
+   "mascara_caminable": {
+    "filas_y0_a_y5": [
+     "####.#",
+     "##....",
+     "...##.",
+     "#.#...",
+     "...E..",
+     "...S.."
+    ],
+    "leyenda": "'.' libre, '#' mueble, 'E' spawn (3, 4), 'S' salida (3, 5); fila = y, columna = x",
+    "nota": "Sale de las huellas de los muebles horneados (celda bloqueada si un mueble cubre ≥ 10 % de ella o si el centro del mueble cae en ella). Los interiores existentes no traían máscara: es un extra para que lo cruces con buildInteriorGrid, que hoy bloquea todo el anillo del borde salvo la salida. Todas las celdas libres se conectan con la salida."
+   },
+   "puerta": {
+    "cara": "+y",
+    "vano": "lado v = 6 de la celda (3, 5), u entre 3 y 4",
+    "celda_salida": [
+     3,
+     5
+    ],
+    "spawn": [
+     3,
+     4
+    ],
+    "umbral_frame": {
+     "x": 240,
+     "y": 580
+    },
+    "nota": "Punto medio del lado de la celda (3, 5) que toca el borde del cuarto. Es la salida del build (exit = (3, 5)); igual en los 5 casos, también en finoa y pg, que por fuera abren en +x: adentro la sala usa la convención del build."
+   },
+   "tapete_salida": {
+    "celda": [
+     3,
+     5
+    ],
+    "centro_frame": {
+     "x": 273.28,
+     "y": 483.36
+    },
+    "nota": "world/wood con borde prop-line de 3 px y dos franjas paralelas al vano; en lejos es el rombo más claro de la sala (prop-line)."
+   }
+  },
+  "int/finoa": {
+   "mascara_caminable": {
+    "filas_y0_a_y5": [
+     "#..###",
+     "#.##..",
+     "#.#...",
+     "....##",
+     "...E..",
+     "...S.#"
+    ],
+    "leyenda": "'.' libre, '#' mueble, 'E' spawn (3, 4), 'S' salida (3, 5); fila = y, columna = x",
+    "nota": "Sale de las huellas de los muebles horneados (celda bloqueada si un mueble cubre ≥ 10 % de ella o si el centro del mueble cae en ella). Los interiores existentes no traían máscara: es un extra para que lo cruces con buildInteriorGrid, que hoy bloquea todo el anillo del borde salvo la salida. Todas las celdas libres se conectan con la salida."
+   },
+   "puerta": {
+    "cara": "+y",
+    "vano": "lado v = 6 de la celda (3, 5), u entre 3 y 4",
+    "celda_salida": [
+     3,
+     5
+    ],
+    "spawn": [
+     3,
+     4
+    ],
+    "umbral_frame": {
+     "x": 240,
+     "y": 580
+    },
+    "nota": "Punto medio del lado de la celda (3, 5) que toca el borde del cuarto. Es la salida del build (exit = (3, 5)); igual en los 5 casos, también en finoa y pg, que por fuera abren en +x: adentro la sala usa la convención del build."
+   },
+   "tapete_salida": {
+    "celda": [
+     3,
+     5
+    ],
+    "centro_frame": {
+     "x": 273.28,
+     "y": 483.36
+    },
+    "nota": "world/wood con borde prop-line de 3 px y dos franjas paralelas al vano; en lejos es el rombo más claro de la sala (prop-line)."
+   }
+  },
+  "int/pg": {
+   "mascara_caminable": {
+    "filas_y0_a_y5": [
+     "###...",
+     ".....#",
+     "#.....",
+     "#...##",
+     "#..E##",
+     "...S.."
+    ],
+    "leyenda": "'.' libre, '#' mueble, 'E' spawn (3, 4), 'S' salida (3, 5); fila = y, columna = x",
+    "nota": "Sale de las huellas de los muebles horneados (celda bloqueada si un mueble cubre ≥ 10 % de ella o si el centro del mueble cae en ella). Los interiores existentes no traían máscara: es un extra para que lo cruces con buildInteriorGrid, que hoy bloquea todo el anillo del borde salvo la salida. Todas las celdas libres se conectan con la salida."
+   },
+   "puerta": {
+    "cara": "+y",
+    "vano": "lado v = 6 de la celda (3, 5), u entre 3 y 4",
+    "celda_salida": [
+     3,
+     5
+    ],
+    "spawn": [
+     3,
+     4
+    ],
+    "umbral_frame": {
+     "x": 240,
+     "y": 580
+    },
+    "nota": "Punto medio del lado de la celda (3, 5) que toca el borde del cuarto. Es la salida del build (exit = (3, 5)); igual en los 5 casos, también en finoa y pg, que por fuera abren en +x: adentro la sala usa la convención del build."
+   },
+   "tapete_salida": {
+    "celda": [
+     3,
+     5
+    ],
+    "centro_frame": {
+     "x": 273.28,
+     "y": 483.36
+    },
+    "nota": "world/wood con borde prop-line de 3 px y dos franjas paralelas al vano; en lejos es el rombo más claro de la sala (prop-line)."
+   }
+  },
+  "prop/obelisco": {
+   "colision": {
+    "decision": "La escalinata BLOQUEA: el Obelisco no tiene interior y la puerta no se abre, así que subir no lleva a nada, y el mapa no tiene alturas. El jugador llega al pie de la escalinata, en el acceso (17, 36). El arco es solo apoyo, pero su pie en la plaza bloquea (14, 36), que pasa a ser sólida. Lo que queda debajo del arco está en (14, 36) y (15, 36), las dos sólidas. (15, 37) sigue sólida por las gradas (45 %) y la losa, no por el arco.",
+    "solida": {
+     "celdas": [
+      [
+       14,
+       36
+      ],
+      [
+       15,
+       35
+      ],
+      [
+       15,
+       36
+      ],
+      [
+       15,
+       37
+      ],
+      [
+       16,
+       36
+      ]
+     ],
+     "nota": "x = 15, y 35–37: gradas y losa (las gradas cubren 100 % de (15, 36) y 45 % de (15, 35) y (15, 37)); (16, 36): la escalinata con sus muros (u 1,65–2,95 × v 1,06–1,94, 84 % de la casilla) la cruza entera. (14, 36): pie del arco (u 0,50–0,60 × v 1,44–1,56) y arco por encima."
+    },
+    "caminable": {
+     "celdas": [
+      [
+       14,
+       35
+      ],
+      [
+       14,
+       37
+      ],
+      [
+       16,
+       35
+      ],
+      [
+       16,
+       37
+      ]
+     ],
+     "nota": "plaza y redoma decorativas: las gradas solo las rozan (≤ 15 %). Si no quieres que se pise la redoma, bloquéalas también."
+    },
+    "cobertura": {
+     "gradas": {
+      "14,35": 0.07,
+      "15,35": 0.45,
+      "16,35": 0.07,
+      "14,36": 0.15,
+      "15,36": 1,
+      "16,36": 0.15,
+      "14,37": 0.07,
+      "15,37": 0.45,
+      "16,37": 0.07
+     },
+     "escalinata": {
+      "15,36": 0.31,
+      "16,36": 0.84
+     }
+    },
+    "rectangulos_locales": {
+     "gradas": {
+      "u": [
+       0.85,
+       2.15
+      ],
+      "v": [
+       0.55,
+       2.45
+      ],
+      "z": [
+       0,
+       12
+      ]
+     },
+     "losa": {
+      "u": [
+       1.35,
+       1.65
+      ],
+      "v": [
+       0.95,
+       2.05
+      ],
+      "z": [
+       12,
+       396
+      ]
+     },
+     "escalinata": {
+      "u": [
+       1.65,
+       2.95
+      ],
+      "v": [
+       1.06,
+       1.94
+      ],
+      "z": [
+       0,
+       59
+      ]
+     },
+     "arco": {
+      "u": [
+       0.5,
+       1.35
+      ],
+      "v": [
+       1.44,
+       1.56
+      ],
+      "z": [
+       0,
+       104
+      ],
+      "pie": {
+       "u": [
+        0.5,
+        0.6
+       ],
+       "v": [
+        1.44,
+        1.56
+       ]
+      }
+     }
+    },
+    "unidades": "casillas del mapa (x, y); locales: u = x − 14, v = y − 35",
+    "acceso": [
+     17,
+     36
+    ]
+   },
+   "punto_lejos": {
+    "x": 202.88,
+    "y": 50.44,
+    "radio": 4
+   },
+   "frente": {
+    "cara": "+x",
+    "mira_a": [
+     17,
+     36
+    ],
+    "elementos": [
+     "ranuras del mirador",
+     "reloj",
+     "placa",
+     "puerta",
+     "escalinata"
+    ],
+    "puerta_frame": {
+     "x": 201.6,
+     "y": 384.8,
+     "nota": "centro del umbral, z 52; la puerta no se abre"
+    },
+    "pie_escalinata_frame": {
+     "x": 284.8,
+     "y": 478.4
+    },
+    "trasera": {
+     "cara": "-x",
+     "elementos": [
+      "reloj",
+      "inscripción 1552 · 1952"
+     ],
+     "nota": "oculta en esta vista"
+    }
+   },
+   "arco": {
+    "cara": "-x",
+    "nace": {
+     "u": 1.35,
+     "v": [
+      1.44,
+      1.56
+     ],
+     "z": 104
+    },
+    "apoya": {
+     "u": [
+      0.5,
+      0.6
+     ],
+     "v": [
+      1.44,
+      1.56
+     ],
+     "z": 0,
+     "celda": [
+      14,
+      36
+     ]
+    },
+    "escalones": false,
+    "visible_en_iso": "asoma a la izquierda de la losa (lomo + cara +y); lo de detrás de la losa queda tapado"
+   }
+  }
+ }
+}

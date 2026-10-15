@@ -1,0 +1,8 @@
+1280 first load: zoom 0.562 #view=x=320.0&y=-2144.0&z=0.562
+1280 volaris mat tap from (4,1): left the room in 250 ms
+1280 obelisco: tap over the shaft at the centre of (9,30) -> walk goal {"x":9,"y":30}
+1280 muro: tapped footprint cell (36,40), character at 36,40
+375 first load: zoom 0.343 #view=x=0.0&y=-2279.5&z=0.343
+375 volaris mat tap from (4,1): left the room in 356 ms
+375 obelisco: tap over the shaft at the centre of (9,30) -> walk goal {"x":9,"y":30}
+375 muro: tapped footprint cell (36,40), character at 36,40

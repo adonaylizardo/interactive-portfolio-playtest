@@ -1,0 +1,22 @@
+name: Verify
+
+# Required check: the gate (fast checks). The long walk suite runs in its own
+# workflow (walk-suite.yml) and never blocks a merge or a deploy.
+on:
+  pull_request:
+    branches:
+      - 'cursor/**'
+  push:
+    branches:
+      - 'cursor/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    uses: ./.github/workflows/gate.yml

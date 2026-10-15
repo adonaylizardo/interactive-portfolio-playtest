@@ -1,0 +1,2231 @@
+{
+ "assets": {
+  "fill/fuente/cerca": {
+   "w": 256,
+   "h": 208,
+   "vfs": {
+    "x": 128,
+    "y": 208
+   },
+   "bbox": {
+    "x0": 43,
+    "y0": 60,
+    "x1": 213,
+    "y1": 189
+   },
+   "f1": "relleno/fuente/fuente__vista-cerca@1x.png",
+   "f2": "relleno/fuente/fuente__vista-cerca@2x.png"
+  },
+  "fill/fuente/lejos": {
+   "w": 256,
+   "h": 208,
+   "vfs": {
+    "x": 128,
+    "y": 208
+   },
+   "bbox": {
+    "x0": 43,
+    "y0": 68,
+    "x1": 213,
+    "y1": 189
+   },
+   "f1": "relleno/fuente/fuente__vista-lejos@1x.png",
+   "f2": "relleno/fuente/fuente__vista-lejos@2x.png"
+  },
+  "fill/banco-con-gente/senor-cafecito-der/cerca": {
+   "w": 128,
+   "h": 176,
+   "vfs": {
+    "x": 64,
+    "y": 176
+   },
+   "bbox": {
+    "x0": 25,
+    "y0": 62,
+    "x1": 101,
+    "y1": 163
+   },
+   "f1": "relleno/banco-con-gente/banco-con-gente__quien-senor-cafecito_orientacion-der_vista-cerca@1x.png",
+   "f2": "relleno/banco-con-gente/banco-con-gente__quien-senor-cafecito_orientacion-der_vista-cerca@2x.png"
+  },
+  "fill/banco-con-gente/senor-cafecito-der/lejos": {
+   "w": 128,
+   "h": 176,
+   "vfs": {
+    "x": 64,
+    "y": 176
+   },
+   "bbox": {
+    "x0": 25,
+    "y0": 62,
+    "x1": 101,
+    "y1": 163
+   },
+   "f1": "relleno/banco-con-gente/banco-con-gente__quien-senor-cafecito_orientacion-der_vista-lejos@1x.png",
+   "f2": "relleno/banco-con-gente/banco-con-gente__quien-senor-cafecito_orientacion-der_vista-lejos@2x.png"
+  },
+  "fill/carrito-cachapas/izq/cerca": {
+   "w": 128,
+   "h": 232,
+   "vfs": {
+    "x": 64,
+    "y": 232
+   },
+   "bbox": {
+    "x0": 15,
+    "y0": 52,
+    "x1": 128,
+    "y1": 229
+   },
+   "f1": "relleno/carrito-cachapas/carrito-cachapas__orientacion-izq_vista-cerca@1x.png",
+   "f2": "relleno/carrito-cachapas/carrito-cachapas__orientacion-izq_vista-cerca@2x.png"
+  },
+  "fill/carrito-cachapas/izq/lejos": {
+   "w": 128,
+   "h": 232,
+   "vfs": {
+    "x": 64,
+    "y": 232
+   },
+   "bbox": {
+    "x0": 15,
+    "y0": 52,
+    "x1": 128,
+    "y1": 229
+   },
+   "f1": "relleno/carrito-cachapas/carrito-cachapas__orientacion-izq_vista-lejos@1x.png",
+   "f2": "relleno/carrito-cachapas/carrito-cachapas__orientacion-izq_vista-lejos@2x.png"
+  },
+  "fill/puesto-jugos/izq/cerca": {
+   "w": 128,
+   "h": 240,
+   "vfs": {
+    "x": 64,
+    "y": 240
+   },
+   "bbox": {
+    "x0": 2,
+    "y0": 45,
+    "x1": 121,
+    "y1": 235
+   },
+   "f1": "relleno/puesto-jugos/puesto-jugos__orientacion-izq_vista-cerca@1x.png",
+   "f2": "relleno/puesto-jugos/puesto-jugos__orientacion-izq_vista-cerca@2x.png"
+  },
+  "fill/puesto-jugos/izq/lejos": {
+   "w": 128,
+   "h": 240,
+   "vfs": {
+    "x": 64,
+    "y": 240
+   },
+   "bbox": {
+    "x0": 3,
+    "y0": 45,
+    "x1": 121,
+    "y1": 234
+   },
+   "f1": "relleno/puesto-jugos/puesto-jugos__orientacion-izq_vista-lejos@1x.png",
+   "f2": "relleno/puesto-jugos/puesto-jugos__orientacion-izq_vista-lejos@2x.png"
+  },
+  "fill/carrito-cepillados/der/cerca": {
+   "w": 128,
+   "h": 224,
+   "vfs": {
+    "x": 64,
+    "y": 224
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 68,
+    "x1": 107,
+    "y1": 216
+   },
+   "f1": "relleno/carrito-cepillados/carrito-cepillados__orientacion-der_vista-cerca@1x.png",
+   "f2": "relleno/carrito-cepillados/carrito-cepillados__orientacion-der_vista-cerca@2x.png"
+  },
+  "fill/carrito-cepillados/der/lejos": {
+   "w": 128,
+   "h": 224,
+   "vfs": {
+    "x": 64,
+    "y": 224
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 68,
+    "x1": 107,
+    "y1": 216
+   },
+   "f1": "relleno/carrito-cepillados/carrito-cepillados__orientacion-der_vista-lejos@1x.png",
+   "f2": "relleno/carrito-cepillados/carrito-cepillados__orientacion-der_vista-lejos@2x.png"
+  },
+  "fill/parada-bus/izq/cerca": {
+   "w": 192,
+   "h": 240,
+   "vfs": {
+    "x": 128,
+    "y": 240
+   },
+   "bbox": {
+    "x0": 15,
+    "y0": 16,
+    "x1": 187,
+    "y1": 231
+   },
+   "f1": "relleno/parada-bus/parada-bus__orientacion-izq_vista-cerca@1x.png",
+   "f2": "relleno/parada-bus/parada-bus__orientacion-izq_vista-cerca@2x.png"
+  },
+  "fill/parada-bus/izq/lejos": {
+   "w": 192,
+   "h": 240,
+   "vfs": {
+    "x": 128,
+    "y": 240
+   },
+   "bbox": {
+    "x0": 15,
+    "y0": 16,
+    "x1": 187,
+    "y1": 231
+   },
+   "f1": "relleno/parada-bus/parada-bus__orientacion-izq_vista-lejos@1x.png",
+   "f2": "relleno/parada-bus/parada-bus__orientacion-izq_vista-lejos@2x.png"
+  },
+  "fill/bicis-estacionadas/izq/cerca": {
+   "w": 128,
+   "h": 128,
+   "vfs": {
+    "x": 64,
+    "y": 128
+   },
+   "bbox": {
+    "x0": 12,
+    "y0": 31,
+    "x1": 103,
+    "y1": 116
+   },
+   "f1": "relleno/bicis-estacionadas/bicis-estacionadas__orientacion-izq_vista-cerca@1x.png",
+   "f2": "relleno/bicis-estacionadas/bicis-estacionadas__orientacion-izq_vista-cerca@2x.png"
+  },
+  "fill/bicis-estacionadas/izq/lejos": {
+   "w": 128,
+   "h": 128,
+   "vfs": {
+    "x": 64,
+    "y": 128
+   },
+   "bbox": {
+    "x0": 12,
+    "y0": 31,
+    "x1": 103,
+    "y1": 116
+   },
+   "f1": "relleno/bicis-estacionadas/bicis-estacionadas__orientacion-izq_vista-lejos@1x.png",
+   "f2": "relleno/bicis-estacionadas/bicis-estacionadas__orientacion-izq_vista-lejos@2x.png"
+  },
+  "fill/bicis-estacionadas/der/cerca": {
+   "w": 128,
+   "h": 128,
+   "vfs": {
+    "x": 64,
+    "y": 128
+   },
+   "bbox": {
+    "x0": 25,
+    "y0": 31,
+    "x1": 116,
+    "y1": 116
+   },
+   "f1": "relleno/bicis-estacionadas/bicis-estacionadas__orientacion-der_vista-cerca@1x.png",
+   "f2": "relleno/bicis-estacionadas/bicis-estacionadas__orientacion-der_vista-cerca@2x.png"
+  },
+  "fill/bicis-estacionadas/der/lejos": {
+   "w": 128,
+   "h": 128,
+   "vfs": {
+    "x": 64,
+    "y": 128
+   },
+   "bbox": {
+    "x0": 25,
+    "y0": 31,
+    "x1": 116,
+    "y1": 116
+   },
+   "f1": "relleno/bicis-estacionadas/bicis-estacionadas__orientacion-der_vista-lejos@1x.png",
+   "f2": "relleno/bicis-estacionadas/bicis-estacionadas__orientacion-der_vista-lejos@2x.png"
+  },
+  "fill/cuji/cerca": {
+   "w": 128,
+   "h": 208,
+   "vfs": {
+    "x": 64,
+    "y": 208
+   },
+   "bbox": {
+    "x0": 3,
+    "y0": 48,
+    "x1": 120,
+    "y1": 187
+   },
+   "f1": "relleno/cuji/cuji__vista-cerca@1x.png",
+   "f2": "relleno/cuji/cuji__vista-cerca@2x.png"
+  },
+  "fill/cuji/lejos": {
+   "w": 128,
+   "h": 208,
+   "vfs": {
+    "x": 64,
+    "y": 208
+   },
+   "bbox": {
+    "x0": 3,
+    "y0": 48,
+    "x1": 120,
+    "y1": 187
+   },
+   "f1": "relleno/cuji/cuji__vista-lejos@1x.png",
+   "f2": "relleno/cuji/cuji__vista-lejos@2x.png"
+  },
+  "fill/cardon/cerca": {
+   "w": 128,
+   "h": 208,
+   "vfs": {
+    "x": 64,
+    "y": 208
+   },
+   "bbox": {
+    "x0": 27,
+    "y0": 1,
+    "x1": 101,
+    "y1": 185
+   },
+   "f1": "relleno/cardon/cardon__vista-cerca@1x.png",
+   "f2": "relleno/cardon/cardon__vista-cerca@2x.png"
+  },
+  "fill/cardon/lejos": {
+   "w": 128,
+   "h": 208,
+   "vfs": {
+    "x": 64,
+    "y": 208
+   },
+   "bbox": {
+    "x0": 27,
+    "y0": 1,
+    "x1": 101,
+    "y1": 185
+   },
+   "f1": "relleno/cardon/cardon__vista-lejos@1x.png",
+   "f2": "relleno/cardon/cardon__vista-lejos@2x.png"
+  },
+  "fill/araguaney-florecido/cerca": {
+   "w": 128,
+   "h": 208,
+   "vfs": {
+    "x": 64,
+    "y": 208
+   },
+   "bbox": {
+    "x0": 11,
+    "y0": 17,
+    "x1": 116,
+    "y1": 187
+   },
+   "f1": "relleno/araguaney-florecido/araguaney-florecido__vista-cerca@1x.png",
+   "f2": "relleno/araguaney-florecido/araguaney-florecido__vista-cerca@2x.png"
+  },
+  "fill/araguaney-florecido/lejos": {
+   "w": 128,
+   "h": 208,
+   "vfs": {
+    "x": 64,
+    "y": 208
+   },
+   "bbox": {
+    "x0": 11,
+    "y0": 17,
+    "x1": 116,
+    "y1": 187
+   },
+   "f1": "relleno/araguaney-florecido/araguaney-florecido__vista-lejos@1x.png",
+   "f2": "relleno/araguaney-florecido/araguaney-florecido__vista-lejos@2x.png"
+  },
+  "fill/mural-logo/base-wireframe/cerca": {
+   "w": 256,
+   "h": 272,
+   "vfs": {
+    "x": 192,
+    "y": 272
+   },
+   "bbox": {
+    "x0": 37,
+    "y0": 12,
+    "x1": 241,
+    "y1": 254
+   },
+   "f1": "relleno/mural-logo/mural-logo__capas-base+wireframe-mentoria_vista-cerca@1x.png",
+   "f2": "relleno/mural-logo/mural-logo__capas-base+wireframe-mentoria_vista-cerca@2x.png"
+  },
+  "fill/mural-logo/base-wireframe/lejos": {
+   "w": 256,
+   "h": 272,
+   "vfs": {
+    "x": 192,
+    "y": 272
+   },
+   "bbox": {
+    "x0": 37,
+    "y0": 12,
+    "x1": 241,
+    "y1": 254
+   },
+   "f1": "relleno/mural-logo/mural-logo__capa-base_vista-lejos@1x.png",
+   "f2": "relleno/mural-logo/mural-logo__capa-base_vista-lejos@2x.png"
+  },
+  "fill/cafe-fachada/izq/cerca": {
+   "w": 192,
+   "h": 288,
+   "vfs": {
+    "x": 128,
+    "y": 288
+   },
+   "bbox": {
+    "x0": 7,
+    "y0": 29,
+    "x1": 192,
+    "y1": 279
+   },
+   "f1": "relleno/cafe-fachada/cafe-fachada__orientacion-izq_vista-cerca@1x.png",
+   "f2": "relleno/cafe-fachada/cafe-fachada__orientacion-izq_vista-cerca@2x.png"
+  },
+  "fill/cafe-fachada/izq/lejos": {
+   "w": 192,
+   "h": 288,
+   "vfs": {
+    "x": 128,
+    "y": 288
+   },
+   "bbox": {
+    "x0": 15,
+    "y0": 29,
+    "x1": 192,
+    "y1": 279
+   },
+   "f1": "relleno/cafe-fachada/cafe-fachada__orientacion-izq_vista-lejos@1x.png",
+   "f2": "relleno/cafe-fachada/cafe-fachada__orientacion-izq_vista-lejos@2x.png"
+  },
+  "fill/disqueria-fachada/der/cerca": {
+   "w": 192,
+   "h": 288,
+   "vfs": {
+    "x": 64,
+    "y": 288
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 29,
+    "x1": 185,
+    "y1": 279
+   },
+   "f1": "relleno/disqueria-fachada/disqueria-fachada__orientacion-der_vista-cerca@1x.png",
+   "f2": "relleno/disqueria-fachada/disqueria-fachada__orientacion-der_vista-cerca@2x.png"
+  },
+  "fill/disqueria-fachada/der/lejos": {
+   "w": 192,
+   "h": 288,
+   "vfs": {
+    "x": 64,
+    "y": 288
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 29,
+    "x1": 177,
+    "y1": 279
+   },
+   "f1": "relleno/disqueria-fachada/disqueria-fachada__orientacion-der_vista-lejos@1x.png",
+   "f2": "relleno/disqueria-fachada/disqueria-fachada__orientacion-der_vista-lejos@2x.png"
+  },
+  "fill/cancha-basket/cerca": {
+   "w": 512,
+   "h": 448,
+   "vfs": {
+    "x": 192,
+    "y": 448
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 72,
+    "x1": 512,
+    "y1": 448
+   },
+   "f1": "relleno/cancha-basket/cancha-basket__vista-cerca@1x.png",
+   "f2": "relleno/cancha-basket/cancha-basket__vista-cerca@2x.png"
+  },
+  "fill/cancha-basket/lejos": {
+   "w": 512,
+   "h": 448,
+   "vfs": {
+    "x": 192,
+    "y": 448
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 73,
+    "x1": 512,
+    "y1": 448
+   },
+   "f1": "relleno/cancha-basket/cancha-basket__vista-lejos@1x.png",
+   "f2": "relleno/cancha-basket/cancha-basket__vista-lejos@2x.png"
+  },
+  "fill/rincon-meditacion/cerca": {
+   "w": 128,
+   "h": 128,
+   "vfs": {
+    "x": 64,
+    "y": 128
+   },
+   "bbox": {
+    "x0": 18,
+    "y0": 45,
+    "x1": 110,
+    "y1": 119
+   },
+   "f1": "relleno/rincon-meditacion/rincon-meditacion__vista-cerca@1x.png",
+   "f2": "relleno/rincon-meditacion/rincon-meditacion__vista-cerca@2x.png"
+  },
+  "fill/rincon-meditacion/lejos": {
+   "w": 128,
+   "h": 128,
+   "vfs": {
+    "x": 64,
+    "y": 128
+   },
+   "bbox": {
+    "x0": 18,
+    "y0": 45,
+    "x1": 110,
+    "y1": 119
+   },
+   "f1": "relleno/rincon-meditacion/rincon-meditacion__vista-lejos@1x.png",
+   "f2": "relleno/rincon-meditacion/rincon-meditacion__vista-lejos@2x.png"
+  },
+  "fill/mirador/deck/cerca": {
+   "w": 384,
+   "h": 320,
+   "vfs": {
+    "x": 192,
+    "y": 320
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 70,
+    "x1": 384,
+    "y1": 320
+   },
+   "f1": "relleno/mirador/mirador-deck__vista-cerca@1x.png",
+   "f2": "relleno/mirador/mirador-deck__vista-cerca@2x.png"
+  },
+  "fill/mirador/deck/lejos": {
+   "w": 384,
+   "h": 320,
+   "vfs": {
+    "x": 192,
+    "y": 320
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 71,
+    "x1": 384,
+    "y1": 320
+   },
+   "f1": "relleno/mirador/mirador-deck__vista-lejos@1x.png",
+   "f2": "relleno/mirador/mirador-deck__vista-lejos@2x.png"
+  },
+  "fill/mirador/telescopio-libre/cerca": {
+   "w": 128,
+   "h": 200,
+   "vfs": {
+    "x": 64,
+    "y": 200
+   },
+   "bbox": {
+    "x0": 38,
+    "y0": 35,
+    "x1": 90,
+    "y1": 175
+   },
+   "f1": "relleno/mirador/telescopio__uso-libre_vista-cerca@1x.png",
+   "f2": "relleno/mirador/telescopio__uso-libre_vista-cerca@2x.png"
+  },
+  "fill/mirador/telescopio-libre/lejos": {
+   "w": 128,
+   "h": 200,
+   "vfs": {
+    "x": 64,
+    "y": 200
+   },
+   "bbox": {
+    "x0": 38,
+    "y0": 35,
+    "x1": 90,
+    "y1": 175
+   },
+   "f1": "relleno/mirador/telescopio__uso-libre_vista-lejos@1x.png",
+   "f2": "relleno/mirador/telescopio__uso-libre_vista-lejos@2x.png"
+  },
+  "fill/mirador/telescopio-con-persona/cerca": {
+   "w": 128,
+   "h": 200,
+   "vfs": {
+    "x": 64,
+    "y": 200
+   },
+   "bbox": {
+    "x0": 27,
+    "y0": 35,
+    "x1": 90,
+    "y1": 179
+   },
+   "f1": "relleno/mirador/telescopio__uso-con-persona_vista-cerca@1x.png",
+   "f2": "relleno/mirador/telescopio__uso-con-persona_vista-cerca@2x.png"
+  },
+  "fill/mirador/telescopio-con-persona/lejos": {
+   "w": 128,
+   "h": 200,
+   "vfs": {
+    "x": 64,
+    "y": 200
+   },
+   "bbox": {
+    "x0": 27,
+    "y0": 35,
+    "x1": 90,
+    "y1": 179
+   },
+   "f1": "relleno/mirador/telescopio__uso-con-persona_vista-lejos@1x.png",
+   "f2": "relleno/mirador/telescopio__uso-con-persona_vista-lejos@2x.png"
+  },
+  "fill/golf/green/cerca": {
+   "w": 512,
+   "h": 360,
+   "vfs": {
+    "x": 256,
+    "y": 360
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 103,
+    "x1": 512,
+    "y1": 360
+   },
+   "f1": "relleno/golf/golf-green__vista-cerca@1x.png",
+   "f2": "relleno/golf/golf-green__vista-cerca@2x.png"
+  },
+  "fill/golf/green/lejos": {
+   "w": 512,
+   "h": 360,
+   "vfs": {
+    "x": 256,
+    "y": 360
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 103,
+    "x1": 512,
+    "y1": 360
+   },
+   "f1": "relleno/golf/golf-green__vista-lejos@1x.png",
+   "f2": "relleno/golf/golf-green__vista-lejos@2x.png"
+  },
+  "fill/golf/tapete-practica/cerca": {
+   "w": 256,
+   "h": 200,
+   "vfs": {
+    "x": 64,
+    "y": 200
+   },
+   "bbox": {
+    "x0": 5,
+    "y0": 80,
+    "x1": 187,
+    "y1": 198
+   },
+   "f1": "relleno/golf/golf-tapete__vista-cerca@1x.png",
+   "f2": "relleno/golf/golf-tapete__vista-cerca@2x.png"
+  },
+  "fill/golf/tapete-practica/lejos": {
+   "w": 256,
+   "h": 200,
+   "vfs": {
+    "x": 64,
+    "y": 200
+   },
+   "bbox": {
+    "x0": 5,
+    "y0": 104,
+    "x1": 187,
+    "y1": 198
+   },
+   "f1": "relleno/golf/golf-tapete__vista-lejos@1x.png",
+   "f2": "relleno/golf/golf-tapete__vista-lejos@2x.png"
+  },
+  "fill/parque-perros/cerca": {
+   "w": 512,
+   "h": 336,
+   "vfs": {
+    "x": 256,
+    "y": 336
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 21,
+    "x1": 512,
+    "y1": 336
+   },
+   "f1": "relleno/parque-perros/parque-perros__vista-cerca@1x.png",
+   "f2": "relleno/parque-perros/parque-perros__vista-cerca@2x.png"
+  },
+  "fill/parque-perros/lejos": {
+   "w": 512,
+   "h": 336,
+   "vfs": {
+    "x": 256,
+    "y": 336
+   },
+   "bbox": {
+    "x0": 0,
+    "y0": 21,
+    "x1": 512,
+    "y1": 336
+   },
+   "f1": "relleno/parque-perros/parque-perros__vista-lejos@1x.png",
+   "f2": "relleno/parque-perros/parque-perros__vista-lejos@2x.png"
+  }
+ },
+ "anims": {
+  "anim/golf/bola": {
+   "f1": "relleno/golf/golf-bola__anim-putt_recorte@1x.png",
+   "f2": "relleno/golf/golf-bola__anim-putt_recorte@2x.png",
+   "cell": {
+    "w": 27,
+    "h": 46
+   },
+   "vfs": {
+    "x": 68,
+    "y": 170
+   },
+   "frames": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "fps": 6,
+   "scale": 1
+  },
+  "anim/golf/golfista-sw": {
+   "f1": "relleno/golf/golf-golfista__anim-putt_sw@1x.png",
+   "f2": "relleno/golf/golf-golfista__anim-putt_sw@2x.png",
+   "cell": {
+    "w": 32,
+    "h": 50
+   },
+   "anchor": {
+    "x": 16,
+    "y": 48
+   },
+   "frames": [
+    0,
+    0,
+    0,
+    1,
+    1,
+    2,
+    3,
+    4,
+    4,
+    4,
+    5,
+    5
+   ],
+   "fps": 6
+  },
+  "anim/bots/forge-se": {
+   "f1": "relleno/bots/bot-forge__trabajar_se@1x.png",
+   "f2": "relleno/bots/bot-forge__trabajar_se@2x.png",
+   "cell": {
+    "w": 40,
+    "h": 36
+   },
+   "anchor": {
+    "x": 20,
+    "y": 34
+   },
+   "frames": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "fps": 4
+  },
+  "anim/bots/architect-sw": {
+   "f1": "relleno/bots/bot-architect__trabajar_sw@1x.png",
+   "f2": "relleno/bots/bot-architect__trabajar_sw@2x.png",
+   "cell": {
+    "w": 40,
+    "h": 36
+   },
+   "anchor": {
+    "x": 20,
+    "y": 34
+   },
+   "frames": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "fps": 4
+  },
+  "anim/bots/tars-se": {
+   "f1": "relleno/bots/bot-tars__trabajar_se@1x.png",
+   "f2": "relleno/bots/bot-tars__trabajar_se@2x.png",
+   "cell": {
+    "w": 40,
+    "h": 36
+   },
+   "anchor": {
+    "x": 20,
+    "y": 34
+   },
+   "frames": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "fps": 4
+  },
+  "anim/bots/jcvd-sw": {
+   "f1": "relleno/bots/bot-jcvd__trabajar_sw@1x.png",
+   "f2": "relleno/bots/bot-jcvd__trabajar_sw@2x.png",
+   "cell": {
+    "w": 40,
+    "h": 36
+   },
+   "anchor": {
+    "x": 20,
+    "y": 34
+   },
+   "frames": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "fps": 4
+  }
+ },
+ "masks": {
+  "fill/fuente": {
+   "w": 64,
+   "h": 52,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAwAAAAAAAD8PwAAAAAAAP5/AAAAAAAA/n8AAAAAAAD//wAAAAAAgP//AQAAAADw//8PAAAAAPz//z8AAAAA/////wAAAID/////AQAAwP////8DAADg/////wcAAPD/////DwAA8P////8PAADw/////w8AAPD/////DwAA8P////8PAADw/////w8AAPj/////HwAA+P////8fAAD4/////x8AAPz/////PwAA+P////8fAAD4/////x8AAPj/////HwAA8P////8PAADg/////wcAAMD/////AwAAgP////8BAAAA/v//fwAAAAD4//8fAAAAAID//wEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  },
+  "fill/banco-con-gente/senor-cafecito-der": {
+   "w": 32,
+   "h": 44,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAfAACAHwAAgD8AAIA/AACAPwAAAD8AAIA/AADgPwAA+H8AAP5/AID/fwDA//8BwP//A8D//wPA//8BwP//AcD//wDA//8DwP//A4D//wGA//8BgP//AID/PwCA/w8AgP8DAAB/AAAAAAAAAAAAAAAAAAA="
+  },
+  "fill/carrito-cachapas/izq": {
+   "w": 32,
+   "h": 58,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADA/x8A8P9/APz//wD+//8A/v//AP7//wD+//8A/v//AP7//wD+//8A+P//AOD/PwCA/w8AAH8AACB/AACgfwAAsH8AAJB/AAAwfwAAIH8AALz/AQD//wHA//8B4P//AeD//wPg//8D4P//A+D//wfg//8H4P//B+D//wfw//8H8P//B+D//wfw//8H8P//B/D//wfw//8P8P//D+D//w/A//8PgP//DwD+/wcA8P8BAAAAAA=="
+  },
+  "fill/puesto-jugos/izq": {
+   "w": 32,
+   "h": 60,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4AEAAPgHAAD+HwCA/38A4P//Afj//wf+//8f/v//f/7//3////8//v//P/7//z/8//8//P//P/z//z/8//8//P//P/z//z/8//8//P//P/z//z/8//8//P//P/z//z/8//8//P//P/z//z/8//8//P//P/z//z/8//8//P//P/z//z/8//8//P//P/z//z/8//8//P//P/z//z/8//8//P//P/D//z/g//8f4P//D8D//wcA//8DAPz/AAAABwAAAAAA"
+  },
+  "fill/carrito-cepillados/der": {
+   "w": 32,
+   "h": 56,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD8fwAA//8BAP//BwD//wcA//8HAP//BwD//wcA//8HAP//BwD//wEA/P8BAID5AACA/wAAgP8PAID/PwCA/z8AgP8/AID//wCA//8BgP//AYD//wGA//8BgP//AYD//wGA//8DgP//A4D//wOA//8DgP//A4D//weA//8HwP//B8D//wfA//8DwP//AYD/fwAA/g8AAAAAAAAAAAA="
+  },
+  "fill/parada-bus/izq": {
+   "w": 48,
+   "h": 60,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOADAAAAAPgPAAAAAP4/AAAAgP//AAAA4P//AwAA+P//DwAA+P//PwAA+P///wAA+P///wMA8P///w8AwP///z8AgP////8AgP////8DgP////8PgP////8/gP////9/gP////9/gP////9/gP////9/gP////8/gP////8fgP////8fgP////8fgP////8fgP////8fgP////8fgP////8fgP////8fgP////8fgP////8fgP////8fgP////8fgP////8fgP////8fgM////8fgP/3//8fgP////8fgP////8fgP////8fAP7///8fAP7///8fAPz///8fAPD///8fAOD///8fAMD///8fAAD///8fAAD8//8dAADw//8dAADA//8fAAAA/v8DAAAA8P8DAAAAgP8BAAAAAA4AAAAAAA4AAAAAAAAAAAAAAAAA"
+  },
+  "fill/bicis-estacionadas/izq": {
+   "w": 32,
+   "h": 32,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAOAAA4BgAAICfDwCA/w8AgH8HAID/9wCA//8A4P+PAfD/nwHw/r8BWP7/AFj+/wCI//8AyP//ANj//wH4//8D8P//A4D//wMA//8DAPz/AQDgfwAAAAAAAAAAAAAAAAA="
+  },
+  "fill/bicis-estacionadas/der": {
+   "w": 32,
+   "h": 32,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAABwAAAAYBwDw+QEA8P8BAOD+AQDv/wEA//8BgPH/B4D5/w+A/X8PAP9/GgD/fxoA//8RAP//E4D//xvA//8fwP//D8D//wHA//8AgP8/AAD+BwAAAAAAAAAAAAAAAAA="
+  },
+  "fill/cuji": {
+   "w": 32,
+   "h": 52,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPwHAAD+/wH4//8f/P//P/7//z////8f/v//B/j//wPA//8BgB5/AAA8DwAAOA4AAHAHAADgAwAAwAMAAMABAADAAQAAwAEAAMABAADAAAAAwAEAAMABAADAAQAAwAEAAIADAACAAwAAgAMAAIADAACAAwCA//8B8P//D/D//w/w//8PgP//AwCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+  },
+  "fill/cardon": {
+   "w": 32,
+   "h": 52,
+   "cell": 4,
+   "bits": "AMADAADgBwAA4AcAAOAPAADgDwAA4A8AAOAPAADgDwAA4O8BAODvAQDg7wMA4O8DAODvA4Dn7wOA5+8DgO/vA4Dv7wOA7+8DgO/vA4Dv/wOA7/8DgO//AYDv/wGA7w8AgP8PAID/DwCA/w8AAP8PAADgDwAA4A8AAOAPAADgDwAA4A8AAOAPAADgDwAA4A8AAOAPAADgDwAA4A8AAOAPAADgDwAA8B8AAPx/AAD+fwAA/n8AAPw/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+  },
+  "fill/araguaney-florecido": {
+   "w": 32,
+   "h": 52,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAADAAQAA4AMAAPgfAAD+/wAA//8AgP//AAD//wEA//8B4P//B/j//x/4//8f/P//H/j//x/4//8f+P//B/D//weg//8BAPw/AAD4HwAA+A0AAPAPAADgBwAAwAMAAMADAACAAwAAgAMAAIADAADAAQAAwAEAAMABAADAAQAAwAEAAMABAADAAQAAwAEAAMABAADAAQCA//8AwP//A8D//wPA//8DgP//AACAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+  },
+  "fill/mural-logo/base-wireframe": {
+   "w": 64,
+   "h": 68,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPAAAAAAAAAA/AMAAAAAAAD8DwAAAAAAAPw/AAAAAAAA+P8AAAAAAAD4/wMAAAAAAPj/DwAAAAAA+P8/AAAAAAD4//8AAAAAAPj//wMAAAAA+P//DwAAAAD4//8/AAAAAPj///8AAAAA+P///wMAAAD4////DwAAAPj///8/AAAA+P////8AAAD4/////wMAAPj/////DwAA+P////8/AAD4//////8AAPj//////wMA+P//////DwD4//////8fAPj//////x8A+P//////BwD4//////8HAPj//////wcA+P//////BwD4//////8HAPj//////wcA+P//////BwD4//////8HAPj//////wcA+P//////BwD+//////8HAP7//////wcA/P//////BwD4//////8HAOD//////wcAwP//////BwAA//////8HAAD+/////wcAAPj/////BwAA4P////8HAADA/////wcAAAD/////BwAAAPz///8HAAAA8P///wcAAADA////BwAAAAD///8HAAAAAPz//wcAAAAA8P//BwAAAADA//8HAAAAAAD//wcAAAAAAPj/BwAAAAAA4P8HAAAAAAAA/wcAAAAAAAD8DwAAAAAAAOAPAAAAAAAAAA4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+  },
+  "fill/cafe-fachada/izq": {
+   "w": 48,
+   "h": 72,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMADAAAAAPAPAAAAAPw/AAAAAP//AAAAwP//AwAA8P//DwAA+P//PwAA+P///wAA8P///wMA8P///w8A8P///z8A8P////8A8P////8D8P////8P8P////8/8P//////8P//////8P//////+P//////+P///////P///////v///////P//////+P//////+P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////4P//////4P//////4P//////wP//////AP7/////APz/////APj/////AOD/////AID///9/AAD+//8/AAD4//8PAADA//8PAAAA/v8HAAAAwP8BAAAAAAAAAAAAAAAA"
+  },
+  "fill/disqueria-fachada/der": {
+   "w": 48,
+   "h": 72,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAMAAAAA8A8AAAAA/D8AAAAA//8AAADA//8DAADw//8PAAD8//8fAAD///8fAMD///8PAPD///8PAPz///8PAP////8PwP////8P8P////8P/P////8P//////8P//////8P//////8P//////8f//////8f//////8///////9///////8///////8f//////8f//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8P//////8H//////8H//////8D//////8B/////38A/////z8A/////x8A/////wcA/v///wEA/P//fwAA8P//HwAA8P//AwAA4P9/AAAAgP8DAAAAAAAAAAAAAAAAAAAA"
+  },
+  "fill/cancha-basket": {
+   "w": 128,
+   "h": 112,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAAQAAAAAAAAAAAAAAAAAAwAcAAAAAAAAAAAAAAAAAAMD/AAAAAAAAAAAAAAAAAADA/wAAAAAAAAAAAAAAAAAAwP8BAAAAAAAAAAAAAAAAAMD/AQAAAAAAAAAAAAAAAADA/wEAAAAAAAAAAAAAAAAAwP8BAAAAAAAAAAAAAAAAAMD/AQAAAAAAAAAAAAAAAADA/wEAAAAAAAAAAAAAAAAAwP8BAAAAAAAAAAAAAAAAAID/AQAAAAAAAAAAAAAAAAAA4AEAAAAAAAAAAAAAAAAAAOAAAAAAAAAAAAAAAAAAAADgAAAAAAAAAAAAAAAAAAAA4AAAAAAAAAAAAAAAAAAAAOAAAAAAAAAAAAAAAAAAAADgAAAAAAAAAAAAAAAAAAAA4AAAAAAAAAAAAAAAAAAAAOAAAAAAAAAAAAAAAAAAAADgAAAAAAAAAAAAAAAAAAAA4AAAAAAAAAAAAAAAAAAAAOAAAAAAAAAAAAAAAAAAAADgAAAAAAAAAAAAAAAAAAAA4AAAAAAAAAAAAAAAAAAAAOAAAAAAAAAAAAAAAAAAAADgAAAAAAAAAAAAAAAAAAAA4AAAAAAAAAAAAAAAAAAAAOAAAAAAAAAAAAAAAACAAQDgAAAAAAAAAAAAAAAA4AcA4AAAAAAAAAAAAAAAAPgfAOAAAAAAAAAAAAAAAAD+fwDgAAAAAAAAAAAAAACA//8B4AAAAAAAAAAAAAAA4P//B+AAAAAAAIADAAAAAPj//x/gAAAAAACADwAAAAD+//9/4AAAAAAAgD8AAACA/////+EAAAAAAID/AAAA4P/////nAAAAAACA/wMAAPj//////wAAAAAAgP8DAAD+//////8AAAAAAID/AwCA////////AQAAAACA/wMA4P///////wcAAAAAgP8DAPj///////8fAAAAAAD/AwD+////////fwAAAAAA/wOA//////////8BAAAAAPcD4P//////////BwAAAADHA/j//////////x8AAAAABwP+//////////9/AAAAAAeA/////////////wEAAAAH4P////////////8HAAAAB/j/////////////HwAAAAf+/////////////38AAACH////////////////AAAA5////////////////wAAAP///////////////38AAAD///////////////8fAACA////////////////BwAA4P///////////////wEAAPj//////////////38AAAD+//////////////8fAACA////////////////BwAA4P///////////////wEAAPj//////////////38AAAD+//////////////8fAACA////////////////BwAA4P///////////////wEAAPj//////////////38AAAD+//////////////8fAAAA////////////////BwAAAP///////////////wEAAAD+/////////////38AAAAA+P////////////8fAAAAAOD/////////////BwAAAACA/////////////wEAAAAAAP7//////////38AAAAAAAD4//////////8fAAAAAAAA4P//////////BwAAAAAAAID//////////wEAAAAAAAAA/v///////38AAAAAAAAAAPj///////8fAAAAAAAAAADg////////BwAAAAAAAAAAgP///////wEAAAAAAAAAAAD+/////38AAAAAAAAAAAAA+P////8fAAAAAAAAAAAAAOD/////BwAAAAAAAAAAAACA/////wEAAAAAAAAAAAAAAP7//38AAAAAAAAAAAAAAAD4//8fAAAAAAAAAAAAAAAA4P//BwAAAAAAAAAAAAAAAID//wEAAAAAAAAAAAAAAAAA/n8AAAAAAAAAAAAAAAAAAPgfAAAAAAAAAAAAAAAAAADgBwAAAAAAAAAAAA=="
+  },
+  "fill/rincon-meditacion": {
+   "w": 32,
+   "h": 32,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA8AMAAPADAADgAQAA4AEAAOABAADgAQAA4AEAAPgfAAD//wDA//8D4P//B+D//wfw//8P8P//D+D//wfg//8HwP//AwD//wAA+B8AAAAAAAAAAAA="
+  },
+  "fill/mirador/deck": {
+   "w": 96,
+   "h": 80,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAQAAAAAAAAAAAADgAQAAAAAAAAAAAAD4AQAAAAAAAAAAAACeAQAAAAAAAAAAAICHAQAAAAAAAAAAAOCHAQAAAAAAAAAAAHiGAQAAAAAAAAAAAB7GAQAAAAAAAAAAgB/2AQAAAAAAAAAA4BmeAQAAAAAAAAAAeBiHAQAAAAAAAAAAftiHAQAAAAAAAACAf3iGAQAAAAAAAADofxzGAwAAAAAAAAD4fx/2DwAAAAAAAAD+/xn+PwAAAAAAAID/fxj//wAAAAAAAOD/f9j//wMAAAAAAHj+f/j//w8AAAAAAB7+efz//z8AAAAAgB/+Yf////8AAAAA4Bme4f////8DAAAAeBiH8f////8PAAAAftiH/f////8/AAAAZ3iG////////AAAAYRzG////////AwAAYR/2////////DwAA4Rn+////////PwAAcRj//////////wAAfdj//////////wMAZ/j//////////w8Abfz//////////z8wf/////////////94//////////////97/f////////////8//f////////////8//////////////////////////////////////////////////////////////////v////////////9/+P////////////8f4P////////////8HgP////////////8BAP7//////////38AAPj//////////x8AAOD//////////wcAAID//////////wEAAAD+////////fwAAAAD4////////HwAAAADg////////BwAAAACA////////AQAAAAAA/v////9/AAAAAAAA+P////8fAAAAAAAA4P////8HAAAAAAAAgP////8BAAAAAAAAAP7//38AAAAAAAAAAPj//x8AAAAAAAAAAOD//wcAAAAAAAAAAID//wEAAAAAAAAAAAD+fwAAAAAAAAAAAAD4HwAAAAAAAAAAAADgBwAAAAAA"
+  },
+  "fill/mirador/telescopio-libre": {
+   "w": 32,
+   "h": 50,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAeAAAAHgAAAA8AAAAPAACABwAAgAcAAMAHAADAAwAAwAMAAOABAADgAQAA8AEAAPADAADwAwAA8AMAAIABAADAAwAAwAMAAMADAADABwAA4AcAAOAFAACgBQAAoA0AALANAACwCQAAkBkAAJgZAAD4HwAA/D8AAP5/AAD+fwAA/n8AAPw/AADwDwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  },
+  "fill/mirador/telescopio-con-persona": {
+   "w": 32,
+   "h": 50,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAeAAAAHgAAAA8AAAAPAACABwAAgAcAAMAHAADAAwAAwAMAAOABAADgAQAA8AEAAP4DAAD/AwAA/wMAAP8BAAD/AwAA/wMAAP8DAAD8BwCA/wcAwP8FAMD/BQDA/w0AwP8NAID/CQCA/xkAgP8ZAID/HwCA/z8AAP9/AAD/fwAA/38AAP8/AAD/DwAA/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  },
+  "fill/golf/green": {
+   "w": 128,
+   "h": 90,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAMAAAAAAAAAAAAAAAAAAPAPAAAAAAAAAAAAAAAAAAD8PwAAAAAAAAAAAAAAAAAA//8AAAAAAAAAAAAAAACAw///AwAAAAAAAAAAAAAAgP///w8AAAAAAAAAAAAAAID///8/AAAAAAAAAAAAAACA/////wAAAAAAAAAAAAAAwP////8DAAAAAAAAAAAAAPD/////DwAAAAAAAAAAAAD8/////z8AAAAAAAAAAAAA////////AAAAAAAAAAAAwP///////wMAAAAAAAAAAPD///////8PAAAAAAAAAAD8////////fwAAAAAAAAAA//////////8BAAAAAAAA8P//////////BwAAAAAAAPz//////////w8AAAAAAAD///////////8/AAAAAACA/////////////wAAAAAAwP////////////8DAAAAAPD/////////////DwAAAAD8/////////////z8AAAAA////////////////AAAAwP///////////////wMAAPD///////////////8PAAD8////////////////PwAA//////////////////8AwP//////////////////A/D//////////////////w/8//////////////////8////////////////////////////////////////////8//////////////////8/8P//////////////////D8D//////////////////wMA//////////////////8AAPz///////////////8/AADw////////////////DwAAwP///////////////wMAAAD///////////////8AAAAA/P////////////8/AAAAAPD/////////////DwAAAADA/////////////wMAAAAAAP////////////8BAAAAAAD8////////////AAAAAAAA8P///////////wAAAAAAAMD//////////38AAAAAAAAA//////////8/AAAAAAAAAPz/////////HwAAAAAAAADw/////////w8AAAAAAAAAwP////////8HAAAAAAAAAAD/////////AQAAAAAAAAAA/P//////fwAAAAAAAAAAAPD//////x8AAAAAAAAAAADA//////8BAAAAAAAAAAAAAP////8AAAAAAAAAAAAAAAD8//8/AAAAAAAAAAAAAAAA8P//DwAAAAAAAAAAAAAAAMD//wMAAAAAAAAAAAAAAAAA//8AAAAAAAAAAAAAAAAAAPw/AAAAAAAAAAAAAAAAAADwDwAAAAAAAAAAAAAAAAAAwAMAAAAAAAAA"
+  },
+  "anim/golf/golfista-sw": {
+   "w": 16,
+   "h": 25,
+   "cell": 4,
+   "bits": "AADgB+AH8A/wD/AH8AfwA/AD4AfwH/gf+B/4H/gf+B/4H/gf+B/wB/gH+Af+B/4H+Ac="
+  },
+  "fill/golf/tapete-practica": {
+   "w": 64,
+   "h": 50,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOAAAAAAAAMA+AAAAAAAAwD8AAAAAAADAPwAAAAAAAMAfAAAAAAB4wB8AAAAAAPzDDQAAAAAA/k8MAAAAAAD+PwwAAAAAgP//DAAAAADg//8PAAAAAPj//w8AAAAA/v//PwAAAID///9/AAAA4P///38AAAD4////PwAAAP7///8PAACA/////wMAAOD/////AAAA+P///z8AAAD+////DwAAAP7///8DAAAA/v///wAAAAD4//8/AAAAAOD//w8AAAAAgP//AwAAAAAA/v8AAAAAAAD4PwAAAAAAAOAPAAAAAAAAgAMAAAAAAA=="
+  },
+  "anim/bots/forge-se": {
+   "w": 20,
+   "h": 18,
+   "cell": 4,
+   "bits": "AAAAAADAPwD+B+D/g/8//P/D/x/4/4H/H/j/gP8P8P8A/w/APwD8A+B/AP4H"
+  },
+  "anim/bots/architect-sw": {
+   "w": 20,
+   "h": 18,
+   "cell": 4,
+   "bits": "AAAAYADAPwD+B+B/AP4H4H8A/gfAPwD8A8A/APwDwD8A/APAPwD8AeB/AP4H"
+  },
+  "anim/bots/tars-se": {
+   "w": 20,
+   "h": 18,
+   "cell": 4,
+   "bits": "AAAA/w/4/4H/H/j/gf8f+P+B/x/4/4H/H/j/gf8f+P+B/x/4/4H/H/j/Af4P"
+  },
+  "anim/bots/jcvd-sw": {
+   "w": 20,
+   "h": 18,
+   "cell": 4,
+   "bits": "AAAA8ADAPwD8A+B/AP4H4H8A/APw/wD/D/D/AP8P4H8A/gfAPwD8A+B/AP4H"
+  },
+  "fill/parque-perros": {
+   "w": 128,
+   "h": 84,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAEAAAAAAAAAAAAAAAAAAIABAAAAAAAAAAAAAAAAAACAAQAAAAAAAAAAAAAAAAAA7ncAAAAAAAAAAAAAAAAAALw9AAAAAAAAAAAAAAAAADCOcQwAAAAAAAAAAAAAAADwj/EPAAAAAAAAAAAAAAAA8IwxDwAAAAAAAAAAAAAAgDmMMZwBAAAAAAAAAAAAAIA/jDH8AQAAAAAAAAAAAACAM+w3zAEAAAAAAAAAAAAA7jH8P4x3AAAAAAAAAAAAALwxnnmMPQAAAAAAAAAAADCOsY/xjXEMAAAAAAAAAADwj/GNsY/xDwAAAAAAAAAA8Ix57DeeMQ8AAAAAAAAAgDmMP/w//DGcAQAAAAAAAIA/jDf+f+wx/AEAAAAAAACAM+yx//+NN8wBAAAAAAAA7jH88f//jz+MdwAAAAAAALwxnvn//595jD0AAAAAADCOsY//////8Y1xDAAAAADwj/GN/////7GP8Q8AAAAA8Ix57P////83njEPAAAAgDmMP/z/////P/wxnAEAAIA//Df+/////3/sMfwBAACAM/yx////////jTfMAQAA7jH/8f///////48/jHcAALzx//n///////+feYw9ADCO8f////////////GNcQzwj/3///////////+xj/EP8Iz/////////////N54xDzmM/////////////z/8MZw/jP////////////9/7DH8M+z//////////////403zDH8//////////////+PP4wxnv///////////////3+MsY/////////////////3jfGN////////////////t4957P///////////////zeeP/z///////////////8//H/+////////////////f/75//////////////////+f8f//////////////////j/v//////////////////9/////////////////////////////////////////////////////////////////+//////////////////9/+P//////////////////H+D//////////////////weA//////////////////8BAP7///////////////9/AAD4////////////////HwAA4P///////////////wcAAID///////////////8BAAAA/v////////////9/AAAAAPj/////////////HwAAAADg/////////////wcAAAAAgP////////////8BAAAAAAD+//////////9/AAAAAAAA+P//////////HwAAAAAAAOD//////////wcAAAAAAACA//////////8BAAAAAAAAAP7///////9/AAAAAAAAAAD4////////HwAAAAAAAAAA4P///////wcAAAAAAAAAAID///////8BAAAAAAAAAAAA/v////9/AAAAAAAAAAAAAPj/////HwAAAAAAAAAAAADg/////wcAAAAAAAAAAAAAgP////8BAAAAAAAAAAAAAAD+//9/AAAAAAAAAAAAAAAA+P//HwAAAAAAAAAAAAAAAOD//wcAAAAAAAAAAAAAAACA//8BAAAAAAAAAAAAAAAAAP5/AAAAAAAAAAAAAAAAAAD4HwAAAAAAAAAAAAAAAAAA4AcAAAAAAAAA"
+  }
+ },
+ "placements": [
+  {
+   "id": "fuente",
+   "kind": "prop",
+   "sprite": "fill/fuente",
+   "footprint": {
+    "x": 30,
+    "y": 42,
+    "w": 2,
+    "h": 2
+   },
+   "front": [
+    31,
+    43
+   ],
+   "cells": [
+    [
+     30,
+     42
+    ],
+    [
+     30,
+     43
+    ],
+    [
+     31,
+     42
+    ],
+    [
+     31,
+     43
+    ]
+   ]
+  },
+  {
+   "id": "banco-2",
+   "kind": "prop",
+   "sprite": "fill/banco-con-gente/senor-cafecito-der",
+   "footprint": {
+    "x": 28,
+    "y": 42,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    28,
+    42
+   ],
+   "cells": [
+    [
+     28,
+     42
+    ]
+   ]
+  },
+  {
+   "id": "cachapas",
+   "kind": "prop",
+   "sprite": "fill/carrito-cachapas/izq",
+   "footprint": {
+    "x": 27,
+    "y": 38,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    27,
+    38
+   ],
+   "cells": [
+    [
+     27,
+     38
+    ]
+   ],
+   "group": "cachapas"
+  },
+  {
+   "id": "jugos",
+   "kind": "prop",
+   "sprite": "fill/puesto-jugos/izq",
+   "footprint": {
+    "x": 22,
+    "y": 38,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    22,
+    38
+   ],
+   "cells": [
+    [
+     22,
+     38
+    ]
+   ]
+  },
+  {
+   "id": "cepillados",
+   "kind": "prop",
+   "sprite": "fill/carrito-cepillados/der",
+   "footprint": {
+    "x": 45,
+    "y": 42,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    45,
+    42
+   ],
+   "cells": [
+    [
+     45,
+     42
+    ]
+   ]
+  },
+  {
+   "id": "parada",
+   "kind": "prop",
+   "sprite": "fill/parada-bus/izq",
+   "footprint": {
+    "x": 42,
+    "y": 35,
+    "w": 2,
+    "h": 1
+   },
+   "front": [
+    43,
+    35
+   ],
+   "cells": [
+    [
+     42,
+     35
+    ],
+    [
+     43,
+     35
+    ]
+   ]
+  },
+  {
+   "id": "bicis-1",
+   "kind": "prop",
+   "sprite": "fill/bicis-estacionadas/izq",
+   "footprint": {
+    "x": 36,
+    "y": 37,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    36,
+    37
+   ],
+   "cells": [
+    [
+     36,
+     37
+    ]
+   ]
+  },
+  {
+   "id": "bicis-2",
+   "kind": "prop",
+   "sprite": "fill/bicis-estacionadas/der",
+   "footprint": {
+    "x": 25,
+    "y": 27,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    25,
+    27
+   ],
+   "cells": [
+    [
+     25,
+     27
+    ]
+   ]
+  },
+  {
+   "id": "bicis-3",
+   "kind": "prop",
+   "sprite": "fill/bicis-estacionadas/izq",
+   "footprint": {
+    "x": 36,
+    "y": 27,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    36,
+    27
+   ],
+   "cells": [
+    [
+     36,
+     27
+    ]
+   ]
+  },
+  {
+   "id": "cuji-1",
+   "kind": "prop",
+   "sprite": "fill/cuji",
+   "footprint": {
+    "x": 19,
+    "y": 38,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    19,
+    38
+   ],
+   "cells": [
+    [
+     19,
+     38
+    ]
+   ]
+  },
+  {
+   "id": "cuji-2",
+   "kind": "prop",
+   "sprite": "fill/cuji",
+   "footprint": {
+    "x": 13,
+    "y": 39,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    13,
+    39
+   ],
+   "cells": [
+    [
+     13,
+     39
+    ]
+   ]
+  },
+  {
+   "id": "cuji-3",
+   "kind": "prop",
+   "sprite": "fill/cuji",
+   "footprint": {
+    "x": 10,
+    "y": 31,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    10,
+    31
+   ],
+   "cells": [
+    [
+     10,
+     31
+    ]
+   ]
+  },
+  {
+   "id": "cuji-4",
+   "kind": "prop",
+   "sprite": "fill/cuji",
+   "footprint": {
+    "x": 20,
+    "y": 20,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    20,
+    20
+   ],
+   "cells": [
+    [
+     20,
+     20
+    ]
+   ]
+  },
+  {
+   "id": "cuji-5",
+   "kind": "prop",
+   "sprite": "fill/cuji",
+   "footprint": {
+    "x": 9,
+    "y": 20,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    9,
+    20
+   ],
+   "cells": [
+    [
+     9,
+     20
+    ]
+   ]
+  },
+  {
+   "id": "cardon-1",
+   "kind": "prop",
+   "sprite": "fill/cardon",
+   "footprint": {
+    "x": 12,
+    "y": 33,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    12,
+    33
+   ],
+   "cells": [
+    [
+     12,
+     33
+    ]
+   ]
+  },
+  {
+   "id": "cardon-2",
+   "kind": "prop",
+   "sprite": "fill/cardon",
+   "footprint": {
+    "x": 12,
+    "y": 38,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    12,
+    38
+   ],
+   "cells": [
+    [
+     12,
+     38
+    ]
+   ]
+  },
+  {
+   "id": "cardon-3",
+   "kind": "prop",
+   "sprite": "fill/cardon",
+   "footprint": {
+    "x": 26,
+    "y": 20,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    26,
+    20
+   ],
+   "cells": [
+    [
+     26,
+     20
+    ]
+   ]
+  },
+  {
+   "id": "araguaney-1",
+   "kind": "prop",
+   "sprite": "fill/araguaney-florecido",
+   "footprint": {
+    "x": 28,
+    "y": 25,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    28,
+    25
+   ],
+   "cells": [
+    [
+     28,
+     25
+    ]
+   ]
+  },
+  {
+   "id": "araguaney-2",
+   "kind": "prop",
+   "sprite": "fill/araguaney-florecido",
+   "footprint": {
+    "x": 35,
+    "y": 25,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    35,
+    25
+   ],
+   "cells": [
+    [
+     35,
+     25
+    ]
+   ]
+  },
+  {
+   "id": "araguaney-3",
+   "kind": "prop",
+   "sprite": "fill/araguaney-florecido",
+   "footprint": {
+    "x": 41,
+    "y": 49,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    41,
+    49
+   ],
+   "cells": [
+    [
+     41,
+     49
+    ]
+   ]
+  },
+  {
+   "id": "araguaney-4",
+   "kind": "prop",
+   "sprite": "fill/araguaney-florecido",
+   "footprint": {
+    "x": 47,
+    "y": 44,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    47,
+    44
+   ],
+   "cells": [
+    [
+     47,
+     44
+    ]
+   ]
+  },
+  {
+   "id": "mural",
+   "kind": "prop",
+   "sprite": "fill/mural-logo/base-wireframe",
+   "footprint": {
+    "x": 18,
+    "y": 33,
+    "w": 3,
+    "h": 1
+   },
+   "front": [
+    20,
+    33
+   ],
+   "cells": [
+    [
+     18,
+     33
+    ],
+    [
+     19,
+     33
+    ],
+    [
+     20,
+     33
+    ]
+   ]
+  },
+  {
+   "id": "cafe",
+   "kind": "prop",
+   "sprite": "fill/cafe-fachada/izq",
+   "footprint": {
+    "x": 20,
+    "y": 16,
+    "w": 2,
+    "h": 1
+   },
+   "front": [
+    21,
+    16
+   ],
+   "cells": [
+    [
+     20,
+     16
+    ],
+    [
+     21,
+     16
+    ]
+   ],
+   "doorFront": [
+    21,
+    17
+   ]
+  },
+  {
+   "id": "disqueria",
+   "kind": "prop",
+   "sprite": "fill/disqueria-fachada/der",
+   "footprint": {
+    "x": 23,
+    "y": 19,
+    "w": 1,
+    "h": 2
+   },
+   "front": [
+    23,
+    20
+   ],
+   "cells": [
+    [
+     23,
+     19
+    ],
+    [
+     23,
+     20
+    ]
+   ],
+   "doorFront": [
+    24,
+    20
+   ]
+  },
+  {
+   "id": "cancha",
+   "kind": "prop",
+   "sprite": "fill/cancha-basket",
+   "footprint": {
+    "x": 48,
+    "y": 24,
+    "w": 3,
+    "h": 5
+   },
+   "front": [
+    50,
+    28
+   ],
+   "cells": [
+    [
+     48,
+     24
+    ],
+    [
+     48,
+     25
+    ],
+    [
+     48,
+     26
+    ],
+    [
+     48,
+     27
+    ],
+    [
+     48,
+     28
+    ],
+    [
+     49,
+     24
+    ],
+    [
+     49,
+     25
+    ],
+    [
+     49,
+     26
+    ],
+    [
+     49,
+     27
+    ],
+    [
+     49,
+     28
+    ],
+    [
+     50,
+     24
+    ],
+    [
+     50,
+     25
+    ],
+    [
+     50,
+     26
+    ],
+    [
+     50,
+     27
+    ],
+    [
+     50,
+     28
+    ]
+   ],
+   "flat": true,
+   "solid": [
+    [
+     49,
+     24
+    ],
+    [
+     49,
+     28
+    ]
+   ]
+  },
+  {
+   "id": "cojin-meditacion",
+   "kind": "prop",
+   "sprite": "fill/rincon-meditacion",
+   "footprint": {
+    "x": 24,
+    "y": 32,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    24,
+    32
+   ],
+   "cells": [
+    [
+     24,
+     32
+    ]
+   ]
+  },
+  {
+   "id": "mirador",
+   "kind": "prop",
+   "sprite": "fill/mirador/deck",
+   "footprint": {
+    "x": 51,
+    "y": 35,
+    "w": 3,
+    "h": 3
+   },
+   "front": [
+    53,
+    37
+   ],
+   "cells": [
+    [
+     51,
+     35
+    ],
+    [
+     51,
+     36
+    ],
+    [
+     51,
+     37
+    ],
+    [
+     52,
+     35
+    ],
+    [
+     52,
+     36
+    ],
+    [
+     52,
+     37
+    ],
+    [
+     53,
+     35
+    ],
+    [
+     53,
+     36
+    ],
+    [
+     53,
+     37
+    ]
+   ],
+   "flat": true,
+   "solid": [],
+   "group": "mirador"
+  },
+  {
+   "id": "telescopio-1",
+   "kind": "prop",
+   "sprite": "fill/mirador/telescopio-libre",
+   "footprint": {
+    "x": 51,
+    "y": 35,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    51,
+    35
+   ],
+   "cells": [
+    [
+     51,
+     35
+    ]
+   ],
+   "group": "mirador"
+  },
+  {
+   "id": "telescopio-2",
+   "kind": "prop",
+   "sprite": "fill/mirador/telescopio-con-persona",
+   "footprint": {
+    "x": 52,
+    "y": 35,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    52,
+    35
+   ],
+   "cells": [
+    [
+     52,
+     35
+    ]
+   ],
+   "group": "mirador"
+  },
+  {
+   "id": "telescopio-3",
+   "kind": "prop",
+   "sprite": "fill/mirador/telescopio-libre",
+   "footprint": {
+    "x": 53,
+    "y": 35,
+    "w": 1,
+    "h": 1
+   },
+   "front": [
+    53,
+    35
+   ],
+   "cells": [
+    [
+     53,
+     35
+    ]
+   ],
+   "group": "mirador"
+  },
+  {
+   "id": "cola-mirador-1",
+   "kind": "npc",
+   "npc": "senora-mono",
+   "anim": "idle_ne",
+   "cell": [
+    52,
+    36
+   ],
+   "group": "mirador"
+  },
+  {
+   "id": "cola-mirador-2",
+   "kind": "npc",
+   "npc": "pana-gorra",
+   "anim": "idle_ne",
+   "cell": [
+    52,
+    37
+   ],
+   "group": "mirador"
+  },
+  {
+   "id": "cola-mirador-3",
+   "kind": "npc",
+   "npc": "mujer-tote",
+   "anim": "idle_ne",
+   "cell": [
+    52,
+    38
+   ],
+   "group": "mirador"
+  },
+  {
+   "id": "cola-mirador-4",
+   "kind": "npc",
+   "npc": "estudiante",
+   "anim": "idle_nw",
+   "cell": [
+    53,
+    38
+   ],
+   "group": "mirador"
+  },
+  {
+   "id": "golf-green",
+   "kind": "prop",
+   "sprite": "fill/golf/green",
+   "footprint": {
+    "x": 48,
+    "y": 46,
+    "w": 4,
+    "h": 4
+   },
+   "front": [
+    51,
+    49
+   ],
+   "cells": [
+    [
+     48,
+     46
+    ],
+    [
+     48,
+     47
+    ],
+    [
+     48,
+     48
+    ],
+    [
+     48,
+     49
+    ],
+    [
+     49,
+     46
+    ],
+    [
+     49,
+     47
+    ],
+    [
+     49,
+     48
+    ],
+    [
+     49,
+     49
+    ],
+    [
+     50,
+     46
+    ],
+    [
+     50,
+     47
+    ],
+    [
+     50,
+     48
+    ],
+    [
+     50,
+     49
+    ],
+    [
+     51,
+     46
+    ],
+    [
+     51,
+     47
+    ],
+    [
+     51,
+     48
+    ],
+    [
+     51,
+     49
+    ]
+   ],
+   "flat": true,
+   "solid": [
+    [
+     49,
+     48
+    ],
+    [
+     51,
+     49
+    ]
+   ],
+   "overlay": "anim/golf/bola",
+   "group": "golf"
+  },
+  {
+   "id": "golf-golfista",
+   "kind": "actor",
+   "anim": "anim/golf/golfista-sw",
+   "cell": [
+    51,
+    47
+   ],
+   "group": "golf"
+  },
+  {
+   "id": "golf-tapete",
+   "kind": "prop",
+   "sprite": "fill/golf/tapete-practica",
+   "footprint": {
+    "x": 53,
+    "y": 46,
+    "w": 1,
+    "h": 2
+   },
+   "front": [
+    53,
+    47
+   ],
+   "cells": [
+    [
+     53,
+     46
+    ],
+    [
+     53,
+     47
+    ]
+   ],
+   "flat": true,
+   "solid": [],
+   "group": "golf"
+  },
+  {
+   "id": "bot-forge",
+   "kind": "actor",
+   "anim": "anim/bots/forge-se",
+   "cell": [
+    35,
+    31
+   ]
+  },
+  {
+   "id": "bot-architect",
+   "kind": "actor",
+   "anim": "anim/bots/architect-sw",
+   "cell": [
+    35,
+    30
+   ]
+  },
+  {
+   "id": "bot-tars",
+   "kind": "actor",
+   "anim": "anim/bots/tars-se",
+   "cell": [
+    35,
+    34
+   ]
+  },
+  {
+   "id": "bot-jcvd",
+   "kind": "actor",
+   "anim": "anim/bots/jcvd-sw",
+   "cell": [
+    35,
+    33
+   ]
+  },
+  {
+   "id": "perrera",
+   "kind": "prop",
+   "sprite": "fill/parque-perros",
+   "footprint": {
+    "x": 34,
+    "y": 44,
+    "w": 4,
+    "h": 4
+   },
+   "front": [
+    37,
+    47
+   ],
+   "cells": [
+    [
+     34,
+     44
+    ],
+    [
+     34,
+     45
+    ],
+    [
+     34,
+     46
+    ],
+    [
+     34,
+     47
+    ],
+    [
+     35,
+     44
+    ],
+    [
+     35,
+     45
+    ],
+    [
+     35,
+     46
+    ],
+    [
+     35,
+     47
+    ],
+    [
+     36,
+     44
+    ],
+    [
+     36,
+     45
+    ],
+    [
+     36,
+     46
+    ],
+    [
+     36,
+     47
+    ],
+    [
+     37,
+     44
+    ],
+    [
+     37,
+     45
+    ],
+    [
+     37,
+     46
+    ],
+    [
+     37,
+     47
+    ]
+   ],
+   "group": "perrera"
+  },
+  {
+   "id": "cola-cachapas-1",
+   "kind": "npc",
+   "npc": "chamo-audifonos",
+   "anim": "idle_ne",
+   "cell": [
+    27,
+    39
+   ],
+   "group": "cachapas"
+  },
+  {
+   "id": "cola-cachapas-2",
+   "kind": "npc",
+   "npc": "mujer-rizos",
+   "anim": "idle_ne",
+   "cell": [
+    27,
+    40
+   ],
+   "group": "cachapas"
+  },
+  {
+   "id": "cola-cachapas-3",
+   "kind": "npc",
+   "npc": "abuelo-baston",
+   "anim": "idle_ne",
+   "cell": [
+    26,
+    40
+   ],
+   "group": "cachapas"
+  },
+  {
+   "id": "farol-1",
+   "kind": "lamp",
+   "cell": [
+    26,
+    35
+   ]
+  },
+  {
+   "id": "farol-2",
+   "kind": "lamp",
+   "cell": [
+    35,
+    35
+   ]
+  },
+  {
+   "id": "farol-3",
+   "kind": "lamp",
+   "cell": [
+    27,
+    25
+   ]
+  },
+  {
+   "id": "farol-4",
+   "kind": "lamp",
+   "cell": [
+    37,
+    25
+   ]
+  },
+  {
+   "id": "farol-5",
+   "kind": "lamp",
+   "cell": [
+    23,
+    28
+   ]
+  },
+  {
+   "id": "farol-6",
+   "kind": "lamp",
+   "cell": [
+    23,
+    34
+   ]
+  },
+  {
+   "id": "farol-7",
+   "kind": "lamp",
+   "cell": [
+    36,
+    30
+   ]
+  },
+  {
+   "id": "farol-8",
+   "kind": "lamp",
+   "cell": [
+    36,
+    33
+   ]
+  },
+  {
+   "id": "farol-9",
+   "kind": "lamp",
+   "cell": [
+    45,
+    21
+   ]
+  },
+  {
+   "id": "farol-10",
+   "kind": "lamp",
+   "cell": [
+    45,
+    29
+   ]
+  },
+  {
+   "id": "farol-11",
+   "kind": "lamp",
+   "cell": [
+    45,
+    40
+   ]
+  },
+  {
+   "id": "sendero-perrera",
+   "kind": "path",
+   "cells": [
+    [
+     38,
+     42
+    ],
+    [
+     38,
+     43
+    ],
+    [
+     38,
+     44
+    ],
+    [
+     38,
+     45
+    ]
+   ],
+   "group": "perrera"
+  }
+ ],
+ "replaced": [
+  [
+   27,
+   38
+  ],
+  [
+   34,
+   38
+  ]
+ ]
+}
