@@ -77,23 +77,27 @@ async function openMap(page, url, crowd = true) {
   await wait(300);
 }
 
-/** One compact row per NPC per rendered frame: [id, tx, ty, x, y, dir, mode, frame, stride, texture, pose, inside, seat]. */
+/**
+ * One compact row per NPC per rendered frame: [id, tx, ty, x, y, dir, mode, frame, stride, texture, pose, inside, seat].
+ * Runs `ms`, then up to as long again until someone has walked each of the four directions (a slow
+ * runner may see only one or two walkers in the first window).
+ */
 function sample(page, ms) {
   return qa(
     page,
     (dur) =>
       new Promise((resolve) => {
         const out = [];
+        const dirs = new Set();
         const t0 = performance.now();
         const tick = () => {
           const t = performance.now() - t0;
-          out.push({
-            t,
-            n: window.__playtestQa
-              .npcs()
-              .npcs.map((n) => [n.id, n.tx, n.ty, n.x, n.y, n.dir, n.mode, n.frame, n.stride, n.texture, n.pose, n.inside, n.seat]),
-          });
-          if (t < dur) requestAnimationFrame(tick);
+          const n = window.__playtestQa
+            .npcs()
+            .npcs.map((n) => [n.id, n.tx, n.ty, n.x, n.y, n.dir, n.mode, n.frame, n.stride, n.texture, n.pose, n.inside, n.seat]);
+          for (const r of n) if (r[6] === 'walk' && !r[11]) dirs.add(r[5]);
+          out.push({ t, n });
+          if (t < dur || (dirs.size < 4 && t < dur * 2)) requestAnimationFrame(tick);
           else resolve(out);
         };
         requestAnimationFrame(tick);
