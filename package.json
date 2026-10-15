@@ -13,6 +13,7 @@
     "qa:sprites": "npm run build && node scripts/qa-sprites.mjs",
     "qa:smoke": "npm run build && node scripts/qa-smoke.mjs",
     "qa:gate": "npm run build && npm run typecheck && node scripts/check-logos.mjs && node scripts/check-case-copy.mjs && node scripts/qa-sprites.mjs && node scripts/qa-smoke.mjs",
+    "compress:sprites": "node scripts/compress-sprites.mjs",
     "check:logos": "node scripts/check-logos.mjs",
     "check:cases": "node scripts/check-case-copy.mjs",
     "deploy:gh-pages": "node scripts/deploy-gh-pages.mjs",
