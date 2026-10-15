@@ -42,7 +42,7 @@ async function main(): Promise<void> {
       }
     } else {
       checklist.setBuildingPanelOpen(false);
-      panel.hide({ snap: true });
+      panel.hide();
     }
     scene.applyCameraFromUi();
   };
@@ -55,7 +55,7 @@ async function main(): Promise<void> {
     },
     onExitInterior: () => {
       checklist.setBuildingPanelOpen(false);
-      panel.hide({ snap: true });
+      panel.hide();
     },
     onInteriorIdChange: (id) => {
       hideToast();

@@ -3005,7 +3005,7 @@ export class IsoScene {
     };
 
     finish();
-    // Tap / Salir: the room is already gone. Fade afterwards so the leave itself stays under 300 ms.
+    // Tap / Salir: the room is already gone. Fade afterwards so leave stays under 150 ms to map-interactive.
     if (opts?.skipFade || opts?.fromHash || opts?.immediate || this.reducedMotion) return;
     void this.runFade(true).then(() => void this.runFade(false));
   }

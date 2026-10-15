@@ -529,6 +529,8 @@ body.is-canvas-dragging * {
   font-weight: 600;
   color: #333;
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Once the text scrolls, a white band behind the button keeps it from floating over the copy. */
@@ -604,7 +606,12 @@ body.is-canvas-dragging * {
   transform: translateY(0);
 }
 
-/* Leave: hide the sheet on this frame, then the close animation can run on a later hide. */
+/* Leave: --open drops on this frame so the map is hittable; the sheet still slides out. */
+.building-panel:not(.building-panel--open) .building-panel__sheet,
+.building-panel:not(.building-panel--open) .building-panel__backdrop {
+  pointer-events: none;
+}
+
 .building-panel--snap .building-panel__backdrop,
 .building-panel--snap .building-panel__sheet {
   transition: none;

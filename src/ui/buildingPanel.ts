@@ -96,6 +96,8 @@ export class BuildingPanel {
   private mode: 'hidden' | 'interior' = 'hidden';
   private peekOnly = true;
   private dragStartY = 0;
+  private leaveArmed = false;
+  private hideTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     container: HTMLElement,
@@ -145,7 +147,17 @@ export class BuildingPanel {
       }
     });
 
-    this.el.querySelector('[data-exit]')!.addEventListener('click', () => this.salir());
+    const exitBtn = this.el.querySelector('[data-exit]') as HTMLButtonElement;
+    // pointerup/touchend: same moment as a mat tap. A `click` listener waits for iOS's
+    // ~300 ms compatibility click (Sentinel's 244–362 ms Salir vs 84–112 ms mat).
+    const onExit = (e: Event) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.salir();
+    };
+    exitBtn.addEventListener('pointerup', onExit);
+    exitBtn.addEventListener('touchend', onExit, { passive: false });
+    exitBtn.addEventListener('click', onExit);
     this.el.querySelector('[data-backdrop]')!.addEventListener('click', () => {
       if (this.isMobile() && this.mode === 'interior') this.setPeek(true);
     });
@@ -209,6 +221,11 @@ export class BuildingPanel {
   }
 
   showInterior(title: string, interiorId: string | null = null): void {
+    this.leaveArmed = false;
+    if (this.hideTimer) {
+      clearTimeout(this.hideTimer);
+      this.hideTimer = null;
+    }
     this.mode = 'interior';
     this.interiorId = interiorId;
     this.setTitle(title, this.renderCase());
@@ -225,6 +242,7 @@ export class BuildingPanel {
 
   /** QA: overlay open while still on the map (dismiss consume test). */
   showOverlayForQa(title: string): void {
+    this.leaveArmed = false;
     this.mode = 'hidden';
     this.interiorId = null;
     this.setTitle(title, this.renderCase());
@@ -293,21 +311,30 @@ export class BuildingPanel {
 
   hide(opts?: { snap?: boolean }): void {
     const snap = !!opts?.snap || this.reducedMotion();
+    const alreadyClosed = !this.el.classList.contains('building-panel--open');
     this.el.classList.toggle('building-panel--snap', snap);
     this.el.classList.remove('building-panel--open', 'building-panel--peek', 'building-panel--expanded');
     const finish = () => {
+      this.hideTimer = null;
       if (this.el.classList.contains('building-panel--open')) return;
       this.el.hidden = true;
       this.mode = 'hidden';
       this.el.classList.remove('building-panel--snap');
     };
+    if (alreadyClosed && !snap) return;
+    if (this.hideTimer) {
+      clearTimeout(this.hideTimer);
+      this.hideTimer = null;
+    }
     if (snap) finish();
-    else setTimeout(finish, 200);
+    else this.hideTimer = setTimeout(finish, 250);
     this.onVisibilityChange();
   }
 
+  /** Same leave as the mat: `onSalir` → `exitInterior({ immediate: true })`. The sheet animates after. */
   salir(): void {
-    this.hide({ snap: true });
+    if (this.leaveArmed) return;
+    this.leaveArmed = true;
     this.onSalir();
   }
 
