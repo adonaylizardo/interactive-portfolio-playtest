@@ -44,6 +44,9 @@ jobs:
       - name: check:logos
         run: node scripts/check-logos.mjs
 
+      - name: check:cases
+        run: node scripts/check-case-copy.mjs
+
       - name: Install Playwright Chromium
         run: npx playwright install chromium --with-deps
 

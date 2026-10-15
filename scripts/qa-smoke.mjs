@@ -13,6 +13,7 @@
  *  - NPC routines: 15 simulated minutes x 4 seeds of stargazers, cart queue, benches, crossers, visitors and strollers around a parked player (qa-run48-routines.mjs)
  *  - pixel-art player: facing from movement, frames locked to distance, ~4.5 tiles/s, Pantone one tile behind, Noah's climb (qa-run45-player.mjs)
  *  - airline case panel: headline title, full text on desktop / short on phone, client never named, scrolls (qa-run46-case.mjs)
+ *  - Bain / P&G / Mentoría / Finoa case panels: desktop full vs iPhone short, verbatim, no Volaris/[FALTA] (qa-run55-cases.mjs)
  *  - map fill: placements clear of streets, footprints and doors, nothing over the Estudio, props block only their cells (qa-run46-fill.mjs)
  *  - Estudio "About me": about.md line for line after the logo strip, lazy WebP photos within the panel; Noah's 1.5x tap box on phones (qa-run47-about.mjs)
  *  - bench sit: a tap (or Enter beside it) sits Adonay with Pantone at the manifest offsets, movement gets both up, the
@@ -31,6 +32,7 @@ import { runRun43LogoSuite } from './qa-run43-logos.mjs';
 import { runRun44NpcSuite } from './qa-run44-npcs.mjs';
 import { runRun45PlayerSuite } from './qa-run45-player.mjs';
 import { runRun46CaseSuite } from './qa-run46-case.mjs';
+import { runRun55CaseSuite } from './qa-run55-cases.mjs';
 import { runRun46FillSuite } from './qa-run46-fill.mjs';
 import { runRun47AboutSuite } from './qa-run47-about.mjs';
 import { runRun48RoutineSuite } from './qa-run48-routines.mjs';
@@ -195,6 +197,9 @@ const GROUPS = {
   case: async () => {
     for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375', 'webkit-iphone']) {
       await runRun46CaseSuite({ kind, base: BASE, errors, notes });
+    }
+    for (const kind of ['chromium-1280', 'webkit-iphone']) {
+      await runRun55CaseSuite({ kind, base: BASE, errors, notes });
     }
   },
   fill: async () => {

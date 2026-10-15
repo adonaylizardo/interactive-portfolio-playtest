@@ -45,6 +45,21 @@ function aboutBlockNode(block: AboutBlock): HTMLElement {
   return p;
 }
 
+/** `**bold**` in case copy becomes a <strong>; the rest is a text node. */
+function appendMarkdown(el: HTMLElement, text: string): void {
+  const re = /\*\*(.+?)\*\*/g;
+  let last = 0;
+  for (const m of text.matchAll(re)) {
+    const at = m.index ?? 0;
+    if (at > last) el.appendChild(document.createTextNode(text.slice(last, at)));
+    const strong = document.createElement('strong');
+    strong.textContent = m[1];
+    el.appendChild(strong);
+    last = at + m[0].length;
+  }
+  if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
+}
+
 function caseBlockNode(block: CaseBlock): HTMLElement {
   if (block.kind === 'closing') {
     const p = document.createElement('p');
@@ -63,17 +78,18 @@ function caseBlockNode(block: CaseBlock): HTMLElement {
     section.appendChild(h);
   }
   for (const text of block.paragraphs) {
+    if (!text) continue;
     const p = document.createElement('p');
     p.className = 'case__text';
-    p.textContent = text;
+    appendMarkdown(p, text);
     section.appendChild(p);
   }
-  if (block.bullets) {
+  if (block.bullets?.length) {
     const ul = document.createElement('ul');
     ul.className = 'case__list';
     for (const text of block.bullets) {
       const li = document.createElement('li');
-      li.textContent = text;
+      appendMarkdown(li, text);
       ul.appendChild(li);
     }
     section.appendChild(ul);
@@ -271,7 +287,8 @@ export class BuildingPanel {
     const short = this.caseEl.querySelector('.case__version--short')!;
     full.replaceChildren(...(content ? content.full.map(caseBlockNode) : []));
     short.replaceChildren(...(content ? content.short.map(caseBlockNode) : []));
-    return content?.headline ?? null;
+    if (!content) return null;
+    return this.isMobile() ? (content.shortHeadline ?? content.headline) : content.headline;
   }
 
   private renderAbout(): void {
