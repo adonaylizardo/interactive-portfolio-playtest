@@ -28,9 +28,7 @@ async function main(): Promise<void> {
       checklist.setBuildingPanelOpen(false);
       scene.applyCameraFromUi();
     },
-    () => {
-      if (scene.isInInterior()) scene.exitInterior({ immediate: true });
-    },
+    () => scene.leaveInteriorNow(),
   );
 
   const syncInteriorPanel = (interiorId: string | null): void => {
@@ -42,7 +40,7 @@ async function main(): Promise<void> {
       }
     } else {
       checklist.setBuildingPanelOpen(false);
-      panel.hide();
+      panel.hide({ snap: true });
     }
     scene.applyCameraFromUi();
   };
@@ -55,7 +53,7 @@ async function main(): Promise<void> {
     },
     onExitInterior: () => {
       checklist.setBuildingPanelOpen(false);
-      panel.hide();
+      panel.hide({ snap: true });
     },
     onInteriorIdChange: (id) => {
       hideToast();
@@ -134,6 +132,8 @@ async function main(): Promise<void> {
     interiorPixelProbes: () => scene.getInteriorPixelProbesClient(),
     tapInteriorTile: (tx: number, ty: number) => scene.tapInteriorTileForQa(tx, ty),
     expandInteriorSheet: () => panel.expandInteriorSheetForQa(),
+    sheetBodySnapshot: () => panel.sheetBodySnapshot(),
+    leaveInteriorNow: () => scene.leaveInteriorNow(),
     collapseInteriorSheetToPeek: () => panel.collapseToPeekOnly(),
     reframeMobileDefault: () => scene.reframeMobileDefaultViewForQa(),
     interiorBlockedTilesHaveProps: (name: string) => {

@@ -1,5 +1,5 @@
 import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
-import { CASES, type CaseBlock } from '../data/cases';
+import { CASES, type CaseBlock, type CaseContent } from '../data/cases';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
 
 function aboutBlockNode(block: AboutBlock): HTMLElement {
@@ -97,7 +97,8 @@ export class BuildingPanel {
   private peekOnly = true;
   private dragStartY = 0;
   private leaveArmed = false;
-  private hideTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Last interior whose case/about/logo DOM was filled. Kept across hide so re-entry can reopen it. */
+  private renderedInteriorId: string | null = null;
 
   constructor(
     container: HTMLElement,
@@ -148,15 +149,14 @@ export class BuildingPanel {
     });
 
     const exitBtn = this.el.querySelector('[data-exit]') as HTMLButtonElement;
-    // pointerup/touchend: same moment as a mat tap. A `click` listener waits for iOS's
-    // ~300 ms compatibility click (Sentinel's 244–362 ms Salir vs 84–112 ms mat).
+    // pointerdown: same moment as a mat tap on the canvas. pointerup/click still wait on lift
+    // (and iOS's ~300 ms compatibility click), which is why Salir stayed at 232–352 ms.
     const onExit = (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
       this.salir();
     };
-    exitBtn.addEventListener('pointerup', onExit);
-    exitBtn.addEventListener('touchend', onExit, { passive: false });
+    exitBtn.addEventListener('pointerdown', onExit);
     exitBtn.addEventListener('click', onExit);
     this.el.querySelector('[data-backdrop]')!.addEventListener('click', () => {
       if (this.isMobile() && this.mode === 'interior') this.setPeek(true);
@@ -222,22 +222,26 @@ export class BuildingPanel {
 
   showInterior(title: string, interiorId: string | null = null): void {
     this.leaveArmed = false;
-    if (this.hideTimer) {
-      clearTimeout(this.hideTimer);
-      this.hideTimer = null;
-    }
     this.mode = 'interior';
     this.interiorId = interiorId;
-    this.setTitle(title, this.renderCase());
-    this.renderWorkedWith();
-    this.renderAbout();
     this.peekOnly = this.isMobile();
     this.el.hidden = false;
-    requestAnimationFrame(() => {
-      this.el.classList.add('building-panel--open');
-      this.syncPeekClass();
-      this.onVisibilityChange();
-    });
+    this.el.removeAttribute('inert');
+    this.el.classList.remove('building-panel--snap');
+    // Unhide first, then fill: replacing children while `hidden` (display:none) leaves the
+    // body blank on WebKit after re-entry. Same room: keep the DOM from the last visit.
+    if (this.renderedInteriorId !== interiorId || this.bodyIsEmpty()) {
+      this.setTitle(title, this.renderCase());
+      this.renderWorkedWith();
+      this.renderAbout();
+      this.renderedInteriorId = interiorId;
+    } else {
+      this.setTitle(title, this.caseHeadline());
+    }
+    void this.el.offsetHeight;
+    this.el.classList.add('building-panel--open');
+    this.syncPeekClass();
+    this.onVisibilityChange();
   }
 
   /** QA: overlay open while still on the map (dismiss consume test). */
@@ -245,11 +249,13 @@ export class BuildingPanel {
     this.leaveArmed = false;
     this.mode = 'hidden';
     this.interiorId = null;
+    this.el.hidden = false;
+    this.el.removeAttribute('inert');
     this.setTitle(title, this.renderCase());
     this.renderAbout();
     this.peekOnly = false;
     this.el.hidden = false;
-    requestAnimationFrame(() => this.el.classList.add('building-panel--open'));
+    this.el.classList.add('building-panel--open');
   }
 
   private setTitle(key: string, shown: string | null): void {
@@ -264,9 +270,23 @@ export class BuildingPanel {
     this.el.classList.toggle('building-panel--scrolled', this.sheet.scrollTop > 4);
   }
 
+  private caseContent(): CaseContent | undefined {
+    return this.interiorId ? CASES[this.interiorId] : undefined;
+  }
+
+  private caseHeadline(): string | null {
+    return this.caseContent()?.headline ?? null;
+  }
+
+  private bodyIsEmpty(): boolean {
+    const wrap = this.el.querySelector('.building-panel__body-wrap');
+    if (!wrap) return true;
+    return !wrap.textContent?.replace(/\s+/g, '').length;
+  }
+
   /** Fills the case article for the current interior; returns its headline, or null when there is no case. */
   private renderCase(): string | null {
-    const content = this.interiorId ? CASES[this.interiorId] : undefined;
+    const content = this.caseContent();
     this.caseEl.hidden = !content;
     this.el.classList.toggle('building-panel--case', !!content);
     const full = this.caseEl.querySelector('.case__version--full')!;
@@ -309,33 +329,52 @@ export class BuildingPanel {
     this.renderWorkedWith();
   }
 
-  hide(opts?: { snap?: boolean }): void {
-    const snap = !!opts?.snap || this.reducedMotion();
-    const alreadyClosed = !this.el.classList.contains('building-panel--open');
-    this.el.classList.toggle('building-panel--snap', snap);
+  hide(_opts?: { snap?: boolean }): void {
+    // Snap out of the hit tree on this frame (same as the mat). A transforming sheet still
+    // intercepts iOS taps even with pointer-events:none, so Salir waited ~250 ms for map input.
+    // Do not empty case/about/logo DOM — showInterior reopens it on re-entry.
+    this.el.classList.add('building-panel--snap');
     this.el.classList.remove('building-panel--open', 'building-panel--peek', 'building-panel--expanded');
-    const finish = () => {
-      this.hideTimer = null;
-      if (this.el.classList.contains('building-panel--open')) return;
-      this.el.hidden = true;
-      this.mode = 'hidden';
-      this.el.classList.remove('building-panel--snap');
-    };
-    if (alreadyClosed && !snap) return;
-    if (this.hideTimer) {
-      clearTimeout(this.hideTimer);
-      this.hideTimer = null;
-    }
-    if (snap) finish();
-    else this.hideTimer = setTimeout(finish, 250);
+    this.el.setAttribute('inert', '');
+    this.el.hidden = true;
+    this.mode = 'hidden';
+    this.el.classList.remove('building-panel--snap');
     this.onVisibilityChange();
   }
 
-  /** Same leave as the mat: `onSalir` → `exitInterior({ immediate: true })`. The sheet animates after. */
+  /** Same leave as the mat: `onSalir` → `leaveInteriorNow()`. */
   salir(): void {
     if (this.leaveArmed) return;
     this.leaveArmed = true;
     this.onSalir();
+  }
+
+  /** Visible sheet body after peek/expand, for enter-leave-reenter checks. */
+  sheetBodySnapshot(): {
+    display: string;
+    text: string;
+    childCount: number;
+    peek: boolean;
+    expanded: boolean;
+    hidden: boolean;
+    open: boolean;
+  } {
+    const wrap = this.el.querySelector('.building-panel__body-wrap') as HTMLElement | null;
+    const cs = wrap ? getComputedStyle(wrap) : null;
+    const nodes = [...(wrap?.querySelectorAll('h3, p, li, img, em, .about__text, .case__text') ?? [])];
+    const visible = nodes.filter((el) => {
+      const s = getComputedStyle(el);
+      return s.display !== 'none' && s.visibility !== 'hidden' && el.getClientRects().length > 0;
+    });
+    return {
+      display: cs?.display ?? 'none',
+      text: wrap?.innerText.replace(/\s+/g, ' ').trim() ?? '',
+      childCount: visible.length,
+      peek: this.el.classList.contains('building-panel--peek'),
+      expanded: this.el.classList.contains('building-panel--expanded'),
+      hidden: this.el.hidden,
+      open: this.isOpen(),
+    };
   }
 
   isOpen(): boolean {
@@ -394,9 +433,5 @@ export class BuildingPanel {
     if (this.peekOnly) return false;
     this.setPeek(true);
     return true;
-  }
-
-  private reducedMotion(): boolean {
-    return matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
 }

@@ -2895,7 +2895,7 @@ export class IsoScene {
       drawInteriorFloor(this.interiorFloorGfx, def);
       drawInteriorWalls(this.interiorWallGfx, def);
       drawInteriorProps(this.interiorPropGfx, def);
-      this.interiorSprite?.destroy();
+      this.interiorSprite?.destroy({ children: false, texture: false, textureSource: false });
       this.interiorSprite = null;
       if (def.sprite) {
         const key = interiorSpriteKey(def.id, this.isLejos());
@@ -2975,7 +2975,7 @@ export class IsoScene {
       this.interiorFloorGfx.clear();
       this.interiorWallGfx.clear();
       this.interiorPropGfx.clear();
-      this.interiorSprite?.destroy();
+      this.interiorSprite?.destroy({ children: false, texture: false, textureSource: false });
       this.interiorSprite = null;
       if (door) {
         this.charTx = door.x;
@@ -3005,7 +3005,7 @@ export class IsoScene {
     };
 
     finish();
-    // Tap / Salir: the room is already gone. Fade afterwards so leave stays under 150 ms to map-interactive.
+    // Tap / Salir: the room is already gone. Fade afterwards so leave stays under 150 ms until the map accepts input.
     if (opts?.skipFade || opts?.fromHash || opts?.immediate || this.reducedMotion) return;
     void this.runFade(true).then(() => void this.runFade(false));
   }
@@ -3055,6 +3055,16 @@ export class IsoScene {
     this.startCameraFollow();
   }
 
+  /**
+   * Shared leave for the mat tap and Salir: room gone and overlay snapped off this frame
+   * so the map can take a pointer immediately.
+   */
+  leaveInteriorNow(): void {
+    if (!this.interiorActive) return;
+    this.interiorPath = [];
+    this.exitInterior({ immediate: true });
+  }
+
   /** One tap on the exit mat / door gap leaves right away, from anywhere the exit is reachable. */
   private exitInteriorFromTap(): void {
     const def = this.interiorDef;
@@ -3065,8 +3075,7 @@ export class IsoScene {
       this.events.onUnreachable?.();
       return;
     }
-    this.interiorPath = [];
-    this.exitInterior({ immediate: true });
+    this.leaveInteriorNow();
   }
 
   private updateInteriorWalk(): void {
