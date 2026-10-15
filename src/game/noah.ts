@@ -18,9 +18,10 @@ const SEQUENCE: Step[] = data.secuencia.map((s) => ({
   to: s.hasta as Waypoint,
   frames: s.frames_totales,
 }));
-/** Climbing anims draw just above the muro; everything else sorts with the walkers. */
+/** Climbing anims draw in front of the muro; idle/walk near it must not fall behind the sprite. */
 const ON_WALL = new Set(['subir', 'travesia_derecha', 'bajar', 'salto_aterrizaje']);
-const MURO_DEPTH_EPS = 0.25;
+const MURO_CLIMB_EPS = 1;
+const MURO_NEAR_EPS = 0.5;
 /** Hit box padding around the frame cell, in art px. */
 const HIT_PAD = 4;
 /** Touch / phone layouts: the hit box grows 1.5x around the cell so a fingertip at map zoom finds him. */
@@ -291,12 +292,16 @@ export class Noah {
   }
 
   syncDepth(): void {
+    const muroZ = this.host.muroZIndex();
     if (ON_WALL.has(this.anim)) {
-      this.sprite.zIndex = this.host.muroZIndex() + MURO_DEPTH_EPS;
+      this.sprite.zIndex = muroZ + MURO_CLIMB_EPS;
       return;
     }
     const f = worldToTileFrac(this.x, this.y);
-    this.sprite.zIndex = this.host.zIndexAt(f.x, f.y);
+    const walk = this.host.zIndexAt(f.x, f.y);
+    // Idle and the walk to the holds sit inside the muro occluder. Walker sort would
+    // put him behind the sprite (he vanishes). Keep him just in front of the wall.
+    this.sprite.zIndex = Math.max(walk, muroZ + MURO_NEAR_EPS);
   }
 
   bindTap(handler: (e: import('pixi.js').FederatedPointerEvent) => void): void {

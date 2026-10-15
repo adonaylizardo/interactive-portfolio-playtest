@@ -1201,6 +1201,7 @@ export class IsoScene {
     const f = tileToWorld(this.charTx, this.charTy);
     this.avatar.update(f.x, f.y, dt);
     this.noah?.update(dt);
+    this.noah?.syncDepth();
     const snap = this.avatar.snapshot();
     studio.noteWalk(snap.adonay.mode === 'walk', snap.adonay.frame, this.sprint);
   }
