@@ -33,13 +33,6 @@ async function shot(page, name) {
   await page.screenshot({ path: path.join(OUT, `${name}.png`) });
 }
 
-async function holdKey(page, key, ms) {
-  await page.keyboard.down(key);
-  await wait(ms);
-  await page.keyboard.up(key);
-  await wait(80);
-}
-
 async function runViewport(tag, options) {
   const errors = [];
   const notes = [];
@@ -66,10 +59,12 @@ async function runViewport(tag, options) {
     notes.push(`${tag} iso ${JSON.stringify({ sy: iso.sy, rot: iso.rot, hidden: iso.roofsHidden })}`);
     await shot(page, `${tag}-iso`);
 
-    const tileBeforeW = await page.evaluate(() => window.__playtestQa.getCharacterTile());
-    await holdKey(page, 'w', 500);
-    const tileAfterW = await page.evaluate(() => window.__playtestQa.getCharacterTile());
-    if (!(tileAfterW.y < tileBeforeW.y - 0.05)) {
+    const tileBeforeW = await page.evaluate(() => window.__playtestQa.getCharacterPos());
+    await page.evaluate(() => {
+      for (let i = 0; i < 18; i++) window.__playtestQa.walk(0, -1);
+    });
+    const tileAfterW = await page.evaluate(() => window.__playtestQa.getCharacterPos());
+    if (!(tileAfterW.y < tileBeforeW.y - 0.2)) {
       errors.push(`${tag}: iso W should walk −y (NE); ${JSON.stringify(tileBeforeW)} → ${JSON.stringify(tileAfterW)}`);
     }
 
@@ -103,7 +98,9 @@ async function runViewport(tag, options) {
     await shot(page, `${tag}-cenital`);
 
     const screenBefore = await page.evaluate(() => window.__playtestQa.cameraViews().charScreen);
-    await holdKey(page, 'w', 600);
+    await page.evaluate(() => {
+      for (let i = 0; i < 18; i++) window.__playtestQa.walk(0, -1);
+    });
     const screenAfter = await page.evaluate(() => window.__playtestQa.cameraViews().charScreen);
     if (!(screenAfter.y < screenBefore.y - 4)) {
       errors.push(

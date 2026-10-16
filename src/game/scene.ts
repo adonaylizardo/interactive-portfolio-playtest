@@ -3943,6 +3943,31 @@ export class IsoScene {
     return { x: this.charTx, y: this.charTy };
   }
 
+  /** QA: one burst of keyboard walking (iso tile space, remapped in alt cameras). */
+  qaWalk(dx: number, dy: number, sprint = false): { x: number; y: number } {
+    if (this.interiorActive) return this.getCharacterPosForQa();
+    const mapped = this.remapWalkStick(dx, dy);
+    const mag = Math.hypot(mapped.x, mapped.y);
+    if (mag < 1e-6) return this.getCharacterPosForQa();
+    const step = sprint ? 1 : 0.6;
+    const sx = (mapped.x / mag) * step;
+    const sy = (mapped.y / mag) * step;
+    const at = { x: Math.round(this.charTx), y: Math.round(this.charTy) };
+    const next = slideStep(
+      this.charTx,
+      this.charTy,
+      sx,
+      sy,
+      (x, y) => (x === at.x && y === at.y) || !!cells[y]?.[x]?.walkable,
+    );
+    this.charTx = next.x;
+    this.charTy = next.y;
+    this.syncCharacterGraphic();
+    this.applyCamera(false);
+    this.app?.render();
+    return this.getCharacterPosForQa();
+  }
+
   /** Same code path as a tap on the drawn door (QA / Playwright). */
   tapBuildingDoor(name: string): boolean {
     const client = this.getDoorScreenClientPoint(name);
@@ -4239,7 +4264,6 @@ export class IsoScene {
     aim: { x: number; y: number };
     labels: { id: string; x: number; y: number; visible: boolean }[];
   } {
-    this.applyBillboards();
     this.app?.render();
     const b = this.avatar.adonay.sprite.getBounds();
     let roofsHidden = 0;
