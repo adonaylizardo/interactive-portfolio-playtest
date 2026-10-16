@@ -227,8 +227,8 @@ async function run(tag, options, phone) {
     await page.screenshot({ path: path.join(OUT, `${tag}-09-get-out.png`) });
 
     await page.evaluate(() => {
-      const j = window.__playtestQa.jac();
-      if (j) window.__playtestQa.frameWorld(j.x * 32, (j.cx + j.cy) * 32, 0.55);
+      const e = window.__playtestQa.jacEntities?.();
+      if (e) window.__playtestQa.frameWorld(e.worldX, e.worldY, 0.62);
     });
     await wait(300);
     const zoom = await page.evaluate(() => window.__playtestQa.jacEntities?.());
