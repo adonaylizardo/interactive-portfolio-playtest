@@ -1,0 +1,12 @@
+{
+  "cooldownMs": 6000,
+  "notes": "Adonay will record these. Missing files are skipped silently.",
+  "lines": [
+    { "id": "on-it", "phrase": "I'm on it", "mp3": "on-it.mp3", "ogg": "on-it.ogg" },
+    { "id": "ready", "phrase": "I'm ready to go", "mp3": "ready.mp3", "ogg": "ready.ogg" },
+    { "id": "you-got-it", "phrase": "You got it", "mp3": "you-got-it.mp3", "ogg": "you-got-it.ogg" },
+    { "id": "sounds-good", "phrase": "Sounds good", "mp3": "sounds-good.mp3", "ogg": "sounds-good.ogg" },
+    { "id": "lets-go", "phrase": "Let's go", "mp3": "lets-go.mp3", "ogg": "lets-go.ogg" },
+    { "id": "on-my-way", "phrase": "On my way", "mp3": "on-my-way.mp3", "ogg": "on-my-way.ogg" }
+  ]
+}
