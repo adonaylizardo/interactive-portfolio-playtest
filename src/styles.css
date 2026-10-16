@@ -17,6 +17,7 @@ body {
   width: 100%;
   height: 100dvh;
   overflow: hidden;
+  overflow-x: hidden;
   overscroll-behavior: none;
   user-select: none;
   -webkit-user-select: none;
@@ -1372,10 +1373,14 @@ body[data-layout='panel'] .checklist {
 .case-read__bar {
   position: sticky;
   top: 0;
+  left: 0;
   z-index: 4;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
+  max-width: 100%;
   padding: 6px 6px 6px 16px;
   background: #141518;
   border-bottom: 1px solid #2a2c31;
@@ -1389,6 +1394,7 @@ body[data-layout='panel'] .checklist {
   line-height: 24px;
   font-weight: 500;
   color: #edeef0;
+  overflow-wrap: anywhere;
 }
 
 .case-read__page {
@@ -1429,6 +1435,7 @@ body[data-layout='panel'] .checklist {
   line-height: 32px;
   font-weight: 600;
   color: #edeef0;
+  overflow-wrap: anywhere;
 }
 
 .case-read__lede {
@@ -1437,6 +1444,7 @@ body[data-layout='panel'] .checklist {
   line-height: 22px;
   font-weight: 400;
   color: #8a8f98;
+  overflow-wrap: anywhere;
 }
 
 .building-panel--preview.building-panel--expanded .case__version--full {
@@ -1464,12 +1472,14 @@ body[data-layout='panel'] .checklist {
   line-height: normal;
   text-transform: uppercase;
   color: #8a8f98;
+  overflow-wrap: anywhere;
 }
 
 .building-panel--preview.building-panel--expanded .case__text,
 .building-panel--preview.building-panel--expanded .case__list {
   font-size: 16px;
   line-height: 24px;
+  overflow-wrap: anywhere;
 }
 
 .building-panel--preview.building-panel--expanded .case__closing {
@@ -1509,14 +1519,41 @@ body[data-layout='panel'] .checklist {
     left: 0;
     right: 0;
     bottom: 0;
+    width: 100%;
+    max-width: 100%;
     max-height: none;
     height: 100%;
     padding: 0;
     border-radius: 0;
+    overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    overflow-wrap: anywhere;
     box-shadow: none;
+  }
+
+  .building-panel--preview.building-panel--expanded .building-panel__sheet > *,
+  .building-panel--preview.building-panel--expanded .case-read,
+  .building-panel--preview.building-panel--expanded .case-read__page,
+  .building-panel--preview.building-panel--expanded .case-read__intro,
+  .building-panel--preview.building-panel--expanded .building-panel__body-wrap,
+  .building-panel--preview.building-panel--expanded .case,
+  .building-panel--preview.building-panel--expanded .case__version,
+  .building-panel--preview.building-panel--expanded .case__section,
+  .building-panel--preview.building-panel--expanded .case__heading,
+  .building-panel--preview.building-panel--expanded .case__text,
+  .building-panel--preview.building-panel--expanded .case__list,
+  .building-panel--preview.building-panel--expanded .case__closing {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .building-panel--preview.building-panel--expanded .case-read,
+  .building-panel--preview.building-panel--expanded .building-panel__body-wrap {
+    overflow-x: hidden;
   }
 
   .building-panel--preview.building-panel--expanded .building-panel__backdrop {
@@ -1561,14 +1598,17 @@ body[data-layout='panel'] .checklist {
     right: 0;
     bottom: 0;
     width: auto;
+    max-width: 100%;
     max-height: none;
     padding: 0;
     border-radius: 0;
     border-left: 0;
     transform: translateY(0);
     box-shadow: none;
+    overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
+    overflow-wrap: anywhere;
   }
 
   .case-read__bar {
