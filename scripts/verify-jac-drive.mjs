@@ -508,8 +508,8 @@ async function runViewport(tag, options, phone) {
         if (sheet.placeholder) errors.push(`${tag} ${st.id}: placeholder description still shown`);
         if (sheet.bark) errors.push(`${tag} ${st.id}: placeholder bubble copy still shown`);
         if (phone && sheet.inCount !== 1) errors.push(`${tag} ${st.id}: Get in count ${sheet.inCount}, want 1`);
-        if (phone && !/5\.33/.test(sheet.length)) errors.push(`${tag} ${st.id}: length missing (${sheet.length})`);
-        if (phone && sheet.desc && !/camioneta de la familia/.test(sheet.desc)) {
+        if (!/5\.33/.test(sheet.length)) errors.push(`${tag} ${st.id}: length missing (${sheet.length})`);
+        if (!/camioneta de la familia/.test(sheet.desc)) {
           errors.push(`${tag} ${st.id}: desc "${sheet.desc}"`);
         }
         if (sheet.toggles.some((id) => id && id !== 'hazards')) {
@@ -527,6 +527,52 @@ async function runViewport(tag, options, phone) {
     const labels = await page.evaluate(() => window.__playtestQa.nameLabels?.() ?? []);
     if (!labels.some((l) => l.id === 'adonay')) errors.push(`${tag}: Adonay pill missing after reset`);
     notes.push(`${tag} pills ${labels.map((l) => l.id).join(',')}`);
+    const pillHit = await page.evaluate(() => {
+      const vis = [...document.querySelectorAll('.name-label, .jac-pill--name')].filter((el) => {
+        const html = el;
+        if (html.hidden || html.closest('[hidden]')) return false;
+        const r = html.getBoundingClientRect();
+        const cs = getComputedStyle(html);
+        return r.width > 2 && r.height > 2 && cs.display !== 'none' && cs.visibility !== 'hidden';
+      });
+      const boxes = vis.map((el) => {
+        const r = el.getBoundingClientRect();
+        return { id: el.getAttribute('data-id') || el.textContent?.trim() || '?', x: r.x, y: r.y, w: r.width, h: r.height };
+      });
+      const pairs = [];
+      for (let i = 0; i < boxes.length; i++) {
+        for (let j = i + 1; j < boxes.length; j++) {
+          const a = boxes[i];
+          const b = boxes[j];
+          const area =
+            Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) *
+            Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+          if (area > 4) pairs.push({ a: a.id, b: b.id, area });
+        }
+      }
+      return { boxes, pairs };
+    });
+    notes.push(`${tag} pill-overlap ${JSON.stringify(pillHit)}`);
+    if (pillHit.pairs.length) errors.push(`${tag}: name pills overlap ${JSON.stringify(pillHit.pairs)}`);
+
+    await page.evaluate(() => {
+      window.__playtestQa.jacSet?.({ mode: 'parked' });
+      window.__playtestQa.setCharacterTile(40, 40);
+      window.__playtestQa.focusJac?.();
+    });
+    await wait(280);
+    const jacLbl = await page.evaluate(() => {
+      const el = document.querySelector('.name-label[data-id="jac"]');
+      const r = el && !el.hidden ? el.getBoundingClientRect() : null;
+      return {
+        shown: !!r && r.width > 2 && r.height > 2,
+        text: el?.textContent?.trim() ?? '',
+        mode: window.__playtestQa.jac?.()?.mode,
+      };
+    });
+    notes.push(`${tag} jac-parked-label ${JSON.stringify(jacLbl)}`);
+    if (!jacLbl.shown) errors.push(`${tag}: JAC label missing when parked and not adjacent`);
+    await shot(page, tag, 'jac-parked-label');
 
     if (phone) {
       const stick = await page.evaluate(() => window.__playtestQa.joystick());
@@ -892,6 +938,9 @@ async function runViewport(tag, options, phone) {
 
     const audio404 = req404.filter((u) => /\/audio\//.test(u));
     if (audio404.length) errors.push(`${tag}: audio 404s ${audio404.join(' | ')}`);
+    const sprite404 = req404.filter((u) => /\/sprites\//.test(u));
+    if (sprite404.length) errors.push(`${tag}: sprite 404s ${sprite404.join(' | ')}`);
+    if (req404.length) errors.push(`${tag}: network 404s ${req404.join(' | ')}`);
 
     const focusUrl = `${BASE}${BASE.includes('?') ? '&' : '?'}focus=jac`;
     await page.goto(focusUrl, { waitUntil: 'domcontentloaded' });
