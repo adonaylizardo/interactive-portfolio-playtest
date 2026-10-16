@@ -311,7 +311,8 @@ export class JacHud {
     const h = dst.height;
     const ctx = dst.getContext('2d');
     if (!ctx || src.sw < 4 || src.sh < 4) return;
-    const res = src.canvas.width / Math.max(1, src.canvas.clientWidth);
+    const displayed = src.canvas.clientWidth > 0 ? src.canvas.clientWidth : src.canvas.width;
+    const res = src.canvas.width / Math.max(1, displayed);
     ctx.fillStyle = '#141518';
     ctx.fillRect(0, 0, w, h);
     try {
