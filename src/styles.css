@@ -142,7 +142,8 @@ body.is-canvas-dragging * {
   pointer-events: none;
 }
 
-#ui-root > .joystick .joystick__idle {
+#ui-root > .joystick .joystick__idle,
+#ui-root > .joystick.is-dragging {
   pointer-events: auto;
 }
 
@@ -1698,7 +1699,8 @@ body[data-layout='panel'] .checklist {
 .joystick {
   position: fixed;
   inset: 0;
-  z-index: 8;
+  z-index: 19;
+  touch-action: none;
 }
 
 .joystick[hidden] {
@@ -1725,22 +1727,10 @@ body[data-layout='panel'] .checklist {
   -webkit-tap-highlight-color: transparent;
 }
 
-.joystick__grid {
-  display: grid;
-  grid-template-columns: repeat(3, 6px);
-  grid-template-rows: repeat(3, 6px);
-  gap: 5px;
-  place-content: center;
-  width: 100%;
-  height: 100%;
-}
-
-.joystick__grid i {
+.joystick__glyph {
   display: block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #1a1c20;
+  margin: auto;
+  color: #1a1c20;
 }
 
 .joystick__active {
@@ -1897,6 +1887,10 @@ body[data-layout='panel'] .checklist {
 .jac-pill--name {
   cursor: default;
   padding: 0 14px;
+}
+
+.jac-hud--drive .jac-pill--name {
+  display: none;
 }
 
 .jac-menu {
@@ -2247,6 +2241,24 @@ body[data-layout='panel'] .checklist {
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.jac-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 196px;
+  transform: translateX(-50%);
+  z-index: 22;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: #141518;
+  color: #edeef0;
+  border: 1px solid #2a2c31;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 

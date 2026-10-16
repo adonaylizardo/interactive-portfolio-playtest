@@ -6,7 +6,8 @@ import { spriteResolution } from './sprites';
 import { WALK_TILES_PER_S, type FacingDir } from './player';
 
 export const JAC_ID = 'fill/jac-t9';
-export const JAC_BUBBLE = 'Texto de burbuja (relleno)';
+/** Placeholder bark — never shown. Real lines land here once recorded. */
+export const JAC_BUBBLE = '';
 
 export type JacLights = 'off' | 'auto' | 'on';
 export type JacGear = 'P' | 'R' | 'N' | 'D';
@@ -67,6 +68,7 @@ export type JacSnapshot = {
   reversing: boolean;
   steering: number;
   trunkOpen: boolean;
+  row: 'apagado' | 'luces' | 'freno';
   bubble: boolean;
   rearCam: boolean;
   x: number;
@@ -154,6 +156,7 @@ export class JacT9 {
   private wheelAcc = 0;
   private row: 'apagado' | 'luces' | 'freno' = 'apagado';
   private qaSteer: number | null = null;
+  private hazardT = 0;
 
   constructor(obj: MapObject, hooks: JacHooks) {
     this.obj = obj;
@@ -356,13 +359,12 @@ export class JacT9 {
       dy /= mag;
     }
     const live = mag > 0.08;
-    // Phone joystick: push up (screen y < 0) → D, pull down → R, release → hold/brake.
-    if (input.autoShift && live) {
+    // Phone stick and desktop WASD/arrows: from P or N, up/W → D, down/S → R. Release holds gear.
+    if (input.autoShift !== false && live) {
       if (dy < -0.16) this.gear = 'D';
       else if (dy > 0.16) this.gear = 'R';
     }
     const fwd = DIR_VEC[this.dir];
-    const along = live ? dx * fwd.x + dy * fwd.y : 0;
     const side = live ? dx * fwd.y - dy * fwd.x : 0;
     if (live) {
       this.qaSteer = null;
@@ -374,8 +376,7 @@ export class JacT9 {
     }
 
     const canGo = this.gear === 'D' || this.gear === 'R';
-    let reverse = this.gear === 'R';
-    if (!input.autoShift && this.gear === 'D' && along < -0.35) reverse = true;
+    const reverse = this.gear === 'R';
     this.reversing = reverse && (live || this.gear === 'R');
 
     if (canGo && live) {
@@ -405,6 +406,8 @@ export class JacT9 {
       this.mph = 0;
       this.wheelAcc = 0;
     }
+    if (this.toggles.hazards) this.hazardT += dt;
+    else this.hazardT = 0;
     this.applySprite();
   }
 
@@ -423,6 +426,13 @@ export class JacT9 {
     return { x: c.x, y: c.y - 90 * objectSpriteScale(this.obj) };
   }
 
+  /** World point looking behind the van (opposite facing). */
+  rearLookWorld(): { x: number; y: number } {
+    const foot = this.worldFoot();
+    const back = DIR_VEC[this.dir];
+    return { x: foot.x - back.x * 220, y: foot.y - back.y * 110 - 40 };
+  }
+
   /** Region of the game canvas (CSS px) looking behind the van. */
   rearSource(toScreen: (x: number, y: number) => { x: number; y: number }, cw: number, ch: number): {
     sx: number;
@@ -430,11 +440,8 @@ export class JacT9 {
     sw: number;
     sh: number;
   } {
-    const foot = this.worldFoot();
-    const back = DIR_VEC[this.dir];
-    const wx = foot.x - back.x * 220;
-    const wy = foot.y - back.y * 110 - 40;
-    const s = toScreen(wx, wy);
+    const look = this.rearLookWorld();
+    const s = toScreen(look.x, look.y);
     const sw = Math.min(420, cw * 0.55);
     const sh = Math.min(180, ch * 0.28);
     return {
@@ -447,8 +454,13 @@ export class JacT9 {
 
   applySprite(): void {
     const on = this.lightsOn;
-    const brake = this.reversing || this.toggles.hazards;
-    this.row = brake && on ? 'freno' : on ? 'luces' : 'apagado';
+    if (this.toggles.hazards) {
+      const flash = Math.floor(this.hazardT / 0.35) % 2 === 0;
+      this.row = flash ? 'freno' : on ? 'luces' : 'apagado';
+    } else {
+      const brake = this.reversing;
+      this.row = brake && on ? 'freno' : on ? 'luces' : 'apagado';
+    }
     const moving = this.driving && this.mph > 0.2;
     const hi = spriteResolution() >= 1.5;
     const key = moving
@@ -487,6 +499,7 @@ export class JacT9 {
       reversing: this.reversing,
       steering: this.steering,
       trunkOpen: this.trunkOpen,
+      row: this.row,
       bubble: this.bubble,
       rearCam: this.rearCam,
       x: this.obj.x,
@@ -636,7 +649,6 @@ export class JacT9 {
       s.position.set(lx, ly);
     }
     const v = this.hooks.visual;
-    v.zIndex = objectDepth(this.obj);
     v.occluder = objectOccluder(this.obj);
     v.cull = {
       x0: foot.x + lx - 8,
@@ -644,7 +656,13 @@ export class JacT9 {
       x1: foot.x + lx + CELL_1X.w * sc + 8,
       y1: foot.y + ly + CELL_1X.h * sc + 8,
     };
+    // Driving: sit above street dashes / flat fill that share the footprint's front row.
+    v.zIndex = objectDepth(this.obj) + (this.driving ? 24 : 0.2);
     this.hooks.container.zIndex = v.zIndex;
+    const parent = this.hooks.container.parent;
+    if (this.driving && parent && parent.children[parent.children.length - 1] !== this.hooks.container) {
+      parent.addChild(this.hooks.container);
+    }
     const box = new Rectangle(lx + 40 * sc, ly + 8 * sc, 200 * sc, 120 * sc);
     this.hooks.tapBox.set(this.obj.id, box);
   }

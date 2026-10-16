@@ -674,19 +674,7 @@ body[data-layout='panel'] #game-canvas {
 }
 
 .chrome--mobile .chrome__lang {
-  top: auto;
-  right: 16px;
   left: auto;
-}
-
-.chrome--sheet .chrome__lang {
-  top: 128px;
-  right: 16px;
-}
-
-.chrome--dock .chrome__lang {
-  top: 30px;
-  right: 72px;
 }
 
 .chrome--mobile .chrome__intro {

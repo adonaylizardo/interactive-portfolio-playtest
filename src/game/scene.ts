@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Point, Polygon, Rectangle, Sprite, Texture, TilingSprite } from 'pixi.js';
+import { Application, Container, Graphics, Point, Polygon, Rectangle, RenderTexture, Sprite, Texture, TilingSprite } from 'pixi.js';
 import {
   cells,
   doorInwardStep,
@@ -222,6 +222,7 @@ export type SceneEvents = {
   onMoveCommand?: () => void;
   onFrame?: () => void;
   stick?: () => { x: number; y: number };
+  stickActive?: () => boolean;
   buildingPanel?: BuildingPanelBridge;
   checklist?: ChecklistBridge;
   chrome?: ChromeBridge;
@@ -321,6 +322,8 @@ export class IsoScene {
   private fillActors!: FillActors;
   private jac: JacT9 | null = null;
   private jacBubbleTimer: ReturnType<typeof setTimeout> | null = null;
+  private rearRt: RenderTexture | null = null;
+  private rearCapturing = false;
   private events: SceneEvents;
   private objectGraphics = new Map<string, Container>();
   /** Opaque bounding box of each non-building object's sprite, relative to its container. */
@@ -2673,6 +2676,7 @@ export class IsoScene {
     );
 
     const onPointerDown = (e: PointerEvent) => {
+      if (this.events.stickActive?.()) return;
       if (e.pointerType === 'touch') {
         this.touchOnlyPinch = false;
       }
@@ -2707,6 +2711,7 @@ export class IsoScene {
     };
 
     const onPointerMove = (e: PointerEvent) => {
+      if (this.events.stickActive?.()) return;
       if (!this.pointers.has(e.pointerId)) return;
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
@@ -2915,6 +2920,7 @@ export class IsoScene {
     }
     this.leaveBenchIfStood();
     const stick = this.events.stick?.() ?? { x: 0, y: 0 };
+    const stickHeld = !!this.events.stickActive?.();
     const stickLive = Math.abs(stick.x) > 0.02 || Math.abs(stick.y) > 0.02;
     if (this.jac?.driving && !this.interiorActive) {
       let dx = 0;
@@ -2923,17 +2929,15 @@ export class IsoScene {
       if (this.keys.has('s') || this.keys.has('arrowdown')) dy += 1;
       if (this.keys.has('a') || this.keys.has('arrowleft')) dx -= 1;
       if (this.keys.has('d') || this.keys.has('arrowright')) dx += 1;
-      let autoShift = false;
-      if (dx === 0 && dy === 0 && stickLive) {
+      if (dx === 0 && dy === 0 && (stickLive || stickHeld)) {
         dx = stick.x;
         dy = stick.y;
-        autoShift = true;
       }
-      if (dx !== 0 || dy !== 0) {
+      if (dx !== 0 || dy !== 0 || stickHeld) {
         this.startCameraFollow();
-        this.fireMoveCommand();
+        if (dx !== 0 || dy !== 0) this.fireMoveCommand();
       }
-      this.jac.update(this.app.ticker.deltaMS / 1000, { dx, dy, autoShift });
+      this.jac.update(this.app.ticker.deltaMS / 1000, { dx, dy, autoShift: true });
       return;
     }
     if (stickLive) {
@@ -3527,6 +3531,7 @@ export class IsoScene {
     const v = obj ? this.objectVisuals.get(obj.id) : undefined;
     if (!obj || !g || !v) return;
     this.jac = new JacT9(obj, { container: g, visual: v, tapBox: this.objectTapBoxes });
+    g.label = JAC_ID;
   }
 
   private pickJacAtScreen(sx: number, sy: number): boolean {
@@ -3579,9 +3584,11 @@ export class IsoScene {
       this.syncCharacterGraphic();
     }
     this.avatar.setVisible(true);
-    this.jac.setBubble(true);
-    if (this.jacBubbleTimer) clearTimeout(this.jacBubbleTimer);
-    this.jacBubbleTimer = setTimeout(() => this.jac?.setBubble(false), 5000);
+    this.jac.setBubble(false);
+    if (this.jacBubbleTimer) {
+      clearTimeout(this.jacBubbleTimer);
+      this.jacBubbleTimer = null;
+    }
     this.startCameraFollow();
     this.centerOnCharacter(true);
   }
@@ -3640,7 +3647,7 @@ export class IsoScene {
   }
 
   jacHudActive(): boolean {
-    return !!this.jac && (this.jac.mode !== 'parked' || this.jac.bubble);
+    return !!this.jac && this.jac.mode !== 'parked';
   }
 
   jacInfoOpen(): boolean {
@@ -3683,18 +3690,85 @@ export class IsoScene {
       }
     }
     if (needRear && this.jac && this.canvasEl) {
-      const src = this.jac.rearSource(
-        (x, y) => this.worldToScreen(x, y),
-        this.app.screen.width,
-        this.app.screen.height,
-      );
-      rear = { canvas: this.canvasEl, ...src };
+      rear = this.captureRearView() ?? {
+        canvas: this.canvasEl,
+        ...this.jac.rearSource(
+          (x, y) => this.worldToScreen(x, y),
+          this.app.screen.width,
+          this.app.screen.height,
+        ),
+      };
     }
     return { menu, bubble, follow, rear };
   }
 
+  /** Off-screen render of the map behind the van (not a crop of the current dashboard view). */
+  private captureRearView(): { canvas: HTMLCanvasElement; sx: number; sy: number; sw: number; sh: number } | null {
+    if (!this.jac || !this.app || this.rearCapturing) return null;
+    const look = this.jac.rearLookWorld();
+    const sw = Math.max(64, Math.ceil(this.app.screen.width));
+    const sh = Math.max(64, Math.ceil(this.app.screen.height));
+    if (!this.rearRt || this.rearRt.width !== sw || this.rearRt.height !== sh) {
+      this.rearRt?.destroy(true);
+      this.rearRt = RenderTexture.create({ width: sw, height: sh });
+    }
+    const savedX = this.cameraX;
+    const savedY = this.cameraY;
+    const g = this.objectGraphics.get(JAC_ID);
+    this.rearCapturing = true;
+    this.placeWorldAtScreen(look.x, look.y, sw / 2, sh * 0.55);
+    this.applyCamera(false);
+    if (g) g.visible = false;
+    try {
+      this.app.renderer.render({ container: this.app.stage, target: this.rearRt, clear: true });
+    } catch {
+      this.cameraX = savedX;
+      this.cameraY = savedY;
+      if (g) g.visible = true;
+      this.applyCamera(false);
+      this.rearCapturing = false;
+      return null;
+    }
+    this.cameraX = savedX;
+    this.cameraY = savedY;
+    if (g) g.visible = true;
+    this.applyCamera(false);
+    this.rearCapturing = false;
+    try {
+      const canvas = this.app.renderer.extract.canvas({ target: this.rearRt }) as HTMLCanvasElement;
+      const cropW = Math.min(640, canvas.width * 0.7);
+      const cropH = Math.min(220, canvas.height * 0.38);
+      return {
+        canvas,
+        sx: (canvas.width - cropW) / 2,
+        sy: (canvas.height - cropH) / 2,
+        sw: cropW,
+        sh: cropH,
+      };
+    } catch {
+      return null;
+    }
+  }
+
   qaJac(): JacSnapshot | null {
     return this.jacSnapshot();
+  }
+
+  qaJacEntities(): { count: number; ids: string[]; cx: number; cy: number; worldX: number; worldY: number } {
+    const ids: string[] = [];
+    for (const id of this.objectGraphics.keys()) if (id === JAC_ID || id.includes('jac')) ids.push(id);
+    for (const id of this.objectVisuals.keys()) {
+      if ((id === JAC_ID || id.includes('jac')) && !ids.includes(id)) ids.push(id);
+    }
+    const w = this.jac?.worldCenter() ?? { x: 0, y: 0 };
+    return {
+      count: ids.length,
+      ids,
+      cx: this.jac?.cx ?? NaN,
+      cy: this.jac?.cy ?? NaN,
+      worldX: w.x,
+      worldY: w.y,
+    };
   }
 
   qaJacSet(partial: {
@@ -4041,20 +4115,26 @@ export class IsoScene {
     const snap = avatar.snapshot();
     const adonay = aboveHead(avatar.adonay.sprite);
     const pantone = aboveHead(avatar.pantone.sprite);
+    let pantoneY = pantone.y;
+    if (Math.hypot(pantone.x - adonay.x, pantone.y - adonay.y) < 28) pantoneY -= 26;
+    const nearJac =
+      !!this.jac &&
+      !this.jac.driving &&
+      Math.hypot(this.charTx - this.jac.cx, this.charTy - this.jac.cy) < 4;
     const out: { id: 'adonay' | 'pantone' | 'noah'; name: string; x: number; y: number; visible: boolean }[] = [
       {
         id: 'adonay',
         name: 'Adonay',
         x: adonay.x,
-        y: adonay.y,
-        visible: snap.adonay.visible && onScreen(adonay.sx, adonay.sy),
+        y: nearJac ? adonay.y - 18 : adonay.y,
+        visible: snap.adonay.visible && onScreen(adonay.sx, adonay.sy) && !this.jac?.driving,
       },
       {
         id: 'pantone',
         name: 'Pantone',
         x: pantone.x,
-        y: pantone.y,
-        visible: snap.pantone.visible && onScreen(pantone.sx, pantone.sy),
+        y: nearJac ? pantoneY - 18 : pantoneY,
+        visible: snap.pantone.visible && onScreen(pantone.sx, pantone.sy) && !this.jac?.driving,
       },
     ];
     if (!this.interiorActive && this.noah) {

@@ -2,7 +2,6 @@ import { getEnterableBuildings } from '../data/map';
 import { tileToWorld } from '../iso/math';
 import { isMobileLayout } from '../checklist/ui';
 import type { JacGear, JacLights, JacSnapshot, JacToggleId } from '../game/jacT9';
-import { JAC_BUBBLE } from '../game/jacT9';
 
 export type JacHudCallbacks = {
   onInfo: () => void;
@@ -16,12 +15,7 @@ export type JacHudCallbacks = {
 };
 
 const TOGGLES: { id: JacToggleId; label: string; icon: string }[] = [
-  { id: 'left', label: 'Left indicator', icon: 'left' },
   { id: 'hazards', label: 'Hazards', icon: 'hazards' },
-  { id: 'right', label: 'Right indicator', icon: 'right' },
-  { id: 'fog', label: 'Fog lights', icon: 'fog' },
-  { id: 'bed', label: 'Trunk / bed light', icon: 'bed' },
-  { id: 'trailer', label: 'Trailer', icon: 'trailer' },
 ];
 
 function glyph(name: string): string {
@@ -56,7 +50,9 @@ export class JacHud {
   private rearEl: HTMLElement;
   private rearView: HTMLCanvasElement;
   private mini: HTMLCanvasElement;
+  private hintEl: HTMLElement;
   private lastHtml = '';
+  private hintUntil = 0;
 
   constructor(container: HTMLElement, callbacks: JacHudCallbacks) {
     this.callbacks = callbacks;
@@ -75,6 +71,7 @@ export class JacHud {
     this.rearEl = this.root.querySelector('.jac-rear')!;
     this.rearView = this.root.querySelector('.jac-rear__view')!;
     this.mini = this.root.querySelector('.jac-dock__mini')!;
+    this.hintEl = this.root.querySelector('.jac-hint')!;
     this.bind();
     window.matchMedia('(max-width: 767px)').addEventListener('change', () => {
       this.mobile = isMobileLayout();
@@ -87,6 +84,9 @@ export class JacHud {
     this.root.hidden = true;
     this.root.setAttribute('inert', '');
     document.body.classList.remove('jac-info', 'jac-drive', 'jac-rearcam', 'jac-hud-open');
+    this.bubbleEl.hidden = true;
+    this.bubbleEl.style.transform = '';
+    this.hintEl.hidden = true;
     this.lastHtml = '';
     this.snap = null;
   }
@@ -100,12 +100,14 @@ export class JacHud {
     },
     rearBlit?: { canvas: HTMLCanvasElement; sx: number; sy: number; sw: number; sh: number } | null,
   ): void {
+    const enteredDrive = snap?.mode === 'drive' && this.snap?.mode !== 'drive';
     this.snap = snap;
-    const open = !!snap && (snap.mode !== 'parked' || snap.bubble);
+    const open = !!snap && snap.mode !== 'parked';
     if (!open || !snap) {
       this.park();
       return;
     }
+    if (enteredDrive && !this.mobile) this.hintUntil = performance.now() + 5000;
     this.root.hidden = false;
     this.root.removeAttribute('inert');
     document.body.classList.toggle('jac-hud-open', snap.mode === 'info' || snap.mode === 'drive');
@@ -116,9 +118,11 @@ export class JacHud {
     if (anchors.menu && snap.mode === 'menu') {
       this.menuEl.style.transform = `translate(${Math.round(anchors.menu.x)}px, ${Math.round(anchors.menu.y)}px) translate(-50%, -100%)`;
     }
-    if (anchors.bubble && snap.bubble) {
-      this.bubbleEl.style.transform = `translate(${Math.round(anchors.bubble.x)}px, ${Math.round(anchors.bubble.y)}px) translate(-50%, -100%)`;
-    }
+    this.bubbleEl.hidden = true;
+    this.bubbleEl.style.transform = '';
+    if (snap.mph > 0) this.hintUntil = 0;
+    const showHint = !this.mobile && snap.mode === 'drive' && performance.now() < this.hintUntil;
+    this.hintEl.hidden = !showHint;
     if (!this.mobile && (snap.mode === 'drive' || snap.mode === 'info')) this.drawMini(anchors.follow);
     if (snap.rearCam && rearBlit) this.blitRear(rearBlit);
   }
@@ -134,9 +138,12 @@ export class JacHud {
       const act = t.dataset.jac;
       e.preventDefault();
       e.stopPropagation();
+      (t as HTMLElement).blur();
       if (act === 'info') this.callbacks.onInfo();
-      else if (act === 'in') this.callbacks.onGetIn();
-      else if (act === 'out') this.callbacks.onGetOut();
+      else if (act === 'in') {
+        this.hintUntil = performance.now() + 5000;
+        this.callbacks.onGetIn();
+      } else if (act === 'out') this.callbacks.onGetOut();
       else if (act === 'close') this.callbacks.onClose();
       else if (act === 'engine') this.callbacks.onEngine();
       else if (act === 'lights') this.callbacks.onLights(t.dataset.val as JacLights);
@@ -161,7 +168,8 @@ export class JacHud {
     this.dockEl.hidden = !(!phone && (snap.mode === 'info' || snap.mode === 'drive'));
     this.barEl.hidden = !(phone && snap.mode === 'drive');
     this.steerEl.hidden = !(phone && snap.mode === 'drive');
-    this.bubbleEl.hidden = !snap.bubble;
+    this.bubbleEl.hidden = true;
+    this.root.classList.toggle('jac-hud--drive', snap.mode === 'drive');
     this.rearEl.hidden = !snap.rearCam;
     this.rearEl.classList.toggle('jac-rear--phone', phone);
     this.rearEl.classList.toggle('jac-rear--turn', Math.abs(snap.steering) > 0.25);
@@ -235,13 +243,12 @@ export class JacHud {
         <button type="button" class="jac-btn jac-btn--primary" data-jac="in">Get in</button>
         <button type="button" class="jac-icon-btn" data-jac="close" aria-label="Close">${glyph('close')}</button>
       </header>
-      <p class="jac-sheet__desc">Descripción de una línea (pendiente).</p>
+      <p class="jac-sheet__desc">JAC T9, la camioneta de la familia.</p>
       <div class="jac-sheet__grid">
         ${this.dialHtml(snap)}
         <div class="jac-toggles">${TOGGLES.map((t) => this.toggleHtml(t, snap)).join('')}</div>
       </div>
-      <div class="jac-length"><span>Length</span><span class="jac-length__dash">—</span></div>
-      <button type="button" class="jac-btn jac-btn--primary jac-sheet__in" data-jac="in">Get in</button>
+      <div class="jac-length"><span>Length</span><span class="jac-length__dash">5.33 m</span></div>
     `;
   }
 
@@ -400,7 +407,8 @@ export class JacHud {
         <button type="button" class="jac-btn jac-btn--primary jac-bar__btn" data-jac="out">Get out</button>
       </div>
       <div class="jac-steer" hidden aria-hidden="true">${glyph('wheel')}</div>
-      <div class="jac-bubble" hidden>${JAC_BUBBLE}</div>
+      <div class="jac-bubble" hidden></div>
+      <div class="jac-hint" hidden>Usa flechas o WASD</div>
       <div class="jac-rear" hidden>
         <div class="jac-rear__tools">
           <span class="jac-icon-btn" aria-hidden="true">${glyph('search')}</span>

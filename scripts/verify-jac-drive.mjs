@@ -228,7 +228,7 @@ async function applyState(page, id) {
       qa.tapJac();
       qa.jacGetIn();
       qa.jacGetOut();
-      qa.jacSetBubble(true);
+      qa.jacSetBubble(false);
       qa.frameWorld((27 - 18) * 64, (27 + 18) * 32 + 32, 1.05);
       return;
     }
@@ -257,7 +257,7 @@ async function applyState(page, id) {
         if (stateId.startsWith('2') || stateId.startsWith('3')) return j.mode === 'info' && j.loaded;
         if (stateId.startsWith('4') || stateId.startsWith('7') || stateId.startsWith('8'))
           return j.driving && j.loaded;
-        if (stateId === '6-out-bubble') return j.bubble;
+        if (stateId === '6-out-bubble') return !j.driving && !j.bubble;
         return true;
       },
       id,
@@ -393,7 +393,32 @@ async function runViewport(tag, options, phone) {
         }
       }
       if (st.id === '5-out' && (jac.driving || jac.bubble)) errors.push(`${tag} out: driving=${jac.driving} bubble=${jac.bubble}`);
-      if (st.id === '6-out-bubble' && !jac.bubble) errors.push(`${tag} bubble missing`);
+      if (st.id === '6-out-bubble' && jac.bubble) errors.push(`${tag} placeholder bubble still on`);
+      if (st.id === '2-info-auto' || st.id === '3-info-on') {
+        const sheet = await page.evaluate(() => {
+          const desc = document.querySelector('.jac-sheet__desc')?.textContent?.trim() ?? '';
+          const ins = [...document.querySelectorAll('[data-jac="in"]')].filter((el) => {
+            const r = el.getBoundingClientRect();
+            return r.width > 2 && r.height > 2 && getComputedStyle(el).display !== 'none';
+          });
+          const length = document.querySelector('.jac-length')?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+          const toggles = [...document.querySelectorAll('.jac-toggle')].map((el) => el.getAttribute('data-val'));
+          const placeholder = document.body.innerText.includes('Descripción de una línea (pendiente).');
+          const bark = document.body.innerText.includes('Texto de burbuja (relleno)');
+          return { desc, inCount: ins.length, length, toggles, placeholder, bark };
+        });
+        notes.push(`${tag} ${st.id} sheet ${JSON.stringify(sheet)}`);
+        if (sheet.placeholder) errors.push(`${tag} ${st.id}: placeholder description still shown`);
+        if (sheet.bark) errors.push(`${tag} ${st.id}: placeholder bubble copy still shown`);
+        if (phone && sheet.inCount !== 1) errors.push(`${tag} ${st.id}: Get in count ${sheet.inCount}, want 1`);
+        if (phone && !/5\.33/.test(sheet.length)) errors.push(`${tag} ${st.id}: length missing (${sheet.length})`);
+        if (phone && sheet.desc && !/camioneta de la familia/.test(sheet.desc)) {
+          errors.push(`${tag} ${st.id}: desc "${sheet.desc}"`);
+        }
+        if (sheet.toggles.some((id) => id && id !== 'hazards')) {
+          errors.push(`${tag} ${st.id}: inert toggles ${JSON.stringify(sheet.toggles)}`);
+        }
+      }
       if (st.id === '7-rearcam-straight' && !jac.rearCam) errors.push(`${tag} rearcam straight missing`);
       if (st.id === '8-rearcam-curve' && !jac.rearCam) errors.push(`${tag} rearcam curve missing`);
       const ours = await shot(page, tag, st.id);
@@ -493,6 +518,150 @@ async function runViewport(tag, options, phone) {
           `${tag}: reverse stick did not move the van (fwd ${fwd.jac?.cx},${fwd.jac?.cy} → ${rev.jac?.cx},${rev.jac?.cy})`,
         );
       }
+      const entities = await page.evaluate(() => window.__playtestQa.jacEntities?.());
+      notes.push(`${tag} van-entities ${JSON.stringify(entities)}`);
+      if ((entities?.count ?? 0) !== 1) {
+        errors.push(`${tag}: expected one van, got ${JSON.stringify(entities)}`);
+      }
+
+      await resetMap(page);
+      const walk0 = await page.evaluate(() => window.__playtestQa.getCharacterTile());
+      const heldWalk = await holdStick(page, 40, -40);
+      if (!heldWalk) errors.push(`${tag}: joystick idle missing for walk`);
+      await wait(900);
+      const walk1 = await page.evaluate(() => ({
+        tile: window.__playtestQa.getCharacterTile(),
+        joy: window.__playtestQa.joystick(),
+      }));
+      await releaseStick(page);
+      notes.push(`${tag} stick-walk ${JSON.stringify({ walk0, walk1 })}`);
+      if (Math.hypot((walk1.tile?.x ?? 0) - walk0.x, (walk1.tile?.y ?? 0) - walk0.y) < 0.4) {
+        errors.push(`${tag}: walking joystick did not move the character`);
+      }
+
+      await resetMap(page);
+      await applyState(page, '3-info-on');
+      const beforeHaz = await page.evaluate(() => window.__playtestQa.jac());
+      await page.evaluate(() => window.__playtestQa.jacSetToggle('hazards'));
+      await wait(80);
+      const afterHaz = await page.evaluate(() => window.__playtestQa.jac());
+      notes.push(`${tag} hazards ${JSON.stringify({ before: beforeHaz?.row, after: afterHaz?.row, on: afterHaz?.toggles?.hazards })}`);
+      if (!afterHaz?.toggles?.hazards) errors.push(`${tag}: hazards toggle did not stick`);
+      if (afterHaz?.row === beforeHaz?.row && afterHaz?.row !== 'freno') {
+        errors.push(`${tag}: hazards did not change the van sprite (row ${afterHaz?.row})`);
+      }
+    } else {
+      await resetMap(page);
+      await applyState(page, '4-drive');
+      const openDesk = await page.evaluate(() => {
+        const walk = window.__playtestQa.fill().walk;
+        const clear = (x, y) => {
+          for (let dy = -1; dy <= 2; dy++) {
+            for (let dx = -1; dx <= 2; dx++) {
+              const ch = walk[y + dy]?.[x + dx];
+              if (!ch || ch === '#' || ch === 'x') return false;
+            }
+          }
+          return true;
+        };
+        for (let y = 22; y < 42; y++) {
+          for (let x = 22; x < 42; x++) {
+            if (clear(x, y)) return { x, y };
+          }
+        }
+        return null;
+      });
+      if (openDesk) {
+        await page.evaluate((p) => window.__playtestQa.jacSet({ cx: p.x, cy: p.y, dir: 'se' }), openDesk);
+        await wait(200);
+      }
+      const startK = await page.evaluate(() => window.__playtestQa.jac());
+      await page.keyboard.down('ArrowUp');
+      await wait(1100);
+      const upK = await page.evaluate(() => window.__playtestQa.jac());
+      await page.keyboard.up('ArrowUp');
+      await wait(200);
+      await page.keyboard.down('KeyW');
+      await wait(400);
+      const wK = await page.evaluate(() => window.__playtestQa.jac());
+      await page.keyboard.up('KeyW');
+      await page.keyboard.down('ArrowDown');
+      await wait(1100);
+      const downK = await page.evaluate(() => {
+        const rear = document.querySelector('.jac-rear');
+        const r = rear?.getBoundingClientRect();
+        const view = document.querySelector('.jac-rear__view');
+        let sample = { mean: 0, var: 0 };
+        if (view instanceof HTMLCanvasElement) {
+          const ctx = view.getContext('2d');
+          if (ctx) {
+            const img = ctx.getImageData(8, 8, Math.max(4, view.width - 16), Math.max(4, view.height - 16));
+            let sum = 0;
+            let sum2 = 0;
+            const n = img.data.length / 4;
+            for (let i = 0; i < img.data.length; i += 4) {
+              const v = (img.data[i] + img.data[i + 1] + img.data[i + 2]) / 3;
+              sum += v;
+              sum2 += v * v;
+            }
+            sample = { mean: sum / n, var: sum2 / n - (sum / n) ** 2 };
+          }
+        }
+        return {
+          jac: window.__playtestQa.jac(),
+          rear: { hidden: rear?.hidden ?? true, w: r?.width ?? 0, h: r?.height ?? 0, sample },
+          hint: document.querySelector('.jac-hint')?.textContent?.trim() ?? '',
+          entities: window.__playtestQa.jacEntities?.(),
+        };
+      });
+      await page.keyboard.up('ArrowDown');
+      notes.push(
+        `${tag} keys ${JSON.stringify({
+          start: { gear: startK?.gear, cx: startK?.cx, cy: startK?.cy },
+          up: { gear: upK?.gear, mph: upK?.mph, cx: upK?.cx, cy: upK?.cy },
+          w: { gear: wK?.gear, cx: wK?.cx },
+          down: { gear: downK.jac?.gear, rearCam: downK.jac?.rearCam, cx: downK.jac?.cx, rear: downK.rear, hint: downK.hint, entities: downK.entities },
+        })}`,
+      );
+      if (upK?.gear !== 'D') errors.push(`${tag}: ArrowUp from P did not auto-shift to D (gear=${upK?.gear})`);
+      if (dist(upK, startK) < 0.35) {
+        errors.push(`${tag}: ArrowUp did not drive the van (${startK?.cx},${startK?.cy} → ${upK?.cx},${upK?.cy})`);
+      }
+      if (wK?.gear !== 'D') errors.push(`${tag}: W did not keep/shift D (gear=${wK?.gear})`);
+      if (downK.jac?.gear !== 'R') errors.push(`${tag}: ArrowDown did not auto-shift to R (gear=${downK.jac?.gear})`);
+      if (!downK.jac?.rearCam) errors.push(`${tag}: ArrowDown did not show rear-cam`);
+      if (downK.rear.hidden || downK.rear.w < 40) errors.push(`${tag}: rear overlay missing on desktop reverse`);
+      if ((downK.rear.sample?.var ?? 0) < 12) {
+        errors.push(`${tag}: rear-cam looks empty/static (var=${downK.rear.sample?.var})`);
+      }
+      if ((downK.entities?.count ?? 0) !== 1) {
+        errors.push(`${tag}: expected one van after keyboard drive, got ${JSON.stringify(downK.entities)}`);
+      }
+
+      await resetMap(page);
+      const langVs = await page.evaluate(() => {
+        const lang = document.querySelector('.chrome__lang');
+        const cl = document.querySelector('.checklist');
+        const locate = document.querySelector('.chrome__locate');
+        const a = lang?.getBoundingClientRect();
+        const b = cl?.getBoundingClientRect();
+        const c = locate?.getBoundingClientRect();
+        const overlap = (p, q) => {
+          if (!p || !q || p.width < 2 || q.width < 2) return 0;
+          return Math.max(0, Math.min(p.right, q.right) - Math.max(p.left, q.left)) *
+            Math.max(0, Math.min(p.bottom, q.bottom) - Math.max(p.top, q.top));
+        };
+        return {
+          lang: a ? { x: a.x, y: a.y, w: a.width, h: a.height } : null,
+          checklist: b ? { x: b.x, y: b.y, w: b.width, h: b.height } : null,
+          locate: c && c.width > 2 ? { x: c.x, y: c.y, w: c.width, h: c.height } : null,
+          areaCl: overlap(a, b),
+          areaLoc: overlap(a, c),
+        };
+      });
+      notes.push(`${tag} lang-space ${JSON.stringify(langVs)}`);
+      if (langVs.areaCl > 4) errors.push(`${tag}: ES toggle overlaps checklist ring`);
+      if (langVs.areaLoc > 4) errors.push(`${tag}: ES toggle overlaps compass`);
     }
 
     await resetMap(page);

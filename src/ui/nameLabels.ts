@@ -52,9 +52,18 @@ export class NameLabels {
     this.separatePills();
   }
 
-  /** Keep pills from stacking when two heads sit on the same screen point. */
+  /** Keep pills from stacking when two heads sit on the same screen point (and vs JAC T9). */
   private separatePills(): void {
     const visible = [...this.pills.values()].filter((p) => !p.hidden);
+    const extras = [...document.querySelectorAll('.jac-pill--name')].filter((el) => {
+      const html = el as HTMLElement;
+      if (html.hidden) return false;
+      const r = html.getBoundingClientRect();
+      return r.width > 2 && r.height > 2;
+    }) as HTMLElement[];
+    const lift = (el: HTMLElement, dy: number) => {
+      el.style.transform = `${el.style.transform} translateY(${dy}px)`;
+    };
     for (let i = 0; i < visible.length; i++) {
       for (let j = i + 1; j < visible.length; j++) {
         const a = visible[i].getBoundingClientRect();
@@ -62,8 +71,19 @@ export class NameLabels {
         const overlapX = Math.min(a.right, b.right) - Math.max(a.left, b.left);
         const overlapY = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
         if (overlapX <= 0 || overlapY <= 0) continue;
-        const cur = visible[j].style.transform;
-        visible[j].style.transform = `${cur} translateY(${-Math.ceil(overlapY + 4)}px)`;
+        const pad = Math.ceil(overlapY / 2 + 6);
+        lift(visible[i], pad);
+        lift(visible[j], -pad);
+      }
+    }
+    for (const pill of visible) {
+      for (const extra of extras) {
+        const a = pill.getBoundingClientRect();
+        const b = extra.getBoundingClientRect();
+        const overlapX = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+        const overlapY = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        if (overlapX <= 0 || overlapY <= 0) continue;
+        lift(pill, -Math.ceil(overlapY + 8));
       }
     }
   }

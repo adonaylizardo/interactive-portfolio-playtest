@@ -115,6 +115,7 @@ async function main(): Promise<void> {
       );
     },
     stick: () => joystick.vector(),
+    stickActive: () => joystick.isActive(),
     onExitInterior: () => {
       checklist.setBuildingPanelOpen(false);
       chrome.setInteriorOpen(false, { skipLayout: true });
@@ -279,6 +280,7 @@ async function main(): Promise<void> {
     expandCasePreview: () => panel.expandPreviewForQa(),
     collapseCasePreview: () => panel.collapsePreviewForQa(),
     jac: () => scene.qaJac(),
+    jacEntities: () => scene.qaJacEntities(),
     tapJac: () => scene.tapJac(),
     jacInfo: () => scene.jacOpenInfo(),
     jacGetIn: () => scene.jacGetIn(),

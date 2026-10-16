@@ -489,20 +489,17 @@ export class ChromeUI {
   private placeLang(): void {
     const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
     if (!lang) return;
-    if (this.mobile) {
-      lang.style.right = '';
-      lang.style.top = '';
+    const cl = document.querySelector('.checklist') as HTMLElement | null;
+    const ring = cl && !cl.hidden ? cl.getBoundingClientRect() : null;
+    if (ring && ring.width > 8) {
+      const top = Math.max(this.mobile ? 24 : 16, ring.top + (ring.height - 40) / 2);
+      const right = Math.max(16, window.innerWidth - ring.left + 8);
+      lang.style.top = `${top}px`;
+      lang.style.right = `${right}px`;
       return;
     }
-    const cl = document.querySelector('.checklist') as HTMLElement | null;
-    if (cl && !cl.hidden) {
-      const r = cl.getBoundingClientRect();
-      lang.style.top = `${Math.max(16, r.top + (52 - 40) / 2)}px`;
-      lang.style.right = `${Math.max(16, window.innerWidth - r.left + 8)}px`;
-    } else {
-      lang.style.top = '20px';
-      lang.style.right = '16px';
-    }
+    lang.style.top = this.mobile ? '24px' : '20px';
+    lang.style.right = '16px';
   }
 
   private drawMinimap(): void {

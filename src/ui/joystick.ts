@@ -1,5 +1,5 @@
 /**
- * Mobile / touch joystick. Idle is a fixed white 3×3 pad; a drag replaces it with a
+ * Mobile / touch joystick. Idle is a Pixel-kit analog stick; a drag replaces it with a
  * ring + knob + dotted line at the finger. Mouse desktops never see it.
  */
 
@@ -13,6 +13,11 @@ const DEADZONE = 10;
 function isCoarse(): boolean {
   return window.matchMedia('(pointer: coarse)').matches;
 }
+
+const STICK_GLYPH = `<svg class="joystick__glyph" viewBox="0 0 15 15" width="22" height="22" aria-hidden="true">
+  <circle fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" cx="7.5" cy="7.5" r="5.5"/>
+  <circle fill="none" stroke="currentColor" stroke-width="1.25" cx="7.5" cy="7.5" r="2"/>
+</svg>`;
 
 export class Joystick {
   readonly root: HTMLElement;
@@ -34,7 +39,7 @@ export class Joystick {
     this.root.hidden = true;
     this.root.innerHTML = `
       <button type="button" class="joystick__idle" aria-label="Mover">
-        <span class="joystick__grid" aria-hidden="true">${'<i></i>'.repeat(9)}</span>
+        ${STICK_GLYPH}
       </button>
       <div class="joystick__active" hidden>
         <div class="joystick__ring"></div>
@@ -107,6 +112,7 @@ export class Joystick {
     if (this.hidden) return;
     e.preventDefault();
     e.stopPropagation();
+    e.stopImmediatePropagation();
     this.pointerId = e.pointerId;
     this.origin = { x: e.clientX, y: e.clientY };
     this.root.classList.add('is-dragging');
@@ -114,15 +120,20 @@ export class Joystick {
     this.placeActive(this.origin.x, this.origin.y);
     this.setKnob(0, 0);
     try {
-      this.idle.setPointerCapture(e.pointerId);
+      this.root.setPointerCapture(e.pointerId);
     } catch {
-      /* capture is optional */
+      try {
+        this.idle.setPointerCapture(e.pointerId);
+      } catch {
+        /* capture is optional */
+      }
     }
     this.onStart?.();
   }
 
   private move(e: PointerEvent): void {
     if (this.pointerId !== e.pointerId) return;
+    e.stopPropagation();
     const dx = e.clientX - this.origin.x;
     const dy = e.clientY - this.origin.y;
     const dist = Math.hypot(dx, dy);
