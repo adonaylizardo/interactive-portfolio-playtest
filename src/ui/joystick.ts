@@ -5,10 +5,10 @@
 
 export type StickVector = { x: number; y: number };
 
-const PAD = 72;
-const KNOB = 56;
-const MAX_RADIUS = 22;
-const DEADZONE = 8;
+const PAD = 96;
+const KNOB = 64;
+const MAX_RADIUS = 16;
+const DEADZONE = 6;
 
 function isCoarse(): boolean {
   return window.matchMedia('(pointer: coarse)').matches;
@@ -94,7 +94,13 @@ export class Joystick {
   qa(): { visible: boolean; active: boolean; x: number; y: number; floating: boolean } {
     const kn = this.knob.getBoundingClientRect();
     const pad = this.root.getBoundingClientRect();
-    const floating = this.isActive() && (kn.left < pad.left - 8 || kn.right > pad.right + 8 || kn.top < pad.top - 8 || kn.bottom > pad.bottom + 8);
+    const slop = 4;
+    const floating =
+      this.isActive() &&
+      (kn.left < pad.left - slop ||
+        kn.right > pad.right + slop ||
+        kn.top < pad.top - slop ||
+        kn.bottom > pad.bottom + slop);
     return { visible: !this.root.hidden, active: this.isActive(), x: this.vec.x, y: this.vec.y, floating };
   }
 
