@@ -164,6 +164,26 @@ function dist(a, b) {
   return Math.hypot((a?.cx ?? 0) - (b?.cx ?? 0), (a?.cy ?? 0) - (b?.cy ?? 0));
 }
 
+async function hiddenHitTargets(page) {
+  return page.evaluate(() =>
+    [...document.querySelectorAll('[hidden]')].flatMap((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1) return [];
+      const cs = getComputedStyle(el);
+      return [
+        {
+          cls: (el.className || el.tagName).toString().slice(0, 80),
+          w: Math.round(r.width),
+          h: Math.round(r.height),
+          y: Math.round(r.y),
+          display: cs.display,
+          pe: cs.pointerEvents,
+        },
+      ];
+    }),
+  );
+}
+
 async function applyState(page, id) {
   await page.evaluate(async (id) => {
     const qa = window.__playtestQa;
@@ -350,17 +370,27 @@ async function runViewport(tag, options, phone) {
           const on = [...document.querySelectorAll('.jac-bar [data-jac="gear"].is-on')].map(
             (el) => el.getAttribute('data-val'),
           );
+          const gearBox = [...document.querySelectorAll('.jac-bar [data-jac="gear"]')].map((el) => {
+            const r = el.getBoundingClientRect();
+            return { g: el.getAttribute('data-val'), w: r.width, h: r.height };
+          });
           return {
             barHidden: bar?.hidden ?? true,
             gearsCount: gears?.querySelectorAll('[data-jac="gear"]').length ?? 0,
             dockHidden: dock?.hidden ?? true,
             gearOn: on,
+            gearBox,
           };
         });
         notes.push(`${tag} drive-hud ${JSON.stringify(hud)}`);
         if (hud.barHidden) errors.push(`${tag} drive: phone bar hidden`);
         if (hud.dockHidden === false) errors.push(`${tag} drive: desktop dock shown on phone`);
         if (hud.gearsCount < 4) errors.push(`${tag} drive: compact gears missing`);
+        for (const g of hud.gearBox ?? []) {
+          if (g.w < 43.5 || g.h < 43.5) {
+            errors.push(`${tag} drive: gear ${g.g} is ${g.w}x${g.h}, want ≥44`);
+          }
+        }
       }
       if (st.id === '5-out' && (jac.driving || jac.bubble)) errors.push(`${tag} out: driving=${jac.driving} bubble=${jac.bubble}`);
       if (st.id === '6-out-bubble' && !jac.bubble) errors.push(`${tag} bubble missing`);
@@ -464,6 +494,41 @@ async function runViewport(tag, options, phone) {
         );
       }
     }
+
+    await resetMap(page);
+    const parkedLeaks = await hiddenHitTargets(page);
+    notes.push(`${tag} hidden-parked ${JSON.stringify(parkedLeaks)}`);
+    if (parkedLeaks.length) errors.push(`${tag}: hidden overlays still laid out ${JSON.stringify(parkedLeaks)}`);
+
+    await page.evaluate(() => window.__playtestQa.enterInterior('estudio'));
+    await page.waitForFunction(() => window.__playtestQa.isInInterior() === true, null, { timeout: 8000 }).catch(() => {});
+    await wait(400);
+    const roomLeaks = await hiddenHitTargets(page);
+    notes.push(`${tag} hidden-estudio ${JSON.stringify(roomLeaks)}`);
+    if (roomLeaks.length) errors.push(`${tag}: hidden overlays in room ${JSON.stringify(roomLeaks)}`);
+    const salirHit = await page.evaluate(() => {
+      const btn = document.querySelector('.building-panel--open [data-exit]');
+      const r = btn?.getBoundingClientRect();
+      if (!r || r.width < 4) return { ok: false, reason: 'no-salir' };
+      const x = r.x + r.width / 2;
+      const y = r.y + r.height / 2;
+      const top = document.elementFromPoint(x, y);
+      return {
+        ok: !!top?.closest?.('[data-exit]'),
+        x: Math.round(x),
+        y: Math.round(y),
+        hit: top?.className?.toString?.().slice(0, 80) ?? String(top?.tagName ?? ''),
+        caseX: !!top?.closest?.('.case-read__x'),
+        bar: !!top?.closest?.('.case-read__bar'),
+        jac: !!top?.closest?.('.jac-hud'),
+      };
+    });
+    notes.push(`${tag} salir-hit ${JSON.stringify(salirHit)}`);
+    if (!salirHit.ok) errors.push(`${tag}: Salir tap hits ${salirHit.hit} not the exit button`);
+    if (salirHit.caseX || salirHit.bar) errors.push(`${tag}: Salir covered by case-read overlay`);
+    if (salirHit.jac) errors.push(`${tag}: Salir covered by JAC HUD`);
+    await page.evaluate(() => window.__playtestQa.leaveInteriorNow());
+    await wait(200);
 
     const casesOk = await page.evaluate(() => {
       window.__playtestQa.showCasePreview?.('bain');
