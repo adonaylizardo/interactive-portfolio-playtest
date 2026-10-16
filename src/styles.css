@@ -2285,6 +2285,11 @@ body:has(.chrome--sheet) .joystick__idle {
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
 }
 
+.jac-dock[data-mode="info"] {
+  height: auto;
+  min-height: 162px;
+}
+
 .jac-dock__body {
   display: flex;
   align-items: center;
@@ -2327,13 +2332,29 @@ body:has(.chrome--sheet) .joystick__idle {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
-  min-width: 120px;
+  gap: 6px;
+  min-width: 168px;
+  max-width: 220px;
 }
 
 .jac-dock__name {
   font-size: 13px;
   font-weight: 600;
+}
+
+.jac-dock__desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.25;
+  color: #8a8f98;
+}
+
+.jac-dock__length {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  width: 100%;
+  font-size: 12px;
 }
 
 .jac-gears {

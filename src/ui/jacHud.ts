@@ -254,6 +254,12 @@ export class JacHud {
 
   private dockBody(snap: JacSnapshot): string {
     const go = snap.mode === 'drive';
+    const desc = go
+      ? ''
+      : '<p class="jac-sheet__desc jac-dock__desc">JAC T9, la camioneta de la familia.</p>';
+    const length = go
+      ? ''
+      : '<div class="jac-length jac-dock__length"><span>Length</span><span class="jac-length__dash">5.33 m</span></div>';
     return `
       ${this.gaugeHtml('rpm', snap.rpm, 'rpm')}
       ${this.gaugeHtml('mph', snap.mph, 'mph')}
@@ -265,7 +271,9 @@ export class JacHud {
       <div class="jac-dock__id">
         <span class="jac-badge">JAC</span>
         <span class="jac-dock__name">JAC T9</span>
+        ${desc}
         <button type="button" class="jac-btn jac-btn--primary" data-jac="${go ? 'out' : 'in'}">${go ? 'Get out' : 'Get in'} <kbd>E</kbd></button>
+        ${length}
       </div>
     `;
   }
