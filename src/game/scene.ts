@@ -537,7 +537,9 @@ export class IsoScene {
 
     this.bindInput();
     canvas.tabIndex = 0;
-    canvas.focus({ preventScroll: true });
+    const focusCanvas = () => canvas.focus({ preventScroll: true });
+    focusCanvas();
+    requestAnimationFrame(focusCanvas);
     this.app.ticker.add(() => this.update());
     window.addEventListener('resize', () => this.onWindowViewportChange());
     window.visualViewport?.addEventListener('resize', () => this.onWindowViewportChange());
@@ -3092,6 +3094,14 @@ export class IsoScene {
     sprint: boolean,
     walkable: (tx: number, ty: number) => boolean,
   ): { x: number; y: number } {
+    const tx = Math.round(x);
+    const ty = Math.round(y);
+    if (!walkable(tx, ty)) {
+      const sx = Math.sign(dx);
+      const sy = Math.sign(dy);
+      if (sx && walkable(tx + sx, ty)) return { x: tx + sx, y: ty };
+      if (sy && walkable(tx, ty + sy)) return { x: tx, y: ty + sy };
+    }
     const world = walkStepWorld(sprint, this.app.ticker.deltaMS);
     const k = world / tileMoveWorld(dx, dy);
     const next = slideStep(x, y, dx * k, dy * k, walkable);
@@ -3796,13 +3806,7 @@ export class IsoScene {
     size: { w: number; h: number };
   } | null {
     if (!this.jac) return null;
-    const o = this.jac.obj;
-    return {
-      origin: { x: o.footprintX ?? o.x, y: o.footprintY ?? o.y },
-      center: { x: this.jac.cx, y: this.jac.cy },
-      front: { x: 27, y: 18 },
-      size: { w: o.w ?? 5, h: o.h ?? 3 },
-    };
+    return this.jac.spawn;
   }
 
   qaJacEntities(): { count: number; ids: string[]; cx: number; cy: number; worldX: number; worldY: number } {

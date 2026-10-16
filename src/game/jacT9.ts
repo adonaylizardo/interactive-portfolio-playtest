@@ -151,6 +151,13 @@ export class JacT9 {
   /** Footprint centre in tile space (floats while driving). */
   cx: number;
   cy: number;
+  /** Parked map placement — never follows the driven van. Origin 23,16; centre 25,17; front 27,18. */
+  readonly spawn: {
+    origin: { x: number; y: number };
+    center: { x: number; y: number };
+    front: { x: number; y: number };
+    size: { w: number; h: number };
+  };
   private claimed = new Map<string, boolean>();
   private wheel = 0;
   private wheelAcc = 0;
@@ -164,6 +171,12 @@ export class JacT9 {
     this.body = hooks.visual.sprite;
     this.cx = (obj.footprintX ?? obj.x) + ((obj.w ?? 1) - 1) / 2;
     this.cy = (obj.footprintY ?? obj.y) + ((obj.h ?? 1) - 1) / 2;
+    this.spawn = {
+      origin: { x: obj.footprintX ?? obj.x, y: obj.footprintY ?? obj.y },
+      center: { x: this.cx, y: this.cy },
+      front: { x: 27, y: 18 },
+      size: { w: obj.w ?? 5, h: obj.h ?? 3 },
+    };
     this.cone.visible = false;
     this.haze.visible = false;
     this.cone.eventMode = 'none';
