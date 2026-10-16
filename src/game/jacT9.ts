@@ -586,12 +586,14 @@ export class JacT9 {
     }
     const moving = this.driving && this.mph > 0.2;
     const hi = spriteResolution() >= 1.5;
-    const key = moving
-      ? this.hojaKey(this.dir, this.row, this.wheel, hi)
-      : this.fixedKey(this.dir, this.row, hi);
-    const tex =
-      this.textures.get(key) ??
-      this.textures.get(moving ? this.hojaKey(this.dir, this.row, this.wheel, !hi) : this.fixedKey(this.dir, this.row, !hi));
+    const tex = moving
+      ? this.pickTex(
+          this.hojaKey(this.dir, this.row, this.wheel, hi),
+          this.hojaKey(this.dir, this.row, this.wheel, !hi),
+          this.fixedKey(this.dir, this.row, hi),
+          this.fixedKey(this.dir, this.row, !hi),
+        )
+      : this.pickTex(this.fixedKey(this.dir, this.row, hi), this.fixedKey(this.dir, this.row, !hi));
     if (tex) this.body.texture = tex;
     const coneKey = this.layerKey('cono_suelo', this.dir, hi);
     const hazeKey = this.layerKey('haz_salida', this.dir, hi);
@@ -792,6 +794,18 @@ export class JacT9 {
     this.hooks.tapBox.set(this.obj.id, box);
   }
 
+  /** Skip empty / off-sheet frames so a bad wheel cell never blanks the van. */
+  private pickTex(...keys: string[]): Texture | undefined {
+    for (const key of keys) {
+      const tex = this.textures.get(key);
+      if (!tex || tex.frame.width < 8 || tex.frame.height < 8) continue;
+      if (tex.frame.x + tex.frame.width > tex.source.width + 0.5) continue;
+      if (tex.frame.y + tex.frame.height > tex.source.height + 0.5) continue;
+      return tex;
+    }
+    return undefined;
+  }
+
   private fixedKey(dir: FacingDir, row: string, hi: boolean): string {
     return `jac:${row}:${dir}:${hi ? 2 : 1}`;
   }
@@ -860,8 +874,9 @@ export class JacT9 {
     try {
       const sheet = await this.loadTex(alias, url);
       if (!sheet) return;
-      const cw = hi ? CELL_1X.w * 2 : CELL_1X.w;
-      const ch = hi ? CELL_1X.h * 2 : CELL_1X.h;
+      // @2x files load at resolution 2, so source.width is the 1x sheet (1120×576), not 2240×1152.
+      const cw = sheet.source.width / 4;
+      const ch = sheet.source.height / 3;
       const rows = ['apagado', 'luces', 'freno'] as const;
       for (let r = 0; r < 3; r++) {
         for (let c = 0; c < 4; c++) {

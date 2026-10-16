@@ -3902,6 +3902,11 @@ export class IsoScene {
     ids: string[];
     sprites: number;
     onScreen: number;
+    frameOk: boolean;
+    texW: number;
+    texH: number;
+    sx: number;
+    sy: number;
     cx: number;
     cy: number;
     worldX: number;
@@ -3917,12 +3922,29 @@ export class IsoScene {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     const vanOnScreen = s.x > 8 && s.x < sw - 8 && s.y > 8 && s.y < sh - 8;
-    const bodyOn = this.jac ? this.objectVisuals.get(this.jac.obj.id)?.sprite.visible !== false : false;
+    const spr = this.jac ? this.objectVisuals.get(this.jac.obj.id)?.sprite : undefined;
+    const bodyOn = spr ? spr.visible && spr.renderable && spr.worldAlpha > 0.05 : false;
+    const tex = spr?.texture;
+    const frame = tex?.frame;
+    const src = tex?.source;
+    const frameOk = !!(
+      frame &&
+      src &&
+      frame.width > 8 &&
+      frame.height > 8 &&
+      frame.x + frame.width <= src.width + 0.5 &&
+      frame.y + frame.height <= src.height + 0.5
+    );
     return {
       count: ids.length,
       ids,
       sprites: bodyOn ? 1 : 0,
-      onScreen: vanOnScreen && bodyOn ? 1 : 0,
+      onScreen: vanOnScreen && bodyOn && frameOk ? 1 : 0,
+      frameOk,
+      texW: frame?.width ?? 0,
+      texH: frame?.height ?? 0,
+      sx: s.x,
+      sy: s.y,
       cx: this.jac?.cx ?? NaN,
       cy: this.jac?.cy ?? NaN,
       worldX: w.x,
