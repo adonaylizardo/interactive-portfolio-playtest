@@ -98,6 +98,7 @@ type JacHooks = {
   visual: JacVisual;
   tapBox: Map<string, Rectangle>;
   onChange?: () => void;
+  onStuck?: () => void;
 };
 
 function vfsOf(dir: FacingDir): { x: number; y: number } {
@@ -201,9 +202,11 @@ export class JacT9 {
   drivePath: { x: number; y: number }[] = [];
   driveGoal: { x: number; y: number } | null = null;
   private shiftDwell = 0;
+  private shiftArmedAt = 0;
   private pendingExit = false;
   private exitHold = 0;
   private exitSit: { x: number; y: number } | null = null;
+  private stuckT = 0;
   bumpT = 0;
 
   constructor(obj: MapObject, hooks: JacHooks) {
@@ -277,9 +280,11 @@ export class JacT9 {
       this.bubble = false;
       this.rearHold = 0;
       this.shiftDwell = 0;
+      this.shiftArmedAt = 0;
       this.pendingExit = false;
       this.exitHold = 0;
       this.exitSit = null;
+      this.stuckT = 0;
       this.bumpT = 0;
       this.clearDrivePath();
       this.applyParkedSolid(false);
@@ -294,8 +299,10 @@ export class JacT9 {
       this.steering = 0;
       this.rearHold = 0;
       this.shiftDwell = 0;
+      this.shiftArmedAt = 0;
       this.pendingExit = false;
       this.exitHold = 0;
+      this.stuckT = 0;
       this.bumpT = 0;
       this.clearDrivePath();
       this.applyParkedSolid(true);
@@ -399,37 +406,51 @@ export class JacT9 {
     return this.canSit(cx, cy) || this.canSitLoose(cx, cy);
   }
 
+  /** Same walkable grid the avatar uses, plus this van's own claimed cells. */
+  private canDriveTile(x: number, y: number): boolean {
+    if (this.claimed.has(k(x, y))) return true;
+    const c = cells[y]?.[x];
+    if (!c) return false;
+    if (c.groundId.includes('borde') || c.groundId.includes('building/footprint')) return false;
+    return c.walkable;
+  }
+
   findDrivePath(gx: number, gy: number): { x: number; y: number }[] | null {
     const sx = Math.round(this.cx);
     const sy = Math.round(this.cy);
-    const sit = (x: number, y: number) => this.canSit(x, y);
-    const direct = findPathWith(sx, sy, gx, gy, sit);
-    if (direct) {
-      if (direct.length === 0 || direct[direct.length - 1].x !== gx || direct[direct.length - 1].y !== gy) {
-        return [...direct, { x: gx, y: gy }];
+    const pass = (x: number, y: number) => this.canDriveTile(x, y);
+    const finish = (path: { x: number; y: number }[], tx: number, ty: number) => {
+      if (path.length === 0 || path[path.length - 1].x !== tx || path[path.length - 1].y !== ty) {
+        return [...path, { x: tx, y: ty }];
       }
-      return direct;
+      return path;
+    };
+    if (pass(gx, gy) || (sx === gx && sy === gy)) {
+      const direct = findPathWith(sx, sy, gx, gy, pass);
+      if (direct) return finish(direct, gx, gy);
+      if (sx === gx && sy === gy) return [];
     }
-    let best: { x: number; y: number }[] | null = null;
-    let bestD = Infinity;
-    for (let r = 1; r <= 6; r++) {
+    for (let r = 1; r <= 24; r++) {
+      let best: { x: number; y: number }[] | null = null;
+      let bestD = Infinity;
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
           const x = gx + dx;
           const y = gy + dy;
-          if (!sit(x, y)) continue;
-          const path = findPathWith(sx, sy, x, y, sit);
+          if (!pass(x, y)) continue;
+          const path = findPathWith(sx, sy, x, y, pass);
           if (!path) continue;
           const d = Math.abs(dx) + Math.abs(dy);
           if (d < bestD) {
             bestD = d;
-            best = [...path, { x: gx, y: gy }];
+            best = finish(path, x, y);
           }
         }
       }
       if (best) return best;
     }
-    return [{ x: gx, y: gy }];
+    return null;
   }
 
   /** Walkable tile beside the driver door (same hunt as get-out). */
@@ -507,7 +528,7 @@ export class JacT9 {
       const moved = this.followDrivePath(dt);
       this.steering = 0;
       this.tickRearHold(dt);
-      if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 3.5);
+      if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 1.4);
       this.syncMeters(moved);
       if (this.toggles.hazards) this.hazardT += dt;
       else this.hazardT = 0;
@@ -532,20 +553,23 @@ export class JacT9 {
 
     this.reversing = this.vel < -0.08;
     this.tickRearHold(dt);
-    if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 3.5);
+    if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 1.4);
     const fwd = DIR_VEC[this.dir];
     if (moving) {
       const nx = fwd.x * this.vel * dt;
       const ny = fwd.y * this.vel * dt;
       const next = slide(this.cx, this.cy, nx, ny, (x, y) => this.canSit(x, y));
+      const moved = Math.hypot(next.x - this.cx, next.y - this.cy);
+      const wantStep = Math.hypot(nx, ny);
+      if (wantStep > 0.04 && moved < wantStep * 0.55 && Math.abs(this.vel) > 0.25) {
+        this.noteBump();
+        if (moved < 1e-4) this.vel *= 0.35;
+      }
       if (next.x !== this.cx || next.y !== this.cy) {
         this.cx = next.x;
         this.cy = next.y;
         this.occupy(this.driveCells());
         this.layout();
-      } else if (Math.abs(this.vel) > 0.25) {
-        this.noteBump();
-        this.vel *= 0.35;
       }
       this.wheelAcc += dt * WHEEL_FPS * Math.min(1.4, Math.abs(this.vel) / DRIVE_TILES_PER_S);
       while (this.wheelAcc >= 1) {
@@ -588,6 +612,7 @@ export class JacT9 {
       if (Math.abs(this.vel) <= 0.08) {
         this.vel = 0;
         this.shiftDwell = 0;
+        this.shiftArmedAt = 0;
       }
       return;
     }
@@ -597,6 +622,7 @@ export class JacT9 {
       this.brakeTowardZero(dt);
       if (Math.abs(this.vel) <= 0.08) {
         this.vel = 0;
+        if (!this.shiftArmedAt) this.shiftArmedAt = performance.now();
         this.shiftDwell = SHIFT_DWELL_S;
       }
       return;
@@ -606,17 +632,20 @@ export class JacT9 {
       this.vel = 0;
       const need: JacGear = want > 0 ? 'D' : 'R';
       if (autoShift && this.gear !== need) {
+        if (!this.shiftArmedAt) this.shiftArmedAt = performance.now();
         if (this.shiftDwell <= 0) this.shiftDwell = SHIFT_DWELL_S;
         this.shiftDwell -= dt;
-        if (this.shiftDwell > 0) return;
+        if (performance.now() - this.shiftArmedAt < SHIFT_DWELL_S * 1000 || this.shiftDwell > 0) return;
         this.gear = need;
       } else if (autoShift) {
         this.gear = need;
       }
       this.shiftDwell = 0;
+      this.shiftArmedAt = 0;
     } else if (autoShift) {
       this.gear = want > 0 ? 'D' : 'R';
       this.shiftDwell = 0;
+      this.shiftArmedAt = 0;
     }
 
     const mag = Math.min(1, Math.abs(throttle));
@@ -630,9 +659,9 @@ export class JacT9 {
   }
 
   private noteBump(): void {
-    if (this.bumpT < 0.2) {
+    if (this.bumpT < 0.25) {
       try {
-        navigator.vibrate?.(24);
+        navigator.vibrate?.(40);
       } catch {
         /* no haptic */
       }
@@ -664,7 +693,9 @@ export class JacT9 {
 
   visualCenterWorld(): { x: number; y: number } {
     const v = this.hooks.visual;
-    return { x: (v.cull.x0 + v.cull.x1) / 2, y: (v.cull.y0 + v.cull.y1) / 2 };
+    const mid = { x: (v.cull.x0 + v.cull.x1) / 2, y: (v.cull.y0 + v.cull.y1) / 2 };
+    const body = this.worldCenter();
+    return { x: mid.x * 0.4 + body.x * 0.6, y: mid.y * 0.4 + body.y * 0.6 };
   }
 
   visualCenterTile(): { x: number; y: number } {
@@ -683,7 +714,8 @@ export class JacT9 {
     const wy = tw.y - off.y;
     const tx = (wx / (TILE_W / 2) + wy / (TILE_H / 2)) / 2;
     const ty = (wy / (TILE_H / 2) - wx / (TILE_W / 2)) / 2;
-    return { x: tx, y: ty };
+    if (this.canSitLoose(tx, ty) || this.canDriveTile(Math.round(tx), Math.round(ty))) return { x: tx, y: ty };
+    return { x: gx, y: gy };
   }
 
   private visualOffsetWorld(): { x: number; y: number } {
@@ -693,9 +725,8 @@ export class JacT9 {
   }
 
   visualOnTile(gx: number, gy: number): boolean {
-    const v = this.visualCenterWorld();
-    const t = tileToWorld(gx, gy);
-    return Math.hypot(v.x - t.x, v.y - t.y) < Math.hypot(TILE_W, TILE_H) * 0.28;
+    const v = this.visualCenterTile();
+    return Math.hypot(v.x - gx, v.y - gy) < 0.38;
   }
 
   private syncMeters(moving: boolean): void {
@@ -712,11 +743,11 @@ export class JacT9 {
     return !!this.driveGoal && t.x === this.driveGoal.x && t.y === this.driveGoal.y;
   }
 
-  /** Step the same van along tile waypoints. Joystick / keys cancel this in update(). */
+  /** Step the same van along A* walkable waypoints. Joystick / keys cancel this in update(). */
   private followDrivePath(dt: number): boolean {
     while (this.drivePath.length > 0) {
       const t = this.drivePath[0];
-      const arrive = this.isGoalNode(t) ? 0.12 : 0.2;
+      const arrive = this.isGoalNode(t) ? 0.18 : 0.28;
       if (Math.hypot(t.x - this.cx, t.y - this.cy) < arrive) this.drivePath.shift();
       else break;
     }
@@ -725,6 +756,7 @@ export class JacT9 {
       this.driveGoal = null;
       this.vel = 0;
       this.reversing = false;
+      this.stuckT = 0;
       return false;
     }
     if (this.drivePath.length === 0) {
@@ -735,14 +767,12 @@ export class JacT9 {
         this.driveGoal = null;
         this.vel = 0;
         this.reversing = false;
+        this.stuckT = 0;
         return false;
       }
     }
-    const t = this.driveGoal ? this.sitForVisual(this.driveGoal.x, this.driveGoal.y) : this.drivePath[0];
-    const goalDist = this.driveGoal
-      ? Math.hypot(this.driveGoal.x - this.cx, this.driveGoal.y - this.cy)
-      : Infinity;
-    const last = this.drivePath.length === 1 || this.isGoalNode(t) || goalDist < 2.6;
+    const last = this.drivePath.length === 1;
+    const t = last && this.driveGoal ? this.sitForVisual(this.driveGoal.x, this.driveGoal.y) : this.drivePath[0];
     const ax = t.x - this.cx;
     const ay = t.y - this.cy;
     const dist = Math.hypot(ax, ay);
@@ -755,37 +785,21 @@ export class JacT9 {
     const step = Math.min(dist, speed * Math.max(dt, 1 / 120));
     const ux = (ax / dist) * step;
     const uy = (ay / dist) * step;
-    const sit = last
-      ? (x: number, y: number) => this.canSit(x, y) || this.canSitLoose(x, y)
-      : (x: number, y: number) => this.canSit(x, y);
-    const next = sit(this.cx + ux, this.cy + uy)
-      ? { x: this.cx + ux, y: this.cy + uy }
-      : slide(this.cx, this.cy, ux, uy, sit);
-    const goalNow = this.driveGoal;
+    const ok = (x: number, y: number) => this.canSitLoose(x, y) || this.canDriveTile(Math.round(x), Math.round(y));
+    const next = ok(this.cx + ux, this.cy + uy) ? { x: this.cx + ux, y: this.cy + uy } : slide(this.cx, this.cy, ux, uy, ok);
     if (next.x === this.cx && next.y === this.cy) {
-      if (last || this.isGoalNode(t) || goalNow) {
-        const snapTo = goalNow ? this.sitForVisual(goalNow.x, goalNow.y) : t;
-        if (Math.hypot(snapTo.x - this.cx, snapTo.y - this.cy) < 3.2) {
-          this.cx = snapTo.x;
-          this.cy = snapTo.y;
-          this.drivePath = [];
-          this.driveGoal = null;
-          this.vel = 0;
-          this.reversing = false;
-          this.occupy(this.driveCells());
-          this.layout();
-          return true;
+      if (!last) {
+        this.drivePath.shift();
+        if (this.drivePath.length === 0) {
+          this.markStuck(dt);
+          return false;
         }
-        this.vel = 0;
-        return false;
+        return this.followDrivePath(dt);
       }
-      this.drivePath.shift();
-      if (this.drivePath.length === 0) {
-        this.vel = 0;
-        return false;
-      }
-      return this.followDrivePath(dt);
+      this.markStuck(dt);
+      return false;
     }
+    this.stuckT = 0;
     this.cx = next.x;
     this.cy = next.y;
     this.dir = reverse ? facingFrom(-ax, -ay, this.dir) : facingFrom(ax, ay, this.dir);
@@ -802,6 +816,16 @@ export class JacT9 {
       this.wheelAcc -= 1;
     }
     return true;
+  }
+
+  private markStuck(dt: number): void {
+    this.vel = 0;
+    this.stuckT += dt;
+    if (this.stuckT < 0.75 || !this.driveGoal) return;
+    this.drivePath = [];
+    this.driveGoal = null;
+    this.stuckT = 0;
+    this.hooks.onStuck?.();
   }
 
   worldFoot(): { x: number; y: number } {
