@@ -1715,6 +1715,7 @@ body[data-layout='panel'] .checklist {
   width: 112px;
   height: 112px;
   overflow: hidden;
+  background: transparent;
   pointer-events: auto;
   touch-action: none;
 }

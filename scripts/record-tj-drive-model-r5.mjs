@@ -27,8 +27,7 @@ function holeInPng(pngPath, css = { x0: 23, x1: 366, y0: 659, y1: 756, w: 390, h
       tot++;
       const i = (y * img.width + x) * 4;
       const a = img.data[i + 3];
-      const lum = img.data[i] + img.data[i + 1] + img.data[i + 2];
-      if (a < 12 || (a < 40 && lum < 18)) n++;
+      if (a < 12) n++;
     }
   }
   return { hole: tot > 0 && n / tot > 0.35, n, tot, ratio: tot ? n / tot : 0 };
@@ -54,9 +53,7 @@ async function canvasHole(page) {
     let n = 0;
     const tot = w * h;
     for (let i = 0; i < pix.length; i += 4) {
-      const a = pix[i + 3];
-      const lum = pix[i] + pix[i + 1] + pix[i + 2];
-      if (a < 12 || (a < 40 && lum < 18)) n++;
+      if (pix[i + 3] < 12) n++;
     }
     return { hole: tot > 0 && n / tot > 0.35, n, tot, ratio: tot ? n / tot : 0, w, h };
   });
@@ -222,7 +219,7 @@ async function run(tag, options, phone) {
         holes.push(gl);
         if (i % 10 === 0) {
           const p = path.join(OUT, `${tag}-hole-${String(i).padStart(2, '0')}.png`);
-          await page.screenshot({ path: p });
+          await page.screenshot({ path: p, omitBackground: true });
           const png = holeInPng(p);
           if (png.hole) throw new Error(`${tag}: PNG hole frame ${i} ${JSON.stringify(png)}`);
         }

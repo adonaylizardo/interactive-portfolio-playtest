@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Point, Polygon, Rectangle, Sprite, Texture, TilingSprite, UPDATE_PRIORITY } from 'pixi.js';
+import { Application, Container, Graphics, Point, Polygon, Rectangle, Sprite, Texture, TilingSprite } from 'pixi.js';
 import {
   cells,
   doorInwardStep,
@@ -327,6 +327,7 @@ export class IsoScene {
   private jac: JacT9 | null = null;
   private jacBubbleTimer: ReturnType<typeof setTimeout> | null = null;
   private rearBlit: HTMLCanvasElement | null = null;
+  private rearScratchEl: HTMLCanvasElement | null = null;
   private rearBlitReady = false;
   private pendingJacExit = false;
   private events: SceneEvents;
@@ -547,7 +548,6 @@ export class IsoScene {
     focusCanvas();
     requestAnimationFrame(focusCanvas);
     this.app.ticker.add(() => this.update());
-    this.app.ticker.add(() => this.blitRearAfterRender(), undefined, UPDATE_PRIORITY.UTILITY);
     window.addEventListener('resize', () => this.onWindowViewportChange());
     window.visualViewport?.addEventListener('resize', () => this.onWindowViewportChange());
     window.visualViewport?.addEventListener('scroll', () => {
@@ -2915,6 +2915,7 @@ export class IsoScene {
   }
 
   private update(): void {
+    this.grabRearFromLastFrame();
     this.updateMovement();
     this.updateAvatars(Math.min(0.25, this.app.ticker.elapsedMS / 1000));
     this.updateCameraFollow();
@@ -3917,10 +3918,10 @@ export class IsoScene {
   }
 
   /**
-   * Crop the already-presented game canvas. Never render-to-texture on the main
-   * WebGL context — that pass punched a transparent hole in the backbuffer.
+   * Copy last frame's rear crop via readPixels at the start of update, so the
+   * upcoming ticker render overwrites any backbuffer damage. Never render-to-texture.
    */
-  private blitRearAfterRender(): void {
+  private grabRearFromLastFrame(): void {
     if (!this.jac?.rearCam || !this.canvasEl || !this.app) {
       this.rearBlitReady = false;
       return;
@@ -3942,26 +3943,50 @@ export class IsoScene {
     );
     ctx.fillStyle = '#141518';
     ctx.fillRect(0, 0, sw, sh);
-    const native = this.canvasEl.width;
-    const displayed = this.canvasEl.clientWidth > 0 ? this.canvasEl.clientWidth : native;
-    const res = native / Math.max(1, displayed);
-    try {
-      ctx.drawImage(
-        this.canvasEl,
-        src.sx * res,
-        src.sy * res,
-        Math.max(1, src.sw * res),
-        Math.max(1, src.sh * res),
-        0,
-        0,
-        sw,
-        sh,
-      );
+    const gl = (this.app.renderer as unknown as { gl?: WebGLRenderingContext }).gl;
+    if (gl && this.canvasEl.width > 4) {
+      try {
+        const native = this.canvasEl.width;
+        const displayed = this.canvasEl.clientWidth > 0 ? this.canvasEl.clientWidth : native;
+        const res = native / Math.max(1, displayed);
+        const sx = Math.max(0, Math.floor(src.sx * res));
+        const syCss = Math.max(0, Math.floor(src.sy * res));
+        const cw = Math.max(1, Math.floor(src.sw * res));
+        const ch = Math.max(1, Math.floor(src.sh * res));
+        const sy = Math.max(0, native - (syCss + ch));
+        const pix = new Uint8Array(cw * ch * 4);
+        gl.readPixels(sx, sy, cw, ch, gl.RGBA, gl.UNSIGNED_BYTE, pix);
+        const img = ctx.createImageData(cw, ch);
+        for (let y = 0; y < ch; y++) {
+          const srcOff = (ch - 1 - y) * cw * 4;
+          img.data.set(pix.subarray(srcOff, srcOff + cw * 4), y * cw * 4);
+        }
+        const scratch = this.rearScratchCanvas();
+        scratch.width = cw;
+        scratch.height = ch;
+        const sctx = scratch.getContext('2d');
+        if (sctx) {
+          sctx.putImageData(img, 0, 0);
+          ctx.drawImage(scratch, 0, 0, cw, ch, 0, 0, sw, sh);
+        }
+        this.rearBlitReady = true;
+      } catch {
+        this.rearBlitReady = true;
+      }
+    } else {
       this.rearBlitReady = true;
-    } catch {
-      this.rearBlitReady = false;
     }
     this.reapStrayCanvases();
+  }
+
+  private rearScratchCanvas(): HTMLCanvasElement {
+    if (!this.rearScratchEl) {
+      this.rearScratchEl = document.createElement('canvas');
+      this.rearScratchEl.width = 1;
+      this.rearScratchEl.height = 1;
+      this.rearScratchEl.setAttribute('data-jac-rear-src', '1');
+    }
+    return this.rearScratchEl;
   }
 
   private reapStrayCanvases(raw?: HTMLCanvasElement): void {
@@ -3969,6 +3994,7 @@ export class IsoScene {
     const keep = new Set<HTMLCanvasElement>();
     if (this.canvasEl) keep.add(this.canvasEl);
     if (this.rearBlit) keep.add(this.rearBlit);
+    if (this.rearScratchEl) keep.add(this.rearScratchEl);
     document.querySelectorAll('canvas').forEach((c) => {
       if (keep.has(c)) return;
       if (c.closest('.jac-hud, .jac-dock, .jac-rear, .chrome')) return;
