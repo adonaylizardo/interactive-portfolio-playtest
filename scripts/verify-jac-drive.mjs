@@ -337,22 +337,34 @@ async function runViewport(tag, options, phone) {
     await shot(page, tag, 'sound-hint');
 
     if (!phone) {
-      const beforeKeys = await page.evaluate(() => window.__playtestQa.getCharacterTile());
-      await page.keyboard.down('ArrowRight');
-      await wait(700);
-      await page.keyboard.up('ArrowRight');
-      const afterKeys = await page.evaluate(() => window.__playtestQa.getCharacterTile());
-      notes.push(`${tag} arrows-no-click ${JSON.stringify({ beforeKeys, afterKeys })}`);
-      if (afterKeys.x === beforeKeys.x && afterKeys.y === beforeKeys.y) {
+      const beforeKeys = await page.evaluate(() => ({
+        tile: window.__playtestQa.getCharacterTile(),
+        focus: document.activeElement?.id || document.activeElement?.tagName || null,
+      }));
+      notes.push(`${tag} canvas-focus ${beforeKeys.focus}`);
+      if (beforeKeys.focus !== 'game-canvas') {
+        errors.push(`${tag}: canvas was not focused on load (active=${beforeKeys.focus})`);
+      }
+      let afterKeys = beforeKeys.tile;
+      for (const key of ['ArrowLeft', 'KeyA', 'ArrowDown', 'ArrowUp', 'ArrowRight']) {
+        await page.keyboard.down(key);
+        await wait(550);
+        await page.keyboard.up(key);
+        afterKeys = await page.evaluate(() => window.__playtestQa.getCharacterTile());
+        if (afterKeys.x !== beforeKeys.tile.x || afterKeys.y !== beforeKeys.tile.y) break;
+      }
+      notes.push(`${tag} arrows-no-click ${JSON.stringify({ before: beforeKeys.tile, after: afterKeys })}`);
+      if (afterKeys.x === beforeKeys.tile.x && afterKeys.y === beforeKeys.tile.y) {
         errors.push(`${tag}: arrow keys did nothing before canvas click`);
       }
     }
 
     if (phone) {
       const sheetHit = await page.evaluate(() => {
-        const cliente = document.querySelector('[data-audience="cliente"]')?.getBoundingClientRect();
+        const cliente = document.querySelector('.ui-seg--phone [data-audience="cliente"]')?.getBoundingClientRect();
         const locate = document.querySelector('.chrome__locate')?.getBoundingClientRect();
-        const idle = document.querySelector('.joystick__idle')?.getBoundingClientRect();
+        const idle = document.querySelector('.joystick__idle');
+        const idleR = idle?.getBoundingClientRect();
         const vis = (r) => r && r.width > 2 && r.height > 2;
         const area = (a, b) => {
           if (!a || !b) return 0;
@@ -361,12 +373,11 @@ async function runViewport(tag, options, phone) {
             Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top))
           );
         };
+        const idleShown = idle && vis(idleR) && getComputedStyle(idle).opacity !== '0' && getComputedStyle(idle).pointerEvents !== 'none';
         return {
-          cliente: vis(cliente) ? { x: cliente.x, w: cliente.width, t: cliente.top } : null,
+          cliente: vis(cliente) ? { x: cliente.x, w: cliente.width, t: cliente.top, h: cliente.height } : null,
           locateArea: vis(locate) ? area(cliente, locate) : 0,
-          idleArea: vis(idle) && getComputedStyle(document.querySelector('.joystick__idle')).opacity !== '0'
-            ? area(cliente, idle)
-            : 0,
+          idleArea: idleShown ? area(cliente, idleR) : 0,
         };
       });
       notes.push(`${tag} cliente-overlap ${JSON.stringify(sheetHit)}`);
