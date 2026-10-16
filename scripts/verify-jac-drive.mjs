@@ -29,6 +29,28 @@ const STATES = [
 
 fs.mkdirSync(OUT, { recursive: true });
 
+function vanPixels(pngPath) {
+  if (!fs.existsSync(pngPath)) return 0;
+  const img = PNG.sync.read(fs.readFileSync(pngPath));
+  let n = 0;
+  const x0 = Math.floor(img.width * 0.12);
+  const x1 = Math.floor(img.width * 0.88);
+  const y0 = Math.floor(img.height * 0.16);
+  const y1 = Math.floor(img.height * 0.72);
+  for (let y = y0; y < y1; y += 2) {
+    for (let x = x0; x < x1; x += 2) {
+      const i = (y * img.width + x) * 4;
+      const r = img.data[i];
+      const g = img.data[i + 1];
+      const b = img.data[i + 2];
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      if (max > 90 && max < 230 && max - min < 42) n++;
+    }
+  }
+  return n;
+}
+
 function sideBySide(oursPath, pixelPath, destPath) {
   const ours = PNG.sync.read(fs.readFileSync(oursPath));
   if (!fs.existsSync(pixelPath)) {
@@ -576,7 +598,7 @@ async function runViewport(tag, options, phone) {
 
     if (phone) {
       const stick = await page.evaluate(() => window.__playtestQa.joystick());
-      if (!stick?.visible) errors.push(`${tag}: joystick hidden after reset`);
+      if (stick?.visible) errors.push(`${tag}: joystick visible while parked`);
 
       await resetMap(page);
       await applyState(page, '4-drive');
@@ -610,8 +632,10 @@ async function runViewport(tag, options, phone) {
       const fwd = await page.evaluate(() => ({
         jac: window.__playtestQa.jac(),
         joy: window.__playtestQa.joystick(),
+        follow: document.getElementById('game-canvas')?.dataset.follow,
+        entities: window.__playtestQa.jacEntities?.(),
       }));
-      await shot(page, tag, 'joystick-forward');
+      const fwdShot = await shot(page, tag, 'joystick-forward');
       await releaseStick(page);
       await wait(280);
       const held = await page.evaluate(() => window.__playtestQa.jac());
@@ -635,8 +659,15 @@ async function runViewport(tag, options, phone) {
       await shot(page, tag, 'joystick-reverse');
       await releaseStick(page);
       notes.push(
-        `${tag} stick-fwd ${JSON.stringify({ gear: fwd.jac?.gear, mph: fwd.jac?.mph, cx: fwd.jac?.cx, cy: fwd.jac?.cy, vec: fwd.joy })}`,
+        `${tag} stick-fwd ${JSON.stringify({ gear: fwd.jac?.gear, mph: fwd.jac?.mph, cx: fwd.jac?.cx, cy: fwd.jac?.cy, vec: fwd.joy, follow: fwd.follow, entities: fwd.entities })}`,
       );
+      if (fwd.follow === 'suspended') errors.push(`${tag}: forward stick detached the camera`);
+      if (!fwd.entities?.frameOk || (fwd.entities?.onScreen ?? 0) !== 1) {
+        errors.push(`${tag}: moving van texture missing ${JSON.stringify(fwd.entities)}`);
+      }
+      if (vanPixels(fwdShot) < 800) {
+        errors.push(`${tag}: forward-drive screenshot has no van (${vanPixels(fwdShot)} gray px)`);
+      }
       notes.push(
         `${tag} stick-hold ${JSON.stringify({ gear: held?.gear, mph: held?.mph, cx: held?.cx, cy: held?.cy })}`,
       );
@@ -663,17 +694,24 @@ async function runViewport(tag, options, phone) {
       }
       const entities = await page.evaluate(() => window.__playtestQa.jacEntities?.());
       notes.push(`${tag} van-entities ${JSON.stringify(entities)}`);
-      if ((entities?.count ?? 0) !== 1 || (entities?.sprites ?? 0) !== 1 || (entities?.onScreen ?? 0) !== 1) {
+      if (
+        (entities?.count ?? 0) !== 1 ||
+        (entities?.sprites ?? 0) !== 1 ||
+        (entities?.onScreen ?? 0) !== 1 ||
+        !entities?.frameOk
+      ) {
         errors.push(`${tag}: expected one on-screen van, got ${JSON.stringify(entities)}`);
       }
       if (rev.joy?.floating) errors.push(`${tag}: driving stick floated off the pad`);
 
+      await page.evaluate(() => window.__playtestQa.jacGetOut?.());
       await resetMap(page);
+      await wait(200);
       const walkJoy = await page.evaluate(() => window.__playtestQa.joystick());
       notes.push(`${tag} walk-joy ${JSON.stringify(walkJoy)}`);
       if (walkJoy?.visible) errors.push(`${tag}: joystick visible while walking`);
       const walk0 = await page.evaluate(() => window.__playtestQa.getCharacterTile());
-      await page.evaluate(() => window.__playtestQa.tapMapTile(walk0.x + 2, walk0.y));
+      await page.evaluate((t) => window.__playtestQa.tapMapTile(t.x + 2, t.y), walk0);
       await wait(900);
       const walk1 = await page.evaluate(() => ({
         tile: window.__playtestQa.getCharacterTile(),
@@ -685,7 +723,10 @@ async function runViewport(tag, options, phone) {
       }
       if (walk1.joy?.visible) errors.push(`${tag}: joystick appeared during tap-to-walk`);
 
-      await page.evaluate(() => window.__playtestQa.setLayout?.('map'));
+      await page.evaluate(() => {
+        window.__playtestQa.setLayout?.('map');
+        window.__playtestQa.jacGetOut?.();
+      });
       await resetMap(page);
       await wait(200);
       const ground0 = await page.evaluate(() => ({
@@ -725,7 +766,7 @@ async function runViewport(tag, options, phone) {
         }
         if (idle1.follow === 'suspended') errors.push(`${tag}: driving stick swipe detached the camera`);
         if (idle1.joy?.floating) errors.push(`${tag}: driving stick floated off the pad`);
-        if ((idle1.entities?.onScreen ?? 0) !== 1) {
+        if ((idle1.entities?.onScreen ?? 0) !== 1 || !idle1.entities?.frameOk) {
           errors.push(`${tag}: van left the viewport during stick swipe ${JSON.stringify(idle1.entities)}`);
         }
       }
@@ -771,9 +812,57 @@ async function runViewport(tag, options, phone) {
         );
       }
       if (tapDrive1.follow === 'suspended') errors.push(`${tag}: tap-to-drive detached the camera`);
-      if ((tapDrive1.entities?.count ?? 0) !== 1 || (tapDrive1.entities?.onScreen ?? 0) !== 1) {
+      if (
+        (tapDrive1.entities?.count ?? 0) !== 1 ||
+        (tapDrive1.entities?.onScreen ?? 0) !== 1 ||
+        !tapDrive1.entities?.frameOk
+      ) {
         errors.push(`${tag}: tap-to-drive van count ${JSON.stringify(tapDrive1.entities)}`);
       }
+
+      await resetMap(page);
+      await applyState(page, '4-drive');
+      const pinch0 = await page.evaluate(() => ({
+        follow: document.getElementById('game-canvas')?.dataset.follow,
+        zoom: window.__playtestQa.camera?.()?.zoom,
+        entities: window.__playtestQa.jacEntities?.(),
+        joy: window.__playtestQa.joystick(),
+      }));
+      await page.evaluate(() => {
+        const c = document.getElementById('game-canvas');
+        const r = c.getBoundingClientRect();
+        const fire = (type, id, x, y) =>
+          c.dispatchEvent(
+            new PointerEvent(type, {
+              pointerId: id,
+              pointerType: 'touch',
+              bubbles: true,
+              cancelable: true,
+              clientX: x,
+              clientY: y,
+            }),
+          );
+        fire('pointerdown', 21, r.left + r.width * 0.4, r.top + r.height * 0.4);
+        fire('pointerdown', 22, r.left + r.width * 0.6, r.top + r.height * 0.6);
+        fire('pointermove', 21, r.left + r.width * 0.32, r.top + r.height * 0.32);
+        fire('pointermove', 22, r.left + r.width * 0.68, r.top + r.height * 0.68);
+        fire('pointerup', 21, r.left + r.width * 0.32, r.top + r.height * 0.32);
+        fire('pointerup', 22, r.left + r.width * 0.68, r.top + r.height * 0.68);
+      });
+      await wait(200);
+      const pinch1 = await page.evaluate(() => ({
+        follow: document.getElementById('game-canvas')?.dataset.follow,
+        zoom: window.__playtestQa.camera?.()?.zoom,
+        entities: window.__playtestQa.jacEntities?.(),
+        joy: window.__playtestQa.joystick(),
+        floating: document.querySelector('.joystick__active:not([hidden])'),
+      }));
+      notes.push(`${tag} pinch-drive ${JSON.stringify({ pinch0, pinch1 })}`);
+      if (pinch1.follow === 'suspended') errors.push(`${tag}: pinch while driving detached the camera`);
+      if ((pinch1.entities?.onScreen ?? 0) !== 1 || (pinch1.entities?.count ?? 0) !== 1) {
+        errors.push(`${tag}: pinch while driving lost the van ${JSON.stringify(pinch1.entities)}`);
+      }
+      if (pinch1.joy?.floating || pinch1.floating) errors.push(`${tag}: pinch spawned a floating stick`);
 
       await resetMap(page);
       await applyState(page, '3-info-on');
@@ -870,7 +959,12 @@ async function runViewport(tag, options, phone) {
       if ((downK.rear.sample?.var ?? 0) < 12) {
         errors.push(`${tag}: rear-cam looks empty/static (var=${downK.rear.sample?.var})`);
       }
-      if ((downK.entities?.count ?? 0) !== 1 || (downK.entities?.sprites ?? 0) !== 1 || (downK.entities?.onScreen ?? 0) !== 1) {
+      if (
+        (downK.entities?.count ?? 0) !== 1 ||
+        (downK.entities?.sprites ?? 0) !== 1 ||
+        (downK.entities?.onScreen ?? 0) !== 1 ||
+        !downK.entities?.frameOk
+      ) {
         errors.push(`${tag}: expected one on-screen van after keyboard drive, got ${JSON.stringify(downK.entities)}`);
       }
 
@@ -914,7 +1008,7 @@ async function runViewport(tag, options, phone) {
       else if (dist(click1.jac, click0) < 0.35) {
         errors.push(`${tag}: click-to-drive did not move the van`);
       }
-      if ((click1.entities?.onScreen ?? 0) !== 1) {
+      if ((click1.entities?.onScreen ?? 0) !== 1 || !click1.entities?.frameOk) {
         errors.push(`${tag}: click-to-drive van left the viewport ${JSON.stringify(click1.entities)}`);
       }
 
