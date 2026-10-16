@@ -223,6 +223,9 @@ export type SceneEvents = {
   onFrame?: () => void;
   stick?: () => { x: number; y: number };
   stickActive?: () => boolean;
+  /** Touch/coarse pad is the 1-finger move control — do not pan or capture the pointer. */
+  stickShown?: () => boolean;
+  stickCancel?: () => void;
   buildingPanel?: BuildingPanelBridge;
   checklist?: ChecklistBridge;
   chrome?: ChromeBridge;
@@ -533,6 +536,8 @@ export class IsoScene {
     this.lastChecklistZoom = this.zoom;
 
     this.bindInput();
+    canvas.tabIndex = 0;
+    canvas.focus({ preventScroll: true });
     this.app.ticker.add(() => this.update());
     window.addEventListener('resize', () => this.onWindowViewportChange());
     window.visualViewport?.addEventListener('resize', () => this.onWindowViewportChange());
@@ -2675,8 +2680,9 @@ export class IsoScene {
       { passive: true },
     );
 
+    const stickOwnsFinger = () => !!this.events.stickActive?.() || !!this.events.stickShown?.();
+
     const onPointerDown = (e: PointerEvent) => {
-      if (this.events.stickActive?.()) return;
       if (e.pointerType === 'touch') {
         this.touchOnlyPinch = false;
       }
@@ -2699,9 +2705,10 @@ export class IsoScene {
       if (this.pointers.size >= 2) {
         this.secondFingerArrived = true;
         this.clearDeferredTap();
+        this.events.stickCancel?.();
       }
       this.onPointerCountChanged(prevCount, this.pointers.size);
-      if (e.pointerType !== 'touch') {
+      if (e.pointerType !== 'touch' && !stickOwnsFinger()) {
         try {
           canvas.setPointerCapture(e.pointerId);
         } catch {
@@ -2711,7 +2718,15 @@ export class IsoScene {
     };
 
     const onPointerMove = (e: PointerEvent) => {
-      if (this.events.stickActive?.()) return;
+      if (this.pointers.size < 2 && (this.events.stickActive?.() || this.events.stickShown?.())) {
+        if (this.tapStart) {
+          this.tapDriftPx = Math.max(
+            this.tapDriftPx,
+            Math.hypot(e.clientX - this.tapStart.x, e.clientY - this.tapStart.y),
+          );
+        }
+        return;
+      }
       if (!this.pointers.has(e.pointerId)) return;
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
@@ -3752,6 +3767,42 @@ export class IsoScene {
 
   qaJac(): JacSnapshot | null {
     return this.jacSnapshot();
+  }
+
+  /**
+   * Parked JAC T9: footprint origin (23,16) 5×3, centre (25, 17), approach tile (27, 18).
+   * `?focus=jac` frames this. Debug-free for QA.
+   */
+  focusJac(): boolean {
+    if (this.interiorActive) this.leaveInteriorNow();
+    if (!this.jac) return false;
+    const c = this.jac.worldCenter();
+    this.follow.suspended = false;
+    this.follow.engaged = false;
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    this.zoom = clampZoom(Math.max(this.zoom, 1), sw, sh);
+    this.updateCameraFitMargins();
+    const aim = this.freeRectCenter();
+    this.placeWorldAtScreen(c.x, c.y - 24, aim.x, aim.y);
+    this.applyCamera(true);
+    return true;
+  }
+
+  jacSpawn(): {
+    origin: { x: number; y: number };
+    center: { x: number; y: number };
+    front: { x: number; y: number };
+    size: { w: number; h: number };
+  } | null {
+    if (!this.jac) return null;
+    const o = this.jac.obj;
+    return {
+      origin: { x: o.footprintX ?? o.x, y: o.footprintY ?? o.y },
+      center: { x: this.jac.cx, y: this.jac.cy },
+      front: { x: 27, y: 18 },
+      size: { w: o.w ?? 5, h: o.h ?? 3 },
+    };
   }
 
   qaJacEntities(): { count: number; ids: string[]; cx: number; cy: number; worldX: number; worldY: number } {

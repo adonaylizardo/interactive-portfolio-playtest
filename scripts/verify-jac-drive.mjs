@@ -160,6 +160,53 @@ async function releaseStick(page) {
   });
 }
 
+/** Fast 150ms touch swipe (DevTools-style) — must drive the stick, not pan the camera. */
+async function swipe150(page, x0, y0, x1, y1) {
+  await page.evaluate(
+    async ({ x0, y0, x1, y1 }) => {
+      const fire = (type, x, y, extra = {}) => {
+        const ev = new PointerEvent(type, {
+          pointerId: 11,
+          pointerType: 'touch',
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: y,
+          ...extra,
+        });
+        const hit = document.elementFromPoint(x, y);
+        if (type === 'pointerdown' && hit) hit.dispatchEvent(ev);
+        else window.dispatchEvent(ev);
+      };
+      fire('pointerdown', x0, y0);
+      await new Promise((r) => setTimeout(r, 40));
+      window.dispatchEvent(
+        new PointerEvent('pointermove', {
+          pointerId: 11,
+          pointerType: 'touch',
+          bubbles: true,
+          cancelable: true,
+          clientX: x1,
+          clientY: y1,
+        }),
+      );
+      await new Promise((r) => setTimeout(r, 110));
+      window.dispatchEvent(
+        new PointerEvent('pointerup', {
+          pointerId: 11,
+          pointerType: 'touch',
+          bubbles: true,
+          cancelable: true,
+          clientX: x1,
+          clientY: y1,
+        }),
+      );
+    },
+    { x0, y0, x1, y1 },
+  );
+}
+
+
 function dist(a, b) {
   return Math.hypot((a?.cx ?? 0) - (b?.cx ?? 0), (a?.cy ?? 0) - (b?.cy ?? 0));
 }
@@ -288,6 +335,45 @@ async function runViewport(tag, options, phone) {
     notes.push(`${tag} sound-hint-boot ${JSON.stringify(bootInfo.hint)}`);
     if (!bootInfo.hint?.visible) errors.push(`${tag}: silent-mode hint missing at boot`);
     await shot(page, tag, 'sound-hint');
+
+    if (!phone) {
+      const beforeKeys = await page.evaluate(() => window.__playtestQa.getCharacterTile());
+      await page.keyboard.down('ArrowRight');
+      await wait(700);
+      await page.keyboard.up('ArrowRight');
+      const afterKeys = await page.evaluate(() => window.__playtestQa.getCharacterTile());
+      notes.push(`${tag} arrows-no-click ${JSON.stringify({ beforeKeys, afterKeys })}`);
+      if (afterKeys.x === beforeKeys.x && afterKeys.y === beforeKeys.y) {
+        errors.push(`${tag}: arrow keys did nothing before canvas click`);
+      }
+    }
+
+    if (phone) {
+      const sheetHit = await page.evaluate(() => {
+        const cliente = document.querySelector('[data-audience="cliente"]')?.getBoundingClientRect();
+        const locate = document.querySelector('.chrome__locate')?.getBoundingClientRect();
+        const idle = document.querySelector('.joystick__idle')?.getBoundingClientRect();
+        const vis = (r) => r && r.width > 2 && r.height > 2;
+        const area = (a, b) => {
+          if (!a || !b) return 0;
+          return (
+            Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) *
+            Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top))
+          );
+        };
+        return {
+          cliente: vis(cliente) ? { x: cliente.x, w: cliente.width, t: cliente.top } : null,
+          locateArea: vis(locate) ? area(cliente, locate) : 0,
+          idleArea: vis(idle) && getComputedStyle(document.querySelector('.joystick__idle')).opacity !== '0'
+            ? area(cliente, idle)
+            : 0,
+        };
+      });
+      notes.push(`${tag} cliente-overlap ${JSON.stringify(sheetHit)}`);
+      if (sheetHit.locateArea > 4) errors.push(`${tag}: recentre overlaps Cliente (${sheetHit.locateArea})`);
+      if (sheetHit.idleArea > 4) errors.push(`${tag}: joystick idle overlaps Cliente (${sheetHit.idleArea})`);
+    }
+
     await resetMap(page);
 
     const car = await page.evaluate(() => {
@@ -539,6 +625,52 @@ async function runViewport(tag, options, phone) {
         errors.push(`${tag}: walking joystick did not move the character`);
       }
 
+      await page.evaluate(() => window.__playtestQa.setLayout?.('map'));
+      await resetMap(page);
+      await wait(200);
+      const ground0 = await page.evaluate(() => ({
+        tile: window.__playtestQa.getCharacterTile(),
+        cam: document.getElementById('game-canvas')?.dataset.camX,
+        follow: document.getElementById('game-canvas')?.dataset.follow,
+      }));
+      await swipe150(page, 188, 360, 188, 280);
+      await wait(400);
+      const ground1 = await page.evaluate(() => ({
+        tile: window.__playtestQa.getCharacterTile(),
+        cam: document.getElementById('game-canvas')?.dataset.camX,
+        follow: document.getElementById('game-canvas')?.dataset.follow,
+        joy: window.__playtestQa.joystick(),
+      }));
+      notes.push(`${tag} swipe150-ground ${JSON.stringify({ ground0, ground1 })}`);
+      if (Math.hypot((ground1.tile?.x ?? 0) - ground0.tile.x, (ground1.tile?.y ?? 0) - ground0.tile.y) < 0.2) {
+        errors.push(
+          `${tag}: 150ms ground swipe did not move the character (${ground0.tile.x},${ground0.tile.y} → ${ground1.tile.x},${ground1.tile.y}) follow=${ground1.follow}`,
+        );
+      }
+      if (ground1.follow === 'suspended') {
+        errors.push(`${tag}: 150ms ground swipe suspended camera follow (panned)`);
+      }
+
+      await resetMap(page);
+      const idleBox = await page.locator('.joystick__idle').boundingBox();
+      const idle0 = await page.evaluate(() => window.__playtestQa.getCharacterTile());
+      if (!idleBox) errors.push(`${tag}: joystick idle missing for 150ms swipe`);
+      else {
+        const cx = idleBox.x + idleBox.width / 2;
+        const cy = idleBox.y + idleBox.height / 2;
+        await swipe150(page, cx, cy, cx, cy - 56);
+        await wait(400);
+        const idle1 = await page.evaluate(() => ({
+          tile: window.__playtestQa.getCharacterTile(),
+          follow: document.getElementById('game-canvas')?.dataset.follow,
+        }));
+        notes.push(`${tag} swipe150-idle ${JSON.stringify({ idle0, idle1 })}`);
+        if (Math.hypot((idle1.tile?.x ?? 0) - idle0.x, (idle1.tile?.y ?? 0) - idle0.y) < 0.2) {
+          errors.push(`${tag}: 150ms idle swipe did not move the character`);
+        }
+        if (idle1.follow === 'suspended') errors.push(`${tag}: 150ms idle swipe panned the camera`);
+      }
+
       await resetMap(page);
       await applyState(page, '3-info-on');
       const beforeHaz = await page.evaluate(() => window.__playtestQa.jac());
@@ -665,6 +797,45 @@ async function runViewport(tag, options, phone) {
     }
 
     await resetMap(page);
+    const spawn = await page.evaluate(() => window.__playtestQa.jacSpawn?.());
+    notes.push(`${tag} jac-spawn ${JSON.stringify(spawn)}`);
+    if (!spawn) errors.push(`${tag}: jacSpawn missing`);
+    else {
+      if (spawn.origin.x !== 23 || spawn.origin.y !== 16) {
+        errors.push(`${tag}: JAC origin ${spawn.origin.x},${spawn.origin.y} want 23,16`);
+      }
+      if (Math.abs(spawn.center.x - 25) > 0.1 || Math.abs(spawn.center.y - 17) > 0.1) {
+        errors.push(`${tag}: JAC center ${spawn.center.x},${spawn.center.y} want 25,17`);
+      }
+    }
+
+    const noahOv = await page.evaluate(() => {
+      const n = window.__playtestQa.noah?.();
+      if (!n) return { skip: true };
+      window.__playtestQa.frameWorld(n.x, n.y, 1.05);
+      return { skip: false, x: n.x, y: n.y };
+    });
+    await wait(250);
+    const noahVs = await page.evaluate(() => {
+      const pill = document.querySelector('.name-label[data-id="noah"]');
+      const cl = document.querySelector('.checklist');
+      const a = pill && !pill.hidden ? pill.getBoundingClientRect() : null;
+      const b = cl && !cl.hidden ? cl.getBoundingClientRect() : null;
+      const area = (p, q) => {
+        if (!p || !q || p.width < 2 || q.width < 2) return 0;
+        return (
+          Math.max(0, Math.min(p.right, q.right) - Math.max(p.left, q.left)) *
+          Math.max(0, Math.min(p.bottom, q.bottom) - Math.max(p.top, q.top))
+        );
+      };
+      return { area: area(a, b), pillOn: !!a, cl: b ? { w: b.width, h: b.height } : null };
+    });
+    notes.push(`${tag} noah-vs-checklist ${JSON.stringify({ noahOv, noahVs })}`);
+    if (!noahOv.skip && noahVs.area > 4) {
+      errors.push(`${tag}: Noah pill overlaps Getting-started counter (${noahVs.area})`);
+    }
+
+    await resetMap(page);
     const parkedLeaks = await hiddenHitTargets(page);
     notes.push(`${tag} hidden-parked ${JSON.stringify(parkedLeaks)}`);
     if (parkedLeaks.length) errors.push(`${tag}: hidden overlays still laid out ${JSON.stringify(parkedLeaks)}`);
@@ -710,6 +881,25 @@ async function runViewport(tag, options, phone) {
 
     const audio404 = req404.filter((u) => /\/audio\//.test(u));
     if (audio404.length) errors.push(`${tag}: audio 404s ${audio404.join(' | ')}`);
+
+    const focusUrl = `${BASE}${BASE.includes('?') ? '&' : '?'}focus=jac`;
+    await page.goto(focusUrl, { waitUntil: 'domcontentloaded' });
+    await wait(500);
+    const focused = await page.evaluate(() => {
+      const jac = window.__playtestQa.jacEntities?.();
+      const spawn = window.__playtestQa.jacSpawn?.();
+      const pt = jac ? window.__playtestQa.worldToClient(jac.worldX, jac.worldY) : null;
+      return {
+        spawn,
+        pt,
+        vw: window.innerWidth,
+        vh: window.innerHeight,
+        onScreen: !!pt && pt.x > 8 && pt.x < window.innerWidth - 8 && pt.y > 8 && pt.y < window.innerHeight - 8,
+      };
+    });
+    notes.push(`${tag} focus-jac ${JSON.stringify(focused)}`);
+    if (!focused.onScreen) errors.push(`${tag}: ?focus=jac did not put the van on screen ${JSON.stringify(focused.pt)}`);
+    await shot(page, tag, 'focus-jac');
   } finally {
     await browser.close();
   }

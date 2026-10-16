@@ -36,7 +36,7 @@ const STEP_COPY: Record<ChecklistStepId, StepCopy> = {
     id: 'move-camera',
     title: 'Mueve la cámara',
     detailDesktop: 'Arrastra con el mouse o desliza con dos dedos en el trackpad para desplazar la vista.',
-    detailTouch: 'Arrastra con un dedo para desplazar la vista.',
+    detailTouch: 'Pellizca con dos dedos para mover y acercar la vista. El recuadro de recentrar vuelve a Adonay.',
   },
   zoom: {
     id: 'zoom',

@@ -116,6 +116,8 @@ async function main(): Promise<void> {
     },
     stick: () => joystick.vector(),
     stickActive: () => joystick.isActive(),
+    stickShown: () => joystick.isShown(),
+    stickCancel: () => joystick.cancel(),
     onExitInterior: () => {
       checklist.setBuildingPanelOpen(false);
       chrome.setInteriorOpen(false, { skipLayout: true });
@@ -155,6 +157,11 @@ async function main(): Promise<void> {
   });
   await scene.init(canvas);
   chrome.beginSoundHint();
+  const bootFocus = new URLSearchParams(location.search).get('focus');
+  if (bootFocus === 'jac') {
+    if (chrome.isMobileSheetOpen()) chrome.setLayout('map');
+    scene.focusJac();
+  }
 
   const bootInterior = parseInteriorFromHash();
   if (bootInterior) {
@@ -281,6 +288,8 @@ async function main(): Promise<void> {
     collapseCasePreview: () => panel.collapsePreviewForQa(),
     jac: () => scene.qaJac(),
     jacEntities: () => scene.qaJacEntities(),
+    jacSpawn: () => scene.jacSpawn(),
+    focusJac: () => scene.focusJac(),
     tapJac: () => scene.tapJac(),
     jacInfo: () => scene.jacOpenInfo(),
     jacGetIn: () => scene.jacGetIn(),

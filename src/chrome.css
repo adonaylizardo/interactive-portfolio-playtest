@@ -821,6 +821,12 @@ body[data-layout='panel'] #game-canvas {
   display: none;
 }
 
+/* Intro sheet owns the bottom of the phone; locate/minimap must not cover Cliente. */
+.chrome--sheet .chrome__views,
+.chrome--sheet .chrome__locate {
+  display: none !important;
+}
+
 .chrome--dock .chrome__views {
   display: block;
   width: auto;

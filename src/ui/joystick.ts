@@ -1,6 +1,8 @@
 /**
  * Mobile / touch joystick. Idle is a Pixel-kit analog stick; a drag replaces it with a
  * ring + knob + dotted line at the finger. Mouse desktops never see it.
+ *
+ * Any touch/coarse pointer on open ground starts the stick so a fast swipe cannot pan the camera.
  */
 
 export type StickVector = { x: number; y: number };
@@ -12,6 +14,13 @@ const DEADZONE = 10;
 
 function isCoarse(): boolean {
   return window.matchMedia('(pointer: coarse)').matches;
+}
+
+function isChromeHit(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return !!target.closest(
+    'button, a, input, textarea, select, .chrome, .checklist, .building-panel, .jac-hud, .name-labels, .toast, .joystick__idle',
+  );
 }
 
 const STICK_GLYPH = `<svg class="joystick__glyph" viewBox="0 0 15 15" width="22" height="22" aria-hidden="true">
@@ -56,9 +65,18 @@ export class Joystick {
     this.knob = this.root.querySelector('.joystick__knob')!;
     this.line = this.root.querySelector('.joystick__line line')!;
 
-    this.idle.addEventListener('pointerdown', (e) => this.begin(e));
+    this.idle.addEventListener('pointerdown', (e) => this.begin(e, { capture: true, stop: true }));
     this.idle.addEventListener('pointermove', (e) => this.move(e));
     this.idle.addEventListener('pointerup', (e) => this.end(e));
+    window.addEventListener(
+      'pointerdown',
+      (e) => {
+        if (!this.wantsPad() || this.hidden || this.pointerId !== null) return;
+        if (isChromeHit(e.target)) return;
+        this.begin(e, { capture: false, stop: false });
+      },
+      { capture: true },
+    );
     window.addEventListener('pointermove', (e) => this.move(e));
     window.addEventListener('pointerup', (e) => this.end(e));
     window.addEventListener('pointercancel', (e) => this.end(e));
@@ -95,6 +113,15 @@ export class Joystick {
     return this.pointerId !== null;
   }
 
+  cancel(): void {
+    this.release();
+  }
+
+  /** True when the pad is the movement control (coarse/touch, not hidden). */
+  isShown(): boolean {
+    return this.wantsPad();
+  }
+
   qa(): { visible: boolean; active: boolean; x: number; y: number } {
     return { visible: !this.root.hidden, active: this.isActive(), x: this.vec.x, y: this.vec.y };
   }
@@ -108,24 +135,29 @@ export class Joystick {
     if (this.root.hidden) this.release();
   }
 
-  private begin(e: PointerEvent): void {
-    if (this.hidden) return;
+  private begin(e: PointerEvent, opts: { capture: boolean; stop: boolean }): void {
+    if (this.hidden || !this.wantsPad()) return;
+    if (this.pointerId !== null) return;
     e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
+    if (opts.stop) {
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+    }
     this.pointerId = e.pointerId;
     this.origin = { x: e.clientX, y: e.clientY };
     this.root.classList.add('is-dragging');
     this.active.hidden = false;
     this.placeActive(this.origin.x, this.origin.y);
     this.setKnob(0, 0);
-    try {
-      this.root.setPointerCapture(e.pointerId);
-    } catch {
+    if (opts.capture) {
       try {
-        this.idle.setPointerCapture(e.pointerId);
+        this.root.setPointerCapture(e.pointerId);
       } catch {
-        /* capture is optional */
+        try {
+          this.idle.setPointerCapture(e.pointerId);
+        } catch {
+          /* capture is optional */
+        }
       }
     }
     this.onStart?.();

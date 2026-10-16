@@ -215,7 +215,7 @@ body[data-layout='panel'] .checklist {
   transition: box-shadow 0.2s ease;
   user-select: none;
   -webkit-user-select: none;
-  z-index: 12;
+  z-index: 14;
 }
 
 .checklist--complete {
@@ -484,7 +484,7 @@ body[data-layout='panel'] .checklist {
     max-height: min(55vh, 480px);
     overflow: auto;
     padding: 0;
-    z-index: 12;
+    z-index: 14;
     border-radius: 16px;
   }
 
@@ -1709,6 +1709,12 @@ body[data-layout='panel'] .checklist {
 
 .joystick.is-dragging .joystick__idle {
   opacity: 0;
+}
+
+/* Idle pad sits on the map, never on the Recruiter/Mentoría/Cliente sheet. */
+body:has(.chrome--sheet) .joystick__idle {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .joystick__idle {

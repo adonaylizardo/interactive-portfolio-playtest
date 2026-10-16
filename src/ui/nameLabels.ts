@@ -50,6 +50,7 @@ export class NameLabels {
       if (!seen.has(id)) pill.hidden = true;
     }
     this.separatePills();
+    this.hideOverChrome();
   }
 
   /** Keep pills from stacking when two heads sit on the same screen point (and vs JAC T9). */
@@ -85,6 +86,32 @@ export class NameLabels {
         if (overlapX <= 0 || overlapY <= 0) continue;
         lift(pill, -Math.ceil(overlapY + 8));
       }
+    }
+  }
+
+  /** Noah (and others) must not cover Getting-started 5 / 5 or other chrome. */
+  private hideOverChrome(): void {
+    const blockers = [...document.querySelectorAll('.checklist, .chrome__lang, .chrome__tools-phone')].filter(
+      (el) => {
+        const r = (el as HTMLElement).getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        return (
+          r.width > 2 &&
+          r.height > 2 &&
+          cs.display !== 'none' &&
+          cs.visibility !== 'hidden' &&
+          !(el as HTMLElement).hidden
+        );
+      },
+    ) as HTMLElement[];
+    if (!blockers.length) return;
+    const overlap = (a: DOMRect, b: DOMRect) =>
+      Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) *
+      Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+    for (const pill of this.pills.values()) {
+      if (pill.hidden) continue;
+      const a = pill.getBoundingClientRect();
+      if (blockers.some((el) => overlap(a, el.getBoundingClientRect()) > 4)) pill.hidden = true;
     }
   }
 
