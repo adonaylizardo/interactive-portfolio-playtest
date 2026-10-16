@@ -19,7 +19,7 @@ export type ChromeCallbacks = {
 };
 
 const EXPERIENCE: { id: string; label: string; nda?: boolean }[] = [
-  { id: 'volaris', label: 'Volaris', nda: true },
+  { id: 'volaris', label: 'Airline', nda: true },
   { id: 'bain', label: 'Bain' },
   { id: 'mentoria', label: 'Mentoría en Applaudo' },
   { id: 'finoa', label: 'Finoa' },
@@ -27,7 +27,7 @@ const EXPERIENCE: { id: string; label: string; nda?: boolean }[] = [
 ];
 
 const CASES_ROWS: { id: string; label: string; nda?: boolean }[] = [
-  { id: 'volaris', label: 'Volaris', nda: true },
+  { id: 'volaris', label: 'Airline', nda: true },
   { id: 'bain', label: 'Bain' },
   { id: 'mentoria', label: 'Mentoría en Applaudo' },
   { id: 'finoa', label: 'Finoa' },
