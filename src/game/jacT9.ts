@@ -696,6 +696,11 @@ export class JacT9 {
     const base = `${import.meta.env.BASE_URL}sprites/jac-t9-v3`;
     const rows = ['apagado', 'luces', 'freno'] as const;
     const layers = ['cono_suelo', 'haz_salida'] as const;
+    /** NE/NW cone/haze files were never exported; skip so Get in/drive does not 404. */
+    const capaDirs: Record<(typeof layers)[number], readonly FacingDir[]> = {
+      cono_suelo: ['se', 'sw'],
+      haz_salida: ['se', 'sw'],
+    };
     const jobs: Promise<void>[] = [];
     for (const dir of DIRS) {
       for (const row of rows) {
@@ -705,6 +710,7 @@ export class JacT9 {
       }
       jobs.push(this.loadHoja(dir, hi, `${base}/jac-t9-v3__hoja_${dir}${suf}.png`));
       for (const layer of layers) {
+        if (!capaDirs[layer].includes(dir)) continue;
         jobs.push(
           this.loadLayer(layer, dir, hi, `${base}/capas/jac-t9-v3__capa_${layer}_${dir}${suf}.png`),
         );
