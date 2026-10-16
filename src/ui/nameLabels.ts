@@ -1,7 +1,7 @@
 /** HTML name pills — crisp at every zoom, always above the Pixi depth sort. */
 
 export type NameLabelTarget = {
-  id: 'adonay' | 'pantone' | 'noah';
+  id: 'adonay' | 'pantone' | 'noah' | 'jac';
   name: string;
   x: number;
   y: number;
@@ -16,7 +16,7 @@ export class NameLabels {
     this.root = document.createElement('div');
     this.root.className = 'name-labels';
     this.root.setAttribute('aria-hidden', 'true');
-    for (const id of ['adonay', 'pantone', 'noah'] as const) {
+    for (const id of ['adonay', 'pantone', 'noah', 'jac'] as const) {
       const pill = document.createElement('div');
       pill.className = 'name-label';
       pill.dataset.id = id;
@@ -53,39 +53,61 @@ export class NameLabels {
     this.hideOverChrome();
   }
 
-  /** Keep pills from stacking when two heads sit on the same screen point (and vs JAC T9). */
+  /** Stack overlapping pills vertically. JAC stays put; Adonay then Pantone then Noah lift. */
   private separatePills(): void {
-    const visible = [...this.pills.values()].filter((p) => !p.hidden);
-    const extras = [...document.querySelectorAll('.jac-pill--name')].filter((el) => {
-      const html = el as HTMLElement;
-      if (html.hidden) return false;
-      const r = html.getBoundingClientRect();
-      return r.width > 2 && r.height > 2;
-    }) as HTMLElement[];
-    const lift = (el: HTMLElement, dy: number) => {
-      el.style.transform = `${el.style.transform} translateY(${dy}px)`;
+    const GAP = 4;
+    type Item = { el: HTMLElement; x: number; y: number; w: number; h: number; baseY: number; rank: number; movable: boolean };
+    const rankOf = (el: HTMLElement) => {
+      if (el.classList.contains('jac-pill--name') || el.dataset.id === 'jac') return 0;
+      if (el.dataset.id === 'adonay') return 1;
+      if (el.dataset.id === 'pantone') return 2;
+      return 3;
     };
-    for (let i = 0; i < visible.length; i++) {
-      for (let j = i + 1; j < visible.length; j++) {
-        const a = visible[i].getBoundingClientRect();
-        const b = visible[j].getBoundingClientRect();
-        const overlapX = Math.min(a.right, b.right) - Math.max(a.left, b.left);
-        const overlapY = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
-        if (overlapX <= 0 || overlapY <= 0) continue;
-        const pad = Math.ceil(overlapY / 2 + 6);
-        lift(visible[i], pad);
-        lift(visible[j], -pad);
-      }
+    const items: Item[] = [];
+    const add = (el: HTMLElement, movable: boolean) => {
+      const r = el.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) return;
+      items.push({ el, x: r.left, y: r.top, w: r.width, h: r.height, baseY: r.top, rank: rankOf(el), movable });
+    };
+    for (const p of this.pills.values()) if (!p.hidden) add(p, true);
+    for (const extra of document.querySelectorAll('.jac-pill--name')) {
+      const html = extra as HTMLElement;
+      if (html.hidden || html.closest('[hidden]')) continue;
+      const cs = getComputedStyle(html);
+      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+      add(html, false);
     }
-    for (const pill of visible) {
-      for (const extra of extras) {
-        const a = pill.getBoundingClientRect();
-        const b = extra.getBoundingClientRect();
-        const overlapX = Math.min(a.right, b.right) - Math.max(a.left, b.left);
-        const overlapY = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
-        if (overlapX <= 0 || overlapY <= 0) continue;
-        lift(pill, -Math.ceil(overlapY + 8));
+    const overlaps = (a: Item, b: Item) =>
+      Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 1 &&
+      Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 1;
+    for (let pass = 0; pass < 10; pass++) {
+      let moved = false;
+      for (let i = 0; i < items.length; i++) {
+        for (let j = i + 1; j < items.length; j++) {
+          const a = items[i];
+          const b = items[j];
+          if (!overlaps(a, b)) continue;
+          const ovY = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+          const lift = ovY + GAP;
+          const [keep, slide] =
+            a.rank === b.rank ? a.y <= b.y ? [a, b] : [b, a] : a.rank < b.rank ? [a, b] : [b, a];
+          if (!slide.movable) {
+            if (!keep.movable) continue;
+            keep.y -= lift;
+            moved = true;
+            continue;
+          }
+          slide.y -= lift;
+          moved = true;
+        }
       }
+      if (!moved) break;
+    }
+    for (const it of items) {
+      if (!it.movable) continue;
+      const dy = Math.round(it.y - it.baseY);
+      if (!dy) continue;
+      it.el.style.transform = `${it.el.style.transform} translateY(${dy}px)`;
     }
   }
 

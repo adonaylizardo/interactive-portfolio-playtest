@@ -4151,7 +4151,7 @@ export class IsoScene {
   }
 
   /** Client pixels of the name-pill anchors (just above each head). */
-  nameLabelAnchors(): { id: 'adonay' | 'pantone' | 'noah'; name: string; x: number; y: number; visible: boolean }[] {
+  nameLabelAnchors(): { id: 'adonay' | 'pantone' | 'noah' | 'jac'; name: string; x: number; y: number; visible: boolean }[] {
     const rect = this.canvasEl?.getBoundingClientRect();
     const sw = this.app?.screen.width ?? 0;
     const sh = this.app?.screen.height ?? 0;
@@ -4176,7 +4176,7 @@ export class IsoScene {
       !!this.jac &&
       !this.jac.driving &&
       Math.hypot(this.charTx - this.jac.cx, this.charTy - this.jac.cy) < 4;
-    const out: { id: 'adonay' | 'pantone' | 'noah'; name: string; x: number; y: number; visible: boolean }[] = [
+    const out: { id: 'adonay' | 'pantone' | 'noah' | 'jac'; name: string; x: number; y: number; visible: boolean }[] = [
       {
         id: 'adonay',
         name: 'Adonay',
@@ -4201,6 +4201,19 @@ export class IsoScene {
         x: head.x,
         y: head.y,
         visible: n.visible && n.loaded && onScreen(head.sx, head.sy),
+      });
+    }
+    if (!this.interiorActive && this.jac && !this.jac.driving && this.jac.mode === 'parked') {
+      const roof = this.jac.worldRoof();
+      const s = this.worldToScreen(roof.x, roof.y);
+      const x = (rect?.left ?? 0) + s.x;
+      const y = (rect?.top ?? 0) + s.y - NAME_PILL_GAP_PX;
+      out.push({
+        id: 'jac',
+        name: 'JAC T9',
+        x,
+        y,
+        visible: onScreen(s.x, s.y),
       });
     }
     return out;
