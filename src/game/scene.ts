@@ -1671,7 +1671,7 @@ export class IsoScene {
       return;
     }
     const path = this.jac.findDrivePath(gx, gy);
-    if (!path) {
+    if (!path || path.length === 0) {
       this.events.onUnreachable?.();
       return;
     }
@@ -2665,15 +2665,15 @@ export class IsoScene {
 
     let lastTouchCount = 0;
 
+    const onTouchPinchStartPassive = (e: TouchEvent) => {
+      if (e.touches.length < 2) lastTouchCount = e.touches.length;
+    };
     const onTouchPinchStart = (e: TouchEvent) => {
       if (!isGameTouchTarget(e.target)) return;
       if (this.zoomSource === 'gesture') return;
       const n = e.touches.length;
-      if (n >= 1) e.preventDefault();
-      if (n < 2) {
-        lastTouchCount = n;
-        return;
-      }
+      if (n < 2) return;
+      e.preventDefault();
       const t0 = e.touches[0];
       const t1 = e.touches[1];
       const mid = this.touchPairMidpoint(t0, t1);
@@ -2683,11 +2683,7 @@ export class IsoScene {
         return;
       }
       this.touchOnlyPinch = true;
-      if (lastTouchCount >= 2 || this.pinchGestureActive) {
-        this.beginPinchAtMid(mid, dist);
-      } else {
-        this.beginPinchAtMid(mid, dist);
-      }
+      this.beginPinchAtMid(mid, dist);
       lastTouchCount = n;
     };
 
@@ -2715,6 +2711,7 @@ export class IsoScene {
       this.endZoomGesture();
     };
 
+    canvas.addEventListener('touchstart', onTouchPinchStartPassive, { passive: true });
     canvas.addEventListener('touchstart', onTouchPinchStart, { passive: false });
     canvas.addEventListener('touchmove', onTouchPinchMove, { passive: false });
     canvas.addEventListener(
@@ -3671,7 +3668,6 @@ export class IsoScene {
     this.jac.setMode('drive');
     this.avatar.setVisible(false);
     this.startCameraFollow();
-    this.centerOnCharacter(true);
     void this.jac.ensureLoaded();
   }
 
@@ -3692,14 +3688,13 @@ export class IsoScene {
       this.jacBubbleTimer = null;
     }
     this.startCameraFollow();
-    this.centerOnCharacter(true);
   }
 
   qaDriveTo(tx: number, ty: number): boolean {
     if (!this.jac?.driving) return false;
     if (!this.jac.canDriveAt(tx, ty)) return false;
     const path = this.jac.findDrivePath(tx, ty);
-    if (!path) return false;
+    if (!path || path.length === 0) return false;
     this.jac.setDrivePath(path, { x: tx, y: ty });
     this.startCameraFollow();
     this.drawPathPreview();
@@ -3828,16 +3823,19 @@ export class IsoScene {
     const savedX = this.cameraX;
     const savedY = this.cameraY;
     const g = this.objectGraphics.get(JAC_ID);
+    const pathWas = this.pathGfx.visible;
     this.rearCapturing = true;
-    this.placeWorldAtScreen(look.x, look.y, sw / 2, sh * 0.55);
+    this.placeWorldAtScreen(look.x, look.y, sw / 2, sh * 0.58);
     this.applyCamera(false);
     if (g) g.visible = false;
+    this.pathGfx.visible = false;
     try {
       this.app.renderer.render({ container: this.app.stage, target: this.rearRt, clear: true });
     } catch {
       this.cameraX = savedX;
       this.cameraY = savedY;
       if (g) g.visible = true;
+      this.pathGfx.visible = pathWas;
       this.applyCamera(false);
       this.rearCapturing = false;
       return null;
@@ -3845,18 +3843,19 @@ export class IsoScene {
     this.cameraX = savedX;
     this.cameraY = savedY;
     if (g) g.visible = true;
+    this.pathGfx.visible = pathWas;
     this.applyCamera(false);
     this.rearCapturing = false;
     try {
       const canvas = this.app.renderer.extract.canvas({ target: this.rearRt }) as HTMLCanvasElement;
-      const cropW = Math.min(640, canvas.width * 0.7);
-      const cropH = Math.min(220, canvas.height * 0.38);
+      const cropW = Math.min(640, Math.max(160, canvas.width * 0.72));
+      const cropH = Math.min(240, Math.max(90, canvas.height * 0.42));
       return {
         canvas,
         sx: (canvas.width - cropW) / 2,
-        sy: (canvas.height - cropH) / 2,
+        sy: Math.max(0, canvas.height * 0.32),
         sw: cropW,
-        sh: cropH,
+        sh: Math.min(cropH, canvas.height - canvas.height * 0.32),
       };
     } catch {
       return null;
