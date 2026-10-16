@@ -5,7 +5,6 @@
 
 export type StickVector = { x: number; y: number };
 
-const IDLE_SIZE = 64;
 const RING_SIZE = 128;
 const KNOB_SIZE = 48;
 const MAX_RADIUS = 48;
