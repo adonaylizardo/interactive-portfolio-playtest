@@ -119,6 +119,7 @@ export class BuildingPanel {
   private previewTeaser: HTMLElement | null = null;
   private peekOnly = true;
   private dragStartY = 0;
+  private ignoreDragUntil = 0;
   private leaveArmed = false;
   /** Press on Salir: leave only on lift, and only if the finger stayed within ~10 px. */
   private exitPress: { x: number; y: number; drift: number } | null = null;
@@ -292,6 +293,8 @@ export class BuildingPanel {
 
   private setPeek(peek: boolean): void {
     this.peekOnly = peek;
+    this.dragStartY = 0;
+    this.ignoreDragUntil = performance.now() + 400;
     this.syncPeekClass();
     this.onVisibilityChange();
   }
@@ -310,7 +313,7 @@ export class BuildingPanel {
 
   private closePreview(): void {
     if (this.mode !== 'preview') return;
-    if (!this.peekOnly) {
+    if (!this.peekOnly || this.el.classList.contains('building-panel--expanded')) {
       this.setPeek(true);
       return;
     }
@@ -318,14 +321,15 @@ export class BuildingPanel {
   }
 
   private onDragStart(e: PointerEvent): void {
-    if (!this.isOpen()) return;
-    if (!this.isMobile() && this.mode !== 'preview') return;
+    if (!this.isMobile() || !this.isOpen() || this.mode === 'preview') return;
+    if (performance.now() < this.ignoreDragUntil) return;
     this.dragStartY = e.clientY;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }
 
   private onDragMove(e: PointerEvent): void {
-    if (!this.dragStartY) return;
+    if (!this.dragStartY || e.buttons === 0) return;
+    if (performance.now() < this.ignoreDragUntil) return;
     const dy = e.clientY - this.dragStartY;
     if (dy > 40 && !this.peekOnly) this.setPeek(true);
     if (dy < -40 && this.peekOnly) this.setPeek(false);

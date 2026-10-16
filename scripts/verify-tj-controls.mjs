@@ -65,6 +65,8 @@ async function runViewport(tag, options, phone) {
 
     await page.evaluate(() => window.__playtestQa.setLayout?.('map'));
     await wait(300);
+    await page.mouse.click(Math.min(180, options.viewport.width / 2), Math.min(360, options.viewport.height / 2));
+    await wait(200);
 
     const joy = await page.evaluate(() => {
       const idle = document.querySelector('.joystick__idle');
@@ -104,14 +106,15 @@ async function runViewport(tag, options, phone) {
               clientY: y,
             }),
           );
-        }, [box.x + box.width / 2, box.y + box.height / 2 - 72]);
-        await wait(700);
+        }, [box.x + box.width / 2 + 80, box.y + box.height / 2]);
+        await wait(900);
       }
       const mid = await page.evaluate(() => ({
         joy: window.__playtestQa.joystick(),
         idleHidden: document.querySelector('.joystick__idle')?.hidden === true,
         active: document.querySelector('.joystick__active')?.hidden === false,
         tile: window.__playtestQa.getCharacterTile(),
+        pos: window.__playtestQa.getCharacterPos?.(),
       }));
       if (!mid.joy.active && !mid.active) errors.push(`${tag}: joystick drag did not activate`);
       await page.evaluate(() => {
@@ -210,7 +213,7 @@ async function runViewport(tag, options, phone) {
       }
       if (!(await page.evaluate(() => window.__playtestQa.isCasePreviewExpanded()))) {
         await page.evaluate(() => window.__playtestQa.expandCasePreview());
-        await wait(300);
+        await wait(500);
       }
       const expanded = await page.evaluate(() => {
         const sheet = document.querySelector('.building-panel__sheet');
@@ -230,18 +233,23 @@ async function runViewport(tag, options, phone) {
       if (!expanded.expanded) errors.push(`${tag}: ${id} card tap did not expand`);
       if (!expanded.fullShown) errors.push(`${tag}: ${id} expand is not showing full copy`);
       if (expanded.scrollH <= expanded.clientH + 8) notes.push(`${tag} ${id} sheet may not need scroll (${expanded.scrollH}/${expanded.clientH})`);
-      await page.locator('.building-panel__sheet').evaluate((el) => {
-        el.scrollTop = Math.min(el.scrollHeight, 240);
-      });
-      await wait(150);
       await page.screenshot({ path: path.join(OUT, `${tag}-${id}-expand.png`) });
 
-      const close = await page.locator('.building-panel__close').boundingBox();
-      if (close) {
-        if (phone) await page.touchscreen.tap(close.x + close.width / 2, close.y + close.height / 2);
-        else await page.mouse.click(close.x + close.width / 2, close.y + close.height / 2);
-        await wait(300);
+      const beforeX = await page.evaluate(() => ({
+        preview: window.__playtestQa.isCasePreview(),
+        expanded: window.__playtestQa.isCasePreviewExpanded(),
+        classes: document.querySelector('.building-panel')?.className ?? '',
+      }));
+      notes.push(`${tag} ${id} beforeX ${JSON.stringify(beforeX)}`);
+      if (!beforeX.expanded) {
+        await page.evaluate(() => window.__playtestQa.expandCasePreview());
+        await wait(200);
       }
+      await page.evaluate(() => {
+        const btn = document.querySelector('.building-panel__close');
+        if (btn instanceof HTMLElement) btn.click();
+      });
+      await wait(300);
       if (await page.evaluate(() => window.__playtestQa.isCasePreviewExpanded())) {
         await page.evaluate(() => window.__playtestQa.collapseCasePreview());
         await wait(200);

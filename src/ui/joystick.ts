@@ -105,7 +105,7 @@ export class Joystick {
     e.stopPropagation();
     this.pointerId = e.pointerId;
     this.origin = { x: e.clientX, y: e.clientY };
-    this.idle.hidden = true;
+    this.root.classList.add('is-dragging');
     this.active.hidden = false;
     this.placeActive(this.origin.x, this.origin.y);
     this.setKnob(0, 0);
@@ -142,7 +142,7 @@ export class Joystick {
   private release(): void {
     this.pointerId = null;
     this.vec = { x: 0, y: 0 };
-    this.idle.hidden = false;
+    this.root.classList.remove('is-dragging');
     this.active.hidden = true;
   }
 

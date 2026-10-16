@@ -1273,6 +1273,10 @@ body[data-layout='panel'] .checklist {
   display: none;
 }
 
+.joystick.is-dragging .joystick__idle {
+  opacity: 0;
+}
+
 .joystick__idle {
   position: absolute;
   right: 16px;
