@@ -31,8 +31,8 @@ for (const [re, label] of FORBIDDEN) {
   if (re.test(src)) errors.push(`src/data/cases.ts contains ${label}`);
 }
 
-const bainStart = src.indexOf('\n  bain:');
-const pgStart = src.indexOf('\n  pg:');
+const bainStart = src.indexOf('\n  bain: {');
+const pgStart = src.indexOf('\n  pg: {');
 if (bainStart < 0 || pgStart < 0 || pgStart < bainStart) {
   errors.push('could not isolate the Bain case block in src/data/cases.ts');
 } else {
