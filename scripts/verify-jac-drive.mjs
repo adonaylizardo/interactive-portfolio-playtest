@@ -663,69 +663,116 @@ async function runViewport(tag, options, phone) {
       }
       const entities = await page.evaluate(() => window.__playtestQa.jacEntities?.());
       notes.push(`${tag} van-entities ${JSON.stringify(entities)}`);
-      if ((entities?.count ?? 0) !== 1) {
-        errors.push(`${tag}: expected one van, got ${JSON.stringify(entities)}`);
+      if ((entities?.count ?? 0) !== 1 || (entities?.sprites ?? 0) !== 1 || (entities?.onScreen ?? 0) !== 1) {
+        errors.push(`${tag}: expected one on-screen van, got ${JSON.stringify(entities)}`);
       }
+      if (rev.joy?.floating) errors.push(`${tag}: driving stick floated off the pad`);
 
       await resetMap(page);
+      const walkJoy = await page.evaluate(() => window.__playtestQa.joystick());
+      notes.push(`${tag} walk-joy ${JSON.stringify(walkJoy)}`);
+      if (walkJoy?.visible) errors.push(`${tag}: joystick visible while walking`);
       const walk0 = await page.evaluate(() => window.__playtestQa.getCharacterTile());
-      const heldWalk = await holdStick(page, 40, -40);
-      if (!heldWalk) errors.push(`${tag}: joystick idle missing for walk`);
+      await page.evaluate(() => window.__playtestQa.tapMapTile(walk0.x + 2, walk0.y));
       await wait(900);
       const walk1 = await page.evaluate(() => ({
         tile: window.__playtestQa.getCharacterTile(),
         joy: window.__playtestQa.joystick(),
       }));
-      await releaseStick(page);
-      notes.push(`${tag} stick-walk ${JSON.stringify({ walk0, walk1 })}`);
+      notes.push(`${tag} tap-walk ${JSON.stringify({ walk0, walk1 })}`);
       if (Math.hypot((walk1.tile?.x ?? 0) - walk0.x, (walk1.tile?.y ?? 0) - walk0.y) < 0.4) {
-        errors.push(`${tag}: walking joystick did not move the character`);
+        errors.push(`${tag}: tap-to-walk did not move the character`);
       }
+      if (walk1.joy?.visible) errors.push(`${tag}: joystick appeared during tap-to-walk`);
 
       await page.evaluate(() => window.__playtestQa.setLayout?.('map'));
       await resetMap(page);
       await wait(200);
       const ground0 = await page.evaluate(() => ({
         tile: window.__playtestQa.getCharacterTile(),
-        cam: document.getElementById('game-canvas')?.dataset.camX,
-        follow: document.getElementById('game-canvas')?.dataset.follow,
+        joy: window.__playtestQa.joystick(),
       }));
       await swipe150(page, 188, 360, 188, 280);
       await wait(400);
       const ground1 = await page.evaluate(() => ({
         tile: window.__playtestQa.getCharacterTile(),
-        cam: document.getElementById('game-canvas')?.dataset.camX,
-        follow: document.getElementById('game-canvas')?.dataset.follow,
         joy: window.__playtestQa.joystick(),
+        floating: document.querySelector('.joystick__active:not([hidden])'),
       }));
       notes.push(`${tag} swipe150-ground ${JSON.stringify({ ground0, ground1 })}`);
-      if (Math.hypot((ground1.tile?.x ?? 0) - ground0.tile.x, (ground1.tile?.y ?? 0) - ground0.tile.y) < 0.2) {
-        errors.push(
-          `${tag}: 150ms ground swipe did not move the character (${ground0.tile.x},${ground0.tile.y} → ${ground1.tile.x},${ground1.tile.y}) follow=${ground1.follow}`,
-        );
-      }
-      if (ground1.follow === 'suspended') {
-        errors.push(`${tag}: 150ms ground swipe suspended camera follow (panned)`);
-      }
+      if (ground1.joy?.visible) errors.push(`${tag}: ground swipe spawned a walking joystick`);
+      if (ground1.joy?.floating || ground1.floating) errors.push(`${tag}: ground swipe spawned a floating stick`);
 
       await resetMap(page);
+      await applyState(page, '4-drive');
       const idleBox = await page.locator('.joystick__idle').boundingBox();
-      const idle0 = await page.evaluate(() => window.__playtestQa.getCharacterTile());
-      if (!idleBox) errors.push(`${tag}: joystick idle missing for 150ms swipe`);
+      const drive0 = await page.evaluate(() => window.__playtestQa.jac());
+      if (!idleBox) errors.push(`${tag}: driving joystick idle missing`);
       else {
         const cx = idleBox.x + idleBox.width / 2;
         const cy = idleBox.y + idleBox.height / 2;
         await swipe150(page, cx, cy, cx, cy - 56);
         await wait(400);
         const idle1 = await page.evaluate(() => ({
-          tile: window.__playtestQa.getCharacterTile(),
+          jac: window.__playtestQa.jac(),
           follow: document.getElementById('game-canvas')?.dataset.follow,
+          joy: window.__playtestQa.joystick(),
+          entities: window.__playtestQa.jacEntities?.(),
         }));
-        notes.push(`${tag} swipe150-idle ${JSON.stringify({ idle0, idle1 })}`);
-        if (Math.hypot((idle1.tile?.x ?? 0) - idle0.x, (idle1.tile?.y ?? 0) - idle0.y) < 0.2) {
-          errors.push(`${tag}: 150ms idle swipe did not move the character`);
+        notes.push(`${tag} swipe150-drive ${JSON.stringify({ drive0: { cx: drive0?.cx, cy: drive0?.cy }, idle1 })}`);
+        if (dist(idle1.jac, drive0) < 0.15) {
+          errors.push(`${tag}: 150ms driving stick swipe did not move the van`);
         }
-        if (idle1.follow === 'suspended') errors.push(`${tag}: 150ms idle swipe panned the camera`);
+        if (idle1.follow === 'suspended') errors.push(`${tag}: driving stick swipe detached the camera`);
+        if (idle1.joy?.floating) errors.push(`${tag}: driving stick floated off the pad`);
+        if ((idle1.entities?.onScreen ?? 0) !== 1) {
+          errors.push(`${tag}: van left the viewport during stick swipe ${JSON.stringify(idle1.entities)}`);
+        }
+      }
+
+      await resetMap(page);
+      await applyState(page, '4-drive');
+      const tapDrive = await page.evaluate(() => {
+        const start = window.__playtestQa.jac();
+        const walk = window.__playtestQa.fill().walk;
+        const clear = (x, y) => {
+          for (let dy = -1; dy <= 2; dy++) {
+            for (let dx = -1; dx <= 2; dx++) {
+              const ch = walk[y + dy]?.[x + dx];
+              if (!ch || ch === '#' || ch === 'x') return false;
+            }
+          }
+          return true;
+        };
+        let goal = null;
+        for (let y = Math.round(start.cy); y < Math.round(start.cy) + 8; y++) {
+          for (let x = Math.round(start.cx) + 2; x < Math.round(start.cx) + 10; x++) {
+            if (clear(x, y)) {
+              goal = { x, y };
+              break;
+            }
+          }
+          if (goal) break;
+        }
+        const ok = goal ? window.__playtestQa.jacDriveTo(goal.x, goal.y) : false;
+        return { start: { cx: start.cx, cy: start.cy }, goal, ok };
+      });
+      await wait(1600);
+      const tapDrive1 = await page.evaluate(() => ({
+        jac: window.__playtestQa.jac(),
+        entities: window.__playtestQa.jacEntities?.(),
+        follow: document.getElementById('game-canvas')?.dataset.follow,
+      }));
+      notes.push(`${tag} tap-drive ${JSON.stringify({ tapDrive, tapDrive1 })}`);
+      if (!tapDrive.ok) errors.push(`${tag}: tap-to-drive path was not accepted`);
+      else if (dist(tapDrive1.jac, tapDrive.start) < 0.35) {
+        errors.push(
+          `${tag}: tap-to-drive did not move the van (${tapDrive.start.cx},${tapDrive.start.cy} → ${tapDrive1.jac?.cx},${tapDrive1.jac?.cy}) mph=${tapDrive1.jac?.mph}`,
+        );
+      }
+      if (tapDrive1.follow === 'suspended') errors.push(`${tag}: tap-to-drive detached the camera`);
+      if ((tapDrive1.entities?.count ?? 0) !== 1 || (tapDrive1.entities?.onScreen ?? 0) !== 1) {
+        errors.push(`${tag}: tap-to-drive van count ${JSON.stringify(tapDrive1.entities)}`);
       }
 
       await resetMap(page);
@@ -823,8 +870,52 @@ async function runViewport(tag, options, phone) {
       if ((downK.rear.sample?.var ?? 0) < 12) {
         errors.push(`${tag}: rear-cam looks empty/static (var=${downK.rear.sample?.var})`);
       }
-      if ((downK.entities?.count ?? 0) !== 1) {
-        errors.push(`${tag}: expected one van after keyboard drive, got ${JSON.stringify(downK.entities)}`);
+      if ((downK.entities?.count ?? 0) !== 1 || (downK.entities?.sprites ?? 0) !== 1 || (downK.entities?.onScreen ?? 0) !== 1) {
+        errors.push(`${tag}: expected one on-screen van after keyboard drive, got ${JSON.stringify(downK.entities)}`);
+      }
+
+      await resetMap(page);
+      await applyState(page, '4-drive');
+      if (openDesk) {
+        await page.evaluate((p) => window.__playtestQa.jacSet({ cx: p.x, cy: p.y, dir: 'se' }), openDesk);
+        await wait(150);
+      }
+      const click0 = await page.evaluate(() => window.__playtestQa.jac());
+      const clickGoal = await page.evaluate(() => {
+        const start = window.__playtestQa.jac();
+        const walk = window.__playtestQa.fill().walk;
+        const clear = (x, y) => {
+          for (let dy = -1; dy <= 2; dy++) {
+            for (let dx = -1; dx <= 2; dx++) {
+              const ch = walk[y + dy]?.[x + dx];
+              if (!ch || ch === '#' || ch === 'x') return false;
+            }
+          }
+          return true;
+        };
+        for (let y = Math.round(start.cy); y < Math.round(start.cy) + 8; y++) {
+          for (let x = Math.round(start.cx) + 2; x < Math.round(start.cx) + 10; x++) {
+            if (clear(x, y)) return { x, y };
+          }
+        }
+        return null;
+      });
+      const clickOk = clickGoal
+        ? await page.evaluate((g) => window.__playtestQa.jacDriveTo(g.x, g.y), clickGoal)
+        : false;
+      await wait(1600);
+      const click1 = await page.evaluate(() => ({
+        jac: window.__playtestQa.jac(),
+        entities: window.__playtestQa.jacEntities?.(),
+        follow: document.getElementById('game-canvas')?.dataset.follow,
+      }));
+      notes.push(`${tag} click-drive ${JSON.stringify({ click0: { cx: click0?.cx, cy: click0?.cy }, clickGoal, clickOk, click1 })}`);
+      if (!clickOk) errors.push(`${tag}: click-to-drive path was not accepted`);
+      else if (dist(click1.jac, click0) < 0.35) {
+        errors.push(`${tag}: click-to-drive did not move the van`);
+      }
+      if ((click1.entities?.onScreen ?? 0) !== 1) {
+        errors.push(`${tag}: click-to-drive van left the viewport ${JSON.stringify(click1.entities)}`);
       }
 
       await resetMap(page);
