@@ -2,8 +2,7 @@
  * Panel copy, keyed by building id. English text is verbatim from
  * `content/cases/{id}-panel.md` (Desktop/full on desktop, Mobile/short in the phone sheet).
  * The airline case never names the client — ignore that file's Español section. Landmark rooms
- * keep the place name as the title and a short placeholder. Draft sections (Omitted / Notes /
- * Change notes / Placeholders) are not stored here.
+ * keep the place name as the title and a short placeholder. Internal draft sections are not stored here.
  */
 export type CaseBlock =
   | { kind: 'section'; heading?: string; paragraphs: string[]; bullets?: string[] }
