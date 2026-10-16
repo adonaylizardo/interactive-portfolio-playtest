@@ -3923,7 +3923,7 @@ export class IsoScene {
     const sh = this.app.screen.height;
     const vanOnScreen = s.x > 8 && s.x < sw - 8 && s.y > 8 && s.y < sh - 8;
     const spr = this.jac ? this.objectVisuals.get(this.jac.obj.id)?.sprite : undefined;
-    const bodyOn = spr ? spr.visible && spr.renderable && spr.worldAlpha > 0.05 : false;
+    const bodyOn = spr ? spr.visible && spr.renderable && spr.alpha > 0.05 : false;
     const tex = spr?.texture;
     const frame = tex?.frame;
     const src = tex?.source;
