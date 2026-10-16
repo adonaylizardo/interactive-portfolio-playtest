@@ -443,7 +443,11 @@ export class BuildingPanel {
         : `${title}: ${subtitle.charAt(0).toLowerCase()}${subtitle.slice(1)}`;
     }
     if (this.readKicker) this.readKicker.textContent = preview?.kicker ?? 'CASE';
-    if (this.readHeadline) this.readHeadline.textContent = preview?.teaserFull ?? preview?.teaser ?? title;
+    if (this.readHeadline) {
+      this.readHeadline.textContent = this.isMobile()
+        ? (preview?.teaser ?? title).replace(/[.]$/, '')
+        : (preview?.teaserFull ?? preview?.teaser ?? title);
+    }
     if (this.readLede) this.readLede.textContent = subtitle;
     if (this.readHeroLabel) this.readHeroLabel.textContent = preview?.placeholder ?? 'IMAGE PLACEHOLDER';
     this.setTitle(interiorId, title);

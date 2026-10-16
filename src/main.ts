@@ -50,6 +50,7 @@ async function main(): Promise<void> {
       checklist.setBuildingPanelOpen(open);
       chrome.setInteriorOpen(open);
       joystick.setHidden(open || panel.isPreviewExpanded());
+      if (panel.isPreviewExpanded()) checklist.setCollapsed(true);
       scene?.applyCameraFromUi();
     },
     () => scene.leaveInteriorNow(),

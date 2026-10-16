@@ -52,6 +52,10 @@ function sectionHeadings(blocks: CaseBlock[]): string[] {
   return blocks.flatMap((block) => (block.kind === 'section' && block.heading ? [block.heading] : []));
 }
 
+function endSentence(text: string): string {
+  return /[.!?…]$/.test(text.trim()) ? text : `${text}.`;
+}
+
 export type CasePreviewCopy = {
   title: string;
   subtitle: string;
@@ -72,7 +76,7 @@ export function casePreviewCopy(id: string): CasePreviewCopy | null {
   return {
     title,
     subtitle: content.subtitle,
-    teaser: content.shortHeadline ?? content.headline,
+    teaser: endSentence(content.shortHeadline ?? content.headline),
     teaserFull: content.headline,
     kicker: `CASE · ${title.toUpperCase()}`,
     placeholder: `${title.toUpperCase()} · IMAGE PLACEHOLDER`,
