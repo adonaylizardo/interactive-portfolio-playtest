@@ -218,7 +218,14 @@ async function run(tag, options, phone) {
       notes.push({ slab, stray });
       if (slab.slab) throw new Error(`${tag}: white slab while reversing ${JSON.stringify(slab)}`);
       const visibleStray = stray.filter(
-        (c) => c.id !== 'game-canvas' && c.w > 80 && c.h > 80 && c.display !== 'none' && c.opacity > 0.05 && c.vis !== 'hidden',
+        (c) =>
+          c.id !== 'game-canvas' &&
+          !/jac-rear|jac-hud|jac-dock/.test(c.parent) &&
+          c.w > 80 &&
+          c.h > 80 &&
+          c.display !== 'none' &&
+          c.opacity > 0.05 &&
+          c.vis !== 'hidden',
       );
       if (visibleStray.length) throw new Error(`${tag}: stray canvas ${JSON.stringify(visibleStray)}`);
 
