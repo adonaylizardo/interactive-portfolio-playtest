@@ -53,6 +53,10 @@ export class JacHud {
   private hintEl: HTMLElement;
   private lastHtml = '';
   private hintUntil = 0;
+  private rearFade = 0;
+  private rearFadeFrom = 0;
+  private rearFadeTo = 0;
+  private rearFadeT0 = 0;
 
   constructor(container: HTMLElement, callbacks: JacHudCallbacks) {
     this.callbacks = callbacks;
@@ -89,6 +93,10 @@ export class JacHud {
     this.hintEl.hidden = true;
     this.lastHtml = '';
     this.snap = null;
+    this.rearFade = 0;
+    this.rearFadeFrom = 0;
+    this.rearFadeTo = 0;
+    this.rearEl.style.opacity = '0';
   }
 
   update(
@@ -114,6 +122,7 @@ export class JacHud {
     document.body.classList.toggle('jac-info', snap.mode === 'info');
     document.body.classList.toggle('jac-drive', snap.mode === 'drive');
     document.body.classList.toggle('jac-rearcam', snap.rearCam);
+    this.tickRearFade(snap.rearCam);
     this.render(snap);
     if (anchors.menu && snap.mode === 'menu') {
       const phone = this.mobile;
@@ -179,10 +188,12 @@ export class JacHud {
     this.steerEl.hidden = true;
     this.bubbleEl.hidden = true;
     this.root.classList.toggle('jac-hud--drive', snap.mode === 'drive');
-    this.rearEl.hidden = snap.mode !== 'drive';
-    this.rearEl.classList.toggle('is-on', snap.rearCam);
-    if (!snap.rearCam) this.rearEl.setAttribute('aria-hidden', 'true');
+    this.rearEl.hidden = snap.mode !== 'drive' && this.rearFade < 0.02;
+    this.rearEl.classList.toggle('is-on', this.rearFade > 0.02);
+    if (this.rearFade < 0.02) this.rearEl.setAttribute('aria-hidden', 'true');
     else this.rearEl.removeAttribute('aria-hidden');
+    this.barEl.classList.toggle('is-bump', snap.bump > 0.25);
+    this.dockEl.classList.toggle('is-bump', snap.bump > 0.25);
     this.rearEl.classList.toggle('jac-rear--phone', phone);
     this.rearEl.classList.toggle('jac-rear--turn', Math.abs(snap.steering) > 0.25);
     this.steerEl.classList.toggle('is-live', snap.mph > 0);
@@ -326,6 +337,19 @@ export class JacHud {
         <span class="jac-gauge__unit">${unit}</span>
       </div>
     `;
+  }
+
+  private tickRearFade(on: boolean): void {
+    const want = on ? 1 : 0;
+    if (want !== this.rearFadeTo) {
+      this.rearFadeFrom = this.rearFade;
+      this.rearFadeTo = want;
+      this.rearFadeT0 = performance.now();
+    }
+    const t = Math.min(1, (performance.now() - this.rearFadeT0) / 500);
+    this.rearFade = this.rearFadeFrom + (this.rearFadeTo - this.rearFadeFrom) * t;
+    this.rearEl.style.transition = 'none';
+    this.rearEl.style.opacity = String(this.rearFade);
   }
 
   private blitRear(src: { canvas: HTMLCanvasElement; sx: number; sy: number; sw: number; sh: number }): void {

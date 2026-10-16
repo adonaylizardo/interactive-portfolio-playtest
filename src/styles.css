@@ -2176,6 +2176,12 @@ body[data-layout='panel'] .checklist {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
 }
 
+.jac-bar.is-bump,
+.jac-dock.is-bump {
+  box-shadow: 0 0 0 3px #edeef0, 0 4px 20px rgba(0, 0, 0, 0.45);
+  border-color: #edeef0;
+}
+
 .jac-bar > span,
 .jac-bar__id {
   flex: 0 0 auto;
@@ -2460,7 +2466,7 @@ body[data-layout='panel'] .checklist {
   opacity: 0;
   pointer-events: none;
   visibility: visible;
-  transition: opacity 0.5s ease;
+  transition: none;
 }
 
 .jac-rear.is-on {

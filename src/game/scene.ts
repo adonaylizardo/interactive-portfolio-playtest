@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Point, Polygon, Rectangle, RenderTexture, Sprite, Texture, TilingSprite } from 'pixi.js';
+import { Application, Container, Graphics, Point, Polygon, Rectangle, Sprite, Texture, TilingSprite, UPDATE_PRIORITY } from 'pixi.js';
 import {
   cells,
   doorInwardStep,
@@ -326,10 +326,8 @@ export class IsoScene {
   private fillActors!: FillActors;
   private jac: JacT9 | null = null;
   private jacBubbleTimer: ReturnType<typeof setTimeout> | null = null;
-  private rearRt: RenderTexture | null = null;
   private rearBlit: HTMLCanvasElement | null = null;
-  private rearScratch: HTMLCanvasElement | null = null;
-  private rearCapturing = false;
+  private rearBlitReady = false;
   private pendingJacExit = false;
   private events: SceneEvents;
   private objectGraphics = new Map<string, Container>();
@@ -431,8 +429,10 @@ export class IsoScene {
     await this.app.init({
       canvas,
       background: worldBackgroundColor(),
+      backgroundAlpha: 1,
       antialias: true,
       autoDensity: true,
+      premultipliedAlpha: true,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
       resizeTo: window,
       preserveDrawingBuffer: true,
@@ -547,6 +547,7 @@ export class IsoScene {
     focusCanvas();
     requestAnimationFrame(focusCanvas);
     this.app.ticker.add(() => this.update());
+    this.app.ticker.add(() => this.blitRearAfterRender(), undefined, UPDATE_PRIORITY.UTILITY);
     window.addEventListener('resize', () => this.onWindowViewportChange());
     window.visualViewport?.addEventListener('resize', () => this.onWindowViewportChange());
     window.visualViewport?.addEventListener('scroll', () => {
@@ -1705,7 +1706,8 @@ export class IsoScene {
       this.events.onUnreachable?.();
       return false;
     }
-    this.jac.setDrivePath(path.length > 0 ? path : [{ x: gx, y: gy }], { x: gx, y: gy });
+    const dest = path.length > 0 ? path[path.length - 1] : { x: gx, y: gy };
+    this.jac.setDrivePath(path.length > 0 ? path : [dest], dest);
     this.startCameraFollow();
     this.drawPathPreview();
     this.fireMoveCommand();
@@ -3017,8 +3019,8 @@ export class IsoScene {
     this.cameraY = wantY;
     const bump = this.jac?.bumpT ?? 0;
     if (bump > 0.02) {
-      this.cameraX += Math.sin(performance.now() * 0.055) * 11 * bump;
-      this.cameraY += Math.cos(performance.now() * 0.07) * 7 * bump;
+      this.cameraX += Math.sin(performance.now() * 0.045) * 38 * bump;
+      this.cameraY += Math.cos(performance.now() * 0.06) * 24 * bump;
     }
     this.applyCamera(false);
     this.shiftGestureBaselines(this.cameraX - camBeforeX, this.cameraY - camBeforeY);
@@ -3669,7 +3671,12 @@ export class IsoScene {
     const g = obj ? this.objectGraphics.get(obj.id) : undefined;
     const v = obj ? this.objectVisuals.get(obj.id) : undefined;
     if (!obj || !g || !v) return;
-    this.jac = new JacT9(obj, { container: g, visual: v, tapBox: this.objectTapBoxes });
+    this.jac = new JacT9(obj, {
+      container: g,
+      visual: v,
+      tapBox: this.objectTapBoxes,
+      onStuck: () => this.events.onUnreachable?.(),
+    });
     g.label = JAC_ID;
   }
 
@@ -3903,92 +3910,58 @@ export class IsoScene {
         bubble = { x: (rect?.left ?? 0) + head.x, y: (rect?.top ?? 0) + head.y };
       }
     }
-    if (needRear && this.jac && this.canvasEl) {
-      rear = this.captureRearView();
+    if (needRear && this.rearBlitReady && this.rearBlit) {
+      rear = { canvas: this.rearBlit, sx: 0, sy: 0, sw: this.rearBlit.width, sh: this.rearBlit.height };
     }
     return { menu, bubble, follow, rear };
   }
 
-  /** Off-screen rear view. Never appends a canvas to the DOM (Pixi extract used to flash a white slab). */
-  private captureRearView(): { canvas: HTMLCanvasElement; sx: number; sy: number; sw: number; sh: number } | null {
-    if (!this.jac || !this.app || this.rearCapturing) return null;
-    const look = this.jac.rearLookWorld();
-    const viewW = Math.max(64, Math.ceil(this.app.screen.width));
-    const viewH = Math.max(64, Math.ceil(this.app.screen.height));
+  /**
+   * Crop the already-presented game canvas. Never render-to-texture on the main
+   * WebGL context — that pass punched a transparent hole in the backbuffer.
+   */
+  private blitRearAfterRender(): void {
+    if (!this.jac?.rearCam || !this.canvasEl || !this.app) {
+      this.rearBlitReady = false;
+      return;
+    }
     const sw = 640;
     const sh = 220;
-    if (!this.rearRt || this.rearRt.width !== viewW || this.rearRt.height !== viewH) {
-      this.rearRt?.destroy(true);
-      this.rearRt = RenderTexture.create({ width: viewW, height: viewH, antialias: false });
-    }
     if (!this.rearBlit) {
       this.rearBlit = document.createElement('canvas');
       this.rearBlit.width = sw;
       this.rearBlit.height = sh;
       this.rearBlit.setAttribute('data-jac-rear-src', '1');
     }
-    const savedX = this.cameraX;
-    const savedY = this.cameraY;
-    const savedZoom = this.zoom;
-    const g = this.objectGraphics.get(JAC_ID);
-    const pathWas = this.pathGfx.visible;
-    this.rearCapturing = true;
-    this.placeWorldAtScreen(look.x, look.y, viewW / 2, viewH * 0.58);
-    this.applyCamera(false);
-    if (g) g.visible = false;
-    this.pathGfx.visible = false;
+    const ctx = this.rearBlit.getContext('2d');
+    if (!ctx) return;
+    const src = this.jac.rearSource(
+      (x, y) => this.worldToScreen(x, y),
+      this.app.screen.width,
+      this.app.screen.height,
+    );
+    ctx.fillStyle = '#141518';
+    ctx.fillRect(0, 0, sw, sh);
+    const native = this.canvasEl.width;
+    const displayed = this.canvasEl.clientWidth > 0 ? this.canvasEl.clientWidth : native;
+    const res = native / Math.max(1, displayed);
     try {
-      this.app.renderer.render({ container: this.app.stage, target: this.rearRt, clear: true });
+      ctx.drawImage(
+        this.canvasEl,
+        src.sx * res,
+        src.sy * res,
+        Math.max(1, src.sw * res),
+        Math.max(1, src.sh * res),
+        0,
+        0,
+        sw,
+        sh,
+      );
+      this.rearBlitReady = true;
     } catch {
-      this.cameraX = savedX;
-      this.cameraY = savedY;
-      this.zoom = savedZoom;
-      if (g) g.visible = true;
-      this.pathGfx.visible = pathWas;
-      this.applyCamera(false);
-      this.rearCapturing = false;
-      return null;
+      this.rearBlitReady = false;
     }
-    this.cameraX = savedX;
-    this.cameraY = savedY;
-    this.zoom = savedZoom;
-    if (g) g.visible = true;
-    this.pathGfx.visible = pathWas;
-    this.applyCamera(false);
-    this.rearCapturing = false;
-    try {
-      const info = this.app.renderer.extract.pixels({ target: this.rearRt });
-      const ctx = this.rearBlit.getContext('2d');
-      if (!ctx || !info || info.width < 4 || info.height < 4) return null;
-      if (!this.rearScratch) {
-        this.rearScratch = document.createElement('canvas');
-        this.rearScratch.width = 1;
-        this.rearScratch.height = 1;
-        this.rearScratch.setAttribute('data-jac-rear-src', '1');
-      }
-      if (this.rearScratch.width !== info.width || this.rearScratch.height !== info.height) {
-        this.rearScratch.width = info.width;
-        this.rearScratch.height = info.height;
-      }
-      const scratch = this.rearScratch.getContext('2d');
-      if (!scratch) return null;
-      const img = scratch.createImageData(info.width, info.height);
-      img.data.set(info.pixels);
-      scratch.putImageData(img, 0, 0);
-      ctx.fillStyle = '#141518';
-      ctx.fillRect(0, 0, sw, sh);
-      const srcW = Math.min(info.width, Math.max(160, Math.floor(info.width * 0.72)));
-      const srcH = Math.min(info.height, Math.max(90, Math.floor(info.height * 0.42)));
-      const sx = Math.floor((info.width - srcW) / 2);
-      const sy = Math.max(0, Math.floor(info.height * 0.32));
-      ctx.drawImage(this.rearScratch, sx, sy, srcW, srcH, 0, 0, sw, sh);
-      this.reapStrayCanvases();
-      this.app.render();
-      return { canvas: this.rearBlit, sx: 0, sy: 0, sw, sh };
-    } catch {
-      this.app.render();
-      return null;
-    }
+    this.reapStrayCanvases();
   }
 
   private reapStrayCanvases(raw?: HTMLCanvasElement): void {
@@ -3996,7 +3969,6 @@ export class IsoScene {
     const keep = new Set<HTMLCanvasElement>();
     if (this.canvasEl) keep.add(this.canvasEl);
     if (this.rearBlit) keep.add(this.rearBlit);
-    if (this.rearScratch) keep.add(this.rearScratch);
     document.querySelectorAll('canvas').forEach((c) => {
       if (keep.has(c)) return;
       if (c.closest('.jac-hud, .jac-dock, .jac-rear, .chrome')) return;
