@@ -14,7 +14,8 @@ const F1 = 'jac-t9-v3/jac-t9-v3__apagado_se@1x.png';
 const F2 = 'jac-t9-v3/jac-t9-v3__apagado_se@2x.png';
 const BASE = 'fill/jac-t9-v3';
 const FRONT = [27, 18];
-const FOOT = { x: 24, y: 17, w: 4, h: 2 };
+const SCALE = 1.35;
+const FOOT = { x: 23, y: 16, w: 5, h: 3 };
 
 const png1 = PNG.sync.read(readFileSync(path.join(ROOT, 'public/sprites', F1)));
 const png2 = PNG.sync.read(readFileSync(path.join(ROOT, 'public/sprites', F2)));
@@ -78,6 +79,7 @@ relleno.placements.push({
   id: 'jac-t9',
   kind: 'prop',
   sprite: BASE,
+  scale: SCALE,
   footprint: FOOT,
   front: FRONT,
   cells,
@@ -91,13 +93,14 @@ man.aprobado_para_mapa = true;
 man.aprobaciones.colocacion_en_mapa = 'aprobada por Adonay (15 oct 2026)';
 man.colocacion.activa = true;
 man.colocacion.propuesta.nota =
-  'celda S = vértice sur de la huella 4×2; origen (24,17), frente (27,18), dir SE';
+  'celda S = vértice sur de la huella 5×3 a escala 1.35; origen (23,16), frente (27,18), dir SE';
 writeFileSync(manPath, `${JSON.stringify(man, null, 2)}\n`);
 
 console.log('jac-t9-v3', {
   frame: `${frame.w}x${frame.h}`,
   vfs: frame.vfs,
   bbox: frame.bbox,
+  scale: SCALE,
   footprint: FOOT,
   front: FRONT,
   mask: `${relleno.masks[BASE].w}x${relleno.masks[BASE].h}`,

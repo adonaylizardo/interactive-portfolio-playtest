@@ -29,6 +29,8 @@ export type MapObject = {
   sprite?: string;
   /** Ground-level art (court, deck, green): drawn under walkers and never hides them. */
   flat?: boolean;
+  /** Uniform sprite scale around the front vertex. */
+  scale?: number;
 };
 
 export const MAP_WIDTH = 64;

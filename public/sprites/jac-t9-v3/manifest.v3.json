@@ -267,11 +267,12 @@
         18
       ],
       "huella": {
-        "x": 4,
-        "y": 2
+        "x": 5,
+        "y": 3
       },
+      "escala": 1.35,
       "dir": "SE",
-      "nota": "celda S = vértice sur de la huella 4×2; origen (24,17), frente (27,18), dir SE"
+      "nota": "celda S = vértice sur de la huella 5×3 a escala 1.35; origen (23,16), frente (27,18), dir SE"
     }
   },
   "qa": {

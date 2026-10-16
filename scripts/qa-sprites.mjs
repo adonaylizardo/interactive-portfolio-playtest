@@ -268,8 +268,9 @@ async function pixelDiffMap(page) {
     const baseKey = inst.key;
     if (seenKey.has(baseKey)) continue;
     seenKey.add(baseKey);
-    const sx = inst.tl.x + A[baseKey].vfs.x;
-    const sy = inst.tl.y + A[baseKey].vfs.y;
+    const sc = inst.scale ?? 1;
+    const sx = inst.tl.x + A[baseKey].vfs.x * sc;
+    const sy = inst.tl.y + A[baseKey].vfs.y * sc;
     const states = isBuilding ? ['default', 'hover', 'resaltado'] : ['default'];
     const lods = isTile ? ['cerca'] : ['cerca', 'lejos'];
     for (const state of states) {

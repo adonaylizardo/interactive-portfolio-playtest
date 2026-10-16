@@ -72,12 +72,18 @@ export function objectSpriteKey(
   return o.type === 'building' ? `${base}/${state}/${zoom}` : `${base}/${zoom}`;
 }
 
+/** Uniform draw scale around the front vertex (JAC T9 is 1.35). */
+export function objectSpriteScale(o: MapObject): number {
+  return o.scale && Number.isFinite(o.scale) && o.scale > 0 ? o.scale : 1;
+}
+
 /** World top-left of an object's sprite. */
 export function objectSpriteTopLeft(o: MapObject, key: string): { x: number; y: number } {
   const f = frontCell(o);
   const s = tileFootWorld(f.x, f.y);
   const a = spriteAsset(key);
-  return { x: s.x - a.vfs.x, y: s.y - a.vfs.y };
+  const sc = objectSpriteScale(o);
+  return { x: s.x - a.vfs.x * sc, y: s.y - a.vfs.y * sc };
 }
 
 /** Draw order against the player: front row of the footprint (x + y). */

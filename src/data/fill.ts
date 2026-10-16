@@ -27,6 +27,8 @@ type PropPlacement = {
   overlay?: string;
   group?: string;
   doorFront?: Cell;
+  /** Uniform sprite scale around the front vertex (JAC T9). */
+  scale?: number;
 };
 type ActorPlacement = { id: string; kind: 'actor'; anim: string; cell: Cell; group?: string };
 type NpcPlacement = { id: string; kind: 'npc'; npc: string; anim: string; cell: Cell; group?: string };
@@ -154,15 +156,16 @@ const boxesMeet = (a: { x0: number; y0: number; x1: number; y1: number }, b: { x
   a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
 
 /** Opaque world cells of one fill sprite placed with its frame top-left at `tl`. */
-function maskHits(m: Bits, tl: { x: number; y: number }, b: BuildingMask): boolean {
-  if (!boxesMeet({ x0: tl.x, y0: tl.y, x1: tl.x + m.w * m.cell, y1: tl.y + m.h * m.cell }, b)) return false;
+function maskHits(m: Bits, tl: { x: number; y: number }, b: BuildingMask, scale = 1): boolean {
+  const cell = m.cell * scale;
+  if (!boxesMeet({ x0: tl.x, y0: tl.y, x1: tl.x + m.w * cell, y1: tl.y + m.h * cell }, b)) return false;
   const hit = b.hit;
   for (let cy = 0; cy < m.h; cy++) {
     for (let cx = 0; cx < m.w; cx++) {
       if (!on(m, cx, cy)) continue;
-      const x0 = tl.x + cx * m.cell;
-      const y0 = tl.y + cy * m.cell;
-      const e = m.cell - 1;
+      const x0 = tl.x + cx * cell;
+      const y0 = tl.y + cy * cell;
+      const e = cell - 1;
       if (hit(x0, y0) || hit(x0 + e, y0) || hit(x0, y0 + e) || hit(x0 + e, y0 + e)) return true;
     }
   }
@@ -205,7 +208,8 @@ function member(p: Placement): Member {
         flat: (dx, dy) => shift(flat, dx, dy),
         over: (dx, dy, b) => {
           const s = foot(p.front[0] + dx, p.front[1] + dy);
-          return maskHits(maskOf(p.sprite), { x: s.x - a.vfs.x, y: s.y - a.vfs.y }, b);
+          const sc = p.scale ?? 1;
+          return maskHits(maskOf(p.sprite), { x: s.x - a.vfs.x * sc, y: s.y - a.vfs.y * sc }, b, sc);
         },
       };
     }
@@ -406,6 +410,7 @@ export function placeFill(ctx: FillContext): FillResult {
           walkable: !!p.flat,
           sprite: p.sprite,
           flat: !!p.flat,
+          scale: p.scale,
         };
         result.objects.push(obj);
         if (p.overlay) result.overlays.push({ id: `fill/${p.id}`, anim: p.overlay, front: { x: obj.x, y: obj.y } });

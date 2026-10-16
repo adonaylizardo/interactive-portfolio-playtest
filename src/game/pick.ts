@@ -4,7 +4,7 @@ import spritesJson from '../data/sprites.json';
 import type { MapObject } from '../data/world';
 import { TILE_H, TILE_W } from '../data/world';
 import { tileFootWorld, tileToWorld } from '../iso/math';
-import { objectDepth, objectSpriteBase, objectSpriteTopLeft } from './mapSprites';
+import { objectDepth, objectSpriteBase, objectSpriteScale, objectSpriteTopLeft } from './mapSprites';
 
 type Pt = { x: number; y: number };
 type Rect = { x0: number; y0: number; x1: number; y1: number };
@@ -81,8 +81,9 @@ export function spriteAlphaHit(o: MapObject, wx: number, wy: number): boolean {
   const m = base ? mask(base) : null;
   if (!m || !key) return false;
   const tl = objectSpriteTopLeft(o, key);
-  const cx = Math.floor((wx - tl.x) / m.cell);
-  const cy = Math.floor((wy - tl.y) / m.cell);
+  const cell = m.cell * objectSpriteScale(o);
+  const cx = Math.floor((wx - tl.x) / cell);
+  const cy = Math.floor((wy - tl.y) / cell);
   if (cx < 0 || cy < 0 || cx >= m.w || cy >= m.h) return false;
   const i = cy * m.w + cx;
   return (m.bits[i >> 3] & (1 << (i & 7))) !== 0;
