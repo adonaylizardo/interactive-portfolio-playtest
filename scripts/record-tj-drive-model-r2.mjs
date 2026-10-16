@@ -99,6 +99,7 @@ async function pickDriveGoal(page) {
   return page.evaluate(() => {
     const j = window.__playtestQa.jac();
     const walk = window.__playtestQa.fill().walk;
+    const stick = document.querySelector('.joystick:not([hidden])')?.getBoundingClientRect();
     const clear = (x, y) => {
       for (let dy = -1; dy <= 2; dy++) {
         for (let dx = -1; dx <= 2; dx++) {
@@ -108,12 +109,25 @@ async function pickDriveGoal(page) {
       }
       return true;
     };
-    for (let y = Math.round(j.cy); y < Math.round(j.cy) + 10; y++) {
-      for (let x = Math.round(j.cx) + 3; x < Math.round(j.cx) + 14; x++) {
-        if (clear(x, y)) return { x, y };
+    const hits = [];
+    for (let y = Math.round(j.cy) - 2; y < Math.round(j.cy) + 12; y++) {
+      for (let x = Math.round(j.cx) - 2; x < Math.round(j.cx) + 14; x++) {
+        if (Math.hypot(x - j.cx, y - j.cy) < 3) continue;
+        if (!clear(x, y)) continue;
+        const wx = (x - y) * 64;
+        const wy = (x + y) * 32;
+        const s = window.__playtestQa.worldToClient(wx, wy);
+        if (s.x < 36 || s.y < 72 || s.x > window.innerWidth - 36 || s.y > window.innerHeight - 96) continue;
+        if (stick && s.x >= stick.left - 8 && s.x <= stick.right + 8 && s.y >= stick.top - 8 && s.y <= stick.bottom + 8) {
+          continue;
+        }
+        const el = document.elementFromPoint(s.x, s.y);
+        if (el && el.id !== 'game-canvas' && !el.closest('#game-canvas')) continue;
+        hits.push({ x, y, client: s, dist: Math.hypot(x - j.cx, y - j.cy) });
       }
     }
-    return null;
+    hits.sort((a, b) => b.dist - a.dist);
+    return hits[0] ?? null;
   });
 }
 
@@ -250,16 +264,22 @@ async function run(tag, options, phone) {
     notes.push({ pip });
     if (!pip.pip) throw new Error(`${tag}: rear PiP has no terrain (var=${pip.variance.toFixed(1)})`);
 
+    await page.evaluate(() => {
+      const e = window.__playtestQa.jacEntities?.();
+      if (e) window.__playtestQa.frameWorld(e.worldX, e.worldY, 1.05);
+    });
+    await wait(250);
     const start = await page.evaluate(() => window.__playtestQa.jac());
     const goal = await pickDriveGoal(page);
     if (!goal) throw new Error(`${tag}: no drive goal`);
-    const client = await goalClient(page, goal);
+    const client = goal.client ?? (await goalClient(page, goal));
+    notes.push({ tapTarget: { goal, client, hit: await page.evaluate((p) => document.elementFromPoint(p.x, p.y)?.id, client) } });
     if (phone) {
       await tapClientCdp(cdp, client.x, client.y);
     } else {
       await page.mouse.click(client.x, client.y);
     }
-    await wait(2200);
+    await wait(2800);
     await page.screenshot({ path: path.join(OUT, `${tag}-05-tap-drive.png`) });
     const afterPath = await page.evaluate(() => ({
       jac: window.__playtestQa.jac(),
