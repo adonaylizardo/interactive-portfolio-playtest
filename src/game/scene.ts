@@ -694,7 +694,7 @@ export class IsoScene {
       if (this.shouldBlockTap()) return;
       this.pixiTapGestureSerial = this.pointerGestureSerial;
       const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
-      if (this.interiorActive) {
+      if (this.interiorActive || this.jac?.driving) {
         const canvas = this.canvasEl;
         if (!canvas) return;
         const native = e.nativeEvent as PointerEvent | undefined;
@@ -778,6 +778,14 @@ export class IsoScene {
     g.on('pointertap', (e) => {
       if (this.shouldBlockTap()) return;
       this.pixiTapGestureSerial = this.pointerGestureSerial;
+      if (this.jac?.driving) {
+        const canvas = this.canvasEl;
+        if (!canvas) return;
+        const native = e.nativeEvent as PointerEvent | undefined;
+        const rect = canvas.getBoundingClientRect();
+        this.handleScreenTap((native?.clientX ?? 0) - rect.left, (native?.clientY ?? 0) - rect.top, false);
+        return;
+      }
       if (!this.prepareMapTap(undefined, tx, ty)) return;
       const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
       this.requestWalk(tx, ty, sprint);
@@ -935,6 +943,14 @@ export class IsoScene {
         if (this.shouldBlockTap()) return;
         e.stopPropagation();
         this.pixiTapGestureSerial = this.pointerGestureSerial;
+        if (this.jac?.driving) {
+          const canvas = this.canvasEl;
+          if (!canvas) return;
+          const native = e.nativeEvent as PointerEvent | undefined;
+          const rect = canvas.getBoundingClientRect();
+          this.handleScreenTap((native?.clientX ?? 0) - rect.left, (native?.clientY ?? 0) - rect.top, false);
+          return;
+        }
         if (obj.id === JAC_ID) {
           this.tapJac();
           return;
