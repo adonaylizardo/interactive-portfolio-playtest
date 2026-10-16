@@ -1,9 +1,9 @@
 /**
- * Pixi-only alt cameras: true orthographic overhead (cenital) and a behind-the-character
- * follow cam (perspectiva). Isometric sprites stay untouched; these modes hide them and
- * draw footprint roofs / extruded boxes instead, then billboard walkers so they stay upright.
+ * Pixi-only alt cameras: true orthographic overhead (cenital) plus helpers for the
+ * behind-character follow cam. Isometric sprites stay untouched in iso; cenital hides them
+ * and draws footprint roofs, then screen-space billboards keep walkers upright.
  */
-import { Container, Graphics, Matrix, Sprite } from 'pixi.js';
+import { Container, Graphics, Sprite } from 'pixi.js';
 import type { MapObject } from '../data/world';
 import { TILE_H, TILE_W } from '../data/world';
 import { mapWorldBounds, tileFootWorld, tileToWorld } from '../iso/math';
@@ -39,9 +39,19 @@ const TREE_CANOPY: Record<string, number> = {
   araguaney: 0x8a9a5a,
 };
 
-type Rest = { sx: number; sy: number; rot: number };
-const restPose = new WeakMap<Container, Rest>();
-const billboardMat = new Matrix();
+type BillboardHome = {
+  parent: Container;
+  index: number;
+  x: number;
+  y: number;
+  sx: number;
+  sy: number;
+  rot: number;
+  skewX: number;
+  skewY: number;
+  zIndex: number;
+};
+const restPose = new WeakMap<Container, BillboardHome>();
 
 /** User yaw (rotate button) + facing so the camera sits behind Adonay. */
 export const FACING_YAW: Record<FacingDir, number> = {
@@ -188,9 +198,18 @@ function paintRoof(g: Graphics, o: MapObject, hover: boolean): void {
     h: Math.max(0.4, h - inset * 2),
   });
   poly(g, [inner.west, inner.south, inner.east, inner.north], shade(roof, hover ? 1.06 : 0.92));
-  g.moveTo(c.north.x, c.north.y);
+  g.moveTo(c.west.x, c.west.y);
   g.lineTo(c.south.x, c.south.y);
-  g.stroke({ width: 1.5, color: shade(roof, 0.72), alpha: 0.9 });
+  g.lineTo(c.east.x, c.east.y);
+  g.lineTo(c.north.x, c.north.y);
+  g.closePath();
+  g.stroke({ width: 1.6, color: shade(roof, 0.55), alpha: 0.95 });
+  g.moveTo(inner.west.x, inner.west.y);
+  g.lineTo(inner.south.x, inner.south.y);
+  g.lineTo(inner.east.x, inner.east.y);
+  g.lineTo(inner.north.x, inner.north.y);
+  g.closePath();
+  g.stroke({ width: 1, color: shade(roof, 0.78), alpha: 0.7 });
   if (o.doorFace === '+y') {
     const door = tileToWorld(fx + (w - 1) / 2, fy + h - 0.15);
     g.circle(door.x, door.y, 4);
@@ -288,35 +307,76 @@ export function paintAltView(
   }
 }
 
-/**
- * Cancel the camera's non-uniform scale + rotation on a sprite so it reads upright on screen
- * (a 2D billboard). Rest pose is captured the first time we billboard and restored on clear.
- */
-export function applyBillboard(sprite: Container, viewRot: number, viewSx: number, viewSy: number): void {
-  if (!restPose.has(sprite)) {
-    restPose.set(sprite, { sx: sprite.scale.x, sy: sprite.scale.y, rot: sprite.rotation });
+export function captureBillboardHome(sprite: Container): BillboardHome {
+  let home = restPose.get(sprite);
+  if (!home) {
+    if (!sprite.parent) {
+      home = {
+        parent: sprite as unknown as Container,
+        index: 0,
+        x: sprite.position.x,
+        y: sprite.position.y,
+        sx: sprite.scale.x,
+        sy: sprite.scale.y,
+        rot: sprite.rotation,
+        skewX: sprite.skew.x,
+        skewY: sprite.skew.y,
+        zIndex: sprite.zIndex,
+      };
+    } else {
+      home = {
+        parent: sprite.parent,
+        index: sprite.parent.getChildIndex(sprite),
+        x: sprite.position.x,
+        y: sprite.position.y,
+        sx: sprite.scale.x,
+        sy: sprite.scale.y,
+        rot: sprite.rotation,
+        skewX: sprite.skew.x,
+        skewY: sprite.skew.y,
+        zIndex: sprite.zIndex,
+      };
+    }
+    restPose.set(sprite, home);
   }
-  const rest = restPose.get(sprite)!;
-  const sx = viewSx || 1;
-  const sy = viewSy || 1;
-  const px = sprite.position.x;
-  const py = sprite.position.y;
-  // Invert camera R*S around the sprite origin. Do not bake translation into the
-  // matrix — Sprite pivot/anchor makes decompose shift the feet off the tile.
-  billboardMat.identity();
-  billboardMat.scale(1 / sx, 1 / sy);
-  billboardMat.rotate(-viewRot);
-  billboardMat.scale(rest.sx, rest.sy);
-  sprite.setFromMatrix(billboardMat);
-  sprite.position.set(px, py);
+  return home;
+}
+
+/**
+ * Reparent a sprite onto an identity screen layer so it stays upright. Affine inverse of
+ * camera R*S cannot cancel non-uniform scale through world translation, so walkers were
+ * left lying down in cenital. Rest pose is captured the first time and restored on clear.
+ */
+export function applyScreenBillboard(
+  sprite: Container,
+  layer: Container,
+  screenX: number,
+  screenY: number,
+  scaleX: number,
+  scaleY: number,
+  zIndex: number,
+): void {
+  captureBillboardHome(sprite);
+  layer.addChild(sprite);
+  sprite.position.set(screenX, screenY);
+  sprite.rotation = 0;
+  sprite.skew.set(0, 0);
+  sprite.scale.set(scaleX, scaleY);
+  sprite.zIndex = zIndex;
 }
 
 export function clearBillboard(sprite: Container): void {
   const rest = restPose.get(sprite);
   if (!rest) return;
-  sprite.rotation = rest.rot;
+  if (rest.parent && rest.parent !== sprite) {
+    const i = Math.max(0, Math.min(rest.index, rest.parent.children.length));
+    rest.parent.addChildAt(sprite, i);
+  }
+  sprite.position.set(rest.x, rest.y);
   sprite.scale.set(rest.sx, rest.sy);
-  sprite.skew.set(0, 0);
+  sprite.rotation = rest.rot;
+  sprite.skew.set(rest.skewX, rest.skewY);
+  sprite.zIndex = rest.zIndex;
   restPose.delete(sprite);
 }
 

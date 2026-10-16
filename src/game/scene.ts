@@ -129,7 +129,8 @@ import { Noah, type NoahSnapshot } from './noah';
 import { JacT9, JAC_ID, type JacGear, type JacLights, type JacSnapshot, type JacToggleId } from './jacT9';
 import {
   ALT_LABEL_GAP_PX,
-  applyBillboard,
+  applyScreenBillboard,
+  captureBillboardHome,
   CENITAL_VIEW_SY,
   CENITAL_VIEW_TILT,
   clearBillboard,
@@ -141,6 +142,7 @@ import {
   screenStickToTile,
   zoomMinForView,
 } from './altView';
+import { billboardHeightM, PerspectiveView } from './perspectiveView';
 import {
   loadPlayerSheets,
   loadRestSheets,
@@ -150,6 +152,7 @@ import {
   SPRINT_TILES_PER_S,
   TILE_STEP_WORLD,
   WALK_TILES_PER_S,
+  worldToTileFrac,
   type AvatarSnapshot,
   type FacingDir,
 } from './player';
@@ -275,6 +278,8 @@ export class IsoScene {
   interiorLayer = new Container();
   private altViewLayer = new Graphics();
   private altPaintKey = '';
+  private billboardLayer = new Container();
+  private perspective = new PerspectiveView();
   private billboarded = new Set<Container>();
   private lastFollowYaw = 0;
   private readonly headScratch = new Point();
@@ -446,6 +451,11 @@ export class IsoScene {
     });
 
     this.app.stage.addChild(this.camera);
+    this.app.stage.addChild(this.perspective.layer);
+    this.app.stage.addChild(this.billboardLayer);
+    this.billboardLayer.sortableChildren = true;
+    this.billboardLayer.eventMode = 'passive';
+    this.billboardLayer.label = 'billboards';
     this.camera.addChild(this.world);
     this.world.addChild(this.tilesLayer);
     this.world.addChild(this.pathLayer);
@@ -1255,8 +1265,16 @@ export class IsoScene {
     studio.noteWalk(snap.adonay.mode === 'walk', snap.adonay.frame, this.sprint);
   }
 
+  private perspectiveOn(): boolean {
+    return !this.interiorActive && this.viewMode === 'perspectiva';
+  }
+
   /** Screen coords (canvas pixels) ↔ world coords with world scaled under a fixed camera pivot. */
   private screenToWorld(sx: number, sy: number): { x: number; y: number } {
+    if (this.perspectiveOn() && this.perspective.cam) {
+      const t = this.perspective.unproject(sx, sy);
+      if (t) return tileToWorld(t.tx, t.ty);
+    }
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     const z = this.zoom;
@@ -1273,6 +1291,11 @@ export class IsoScene {
   }
 
   private worldToScreen(wx: number, wy: number): { x: number; y: number } {
+    if (this.perspectiveOn() && this.perspective.cam) {
+      const t = worldToTileFrac(wx, wy);
+      const p = this.perspective.project(t.x, t.y, 0);
+      if (p) return { x: p.x, y: p.y };
+    }
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     const z = this.zoom;
@@ -1373,37 +1396,45 @@ export class IsoScene {
 
   setViewMode(mode: Camera): void {
     if (this.interiorActive) return;
+    this.restoreBillboards();
     this.viewMode = mode;
     this.leaveMapOverview();
     this.syncViewTransform();
     this.centerOnCharacter(false);
     this.applyCamera(true);
+    this.applyBillboards();
   }
 
   rotateView(): void {
     if (this.interiorActive) return;
+    this.restoreBillboards();
     this.yaw = (this.yaw + 1) % 4;
     this.syncViewTransform();
     if (this.mapOverview) {
       this.frameMapOverview();
       this.applyCamera(true);
+      this.applyBillboards();
       return;
     }
     this.centerOnCharacter(false);
     this.applyCamera(true);
+    this.applyBillboards();
   }
 
   toggleMapOverview(): void {
     if (this.interiorActive) return;
+    this.restoreBillboards();
     if (this.mapOverview) {
       this.leaveMapOverview({ restorePan: true });
       this.applyCamera(true);
+      this.applyBillboards();
       return;
     }
     this.savedCam = { x: this.cameraX, y: this.cameraY, zoom: this.zoom };
     this.mapOverview = true;
     this.frameMapOverview();
     this.applyCamera(true);
+    this.applyBillboards();
   }
 
   requestWalk(
@@ -1890,6 +1921,8 @@ export class IsoScene {
       const zFloor = this.zoomMinForCurrentView(sw, sh);
       if (this.mapOverview) {
         this.zoom = Math.min(1.5, Math.max(zFloor, this.zoom));
+      } else if (this.perspectiveOn()) {
+        this.zoom = Math.min(1.5, Math.max(0.35, this.zoom));
       } else if (this.identityView()) {
         this.zoom = clampZoom(this.zoom, sw, sh);
         const stabilize =
@@ -1923,8 +1956,15 @@ export class IsoScene {
     }
     this.syncViewTransform();
     this.camera.position.set(sw / 2, sh / 2);
-    this.camera.scale.set(this.viewSx, this.viewSy);
-    this.camera.rotation = this.viewRot;
+    if (this.perspectiveOn()) {
+      this.camera.scale.set(1, 1);
+      this.camera.rotation = 0;
+      this.world.visible = false;
+    } else {
+      this.camera.scale.set(this.viewSx, this.viewSy);
+      this.camera.rotation = this.viewRot;
+      this.world.visible = true;
+    }
     this.world.position.set(this.cameraX * this.zoom, this.cameraY * this.zoom);
     this.world.scale.set(this.zoom);
     this.fitOutskirts(sw, sh);
@@ -2023,28 +2063,53 @@ export class IsoScene {
     }
     this.syncObjectSprites();
     this.syncAltView();
+    this.syncPerspective();
     this.cullVisibleTiles();
+  }
+
+  private syncPerspective(): void {
+    const on = this.perspectiveOn();
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const follow =
+      this.jac?.driving && !this.interiorActive
+        ? worldToTileFrac(this.jac.worldCenter().x, this.jac.worldCenter().y)
+        : { x: this.charTx, y: this.charTy };
+    this.perspective.sync({
+      active: on,
+      tx: follow.x,
+      ty: follow.y,
+      dir: this.followFacing(),
+      userYaw: this.yaw,
+      zoom: this.zoom,
+      overview: this.mapOverview,
+      sw,
+      sh,
+      cells,
+      objects,
+      hoverId: this.hoveredObject?.id ?? null,
+    });
   }
 
   private syncAltView(): void {
     const on = this.altViewOn();
-    this.altViewLayer.visible = on;
+    const roofs = on && !this.perspectiveOn();
+    this.altViewLayer.visible = roofs;
     for (const v of this.objectVisuals.values()) {
       if (v.obj.id === JAC_ID) continue;
       v.sprite.visible = !(on && hideIsoPropSprite(v.obj));
     }
-    if (!on) {
+    if (!roofs) {
       this.altViewLayer.clear();
       this.altPaintKey = '';
       return;
     }
-    const mode = this.viewMode as 'cenital' | 'perspectiva';
     const yaw = this.cameraYawQuarter();
     const hover = this.hoveredObject?.id ?? null;
-    const key = `${mode}:${yaw}:${hover ?? ''}`;
+    const key = `cenital:${yaw}:${hover ?? ''}`;
     if (key === this.altPaintKey) return;
     this.altPaintKey = key;
-    paintAltView(this.altViewLayer, objects, mode, yaw, hover);
+    paintAltView(this.altViewLayer, objects, 'cenital', yaw, hover);
   }
 
   private collectBillboards(): Container[] {
@@ -2064,11 +2129,48 @@ export class IsoScene {
   }
 
   private applyBillboards(): void {
+    this.billboardLayer.visible = this.altViewOn();
     if (!this.altViewOn()) return;
     this.syncViewTransform();
+    if (this.perspectiveOn()) this.syncPerspective();
     for (const s of this.collectBillboards()) {
       if (!s.visible) continue;
-      applyBillboard(s, this.viewRot, this.viewSx, this.viewSy);
+      const home = captureBillboardHome(s);
+      if (this.perspectiveOn()) {
+        const t = worldToTileFrac(home.x, home.y);
+        const p = this.perspective.project(t.x, t.y, 0);
+        if (!p) continue;
+        const signX = home.sx < 0 ? -1 : 1;
+        let sc: number;
+        if (s instanceof Sprite && s.texture) {
+          const texH = Math.max(8, s.texture.height);
+          sc = Math.max(0.2, (p.scale * billboardHeightM(s.label ?? '')) / texH);
+        } else {
+          sc = Math.abs(home.sy) * Math.max(0.5, p.scale * 0.014);
+        }
+        applyScreenBillboard(
+          s,
+          this.billboardLayer,
+          p.x,
+          p.y,
+          signX * sc,
+          sc,
+          Math.round(40_000 - p.z * 40),
+        );
+      } else {
+        const screen = this.worldToScreen(home.x, home.y);
+        const signX = home.sx < 0 ? -1 : 1;
+        const signY = home.sy < 0 ? -1 : 1;
+        applyScreenBillboard(
+          s,
+          this.billboardLayer,
+          screen.x,
+          screen.y,
+          signX * Math.abs(home.sx) * this.zoom,
+          signY * Math.abs(home.sy) * this.zoom,
+          Math.round(home.x + home.y),
+        );
+      }
       this.billboarded.add(s);
     }
   }
@@ -2978,6 +3080,7 @@ export class IsoScene {
       this.npcs.update(dt);
       this.fillActors?.update(dt);
     }
+    this.syncPerspective();
     this.applyBillboards();
     this.events.onFrame?.();
   }
@@ -2994,6 +3097,15 @@ export class IsoScene {
   }
 
   private followTargetScreen(): { x: number; y: number } {
+    if (this.perspectiveOn()) {
+      this.syncPerspective();
+      const follow =
+        this.jac?.driving && !this.interiorActive
+          ? worldToTileFrac(this.jac.worldCenter().x, this.jac.worldCenter().y)
+          : { x: this.charTx, y: this.charTy };
+      const p = this.perspective.playerScreen(follow.x, follow.y, 0);
+      if (p) return { x: p.x, y: p.y };
+    }
     const t = this.followTargetWorld();
     return this.worldToScreen(t.x, t.y);
   }
@@ -3440,6 +3552,7 @@ export class IsoScene {
     buildingId: string,
     opts?: { skipFade?: boolean; fromHash?: boolean },
   ): void {
+    this.restoreBillboards();
     if (this.interiorActive && this.interiorDef?.id === buildingId) return;
     const def = getInteriorDef(buildingId);
     const building = objects.find((o) => o.type === 'building' && o.name === buildingId);
@@ -3946,6 +4059,7 @@ export class IsoScene {
   /** QA: one burst of keyboard walking (iso tile space, remapped in alt cameras). */
   qaWalk(dx: number, dy: number, sprint = false): { x: number; y: number } {
     if (this.interiorActive) return this.getCharacterPosForQa();
+    this.restoreBillboards();
     const mapped = this.remapWalkStick(dx, dy);
     const mag = Math.hypot(mapped.x, mapped.y);
     if (mag < 1e-6) return this.getCharacterPosForQa();
@@ -3964,6 +4078,7 @@ export class IsoScene {
     this.charTy = next.y;
     this.syncCharacterGraphic();
     this.applyCamera(false);
+    this.applyBillboards();
     this.app?.render();
     return this.getCharacterPosForQa();
   }
@@ -4264,6 +4379,9 @@ export class IsoScene {
     aim: { x: number; y: number };
     labels: { id: string; x: number; y: number; visible: boolean }[];
   } {
+    this.restoreBillboards();
+    this.applyCamera(false);
+    this.applyBillboards();
     this.app?.render();
     const b = this.avatar.adonay.sprite.getBounds();
     let roofsHidden = 0;
@@ -4277,7 +4395,7 @@ export class IsoScene {
       ...this.getViewMode(),
       cameraYaw: this.cameraYawQuarter(),
       altView: this.canvasEl?.dataset.altView ?? 'off',
-      altLayer: this.altViewLayer.visible,
+      altLayer: this.perspectiveOn() ? this.perspective.layer.visible : this.altViewLayer.visible,
       roofsHidden,
       roofsTotal,
       adonayScreen: { x: b.x, y: b.y, w: b.width, h: b.height },
