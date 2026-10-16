@@ -57,7 +57,7 @@ import {
   TILE_DIAMOND,
   type OccluderBox,
 } from './mapSprites';
-import { NAME_PILL_GAP_PX, spriteOpaqueTopWorld } from './spriteTop';
+import { NAME_PILL_GAP_PX, spriteOpaqueTopWorld, textureOpaqueTop } from './spriteTop';
 import {
   allSpriteKeys,
   hasSprite,
@@ -127,6 +127,20 @@ import { NpcCrowd, type NpcSnapshot } from './npcs';
 import { buildTown, type Bench } from './npcRoutines';
 import { Noah, type NoahSnapshot } from './noah';
 import { JacT9, JAC_ID, type JacGear, type JacLights, type JacSnapshot, type JacToggleId } from './jacT9';
+import {
+  ALT_LABEL_GAP_PX,
+  applyBillboard,
+  CENITAL_VIEW_SY,
+  CENITAL_VIEW_TILT,
+  clearBillboard,
+  hideIsoPropSprite,
+  isBillboarded,
+  paintAltView,
+  PERSPECTIVE_AIM_DOWN_FRAC,
+  perspectiveYaw,
+  screenStickToTile,
+  zoomMinForView,
+} from './altView';
 import {
   loadPlayerSheets,
   loadRestSheets,
@@ -259,6 +273,11 @@ export class IsoScene {
   characterLayer = new Container();
   highlightLayer = new Container();
   interiorLayer = new Container();
+  private altViewLayer = new Graphics();
+  private altPaintKey = '';
+  private billboarded = new Set<Container>();
+  private lastFollowYaw = 0;
+  private readonly headScratch = new Point();
   private interiorTapRoutingBound = false;
 
   charTx = INICIO[0];
@@ -430,10 +449,13 @@ export class IsoScene {
     this.camera.addChild(this.world);
     this.world.addChild(this.tilesLayer);
     this.world.addChild(this.pathLayer);
+    this.world.addChild(this.altViewLayer);
     this.world.addChild(this.objectsLayer);
     this.world.addChild(this.highlightLayer);
     this.world.addChild(this.characterLayer);
     this.world.addChild(this.interiorLayer);
+    this.altViewLayer.eventMode = 'none';
+    this.altViewLayer.label = 'alt-view';
     this.interiorLayer.visible = false;
     this.interiorLayer.sortableChildren = true;
     this.interiorFloorGfx.zIndex = 0;
@@ -1264,6 +1286,19 @@ export class IsoScene {
     };
   }
 
+  private followFacing(): FacingDir {
+    if (this.jac?.driving && !this.interiorActive) return this.jac.dir;
+    return this.avatar?.adonay.dir ?? 'se';
+  }
+
+  /** Effective yaw quarter applied to the camera (perspectiva adds facing so we sit behind Adonay). */
+  private cameraYawQuarter(): number {
+    if (this.viewMode === 'perspectiva' && !this.interiorActive) {
+      return perspectiveYaw(this.followFacing(), this.yaw);
+    }
+    return ((this.yaw % 4) + 4) % 4;
+  }
+
   private syncViewTransform(): void {
     if (this.interiorActive) {
       this.viewRot = 0;
@@ -1271,15 +1306,11 @@ export class IsoScene {
       this.viewSy = 1;
       return;
     }
-    const yaw = (this.yaw % 4) * (Math.PI / 2);
+    const yaw = this.cameraYawQuarter() * (Math.PI / 2);
     if (this.viewMode === 'cenital') {
-      this.viewRot = yaw + Math.PI / 4;
+      this.viewRot = yaw + CENITAL_VIEW_TILT;
       this.viewSx = 1;
-      this.viewSy = 2;
-    } else if (this.viewMode === 'perspectiva') {
-      this.viewRot = yaw;
-      this.viewSx = 1;
-      this.viewSy = 1.38;
+      this.viewSy = CENITAL_VIEW_SY;
     } else {
       this.viewRot = yaw;
       this.viewSx = 1;
@@ -1297,10 +1328,54 @@ export class IsoScene {
     };
   }
 
+  private altViewOn(): boolean {
+    return !this.interiorActive && (this.viewMode === 'cenital' || this.viewMode === 'perspectiva');
+  }
+
+  private identityView(): boolean {
+    return Math.abs(this.viewRot) < 1e-4 && Math.abs(this.viewSx - 1) < 1e-4 && Math.abs(this.viewSy - 1) < 1e-4;
+  }
+
+  private zoomMinForCurrentView(sw: number, sh: number): number {
+    this.syncViewTransform();
+    const m = cameraFitMargins();
+    return zoomMinForView(
+      this.viewRot,
+      this.viewSx,
+      this.viewSy,
+      Math.max(1, sw - m.left - m.right),
+      Math.max(1, sh - m.top - m.bottom),
+    );
+  }
+
+  private frameMapOverview(): void {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    this.updateCameraFitMargins();
+    this.syncViewTransform();
+    this.zoom = this.zoomMinForCurrentView(sw, sh);
+    const b = mapWorldBounds();
+    const aim = this.freeRectCenter();
+    this.placeWorldAtScreen((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, aim.x, aim.y);
+  }
+
+  private leaveMapOverview(opts?: { restorePan?: boolean }): void {
+    if (!this.mapOverview) return;
+    this.mapOverview = false;
+    if (this.savedCam) {
+      this.zoom = this.savedCam.zoom;
+      if (opts?.restorePan) {
+        this.cameraX = this.savedCam.x;
+        this.cameraY = this.savedCam.y;
+      }
+    }
+  }
+
   setViewMode(mode: Camera): void {
     if (this.interiorActive) return;
     this.viewMode = mode;
-    this.mapOverview = false;
+    this.leaveMapOverview();
+    this.syncViewTransform();
     this.centerOnCharacter(false);
     this.applyCamera(true);
   }
@@ -1308,35 +1383,26 @@ export class IsoScene {
   rotateView(): void {
     if (this.interiorActive) return;
     this.yaw = (this.yaw + 1) % 4;
+    this.syncViewTransform();
+    if (this.mapOverview) {
+      this.frameMapOverview();
+      this.applyCamera(true);
+      return;
+    }
     this.centerOnCharacter(false);
     this.applyCamera(true);
   }
 
   toggleMapOverview(): void {
     if (this.interiorActive) return;
-    const sw = this.app.screen.width;
-    const sh = this.app.screen.height;
     if (this.mapOverview) {
-      this.mapOverview = false;
-      if (this.savedCam) {
-        this.cameraX = this.savedCam.x;
-        this.cameraY = this.savedCam.y;
-        this.zoom = this.savedCam.zoom;
-      }
+      this.leaveMapOverview({ restorePan: true });
       this.applyCamera(true);
       return;
     }
     this.savedCam = { x: this.cameraX, y: this.cameraY, zoom: this.zoom };
     this.mapOverview = true;
-    this.zoom = zoomMinForViewport(sw, sh);
-    const fitted = clampPanMapFullyInView(
-      { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
-      sw,
-      sh,
-    );
-    this.cameraX = fitted.cameraX;
-    this.cameraY = fitted.cameraY;
-    this.zoom = fitted.zoom;
+    this.frameMapOverview();
     this.applyCamera(true);
   }
 
@@ -1671,7 +1737,10 @@ export class IsoScene {
   }
 
   recenterOnCharacter(): void {
+    this.leaveMapOverview();
+    this.syncViewTransform();
     this.centerOnCharacter(false);
+    this.applyCamera(true);
   }
 
   private freeRectCenter(): { x: number; y: number } {
@@ -1684,17 +1753,36 @@ export class IsoScene {
     };
   }
 
+  /** Where the follow target should sit on screen (perspectiva: lower third, over-the-shoulder). */
+  private followAimScreen(): { x: number; y: number } {
+    const aim = this.freeRectCenter();
+    if (this.viewMode === 'perspectiva' && !this.interiorActive && !this.mapOverview) {
+      const sh = this.app.screen.height;
+      return { x: aim.x, y: aim.y + sh * PERSPECTIVE_AIM_DOWN_FRAC };
+    }
+    return aim;
+  }
+
   private placeWorldAtScreen(wx: number, wy: number, sx: number, sy: number): void {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
-    this.cameraX = (sx - sw / 2) / this.zoom - wx;
-    this.cameraY = (sy - sh / 2) / this.zoom - wy;
+    const z = this.zoom || 1;
+    const dx = sx - sw / 2;
+    const dy = sy - sh / 2;
+    const cos = Math.cos(this.viewRot);
+    const sin = Math.sin(this.viewRot);
+    const lx = (dx * cos + dy * sin) / (this.viewSx || 1);
+    const ly = (-dx * sin + dy * cos) / (this.viewSy || 1);
+    this.cameraX = lx / z - wx;
+    this.cameraY = ly / z - wy;
   }
 
   private centerOnCharacter(animate: boolean): void {
     this.updateCameraFitMargins();
+    this.syncViewTransform();
+    this.lastFollowYaw = this.cameraYawQuarter();
     const t = this.followTargetWorld();
-    const aim = this.freeRectCenter();
+    const aim = this.followAimScreen();
     this.placeWorldAtScreen(t.x, t.y, aim.x, aim.y);
     if (!animate || this.reducedMotion) this.applyCamera();
   }
@@ -1798,21 +1886,31 @@ export class IsoScene {
         });
       }
     } else {
-      this.zoom = clampZoom(this.zoom, sw, sh);
-      const stabilize =
-        this.pinchGestureActive && this.zoomSource === 'pointer'
-          ? stabilizeCameraDuringPinch
-          : stabilizeCameraAfterGesture;
-      const hardened = stabilize(
-        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
-        sw,
-        sh,
-      );
-      this.cameraX = hardened.cameraX;
-      this.cameraY = hardened.cameraY;
-      this.zoom = hardened.zoom;
+      this.syncViewTransform();
+      const zFloor = this.zoomMinForCurrentView(sw, sh);
+      if (this.mapOverview) {
+        this.zoom = Math.min(1.5, Math.max(zFloor, this.zoom));
+      } else if (this.identityView()) {
+        this.zoom = clampZoom(this.zoom, sw, sh);
+        const stabilize =
+          this.pinchGestureActive && this.zoomSource === 'pointer'
+            ? stabilizeCameraDuringPinch
+            : stabilizeCameraAfterGesture;
+        const hardened = stabilize(
+          { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+          sw,
+          sh,
+        );
+        this.cameraX = hardened.cameraX;
+        this.cameraY = hardened.cameraY;
+        this.zoom = hardened.zoom;
+      } else {
+        this.zoom = Math.min(1.5, Math.max(zFloor, this.zoom));
+      }
       const zMin = zoomMinForViewport(sw, sh);
-      if (this.zoom <= zMin + 0.001) {
+      // Only the map-overview button may snap to a full-map fit. Doing it whenever
+      // zoom ≈ zMin undoes Center / Rotate and keeps overview framing after leaving it.
+      if (this.mapOverview && this.identityView() && this.zoom <= zMin + 0.001) {
         const fitted = clampPanMapFullyInView(
           { cameraX: this.cameraX, cameraY: this.cameraY, zoom: zMin },
           sw,
@@ -1879,9 +1977,14 @@ export class IsoScene {
       this.canvasEl.dataset.anchorWy = String(-this.cameraY);
       this.canvasEl.dataset.viewMode = this.viewMode;
       this.canvasEl.dataset.yaw = String(this.yaw);
+      this.canvasEl.dataset.cameraYaw = String(this.cameraYawQuarter());
       this.canvasEl.dataset.viewSy = String(this.viewSy);
       this.canvasEl.dataset.viewRot = String(this.viewRot);
       this.canvasEl.dataset.mapOverview = this.mapOverview ? '1' : '0';
+      this.canvasEl.dataset.altView =
+        !this.interiorActive && (this.viewMode === 'cenital' || this.viewMode === 'perspectiva')
+          ? this.viewMode
+          : 'off';
       this.canvasEl.dataset.layout = document.body.dataset.layout ?? '';
       const charScreen = this.followTargetScreen();
       this.canvasEl.dataset.charScreen = JSON.stringify({
@@ -1919,7 +2022,79 @@ export class IsoScene {
       this.panDragScreenPx = 0;
     }
     this.syncObjectSprites();
+    this.syncAltView();
     this.cullVisibleTiles();
+  }
+
+  private syncAltView(): void {
+    const on = this.altViewOn();
+    this.altViewLayer.visible = on;
+    for (const v of this.objectVisuals.values()) {
+      if (v.obj.id === JAC_ID) continue;
+      v.sprite.visible = !(on && hideIsoPropSprite(v.obj));
+    }
+    if (!on) {
+      this.altViewLayer.clear();
+      this.altPaintKey = '';
+      return;
+    }
+    const mode = this.viewMode as 'cenital' | 'perspectiva';
+    const yaw = this.cameraYawQuarter();
+    const hover = this.hoveredObject?.id ?? null;
+    const key = `${mode}:${yaw}:${hover ?? ''}`;
+    if (key === this.altPaintKey) return;
+    this.altPaintKey = key;
+    paintAltView(this.altViewLayer, objects, mode, yaw, hover);
+  }
+
+  private collectBillboards(): Container[] {
+    const out: Container[] = [];
+    if (this.interiorActive) return out;
+    if (this.avatar) out.push(...this.avatar.spritesForBillboard());
+    if (this.noah) out.push(...this.noah.spritesForBillboard());
+    if (this.npcs) out.push(...this.npcs.spritesForBillboard());
+    if (this.fillActors) out.push(...this.fillActors.spritesForBillboard());
+    if (this.jac) out.push(...this.jac.spritesForBillboard());
+    return out;
+  }
+
+  private restoreBillboards(): void {
+    for (const s of this.billboarded) clearBillboard(s);
+    this.billboarded.clear();
+  }
+
+  private applyBillboards(): void {
+    if (!this.altViewOn()) return;
+    this.syncViewTransform();
+    for (const s of this.collectBillboards()) {
+      if (!s.visible) continue;
+      applyBillboard(s, this.viewRot, this.viewSx, this.viewSy);
+      this.billboarded.add(s);
+    }
+  }
+
+  private remapWalkStick(dx: number, dy: number): { x: number; y: number } {
+    if (!this.altViewOn() || (dx === 0 && dy === 0)) return { x: dx, y: dy };
+    this.syncViewTransform();
+    return screenStickToTile(dx, dy, this.viewRot, this.viewSx, this.viewSy);
+  }
+
+  private spriteHeadCanvas(sprite: Sprite): { x: number; y: number } {
+    if (this.altViewOn() && isBillboarded(sprite)) {
+      const tex = sprite.texture;
+      const local = textureOpaqueTop(tex);
+      const lx = local ? local.x - sprite.anchor.x * tex.width : 0;
+      const ly = local ? local.y - sprite.anchor.y * tex.height : -(sprite.anchor.y * tex.height);
+      this.headScratch.set(lx, ly);
+      const g = sprite.toGlobal(this.headScratch);
+      return { x: g.x, y: g.y };
+    }
+    const top = spriteOpaqueTopWorld(sprite);
+    return this.worldToScreen(top.x, top.y);
+  }
+
+  private namePillGap(): number {
+    return this.altViewOn() ? ALT_LABEL_GAP_PX : NAME_PILL_GAP_PX;
   }
 
   private cullVisibleTiles(): void {
@@ -2794,6 +2969,7 @@ export class IsoScene {
   }
 
   private update(): void {
+    this.restoreBillboards();
     this.updateMovement();
     this.updateAvatars(Math.min(0.25, this.app.ticker.elapsedMS / 1000));
     this.updateCameraFollow();
@@ -2802,6 +2978,7 @@ export class IsoScene {
       this.npcs.update(dt);
       this.fillActors?.update(dt);
     }
+    this.applyBillboards();
     this.events.onFrame?.();
   }
 
@@ -2855,20 +3032,37 @@ export class IsoScene {
     if (this.canvasEl) {
       this.canvasEl.dataset.follow = f.suspended ? 'suspended' : f.engaged ? 'engaged' : 'idle';
     }
-    if (jumped || f.suspended) return;
+    if (jumped || f.suspended || this.mapOverview) return;
     const moved = Math.hypot(stepX, stepY) > 1e-4;
     const walking = this.interiorActive ? this.interiorPath.length > 0 : this.path.length > 0;
     if (moved || walking) f.engaged = true;
     if (!f.engaged) return;
 
+    this.syncViewTransform();
+    const yawNow = this.cameraYawQuarter();
+    const yawChanged = yawNow !== this.lastFollowYaw;
+    this.lastFollowYaw = yawNow;
     const dt = Math.min(0.1, this.app.ticker.deltaMS / 1000);
     const camBeforeX = this.cameraX;
     const camBeforeY = this.cameraY;
+    const aim = this.followAimScreen();
+    if (yawChanged && this.viewMode === 'perspectiva' && !this.interiorActive) {
+      f.vx = 0;
+      f.vy = 0;
+      this.placeWorldAtScreen(t.x, t.y, aim.x, aim.y);
+      this.applyCamera(false);
+      this.shiftGestureBaselines(this.cameraX - camBeforeX, this.cameraY - camBeforeY);
+      return;
+    }
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
-    const aim = this.freeRectCenter();
-    const aimWx = (aim.x - sw / 2) / this.zoom;
-    const aimWy = (aim.y - sh / 2) / this.zoom;
+    const z = this.zoom || 1;
+    const dxAim = aim.x - sw / 2;
+    const dyAim = aim.y - sh / 2;
+    const cos = Math.cos(this.viewRot);
+    const sin = Math.sin(this.viewRot);
+    const aimWx = ((dxAim * cos + dyAim * sin) / (this.viewSx || 1)) / z;
+    const aimWy = ((-dxAim * sin + dyAim * cos) / (this.viewSy || 1)) / z;
     // Offset of the character from the map hole (free-rect) centre, in world px.
     let ox = this.cameraX - stepX + t.x - aimWx;
     let oy = this.cameraY - stepY + t.y - aimWy;
@@ -2929,6 +3123,9 @@ export class IsoScene {
         dy = stick.y;
         autoShift = true;
       }
+      const mapped = this.remapWalkStick(dx, dy);
+      dx = mapped.x;
+      dy = mapped.y;
       if (dx !== 0 || dy !== 0) {
         this.startCameraFollow();
         this.fireMoveCommand();
@@ -2950,6 +3147,11 @@ export class IsoScene {
       if (dx === 0 && dy === 0 && stickLive) {
         dx = stick.x;
         dy = stick.y;
+      }
+      if (!this.interiorActive) {
+        const mapped = this.remapWalkStick(dx, dy);
+        dx = mapped.x;
+        dy = mapped.y;
       }
       if (this.interiorActive && this.interiorDef) {
         if (dx !== 0 || dy !== 0) {
@@ -4021,19 +4223,59 @@ export class IsoScene {
     return { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y };
   }
 
+  qaCameraViews(): {
+    mode: Camera;
+    yaw: number;
+    cameraYaw: number;
+    overview: boolean;
+    rot: number;
+    sy: number;
+    altView: string;
+    altLayer: boolean;
+    roofsHidden: number;
+    roofsTotal: number;
+    adonayScreen: { x: number; y: number; w: number; h: number };
+    charScreen: { x: number; y: number };
+    aim: { x: number; y: number };
+    labels: { id: string; x: number; y: number; visible: boolean }[];
+  } {
+    this.applyBillboards();
+    this.app?.render();
+    const b = this.avatar.adonay.sprite.getBounds();
+    let roofsHidden = 0;
+    let roofsTotal = 0;
+    for (const v of this.objectVisuals.values()) {
+      if (!hideIsoPropSprite(v.obj) || v.obj.id === JAC_ID) continue;
+      roofsTotal += 1;
+      if (!v.sprite.visible) roofsHidden += 1;
+    }
+    return {
+      ...this.getViewMode(),
+      cameraYaw: this.cameraYawQuarter(),
+      altView: this.canvasEl?.dataset.altView ?? 'off',
+      altLayer: this.altViewLayer.visible,
+      roofsHidden,
+      roofsTotal,
+      adonayScreen: { x: b.x, y: b.y, w: b.width, h: b.height },
+      charScreen: this.followTargetScreen(),
+      aim: this.followAimScreen(),
+      labels: this.nameLabelAnchors().map((l) => ({ id: l.id, x: l.x, y: l.y, visible: l.visible })),
+    };
+  }
+
   /** Client pixels of the name-pill anchors (just above each head). */
   nameLabelAnchors(): { id: 'adonay' | 'pantone' | 'noah'; name: string; x: number; y: number; visible: boolean }[] {
     const rect = this.canvasEl?.getBoundingClientRect();
     const sw = this.app?.screen.width ?? 0;
     const sh = this.app?.screen.height ?? 0;
+    const gap = this.namePillGap();
     const aboveHead = (sprite: Sprite) => {
-      const top = spriteOpaqueTopWorld(sprite);
-      const s = this.worldToScreen(top.x, top.y);
+      const s = this.spriteHeadCanvas(sprite);
       return {
         x: (rect?.left ?? 0) + s.x,
-        y: (rect?.top ?? 0) + s.y - NAME_PILL_GAP_PX,
+        y: (rect?.top ?? 0) + s.y - gap,
         sx: s.x,
-        sy: s.y - NAME_PILL_GAP_PX,
+        sy: s.y - gap,
       };
     };
     const onScreen = (sx: number, sy: number) => sx > -40 && sy > -40 && sx < sw + 40 && sy < sh + 40;
@@ -4076,8 +4318,7 @@ export class IsoScene {
     const rect = this.canvasEl?.getBoundingClientRect();
     const avatar = this.interiorActive ? this.interiorAvatar : this.avatar;
     const of = (id: string, sprite: Sprite) => {
-      const top = spriteOpaqueTopWorld(sprite);
-      const s = this.worldToScreen(top.x, top.y);
+      const s = this.spriteHeadCanvas(sprite);
       return { id, headX: (rect?.left ?? 0) + s.x, headY: (rect?.top ?? 0) + s.y };
     };
     const heads = [of('adonay', avatar.adonay.sprite), of('pantone', avatar.pantone.sprite)];

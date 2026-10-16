@@ -293,7 +293,7 @@ export class ChromeUI {
           <button type="button" class="ui-view" data-view="rotate" aria-label="Rotate">${iconSvg('rotate')}</button>
           <button type="button" class="ui-view is-active" data-view="isometrica" aria-label="Isometric">${iconSvg('cube')}</button>
           <button type="button" class="ui-view" data-view="cenital" aria-label="Top-down">${iconSvg('grid')}</button>
-          <button type="button" class="ui-view" data-view="perspectiva" aria-label="Perspective">${iconSvg('persp')}</button>
+          <button type="button" class="ui-view" data-view="perspectiva" aria-label="Behind character">${iconSvg('persp')}</button>
           <button type="button" class="ui-view" data-view="map" aria-label="Map overview">${iconSvg('map')}</button>
         </div>
       </div>

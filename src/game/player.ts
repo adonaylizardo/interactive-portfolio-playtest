@@ -440,6 +440,10 @@ export class PlayerAvatar {
     layer.addChild(this.pantone.sprite, this.adonay.sprite);
   }
 
+  spritesForBillboard(): Sprite[] {
+    return [this.adonay.sprite, this.pantone.sprite];
+  }
+
   setVisible(on: boolean): void {
     this.visible = on;
     this.adonay.sprite.visible = on;
