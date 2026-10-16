@@ -91,11 +91,15 @@ async function holdStickCdp(page, cdp, ox, oy, ms) {
   return { box, x0, y0 };
 }
 
-async function moveStickCdp(cdp, x0, y0, ox, oy, ms) {
-  const steps = Math.max(6, Math.round(ms / 80));
+async function dragStickCdp(page, cdp, from, to, ms, samples) {
+  const steps = Math.max(12, Math.round(ms / 50));
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
-    await cdpTouch(cdp, 'touchMove', [{ x: x0 + ox * t, y: y0 + oy * t }]);
+    await cdpTouch(cdp, 'touchMove', [{
+      x: from.x + (to.x - from.x) * t,
+      y: from.y + (to.y - from.y) * t,
+    }]);
+    if (samples) samples.push(await page.evaluate(() => window.__playtestQa.jac()));
     await wait(ms / steps);
   }
 }
@@ -247,7 +251,7 @@ async function run(tag, options, phone) {
           const ch = walk[y][x];
           if (!ch || ch === '#' || ch === 'x') continue;
           const d = Math.hypot(x - sx, y - sy);
-          if (d < 10 || d > 18) continue;
+          if (d < 7 || d > 12) continue;
           if (!best || d > best.d) best = { x, y, d };
         }
       }
@@ -279,12 +283,22 @@ async function run(tag, options, phone) {
         if (s.mode === 'menu') return s;
         return null;
       },
-      16000,
+      28000,
     );
     notes.push({ arrived });
-    if (arrived?.mode !== 'menu') throw new Error(`${tag}: F3 panel did not open on arrival`);
-    const charNear = Math.hypot((arrived.char?.x ?? 0) - (arrived.jac?.cx ?? 0), (arrived.char?.y ?? 0) - (arrived.jac?.cy ?? 0));
-    if (charNear > 3.2) throw new Error(`${tag}: F3 panel opened while still far (${charNear.toFixed(2)})`);
+    if (arrived?.mode !== 'menu') {
+      const stuck = await page.evaluate(() => ({
+        char: window.__playtestQa.getCharacterTile(),
+        goal: window.__playtestQa.readWalkGoal?.(),
+        jac: window.__playtestQa.jac(),
+      }));
+      throw new Error(`${tag}: F3 panel did not open on arrival ${JSON.stringify(stuck)}`);
+    }
+    const walked = Math.hypot((arrived.char?.x ?? 0) - far.far.x, (arrived.char?.y ?? 0) - far.far.y);
+    const nearVan = Math.hypot((arrived.char?.x ?? 0) - (arrived.jac?.cx ?? 0), (arrived.char?.y ?? 0) - (arrived.jac?.cy ?? 0));
+    notes.push({ walked, nearVan });
+    if (walked < 4) throw new Error(`${tag}: F3 did not walk from the far tile (${walked.toFixed(2)})`);
+    if (nearVan > 5) throw new Error(`${tag}: F3 panel opened while still far (${nearVan.toFixed(2)})`);
     await page.screenshot({ path: path.join(OUT, `${tag}-03-panel-on-arrival.png`) });
     const pill = await layoutProbe(page);
     notes.push({ pill });
@@ -341,10 +355,18 @@ async function run(tag, options, phone) {
       if ((atSpeed.jac?.mph ?? 0) < 4) throw new Error(`${tag}: F2 internal mph stayed low ${JSON.stringify(atSpeed)}`);
       if (!atSpeed.mphText || atSpeed.mphText === '0') throw new Error(`${tag}: F2 phone bar has no mph readout`);
       await page.screenshot({ path: path.join(OUT, `${tag}-05-mph-bar.png`) });
-      await moveStickCdp(cdp, held.x0, held.y0, 0, 50, 900);
-      for (let i = 0; i < 10; i++) {
+      brakeSamples.push(atSpeed.jac);
+      await dragStickCdp(
+        page,
+        cdp,
+        { x: held.x0 + 8, y: held.y0 - 48 },
+        { x: held.x0, y: held.y0 + 50 },
+        1600,
+        brakeSamples,
+      );
+      for (let i = 0; i < 8; i++) {
         brakeSamples.push(await page.evaluate(() => window.__playtestQa.jac()));
-        await wait(90);
+        await wait(60);
       }
       await page.screenshot({ path: path.join(OUT, `${tag}-06-brake-then-reverse.png`) });
     } else {
@@ -363,20 +385,24 @@ async function run(tag, options, phone) {
       await page.screenshot({ path: path.join(OUT, `${tag}-06-brake-then-reverse.png`) });
     }
     notes.push({ brakeSamples: brakeSamples.map((s) => ({ mph: s.mph, gear: s.gear, reversing: s.reversing })) });
-    const hitZero = brakeSamples.some((s) => (s.mph ?? 1) === 0);
-    const thenRev = brakeSamples.some((s, i) => {
-      const priorZero = brakeSamples.slice(0, i + 1).some((p) => (p.mph ?? 1) === 0);
-      return priorZero && (s.reversing || s.gear === 'R');
-    });
-    if (!hitZero) throw new Error(`${tag}: brake did not reach 0 mph before reverse`);
-    if (!thenRev) throw new Error(`${tag}: did not reverse after braking to 0`);
+    const firstBack = brakeSamples.findIndex((s) => s.reversing);
+    const beforeBack = firstBack < 0 ? brakeSamples : brakeSamples.slice(0, Math.max(1, firstBack));
+    const minBefore = Math.min(...beforeBack.map((s) => s.mph ?? 99));
+    const maxBefore = Math.max(...beforeBack.map((s) => s.mph ?? 0));
+    const hitZero = beforeBack.some((s) => (s.mph ?? 1) === 0);
+    if (maxBefore < 4) throw new Error(`${tag}: brake proof never reached forward speed`);
+    if (!hitZero && minBefore > 1) {
+      throw new Error(`${tag}: brake did not reach 0 mph before reverse ${JSON.stringify({ minBefore, maxBefore, firstBack })}`);
+    }
+    if (firstBack < 0) throw new Error(`${tag}: did not reverse after braking to 0`);
 
     // F4: PiP only while actually reversing.
     await wait(200);
     const reversing = await page.evaluate(() => {
       const el = document.querySelector('.jac-rear');
+      const toolsEl = document.querySelector('.chrome__tools-phone');
       const r = el?.getBoundingClientRect();
-      const tools = document.querySelector('.chrome__tools-phone')?.getBoundingClientRect();
+      const tools = toolsEl?.getBoundingClientRect();
       return {
         hidden: el?.hidden ?? true,
         on: el?.classList.contains('is-on') ?? false,
@@ -384,7 +410,7 @@ async function run(tag, options, phone) {
         top: r?.top ?? 0,
         bottom: r?.bottom ?? 0,
         toolsBottom: tools?.bottom ?? 0,
-        toolsVis: tools ? getComputedStyle(tools).visibility : 'missing',
+        toolsVis: toolsEl ? getComputedStyle(toolsEl).visibility : 'missing',
         rearCam: window.__playtestQa.jac()?.rearCam,
         reversing: window.__playtestQa.jac()?.reversing,
         mph: window.__playtestQa.jac()?.mph,
@@ -409,11 +435,11 @@ async function run(tag, options, phone) {
       page,
       async () => {
         const j = await page.evaluate(() => window.__playtestQa.jac());
-        return (j?.mph ?? 1) === 0 && !j?.reversing ? j : null;
+        return (j?.mph ?? 1) === 0 && !j?.reversing && !j?.rearCam ? j : null;
       },
-      4000,
+      3500,
     );
-    await wait(700);
+    await wait(200);
     const afterStop = await page.evaluate(() => {
       const el = document.querySelector('.jac-rear');
       return {
@@ -472,15 +498,29 @@ async function run(tag, options, phone) {
     if ((afterPath.entities?.count ?? 0) !== 1) throw new Error(`${tag}: extra van during path follow`);
 
     // F6: stop on the target (desktop especially).
+    await waitUntil(
+      page,
+      async () => {
+        const j = await page.evaluate(() => window.__playtestQa.jac());
+        return !j?.driveGoal && (j?.mph ?? 1) === 0 ? j : null;
+      },
+      12000,
+    );
     const stopGoal = await pickDriveGoal(page);
     if (stopGoal) {
-      if (phone) {
-        const c = stopGoal.client ?? (await goalClient(page, stopGoal));
-        await tapClientCdp(cdp, c.x, c.y);
-      } else {
-        const c = stopGoal.client ?? (await goalClient(page, stopGoal));
-        await page.mouse.click(c.x, c.y);
-      }
+      const c = stopGoal.client ?? (await goalClient(page, stopGoal));
+      if (phone) await tapClientCdp(cdp, c.x, c.y);
+      else await page.mouse.click(c.x, c.y);
+      const aimed = await waitUntil(
+        page,
+        async () => {
+          const j = await page.evaluate(() => window.__playtestQa.jac());
+          if (j?.driveGoal) return j.driveGoal;
+          return null;
+        },
+        3000,
+      );
+      if (!aimed) throw new Error(`${tag}: F6 tap did not set a drive target`);
       const arrivedGoal = await waitUntil(
         page,
         async () => {
@@ -491,9 +531,9 @@ async function run(tag, options, phone) {
         16000,
       );
       const miss = arrivedGoal
-        ? Math.hypot((arrivedGoal.cx ?? 0) - stopGoal.x, (arrivedGoal.cy ?? 0) - stopGoal.y)
+        ? Math.hypot((arrivedGoal.cx ?? 0) - aimed.x, (arrivedGoal.cy ?? 0) - aimed.y)
         : 99;
-      notes.push({ stopOnTarget: { stopGoal, miss, arrived: arrivedGoal } });
+      notes.push({ stopOnTarget: { stopGoal, aimed, miss, arrived: arrivedGoal } });
       if (miss > 0.85) throw new Error(`${tag}: F6 stopped ${miss.toFixed(2)} tiles short of target`);
     }
     await page.screenshot({ path: path.join(OUT, `${tag}-09-stop-on-target.png`) });

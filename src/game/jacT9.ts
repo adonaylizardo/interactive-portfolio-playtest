@@ -237,7 +237,7 @@ export class JacT9 {
   }
 
   private tickRearHold(dt: number): void {
-    if (this.vel < -0.08 || this.reversing) this.rearHold = 0.5;
+    if (this.vel < -0.08) this.rearHold = 0.5;
     else this.rearHold = Math.max(0, this.rearHold - dt);
   }
 
@@ -593,7 +593,10 @@ export class JacT9 {
       }
     }
     const t = this.drivePath[0];
-    const last = this.drivePath.length === 1 || this.isGoalNode(t);
+    const goalDist = this.driveGoal
+      ? Math.hypot(this.driveGoal.x - this.cx, this.driveGoal.y - this.cy)
+      : Infinity;
+    const last = this.drivePath.length === 1 || this.isGoalNode(t) || goalDist < 2.6;
     const ax = t.x - this.cx;
     const ay = t.y - this.cy;
     const dist = Math.hypot(ax, ay);
@@ -613,23 +616,28 @@ export class JacT9 {
       ? { x: this.cx + ux, y: this.cy + uy }
       : slide(this.cx, this.cy, ux, uy, sit);
     if (next.x === this.cx && next.y === this.cy) {
-      if (last) {
-        if (dist < 0.4) {
-          this.cx = t.x;
-          this.cy = t.y;
+      if (last || this.isGoalNode(t)) {
+        const snapTo = this.driveGoal ?? t;
+        if (Math.hypot(snapTo.x - this.cx, snapTo.y - this.cy) < 2.6) {
+          this.cx = snapTo.x;
+          this.cy = snapTo.y;
           this.drivePath = [];
           this.driveGoal = null;
           this.vel = 0;
           this.reversing = false;
           this.occupy(this.driveCells());
           this.layout();
-        } else {
-          this.vel = 0;
+          return true;
         }
-        return dist < 0.4;
+        this.vel = 0;
+        return false;
       }
       this.drivePath.shift();
       if (this.drivePath.length === 0) {
+        if (this.driveGoal && Math.hypot(this.driveGoal.x - this.cx, this.driveGoal.y - this.cy) > 0.12) {
+          this.drivePath.push({ x: this.driveGoal.x, y: this.driveGoal.y });
+          return this.followDrivePath(dt);
+        }
         this.driveGoal = null;
         this.vel = 0;
         this.reversing = false;
