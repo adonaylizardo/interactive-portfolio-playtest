@@ -101,13 +101,18 @@ async function main(): Promise<void> {
     onMoveCommand: () => studio.noteMoveCommand(),
     onFrame: () => {
       labels.update(scene.nameLabelAnchors());
-      const snap = scene.jacSnapshot();
-      const anchors = scene.jacHudAnchors();
-      jacHud.update(snap, anchors, anchors.rear);
-      labels.setHidden(!!snap?.driving);
-      const hideStick =
-        !!scene.isInInterior() || panel.isPreviewExpanded() || snap?.mode === 'info';
-      joystick.setHidden(hideStick);
+      if (scene.jacHudActive()) {
+        const snap = scene.jacSnapshot();
+        const anchors = scene.jacHudAnchors();
+        jacHud.update(snap, anchors, anchors.rear);
+        labels.setHidden(!!snap?.driving);
+      } else {
+        jacHud.park();
+        labels.setHidden(false);
+      }
+      joystick.setHidden(
+        !!scene.isInInterior() || panel.isPreviewExpanded() || scene.jacInfoOpen(),
+      );
     },
     stick: () => joystick.vector(),
     onExitInterior: () => {

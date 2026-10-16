@@ -63,6 +63,7 @@ export class JacHud {
     this.root = document.createElement('div');
     this.root.className = 'jac-hud';
     this.root.hidden = true;
+    this.root.setAttribute('inert', '');
     this.root.innerHTML = this.shell();
     container.appendChild(this.root);
     this.menuEl = this.root.querySelector('.jac-menu')!;
@@ -81,6 +82,15 @@ export class JacHud {
     });
   }
 
+  park(): void {
+    if (this.root.hidden && !document.body.classList.contains('jac-hud-open')) return;
+    this.root.hidden = true;
+    this.root.setAttribute('inert', '');
+    document.body.classList.remove('jac-info', 'jac-drive', 'jac-rearcam', 'jac-hud-open');
+    this.lastHtml = '';
+    this.snap = null;
+  }
+
   update(
     snap: JacSnapshot | null,
     anchors: {
@@ -93,14 +103,11 @@ export class JacHud {
     this.snap = snap;
     const open = !!snap && (snap.mode !== 'parked' || snap.bubble);
     if (!open || !snap) {
-      if (!this.root.hidden || document.body.classList.contains('jac-hud-open')) {
-        this.root.hidden = true;
-        document.body.classList.remove('jac-info', 'jac-drive', 'jac-rearcam', 'jac-hud-open');
-        this.lastHtml = '';
-      }
+      this.park();
       return;
     }
     this.root.hidden = false;
+    this.root.removeAttribute('inert');
     document.body.classList.toggle('jac-hud-open', snap.mode === 'info' || snap.mode === 'drive');
     document.body.classList.toggle('jac-info', snap.mode === 'info');
     document.body.classList.toggle('jac-drive', snap.mode === 'drive');

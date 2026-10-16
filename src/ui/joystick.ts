@@ -69,6 +69,10 @@ export class Joystick {
   }
 
   setHidden(hidden: boolean): void {
+    if (this.hidden === hidden) {
+      if (hidden && this.pointerId !== null) this.release();
+      return;
+    }
     this.hidden = hidden;
     if (hidden) this.release();
     this.syncVisible();

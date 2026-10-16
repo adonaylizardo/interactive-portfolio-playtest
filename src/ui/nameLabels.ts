@@ -29,6 +29,7 @@ export class NameLabels {
   }
 
   setHidden(hidden: boolean): void {
+    if (this.root.hidden === hidden) return;
     this.root.hidden = hidden;
   }
 

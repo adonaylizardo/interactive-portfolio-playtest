@@ -3639,35 +3639,50 @@ export class IsoScene {
     return this.jac?.snapshot() ?? null;
   }
 
+  jacHudActive(): boolean {
+    return !!this.jac && (this.jac.mode !== 'parked' || this.jac.bubble);
+  }
+
+  jacInfoOpen(): boolean {
+    return this.jac?.mode === 'info';
+  }
+
   jacHudAnchors(): {
     menu: { x: number; y: number } | null;
     bubble: { x: number; y: number } | null;
     follow: { x: number; y: number };
     rear: { canvas: HTMLCanvasElement; sx: number; sy: number; sw: number; sh: number } | null;
   } {
-    const rect = this.canvasEl?.getBoundingClientRect();
-    const toClient = (wx: number, wy: number) => {
-      const s = this.worldToScreen(wx, wy);
-      return { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y };
-    };
     const follow = this.jac?.driving ? this.jac.worldCenter() : tileToWorld(this.charTx, this.charTy);
+    const needClient = this.jac?.mode === 'menu' || !!this.jac?.bubble;
+    const needRear = !!this.jac?.rearCam;
     let menu: { x: number; y: number } | null = null;
     let bubble: { x: number; y: number } | null = null;
-    if (this.jac && this.jac.mode === 'menu') {
-      const v = this.objectVisuals.get(JAC_ID);
-      if (v) {
-        menu = toClient((v.cull.x0 + v.cull.x1) / 2, v.cull.y0 + 28);
-      } else {
-        const roof = this.jac.worldRoof();
-        menu = toClient(roof.x, roof.y);
+    let rear: { canvas: HTMLCanvasElement; sx: number; sy: number; sw: number; sh: number } | null = null;
+    if (needClient) {
+      const rect = this.canvasEl?.getBoundingClientRect();
+      const toClient = (wx: number, wy: number) => {
+        const s = this.worldToScreen(wx, wy);
+        return { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y };
+      };
+      if (this.jac && this.jac.mode === 'menu') {
+        const v = this.objectVisuals.get(JAC_ID);
+        if (v) {
+          menu = toClient((v.cull.x0 + v.cull.x1) / 2, v.cull.y0 + 28);
+        } else {
+          const roof = this.jac.worldRoof();
+          menu = toClient(roof.x, roof.y);
+        }
+      }
+      if (this.jac?.bubble) {
+        const head = this.worldToScreen(
+          tileToWorld(this.charTx, this.charTy).x,
+          tileToWorld(this.charTx, this.charTy).y - 90,
+        );
+        bubble = { x: (rect?.left ?? 0) + head.x, y: (rect?.top ?? 0) + head.y };
       }
     }
-    if (this.jac?.bubble) {
-      const head = this.worldToScreen(tileToWorld(this.charTx, this.charTy).x, tileToWorld(this.charTx, this.charTy).y - 90);
-      bubble = { x: (rect?.left ?? 0) + head.x, y: (rect?.top ?? 0) + head.y };
-    }
-    let rear: { canvas: HTMLCanvasElement; sx: number; sy: number; sw: number; sh: number } | null = null;
-    if (this.jac?.rearCam && this.canvasEl) {
+    if (needRear && this.jac && this.canvasEl) {
       const src = this.jac.rearSource(
         (x, y) => this.worldToScreen(x, y),
         this.app.screen.width,
