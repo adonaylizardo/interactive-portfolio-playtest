@@ -199,6 +199,7 @@ try {
       else {
         if (top.bar.w !== vw) errors.push(`${id}: sticky bar width ${top.bar.w}px, want ${vw}`);
         if (top.bar.left !== 0) errors.push(`${id}: sticky bar left ${top.bar.left}, want 0`);
+        if (top.bar.top > 2) errors.push(`${id}: sticky bar top ${top.bar.top}, want 0`);
       }
       if (top.sheet.scrollLeft !== 0) errors.push(`${id}: sheet scrollLeft ${top.sheet.scrollLeft} at top`);
       if (top.sheet.scrollWidth > top.sheet.clientWidth + 1) {
@@ -220,8 +221,10 @@ try {
     const mid = await page.evaluate(measure, vw);
     await page.screenshot({ path: path.join(OUT, `375-${id}-mid.png`) });
     if (mid.sheet && mid.sheet.scrollLeft !== 0) errors.push(`${id}: scrollLeft ${mid.sheet.scrollLeft} after vertical pan`);
-    if (mid.bar && (mid.bar.w !== vw || mid.bar.left !== 0)) {
-      errors.push(`${id}: sticky bar shifted after vertical pan w=${mid.bar.w} left=${mid.bar.left}`);
+    if (mid.bar && (mid.bar.w !== vw || mid.bar.left !== 0 || mid.bar.top > 2)) {
+      errors.push(
+        `${id}: sticky bar shifted after vertical pan w=${mid.bar.w} left=${mid.bar.left} top=${mid.bar.top}`,
+      );
     }
     if (mid.wide?.length) errors.push(`${id}: wide after vertical pan ${JSON.stringify(mid.wide)}`);
 
@@ -238,8 +241,10 @@ try {
     if (afterSwipe.sheet.left !== 0 || afterSwipe.sheet.w !== vw) {
       errors.push(`${id}: sheet shifted after swipe left=${afterSwipe.sheet.left} w=${afterSwipe.sheet.w}`);
     }
-    if (afterSwipe.bar && (afterSwipe.bar.left !== 0 || afterSwipe.bar.w !== vw)) {
-      errors.push(`${id}: sticky bar shifted after swipe w=${afterSwipe.bar.w} left=${afterSwipe.bar.left}`);
+    if (afterSwipe.bar && (afterSwipe.bar.left !== 0 || afterSwipe.bar.w !== vw || afterSwipe.bar.top > 2)) {
+      errors.push(
+        `${id}: sticky bar shifted after swipe w=${afterSwipe.bar.w} left=${afterSwipe.bar.left} top=${afterSwipe.bar.top}`,
+      );
     }
     const dx = afterSwipe.sheet.left - beforeSwipe.sheet.left;
     if (dx !== 0) errors.push(`${id}: sheet left moved ${dx}px on horizontal swipe`);
@@ -252,8 +257,10 @@ try {
     const bottom = await page.evaluate(measure, vw);
     await page.screenshot({ path: path.join(OUT, `375-${id}-bottom.png`) });
     if (bottom.sheet.scrollLeft !== 0) errors.push(`${id}: scrollLeft ${bottom.sheet.scrollLeft} at bottom`);
-    if (bottom.bar && (bottom.bar.w !== vw || bottom.bar.left !== 0)) {
-      errors.push(`${id}: sticky bar not full width at bottom w=${bottom.bar.w} left=${bottom.bar.left}`);
+    if (bottom.bar && (bottom.bar.w !== vw || bottom.bar.left !== 0 || bottom.bar.top > 2)) {
+      errors.push(
+        `${id}: sticky bar not full width at bottom w=${bottom.bar.w} left=${bottom.bar.left} top=${bottom.bar.top}`,
+      );
     }
     if (bottom.wide?.length) errors.push(`${id}: wide at bottom ${JSON.stringify(bottom.wide)}`);
     notes.push(`${id} bottom scrollTop=${bottom.sheet?.scrollTop}/${bottom.sheet?.scrollHeight}`);

@@ -1524,6 +1524,7 @@ body[data-layout='panel'] .checklist {
     max-height: none;
     height: 100%;
     padding: 0;
+    border: 0;
     border-radius: 0;
     overflow-x: hidden;
     overflow-y: auto;
@@ -1551,7 +1552,6 @@ body[data-layout='panel'] .checklist {
     overflow-wrap: anywhere;
   }
 
-  .building-panel--preview.building-panel--expanded .case-read,
   .building-panel--preview.building-panel--expanded .building-panel__body-wrap {
     overflow-x: hidden;
   }
