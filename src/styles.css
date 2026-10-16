@@ -131,7 +131,8 @@ body.is-canvas-dragging * {
 #ui-root > .chrome,
 #ui-root > .building-panel,
 #ui-root > .name-labels,
-#ui-root > .joystick {
+#ui-root > .joystick,
+#ui-root > .jac-hud {
   pointer-events: none;
 }
 
@@ -1824,3 +1825,632 @@ body[data-layout='panel'] .checklist {
   background: #fff;
   flex: 0 0 auto;
 }
+
+/* JAC T9 HUD — Pixel frames, phone + desktop. */
+.jac-hud {
+  position: fixed;
+  inset: 0;
+  z-index: 18;
+  font-family: Inter, system-ui, sans-serif;
+  color: #edeef0;
+}
+
+.jac-hud [hidden] {
+  display: none !important;
+}
+
+.jac-hud button,
+.jac-hud .jac-pill,
+.jac-hud .jac-sheet,
+.jac-hud .jac-dock,
+.jac-hud .jac-bar,
+.jac-hud .jac-steer,
+.jac-hud .jac-bubble,
+.jac-hud .jac-rear {
+  pointer-events: auto;
+}
+
+.jac-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px 0 10px;
+  border: 1px solid #2a2c31;
+  border-radius: 16px;
+  background: #141518;
+  color: #edeef0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+
+.jac-pill i {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  border: 1px solid #3a3d44;
+  align-items: center;
+  justify-content: center;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.jac-pill--name {
+  cursor: default;
+  padding: 0 14px;
+}
+
+.jac-menu {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.jac-menu .jac-pill {
+  pointer-events: auto;
+}
+
+.jac-menu__row {
+  display: flex;
+  gap: 8px;
+}
+
+.jac-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #1b1d22;
+  border: 1px solid #2a2c31;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.jac-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.jac-btn--primary {
+  background: #edeef0;
+  color: #0b0c0e;
+}
+
+.jac-btn kbd {
+  display: inline-flex;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  margin-left: 4px;
+  border-radius: 4px;
+  background: #d4d6da;
+  font: 600 11px/18px Inter, sans-serif;
+  color: #3a3d44;
+}
+
+.jac-icon-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #2a2c31;
+  border-radius: 18px;
+  background: #141518;
+  color: #edeef0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.jac-sheet {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 20;
+  padding: 10px 16px 16px;
+  border-radius: 24px;
+  background: #141518;
+  border: 1px solid #2a2c31;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+}
+
+.jac-sheet__handle {
+  width: 36px;
+  height: 4px;
+  margin: 2px auto 12px;
+  border-radius: 2px;
+  background: #2a2c31;
+}
+
+.jac-sheet__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.jac-sheet__head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.jac-sheet__desc {
+  margin: 12px 0 16px;
+  color: #8a8f98;
+  font-size: 14px;
+}
+
+.jac-sheet__grid {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.jac-sheet__in {
+  margin-top: 16px;
+}
+
+.jac-length {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #2a2c31;
+  color: #8a8f98;
+  font-size: 13px;
+}
+
+.jac-length__dash {
+  color: #edeef0;
+}
+
+.jac-dial {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  border: 1px solid #2a2c31;
+  background: #101114;
+  cursor: pointer;
+}
+
+.jac-dial__auto,
+.jac-dial__off,
+.jac-dial__on {
+  position: absolute;
+  font-size: 10px;
+  color: #8a8f98;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.jac-dial__auto {
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.jac-dial__off {
+  left: 8px;
+  bottom: 22px;
+}
+
+.jac-dial__on {
+  right: 8px;
+  bottom: 22px;
+}
+
+.jac-dial__knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 36px;
+  height: 3px;
+  margin: -1.5px 0 0;
+  background: #edeef0;
+  border-radius: 2px;
+  transform-origin: 0 50%;
+  transform: rotate(-70deg);
+}
+
+.jac-dial[data-pos='off'] .jac-dial__knob {
+  transform: rotate(-155deg);
+}
+
+.jac-dial[data-pos='auto'] .jac-dial__knob {
+  transform: rotate(-70deg);
+}
+
+.jac-dial[data-pos='on'] .jac-dial__knob {
+  transform: rotate(12deg);
+}
+
+.jac-dial[data-pos='off'] .jac-dial__off,
+.jac-dial[data-pos='on'] .jac-dial__on,
+.jac-dial[data-pos='auto'] .jac-dial__auto {
+  color: #edeef0;
+}
+
+.jac-dial__engine {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  width: 22px;
+  height: 22px;
+  margin-left: -11px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: #8a8f98;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.jac-toggles {
+  display: grid;
+  grid-template-columns: repeat(3, 44px);
+  gap: 8px;
+  justify-content: end;
+}
+
+.jac-toggle {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #2a2c31;
+  border-radius: 12px;
+  background: #1a1c20;
+  color: #8a8f98;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.jac-toggle::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 10px;
+  right: 10px;
+  height: 2px;
+  border-radius: 1px;
+  background: #3a3d44;
+}
+
+.jac-toggle.is-on {
+  color: #edeef0;
+}
+
+.jac-toggle.is-on::before {
+  background: #f2a93b;
+}
+
+.jac-bar {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 19;
+  height: 56px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 18px;
+  background: #141518;
+  border: 1px solid #2a2c31;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+}
+
+.jac-steer {
+  position: fixed;
+  top: 76px;
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  border: 1px solid #2a2c31;
+  background: #141518;
+  color: #edeef0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.jac-steer.is-live {
+  box-shadow: inset 0 0 0 2px #f2a93b;
+}
+
+.jac-bubble {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 21;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #edeef0;
+  color: #0b0c0e;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.jac-dock {
+  position: fixed;
+  left: 80px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 19;
+  height: 162px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-radius: 20px;
+  background: #141518;
+  border: 1px solid #2a2c31;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+}
+
+.jac-dock__body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.jac-dock__right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.jac-dock__mini {
+  width: 120px;
+  height: 78px;
+  border-radius: 12px;
+}
+
+.jac-dock__views {
+  display: flex;
+  gap: 6px;
+}
+
+.jac-dock__view {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid #2a2c31;
+  background: #1a1c20;
+}
+
+.jac-dock__view.is-on {
+  border-color: #edeef0;
+}
+
+.jac-dock__id {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 120px;
+}
+
+.jac-dock__name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.jac-gears {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.jac-gear {
+  width: 28px;
+  height: 22px;
+  border: 0;
+  background: transparent;
+  color: #8a8f98;
+  font: 600 13px/22px Inter, sans-serif;
+  cursor: pointer;
+}
+
+.jac-gear.is-on {
+  color: #edeef0;
+}
+
+.jac-gauge {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  flex: 0 0 96px;
+}
+
+.jac-gauge svg {
+  width: 100%;
+  height: 100%;
+}
+
+.jac-gauge__needle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 36px;
+  height: 2px;
+  margin-top: -1px;
+  background: #edeef0;
+  transform-origin: 0 50%;
+  transform: rotate(-120deg);
+}
+
+.jac-gauge__val {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 22px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.jac-gauge__unit {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  text-align: center;
+  font-size: 10px;
+  color: #8a8f98;
+}
+
+.jac-toggles--dock {
+  grid-template-columns: repeat(3, 40px);
+}
+
+.jac-toggles--dock .jac-toggle {
+  width: 40px;
+  height: 40px;
+}
+
+.jac-rear {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  z-index: 22;
+  width: min(420px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  border-radius: 16px;
+  border: 1px solid #edeef0;
+  background: #141518;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.jac-rear--phone {
+  top: 8px;
+  width: calc(100vw - 16px);
+  border-radius: 20px;
+}
+
+.jac-rear__view {
+  display: block;
+  width: 100%;
+  height: 128px;
+  background: #101114;
+}
+
+.jac-rear--phone .jac-rear__view {
+  height: 110px;
+}
+
+.jac-rear__guides {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 110px;
+  pointer-events: none;
+}
+
+.jac-rear__guides--curve {
+  display: none;
+}
+
+.jac-rear--turn .jac-rear__guides--straight {
+  display: none;
+}
+
+.jac-rear--turn .jac-rear__guides--curve {
+  display: block;
+}
+
+.jac-rear__tools {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: none;
+  gap: 6px;
+  z-index: 1;
+}
+
+.jac-rear--phone .jac-rear__tools {
+  display: flex;
+}
+
+.jac-rear__batt {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  border: 1px solid #2a2c31;
+  background: #141518;
+  align-items: center;
+  justify-content: center;
+  color: #edeef0;
+}
+
+.jac-rear--phone .jac-rear__batt {
+  display: flex;
+}
+
+body.jac-info .chrome__views,
+body.jac-drive .chrome__views {
+  visibility: hidden;
+}
+
+body.jac-drive .chrome__dock,
+body.jac-info[data-chrome='phone'] .chrome__dock,
+body.jac-rearcam .checklist,
+body.jac-rearcam .chrome__tools-phone {
+  visibility: hidden;
+}
+
+@media (max-width: 767px) {
+  body.jac-info .joystick,
+  body.jac-info .chrome__dock {
+    visibility: hidden;
+  }
+}
+

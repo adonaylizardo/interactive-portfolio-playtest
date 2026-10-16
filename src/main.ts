@@ -16,6 +16,7 @@ import { IsoScene } from './game/scene';
 import { findPath } from './iso/pathfinding';
 import { BuildingPanel } from './ui/buildingPanel';
 import { ChromeUI, type DesktopLayout } from './ui/chrome';
+import { JacHud } from './ui/jacHud';
 import { Joystick } from './ui/joystick';
 import { NameLabels } from './ui/nameLabels';
 import { hideToast, showToast } from './ui/toast';
@@ -43,6 +44,16 @@ async function main(): Promise<void> {
 
   const joystick = new Joystick(uiRoot);
   const labels = new NameLabels(uiRoot);
+  const jacHud = new JacHud(uiRoot, {
+    onInfo: () => scene.jacOpenInfo(),
+    onGetIn: () => scene.jacGetIn(),
+    onGetOut: () => scene.jacGetOut(),
+    onClose: () => scene.jacClose(),
+    onLights: (lights) => scene.jacSetLights(lights),
+    onGear: (gear) => scene.jacSetGear(gear),
+    onToggle: (id) => scene.jacSetToggle(id),
+    onEngine: () => scene.jacSetEngine(),
+  });
   const panel = new BuildingPanel(
     uiRoot,
     () => {
@@ -88,7 +99,16 @@ async function main(): Promise<void> {
       scene.enterInterior(buildingId);
     },
     onMoveCommand: () => studio.noteMoveCommand(),
-    onFrame: () => labels.update(scene.nameLabelAnchors()),
+    onFrame: () => {
+      labels.update(scene.nameLabelAnchors());
+      const snap = scene.jacSnapshot();
+      const anchors = scene.jacHudAnchors();
+      jacHud.update(snap, anchors, anchors.rear);
+      labels.setHidden(!!snap?.driving);
+      const hideStick =
+        !!scene.isInInterior() || panel.isPreviewExpanded() || snap?.mode === 'info';
+      joystick.setHidden(hideStick);
+    },
     stick: () => joystick.vector(),
     onExitInterior: () => {
       checklist.setBuildingPanelOpen(false);
@@ -119,6 +139,7 @@ async function main(): Promise<void> {
       onMapInteract: () => {
         if (chrome.isMobileSheetOpen()) chrome.setLayout('map');
       },
+      onJacHud: () => chrome.setLayout('map'),
     },
   });
 
@@ -237,6 +258,19 @@ async function main(): Promise<void> {
     showCasePreview: (id: string) => panel.showPreview(id),
     expandCasePreview: () => panel.expandPreviewForQa(),
     collapseCasePreview: () => panel.collapsePreviewForQa(),
+    jac: () => scene.qaJac(),
+    tapJac: () => scene.tapJac(),
+    jacInfo: () => scene.jacOpenInfo(),
+    jacGetIn: () => scene.jacGetIn(),
+    jacGetOut: () => scene.jacGetOut(),
+    jacClose: () => scene.jacClose(),
+    jacSetLights: (lights: 'off' | 'auto' | 'on') => scene.jacSetLights(lights),
+    jacSetGear: (gear: 'P' | 'R' | 'N' | 'D') => scene.jacSetGear(gear),
+    jacSetToggle: (id: 'left' | 'hazards' | 'right' | 'fog' | 'bed' | 'trailer') =>
+      scene.jacSetToggle(id),
+    jacSetEngine: () => scene.jacSetEngine(),
+    jacSetBubble: (on: boolean) => scene.jacSetBubble(on),
+    jacSet: (partial: Parameters<IsoScene['qaJacSet']>[0]) => scene.qaJacSet(partial),
   };
 }
 

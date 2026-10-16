@@ -126,6 +126,7 @@ import { FillActors, type FillActorSnapshot } from './fillActors';
 import { NpcCrowd, type NpcSnapshot } from './npcs';
 import { buildTown, type Bench } from './npcRoutines';
 import { Noah, type NoahSnapshot } from './noah';
+import { JacT9, JAC_ID, type JacGear, type JacLights, type JacSnapshot, type JacToggleId } from './jacT9';
 import {
   loadPlayerSheets,
   loadRestSheets,
@@ -209,6 +210,7 @@ export type ChecklistBridge = {
 export type ChromeBridge = {
   layoutInsets?: () => { left: number; top: number; right: number; bottom: number };
   onMapInteract?: () => void;
+  onJacHud?: () => void;
 };
 
 export type SceneEvents = {
@@ -317,6 +319,8 @@ export class IsoScene {
   private afterStand: (() => void) | null = null;
   private npcs!: NpcCrowd;
   private fillActors!: FillActors;
+  private jac: JacT9 | null = null;
+  private jacBubbleTimer: ReturnType<typeof setTimeout> | null = null;
   private events: SceneEvents;
   private objectGraphics = new Map<string, Container>();
   /** Opaque bounding box of each non-building object's sprite, relative to its container. */
@@ -489,6 +493,7 @@ export class IsoScene {
     this.buildVoidClickLayer();
     this.buildOutskirts();
     this.buildObjects();
+    this.initJac();
     this.npcs = new NpcCrowd(
       this.objectsLayer,
       {
@@ -918,6 +923,10 @@ export class IsoScene {
         if (this.shouldBlockTap()) return;
         e.stopPropagation();
         this.pixiTapGestureSerial = this.pointerGestureSerial;
+        if (obj.id === JAC_ID) {
+          this.tapJac();
+          return;
+        }
         if (obj.type === 'building' && obj.panelTitle && !this.prepareMapTap(obj)) return;
         const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
         if (obj.type === 'building' && obj.door && obj.panelTitle) {
@@ -971,6 +980,10 @@ export class IsoScene {
     const lodChanged = lejos !== this.lodLejos;
     this.lodLejos = lejos;
     for (const v of this.objectVisuals.values()) {
+      if (v.obj.id === JAC_ID) {
+        this.jac?.applySprite();
+        continue;
+      }
       const state = v.obj.type === 'building' ? this.buildingSpriteState(v.obj) : 'default';
       if (!force && !lodChanged && state === v.state) continue;
       const key = objectSpriteKey(v.obj, state, lejos);
@@ -1550,6 +1563,19 @@ export class IsoScene {
       this.handleInteriorScreenTap(sx, sy, sprint);
       return;
     }
+    if (this.jac?.driving) return;
+    if (this.jac && (this.jac.mode === 'menu' || this.jac.mode === 'info')) {
+      if (this.pickJacAtScreen(sx, sy)) {
+        this.tapJac();
+        return;
+      }
+      this.jacClose();
+      return;
+    }
+    if (this.pickJacAtScreen(sx, sy)) {
+      this.tapJac();
+      return;
+    }
     const doorFirst = this.pickBuildingDoorAtScreen(sx, sy);
     if (doorFirst?.door && doorFirst.panelTitle) {
       if (!this.prepareMapTap(doorFirst)) return;
@@ -1687,6 +1713,11 @@ export class IsoScene {
       top = Math.max(top, chromeInsets.top);
       right = Math.max(right, chromeInsets.right);
       bottom = Math.max(bottom, chromeInsets.bottom);
+    }
+    if (this.jac && (this.jac.mode === 'info' || this.jac.mode === 'drive')) {
+      const phone = this.app.screen.width <= 767;
+      bottom = Math.max(bottom, phone ? (this.jac.mode === 'info' ? 320 : 80) : 180);
+      if (this.jac.rearCam) top = Math.max(top, phone ? 140 : 160);
     }
     const panelInsets = this.events.buildingPanel?.layoutInsets?.();
     const bottomSheet =
@@ -1896,7 +1927,7 @@ export class IsoScene {
     this.ensureVisibleTiles();
     const { minX, maxX, minY, maxY } = this.viewWorldAabb(TILE_W * 1.5);
     const iso = this.qaIsolation;
-    this.avatar?.setVisible(!iso);
+    this.avatar?.setVisible(!iso && !this.jac?.driving);
     this.noah?.setHidden(!!iso || this.interiorActive);
     this.npcs?.cull({ minX, maxX, minY, maxY }, !!iso || this.interiorActive);
     this.fillActors?.cull({ minX, maxX, minY, maxY }, !!iso || this.interiorActive);
@@ -2527,6 +2558,9 @@ export class IsoScene {
         e.preventDefault();
       }
       if (e.key === 'Shift') this.shiftHeld = true;
+      if (!e.repeat && !isTypingTarget(e.target) && (k === 'e' || k === '1' || k === '2')) {
+        if (this.handleJacKey(k)) e.preventDefault();
+      }
       if ((e.key === 'Enter' || e.key === ' ') && !e.repeat && !isTypingTarget(e.target)) {
         if (this.seatedBench && !this.interiorActive) {
           this.standThen(null);
@@ -2772,6 +2806,10 @@ export class IsoScene {
   }
 
   private followTargetWorld(): { x: number; y: number } {
+    if (this.jac?.driving && !this.interiorActive) {
+      const c = this.jac.worldCenter();
+      return { x: c.x, y: c.y - CHAR_BODY_CENTRE_RISE };
+    }
     const foot = this.interiorActive
       ? tileToWorld(this.interiorCharTx, this.interiorCharTy)
       : tileToWorld(this.charTx, this.charTy);
@@ -2878,6 +2916,25 @@ export class IsoScene {
     this.leaveBenchIfStood();
     const stick = this.events.stick?.() ?? { x: 0, y: 0 };
     const stickLive = Math.abs(stick.x) > 0.02 || Math.abs(stick.y) > 0.02;
+    if (this.jac?.driving && !this.interiorActive) {
+      let dx = 0;
+      let dy = 0;
+      if (this.keys.has('w') || this.keys.has('arrowup')) dy -= 1;
+      if (this.keys.has('s') || this.keys.has('arrowdown')) dy += 1;
+      if (this.keys.has('a') || this.keys.has('arrowleft')) dx -= 1;
+      if (this.keys.has('d') || this.keys.has('arrowright')) dx += 1;
+      if (dx === 0 && dy === 0 && stickLive) {
+        dx = stick.x;
+        dy = stick.y;
+      }
+      if (dx !== 0 || dy !== 0) {
+        this.startCameraFollow();
+        this.fireMoveCommand();
+      }
+      this.jac.update(this.app.ticker.deltaMS / 1000, { dx, dy });
+      return;
+    }
+    this.jac?.update(this.app.ticker.deltaMS / 1000, { dx: 0, dy: 0 });
     if (stickLive) {
       this.noteAvatarInput();
       this.startCameraFollow();
@@ -3463,8 +3520,196 @@ export class IsoScene {
     return def.exitFace === '+x' ? 'nw' : 'ne';
   }
 
+  private initJac(): void {
+    const obj = objects.find((o) => o.id === JAC_ID);
+    const g = obj ? this.objectGraphics.get(obj.id) : undefined;
+    const v = obj ? this.objectVisuals.get(obj.id) : undefined;
+    if (!obj || !g || !v) return;
+    this.jac = new JacT9(obj, { container: g, visual: v, tapBox: this.objectTapBoxes });
+  }
+
+  private pickJacAtScreen(sx: number, sy: number): boolean {
+    if (!this.jac || this.interiorActive) return false;
+    const { x, y } = this.screenToWorld(sx, sy);
+    return spriteAlphaHit(this.jac.obj, x, y);
+  }
+
+  tapJac(): void {
+    if (!this.jac || this.interiorActive || this.jac.driving) return;
+    this.path = [];
+    this.drawPathPreview();
+    this.jac.openMenu();
+    void this.jac.ensureLoaded();
+    this.events.chrome?.onJacHud?.();
+  }
+
+  jacClose(): void {
+    this.jac?.closeToMap();
+  }
+
+  jacOpenInfo(): void {
+    if (!this.jac || this.jac.driving) return;
+    this.events.chrome?.onJacHud?.();
+    this.jac.openInfo();
+    void this.jac.ensureLoaded();
+  }
+
+  jacGetIn(): void {
+    if (!this.jac || this.interiorActive) return;
+    this.path = [];
+    this.drawPathPreview();
+    this.pendingBuildingEntry = null;
+    if (this.seatedBench) this.standThen(null);
+    this.events.chrome?.onJacHud?.();
+    this.jac.setMode('drive');
+    this.avatar.setVisible(false);
+    this.startCameraFollow();
+    this.centerOnCharacter(true);
+    void this.jac.ensureLoaded();
+  }
+
+  jacGetOut(): void {
+    if (!this.jac?.driving) return;
+    const spot = this.jac.exitTile();
+    this.jac.setMode('parked');
+    if (spot) {
+      this.charTx = spot.x;
+      this.charTy = spot.y;
+      this.syncCharacterGraphic();
+    }
+    this.avatar.setVisible(true);
+    this.jac.setBubble(true);
+    if (this.jacBubbleTimer) clearTimeout(this.jacBubbleTimer);
+    this.jacBubbleTimer = setTimeout(() => this.jac?.setBubble(false), 5000);
+    this.startCameraFollow();
+    this.centerOnCharacter(true);
+  }
+
+  jacSetLights(lights: JacLights): void {
+    this.jac?.setLights(lights);
+  }
+
+  jacSetGear(gear: JacGear): void {
+    this.jac?.setGear(gear);
+  }
+
+  jacSetToggle(id: JacToggleId): void {
+    this.jac?.setToggle(id);
+  }
+
+  jacSetEngine(): void {
+    if (!this.jac) return;
+    this.jac.setEngine(!this.jac.engineOn);
+  }
+
+  jacSetBubble(on: boolean): void {
+    if (this.jacBubbleTimer) {
+      clearTimeout(this.jacBubbleTimer);
+      this.jacBubbleTimer = null;
+    }
+    this.jac?.setBubble(on);
+  }
+
+  private handleJacKey(k: string): boolean {
+    if (!this.jac || this.interiorActive) return false;
+    if (k === 'e') {
+      if (this.jac.driving) {
+        this.jacGetOut();
+        return true;
+      }
+      if (this.jac.mode === 'menu' || this.jac.mode === 'info') {
+        this.jacGetIn();
+        return true;
+      }
+      return false;
+    }
+    if (this.jac.mode === 'menu' && k === '1') {
+      this.jacOpenInfo();
+      return true;
+    }
+    if (this.jac.mode === 'menu' && k === '2') {
+      this.jacGetIn();
+      return true;
+    }
+    return false;
+  }
+
+  jacSnapshot(): JacSnapshot | null {
+    return this.jac?.snapshot() ?? null;
+  }
+
+  jacHudAnchors(): {
+    menu: { x: number; y: number } | null;
+    bubble: { x: number; y: number } | null;
+    follow: { x: number; y: number };
+    rear: { canvas: HTMLCanvasElement; sx: number; sy: number; sw: number; sh: number } | null;
+  } {
+    const rect = this.canvasEl?.getBoundingClientRect();
+    const toClient = (wx: number, wy: number) => {
+      const s = this.worldToScreen(wx, wy);
+      return { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y };
+    };
+    const follow = this.jac?.driving ? this.jac.worldCenter() : tileToWorld(this.charTx, this.charTy);
+    let menu: { x: number; y: number } | null = null;
+    let bubble: { x: number; y: number } | null = null;
+    if (this.jac && this.jac.mode === 'menu') menu = toClient(this.jac.worldRoof().x, this.jac.worldRoof().y);
+    if (this.jac?.bubble) {
+      const head = this.worldToScreen(tileToWorld(this.charTx, this.charTy).x, tileToWorld(this.charTx, this.charTy).y - 90);
+      bubble = { x: (rect?.left ?? 0) + head.x, y: (rect?.top ?? 0) + head.y };
+    }
+    let rear: { canvas: HTMLCanvasElement; sx: number; sy: number; sw: number; sh: number } | null = null;
+    if (this.jac?.rearCam && this.canvasEl) {
+      const src = this.jac.rearSource(
+        (x, y) => this.worldToScreen(x, y),
+        this.app.screen.width,
+        this.app.screen.height,
+      );
+      rear = { canvas: this.canvasEl, ...src };
+    }
+    return { menu, bubble, follow, rear };
+  }
+
+  qaJac(): JacSnapshot | null {
+    return this.jacSnapshot();
+  }
+
+  qaJacSet(partial: {
+    mode?: JacSnapshot['mode'];
+    lights?: JacLights;
+    gear?: JacGear;
+    dir?: 'se' | 'sw' | 'ne' | 'nw';
+    engineOn?: boolean;
+    bubble?: boolean;
+    reversing?: boolean;
+    steering?: number;
+    trunk?: boolean;
+    cx?: number;
+    cy?: number;
+  }): JacSnapshot | null {
+    if (!this.jac) return null;
+    if (partial.lights) this.jac.setLights(partial.lights);
+    if (partial.gear) this.jac.setGear(partial.gear);
+    if (partial.engineOn !== undefined) this.jac.setEngine(partial.engineOn);
+    if (partial.trunk !== undefined) this.jac.setTrunk(partial.trunk);
+    if (partial.bubble !== undefined) this.jacSetBubble(partial.bubble);
+    if (partial.dir || partial.cx !== undefined || partial.cy !== undefined) {
+      this.jac.qaPlace(partial.cx ?? this.jac.cx, partial.cy ?? this.jac.cy, partial.dir ?? this.jac.dir, this.jac.driving);
+    }
+    if (partial.mode === 'menu') this.tapJac();
+    else if (partial.mode === 'info') this.jacOpenInfo();
+    else if (partial.mode === 'drive') this.jacGetIn();
+    else if (partial.mode === 'parked' && this.jac.driving) this.jacGetOut();
+    else if (partial.mode === 'parked') this.jacClose();
+    if (partial.reversing !== undefined) this.jac.reversing = partial.reversing;
+    if (partial.steering !== undefined) this.jac.steering = partial.steering;
+    this.jac.applySprite();
+    this.app?.render();
+    return this.jac.snapshot();
+  }
+
   /** For QA — programmatic walk */
   getCharacterTile(): { x: number; y: number } {
+    if (this.jac?.driving) return { x: Math.round(this.jac.cx), y: Math.round(this.jac.cy) };
     return { x: Math.round(this.charTx), y: Math.round(this.charTy) };
   }
 
