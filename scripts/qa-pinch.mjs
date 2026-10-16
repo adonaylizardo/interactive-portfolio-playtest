@@ -3085,7 +3085,12 @@ async function testPanelClickInside(page, errors) {
     errors.push('panel-inside: could not open panel');
     return;
   }
-  await page.locator('.building-panel__title').click();
+  const sheet = await page.locator('.building-panel__sheet').boundingBox();
+  if (!sheet) {
+    errors.push('panel-inside: sheet missing');
+    return;
+  }
+  await page.mouse.click(sheet.x + Math.min(48, sheet.width / 2), sheet.y + Math.min(36, sheet.height / 2));
   await wait(300);
   if ((await page.locator('.building-panel--open').count()) === 0) {
     errors.push('panel-inside: panel closed on click inside sheet');
