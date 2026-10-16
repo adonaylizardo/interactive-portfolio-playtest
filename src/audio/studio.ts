@@ -7,8 +7,13 @@ import { VOICE_LINES } from '../data/voice-lines';
 
 const MUTE_KEY = 'studio-audio-muted';
 const VOICE_DIR = `${import.meta.env.BASE_URL}audio/voice/`;
+const AMBIENCE_DIR = `${import.meta.env.BASE_URL}audio/`;
+const BARK_DIR = `${import.meta.env.BASE_URL}audio/barks/`;
 /** −12 dB vs the previous 0.16 foot gain (0.16 × 10^(−12/20) ≈ 0.040). */
 const FOOT_GAIN = 0.04;
+const BARK_COOLDOWN_MS = 6000;
+
+type BarkLine = { id: string; phrase: string; mp3: string; ogg: string };
 const FOOT_MIN_MS_WALK = 140;
 const FOOT_MIN_MS_SPRINT = 95;
 /** Walk-cycle frames where a foot plants (8-frame strip, two contacts). */
@@ -61,6 +66,12 @@ export class StudioAudio {
   /** First gesture owns the intro; other lines wait until it has finished. */
   private introLock = false;
   private pending: string | null = null;
+  private bark: HTMLAudioElement | null = null;
+  private barkLines: BarkLine[] = [];
+  private barkReady = new Set<string>();
+  private lastBarkId = '';
+  private lastBarkAt = 0;
+  private barksLoaded = false;
 
   constructor() {
     const unlock = () => this.unlock();
@@ -75,6 +86,18 @@ export class StudioAudio {
 
   isUnlocked(): boolean {
     return this.unlocked;
+  }
+
+  isVoicePlaying(): boolean {
+    return !!this.voice;
+  }
+
+  qaBarks(): { ready: string[]; lastId: string; cooldownMs: number } {
+    return {
+      ready: [...this.barkReady],
+      lastId: this.lastBarkId,
+      cooldownMs: BARK_COOLDOWN_MS,
+    };
   }
 
   subtitle(): string {
@@ -94,8 +117,10 @@ export class StudioAudio {
     this.muted = muted;
     writeMute(muted);
     if (this.master) this.master.gain.value = muted ? 0 : 1;
-    if (muted) this.stopVoice();
-    else this.syncAmbience();
+    if (muted) {
+      this.stopVoice();
+      this.stopBark();
+    } else this.syncAmbience();
     this.emit();
   }
 
@@ -134,6 +159,7 @@ export class StudioAudio {
         this.master.connect(this.ctx.destination);
         void this.ctx.resume();
         this.startAmbience();
+        void this.loadBarks();
       } else {
         void this.ctx?.resume();
       }
@@ -180,6 +206,39 @@ export class StudioAudio {
     this.playLine(file);
   }
 
+  /** Move command: a random bark ≠ last, ~6 s cooldown, never over a case line. */
+  noteMoveCommand(): void {
+    if (this.muted || !this.unlocked || this.voice) return;
+    if (automatedWebKitPhone()) return;
+    const now = performance.now();
+    if (now - this.lastBarkAt < BARK_COOLDOWN_MS) return;
+    if (!this.barksLoaded) void this.loadBarks();
+    if (this.barkReady.size === 0) return;
+    const pool = [...this.barkReady].filter((id) => id !== this.lastBarkId);
+    const pick = (pool.length ? pool : [...this.barkReady])[Math.floor(Math.random() * (pool.length || this.barkReady.size))];
+    const line = this.barkLines.find((l) => l.id === pick);
+    if (!line) return;
+    this.preferOgg ??= canPlayOgg();
+    const file = this.preferOgg ? line.ogg : line.mp3;
+    this.stopBark();
+    const el = new Audio(`${BARK_DIR}${file}`);
+    el.preload = 'auto';
+    el.addEventListener('error', () => {
+      this.barkReady.delete(line.id);
+      if (this.bark === el) this.bark = null;
+    });
+    el.addEventListener('ended', () => {
+      if (this.bark === el) this.bark = null;
+    });
+    this.bark = el;
+    this.lastBarkId = line.id;
+    this.lastBarkAt = now;
+    void el.play().catch(() => {
+      this.barkReady.delete(line.id);
+      if (this.bark === el) this.bark = null;
+    });
+  }
+
   playLine(id: string): void {
     const line = VOICE_LINES[id];
     if (!line || this.played.has(id) || this.muted) return;
@@ -189,6 +248,7 @@ export class StudioAudio {
       return;
     }
     this.stopVoice();
+    this.stopBark();
     this.played.add(id);
     this.subtitleText = line.script_text;
     this.emit();
@@ -238,6 +298,38 @@ export class StudioAudio {
     const ctx = this.ctx;
     const master = this.master;
     if (!ctx || !master || this.ambience) return;
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    gain.connect(master);
+    this.ambienceGain = gain;
+    void this.loadAmbienceBuffer(ctx)
+      .then((buffer) => {
+        if (this.ambience || this.ctx !== ctx) return;
+        const src = ctx.createBufferSource();
+        src.buffer = buffer;
+        src.loop = true;
+        src.connect(gain);
+        src.start();
+        this.ambience = src;
+        this.syncAmbience();
+      })
+      .catch(() => {
+        if (this.ambience || this.ctx !== ctx) return;
+        this.startFallbackAmbience(ctx, gain);
+      });
+  }
+
+  private async loadAmbienceBuffer(ctx: AudioContext): Promise<AudioBuffer> {
+    this.preferOgg ??= canPlayOgg();
+    const file = this.preferOgg ? 'ambience-nature.ogg' : 'ambience-nature.mp3';
+    const res = await fetch(`${AMBIENCE_DIR}${file}`);
+    if (!res.ok) throw new Error('ambience missing');
+    const raw = await res.arrayBuffer();
+    return ctx.decodeAudioData(raw.slice(0));
+  }
+
+  /** Soft brown-noise bed if the CC0 file cannot decode. */
+  private startFallbackAmbience(ctx: AudioContext, gain: GainNode): void {
     const seconds = 2.5;
     const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * seconds), ctx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -254,15 +346,43 @@ export class StudioAudio {
     filter.type = 'lowpass';
     filter.frequency.value = 720;
     filter.Q.value = 0.5;
-    const gain = ctx.createGain();
-    gain.gain.value = 0;
     src.connect(filter);
     filter.connect(gain);
-    gain.connect(master);
     src.start();
     this.ambience = src;
-    this.ambienceGain = gain;
     this.syncAmbience();
+  }
+
+  private async loadBarks(): Promise<void> {
+    if (this.barksLoaded) return;
+    this.barksLoaded = true;
+    try {
+      const res = await fetch(`${BARK_DIR}manifest.json`);
+      if (!res.ok) return;
+      const data = (await res.json()) as { lines?: BarkLine[] };
+      this.barkLines = data.lines ?? [];
+      this.preferOgg ??= canPlayOgg();
+      await Promise.all(
+        this.barkLines.map(async (line) => {
+          const file = this.preferOgg ? line.ogg : line.mp3;
+          try {
+            const probe = await fetch(`${BARK_DIR}${file}`, { method: 'HEAD' });
+            if (probe.ok) this.barkReady.add(line.id);
+          } catch {
+            /* missing file: stay silent */
+          }
+        }),
+      );
+    } catch {
+      /* empty slot: stay silent */
+    }
+  }
+
+  private stopBark(): void {
+    if (!this.bark) return;
+    this.bark.pause();
+    this.bark.src = '';
+    this.bark = null;
   }
 
   private ambienceTarget(): number {
