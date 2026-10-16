@@ -3652,7 +3652,15 @@ export class IsoScene {
     const follow = this.jac?.driving ? this.jac.worldCenter() : tileToWorld(this.charTx, this.charTy);
     let menu: { x: number; y: number } | null = null;
     let bubble: { x: number; y: number } | null = null;
-    if (this.jac && this.jac.mode === 'menu') menu = toClient(this.jac.worldRoof().x, this.jac.worldRoof().y);
+    if (this.jac && this.jac.mode === 'menu') {
+      const v = this.objectVisuals.get(JAC_ID);
+      if (v) {
+        menu = toClient((v.cull.x0 + v.cull.x1) / 2, v.cull.y0 + 28);
+      } else {
+        const roof = this.jac.worldRoof();
+        menu = toClient(roof.x, roof.y);
+      }
+    }
     if (this.jac?.bubble) {
       const head = this.worldToScreen(tileToWorld(this.charTx, this.charTy).x, tileToWorld(this.charTx, this.charTy).y - 90);
       bubble = { x: (rect?.left ?? 0) + head.x, y: (rect?.top ?? 0) + head.y };
@@ -3701,7 +3709,7 @@ export class IsoScene {
     else if (partial.mode === 'parked' && this.jac.driving) this.jacGetOut();
     else if (partial.mode === 'parked') this.jacClose();
     if (partial.reversing !== undefined) this.jac.reversing = partial.reversing;
-    if (partial.steering !== undefined) this.jac.steering = partial.steering;
+    if (partial.steering !== undefined) this.jac.setQaSteer(partial.steering);
     this.jac.applySprite();
     this.app?.render();
     return this.jac.snapshot();

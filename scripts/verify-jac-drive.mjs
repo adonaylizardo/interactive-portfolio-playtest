@@ -171,7 +171,23 @@ async function applyState(page, id) {
       qa.jacSet({ reversing: true, steering: 0.8 });
     }
   }, id);
-  await wait(id.startsWith('2') || id.startsWith('3') || id.startsWith('4') || id.startsWith('7') || id.startsWith('8') ? 800 : 350);
+  await page
+    .waitForFunction(
+      (stateId) => {
+        const j = window.__playtestQa.jac?.();
+        if (!j) return false;
+        if (stateId === '1-menu') return j.mode === 'menu';
+        if (stateId.startsWith('2') || stateId.startsWith('3')) return j.mode === 'info' && j.loaded;
+        if (stateId.startsWith('4') || stateId.startsWith('7') || stateId.startsWith('8'))
+          return j.driving && j.loaded;
+        if (stateId === '6-out-bubble') return j.bubble;
+        return true;
+      },
+      id,
+      { timeout: 8000 },
+    )
+    .catch(() => {});
+  await wait(200);
 }
 
 async function runViewport(tag, options, phone) {

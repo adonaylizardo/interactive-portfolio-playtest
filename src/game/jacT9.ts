@@ -1,7 +1,6 @@
-import { Container, Rectangle, Sprite, Texture } from 'pixi.js';
+import { Assets, Container, Rectangle, Sprite, Texture } from 'pixi.js';
 import { cells, MAP_HEIGHT, MAP_WIDTH, type MapObject } from '../data/map';
 import { tileFootWorld, tileToWorld } from '../iso/math';
-import { loadPngOrWebp } from './assetUrl';
 import { objectDepth, objectOccluder, objectSpriteScale, type OccluderBox } from './mapSprites';
 import { spriteResolution } from './sprites';
 import { WALK_TILES_PER_S, type FacingDir } from './player';
@@ -54,6 +53,7 @@ export type JacInput = { dx: number; dy: number };
 
 export type JacSnapshot = {
   mode: JacMode;
+  loaded: boolean;
   driving: boolean;
   engineOn: boolean;
   lights: JacLights;
@@ -151,6 +151,7 @@ export class JacT9 {
   private wheel = 0;
   private wheelAcc = 0;
   private row: 'apagado' | 'luces' | 'freno' = 'apagado';
+  private qaSteer: number | null = null;
 
   constructor(obj: MapObject, hooks: JacHooks) {
     this.obj = obj;
@@ -294,24 +295,8 @@ export class JacT9 {
     this.hooks.onChange?.();
   }
 
-  /** Walkable tile beside the van, or null if none. */
+  /** Walkable tile beside the van, or null if none. Prefers the near/south side so the avatar stays on screen. */
   exitTile(): { x: number; y: number } | null {
-    const right: Record<FacingDir, { x: number; y: number }> = {
-      se: { x: 0, y: 1 },
-      sw: { x: -1, y: 0 },
-      nw: { x: 0, y: -1 },
-      ne: { x: 1, y: 0 },
-    };
-    const r = right[this.dir];
-    const f = DIR_VEC[this.dir];
-    const order = [
-      { x: r.x, y: r.y },
-      { x: -r.x, y: -r.y },
-      { x: -f.x, y: -f.y },
-      { x: f.x, y: f.y },
-      { x: r.x + f.x, y: r.y + f.y },
-      { x: r.x - f.x, y: r.y - f.y },
-    ];
     const foot = this.solidCells();
     const blocked = new Set(foot.map(([x, y]) => k(x, y)));
     const tryCell = (x: number, y: number) => {
@@ -319,13 +304,25 @@ export class JacT9 {
       if (!c || blocked.has(k(x, y))) return false;
       return c.walkable;
     };
-    for (const o of order) {
-      for (const [sx, sy] of foot) {
-        const x = sx + o.x;
-        const y = sy + o.y;
-        if (tryCell(x, y)) return { x, y };
+    const found: { x: number; y: number }[] = [];
+    for (const [sx, sy] of foot) {
+      for (const [dx, dy] of [
+        [1, 0],
+        [0, 1],
+        [1, 1],
+        [-1, 1],
+        [1, -1],
+        [-1, 0],
+        [0, -1],
+        [-1, -1],
+      ] as const) {
+        const x = sx + dx;
+        const y = sy + dy;
+        if (tryCell(x, y) && !found.some((p) => p.x === x && p.y === y)) found.push({ x, y });
       }
     }
+    found.sort((a, b) => b.x + b.y - (a.x + a.y));
+    if (found[0]) return found[0];
     for (let d = 1; d <= 3; d++) {
       for (let dy = -d; dy <= d; dy++) {
         for (let dx = -d; dx <= d; dx++) {
@@ -361,7 +358,14 @@ export class JacT9 {
     const fwd = DIR_VEC[this.dir];
     const along = live ? dx * fwd.x + dy * fwd.y : 0;
     const side = live ? dx * fwd.y - dy * fwd.x : 0;
-    this.steering = Math.max(-1, Math.min(1, side * 1.4));
+    if (live) {
+      this.qaSteer = null;
+      this.steering = Math.max(-1, Math.min(1, side * 1.4));
+    } else if (this.qaSteer != null) {
+      this.steering = this.qaSteer;
+    } else {
+      this.steering = 0;
+    }
 
     const canGo = this.gear === 'D' || this.gear === 'R';
     let reverse = this.gear === 'R';
@@ -444,16 +448,19 @@ export class JacT9 {
     const key = moving
       ? this.hojaKey(this.dir, this.row, this.wheel, hi)
       : this.fixedKey(this.dir, this.row, hi);
-    const tex = this.textures.get(key);
+    const tex =
+      this.textures.get(key) ??
+      this.textures.get(moving ? this.hojaKey(this.dir, this.row, this.wheel, !hi) : this.fixedKey(this.dir, this.row, !hi));
     if (tex) this.body.texture = tex;
     const coneKey = this.layerKey('cono_suelo', this.dir, hi);
     const hazeKey = this.layerKey('haz_salida', this.dir, hi);
     const coneTex = this.textures.get(coneKey);
     const hazeTex = this.textures.get(hazeKey);
-    const showCone = on && !!coneTex;
-    this.cone.visible = showCone;
+    // luces/freno frames already include the ground cone; extra capas only fill gaps.
+    const baked = this.row !== 'apagado' && !!tex;
+    this.cone.visible = on && !baked && !!coneTex;
     if (coneTex) this.cone.texture = coneTex;
-    this.haze.visible = on && !!hazeTex;
+    this.haze.visible = on && !baked && !!hazeTex;
     if (hazeTex) this.haze.texture = hazeTex;
     this.layout();
   }
@@ -462,6 +469,7 @@ export class JacT9 {
     const size = this.driving ? { w: DRIVE_BOX, h: DRIVE_BOX } : parkSize(this.dir);
     return {
       mode: this.mode,
+      loaded: this.loaded,
       driving: this.driving,
       engineOn: this.engineOn,
       lights: this.lights,
@@ -483,6 +491,11 @@ export class JacT9 {
       h: size.h,
       toggles: { ...this.toggles },
     };
+  }
+
+  setQaSteer(value: number | null): void {
+    this.qaSteer = value;
+    this.steering = value ?? 0;
   }
 
   /** QA: snap the van to a tile centre and facing. */
@@ -663,42 +676,35 @@ export class JacT9 {
     await Promise.all(jobs);
   }
 
+  private async loadTex(alias: string, url: string): Promise<Texture | null> {
+    try {
+      return await Assets.load<Texture>({
+        alias,
+        src: url,
+        data: { autoGenerateMipmaps: false, magFilter: 'nearest', minFilter: 'nearest' },
+      });
+    } catch {
+      return null;
+    }
+  }
+
   private async loadFixed(dir: FacingDir, row: string, hi: boolean, url: string): Promise<void> {
     const alias = this.fixedKey(dir, row, hi);
-    try {
-      const tex = await loadPngOrWebp(alias, url, {
-            autoGenerateMipmaps: false,
-            magFilter: 'nearest',
-            minFilter: 'nearest',
-          });
-      this.textures.set(alias, tex);
-    } catch {
-      /* missing variant */
-    }
+    const tex = await this.loadTex(alias, url);
+    if (tex) this.textures.set(alias, tex);
   }
 
   private async loadLayer(layer: string, dir: FacingDir, hi: boolean, url: string): Promise<void> {
     const alias = this.layerKey(layer, dir, hi);
-    try {
-      const tex = await loadPngOrWebp(alias, url, {
-            autoGenerateMipmaps: false,
-            magFilter: 'nearest',
-            minFilter: 'nearest',
-          });
-      this.textures.set(alias, tex);
-    } catch {
-      /* optional */
-    }
+    const tex = await this.loadTex(alias, url);
+    if (tex) this.textures.set(alias, tex);
   }
 
   private async loadHoja(dir: FacingDir, hi: boolean, url: string): Promise<void> {
     const alias = `jac:hoja:${dir}:${hi ? 2 : 1}`;
     try {
-      const sheet = await loadPngOrWebp(alias, url, {
-        autoGenerateMipmaps: false,
-        magFilter: 'nearest',
-        minFilter: 'nearest',
-      });
+      const sheet = await this.loadTex(alias, url);
+      if (!sheet) return;
       const cw = hi ? CELL_1X.w * 2 : CELL_1X.w;
       const ch = hi ? CELL_1X.h * 2 : CELL_1X.h;
       const rows = ['apagado', 'luces', 'freno'] as const;
