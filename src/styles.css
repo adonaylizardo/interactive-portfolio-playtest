@@ -1867,6 +1867,14 @@ body[data-layout='panel'] .checklist {
   cursor: pointer;
 }
 
+.jac-menu__row .jac-pill {
+  height: 44px;
+  min-height: 44px;
+  min-width: 44px;
+  border-radius: 22px;
+  padding: 0 16px 0 12px;
+}
+
 .jac-pill i {
   display: inline-flex;
   width: 18px;
@@ -2163,14 +2171,42 @@ body[data-layout='panel'] .checklist {
   bottom: 12px;
   z-index: 19;
   height: 56px;
-  padding: 0 16px;
+  padding: 0 12px 0 16px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   border-radius: 18px;
   background: #141518;
   border: 1px solid #2a2c31;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+}
+
+.jac-bar > span {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.jac-bar__gears {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  flex: 1 1 auto;
+}
+
+.jac-bar .jac-gear {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 50%;
+  font: 700 12px/36px Inter, sans-serif;
+}
+
+.jac-bar__btn {
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .jac-steer {

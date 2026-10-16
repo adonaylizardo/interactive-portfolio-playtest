@@ -91,15 +91,16 @@ export class JacHud {
     rearBlit?: { canvas: HTMLCanvasElement; sx: number; sy: number; sw: number; sh: number } | null,
   ): void {
     this.snap = snap;
-    const show = !!snap && snap.mode !== 'parked';
-    this.root.hidden = !show && !(snap?.bubble);
-    if (!snap) {
-      document.body.classList.remove('jac-info', 'jac-drive', 'jac-rearcam', 'jac-hud-open');
-      this.root.hidden = true;
+    const open = !!snap && (snap.mode !== 'parked' || snap.bubble);
+    if (!open || !snap) {
+      if (!this.root.hidden || document.body.classList.contains('jac-hud-open')) {
+        this.root.hidden = true;
+        document.body.classList.remove('jac-info', 'jac-drive', 'jac-rearcam', 'jac-hud-open');
+        this.lastHtml = '';
+      }
       return;
     }
-    const open = snap.mode !== 'parked' || snap.bubble;
-    this.root.hidden = !open;
+    this.root.hidden = false;
     document.body.classList.toggle('jac-hud-open', snap.mode === 'info' || snap.mode === 'drive');
     document.body.classList.toggle('jac-info', snap.mode === 'info');
     document.body.classList.toggle('jac-drive', snap.mode === 'drive');
@@ -111,7 +112,7 @@ export class JacHud {
     if (anchors.bubble && snap.bubble) {
       this.bubbleEl.style.transform = `translate(${Math.round(anchors.bubble.x)}px, ${Math.round(anchors.bubble.y)}px) translate(-50%, -100%)`;
     }
-    if (snap.mode === 'drive' || snap.mode === 'info') this.drawMini(anchors.follow);
+    if (!this.mobile && (snap.mode === 'drive' || snap.mode === 'info')) this.drawMini(anchors.follow);
     if (snap.rearCam && rearBlit) this.blitRear(rearBlit);
   }
 
@@ -175,8 +176,7 @@ export class JacHud {
       if (body) body.innerHTML = this.dockBody(snap);
     }
     if (phone && snap.mode === 'drive') {
-      const out = snap.mode === 'drive' ? 'Get out' : 'Get in';
-      this.barEl.querySelector('.jac-bar__btn')!.textContent = out;
+      this.barEl.querySelector('.jac-bar__btn')!.textContent = 'Get out';
     }
     this.syncLive(snap);
   }
@@ -387,6 +387,9 @@ export class JacHud {
       </section>
       <div class="jac-bar" hidden>
         <span>JAC T9</span>
+        <div class="jac-bar__gears" role="group" aria-label="Gear">
+          ${(['P', 'R', 'N', 'D'] as JacGear[]).map((g) => `<button type="button" class="jac-gear" data-jac="gear" data-val="${g}">${g}</button>`).join('')}
+        </div>
         <button type="button" class="jac-btn jac-btn--primary jac-bar__btn" data-jac="out">Get out</button>
       </div>
       <div class="jac-steer" hidden aria-hidden="true">${glyph('wheel')}</div>

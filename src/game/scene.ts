@@ -2923,18 +2923,19 @@ export class IsoScene {
       if (this.keys.has('s') || this.keys.has('arrowdown')) dy += 1;
       if (this.keys.has('a') || this.keys.has('arrowleft')) dx -= 1;
       if (this.keys.has('d') || this.keys.has('arrowright')) dx += 1;
+      let autoShift = false;
       if (dx === 0 && dy === 0 && stickLive) {
         dx = stick.x;
         dy = stick.y;
+        autoShift = true;
       }
       if (dx !== 0 || dy !== 0) {
         this.startCameraFollow();
         this.fireMoveCommand();
       }
-      this.jac.update(this.app.ticker.deltaMS / 1000, { dx, dy });
+      this.jac.update(this.app.ticker.deltaMS / 1000, { dx, dy, autoShift });
       return;
     }
-    this.jac?.update(this.app.ticker.deltaMS / 1000, { dx: 0, dy: 0 });
     if (stickLive) {
       this.noteAvatarInput();
       this.startCameraFollow();

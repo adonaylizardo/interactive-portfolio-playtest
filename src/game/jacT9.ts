@@ -51,7 +51,7 @@ export type JacVisual = {
   zIndex: number;
 };
 
-export type JacInput = { dx: number; dy: number };
+export type JacInput = { dx: number; dy: number; autoShift?: boolean };
 
 export type JacSnapshot = {
   mode: JacMode;
@@ -345,7 +345,6 @@ export class JacT9 {
         this.rpm = 0;
         this.mph = 0;
       }
-      this.applySprite();
       return;
     }
 
@@ -357,6 +356,11 @@ export class JacT9 {
       dy /= mag;
     }
     const live = mag > 0.08;
+    // Phone joystick: push up (screen y < 0) → D, pull down → R, release → hold/brake.
+    if (input.autoShift && live) {
+      if (dy < -0.16) this.gear = 'D';
+      else if (dy > 0.16) this.gear = 'R';
+    }
     const fwd = DIR_VEC[this.dir];
     const along = live ? dx * fwd.x + dy * fwd.y : 0;
     const side = live ? dx * fwd.y - dy * fwd.x : 0;
@@ -371,7 +375,7 @@ export class JacT9 {
 
     const canGo = this.gear === 'D' || this.gear === 'R';
     let reverse = this.gear === 'R';
-    if (this.gear === 'D' && along < -0.35) reverse = true;
+    if (!input.autoShift && this.gear === 'D' && along < -0.35) reverse = true;
     this.reversing = reverse && (live || this.gear === 'R');
 
     if (canGo && live) {
