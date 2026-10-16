@@ -1882,6 +1882,12 @@ body[data-layout='panel'] .checklist {
   gap: 8px;
 }
 
+@media (max-width: 767px) {
+  .jac-menu {
+    max-width: calc(100vw - 104px);
+  }
+}
+
 .jac-badge {
   display: inline-flex;
   align-items: center;
@@ -2150,10 +2156,38 @@ body[data-layout='panel'] .checklist {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
 }
 
-.jac-bar > span {
+.jac-bar > span,
+.jac-bar__id {
   flex: 0 0 auto;
   font-size: 13px;
   font-weight: 600;
+}
+
+.jac-bar__id {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  min-width: 44px;
+  line-height: 1.1;
+}
+
+.jac-bar__id > span:first-child {
+  font-size: 11px;
+  font-weight: 600;
+  color: #c5c8ce;
+}
+
+.jac-bar__mph {
+  font-size: 12px;
+  font-weight: 700;
+  color: #8a8f98;
+  letter-spacing: -0.02em;
+}
+
+.jac-bar__mph b {
+  color: #edeef0;
+  font-weight: 700;
 }
 
 .jac-bar__gears {
@@ -2403,11 +2437,20 @@ body[data-layout='panel'] .checklist {
   background: #141518;
   overflow: hidden;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.45s ease, visibility 0.45s ease;
+}
+
+.jac-rear.is-on {
+  opacity: 1;
+  visibility: visible;
 }
 
 .jac-rear--phone {
-  top: 8px;
-  width: calc(100vw - 16px);
+  top: 80px;
+  width: calc(100vw - 32px);
   border-radius: 20px;
 }
 
@@ -2483,9 +2526,7 @@ body.jac-drive .chrome__locate {
 }
 
 body.jac-drive .chrome__dock,
-body.jac-info[data-chrome='phone'] .chrome__dock,
-body.jac-rearcam .checklist,
-body.jac-rearcam .chrome__tools-phone {
+body.jac-info[data-chrome='phone'] .chrome__dock {
   visibility: hidden;
 }
 

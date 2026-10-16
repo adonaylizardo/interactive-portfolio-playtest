@@ -116,7 +116,14 @@ export class JacHud {
     document.body.classList.toggle('jac-rearcam', snap.rearCam);
     this.render(snap);
     if (anchors.menu && snap.mode === 'menu') {
-      this.menuEl.style.transform = `translate(${Math.round(anchors.menu.x)}px, ${Math.round(anchors.menu.y)}px) translate(-50%, -100%)`;
+      const phone = this.mobile;
+      const menuW = Math.max(this.menuEl.offsetWidth || 0, 220);
+      const half = menuW / 2;
+      const pad = 12;
+      const rightReserve = phone ? 88 : 16;
+      const x = Math.max(pad + half, Math.min(window.innerWidth - rightReserve - half, anchors.menu.x));
+      const y = Math.max(56, Math.min(window.innerHeight - 96, anchors.menu.y));
+      this.menuEl.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px) translate(-50%, -100%)`;
     }
     this.bubbleEl.hidden = true;
     this.bubbleEl.style.transform = '';
@@ -170,7 +177,8 @@ export class JacHud {
     this.steerEl.hidden = true;
     this.bubbleEl.hidden = true;
     this.root.classList.toggle('jac-hud--drive', snap.mode === 'drive');
-    this.rearEl.hidden = !snap.rearCam;
+    this.rearEl.hidden = snap.mode !== 'drive';
+    this.rearEl.classList.toggle('is-on', snap.rearCam);
     this.rearEl.classList.toggle('jac-rear--phone', phone);
     this.rearEl.classList.toggle('jac-rear--turn', Math.abs(snap.steering) > 0.25);
     this.steerEl.classList.toggle('is-live', snap.mph > 0);
@@ -191,7 +199,8 @@ export class JacHud {
       if (body) body.innerHTML = this.dockBody(snap);
     }
     if (phone && snap.mode === 'drive') {
-      this.barEl.querySelector('.jac-bar__btn')!.textContent = 'Get out';
+      const btn = this.barEl.querySelector('.jac-bar__btn');
+      if (btn) btn.textContent = 'Get out';
     }
     this.syncLive(snap);
   }
@@ -412,7 +421,10 @@ export class JacHud {
         </div>
       </section>
       <div class="jac-bar" hidden>
-        <span>JAC T9</span>
+        <span class="jac-bar__id">
+          <span>JAC T9</span>
+          <span class="jac-bar__mph"><b data-mph>0</b> mph</span>
+        </span>
         <div class="jac-bar__gears" role="group" aria-label="Gear">
           ${(['P', 'R', 'N', 'D'] as JacGear[]).map((g) => `<button type="button" class="jac-gear" data-jac="gear" data-val="${g}" aria-pressed="false">${g}</button>`).join('')}
         </div>
