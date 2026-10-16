@@ -2664,9 +2664,16 @@ export class IsoScene {
     );
 
     let lastTouchCount = 0;
+    let driveTap: { x: number; y: number; t: number } | null = null;
 
     const onTouchPinchStartPassive = (e: TouchEvent) => {
       if (e.touches.length < 2) lastTouchCount = e.touches.length;
+      if (this.jac?.driving && e.touches.length === 1 && !this.events.stickActive?.()) {
+        const t = e.touches[0];
+        driveTap = { x: t.clientX, y: t.clientY, t: performance.now() };
+      } else if (e.touches.length >= 2) {
+        driveTap = null;
+      }
     };
     const onTouchPinchStart = (e: TouchEvent) => {
       if (!isGameTouchTarget(e.target)) return;
@@ -2719,6 +2726,25 @@ export class IsoScene {
       (e) => {
         lastTouchCount = e.touches.length;
         if (e.touches.length < 2) endTouchPinch();
+        if (
+          this.jac?.driving &&
+          driveTap &&
+          e.changedTouches.length === 1 &&
+          e.touches.length === 0 &&
+          !this.events.stickActive?.() &&
+          !this.pinchGestureActive
+        ) {
+          const t = e.changedTouches[0];
+          const dt = performance.now() - driveTap.t;
+          const dist = Math.hypot(t.clientX - driveTap.x, t.clientY - driveTap.y);
+          driveTap = null;
+          if (dt < 450 && dist < 22) {
+            const rect = canvas.getBoundingClientRect();
+            this.requestDriveToScreen(t.clientX - rect.left, t.clientY - rect.top);
+          }
+        } else if (e.touches.length === 0) {
+          driveTap = null;
+        }
       },
       { passive: true },
     );
