@@ -128,13 +128,6 @@ function wrapHeading(h: number): number {
   return x;
 }
 
-function headingDelta(from: number, to: number): number {
-  let d = wrapHeading(to) - wrapHeading(from);
-  if (d > 2) d -= 4;
-  if (d < -2) d += 4;
-  return d;
-}
-
 function slide(
   x: number,
   y: number,
@@ -180,7 +173,7 @@ export class JacT9 {
   /** Footprint centre in tile space (floats while driving). */
   cx: number;
   cy: number;
-  /** Parked map placement — never follows the driven van. Origin 23,16; centre 25,17; front 27,18. */
+  /** Initial map placement of this same van (origin 23,16). Driving moves these coords. */
   readonly spawn: {
     origin: { x: number; y: number };
     center: { x: number; y: number };
@@ -192,6 +185,8 @@ export class JacT9 {
   private wheelAcc = 0;
   private row: 'apagado' | 'luces' | 'freno' = 'apagado';
   private qaSteer: number | null = null;
+  /** True after the player taps D/R/P/N so auto-shift does not overwrite it. */
+  private gearHeld = false;
   private hazardT = 0;
   /** Continuous heading: 0=se, 1=sw, 2=nw, 3=ne. */
   private heading = 0;
@@ -236,7 +231,7 @@ export class JacT9 {
   }
 
   get rearCam(): boolean {
-    return this.driving && this.gear === 'R' && this.vel <= 0.08;
+    return this.driving && (this.gear === 'R' || this.reversing);
   }
 
   ensureLoaded(): Promise<void> {
@@ -260,12 +255,14 @@ export class JacT9 {
       this.mph = 0;
       this.vel = 0;
       this.heading = dirIndex(this.dir);
+      this.gearHeld = false;
       this.bubble = false;
       this.clearDrivePath();
       this.applyParkedSolid(false);
     } else if (wasDrive) {
       this.engineOn = false;
       this.gear = 'P';
+      this.gearHeld = false;
       this.rpm = 0;
       this.mph = 0;
       this.vel = 0;
@@ -303,14 +300,13 @@ export class JacT9 {
   }
 
   setGear(gear: JacGear): void {
-    if (!this.driving) {
-      this.gear = gear;
-      return;
-    }
     this.gear = gear;
+    this.gearHeld = true;
     if (gear === 'P' || gear === 'N') {
+      this.vel = 0;
       this.mph = 0;
       this.reversing = false;
+      this.clearDrivePath();
     } else {
       this.reversing = gear === 'R';
     }
@@ -444,14 +440,25 @@ export class JacT9 {
       this.qaSteer = null;
     }
 
+    if (!live && (this.drivePath.length > 0 || this.driveGoal)) {
+      const moved = this.followDrivePath(dt);
+      this.steering = 0;
+      this.reversing = false;
+      this.syncMeters(moved);
+      if (this.toggles.hazards) this.hazardT += dt;
+      else this.hazardT = 0;
+      this.applySprite();
+      return;
+    }
+
     let throttle = live ? -dy : 0;
     let steer = live ? dx : 0;
     if (!live && this.qaSteer != null) steer = this.qaSteer;
 
-    if (!live && this.drivePath.length > 0) {
-      const auto = this.autopilot(dt);
-      throttle = auto.throttle;
-      steer = auto.steer;
+    if (this.gearHeld) {
+      if (this.gear === 'P' || this.gear === 'N') throttle = 0;
+      else if (this.gear === 'R' && throttle > 0) throttle = 0;
+      else if (this.gear === 'D' && throttle < 0) throttle = 0;
     }
 
     this.steering = Math.max(-1, Math.min(1, steer));
@@ -468,7 +475,7 @@ export class JacT9 {
       this.vel = Math.min(0, this.vel + FRICTION_TILES_S2 * dt);
     }
 
-    if (input.autoShift !== false) {
+    if (input.autoShift !== false && !this.gearHeld) {
       if (this.vel > 0.12 || throttle > 0.16) this.gear = 'D';
       else if (this.vel < -0.12 || throttle < -0.16) this.gear = 'R';
     }
@@ -499,11 +506,9 @@ export class JacT9 {
         this.wheel = (this.wheel + 1) & 3;
         this.wheelAcc -= 1;
       }
-      this.rpm = MOVE_RPM;
-      this.mph = Math.max(1, Math.round((Math.abs(this.vel) / DRIVE_TILES_PER_S) * MOVE_MPH));
+      this.syncMeters(true);
     } else {
-      this.rpm = this.engineOn ? IDLE_RPM : 0;
-      this.mph = 0;
+      this.syncMeters(false);
       this.wheelAcc = 0;
     }
     if (this.toggles.hazards) this.hazardT += dt;
@@ -511,27 +516,71 @@ export class JacT9 {
     this.applySprite();
   }
 
-  private autopilot(dt: number): { throttle: number; steer: number } {
-    void dt;
+  private syncMeters(moving: boolean): void {
+    if (moving) {
+      this.rpm = MOVE_RPM;
+      this.mph = Math.max(1, Math.round((Math.abs(this.vel) / DRIVE_TILES_PER_S) * MOVE_MPH));
+    } else {
+      this.rpm = this.engineOn ? IDLE_RPM : 0;
+      this.mph = 0;
+    }
+  }
+
+  /** Step the same van along tile waypoints. Joystick / keys cancel this in update(). */
+  private followDrivePath(dt: number): boolean {
     while (this.drivePath.length > 0) {
       const t = this.drivePath[0];
-      if (Math.hypot(t.x - this.cx, t.y - this.cy) < 0.48) this.drivePath.shift();
+      if (Math.hypot(t.x - this.cx, t.y - this.cy) < 0.2) this.drivePath.shift();
       else break;
     }
     if (this.drivePath.length === 0) {
-      this.driveGoal = null;
-      return { throttle: 0, steer: 0 };
+      if (this.driveGoal && Math.hypot(this.driveGoal.x - this.cx, this.driveGoal.y - this.cy) > 0.2) {
+        this.drivePath.push({ x: this.driveGoal.x, y: this.driveGoal.y });
+      } else {
+        this.driveGoal = null;
+        this.vel = 0;
+        return false;
+      }
     }
     const t = this.drivePath[0];
     const ax = t.x - this.cx;
     const ay = t.y - this.cy;
-    const want = dirIndex(facingFrom(ax, ay, this.dir));
-    const delta = headingDelta(this.heading, want);
-    const aligned = Math.abs(delta) < 0.35;
-    return {
-      throttle: aligned ? 0.9 : 0.42,
-      steer: Math.max(-1, Math.min(1, delta * 1.6)),
-    };
+    const dist = Math.hypot(ax, ay);
+    if (dist < 1e-4) {
+      this.drivePath.shift();
+      return this.followDrivePath(dt);
+    }
+    const speed = DRIVE_TILES_PER_S * 0.92;
+    const step = Math.min(dist, speed * Math.max(dt, 1 / 120));
+    const ux = (ax / dist) * step;
+    const uy = (ay / dist) * step;
+    const next = this.canSit(this.cx + ux, this.cy + uy)
+      ? { x: this.cx + ux, y: this.cy + uy }
+      : slide(this.cx, this.cy, ux, uy, (x, y) => this.canSit(x, y));
+    if (next.x === this.cx && next.y === this.cy) {
+      this.drivePath.shift();
+      if (this.drivePath.length === 0) {
+        this.driveGoal = null;
+        this.vel = 0;
+        return false;
+      }
+      return this.followDrivePath(dt);
+    }
+    this.cx = next.x;
+    this.cy = next.y;
+    this.dir = facingFrom(ax, ay, this.dir);
+    this.heading = dirIndex(this.dir);
+    this.vel = speed;
+    this.gear = 'D';
+    this.gearHeld = false;
+    this.occupy(this.driveCells());
+    this.layout();
+    this.wheelAcc += dt * WHEEL_FPS;
+    while (this.wheelAcc >= 1) {
+      this.wheel = (this.wheel + 1) & 3;
+      this.wheelAcc -= 1;
+    }
+    return true;
   }
 
   worldFoot(): { x: number; y: number } {
@@ -549,11 +598,10 @@ export class JacT9 {
     return { x: c.x, y: c.y - 90 * objectSpriteScale(this.obj) };
   }
 
-  /** World point looking behind the van (opposite facing). */
+  /** World point looking behind the van (opposite facing), in iso tile space. */
   rearLookWorld(): { x: number; y: number } {
-    const foot = this.worldFoot();
     const back = DIR_VEC[this.dir];
-    return { x: foot.x - back.x * 220, y: foot.y - back.y * 110 - 40 };
+    return tileToWorld(this.cx - back.x * 5, this.cy - back.y * 5);
   }
 
   /** Region of the game canvas (CSS px) looking behind the van. */
@@ -663,7 +711,8 @@ export class JacT9 {
   }
 
   private south(): { x: number; y: number } {
-    const size = this.driving ? { w: DRIVE_BOX, h: DRIVE_BOX } : parkSize(this.dir);
+    // Always the parked AABB so Get in / Get out never jumps the sprite.
+    const size = parkSize(this.dir);
     const o = this.origin(size.w, size.h);
     return { x: o.x + size.w - 1, y: o.y + size.h - 1 };
   }
@@ -759,7 +808,7 @@ export class JacT9 {
     const south = this.south();
     this.obj.x = south.x;
     this.obj.y = south.y;
-    const size = this.driving ? { w: DRIVE_BOX, h: DRIVE_BOX } : parkSize(this.dir);
+    const size = parkSize(this.dir);
     const o = this.origin(size.w, size.h);
     this.obj.footprintX = o.x;
     this.obj.footprintY = o.y;
