@@ -1,6 +1,7 @@
 import { Assets, Container, Rectangle, Sprite, Texture } from 'pixi.js';
 import { cells, MAP_HEIGHT, MAP_WIDTH, type MapObject } from '../data/map';
 import { tileFootWorld, tileToWorld } from '../iso/math';
+import { findPathWith } from '../iso/pathfinding';
 import { objectDepth, objectOccluder, objectSpriteScale, type OccluderBox } from './mapSprites';
 import { spriteResolution } from './sprites';
 import { WALK_TILES_PER_S, type FacingDir } from './player';
@@ -15,6 +16,7 @@ export type JacMode = 'parked' | 'menu' | 'info' | 'drive';
 export type JacToggleId = 'left' | 'hazards' | 'right' | 'fog' | 'bed' | 'trailer';
 
 const DIRS: FacingDir[] = ['se', 'sw', 'nw', 'ne'];
+const DIR_ORDER: FacingDir[] = ['se', 'sw', 'nw', 'ne'];
 const DIR_VEC: Record<FacingDir, { x: number; y: number }> = {
   se: { x: 1, y: 0 },
   sw: { x: 0, y: 1 },
@@ -39,6 +41,10 @@ const CELL_1X = { w: 280, h: 192 };
 const WHEEL_FPS = 10;
 const DRIVE_TILES_PER_S = WALK_TILES_PER_S * 1.15;
 const REVERSE_TILES_PER_S = WALK_TILES_PER_S * 0.85;
+const ACCEL_TILES_S2 = 14;
+const BRAKE_TILES_S2 = 18;
+const FRICTION_TILES_S2 = 10;
+const TURN_RATE = 2.4;
 const IDLE_RPM = 700;
 const MOVE_RPM = 2250;
 const MOVE_MPH = 10;
@@ -67,6 +73,7 @@ export type JacSnapshot = {
   mph: number;
   reversing: boolean;
   steering: number;
+  driveGoal: { x: number; y: number } | null;
   trunkOpen: boolean;
   row: 'apagado' | 'luces' | 'freno';
   bubble: boolean;
@@ -104,6 +111,28 @@ function facingFrom(dx: number, dy: number, prev: FacingDir): FacingDir {
   if (Math.abs(dx) < 1e-4 && Math.abs(dy) < 1e-4) return prev;
   if (Math.abs(dx) >= Math.abs(dy)) return dx > 0 ? 'se' : 'nw';
   return dy > 0 ? 'sw' : 'ne';
+}
+
+function dirIndex(dir: FacingDir): number {
+  const i = DIR_ORDER.indexOf(dir);
+  return i < 0 ? 0 : i;
+}
+
+function dirFromHeading(h: number): FacingDir {
+  return DIR_ORDER[(((Math.round(h) % 4) + 4) % 4)];
+}
+
+function wrapHeading(h: number): number {
+  let x = h % 4;
+  if (x < 0) x += 4;
+  return x;
+}
+
+function headingDelta(from: number, to: number): number {
+  let d = wrapHeading(to) - wrapHeading(from);
+  if (d > 2) d -= 4;
+  if (d < -2) d += 4;
+  return d;
 }
 
 function slide(
@@ -164,6 +193,12 @@ export class JacT9 {
   private row: 'apagado' | 'luces' | 'freno' = 'apagado';
   private qaSteer: number | null = null;
   private hazardT = 0;
+  /** Continuous heading: 0=se, 1=sw, 2=nw, 3=ne. */
+  private heading = 0;
+  /** Signed tiles/s: +forward along heading, −reverse. */
+  private vel = 0;
+  drivePath: { x: number; y: number }[] = [];
+  driveGoal: { x: number; y: number } | null = null;
 
   constructor(obj: MapObject, hooks: JacHooks) {
     this.obj = obj;
@@ -201,7 +236,7 @@ export class JacT9 {
   }
 
   get rearCam(): boolean {
-    return this.driving && (this.gear === 'R' || this.reversing);
+    return this.driving && this.gear === 'R' && this.vel <= 0.08;
   }
 
   ensureLoaded(): Promise<void> {
@@ -223,15 +258,20 @@ export class JacT9 {
       this.gear = 'P';
       this.rpm = IDLE_RPM;
       this.mph = 0;
+      this.vel = 0;
+      this.heading = dirIndex(this.dir);
       this.bubble = false;
+      this.clearDrivePath();
       this.applyParkedSolid(false);
     } else if (wasDrive) {
       this.engineOn = false;
       this.gear = 'P';
       this.rpm = 0;
       this.mph = 0;
+      this.vel = 0;
       this.reversing = false;
       this.steering = 0;
+      this.clearDrivePath();
       this.applyParkedSolid(true);
     }
     if (mode === 'info') void this.ensureLoaded();
@@ -307,10 +347,36 @@ export class JacT9 {
   setDir(dir: FacingDir): void {
     if (this.dir === dir) return;
     this.dir = dir;
+    this.heading = dirIndex(dir);
     if (!this.driving) this.applyParkedSolid(true);
     this.layout();
     this.applySprite();
     this.hooks.onChange?.();
+  }
+
+  clearDrivePath(): void {
+    this.drivePath = [];
+    this.driveGoal = null;
+  }
+
+  setDrivePath(path: { x: number; y: number }[], goal: { x: number; y: number }): void {
+    this.drivePath = path;
+    this.driveGoal = goal;
+  }
+
+  canDriveAt(cx: number, cy: number): boolean {
+    return this.canSit(cx, cy);
+  }
+
+  findDrivePath(gx: number, gy: number): { x: number; y: number }[] | null {
+    const sx = Math.round(this.cx);
+    const sy = Math.round(this.cy);
+    return findPathWith(sx, sy, gx, gy, (x, y) => this.canSit(x, y));
+  }
+
+  /** Walkable tile beside the driver door (same hunt as get-out). */
+  driverDoorTile(): { x: number; y: number } | null {
+    return this.exitTile();
   }
 
   /** Walkable tile beside the van, or null if none. Prefers the near/south side so the avatar stays on screen. */
@@ -357,6 +423,7 @@ export class JacT9 {
     if (!this.driving) {
       this.steering = 0;
       this.reversing = false;
+      this.vel = 0;
       if (!this.engineOn) {
         this.rpm = 0;
         this.mph = 0;
@@ -372,48 +439,68 @@ export class JacT9 {
       dy /= mag;
     }
     const live = mag > 0.08;
-    // Phone stick and desktop WASD/arrows: from P or N, up/W → D, down/S → R. Release holds gear.
-    if (input.autoShift !== false && live) {
-      if (dy < -0.16) this.gear = 'D';
-      else if (dy > 0.16) this.gear = 'R';
-    }
-    const fwd = DIR_VEC[this.dir];
-    const side = live ? dx * fwd.y - dy * fwd.x : 0;
     if (live) {
+      this.clearDrivePath();
       this.qaSteer = null;
-      this.steering = Math.max(-1, Math.min(1, side * 1.4));
-    } else if (this.qaSteer != null) {
-      this.steering = this.qaSteer;
-    } else {
-      this.steering = 0;
     }
 
-    const canGo = this.gear === 'D' || this.gear === 'R';
-    const reverse = this.gear === 'R';
-    this.reversing = reverse && (live || this.gear === 'R');
+    let throttle = live ? -dy : 0;
+    let steer = live ? dx : 0;
+    if (!live && this.qaSteer != null) steer = this.qaSteer;
 
-    if (canGo && live) {
-      if (this.gear === 'D' && !reverse) this.dir = facingFrom(dx, dy, this.dir);
-      const speed = (reverse ? REVERSE_TILES_PER_S : DRIVE_TILES_PER_S) * dt;
-      const vx = reverse ? -fwd.x : this.gear === 'D' ? DIR_VEC[this.dir].x : -fwd.x;
-      const vy = reverse ? -fwd.y : this.gear === 'D' ? DIR_VEC[this.dir].y : -fwd.y;
-      const len = Math.hypot(vx, vy) || 1;
-      const nx = (vx / len) * speed;
-      const ny = (vy / len) * speed;
+    if (!live && this.drivePath.length > 0) {
+      const auto = this.autopilot(dt);
+      throttle = auto.throttle;
+      steer = auto.steer;
+    }
+
+    this.steering = Math.max(-1, Math.min(1, steer));
+
+    if (throttle > 0.08) {
+      if (this.vel < 0) this.vel = Math.min(0, this.vel + BRAKE_TILES_S2 * dt);
+      else this.vel = Math.min(DRIVE_TILES_PER_S, this.vel + ACCEL_TILES_S2 * throttle * dt);
+    } else if (throttle < -0.08) {
+      if (this.vel > 0) this.vel = Math.max(0, this.vel - BRAKE_TILES_S2 * dt);
+      else this.vel = Math.max(-REVERSE_TILES_PER_S, this.vel + ACCEL_TILES_S2 * throttle * dt);
+    } else if (this.vel > 0) {
+      this.vel = Math.max(0, this.vel - FRICTION_TILES_S2 * dt);
+    } else if (this.vel < 0) {
+      this.vel = Math.min(0, this.vel + FRICTION_TILES_S2 * dt);
+    }
+
+    if (input.autoShift !== false) {
+      if (this.vel > 0.12 || throttle > 0.16) this.gear = 'D';
+      else if (this.vel < -0.12 || throttle < -0.16) this.gear = 'R';
+    }
+
+    const moving = Math.abs(this.vel) > 0.08;
+    if (moving && Math.abs(this.steering) > 0.08) {
+      const sign = this.vel >= 0 ? 1 : -1;
+      this.heading = wrapHeading(this.heading + this.steering * TURN_RATE * sign * dt);
+      this.dir = dirFromHeading(this.heading);
+    }
+
+    this.reversing = this.vel < -0.08;
+    const fwd = DIR_VEC[this.dir];
+    if (moving) {
+      const nx = fwd.x * this.vel * dt;
+      const ny = fwd.y * this.vel * dt;
       const next = slide(this.cx, this.cy, nx, ny, (x, y) => this.canSit(x, y));
       if (next.x !== this.cx || next.y !== this.cy) {
         this.cx = next.x;
         this.cy = next.y;
         this.occupy(this.driveCells());
         this.layout();
+      } else if (Math.abs(this.vel) > 0.4) {
+        this.vel *= 0.4;
       }
-      this.wheelAcc += dt * WHEEL_FPS;
+      this.wheelAcc += dt * WHEEL_FPS * Math.min(1.4, Math.abs(this.vel) / DRIVE_TILES_PER_S);
       while (this.wheelAcc >= 1) {
         this.wheel = (this.wheel + 1) & 3;
         this.wheelAcc -= 1;
       }
       this.rpm = MOVE_RPM;
-      this.mph = MOVE_MPH;
+      this.mph = Math.max(1, Math.round((Math.abs(this.vel) / DRIVE_TILES_PER_S) * MOVE_MPH));
     } else {
       this.rpm = this.engineOn ? IDLE_RPM : 0;
       this.mph = 0;
@@ -422,6 +509,29 @@ export class JacT9 {
     if (this.toggles.hazards) this.hazardT += dt;
     else this.hazardT = 0;
     this.applySprite();
+  }
+
+  private autopilot(dt: number): { throttle: number; steer: number } {
+    void dt;
+    while (this.drivePath.length > 0) {
+      const t = this.drivePath[0];
+      if (Math.hypot(t.x - this.cx, t.y - this.cy) < 0.48) this.drivePath.shift();
+      else break;
+    }
+    if (this.drivePath.length === 0) {
+      this.driveGoal = null;
+      return { throttle: 0, steer: 0 };
+    }
+    const t = this.drivePath[0];
+    const ax = t.x - this.cx;
+    const ay = t.y - this.cy;
+    const want = dirIndex(facingFrom(ax, ay, this.dir));
+    const delta = headingDelta(this.heading, want);
+    const aligned = Math.abs(delta) < 0.35;
+    return {
+      throttle: aligned ? 0.9 : 0.42,
+      steer: Math.max(-1, Math.min(1, delta * 1.6)),
+    };
   }
 
   worldFoot(): { x: number; y: number } {
@@ -511,6 +621,7 @@ export class JacT9 {
       mph: Math.round(this.mph),
       reversing: this.reversing,
       steering: this.steering,
+      driveGoal: this.driveGoal,
       trunkOpen: this.trunkOpen,
       row: this.row,
       bubble: this.bubble,
@@ -533,6 +644,7 @@ export class JacT9 {
   /** QA: snap the van to a tile centre and facing. */
   qaPlace(cx: number, cy: number, dir: FacingDir, driving: boolean): void {
     this.dir = dir;
+    this.heading = dirIndex(dir);
     this.cx = cx;
     this.cy = cy;
     if (driving) {

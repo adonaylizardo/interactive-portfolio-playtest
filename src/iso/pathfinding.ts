@@ -21,14 +21,15 @@ function inBounds(x: number, y: number): boolean {
   return x >= 0 && y >= 0 && x < MAP_WIDTH && y < MAP_HEIGHT;
 }
 
-export function findPath(
+export function findPathWith(
   sx: number,
   sy: number,
   gx: number,
   gy: number,
+  passable: (x: number, y: number) => boolean,
 ): { x: number; y: number }[] | null {
   if (!inBounds(gx, gy)) return null;
-  if (!cells[gy][gx].walkable) return null;
+  if (!passable(gx, gy)) return null;
   if (sx === gx && sy === gy) return [];
 
   const open: Node[] = [];
@@ -58,7 +59,7 @@ export function findPath(
       const nx = current.x + dx;
       const ny = current.y + dy;
       if (!inBounds(nx, ny)) continue;
-      if (!cells[ny][nx].walkable) continue;
+      if (!passable(nx, ny)) continue;
       const nk = key(nx, ny);
       if (closed.has(nk)) continue;
       const g = current.g + 1;
@@ -75,6 +76,15 @@ export function findPath(
     }
   }
   return null;
+}
+
+export function findPath(
+  sx: number,
+  sy: number,
+  gx: number,
+  gy: number,
+): { x: number; y: number }[] | null {
+  return findPathWith(sx, sy, gx, gy, (x, y) => !!cells[y]?.[x]?.walkable);
 }
 
 export type PathResult = {

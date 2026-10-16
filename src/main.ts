@@ -105,13 +105,16 @@ async function main(): Promise<void> {
         const snap = scene.jacSnapshot();
         const anchors = scene.jacHudAnchors();
         jacHud.update(snap, anchors, anchors.rear);
-        labels.setHidden(!!snap?.driving);
+        labels.setHidden(false);
       } else {
         jacHud.park();
         labels.setHidden(false);
       }
       joystick.setHidden(
-        !!scene.isInInterior() || panel.isPreviewExpanded() || scene.jacInfoOpen(),
+        !scene.jacSnapshot()?.driving ||
+          !!scene.isInInterior() ||
+          panel.isPreviewExpanded() ||
+          scene.jacInfoOpen(),
       );
     },
     stick: () => joystick.vector(),
@@ -294,6 +297,7 @@ async function main(): Promise<void> {
     jacInfo: () => scene.jacOpenInfo(),
     jacGetIn: () => scene.jacGetIn(),
     jacGetOut: () => scene.jacGetOut(),
+    jacDriveTo: (tx: number, ty: number) => scene.qaDriveTo(tx, ty),
     jacClose: () => scene.jacClose(),
     jacSetLights: (lights: 'off' | 'auto' | 'on') => scene.jacSetLights(lights),
     jacSetGear: (gear: 'P' | 'R' | 'N' | 'D') => scene.jacSetGear(gear),
