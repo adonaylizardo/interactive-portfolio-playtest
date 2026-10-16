@@ -148,6 +148,7 @@ async function main(): Promise<void> {
     getView: () => scene.getViewMode(),
   });
   await scene.init(canvas);
+  chrome.beginSoundHint();
 
   const bootInterior = parseInteriorFromHash();
   if (bootInterior) {
@@ -249,6 +250,20 @@ async function main(): Promise<void> {
     audioMuted: () => studio.isMuted(),
     audioUnlocked: () => studio.isUnlocked(),
     setAudioMuted: (muted: boolean) => studio.setMuted(muted),
+    soundHint: () => {
+      const el = document.querySelector('.chrome__sound') as HTMLElement | null;
+      if (!el) return { present: false, visible: false, opacity: 0, hint: '' };
+      const style = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      const visible =
+        !el.hidden &&
+        style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        Number(style.opacity) > 0.05 &&
+        r.width > 0 &&
+        r.height > 0;
+      return { present: true, visible, opacity: Number(style.opacity), hint: el.dataset.hint ?? '' };
+    },
     joystick: () => joystick.qa(),
     nameLabels: () => labels.qa(),
     namePillHeads: () => scene.qaNamePillHeads(),

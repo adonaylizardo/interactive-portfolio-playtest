@@ -122,11 +122,11 @@ async function runViewport(tag, options, phone) {
       errors.push(`${tag}: JAC T9 was moved: ${car.report.plannedConflicts.join('; ')}`);
     }
     if (car.blocked?.length) errors.push(`${tag}: JAC T9 footprint not solid: ${car.blocked}`);
-    if (Math.abs((car.obj?.scale ?? 1) - 1.35) > 1e-6) {
-      errors.push(`${tag}: JAC T9 scale ${car.obj?.scale}, want 1.35`);
+    if (Math.abs((car.obj?.scale ?? 1) - 1.6) > 1e-6) {
+      errors.push(`${tag}: JAC T9 scale ${car.obj?.scale}, want 1.6`);
     }
-    if (car.obj && Math.abs(car.obj.h - 192 * 1.35) > 1) {
-      errors.push(`${tag}: JAC T9 drawn height ${car.obj.h}, want ${192 * 1.35}`);
+    if (car.obj && Math.abs(car.obj.h - 192 * 1.6) > 1) {
+      errors.push(`${tag}: JAC T9 drawn height ${car.obj.h}, want ${192 * 1.6}`);
     }
     notes.push(`${tag} car z=${car.obj?.zIndex} cells=${JSON.stringify(car.obj?.cells)} key=${car.obj?.key}`);
     await page.evaluate(() => window.__playtestQa.frameWorld((27 - 18) * 64, (27 + 18) * 32 + 32, 1.05));

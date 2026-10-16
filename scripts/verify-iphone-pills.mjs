@@ -163,10 +163,10 @@ async function runViewport(tag, options, phone) {
         roofRatio: obj && player.adonay.worldH ? (138 - 13) * (obj.scale ?? 1) / player.adonay.worldH : null,
       };
     });
-    if (Math.abs((car.scale ?? 0) - 1.35) > 1e-6) errors.push(`${tag}: JAC scale ${car.scale}, want 1.35`);
+    if (Math.abs((car.scale ?? 0) - 1.6) > 1e-6) errors.push(`${tag}: JAC scale ${car.scale}, want 1.6`);
     if (car.conflicts.length) errors.push(`${tag}: JAC moved: ${car.conflicts.join('; ')}`);
-    if (car.roofRatio != null && (car.roofRatio < 1.55 || car.roofRatio > 1.8)) {
-      errors.push(`${tag}: JAC roof/avatar ${car.roofRatio.toFixed(3)}, want ~1.6–1.7`);
+    if (car.roofRatio != null && (car.roofRatio < 1.85 || car.roofRatio > 2.2)) {
+      errors.push(`${tag}: JAC roof/avatar ${car.roofRatio.toFixed(3)}, want ~2.0 at 1.6×`);
     }
     notes.push(`${tag} car ${JSON.stringify(car)}`);
     await page.screenshot({ path: path.join(OUT, `${tag}-car.png`) });

@@ -210,11 +210,52 @@ async function runViewport(tag, options, phone) {
     notes.push(`${tag} bundle ${bootInfo.bundle} load=${bootInfo.loadMs}ms`);
     await resetMap(page);
 
-    const hasJac = await page.evaluate(() => {
+    const hint0 = await page.evaluate(() => window.__playtestQa.soundHint?.());
+    notes.push(`${tag} sound-hint-boot ${JSON.stringify(hint0)}`);
+    if (!hint0?.visible) errors.push(`${tag}: silent-mode hint missing at boot`);
+
+    const car = await page.evaluate(() => {
       const fill = window.__playtestQa.fill();
-      return !!fill.objects.find((o) => o.id === 'fill/jac-t9');
+      const obj = fill.objects.find((o) => o.id === 'fill/jac-t9');
+      const player = window.__playtestQa.playerAvatar();
+      const blocked = [];
+      for (let y = 16; y <= 18; y++) {
+        for (let x = 23; x <= 27; x++) {
+          if (fill.walk[y][x] !== '#') blocked.push([x, y]);
+        }
+      }
+      return {
+        scale: obj?.scale,
+        h: obj?.h,
+        cells: obj?.cells,
+        blocked,
+        avatarH: player.adonay.worldH,
+        roofRatio: obj && player.adonay.worldH ? (125 * (obj.scale ?? 1)) / player.adonay.worldH : null,
+      };
     });
-    if (!hasJac) errors.push(`${tag}: JAC T9 missing from fill`);
+    notes.push(`${tag} car ${JSON.stringify(car)}`);
+    if (!car.scale) errors.push(`${tag}: JAC T9 missing from fill`);
+    if (Math.abs((car.scale ?? 0) - 1.6) > 1e-6) errors.push(`${tag}: JAC scale ${car.scale}, want 1.6`);
+    if (car.h != null && Math.abs(car.h - 192 * 1.6) > 1) {
+      errors.push(`${tag}: JAC drawn height ${car.h}, want ${192 * 1.6}`);
+    }
+    if (car.blocked?.length) errors.push(`${tag}: JAC footprint not solid: ${JSON.stringify(car.blocked)}`);
+    if (car.roofRatio != null && (car.roofRatio < 1.85 || car.roofRatio > 2.2)) {
+      errors.push(`${tag}: JAC/avatar ${car.roofRatio.toFixed(3)}, want ~2.0`);
+    }
+    await page.evaluate(() => {
+      window.__playtestQa.setCharacterTile(27, 19);
+      window.__playtestQa.setAnim?.('se', false, 0);
+      window.__playtestQa.frameWorld((27 - 18) * 64, (27 + 18) * 32 + 32, 1.05);
+    });
+    await wait(200);
+    await shot(page, tag, 'parked-avatar');
+
+    await wait(4200);
+    const hint1 = await page.evaluate(() => window.__playtestQa.soundHint?.());
+    notes.push(`${tag} sound-hint-after ${JSON.stringify(hint1)}`);
+    if (hint1?.visible) errors.push(`${tag}: silent-mode hint still visible after 4s fade`);
+    if (hint1?.hint === '1') errors.push(`${tag}: silent-mode hint dataset still 1 after fade`);
 
     for (const st of STATES) {
       await resetMap(page);

@@ -51,6 +51,7 @@ export class ChromeUI {
   private mobile = isMobileLayout();
   private callbacks: ChromeCallbacks;
   private minimap: HTMLCanvasElement;
+  private soundHintTimer: ReturnType<typeof setTimeout> | null = null;
   private getCharTile: () => { x: number; y: number } = () => ({ x: 0, y: 0 });
   private getView: () => { mode: Camera; yaw: number; overview: boolean } = () => ({
     mode: 'isometrica',
@@ -278,7 +279,7 @@ export class ChromeUI {
         <button type="button" class="chrome__lang-opt is-active" data-lang="en">EN</button>
         <button type="button" class="chrome__lang-opt" data-lang="es">ES</button>
       </div>
-      <div class="chrome__sound" role="note">
+      <div class="chrome__sound" role="note" data-hint="1">
         ${iconSvg('info')}
         <span>No sound? Check silent mode</span>
       </div>
@@ -386,6 +387,32 @@ export class ChromeUI {
     const sub = this.root.querySelector('.chrome__subtitle') as HTMLElement | null;
     if (!sub) return;
     sub.textContent = studio.subtitle();
+  }
+
+  /** 'No sound? Check silent mode' is a boot hint — fade out after ~4s, then stay gone. */
+  beginSoundHint(): void {
+    this.scheduleSoundHint();
+  }
+
+  private scheduleSoundHint(): void {
+    const el = this.root.querySelector('.chrome__sound') as HTMLElement | null;
+    if (!el || this.soundHintTimer) return;
+    el.dataset.hint = '1';
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const visibleMs = 4000;
+    const fadeMs = reduced ? 0 : 400;
+    this.soundHintTimer = window.setTimeout(() => {
+      if (reduced) {
+        el.hidden = true;
+      } else {
+        el.classList.add('chrome__sound--fade');
+      }
+      el.dataset.hint = '0';
+      el.setAttribute('aria-hidden', 'true');
+      window.setTimeout(() => {
+        el.hidden = true;
+      }, fadeMs);
+    }, visibleMs);
   }
 
   private syncSound(): void {

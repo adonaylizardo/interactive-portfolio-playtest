@@ -72,7 +72,7 @@ export function objectSpriteKey(
   return o.type === 'building' ? `${base}/${state}/${zoom}` : `${base}/${zoom}`;
 }
 
-/** Uniform draw scale around the front vertex (JAC T9 is 1.35). */
+/** Uniform draw scale around the front vertex (JAC T9 is 1.6). */
 export function objectSpriteScale(o: MapObject): number {
   return o.scale && Number.isFinite(o.scale) && o.scale > 0 ? o.scale : 1;
 }

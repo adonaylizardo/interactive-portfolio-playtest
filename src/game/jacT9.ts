@@ -24,7 +24,9 @@ const DIR_VEC: Record<FacingDir, { x: number; y: number }> = {
 const PARK_SE = { w: 5, h: 3 };
 const PARK_SW = { w: 3, h: 5 };
 const DRIVE_BOX = 2;
-const SCALE_HOME = 1.35;
+/** Visual draw scale around the south vertex. Collision footprint stays 5×3 / 3×5 tiles. */
+export const JAC_SPRITE_SCALE = 1.6;
+const SCALE_HOME = JAC_SPRITE_SCALE;
 const ANCHOR_1X = { x: 140, y: 90 };
 const SOUTH_OFF_1X: Record<FacingDir, { x: number; y: number }> = {
   se: { x: 32, y: 48 },
