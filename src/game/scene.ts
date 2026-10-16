@@ -193,6 +193,7 @@ export type BuildingPanelBridge = {
   isOpen: () => boolean;
   openTitle: () => string;
   dismiss: () => void;
+  isPreview?: () => boolean;
   layoutInsets?: () => { left: number; top: number; right: number; bottom: number };
   consumeInteriorCanvasTap?: (clientX: number, clientY: number) => boolean;
   expandInteriorSheetForQa?: () => void;
@@ -214,6 +215,9 @@ export type SceneEvents = {
   onExitInterior?: () => void;
   onInteriorIdChange?: (interiorId: string | null) => void;
   onUnreachable?: () => void;
+  onMoveCommand?: () => void;
+  onFrame?: () => void;
+  stick?: () => { x: number; y: number };
   buildingPanel?: BuildingPanelBridge;
   checklist?: ChecklistBridge;
   chrome?: ChromeBridge;
@@ -1378,6 +1382,7 @@ export class IsoScene {
     this.sprint = sprint;
     this.charState = sprint ? 'sprint' : 'walk';
     this.startCameraFollow();
+    this.events.onMoveCommand?.();
     this.events.onChecklist('walk-around');
     this.drawPathPreview();
     if (this.path.length === 0) {
@@ -1483,20 +1488,24 @@ export class IsoScene {
     const bridge = this.events.buildingPanel;
     if (!bridge?.isOpen()) return true;
     const openTitle = bridge.openTitle();
-    if (building?.panelTitle === openTitle) return false;
+    const same = (o?: { panelTitle?: string; name?: string } | null) =>
+      !!o && (o.panelTitle === openTitle || o.name === openTitle);
+    if (same(building)) return false;
     if (tx !== undefined && ty !== undefined) {
-      if (getBuildingAtDoor(tx, ty)?.panelTitle === openTitle) return false;
-      if (getBuildingAt(tx, ty)?.panelTitle === openTitle) return false;
+      if (same(getBuildingAtDoor(tx, ty))) return false;
+      if (same(getBuildingAt(tx, ty))) return false;
     }
+    const preview = !!bridge.isPreview?.();
     bridge.dismiss();
     this.pendingBuildingEntry = null;
     this.clearWalkPreview();
-    this.suppressMapTapOnce = true;
     const ctx = Math.round(this.charTx);
     const cty = Math.round(this.charTy);
     if (getBuildingAtDoor(ctx, cty)) {
       this.doorCooldown = 200;
     }
+    if (preview) return true;
+    this.suppressMapTapOnce = true;
     return false;
   }
 
@@ -1509,7 +1518,7 @@ export class IsoScene {
       this.events.checklist.collapseMobile();
       return;
     }
-    if (!this.interiorActive && this.events.buildingPanel?.isOpen()) {
+    if (!this.interiorActive && this.events.buildingPanel?.isOpen() && !this.events.buildingPanel.isPreview?.()) {
       this.events.buildingPanel.dismiss();
       this.pendingBuildingEntry = null;
       this.clearWalkPreview();
@@ -2749,6 +2758,7 @@ export class IsoScene {
       this.npcs.update(dt);
       this.fillActors?.update(dt);
     }
+    this.events.onFrame?.();
   }
 
   private followTargetWorld(): { x: number; y: number } {
@@ -2848,22 +2858,31 @@ export class IsoScene {
     }
   }
 
+  private moveCommandArmed = true;
+
   private updateMovement(): void {
     this.syncObjectSprites();
     if (this.doorCooldown > 0) {
       this.doorCooldown -= this.app.ticker.deltaMS;
     }
     this.leaveBenchIfStood();
-    if (this.keys.size > 0) {
+    const stick = this.events.stick?.() ?? { x: 0, y: 0 };
+    const stickLive = Math.abs(stick.x) > 0.02 || Math.abs(stick.y) > 0.02;
+    if (this.keys.size > 0 || stickLive) {
       let dx = 0;
       let dy = 0;
       if (this.keys.has('w') || this.keys.has('arrowup')) dy -= 1;
       if (this.keys.has('s') || this.keys.has('arrowdown')) dy += 1;
       if (this.keys.has('a') || this.keys.has('arrowleft')) dx -= 1;
       if (this.keys.has('d') || this.keys.has('arrowright')) dx += 1;
+      if (dx === 0 && dy === 0 && stickLive) {
+        dx = stick.x;
+        dy = stick.y;
+      }
       if (this.interiorActive && this.interiorDef) {
         if (dx !== 0 || dy !== 0) {
           this.interiorPath = [];
+          this.fireMoveCommand();
           const sprint = this.shiftHeld;
           this.sprint = sprint;
           this.charState = sprint ? 'sprint' : 'walk';
@@ -2894,6 +2913,7 @@ export class IsoScene {
       } else if (dx !== 0 || dy !== 0) {
         this.path = [];
         this.drawPathPreview();
+        this.fireMoveCommand();
         const sprint = this.shiftHeld;
         this.sprint = sprint;
         this.charState = sprint ? 'sprint' : 'walk';
@@ -2915,6 +2935,10 @@ export class IsoScene {
         this.charState = 'idle';
         this.syncCharacterGraphic();
       }
+    }
+
+    if (this.keys.size === 0 && !stickLive && this.path.length === 0 && this.interiorPath.length === 0) {
+      this.moveCommandArmed = true;
     }
 
     if (this.path.length > 0) {
@@ -2958,6 +2982,12 @@ export class IsoScene {
   }
 
   private doorCooldown = 0;
+
+  private fireMoveCommand(): void {
+    if (!this.moveCommandArmed) return;
+    this.moveCommandArmed = false;
+    this.events.onMoveCommand?.();
+  }
 
   /**
    * One frame of keyboard walking: the same world speed in every direction, and a diagonal pushed
@@ -3358,6 +3388,7 @@ export class IsoScene {
     this.sprint = sprint;
     this.charState = sprint ? 'sprint' : 'walk';
     this.startCameraFollow();
+    this.fireMoveCommand();
   }
 
   /**
@@ -3703,6 +3734,50 @@ export class IsoScene {
     const rect = this.canvasEl?.getBoundingClientRect();
     const s = this.worldToScreen(wx, wy);
     return { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y };
+  }
+
+  /** Client pixels of the name-pill anchors (just above each head). */
+  nameLabelAnchors(): { id: 'adonay' | 'pantone' | 'noah'; name: string; x: number; y: number; visible: boolean }[] {
+    const rect = this.canvasEl?.getBoundingClientRect();
+    const sw = this.app?.screen.width ?? 0;
+    const sh = this.app?.screen.height ?? 0;
+    const toClient = (wx: number, wy: number) => {
+      const s = this.worldToScreen(wx, wy);
+      return { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y, sx: s.x, sy: s.y };
+    };
+    const onScreen = (sx: number, sy: number) => sx > -40 && sy > -40 && sx < sw + 40 && sy < sh + 40;
+    const avatar = this.interiorActive ? this.interiorAvatar : this.avatar;
+    const snap = avatar.snapshot();
+    const adonay = toClient(snap.adonay.x, snap.adonay.y - snap.adonay.worldH - 6);
+    const pantone = toClient(snap.pantone.x, snap.pantone.y - snap.pantone.worldH - 4);
+    const out: { id: 'adonay' | 'pantone' | 'noah'; name: string; x: number; y: number; visible: boolean }[] = [
+      {
+        id: 'adonay',
+        name: 'Adonay',
+        x: adonay.x,
+        y: adonay.y,
+        visible: snap.adonay.visible && onScreen(adonay.sx, adonay.sy),
+      },
+      {
+        id: 'pantone',
+        name: 'Pantone',
+        x: pantone.x,
+        y: pantone.y,
+        visible: snap.pantone.visible && onScreen(pantone.sx, pantone.sy),
+      },
+    ];
+    if (!this.interiorActive && this.noah) {
+      const n = this.noah.snapshot();
+      const head = toClient(n.x, n.y - n.worldH - 6);
+      out.push({
+        id: 'noah',
+        name: 'Noah',
+        x: head.x,
+        y: head.y,
+        visible: n.visible && n.loaded && onScreen(head.sx, head.sy),
+      });
+    }
+    return out;
   }
 
   qaFill(): {

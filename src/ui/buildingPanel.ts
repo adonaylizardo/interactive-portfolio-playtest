@@ -1,6 +1,6 @@
 import { studio } from '../audio/studio';
 import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
-import { CASES, type CaseBlock } from '../data/cases';
+import { CASES, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
 
 function aboutBlockNode(block: AboutBlock): HTMLElement {
@@ -112,7 +112,11 @@ export class BuildingPanel {
   private interiorId: string | null = null;
   private onVisibilityChange: () => void;
   private onSalir: () => void;
-  private mode: 'hidden' | 'interior' = 'hidden';
+  private mode: 'hidden' | 'interior' | 'preview' = 'hidden';
+  private previewEl: HTMLElement | null = null;
+  private previewTitle: HTMLElement | null = null;
+  private previewSubtitle: HTMLElement | null = null;
+  private previewTeaser: HTMLElement | null = null;
   private peekOnly = true;
   private dragStartY = 0;
   private leaveArmed = false;
@@ -136,6 +140,12 @@ export class BuildingPanel {
         <div class="building-panel__drag" data-drag aria-hidden="true"></div>
         <div class="building-panel__bar">
           <button type="button" class="building-panel__exit" data-exit>Salir</button>
+          <button type="button" class="building-panel__close" data-close aria-label="Cerrar">×</button>
+        </div>
+        <div class="case-preview" data-preview hidden>
+          <h2 class="case-preview__title"></h2>
+          <p class="case-preview__subtitle"></p>
+          <p class="case-preview__teaser"></p>
         </div>
         <h2 class="building-panel__title"></h2>
         <div class="building-panel__body-wrap">
@@ -159,6 +169,10 @@ export class BuildingPanel {
     this.workedWithEl = this.el.querySelector('.worked-with')!;
     this.caseEl = this.el.querySelector('.case')!;
     this.aboutEl = this.el.querySelector('.about')!;
+    this.previewEl = this.el.querySelector('[data-preview]') as HTMLElement;
+    this.previewTitle = this.el.querySelector('.case-preview__title');
+    this.previewSubtitle = this.el.querySelector('.case-preview__subtitle');
+    this.previewTeaser = this.el.querySelector('.case-preview__teaser');
     this.aboutEl.append(...ABOUT.map(aboutBlockNode));
     // Touch has no hover: a tap shows that logo's colours until another logo (or the same one) is tapped.
     this.workedWithEl.addEventListener('click', (e) => {
@@ -244,13 +258,24 @@ export class BuildingPanel {
     window.addEventListener('pointerup', () => this.onDragEnd());
 
     this.titleEl.addEventListener('click', () => {
-      if (this.isMobile() && this.peekOnly) this.setPeek(false);
+      if (this.peekOnly && (this.isMobile() || this.mode === 'preview')) this.setPeek(false);
+    });
+    this.previewEl?.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('[data-close]')) return;
+      if (this.mode === 'preview' && this.peekOnly) this.setPeek(false);
+    });
+    const closeBtn = this.el.querySelector('[data-close]') as HTMLButtonElement;
+    closeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.closePreview();
     });
 
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.isOpen()) {
         e.preventDefault();
-        this.salir();
+        if (this.mode === 'preview') this.closePreview();
+        else this.salir();
       }
     });
 
@@ -268,16 +293,29 @@ export class BuildingPanel {
   }
 
   private syncPeekClass(): void {
+    const preview = this.mode === 'preview' && this.isOpen();
     const mobileInterior = this.isMobile() && this.mode === 'interior' && this.isOpen();
-    this.el.classList.toggle('building-panel--peek', mobileInterior && this.peekOnly);
-    this.el.classList.toggle(
-      'building-panel--expanded',
-      mobileInterior && !this.peekOnly,
-    );
+    const peek = (preview || mobileInterior) && this.peekOnly;
+    const expanded = (preview || mobileInterior) && !this.peekOnly;
+    this.el.classList.toggle('building-panel--peek', peek);
+    this.el.classList.toggle('building-panel--expanded', expanded);
+    this.el.classList.toggle('building-panel--preview', preview);
+    if (this.previewEl) this.previewEl.hidden = !preview || !this.peekOnly;
+    this.titleEl.hidden = preview && this.peekOnly;
+  }
+
+  private closePreview(): void {
+    if (this.mode !== 'preview') return;
+    if (!this.peekOnly) {
+      this.setPeek(true);
+      return;
+    }
+    this.hide();
   }
 
   private onDragStart(e: PointerEvent): void {
-    if (!this.isMobile() || !this.isOpen()) return;
+    if (!this.isOpen()) return;
+    if (!this.isMobile() && this.mode !== 'preview') return;
     this.dragStartY = e.clientY;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }
@@ -300,6 +338,8 @@ export class BuildingPanel {
     this.mode = 'interior';
     this.interiorId = interiorId;
     this.peekOnly = this.isMobile();
+    this.el.classList.remove('building-panel--preview');
+    this.titleEl.hidden = false;
     this.el.hidden = false;
     this.el.style.visibility = '';
     this.el.style.pointerEvents = '';
@@ -307,6 +347,36 @@ export class BuildingPanel {
     this.el.removeAttribute('inert');
     this.el.classList.remove('building-panel--snap');
     this.setTitle(title, this.renderCase());
+    this.renderWorkedWith();
+    this.renderAbout();
+    this.el.classList.add('building-panel--open');
+    this.syncPeekClass();
+    this.onVisibilityChange();
+    studio.playClick();
+    studio.playCaseVoice(interiorId);
+  }
+
+  /** Stay on the map: lower-third card, then a full-copy expand. */
+  showPreview(interiorId: string): void {
+    if (!isCaseHouse(interiorId)) return;
+    this.leaveArmed = false;
+    this.exitPress = null;
+    this.exitFromPointer = false;
+    this.mode = 'preview';
+    this.interiorId = interiorId;
+    this.peekOnly = true;
+    this.el.hidden = false;
+    this.el.style.visibility = '';
+    this.el.style.pointerEvents = '';
+    this.aboutEl.style.contentVisibility = '';
+    this.el.removeAttribute('inert');
+    this.el.classList.remove('building-panel--snap');
+    const preview = casePreviewCopy(interiorId);
+    const shown = this.renderCase();
+    if (this.previewTitle) this.previewTitle.textContent = preview?.title ?? shown ?? interiorId;
+    if (this.previewSubtitle) this.previewSubtitle.textContent = preview?.subtitle ?? '';
+    if (this.previewTeaser) this.previewTeaser.textContent = preview?.teaser ?? '';
+    this.setTitle(interiorId, preview?.title ?? shown);
     this.renderWorkedWith();
     this.renderAbout();
     this.el.classList.add('building-panel--open');
@@ -394,13 +464,20 @@ export class BuildingPanel {
     // Snap out of the hit tree on this frame (same as the mat). A transforming sheet still
     // intercepts iOS taps even with pointer-events:none, so Salir waited ~250 ms for map input.
     this.el.classList.add('building-panel--snap');
-    this.el.classList.remove('building-panel--open', 'building-panel--peek', 'building-panel--expanded');
+    this.el.classList.remove(
+      'building-panel--open',
+      'building-panel--peek',
+      'building-panel--expanded',
+      'building-panel--preview',
+    );
     this.el.setAttribute('inert', '');
     this.el.style.visibility = 'hidden';
     this.el.style.pointerEvents = 'none';
     this.aboutEl.style.contentVisibility = 'hidden';
     this.el.hidden = true;
     this.mode = 'hidden';
+    this.titleEl.hidden = false;
+    if (this.previewEl) this.previewEl.hidden = true;
     this.el.classList.remove('building-panel--snap');
     if (!opts?.silent) this.onVisibilityChange();
     if (opts?.snap) requestAnimationFrame(() => this.releaseCaseDom());
@@ -428,13 +505,38 @@ export class BuildingPanel {
     return this.mode === 'interior' && this.isOpen();
   }
 
+  isPreviewMode(): boolean {
+    return this.mode === 'preview' && this.isOpen();
+  }
+
+  isPreviewExpanded(): boolean {
+    return this.isPreviewMode() && !this.peekOnly;
+  }
+
+  expandPreviewForQa(): void {
+    if (!this.isPreviewMode()) return;
+    this.setPeek(false);
+  }
+
+  collapsePreviewForQa(): void {
+    if (!this.isPreviewMode()) return;
+    this.setPeek(true);
+  }
+
   openTitle(): string {
     return this.isOpen() ? this.openKey : '';
   }
 
   /** Peek / sheet inset for interior camera fit. */
   layoutInsets(): { left: number; top: number; right: number; bottom: number } {
-    if (!this.isOpen() || this.mode !== 'interior') {
+    if (!this.isOpen() || (this.mode !== 'interior' && this.mode !== 'preview')) {
+      return { left: 0, top: 0, right: 0, bottom: 0 };
+    }
+    if (this.mode === 'preview') {
+      const sheet = this.sheet.getBoundingClientRect();
+      if (this.isMobile()) {
+        return { left: 0, top: 0, right: 0, bottom: Math.ceil(Math.min(sheet.height, this.peekOnly ? 220 : sheet.height) + 8) };
+      }
       return { left: 0, top: 0, right: 0, bottom: 0 };
     }
     const sheet = this.sheet.getBoundingClientRect();

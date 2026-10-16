@@ -4,6 +4,8 @@
  * The airline case never names the client — ignore that file's Español section. Landmark rooms
  * keep the place name as the title and a short placeholder. Internal draft sections are not stored here.
  */
+import { VOICE_LINES } from './voice-lines';
+
 export type CaseBlock =
   | { kind: 'section'; heading?: string; paragraphs: string[]; bullets?: string[] }
   | { kind: 'closing'; text: string };
@@ -27,6 +29,52 @@ export type CaseContent = {
 export function caseVoiceFile(id: string | null | undefined): string | null {
   if (!id) return null;
   return CASES[id]?.voice ?? null;
+}
+
+/** The five case houses stay on the map and use the preview-then-expand sheet. */
+export const CASE_HOUSE_IDS = ['volaris', 'bain', 'mentoria', 'finoa', 'pg'] as const;
+export type CaseHouseId = (typeof CASE_HOUSE_IDS)[number];
+
+export function isCaseHouse(id: string | null | undefined): id is CaseHouseId {
+  return !!id && (CASE_HOUSE_IDS as readonly string[]).includes(id);
+}
+
+function stripMarks(text: string): string {
+  return text.replace(/\*\*/g, '').replace(/^[^:]+:\s*/, '').trim();
+}
+
+function firstTeaser(blocks: CaseBlock[]): string {
+  for (const block of blocks) {
+    if (block.kind === 'closing') continue;
+    for (const text of block.paragraphs) {
+      const clean = stripMarks(text);
+      if (clean) return clipTeaser(clean);
+    }
+    for (const text of block.bullets ?? []) {
+      const clean = stripMarks(text);
+      if (clean) return clipTeaser(clean);
+    }
+  }
+  return '';
+}
+
+function clipTeaser(text: string): string {
+  if (text.length <= 220) return text;
+  const cut = text.slice(0, 220);
+  const at = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf(' '));
+  return `${(at > 80 ? cut.slice(0, at) : cut).trim()}…`;
+}
+
+/** Door-step card: title, one-line subtitle, short teaser from the mobile copy. */
+export function casePreviewCopy(id: string): { title: string; subtitle: string; teaser: string } | null {
+  if (!isCaseHouse(id)) return null;
+  const content = CASES[id];
+  if (!content) return null;
+  return {
+    title: content.shortHeadline ?? content.headline,
+    subtitle: (content.voice && VOICE_LINES[content.voice]?.script_text) || content.headline,
+    teaser: firstTeaser(content.short),
+  };
 }
 
 const AIRLINE_PROBLEM =

@@ -1,5 +1,6 @@
 import { studio } from './audio/studio';
 import { ChecklistUI } from './checklist/ui';
+import { isCaseHouse } from './data/cases';
 import {
   doorInwardStep,
   getBuildingByName,
@@ -15,6 +16,8 @@ import { IsoScene } from './game/scene';
 import { findPath } from './iso/pathfinding';
 import { BuildingPanel } from './ui/buildingPanel';
 import { ChromeUI, type DesktopLayout } from './ui/chrome';
+import { Joystick } from './ui/joystick';
+import { NameLabels } from './ui/nameLabels';
 import { hideToast, showToast } from './ui/toast';
 import type { Camera } from './tokens';
 
@@ -38,6 +41,8 @@ async function main(): Promise<void> {
     onLocate: (id) => scene?.walkToBuildingForQa(id),
   });
 
+  const joystick = new Joystick(uiRoot);
+  const labels = new NameLabels(uiRoot);
   const panel = new BuildingPanel(
     uiRoot,
     () => {
@@ -48,6 +53,10 @@ async function main(): Promise<void> {
     },
     () => scene.leaveInteriorNow(),
   );
+  joystick.onStickStart(() => {
+    if (panel.isPreviewMode()) panel.hide();
+    studio.noteMoveCommand();
+  });
 
   const syncInteriorPanel = (interiorId: string | null): void => {
     if (interiorId) {
@@ -69,8 +78,16 @@ async function main(): Promise<void> {
     onChecklist: (step) => checklist.complete(step),
     onEnterBuilding: (buildingId) => {
       checklist.complete('enter-building');
+      if (isCaseHouse(buildingId)) {
+        if (chrome.isMobileSheetOpen()) chrome.setLayout('map');
+        panel.showPreview(buildingId);
+        return;
+      }
       scene.enterInterior(buildingId);
     },
+    onMoveCommand: () => studio.noteMoveCommand(),
+    onFrame: () => labels.update(scene.nameLabelAnchors()),
+    stick: () => joystick.vector(),
     onExitInterior: () => {
       checklist.setBuildingPanelOpen(false);
       chrome.setInteriorOpen(false, { skipLayout: true });
@@ -78,6 +95,7 @@ async function main(): Promise<void> {
     },
     onInteriorIdChange: (id) => {
       hideToast();
+      joystick.setHidden(!!id);
       syncInteriorPanel(id);
     },
     onUnreachable: () => showToast('No se puede llegar'),
@@ -85,6 +103,7 @@ async function main(): Promise<void> {
       isOpen: () => panel.isOpen(),
       openTitle: () => panel.openTitle(),
       dismiss: () => panel.hide(),
+      isPreview: () => panel.isPreviewMode(),
       layoutInsets: () => panel.layoutInsets(),
       consumeInteriorCanvasTap: (x, y) => panel.consumeInteriorCanvasTap(x, y),
       expandInteriorSheetForQa: () => panel.expandInteriorSheetForQa(),
@@ -204,6 +223,14 @@ async function main(): Promise<void> {
     audioMuted: () => studio.isMuted(),
     audioUnlocked: () => studio.isUnlocked(),
     setAudioMuted: (muted: boolean) => studio.setMuted(muted),
+    joystick: () => joystick.qa(),
+    nameLabels: () => labels.qa(),
+    barks: () => studio.qaBarks(),
+    isCasePreview: () => panel.isPreviewMode(),
+    isCasePreviewExpanded: () => panel.isPreviewExpanded(),
+    showCasePreview: (id: string) => panel.showPreview(id),
+    expandCasePreview: () => panel.expandPreviewForQa(),
+    collapseCasePreview: () => panel.collapsePreviewForQa(),
   };
 }
 
