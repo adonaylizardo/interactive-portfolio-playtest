@@ -359,18 +359,21 @@ export class StudioAudio {
     try {
       const res = await fetch(`${BARK_DIR}manifest.json`);
       if (!res.ok) return;
-      const data = (await res.json()) as { lines?: BarkLine[] };
+      const data = (await res.json()) as { lines?: BarkLine[]; files?: string[] };
       this.barkLines = data.lines ?? [];
+      const present = new Set(data.files ?? []);
+      if (present.size === 0) return;
       this.preferOgg ??= canPlayOgg();
       await Promise.all(
         this.barkLines.map(async (line) => {
           const file = this.preferOgg ? line.ogg : line.mp3;
+          if (!file || !present.has(file)) return;
           try {
             const probe = await fetch(`${BARK_DIR}${file}`);
             const type = probe.headers.get('content-type') ?? '';
             if (probe.ok && /audio/i.test(type)) this.barkReady.add(line.id);
           } catch {
-            /* missing file: stay silent */
+            /* listed file failed: stay silent */
           }
         }),
       );

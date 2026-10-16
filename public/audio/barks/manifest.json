@@ -1,6 +1,7 @@
 {
   "cooldownMs": 6000,
-  "notes": "Adonay will record these. Missing files are skipped silently.",
+  "notes": "Adonay will record these. Only filenames in `files` are fetched; leave it empty until the ogg/mp3 exist.",
+  "files": [],
   "lines": [
     { "id": "on-it", "phrase": "I'm on it", "mp3": "on-it.mp3", "ogg": "on-it.ogg" },
     { "id": "ready", "phrase": "I'm ready to go", "mp3": "ready.mp3", "ogg": "ready.ogg" },

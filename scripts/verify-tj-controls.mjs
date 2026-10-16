@@ -354,7 +354,7 @@ results.push(
 
 const errors = results.flatMap((r) => [
   ...r.errors,
-  ...r.req404.filter((u) => !/barks\/.+\.(mp3|ogg)/.test(u)).map((u) => `${r.tag} 404: ${u}`),
+  ...r.req404.map((u) => `${r.tag} 404: ${u}`),
   ...r.consoleErrors.map((u) => `${r.tag} console: ${u}`),
 ]);
 for (const r of results) {
