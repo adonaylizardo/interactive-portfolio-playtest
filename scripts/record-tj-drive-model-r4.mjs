@@ -321,9 +321,10 @@ async function run(tag, options, phone) {
     );
     if (phone) await releaseStickCdp(cdp);
     else await page.keyboard.up('ArrowUp');
-    const origin = stoppedAt ?? { cx: moving.cx, cy: moving.cy };
+    const origin = stoppedAt
+      ?? (parked?.exitCx != null ? { cx: parked.exitCx, cy: parked.exitCy } : { cx: moving.cx, cy: moving.cy });
     const slide = parked ? Math.hypot(parked.cx - origin.cx, parked.cy - origin.cy) : 99;
-    notes.push({ afterGetOut: { slide, stoppedAt, parked } });
+    notes.push({ afterGetOut: { slide, stoppedAt, origin, parked: { cx: parked?.cx, cy: parked?.cy, driving: parked?.driving } } });
     if (slide > 0.55) throw new Error(`${tag}: Get out slid the van ${slide.toFixed(2)} tiles`);
     await page.screenshot({ path: path.join(OUT, `${tag}-04-get-out.png`) });
 
