@@ -229,6 +229,7 @@ async function main(): Promise<void> {
     setAudioMuted: (muted: boolean) => studio.setMuted(muted),
     joystick: () => joystick.qa(),
     nameLabels: () => labels.qa(),
+    namePillHeads: () => scene.qaNamePillHeads(),
     barks: () => studio.qaBarks(),
     isCasePreview: () => panel.isPreviewMode(),
     isCasePreviewExpanded: () => panel.isPreviewExpanded(),

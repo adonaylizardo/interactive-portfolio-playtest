@@ -3802,6 +3802,26 @@ export class IsoScene {
     return out;
   }
 
+  /** QA: opaque-top client point vs the HTML pill's bottom (gap should stay ~NAME_PILL_GAP_PX). */
+  qaNamePillHeads(): { id: string; headX: number; headY: number; pillBottom: number; gap: number }[] {
+    const rect = this.canvasEl?.getBoundingClientRect();
+    const avatar = this.interiorActive ? this.interiorAvatar : this.avatar;
+    const of = (id: string, sprite: Sprite) => {
+      const top = spriteOpaqueTopWorld(sprite);
+      const s = this.worldToScreen(top.x, top.y);
+      return { id, headX: (rect?.left ?? 0) + s.x, headY: (rect?.top ?? 0) + s.y };
+    };
+    const heads = [of('adonay', avatar.adonay.sprite), of('pantone', avatar.pantone.sprite)];
+    if (!this.interiorActive && this.noah) heads.push(of('noah', this.noah.sprite));
+    const pills = [...document.querySelectorAll('.name-label')];
+    return heads.map((h) => {
+      const pill = pills.find((p) => (p as HTMLElement).dataset.id === h.id) as HTMLElement | undefined;
+      const box = pill && !pill.hidden ? pill.getBoundingClientRect() : null;
+      const pillBottom = box ? box.bottom : NaN;
+      return { ...h, pillBottom, gap: Number.isFinite(pillBottom) ? h.headY - pillBottom : NaN };
+    });
+  }
+
   qaFill(): {
     loaded: boolean;
     report: typeof fill.report;
