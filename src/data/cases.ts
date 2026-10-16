@@ -4,8 +4,6 @@
  * The airline case never names the client — ignore that file's Español section. Landmark rooms
  * keep the place name as the title and a short placeholder. Internal draft sections are not stored here.
  */
-import { VOICE_LINES } from './voice-lines';
-
 export type CaseBlock =
   | { kind: 'section'; heading?: string; paragraphs: string[]; bullets?: string[] }
   | { kind: 'closing'; text: string };
@@ -14,6 +12,8 @@ export type CaseContent = {
   headline: string;
   /** Phone peek / short-version title when it differs from the desktop headline. */
   shortHeadline?: string;
+  /** One-line role under the case name on the Pixel preview card. */
+  subtitle: string;
   /**
    * Basename under `audio/voice/` (no extension). `null` = this slot has no file;
    * callers must not request `audio/voice/*.mp3`.
@@ -39,41 +39,44 @@ export function isCaseHouse(id: string | null | undefined): id is CaseHouseId {
   return !!id && (CASE_HOUSE_IDS as readonly string[]).includes(id);
 }
 
-function stripMarks(text: string): string {
-  return text.replace(/\*\*/g, '').replace(/^[^:]+:\s*/, '').trim();
+/** Public card title. The airline case never names the client. */
+export const CASE_CARD_TITLES: Record<CaseHouseId, string> = {
+  volaris: 'Airline',
+  bain: 'Bain',
+  mentoria: 'Mentoría',
+  finoa: 'Finoa',
+  pg: 'P&G',
+};
+
+function sectionHeadings(blocks: CaseBlock[]): string[] {
+  return blocks.flatMap((block) => (block.kind === 'section' && block.heading ? [block.heading] : []));
 }
 
-function firstTeaser(blocks: CaseBlock[]): string {
-  for (const block of blocks) {
-    if (block.kind === 'closing') continue;
-    for (const text of block.paragraphs) {
-      const clean = stripMarks(text);
-      if (clean) return clipTeaser(clean);
-    }
-    for (const text of block.bullets ?? []) {
-      const clean = stripMarks(text);
-      if (clean) return clipTeaser(clean);
-    }
-  }
-  return '';
-}
+export type CasePreviewCopy = {
+  title: string;
+  subtitle: string;
+  teaser: string;
+  teaserFull: string;
+  kicker: string;
+  placeholder: string;
+  pillMeta: string;
+};
 
-function clipTeaser(text: string): string {
-  if (text.length <= 220) return text;
-  const cut = text.slice(0, 220);
-  const at = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf(' '));
-  return `${(at > 80 ? cut.slice(0, at) : cut).trim()}…`;
-}
-
-/** Door-step card: title, one-line subtitle, short teaser from the mobile copy. */
-export function casePreviewCopy(id: string): { title: string; subtitle: string; teaser: string } | null {
+/** Door-step card: CASE label, name, one-line role, headline teaser. */
+export function casePreviewCopy(id: string): CasePreviewCopy | null {
   if (!isCaseHouse(id)) return null;
   const content = CASES[id];
   if (!content) return null;
+  const title = CASE_CARD_TITLES[id];
+  const headings = sectionHeadings(content.full).slice(0, 3);
   return {
-    title: content.shortHeadline ?? content.headline,
-    subtitle: (content.voice && VOICE_LINES[content.voice]?.script_text) || content.headline,
-    teaser: firstTeaser(content.short),
+    title,
+    subtitle: content.subtitle,
+    teaser: content.shortHeadline ?? content.headline,
+    teaserFull: content.headline,
+    kicker: `CASE · ${title.toUpperCase()}`,
+    placeholder: `${title.toUpperCase()} · IMAGE PLACEHOLDER`,
+    pillMeta: headings.length ? headings.join(' · ') : 'Problem · What I did · Result',
   };
 }
 
@@ -92,6 +95,7 @@ function landmarkPlaceholder(name: string, voice: string | null = null): CaseCon
   const paragraphs = [`${name} — a landmark of the map. More coming soon.`];
   return {
     headline: name,
+    subtitle: name,
     voice,
     full: [{ kind: 'section', paragraphs }],
     short: [{ kind: 'section', paragraphs }],
@@ -101,6 +105,7 @@ function landmarkPlaceholder(name: string, voice: string | null = null): CaseCon
 export const CASES: Record<string, CaseContent> = {
   volaris: {
     headline: "A contract engineering couldn't misread",
+    subtitle: 'Product strategist and sole approver',
     voice: '02-volaris',
     full: [
       { kind: 'section', heading: 'Problem', paragraphs: [AIRLINE_PROBLEM] },
@@ -138,6 +143,7 @@ export const CASES: Record<string, CaseContent> = {
   bain: {
     headline: 'Leading 9 designers across Bain, while still shipping the work',
     shortHeadline: 'Leading 9 designers across Bain',
+    subtitle: 'Squad lead, mentor, and hands-on designer',
     voice: '03-bain',
     full: [
       {
@@ -197,6 +203,7 @@ export const CASES: Record<string, CaseContent> = {
   },
   pg: {
     headline: 'An app panelists actually want to open',
+    subtitle: 'UX/UI designer, panelist health app',
     voice: '06-pg',
     full: [
       {
@@ -239,6 +246,7 @@ export const CASES: Record<string, CaseContent> = {
   mentoria: {
     headline: 'Mentoring with the same rigor as client work',
     shortHeadline: 'Mentoring as a system',
+    subtitle: 'Mentoring lead and Design Senior Council',
     voice: '04-mentoring',
     full: [
       {
@@ -295,6 +303,7 @@ export const CASES: Record<string, CaseContent> = {
   finoa: {
     headline: 'A custody platform institutions can trust at a glance',
     shortHeadline: 'A custody platform institutions can trust',
+    subtitle: 'UX designer, institutional custody platform',
     voice: '05-finoa',
     full: [
       {

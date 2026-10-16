@@ -25,7 +25,8 @@ export type IconName =
   | 'locate'
   | 'info'
   | 'page'
-  | 'chevron';
+  | 'chevron'
+  | 'arrowNe';
 
 const PATHS: Record<IconName, string> = {
   briefcase: `<rect ${STROKE} x="1.5" y="5" width="12" height="8.5" rx="1.5"/><path ${STROKE} d="M5 5V3.5A1.5 1.5 0 0 1 6.5 2h2A1.5 1.5 0 0 1 10 3.5V5M1.5 8.5h12"/>`,
@@ -47,4 +48,5 @@ const PATHS: Record<IconName, string> = {
   info: `<circle ${STROKE} cx="7.5" cy="7.5" r="5.5"/><path ${STROKE} d="M7.5 7v3.5M7.5 4.5h.01"/>`,
   page: `<path ${STROKE} d="M4 2.5h5l3 3V12.5H4z"/><path ${STROKE} d="M9 2.5V5.5h3"/>`,
   chevron: `<path ${STROKE} d="m5 3.5 5 4-5 4"/>`,
+  arrowNe: `<path ${STROKE} d="M4 11 11 4M6.5 4H11v4.5"/>`,
 };
