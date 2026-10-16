@@ -294,6 +294,7 @@ async function main(): Promise<void> {
     setViewMode: (m: Camera) => scene.setViewMode(m),
     rotateView: () => scene.rotateView(),
     toggleMapOverview: () => scene.toggleMapOverview(),
+    cameraViews: () => scene.qaCameraViews(),
     isMobileSheetOpen: () => chrome.isMobileSheetOpen(),
     audioMuted: () => studio.isMuted(),
     audioUnlocked: () => studio.isUnlocked(),

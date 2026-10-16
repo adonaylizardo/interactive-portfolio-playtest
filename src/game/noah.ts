@@ -308,6 +308,10 @@ export class Noah {
     this.sprite.on('pointertap', handler);
   }
 
+  spritesForBillboard(): Container[] {
+    return [this.sprite, this.bubble];
+  }
+
   private hitWorld(): NoahSnapshot['hit'] {
     const r = this.sprite.hitArea as Rectangle;
     const sx = Math.abs(this.sprite.scale.x);

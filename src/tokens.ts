@@ -62,7 +62,9 @@ export const kit = {
   tile: { w: 128, h: 64 }, // rombo 2:1, escalar en código, nunca en el arte
   anchor: "bottom-center", // del frame completo exportado (PNG @1x y @2x, sin recortar)
   zoomLejosBelow: 0.25, // tope: además solo en el último ×2 de alejamiento (ver isLejosZoom)
-  // Cámaras del minimapa (Figma ui/minimapa vista=…); perspectiva = detrás del personaje, solo escritorio, llega en v1.1
+  // Cámaras del minimapa (Figma ui/minimapa vista=…).
+  // isometrica = default 2:1 iso. cenital = true overhead (roofs + upright billboards).
+  // perspectiva = behind-the-character follow cam (Pixi 2.5D boxes, camera-relative WASD).
   cameras: ["isometrica", "cenital", "perspectiva"],
 } as const;
 

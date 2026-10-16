@@ -304,7 +304,6 @@ export class ChromeUI {
           <button type="button" class="ui-view" data-view="rotate" aria-label="Rotate" data-i18n-aria="chrome.rotate">${iconSvg('rotate')}</button>
           <button type="button" class="ui-view is-active" data-view="isometrica" aria-label="Isometric" data-i18n-aria="chrome.isometric">${iconSvg('cube')}</button>
           <button type="button" class="ui-view" data-view="cenital" aria-label="Top-down" data-i18n-aria="chrome.topdown">${iconSvg('grid')}</button>
-          <button type="button" class="ui-view" data-view="perspectiva" aria-label="Perspective" data-i18n-aria="chrome.perspective">${iconSvg('persp')}</button>
           <button type="button" class="ui-view" data-view="map" aria-label="Map overview" data-i18n-aria="chrome.map">${iconSvg('map')}</button>
         </div>
       </div>

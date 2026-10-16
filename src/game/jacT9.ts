@@ -1817,6 +1817,10 @@ export class JacT9 {
     };
   }
 
+  spritesForBillboard(): Sprite[] {
+    return [this.body];
+  }
+
   applySprite(): void {
     const on = this.lightsOn;
     if (this.toggles.hazards) {
