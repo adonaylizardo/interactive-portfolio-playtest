@@ -1,6 +1,6 @@
-# JAC T9 — v3 (BORRADOR)
+# JAC T9 — v3
 
-**Estado:** BORRADOR. Adonay aprobó la forma y las 4 direcciones, pero **no** aprobó ponerla en el mapa. Por eso `colocacion.activa=false` y `aprobado_para_mapa=false`. No la actives sin su OK.
+**Estado:** EN EL MAPA. Adonay aprobó la forma, las 4 direcciones y la colocación. Parqueada en S=(27,18) mirando a SE, huella 4×2, solo el frame `apagado_se` (luces apagadas).
 
 - **v3 (vigente):** `manifest.v3.json` + carpeta `v3/`.
 - **v2 (superseded):** `manifest.json` y los `jac-t9__*.png` de esta carpeta. Se dejan para referencia y no se borraron.
@@ -14,7 +14,7 @@
 - Escala: el largo real (5,0 m) es 2,8× la altura de Adonay (1,78 m, 96 px @2x), o sea ≈270 px @2x a lo largo del eje iso (≈3,8 tiles → huella 4×2).
 - Luces: dos conos, uno por faro. Cada uno arranca en su faro y sigue el rumbo iso, abriéndose un poquito.
 - Ruedas: el loop es de 4 frames y rota 15° por frame los rayos del rin (6 rayos). Los cauchos no se tocan.
-- Propuesta de parqueo: celda S = (27,18), mirando a SE. **No está activa.**
+- Parqueo: celda S = (27,18), mirando a SE. Huella (24,17) 4×2. Activa.
 
 ## QA
 - `/workspace/portfolio/qa/relleno/jac-t9-v3-hoja.png`

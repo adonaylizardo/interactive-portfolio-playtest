@@ -1,11 +1,11 @@
 {
   "asset": "jac-t9",
   "version": "v3",
-  "estado": "BORRADOR",
-  "aprobado_para_mapa": false,
+  "estado": "EN_MAPA",
+  "aprobado_para_mapa": true,
   "aprobaciones": {
     "forma_y_4_direcciones": "aprobado por Adonay (renders pixel-art, 15 oct 2026)",
-    "colocacion_en_mapa": "NO aprobada"
+    "colocacion_en_mapa": "aprobada por Adonay (15 oct 2026)"
   },
   "reemplaza_a": "v2 (manifest.json, superseded)",
   "origen": {
@@ -260,7 +260,7 @@
     "conos": "dos conos, uno por faro (bloque inferior + tira LED de cada esquina), siguen el rumbo iso y abren ±~6°"
   },
   "colocacion": {
-    "activa": false,
+    "activa": true,
     "propuesta": {
       "celda_S": [
         27,
@@ -271,7 +271,7 @@
         "y": 2
       },
       "dir": "SE",
-      "nota": "solo propuesta; con huella 4x2 revisar que (27,18) siga libre; NO activar hasta que Adonay apruebe la colocación"
+      "nota": "celda S = vértice sur de la huella 4×2; origen (24,17), frente (27,18), dir SE"
     }
   },
   "qa": {

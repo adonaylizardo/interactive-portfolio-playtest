@@ -703,6 +703,38 @@
    },
    "f1": "relleno/parque-perros/parque-perros__vista-lejos@1x.png",
    "f2": "relleno/parque-perros/parque-perros__vista-lejos@2x.png"
+  },
+  "fill/jac-t9-v3/cerca": {
+   "w": 280,
+   "h": 192,
+   "vfs": {
+    "x": 172,
+    "y": 138
+   },
+   "bbox": {
+    "x0": 59,
+    "y0": 13,
+    "x1": 219,
+    "y1": 122
+   },
+   "f1": "jac-t9-v3/jac-t9-v3__apagado_se@1x.png",
+   "f2": "jac-t9-v3/jac-t9-v3__apagado_se@2x.png"
+  },
+  "fill/jac-t9-v3/lejos": {
+   "w": 280,
+   "h": 192,
+   "vfs": {
+    "x": 172,
+    "y": 138
+   },
+   "bbox": {
+    "x0": 59,
+    "y0": 13,
+    "x1": 219,
+    "y1": 122
+   },
+   "f1": "jac-t9-v3/jac-t9-v3__apagado_se@1x.png",
+   "f2": "jac-t9-v3/jac-t9-v3__apagado_se@2x.png"
   }
  },
  "anims": {
@@ -1000,6 +1032,12 @@
    "h": 84,
    "cell": 4,
    "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAEAAAAAAAAAAAAAAAAAAIABAAAAAAAAAAAAAAAAAACAAQAAAAAAAAAAAAAAAAAA7ncAAAAAAAAAAAAAAAAAALw9AAAAAAAAAAAAAAAAADCOcQwAAAAAAAAAAAAAAADwj/EPAAAAAAAAAAAAAAAA8IwxDwAAAAAAAAAAAAAAgDmMMZwBAAAAAAAAAAAAAIA/jDH8AQAAAAAAAAAAAACAM+w3zAEAAAAAAAAAAAAA7jH8P4x3AAAAAAAAAAAAALwxnnmMPQAAAAAAAAAAADCOsY/xjXEMAAAAAAAAAADwj/GNsY/xDwAAAAAAAAAA8Ix57DeeMQ8AAAAAAAAAgDmMP/w//DGcAQAAAAAAAIA/jDf+f+wx/AEAAAAAAACAM+yx//+NN8wBAAAAAAAA7jH88f//jz+MdwAAAAAAALwxnvn//595jD0AAAAAADCOsY//////8Y1xDAAAAADwj/GN/////7GP8Q8AAAAA8Ix57P////83njEPAAAAgDmMP/z/////P/wxnAEAAIA//Df+/////3/sMfwBAACAM/yx////////jTfMAQAA7jH/8f///////48/jHcAALzx//n///////+feYw9ADCO8f////////////GNcQzwj/3///////////+xj/EP8Iz/////////////N54xDzmM/////////////z/8MZw/jP////////////9/7DH8M+z//////////////403zDH8//////////////+PP4wxnv///////////////3+MsY/////////////////3jfGN////////////////t4957P///////////////zeeP/z///////////////8//H/+////////////////f/75//////////////////+f8f//////////////////j/v//////////////////9/////////////////////////////////////////////////////////////////+//////////////////9/+P//////////////////H+D//////////////////weA//////////////////8BAP7///////////////9/AAD4////////////////HwAA4P///////////////wcAAID///////////////8BAAAA/v////////////9/AAAAAPj/////////////HwAAAADg/////////////wcAAAAAgP////////////8BAAAAAAD+//////////9/AAAAAAAA+P//////////HwAAAAAAAOD//////////wcAAAAAAACA//////////8BAAAAAAAAAP7///////9/AAAAAAAAAAD4////////HwAAAAAAAAAA4P///////wcAAAAAAAAAAID///////8BAAAAAAAAAAAA/v////9/AAAAAAAAAAAAAPj/////HwAAAAAAAAAAAADg/////wcAAAAAAAAAAAAAgP////8BAAAAAAAAAAAAAAD+//9/AAAAAAAAAAAAAAAA+P//HwAAAAAAAAAAAAAAAOD//wcAAAAAAAAAAAAAAACA//8BAAAAAAAAAAAAAAAAAP5/AAAAAAAAAAAAAAAAAAD4HwAAAAAAAAAAAAAAAAAA4AcAAAAAAAAA"
+  },
+  "fill/jac-t9-v3": {
+   "w": 70,
+   "h": 48,
+   "cell": 4,
+   "bits": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeAAAAAAAAAPCfDwAAAAAAAP//DwAAAAAA8P//DwAAAAAA/v//DwAAAADA////BwAAAADw////AwAAAAD8////AQAAAAD/////AwAAAMD/////AAAAAPD///8/AAAAAPD///8fAAAAAPj///8fAAAAAPz///8fAAAAAP////8PAAAAwP////8HAAAA4P////8BAAAA+Pj//38AAAAACPj//x8AAAAAAPj//wcAAAAAAPj//wEAAAAAAPj/fwAAAAAAAPz/DwAAAAAAAP//AQAAAAAAgP8fAAAAAAAA4P8AAAAAAAAA8AEAAAAAAAAAOAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
   }
  },
  "placements": [
@@ -2216,6 +2254,55 @@
     ]
    ],
    "group": "perrera"
+  },
+  {
+   "id": "jac-t9",
+   "kind": "prop",
+   "sprite": "fill/jac-t9-v3",
+   "footprint": {
+    "x": 24,
+    "y": 17,
+    "w": 4,
+    "h": 2
+   },
+   "front": [
+    27,
+    18
+   ],
+   "cells": [
+    [
+     24,
+     17
+    ],
+    [
+     25,
+     17
+    ],
+    [
+     26,
+     17
+    ],
+    [
+     27,
+     17
+    ],
+    [
+     24,
+     18
+    ],
+    [
+     25,
+     18
+    ],
+    [
+     26,
+     18
+    ],
+    [
+     27,
+     18
+    ]
+   ]
   }
  ],
  "replaced": [
