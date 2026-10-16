@@ -1,23 +1,18 @@
 /**
  * One analog stick, fixed bottom-right, used only while driving (Tom John model).
- * Knob moves inside the pad. Never spawns a second stick at the finger, never used for walking.
+ * Knob stays inside the pad. Never spawns a second stick at the finger, never used for walking.
  */
 
 export type StickVector = { x: number; y: number };
 
-const PAD = 96;
-const KNOB = 64;
-const MAX_RADIUS = 16;
-const DEADZONE = 6;
+const PAD = 112;
+const KNOB = 44;
+const MAX_RADIUS = 28;
+const DEADZONE = 8;
 
 function isCoarse(): boolean {
   return window.matchMedia('(pointer: coarse)').matches;
 }
-
-const STICK_GLYPH = `<svg class="joystick__glyph" viewBox="0 0 15 15" width="18" height="18" aria-hidden="true">
-  <circle fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" cx="7.5" cy="7.5" r="5.5"/>
-  <circle fill="none" stroke="currentColor" stroke-width="1.25" cx="7.5" cy="7.5" r="2"/>
-</svg>`;
 
 export class Joystick {
   readonly root: HTMLElement;
@@ -28,36 +23,68 @@ export class Joystick {
   private vec: StickVector = { x: 0, y: 0 };
   private touchSeen = false;
   private hidden = true;
+  private touchActive = false;
   private onStart: (() => void) | null = null;
 
   constructor(container: HTMLElement) {
     this.root = document.createElement('div');
     this.root.className = 'joystick';
     this.root.hidden = true;
+    this.root.setAttribute('aria-label', 'Conducir');
     this.root.innerHTML = `
       <div class="joystick__ring" aria-hidden="true"></div>
-      <button type="button" class="joystick__idle" aria-label="Conducir">
-        ${STICK_GLYPH}
-      </button>
-      <div class="joystick__knob" hidden></div>
+      <button type="button" class="joystick__idle" aria-label="Conducir"></button>
     `;
     container.appendChild(this.root);
     this.idle = this.root.querySelector('.joystick__idle')!;
-    this.knob = this.root.querySelector('.joystick__knob')!;
+    this.knob = this.idle;
 
-    this.idle.addEventListener('pointerdown', (e) => this.begin(e));
-    window.addEventListener('pointermove', (e) => this.move(e));
-    window.addEventListener('pointerup', (e) => this.end(e));
-    window.addEventListener('pointercancel', (e) => this.end(e));
+    this.root.addEventListener('pointerdown', (e) => this.beginPointer(e));
+    window.addEventListener('pointermove', (e) => this.movePointer(e));
+    window.addEventListener('pointerup', (e) => this.endPointer(e));
+    window.addEventListener('pointercancel', (e) => this.endPointer(e));
+    this.root.addEventListener(
+      'touchstart',
+      (e) => {
+        this.noteTouch();
+        this.beginTouch(e);
+      },
+      { passive: false },
+    );
+    window.addEventListener(
+      'touchmove',
+      (e) => {
+        if (!this.touchActive) return;
+        e.preventDefault();
+        this.moveTouch(e);
+      },
+      { passive: false },
+    );
+    window.addEventListener(
+      'touchend',
+      (e) => {
+        if (!this.touchActive) return;
+        this.endTouch(e);
+      },
+      { passive: true },
+    );
+    window.addEventListener(
+      'touchcancel',
+      (e) => {
+        if (!this.touchActive) return;
+        this.endTouch(e);
+      },
+      { passive: true },
+    );
 
-    const noteTouch = () => {
-      if (this.touchSeen) return;
-      this.touchSeen = true;
-      this.syncVisible();
-    };
-    window.addEventListener('touchstart', noteTouch, { capture: true, passive: true });
+    window.addEventListener(
+      'touchstart',
+      () => this.noteTouch(),
+      { capture: true, passive: true },
+    );
     window.matchMedia('(pointer: coarse)').addEventListener('change', () => this.syncVisible());
     this.syncVisible();
+    this.setKnob(0, 0);
   }
 
   setHidden(hidden: boolean): void {
@@ -79,7 +106,7 @@ export class Joystick {
   }
 
   isActive(): boolean {
-    return this.pointerId !== null;
+    return this.pointerId !== null || this.touchActive;
   }
 
   cancel(): void {
@@ -108,6 +135,12 @@ export class Joystick {
     return !this.hidden && (isCoarse() || this.touchSeen);
   }
 
+  private noteTouch(): void {
+    if (this.touchSeen) return;
+    this.touchSeen = true;
+    this.syncVisible();
+  }
+
   private syncVisible(): void {
     this.root.hidden = !this.wantsPad();
     if (this.root.hidden) this.release();
@@ -118,30 +151,67 @@ export class Joystick {
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   }
 
-  private begin(e: PointerEvent): void {
+  private beginPointer(e: PointerEvent): void {
     if (this.hidden || !this.wantsPad()) return;
-    if (this.pointerId !== null) return;
+    if (this.touchActive || this.pointerId !== null) return;
+    if (e.pointerType === 'touch') this.noteTouch();
     e.preventDefault();
     e.stopPropagation();
     this.pointerId = e.pointerId;
     this.origin = this.padCenter();
     this.root.classList.add('is-dragging');
-    this.knob.hidden = false;
-    this.idle.style.opacity = '0';
-    this.setKnob(0, 0);
+    this.applyDelta(e.clientX - this.origin.x, e.clientY - this.origin.y);
     try {
-      this.idle.setPointerCapture(e.pointerId);
+      this.root.setPointerCapture(e.pointerId);
     } catch {
       /* capture is optional */
     }
     this.onStart?.();
   }
 
-  private move(e: PointerEvent): void {
-    if (this.pointerId !== e.pointerId) return;
+  private movePointer(e: PointerEvent): void {
+    if (this.touchActive || this.pointerId !== e.pointerId) return;
     e.stopPropagation();
-    const dx = e.clientX - this.origin.x;
-    const dy = e.clientY - this.origin.y;
+    this.applyDelta(e.clientX - this.origin.x, e.clientY - this.origin.y);
+  }
+
+  private endPointer(e: PointerEvent): void {
+    if (this.pointerId !== e.pointerId) return;
+    this.release();
+  }
+
+  private beginTouch(e: TouchEvent): void {
+    if (this.hidden || !this.wantsPad()) return;
+    if (this.touchActive || this.pointerId !== null) return;
+    const t = e.changedTouches[0];
+    if (!t) return;
+    e.preventDefault();
+    e.stopPropagation();
+    this.touchActive = true;
+    this.origin = this.padCenter();
+    this.root.classList.add('is-dragging');
+    this.applyDelta(t.clientX - this.origin.x, t.clientY - this.origin.y);
+    this.onStart?.();
+  }
+
+  private moveTouch(e: TouchEvent): void {
+    if (!this.touchActive) return;
+    const t = e.touches[0] ?? e.changedTouches[0];
+    if (!t) return;
+    this.applyDelta(t.clientX - this.origin.x, t.clientY - this.origin.y);
+  }
+
+  private endTouch(e: TouchEvent): void {
+    if (!this.touchActive) return;
+    if (e.touches.length > 0) {
+      const t = e.touches[0];
+      this.applyDelta(t.clientX - this.origin.x, t.clientY - this.origin.y);
+      return;
+    }
+    this.release();
+  }
+
+  private applyDelta(dx: number, dy: number): void {
     const dist = Math.hypot(dx, dy);
     const clamped = Math.min(dist, MAX_RADIUS);
     const ux = dist > 0 ? (dx / dist) * clamped : 0;
@@ -155,23 +225,18 @@ export class Joystick {
     this.vec = { x: (ux / clamped) * gain, y: (uy / clamped) * gain };
   }
 
-  private end(e: PointerEvent): void {
-    if (this.pointerId !== e.pointerId) return;
-    this.release();
-  }
-
   private release(): void {
     this.pointerId = null;
+    this.touchActive = false;
     this.vec = { x: 0, y: 0 };
     this.root.classList.remove('is-dragging');
-    this.knob.hidden = true;
-    this.idle.style.opacity = '';
+    this.setKnob(0, 0);
   }
 
   private setKnob(ox: number, oy: number): void {
     const cx = PAD / 2 - KNOB / 2;
     const cy = PAD / 2 - KNOB / 2;
-    this.knob.style.left = `${cx + ox}px`;
-    this.knob.style.top = `${cy + oy}px`;
+    this.idle.style.left = `${cx + ox}px`;
+    this.idle.style.top = `${cy + oy}px`;
   }
 }

@@ -235,6 +235,7 @@ export class ChromeUI {
       <div class="chrome__tools-phone">
         ${roundBtn('search', 'Buscar')}
         ${roundBtn('sound', 'Sonido')}
+        ${roundBtn('locate', 'Center on Adonay')}
       </div>
       <div class="chrome__intro" data-intro>
         <button type="button" class="chrome__intro-close" aria-label="Close">${iconSvg('close')}</button>
@@ -341,7 +342,9 @@ export class ChromeUI {
         else this.callbacks.onView(v as Camera);
       });
     });
-    this.root.querySelector('[aria-label="Center on Adonay"]')?.addEventListener('click', () => this.callbacks.onCenter());
+    this.root.querySelectorAll('[aria-label="Center on Adonay"]').forEach((btn) => {
+      btn.addEventListener('click', () => this.callbacks.onCenter());
+    });
     this.root.querySelector('[data-dock="intro"]')?.addEventListener('click', () => this.setLayout('split'));
     this.root.querySelector('.chrome__dock [aria-label="Casos"]')?.addEventListener('click', () => {
       this.setLayout('split');
