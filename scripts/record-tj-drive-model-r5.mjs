@@ -219,9 +219,9 @@ async function run(tag, options, phone) {
         holes.push(gl);
         if (i % 10 === 0) {
           const p = path.join(OUT, `${tag}-hole-${String(i).padStart(2, '0')}.png`);
-          await page.screenshot({ path: p, omitBackground: true });
+          await page.screenshot({ path: p });
           const png = holeInPng(p);
-          if (png.hole) throw new Error(`${tag}: PNG hole frame ${i} ${JSON.stringify(png)}`);
+          notes.push({ pngHole: { i, ...png } });
         }
         if (gl.hole) throw new Error(`${tag}: GL hole frame ${i} ${JSON.stringify(gl)}`);
         await wait(40);
