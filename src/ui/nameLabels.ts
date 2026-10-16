@@ -62,7 +62,7 @@ export class NameLabels {
         const overlapY = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
         if (overlapX <= 0 || overlapY <= 0) continue;
         const cur = visible[j].style.transform;
-        visible[j].style.transform = `${cur} translateY(${Math.ceil(overlapY + 4)}px)`;
+        visible[j].style.transform = `${cur} translateY(${-Math.ceil(overlapY + 4)}px)`;
       }
     }
   }

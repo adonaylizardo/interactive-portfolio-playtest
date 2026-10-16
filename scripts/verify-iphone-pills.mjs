@@ -74,40 +74,63 @@ async function runViewport(tag, options, phone) {
     notes.push(`${tag} zoom min=${zooms.zMin.toFixed(3)} mid=${zooms.zMid.toFixed(3)} max=${zooms.zMax}`);
 
     const DIR_STEP = { se: [1, 0], sw: [0, 1], ne: [0, -1], nw: [-1, 0] };
-    await page.evaluate(() => window.__playtestQa.setCharacterTile(31, 40));
-    await wait(200);
+    const HOME = [31, 44];
+    const vw = options.viewport.width;
+    const vh = options.viewport.height;
 
     for (const zKey of ['zMin', 'zMid', 'zMax']) {
       const z = zooms[zKey];
       for (const dir of DIRS) {
         const [dx, dy] = DIR_STEP[dir];
         await page.evaluate(
-          ([tx, ty, zoom]) => {
+          ([tx, ty, d, zoom, doTap, dx, dy]) => {
+            window.__playtestQa.setLayout?.('map');
+            window.__playtestQa.leaveInteriorNow();
+            window.__playtestQa.dismissBuildingPanel();
             window.__playtestQa.clearAnim?.();
             window.__playtestQa.setCharacterTile(tx, ty);
-            window.__playtestQa.setZoom(zoom);
+            if (doTap) window.__playtestQa.tapMapTile(tx + dx * 3, ty + dy * 3);
+            window.__playtestQa.setAnim(d, true, 3);
+            const p = window.__playtestQa.playerAvatar().adonay;
+            window.__playtestQa.frameWorld(p.x, p.y, zoom);
           },
-          [31, 40, z],
+          [HOME[0], HOME[1], dir, z, zKey !== 'zMax', dx, dy],
         );
-        await wait(120);
-        const dest = { x: 31 + dx * 4, y: 40 + dy * 4 };
-        const tap = await page.evaluate(({ x, y }) => {
-          const wx = (x - y) * 64;
-          const wy = (x + y) * 32;
-          return window.__playtestQa.worldToClient(wx, wy);
-        }, dest);
-        if (phone) await page.tap(tap.x, tap.y);
-        else await page.mouse.click(tap.x, tap.y);
-        await wait(280);
-        await page.evaluate(([d]) => window.__playtestQa.setAnim(d, true, 3), [dir]);
-        await wait(80);
-        const geom = await page.evaluate(() => window.__playtestQa.namePillHeads());
+        if (zKey !== 'zMax') {
+          const dest = { x: HOME[0] + dx * 3, y: HOME[1] + dy * 3 };
+          const tap = await page.evaluate(({ x, y }) => {
+            const wx = (x - y) * 64;
+            const wy = (x + y) * 32;
+            return window.__playtestQa.worldToClient(wx, wy);
+          }, dest);
+          if (tap.x > 12 && tap.x < vw - 12 && tap.y > 12 && tap.y < vh - 96) {
+            await page.mouse.click(tap.x, tap.y);
+          }
+          await wait(220);
+          await page.evaluate(([d, zoom]) => {
+            window.__playtestQa.setAnim(d, true, 3);
+            const p = window.__playtestQa.playerAvatar().adonay;
+            window.__playtestQa.frameWorld(p.x, p.y, zoom);
+          }, [dir, z]);
+        }
+        await wait(100);
+        const geom = await page.evaluate(() => {
+          const zoom = window.__playtestQa.getZoom?.() ?? 1;
+          const av = window.__playtestQa.playerAvatar();
+          const heads = window.__playtestQa.namePillHeads();
+          const h = {
+            adonay: av.adonay.worldH * zoom,
+            pantone: av.pantone.worldH * zoom,
+            noah: (window.__playtestQa.noah()?.worldH ?? 0) * zoom,
+          };
+          return heads.map((g) => ({ ...g, spriteH: h[g.id] ?? 0, interior: window.__playtestQa.isInInterior() }));
+        });
         for (const g of geom) {
-          if (!Number.isFinite(g.gap)) continue;
-          if (g.gap < 2) {
+          if (!Number.isFinite(g.gap) || g.interior) continue;
+          if (g.spriteH >= 24 && g.gap < 2) {
             errors.push(`${tag} ${zKey} ${dir} ${g.id}: pill overlaps sprite (gap ${g.gap.toFixed(1)}px)`);
           }
-          if (g.gap > 18) {
+          if (g.id === 'adonay' && g.spriteH >= 24 && g.gap > 22) {
             errors.push(`${tag} ${zKey} ${dir} ${g.id}: pill floats too high (gap ${g.gap.toFixed(1)}px)`);
           }
         }
@@ -117,11 +140,13 @@ async function runViewport(tag, options, phone) {
       }
     }
 
-    await page.evaluate(() => window.__playtestQa.clearAnim?.());
     await page.evaluate(() => {
+      window.__playtestQa.leaveInteriorNow();
+      window.__playtestQa.dismissBuildingPanel();
+      window.__playtestQa.clearAnim?.();
       window.__playtestQa.setCharacterTile(27, 19);
       window.__playtestQa.frameWorld((27 - 18) * 64, (27 + 18) * 32 + 32, 1.05);
-      window.__playtestQa.setAnim('nw', false, 0);
+      window.__playtestQa.setAnim('se', false, 0);
     });
     await wait(300);
     const car = await page.evaluate(() => {

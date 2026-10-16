@@ -1,8 +1,8 @@
 import type { Sprite, Texture } from 'pixi.js';
 
 /** Screen pixels between the sprite's opaque top and the bottom of the name pill. */
-export const NAME_PILL_GAP_PX = 8;
-const ALPHA = 12;
+export const NAME_PILL_GAP_PX = 10;
+const ALPHA = 1;
 const TOP_BAND = 2;
 
 const cache = new WeakMap<Texture, { x: number; y: number } | null>();
