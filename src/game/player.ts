@@ -401,6 +401,7 @@ export class PlayerAvatar {
   private hasFoot = false;
   private visible = true;
   private facingHold: { dir: FacingDir; fresh: boolean } | null = null;
+  private qaAnimHold: { dir: FacingDir; walk: boolean; frame: number } | null = null;
 
   private seat: (BenchSeat & { feet: Spot; dog: Spot }) | null = null;
   private sit: SitPhase = 'free';
@@ -450,6 +451,33 @@ export class PlayerAvatar {
     this.facingHold = { dir, fresh: true };
     this.adonay.dir = dir;
     this.adonay.applyTexture();
+  }
+
+  /** QA: hold both walkers on a facing and idle/walk frame until `qaClearAnim`. */
+  qaSetAnim(dir: FacingDir, walk: boolean, frame = 0): void {
+    this.qaAnimHold = { dir, walk, frame };
+    this.applyQaAnim();
+  }
+
+  qaClearAnim(): void {
+    this.qaAnimHold = null;
+  }
+
+  private applyQaAnim(): void {
+    const h = this.qaAnimHold;
+    if (!h) return;
+    this.facingHold = { dir: h.dir, fresh: true };
+    for (const w of [this.adonay, this.pantone]) {
+      w.dir = h.dir;
+      w.mode = h.walk ? 'walk' : 'idle';
+      w.frame = h.frame;
+      if (h.walk) {
+        w.walked = h.frame * WALK_STRIDE_WORLD;
+        w.stillFor = 0;
+        w.stillTicks = 0;
+      }
+      w.applyTexture();
+    }
   }
 
   /** Drops the trail and stands Pantone behind the player (first placement, rooms, teleports). */
@@ -548,6 +576,7 @@ export class PlayerAvatar {
       }
     } else this.tickSeat(dt);
     this.tickPantone(dt);
+    this.applyQaAnim();
     this.syncDepth();
   }
 

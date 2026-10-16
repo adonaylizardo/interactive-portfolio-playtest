@@ -211,6 +211,8 @@ async function main(): Promise<void> {
     npcTown: () => scene.qaNpcTown(),
     advanceNpcs: (seconds: number) => scene.qaAdvanceNpcs(seconds),
     playerAvatar: () => scene.qaPlayerAvatar(),
+    setAnim: (dir: 'se' | 'sw' | 'ne' | 'nw', walk: boolean, frame = 0) => scene.qaSetAnim(dir, walk, frame),
+    clearAnim: () => scene.qaClearAnim(),
     benches: () => scene.qaBenches(),
     skipQuiet: (seconds: number) => scene.qaSkipQuiet(seconds),
     noah: () => scene.qaNoah(),

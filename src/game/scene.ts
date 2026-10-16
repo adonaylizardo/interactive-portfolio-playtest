@@ -50,12 +50,14 @@ import {
   objectDepth,
   objectOccluder,
   objectSpriteKey,
+  objectSpriteScale,
   objectSpriteTopLeft,
   playerBehind,
   tileSpriteKey,
   TILE_DIAMOND,
   type OccluderBox,
 } from './mapSprites';
+import { NAME_PILL_GAP_PX, spriteOpaqueTopWorld } from './spriteTop';
 import {
   allSpriteKeys,
   hasSprite,
@@ -715,7 +717,8 @@ export class IsoScene {
       if (!key || !hasSprite(key) || key.endsWith('/lejos')) continue;
       const tl = objectSpriteTopLeft(obj, key);
       const a = spriteAsset(key);
-      if (tl.x + a.w < minX || tl.x > maxX || tl.y + a.h < minY || tl.y > maxY) continue;
+      const sc = objectSpriteScale(obj);
+      if (tl.x + a.w * sc < minX || tl.x > maxX || tl.y + a.h * sc < minY || tl.y > maxY) continue;
       keys.add(key);
     }
     return [...keys];
@@ -861,11 +864,18 @@ export class IsoScene {
         const ready = spritesLoaded(key);
         const sprite = new Sprite(ready ? spriteTexture(key) : Texture.EMPTY);
         const tl = objectSpriteTopLeft(obj, key);
+        const sc = objectSpriteScale(obj);
+        sprite.scale.set(sc);
         sprite.position.set(tl.x - pos.x, tl.y - pos.y);
         g.addChild(sprite);
         const a = spriteAsset(key);
         const tlw = { x: tl.x, y: tl.y };
-        const box = new Rectangle(tlw.x + a.bbox.x0 - pos.x, tlw.y + a.bbox.y0 - pos.y, a.bbox.x1 - a.bbox.x0, a.bbox.y1 - a.bbox.y0);
+        const box = new Rectangle(
+          tlw.x + a.bbox.x0 * sc - pos.x,
+          tlw.y + a.bbox.y0 * sc - pos.y,
+          (a.bbox.x1 - a.bbox.x0) * sc,
+          (a.bbox.y1 - a.bbox.y0) * sc,
+        );
         this.objectTapBoxes.set(obj.id, box);
         g.hitArea =
           obj.type === 'building'
@@ -880,8 +890,8 @@ export class IsoScene {
         const spriteBox = {
           x0: tlw.x - 8,
           y0: tlw.y - 8,
-          x1: tlw.x + a.w + 8,
-          y1: tlw.y + a.h + 8,
+          x1: tlw.x + a.w * sc + 8,
+          y1: tlw.y + a.h * sc + 8,
         };
         this.objectVisuals.set(obj.id, {
           obj,
@@ -3637,13 +3647,15 @@ export class IsoScene {
     h: number;
     kind: string;
     zIndex?: number;
+    scale?: number;
   }[] {
-    const out: { id: string; key: string; tl: { x: number; y: number }; w: number; h: number; kind: string; zIndex?: number }[] = [];
+    const out: { id: string; key: string; tl: { x: number; y: number }; w: number; h: number; kind: string; zIndex?: number; scale?: number }[] = [];
     for (const v of this.objectVisuals.values()) {
       const key = objectSpriteKey(v.obj, 'default', false)!;
       const tl = objectSpriteTopLeft(v.obj, key);
       const a = spriteAsset(key);
-      out.push({ id: v.obj.id, key, tl, w: a.w, h: a.h, kind: v.obj.name, zIndex: v.zIndex });
+      const sc = objectSpriteScale(v.obj);
+      out.push({ id: v.obj.id, key, tl, w: a.w * sc, h: a.h * sc, kind: v.obj.name, zIndex: v.zIndex, scale: sc });
     }
     const seen = new Set<string>();
     for (const { tx, ty } of this.tileCullEntries) {
@@ -3745,15 +3757,21 @@ export class IsoScene {
     const rect = this.canvasEl?.getBoundingClientRect();
     const sw = this.app?.screen.width ?? 0;
     const sh = this.app?.screen.height ?? 0;
-    const toClient = (wx: number, wy: number) => {
-      const s = this.worldToScreen(wx, wy);
-      return { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y, sx: s.x, sy: s.y };
+    const aboveHead = (sprite: Sprite) => {
+      const top = spriteOpaqueTopWorld(sprite);
+      const s = this.worldToScreen(top.x, top.y);
+      return {
+        x: (rect?.left ?? 0) + s.x,
+        y: (rect?.top ?? 0) + s.y - NAME_PILL_GAP_PX,
+        sx: s.x,
+        sy: s.y - NAME_PILL_GAP_PX,
+      };
     };
     const onScreen = (sx: number, sy: number) => sx > -40 && sy > -40 && sx < sw + 40 && sy < sh + 40;
     const avatar = this.interiorActive ? this.interiorAvatar : this.avatar;
     const snap = avatar.snapshot();
-    const adonay = toClient(snap.adonay.x, snap.adonay.y - snap.adonay.worldH - 6);
-    const pantone = toClient(snap.pantone.x, snap.pantone.y - snap.pantone.worldH - 4);
+    const adonay = aboveHead(avatar.adonay.sprite);
+    const pantone = aboveHead(avatar.pantone.sprite);
     const out: { id: 'adonay' | 'pantone' | 'noah'; name: string; x: number; y: number; visible: boolean }[] = [
       {
         id: 'adonay',
@@ -3772,7 +3790,7 @@ export class IsoScene {
     ];
     if (!this.interiorActive && this.noah) {
       const n = this.noah.snapshot();
-      const head = toClient(n.x, n.y - n.worldH - 6);
+      const head = aboveHead(this.noah.sprite);
       out.push({
         id: 'noah',
         name: 'Noah',
@@ -3788,7 +3806,7 @@ export class IsoScene {
     loaded: boolean;
     report: typeof fill.report;
     actors: FillActorSnapshot[];
-    objects: { id: string; key: string; tl: { x: number; y: number }; w: number; h: number; flat: boolean; zIndex: number; cells: [number, number][] }[];
+    objects: { id: string; key: string; tl: { x: number; y: number }; w: number; h: number; flat: boolean; zIndex: number; cells: [number, number][]; scale: number }[];
     pathCells: [number, number][];
     solidCells: [number, number][];
     flatCells: [number, number][];
@@ -3802,15 +3820,17 @@ export class IsoScene {
       for (let dy = 0; dy < (o.h ?? 1); dy++) {
         for (let dx = 0; dx < (o.w ?? 1); dx++) cellsOut.push([(o.footprintX ?? o.x) + dx, (o.footprintY ?? o.y) + dy]);
       }
+      const sc = objectSpriteScale(o);
       return {
         id: o.id,
         key,
         tl: objectSpriteTopLeft(o, key),
-        w: a.w,
-        h: a.h,
+        w: a.w * sc,
+        h: a.h * sc,
         flat: !!o.flat,
         zIndex: this.objectVisuals.get(o.id)?.zIndex ?? NaN,
         cells: cellsOut,
+        scale: sc,
       };
     });
     const owned: [number, number][] = [...fill.solidCells];
@@ -3861,6 +3881,18 @@ export class IsoScene {
 
   qaAdvanceNpcs(seconds: number): void {
     this.npcs.advance(seconds);
+  }
+
+  qaSetAnim(dir: FacingDir, walk: boolean, frame = 0): void {
+    const a = this.interiorActive ? this.interiorAvatar : this.avatar;
+    a.qaSetAnim(dir, walk, frame);
+    this.app?.render();
+  }
+
+  qaClearAnim(): void {
+    this.avatar.qaClearAnim();
+    this.interiorAvatar?.qaClearAnim();
+    this.app?.render();
   }
 
   /** QA: the on-screen player avatar (map or room) and the canvas resolution it was loaded for. */
