@@ -79,13 +79,18 @@ function sideBySide(oursPath, pixelPath, destPath) {
 
 async function boot(page, tag) {
   const t0 = Date.now();
-  await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.waitForFunction(() => Boolean(window.__playtestQa?.isInInterior), null, { timeout: 45000 });
-  await wait(400);
+  // domcontentloaded + qa-ready wait: do not sit on networkidle or the 4s hint is already gone.
+  await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+  const hint = await page.evaluate(() => window.__playtestQa.soundHint?.());
   const info = await page.evaluate(() => ({
     js: [...document.scripts].map((s) => s.src).filter((s) => /index-.*\.js/.test(s)),
   }));
-  return { tag, loadMs: Date.now() - t0, bundle: info.js.map((s) => s.split('/').pop()).join(',') || 'dev' };
+  return {
+    tag,
+    loadMs: Date.now() - t0,
+    bundle: info.js.map((s) => s.split('/').pop()).join(',') || 'dev',
+    hint,
+  };
 }
 
 async function resetMap(page) {
@@ -208,11 +213,10 @@ async function runViewport(tag, options, phone) {
   try {
     const bootInfo = await boot(page, tag);
     notes.push(`${tag} bundle ${bootInfo.bundle} load=${bootInfo.loadMs}ms`);
+    notes.push(`${tag} sound-hint-boot ${JSON.stringify(bootInfo.hint)}`);
+    if (!bootInfo.hint?.visible) errors.push(`${tag}: silent-mode hint missing at boot`);
+    await shot(page, tag, 'sound-hint');
     await resetMap(page);
-
-    const hint0 = await page.evaluate(() => window.__playtestQa.soundHint?.());
-    notes.push(`${tag} sound-hint-boot ${JSON.stringify(hint0)}`);
-    if (!hint0?.visible) errors.push(`${tag}: silent-mode hint missing at boot`);
 
     const car = await page.evaluate(() => {
       const fill = window.__playtestQa.fill();
