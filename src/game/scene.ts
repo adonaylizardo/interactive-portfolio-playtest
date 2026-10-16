@@ -1,4 +1,15 @@
-import { Application, Container, Graphics, Point, Polygon, Rectangle, Sprite, Texture, TilingSprite } from 'pixi.js';
+import {
+  Application,
+  Container,
+  Graphics,
+  Point,
+  Polygon,
+  Rectangle,
+  Sprite,
+  Texture,
+  TilingSprite,
+  UPDATE_PRIORITY,
+} from 'pixi.js';
 import {
   cells,
   doorInwardStep,
@@ -328,6 +339,9 @@ export class IsoScene {
   private jacBubbleTimer: ReturnType<typeof setTimeout> | null = null;
   private rearBlit: HTMLCanvasElement | null = null;
   private rearBlitReady = false;
+  /** Off-DOM WebGL view. Never shown — we blit it onto the opaque 2D #game-canvas. */
+  private glView: HTMLCanvasElement | null = null;
+  private presentCtx: CanvasRenderingContext2D | null = null;
   private pendingJacExit = false;
   private events: SceneEvents;
   private objectGraphics = new Map<string, Container>();
@@ -425,9 +439,17 @@ export class IsoScene {
 
   async init(canvas: HTMLCanvasElement): Promise<void> {
     this.canvasEl = canvas;
+    const glView = document.createElement('canvas');
+    glView.setAttribute('data-jac-gl', '1');
+    glView.setAttribute('aria-hidden', 'true');
+    glView.style.cssText =
+      'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none';
+    glView.width = Math.max(1, canvas.clientWidth || window.innerWidth);
+    glView.height = Math.max(1, canvas.clientHeight || window.innerHeight);
+    this.glView = glView;
     this.app = new Application();
     await this.app.init({
-      canvas,
+      canvas: glView,
       background: worldBackgroundColor(),
       backgroundAlpha: 1,
       antialias: true,
@@ -436,6 +458,7 @@ export class IsoScene {
       resolution: Math.min(window.devicePixelRatio || 1, 2),
       resizeTo: window,
       preserveDrawingBuffer: true,
+      preference: 'webgl',
     });
 
     this.app.stage.addChild(this.camera);
@@ -546,7 +569,8 @@ export class IsoScene {
     const focusCanvas = () => canvas.focus({ preventScroll: true });
     focusCanvas();
     requestAnimationFrame(focusCanvas);
-    this.app.ticker.add(() => this.update());
+    this.app.ticker.add(() => this.update(), undefined, UPDATE_PRIORITY.NORMAL);
+    this.app.ticker.add(() => this.presentAndHud(), undefined, UPDATE_PRIORITY.UTILITY);
     window.addEventListener('resize', () => this.onWindowViewportChange());
     window.visualViewport?.addEventListener('resize', () => this.onWindowViewportChange());
     window.visualViewport?.addEventListener('scroll', () => {
@@ -568,6 +592,7 @@ export class IsoScene {
     setHashWriteSuppressed(false);
     this.applyCamera(true);
     this.app.render();
+    this.presentAndHud();
     dismissBootScreen();
     this.hydrateMap();
   }
@@ -2914,7 +2939,6 @@ export class IsoScene {
   }
 
   private update(): void {
-    this.grabRearFromLastFrame();
     this.updateMovement();
     this.updateAvatars(Math.min(0.25, this.app.ticker.elapsedMS / 1000));
     this.updateCameraFollow();
@@ -2923,7 +2947,42 @@ export class IsoScene {
       this.npcs.update(dt);
       this.fillActors?.update(dt);
     }
+  }
+
+  /** After Pixi presents the off-DOM GL view: copy onto #game-canvas, then HUD. */
+  private presentAndHud(): void {
+    this.presentGameCanvas();
+    this.grabRearFromLastFrame();
     this.events.onFrame?.();
+  }
+
+  /**
+   * #game-canvas is a 2D surface with no alpha. Playwright / video read this bitmap,
+   * never the WebGL backbuffer — that is what punched the reverse-cam hole.
+   */
+  private presentGameCanvas(): void {
+    const src = this.app?.canvas as HTMLCanvasElement | undefined;
+    const dst = this.canvasEl;
+    if (!src || !dst || src === dst) return;
+    if (dst.width !== src.width || dst.height !== src.height) {
+      dst.width = src.width;
+      dst.height = src.height;
+      this.presentCtx = null;
+    }
+    if (!this.presentCtx) {
+      this.presentCtx = dst.getContext('2d', { alpha: false, desynchronized: true });
+    }
+    const ctx = this.presentCtx;
+    if (!ctx) return;
+    ctx.globalCompositeOperation = 'copy';
+    try {
+      ctx.drawImage(src, 0, 0);
+    } catch {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = '#0b0c0e';
+      ctx.fillRect(0, 0, dst.width, dst.height);
+    }
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   private followTargetWorld(): { x: number; y: number } {
@@ -3917,14 +3976,18 @@ export class IsoScene {
   }
 
   /**
-   * PiP pixels live on a 2D canvas we own. Never read or render-to-texture on
-   * the game WebGL context — that punches a transparent hole in the backbuffer.
+   * Rear PiP crops the already-presented 2D #game-canvas. Never render-to-texture
+   * or readPixels / drawImage the WebGL view — that punches a hole in the backbuffer.
    */
   private grabRearFromLastFrame(): void {
-    if (!this.jac?.rearCam) {
+    if (!this.jac?.rearCam || !this.canvasEl) {
       this.rearBlitReady = false;
       return;
     }
+    const src = this.canvasEl;
+    const cw = src.clientWidth || 1;
+    const ch = src.clientHeight || 1;
+    const region = this.jac.rearSource((x, y) => this.worldToScreen(x, y), cw, ch);
     const sw = 640;
     const sh = 220;
     if (!this.rearBlit) {
@@ -3934,20 +3997,25 @@ export class IsoScene {
       this.rearBlit.setAttribute('data-jac-rear-src', '1');
     }
     const ctx = this.rearBlit.getContext('2d');
-    if (!ctx) return;
+    if (!ctx || region.sw < 4 || region.sh < 4) return;
+    const res = src.width / Math.max(1, cw);
     ctx.fillStyle = '#101114';
     ctx.fillRect(0, 0, sw, sh);
-    ctx.strokeStyle = 'rgba(237,238,240,0.12)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 8; i++) {
-      const y = 20 + i * 26;
-      ctx.beginPath();
-      ctx.moveTo(40 + i * 12, y);
-      ctx.lineTo(sw - 40 - i * 12, y);
-      ctx.stroke();
+    try {
+      ctx.drawImage(
+        src,
+        region.sx * res,
+        region.sy * res,
+        region.sw * res,
+        region.sh * res,
+        0,
+        0,
+        sw,
+        sh,
+      );
+    } catch {
+      /* canvas unread */
     }
-    ctx.fillStyle = '#3a3d44';
-    ctx.fillRect(sw * 0.47, sh * 0.72, sw * 0.06, 6);
     this.rearBlitReady = true;
     this.reapStrayCanvases();
   }
@@ -3957,11 +4025,12 @@ export class IsoScene {
     const keep = new Set<HTMLCanvasElement>();
     if (this.canvasEl) keep.add(this.canvasEl);
     if (this.rearBlit) keep.add(this.rearBlit);
+    if (this.glView) keep.add(this.glView);
     document.querySelectorAll('canvas').forEach((c) => {
       if (keep.has(c)) return;
       if (c.closest('.jac-hud, .jac-dock, .jac-rear, .chrome')) return;
       if (c.id === 'game-canvas') return;
-      if (c.hasAttribute('data-jac-rear-src')) return;
+      if (c.hasAttribute('data-jac-rear-src') || c.hasAttribute('data-jac-gl')) return;
       if (c.parentElement && c.parentElement !== this.canvasEl?.parentElement && c.parentElement !== document.body) {
         return;
       }
@@ -4675,6 +4744,7 @@ export class IsoScene {
     const canvas = this.canvasEl;
     if (!canvas) return points.map(() => null);
     this.app.render();
+    this.presentGameCanvas();
     const rect = canvas.getBoundingClientRect();
     const tmp = document.createElement('canvas');
     tmp.width = canvas.width;
@@ -4700,6 +4770,7 @@ export class IsoScene {
     const canvas = this.canvasEl;
     if (!canvas) return null;
     this.app.render();
+    this.presentGameCanvas();
     const rect = canvas.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return null;
     const sx = (clientX - rect.left) * (canvas.width / rect.width);

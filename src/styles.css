@@ -128,6 +128,16 @@ body > canvas:not(#game-canvas),
   -webkit-user-select: none;
 }
 
+canvas[data-jac-gl] {
+  position: fixed !important;
+  left: -9999px !important;
+  top: -9999px !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 body.is-canvas-dragging,
 body.is-canvas-dragging * {
   user-select: none !important;
