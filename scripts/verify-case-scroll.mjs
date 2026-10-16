@@ -221,7 +221,8 @@ try {
     const mid = await page.evaluate(measure, vw);
     await page.screenshot({ path: path.join(OUT, `375-${id}-mid.png`) });
     if (mid.sheet && mid.sheet.scrollLeft !== 0) errors.push(`${id}: scrollLeft ${mid.sheet.scrollLeft} after vertical pan`);
-    if (mid.bar && (mid.bar.w !== vw || mid.bar.left !== 0 || mid.bar.top > 2)) {
+    if (!mid.bar) errors.push(`${id}: sticky bar missing after vertical pan`);
+    else if (mid.bar.w !== vw || mid.bar.left !== 0 || mid.bar.top > 2) {
       errors.push(
         `${id}: sticky bar shifted after vertical pan w=${mid.bar.w} left=${mid.bar.left} top=${mid.bar.top}`,
       );
@@ -257,7 +258,8 @@ try {
     const bottom = await page.evaluate(measure, vw);
     await page.screenshot({ path: path.join(OUT, `375-${id}-bottom.png`) });
     if (bottom.sheet.scrollLeft !== 0) errors.push(`${id}: scrollLeft ${bottom.sheet.scrollLeft} at bottom`);
-    if (bottom.bar && (bottom.bar.w !== vw || bottom.bar.left !== 0 || bottom.bar.top > 2)) {
+    if (!bottom.bar) errors.push(`${id}: sticky bar missing at bottom`);
+    else if (bottom.bar.w !== vw || bottom.bar.left !== 0 || bottom.bar.top > 2) {
       errors.push(
         `${id}: sticky bar not full width at bottom w=${bottom.bar.w} left=${bottom.bar.left} top=${bottom.bar.top}`,
       );
