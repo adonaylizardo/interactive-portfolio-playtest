@@ -1,5 +1,5 @@
 import { Assets, Container, Rectangle, Sprite, Texture } from 'pixi.js';
-import { cells, MAP_HEIGHT, MAP_WIDTH, type MapObject } from '../data/map';
+import { cells, MAP_HEIGHT, MAP_WIDTH, TILE_H, TILE_W, type MapObject } from '../data/map';
 import { tileFootWorld, tileToWorld } from '../iso/math';
 import { findPathWith } from '../iso/pathfinding';
 import { objectDepth, objectOccluder, objectSpriteScale, type OccluderBox } from './mapSprites';
@@ -48,6 +48,7 @@ const TURN_RATE = 2.4;
 const IDLE_RPM = 700;
 const MOVE_RPM = 2250;
 const MOVE_MPH = 10;
+const SHIFT_DWELL_S = 0.25;
 
 export type JacVisual = {
   obj: MapObject;
@@ -74,6 +75,9 @@ export type JacSnapshot = {
   reversing: boolean;
   steering: number;
   driveGoal: { x: number; y: number } | null;
+  visualTx: number;
+  visualTy: number;
+  bump: number;
   trunkOpen: boolean;
   row: 'apagado' | 'luces' | 'freno';
   bubble: boolean;
@@ -194,6 +198,9 @@ export class JacT9 {
   private vel = 0;
   drivePath: { x: number; y: number }[] = [];
   driveGoal: { x: number; y: number } | null = null;
+  private shiftDwell = 0;
+  private pendingExit = false;
+  bumpT = 0;
 
   constructor(obj: MapObject, hooks: JacHooks) {
     this.obj = obj;
@@ -265,6 +272,9 @@ export class JacT9 {
       this.gearHeld = false;
       this.bubble = false;
       this.rearHold = 0;
+      this.shiftDwell = 0;
+      this.pendingExit = false;
+      this.bumpT = 0;
       this.clearDrivePath();
       this.applyParkedSolid(false);
     } else if (wasDrive) {
@@ -277,6 +287,9 @@ export class JacT9 {
       this.reversing = false;
       this.steering = 0;
       this.rearHold = 0;
+      this.shiftDwell = 0;
+      this.pendingExit = false;
+      this.bumpT = 0;
       this.clearDrivePath();
       this.applyParkedSolid(true);
     }
@@ -487,6 +500,7 @@ export class JacT9 {
       const moved = this.followDrivePath(dt);
       this.steering = 0;
       this.tickRearHold(dt);
+      if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 3.5);
       this.syncMeters(moved);
       if (this.toggles.hazards) this.hazardT += dt;
       else this.hazardT = 0;
@@ -497,31 +511,10 @@ export class JacT9 {
     let throttle = live ? -dy : 0;
     let steer = live ? dx : 0;
     if (!live && this.qaSteer != null) steer = this.qaSteer;
-
-    if (this.gearHeld) {
-      if (this.gear === 'P' || this.gear === 'N') throttle = 0;
-      else if (this.gear === 'R' && throttle > 0) throttle = 0;
-      else if (this.gear === 'D' && throttle < 0) throttle = 0;
-    }
+    if (this.pendingExit) throttle = 0;
 
     this.steering = Math.max(-1, Math.min(1, steer));
-
-    if (throttle > 0.08) {
-      if (this.vel < 0) this.vel = Math.min(0, this.vel + BRAKE_TILES_S2 * dt);
-      else this.vel = Math.min(DRIVE_TILES_PER_S, this.vel + ACCEL_TILES_S2 * throttle * dt);
-    } else if (throttle < -0.08) {
-      if (this.vel > 0) this.vel = Math.max(0, this.vel - BRAKE_TILES_S2 * dt);
-      else this.vel = Math.max(-REVERSE_TILES_PER_S, this.vel + ACCEL_TILES_S2 * throttle * dt);
-    } else if (this.vel > 0) {
-      this.vel = Math.max(0, this.vel - FRICTION_TILES_S2 * dt);
-    } else if (this.vel < 0) {
-      this.vel = Math.min(0, this.vel + FRICTION_TILES_S2 * dt);
-    }
-
-    if (input.autoShift !== false && !this.gearHeld) {
-      if (this.vel > 0.12 || throttle > 0.16) this.gear = 'D';
-      else if (this.vel < -0.12 || throttle < -0.16) this.gear = 'R';
-    }
+    this.applyThrottle(dt, throttle, input.autoShift !== false);
 
     const moving = Math.abs(this.vel) > 0.08;
     if (moving && Math.abs(this.steering) > 0.08) {
@@ -532,6 +525,7 @@ export class JacT9 {
 
     this.reversing = this.vel < -0.08;
     this.tickRearHold(dt);
+    if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 3.5);
     const fwd = DIR_VEC[this.dir];
     if (moving) {
       const nx = fwd.x * this.vel * dt;
@@ -542,8 +536,9 @@ export class JacT9 {
         this.cy = next.y;
         this.occupy(this.driveCells());
         this.layout();
-      } else if (Math.abs(this.vel) > 0.4) {
-        this.vel *= 0.4;
+      } else if (Math.abs(this.vel) > 0.25) {
+        this.noteBump();
+        this.vel *= 0.35;
       }
       this.wheelAcc += dt * WHEEL_FPS * Math.min(1.4, Math.abs(this.vel) / DRIVE_TILES_PER_S);
       while (this.wheelAcc >= 1) {
@@ -558,6 +553,128 @@ export class JacT9 {
     if (this.toggles.hazards) this.hazardT += dt;
     else this.hazardT = 0;
     this.applySprite();
+  }
+
+  /** Stick / S / down: brake to 0, dwell, then shift. Never skip the stop. */
+  private applyThrottle(dt: number, throttle: number, autoShift: boolean): void {
+    const want = throttle > 0.08 ? 1 : throttle < -0.08 ? -1 : 0;
+    if (want !== 0) this.gearHeld = false;
+
+    if (this.pendingExit || (this.gearHeld && (this.gear === 'P' || this.gear === 'N') && want === 0)) {
+      this.brakeTowardZero(dt);
+      if (Math.abs(this.vel) <= 0.08) this.vel = 0;
+      return;
+    }
+
+    if (want === 0) {
+      this.brakeTowardZero(dt, FRICTION_TILES_S2);
+      if (Math.abs(this.vel) <= 0.08) {
+        this.vel = 0;
+        this.shiftDwell = 0;
+      }
+      return;
+    }
+
+    const velSign = this.vel > 0.08 ? 1 : this.vel < -0.08 ? -1 : 0;
+    if (velSign !== 0 && velSign !== want) {
+      this.brakeTowardZero(dt);
+      if (Math.abs(this.vel) <= 0.08) {
+        this.vel = 0;
+        this.shiftDwell = SHIFT_DWELL_S;
+      }
+      return;
+    }
+
+    if (Math.abs(this.vel) <= 0.08) {
+      this.vel = 0;
+      const need: JacGear = want > 0 ? 'D' : 'R';
+      if (autoShift && this.gear !== need) {
+        if (this.shiftDwell <= 0) this.shiftDwell = SHIFT_DWELL_S;
+        this.shiftDwell -= dt;
+        if (this.shiftDwell > 0) return;
+        this.gear = need;
+      } else if (autoShift) {
+        this.gear = need;
+      }
+      this.shiftDwell = 0;
+    } else if (autoShift) {
+      this.gear = want > 0 ? 'D' : 'R';
+      this.shiftDwell = 0;
+    }
+
+    const mag = Math.min(1, Math.abs(throttle));
+    if (want > 0) this.vel = Math.min(DRIVE_TILES_PER_S, this.vel + ACCEL_TILES_S2 * mag * dt);
+    else this.vel = Math.max(-REVERSE_TILES_PER_S, this.vel - ACCEL_TILES_S2 * mag * dt);
+  }
+
+  private brakeTowardZero(dt: number, rate = BRAKE_TILES_S2): void {
+    if (this.vel > 0) this.vel = Math.max(0, this.vel - rate * dt);
+    else if (this.vel < 0) this.vel = Math.min(0, this.vel + rate * dt);
+  }
+
+  private noteBump(): void {
+    if (this.bumpT < 0.2) {
+      try {
+        navigator.vibrate?.(24);
+      } catch {
+        /* no haptic */
+      }
+    }
+    this.bumpT = 1;
+  }
+
+  requestExit(): void {
+    this.pendingExit = true;
+    this.clearDrivePath();
+    this.gearHeld = false;
+  }
+
+  readyToExit(): boolean {
+    return this.pendingExit && Math.abs(this.vel) <= 0.08 && this.mph === 0;
+  }
+
+  isMoving(): boolean {
+    return Math.abs(this.vel) > 0.08 || this.mph > 0;
+  }
+
+  cancelExit(): void {
+    this.pendingExit = false;
+  }
+
+  visualCenterWorld(): { x: number; y: number } {
+    const v = this.hooks.visual;
+    return { x: (v.cull.x0 + v.cull.x1) / 2, y: (v.cull.y0 + v.cull.y1) / 2 };
+  }
+
+  visualCenterTile(): { x: number; y: number } {
+    const w = this.visualCenterWorld();
+    return {
+      x: (w.x / (TILE_W / 2) + w.y / (TILE_H / 2)) / 2,
+      y: (w.y / (TILE_H / 2) - w.x / (TILE_W / 2)) / 2,
+    };
+  }
+
+  /** Collision centre that puts the sprite's visual centre on a tile. */
+  sitForVisual(gx: number, gy: number): { x: number; y: number } {
+    const off = this.visualOffsetWorld();
+    const tw = tileToWorld(gx, gy);
+    const wx = tw.x - off.x;
+    const wy = tw.y - off.y;
+    const tx = (wx / (TILE_W / 2) + wy / (TILE_H / 2)) / 2;
+    const ty = (wy / (TILE_H / 2) - wx / (TILE_W / 2)) / 2;
+    return { x: tx, y: ty };
+  }
+
+  private visualOffsetWorld(): { x: number; y: number } {
+    const c = this.worldCenter();
+    const v = this.visualCenterWorld();
+    return { x: v.x - c.x, y: v.y - c.y };
+  }
+
+  visualOnTile(gx: number, gy: number): boolean {
+    const v = this.visualCenterWorld();
+    const t = tileToWorld(gx, gy);
+    return Math.hypot(v.x - t.x, v.y - t.y) < Math.hypot(TILE_W, TILE_H) * 0.28;
   }
 
   private syncMeters(moving: boolean): void {
@@ -582,9 +699,17 @@ export class JacT9 {
       if (Math.hypot(t.x - this.cx, t.y - this.cy) < arrive) this.drivePath.shift();
       else break;
     }
+    if (this.driveGoal && this.visualOnTile(this.driveGoal.x, this.driveGoal.y)) {
+      this.drivePath = [];
+      this.driveGoal = null;
+      this.vel = 0;
+      this.reversing = false;
+      return false;
+    }
     if (this.drivePath.length === 0) {
-      if (this.driveGoal && Math.hypot(this.driveGoal.x - this.cx, this.driveGoal.y - this.cy) > 0.12) {
-        this.drivePath.push({ x: this.driveGoal.x, y: this.driveGoal.y });
+      if (this.driveGoal) {
+        const sit = this.sitForVisual(this.driveGoal.x, this.driveGoal.y);
+        this.drivePath.push({ x: sit.x, y: sit.y });
       } else {
         this.driveGoal = null;
         this.vel = 0;
@@ -592,7 +717,7 @@ export class JacT9 {
         return false;
       }
     }
-    const t = this.drivePath[0];
+    const t = this.driveGoal ? this.sitForVisual(this.driveGoal.x, this.driveGoal.y) : this.drivePath[0];
     const goalDist = this.driveGoal
       ? Math.hypot(this.driveGoal.x - this.cx, this.driveGoal.y - this.cy)
       : Infinity;
@@ -615,10 +740,11 @@ export class JacT9 {
     const next = sit(this.cx + ux, this.cy + uy)
       ? { x: this.cx + ux, y: this.cy + uy }
       : slide(this.cx, this.cy, ux, uy, sit);
+    const goalNow = this.driveGoal;
     if (next.x === this.cx && next.y === this.cy) {
-      if (last || this.isGoalNode(t)) {
-        const snapTo = this.driveGoal ?? t;
-        if (Math.hypot(snapTo.x - this.cx, snapTo.y - this.cy) < 2.6) {
+      if (last || this.isGoalNode(t) || goalNow) {
+        const snapTo = goalNow ? this.sitForVisual(goalNow.x, goalNow.y) : t;
+        if (Math.hypot(snapTo.x - this.cx, snapTo.y - this.cy) < 3.2) {
           this.cx = snapTo.x;
           this.cy = snapTo.y;
           this.drivePath = [];
@@ -634,13 +760,7 @@ export class JacT9 {
       }
       this.drivePath.shift();
       if (this.drivePath.length === 0) {
-        if (this.driveGoal && Math.hypot(this.driveGoal.x - this.cx, this.driveGoal.y - this.cy) > 0.12) {
-          this.drivePath.push({ x: this.driveGoal.x, y: this.driveGoal.y });
-          return this.followDrivePath(dt);
-        }
-        this.driveGoal = null;
         this.vel = 0;
-        this.reversing = false;
         return false;
       }
       return this.followDrivePath(dt);
@@ -752,6 +872,9 @@ export class JacT9 {
       reversing: this.reversing,
       steering: this.steering,
       driveGoal: this.driveGoal,
+      visualTx: this.visualCenterTile().x,
+      visualTy: this.visualCenterTile().y,
+      bump: this.bumpT,
       trunkOpen: this.trunkOpen,
       row: this.row,
       bubble: this.bubble,
