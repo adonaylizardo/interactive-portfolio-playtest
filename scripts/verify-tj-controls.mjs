@@ -231,9 +231,11 @@ async function runViewport(tag, options, phone) {
         else await page.mouse.click(x, y);
         await wait(400);
       }
+      await page.evaluate(() => window.__playtestQa.expandCasePreview());
+      await wait(500);
       if (!(await page.evaluate(() => window.__playtestQa.isCasePreviewExpanded()))) {
         await page.evaluate(() => window.__playtestQa.expandCasePreview());
-        await wait(500);
+        await wait(600);
       }
       const expanded = await page.evaluate(() => {
         const shown = (el) => !!el && el.getClientRects().length > 0;
