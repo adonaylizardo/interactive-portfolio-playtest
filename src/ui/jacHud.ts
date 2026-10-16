@@ -147,7 +147,7 @@ export class JacHud {
       else if (act === 'close') this.callbacks.onClose();
       else if (act === 'engine') this.callbacks.onEngine();
       else if (act === 'lights') this.callbacks.onLights(t.dataset.val as JacLights);
-      else if (act === 'gear') return;
+      else if (act === 'gear') this.callbacks.onGear(t.dataset.val as JacGear);
       else if (act === 'toggle') this.callbacks.onToggle(t.dataset.val as JacToggleId);
       else if (act === 'dial') this.cycleLights();
     });
@@ -198,7 +198,9 @@ export class JacHud {
 
   private syncLive(snap: JacSnapshot): void {
     this.root.querySelectorAll('[data-jac="gear"]').forEach((el) => {
-      el.classList.toggle('is-on', (el as HTMLElement).dataset.val === snap.gear);
+      const on = (el as HTMLElement).dataset.val === snap.gear;
+      el.classList.toggle('is-on', on);
+      el.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
     this.root.querySelectorAll('[data-jac="lights"]').forEach((el) => {
       el.classList.toggle('is-on', (el as HTMLElement).dataset.val === snap.lights);
@@ -220,7 +222,7 @@ export class JacHud {
       (el as HTMLElement).style.transform = `rotate(${this.needleDeg(snap.rpm, 4000, -120, 120)}deg)`;
     });
     this.root.querySelectorAll('.jac-gauge--mph .jac-gauge__needle').forEach((el) => {
-      (el as HTMLElement).style.transform = `rotate(${this.needleDeg(snap.mph, 80, -120, 120)}deg)`;
+      (el as HTMLElement).style.transform = `rotate(${this.needleDeg(snap.mph, 20, -120, 120)}deg)`;
     });
     const inBtn = snap.mode === 'drive';
     this.root.querySelectorAll('[data-jac="in"], [data-jac="out"]').forEach((el) => {
@@ -264,7 +266,7 @@ export class JacHud {
       ${this.gaugeHtml('rpm', snap.rpm, 'rpm')}
       ${this.gaugeHtml('mph', snap.mph, 'mph')}
       <div class="jac-gears" role="group" aria-label="Gear">
-        ${(['P', 'R', 'N', 'D'] as JacGear[]).map((g) => `<span class="jac-gear${snap.gear === g ? ' is-on' : ''}" data-jac="gear" data-val="${g}" aria-hidden="true">${g}</span>`).join('')}
+        ${(['P', 'R', 'N', 'D'] as JacGear[]).map((g) => `<button type="button" class="jac-gear${snap.gear === g ? ' is-on' : ''}" data-jac="gear" data-val="${g}" aria-pressed="${snap.gear === g}">${g}</button>`).join('')}
       </div>
       ${this.dialHtml(snap)}
       <div class="jac-toggles jac-toggles--dock">${TOGGLES.map((t) => this.toggleHtml(t, snap)).join('')}</div>
@@ -319,8 +321,9 @@ export class JacHud {
     const h = dst.height;
     const ctx = dst.getContext('2d');
     if (!ctx || src.sw < 4 || src.sh < 4) return;
-    const displayed = src.canvas.clientWidth > 0 ? src.canvas.clientWidth : src.canvas.width;
-    const res = src.canvas.width / Math.max(1, displayed);
+    const native = src.canvas.width;
+    const displayed = src.canvas.clientWidth > 0 ? src.canvas.clientWidth : native;
+    const res = native / Math.max(1, displayed);
     ctx.fillStyle = '#141518';
     ctx.fillRect(0, 0, w, h);
     try {
@@ -411,7 +414,7 @@ export class JacHud {
       <div class="jac-bar" hidden>
         <span>JAC T9</span>
         <div class="jac-bar__gears" role="group" aria-label="Gear">
-          ${(['P', 'R', 'N', 'D'] as JacGear[]).map((g) => `<span class="jac-gear" data-jac="gear" data-val="${g}" aria-hidden="true">${g}</span>`).join('')}
+          ${(['P', 'R', 'N', 'D'] as JacGear[]).map((g) => `<button type="button" class="jac-gear" data-jac="gear" data-val="${g}" aria-pressed="false">${g}</button>`).join('')}
         </div>
         <button type="button" class="jac-btn jac-btn--primary jac-bar__btn" data-jac="out">Get out</button>
       </div>

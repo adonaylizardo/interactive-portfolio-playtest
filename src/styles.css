@@ -142,8 +142,7 @@ body.is-canvas-dragging * {
   pointer-events: none;
 }
 
-#ui-root > .joystick .joystick__idle,
-#ui-root > .joystick.is-dragging {
+#ui-root > .joystick:not([hidden]) {
   pointer-events: auto;
 }
 
@@ -1695,15 +1694,15 @@ body[data-layout='panel'] .checklist {
   }
 }
 
-/* One fixed driving stick (Tom John): pad stays bottom-right, knob moves inside it. */
+/* One fixed driving stick (Tom John): ring + knob, bottom-right, only while driving. */
 .joystick {
   position: fixed;
   right: 16px;
   bottom: 118px;
-  z-index: 19;
-  width: 96px;
-  height: 96px;
-  pointer-events: none;
+  z-index: 30;
+  width: 112px;
+  height: 112px;
+  pointer-events: auto;
   touch-action: none;
 }
 
@@ -1714,48 +1713,34 @@ body[data-layout='panel'] .checklist {
 .joystick__ring {
   position: absolute;
   inset: 0;
-  border: 2px solid rgb(255 255 255 / 42%);
+  border: 2px solid rgb(255 255 255 / 55%);
   border-radius: 50%;
+  background: rgb(20 21 24 / 28%);
   pointer-events: none;
 }
 
 .joystick__idle {
   position: absolute;
-  inset: 16px;
-  width: 64px;
-  height: 64px;
+  left: 34px;
+  top: 34px;
+  width: 44px;
+  height: 44px;
   padding: 0;
-  border: 0;
-  border-radius: 32px;
-  background: #fff;
-  box-shadow: 0 2px 10px rgb(0 0 0 / 35%);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #edeef0;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 35%);
   cursor: pointer;
-  pointer-events: auto;
+  pointer-events: none;
   touch-action: none;
   -webkit-tap-highlight-color: transparent;
 }
 
-.joystick.is-dragging .joystick__idle {
-  opacity: 0;
-}
-
 .joystick__glyph {
-  display: block;
-  margin: auto;
-  color: #1a1c20;
+  display: none;
 }
 
 .joystick__knob {
-  position: absolute;
-  width: 64px;
-  height: 64px;
-  border-radius: 32px;
-  background: #fff;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 30%);
-  pointer-events: none;
-}
-
-.joystick__knob[hidden] {
   display: none;
 }
 
@@ -2184,6 +2169,7 @@ body[data-layout='panel'] .checklist {
   height: 44px;
   min-width: 44px;
   min-height: 44px;
+  padding: 0;
   border-radius: 50%;
   font: 700 13px/44px Inter, sans-serif;
 }
@@ -2336,10 +2322,13 @@ body[data-layout='panel'] .checklist {
   background: transparent;
   color: #8a8f98;
   font: 600 13px/22px Inter, sans-serif;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .jac-gear.is-on {
@@ -2488,7 +2477,8 @@ body[data-layout='panel'] .checklist {
 }
 
 body.jac-info .chrome__views,
-body.jac-drive .chrome__views {
+body.jac-drive .chrome__views,
+body.jac-drive .chrome__locate {
   visibility: hidden;
 }
 
