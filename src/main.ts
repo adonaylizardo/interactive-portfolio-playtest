@@ -49,6 +49,7 @@ async function main(): Promise<void> {
       const open = panel.isInteriorMode();
       checklist.setBuildingPanelOpen(open);
       chrome.setInteriorOpen(open);
+      joystick.setHidden(open || panel.isPreviewExpanded());
       scene?.applyCameraFromUi();
     },
     () => scene.leaveInteriorNow(),

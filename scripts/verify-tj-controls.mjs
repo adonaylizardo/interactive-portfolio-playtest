@@ -190,23 +190,43 @@ async function runViewport(tag, options, phone) {
       if (preview.interior) errors.push(`${tag}: ${id} entered the 3D room from the door`);
       const card = await page.evaluate(() => {
         const shown = (el) => !!el && el.getClientRects().length > 0;
+        const pill = document.querySelector('.case-preview__read');
+        const r = pill?.getBoundingClientRect();
         return {
           title: document.querySelector('.case-preview__title')?.textContent ?? '',
           subtitle: document.querySelector('.case-preview__subtitle')?.textContent ?? '',
           teaser: document.querySelector('.case-preview__teaser')?.textContent ?? '',
+          kicker: document.querySelector('.case-preview__kicker')?.textContent ?? '',
+          read: document.querySelector('.case-preview__read-label')?.textContent ?? '',
+          pill: shown(pill),
+          pillH: r ? Math.round(r.height) : 0,
           card: shown(document.querySelector('.case-preview')),
           volaris: /volaris/i.test(document.body.innerText),
+          extras: {
+            checklist: shown(document.querySelector('.checklist')),
+            minimap: shown(document.querySelector('.chrome__minimap')),
+            lang: shown(document.querySelector('.chrome__lang')),
+          },
         };
       });
       if (!card.title) errors.push(`${tag}: ${id} preview has no title`);
       if (!card.teaser) errors.push(`${tag}: ${id} preview has no teaser`);
+      if (card.kicker.trim() !== 'CASE') errors.push(`${tag}: ${id} preview missing CASE label`);
+      if (!/read case/i.test(card.read) || !card.pill) errors.push(`${tag}: ${id} Read case pill missing`);
+      if (phone && (card.pillH < 56 || card.pillH > 60)) {
+        errors.push(`${tag}: ${id} Read case pill is ${card.pillH}px, want 58`);
+      }
       if (card.volaris) errors.push(`${tag}: ${id} public text names Volaris`);
+      if (!phone && (!card.extras.checklist || !card.extras.minimap || !card.extras.lang)) {
+        errors.push(`${tag}: ${id} desktop extras hidden in preview ${JSON.stringify(card.extras)}`);
+      }
+      notes.push(`${tag} ${id} card ${JSON.stringify({ title: card.title, pillH: card.pillH, extras: card.extras })}`);
       await page.screenshot({ path: path.join(OUT, `${tag}-${id}-preview.png`) });
 
-      const cardBox = await page.locator('.building-panel__sheet').boundingBox();
-      if (cardBox) {
-        const x = cardBox.x + Math.min(80, cardBox.width / 2);
-        const y = cardBox.y + Math.min(70, cardBox.height / 2);
+      const pillBox = await page.locator('.case-preview__read').boundingBox();
+      if (pillBox) {
+        const x = pillBox.x + pillBox.width / 2;
+        const y = pillBox.y + pillBox.height / 2;
         if (phone) await page.touchscreen.tap(x, y);
         else await page.mouse.click(x, y);
         await wait(400);
@@ -216,22 +236,40 @@ async function runViewport(tag, options, phone) {
         await wait(500);
       }
       const expanded = await page.evaluate(() => {
+        const shown = (el) => !!el && el.getClientRects().length > 0;
         const sheet = document.querySelector('.building-panel__sheet');
         const full = document.querySelector('.case__version--full');
         return {
           expanded: window.__playtestQa.isCasePreviewExpanded(),
           interior: window.__playtestQa.isInInterior(),
           fullShown: !!full && full.getClientRects().length > 0,
+          hero: shown(document.querySelector('.case-read__hero')),
+          placeholder: document.querySelector('.case-read__hero-label')?.textContent ?? '',
+          closing: shown(document.querySelector('.case__closing')),
+          bar: shown(document.querySelector('.case-read__bar')),
           scrollH: sheet?.scrollHeight ?? 0,
           clientH: sheet?.clientHeight ?? 0,
+          extras: {
+            checklist: shown(document.querySelector('.checklist')),
+            minimap: shown(document.querySelector('.chrome__minimap')),
+            lang: shown(document.querySelector('.chrome__lang')),
+          },
           copy: [...(full?.querySelectorAll('h3, p.case__text, li, .case__closing em') ?? [])]
             .map((el) => el.textContent.replace(/\s+/g, ' ').trim())
             .filter(Boolean)
             .slice(0, 4),
         };
       });
-      if (!expanded.expanded) errors.push(`${tag}: ${id} card tap did not expand`);
+      if (!expanded.expanded) errors.push(`${tag}: ${id} Read case pill did not expand`);
       if (!expanded.fullShown) errors.push(`${tag}: ${id} expand is not showing full copy`);
+      if (!expanded.hero || !/IMAGE PLACEHOLDER/i.test(expanded.placeholder)) {
+        errors.push(`${tag}: ${id} expand missing header image placeholder`);
+      }
+      if (!expanded.closing) errors.push(`${tag}: ${id} expand missing closing quote`);
+      if (!expanded.bar) errors.push(`${tag}: ${id} expand missing sticky bar`);
+      if (!phone && (!expanded.extras.checklist || !expanded.extras.minimap || !expanded.extras.lang)) {
+        errors.push(`${tag}: ${id} desktop extras hidden in expand ${JSON.stringify(expanded.extras)}`);
+      }
       if (expanded.scrollH <= expanded.clientH + 8) notes.push(`${tag} ${id} sheet may not need scroll (${expanded.scrollH}/${expanded.clientH})`);
       await page.screenshot({ path: path.join(OUT, `${tag}-${id}-expand.png`) });
 
@@ -246,7 +284,7 @@ async function runViewport(tag, options, phone) {
         await wait(200);
       }
       await page.evaluate(() => {
-        const btn = document.querySelector('.building-panel__close');
+        const btn = document.querySelector('.case-read__x, .building-panel__close');
         if (btn instanceof HTMLElement) btn.click();
       });
       await wait(300);
@@ -300,6 +338,9 @@ async function runViewport(tag, options, phone) {
 const results = [];
 results.push(
   await runViewport('desktop-1280', { viewport: { width: 1280, height: 800 } }, false),
+);
+results.push(
+  await runViewport('desktop-1440', { viewport: { width: 1440, height: 900 } }, false),
 );
 results.push(
   await runViewport(

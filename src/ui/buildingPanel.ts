@@ -2,6 +2,7 @@ import { studio } from '../audio/studio';
 import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
 import { CASES, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
+import { iconSvg } from './icons';
 
 function aboutBlockNode(block: AboutBlock): HTMLElement {
   if (block.kind === 'heading') {
@@ -117,6 +118,12 @@ export class BuildingPanel {
   private previewTitle: HTMLElement | null = null;
   private previewSubtitle: HTMLElement | null = null;
   private previewTeaser: HTMLElement | null = null;
+  private readEl: HTMLElement | null = null;
+  private readBarTitle: HTMLElement | null = null;
+  private readKicker: HTMLElement | null = null;
+  private readHeadline: HTMLElement | null = null;
+  private readLede: HTMLElement | null = null;
+  private readHeroLabel: HTMLElement | null = null;
   private peekOnly = true;
   private dragStartY = 0;
   private ignoreDragUntil = 0;
@@ -144,9 +151,41 @@ export class BuildingPanel {
           <button type="button" class="building-panel__close" data-close aria-label="Cerrar">×</button>
         </div>
         <div class="case-preview" data-preview hidden>
-          <h2 class="case-preview__title"></h2>
+          <div class="case-preview__handle" aria-hidden="true"></div>
+          <div class="case-preview__head">
+            <div class="case-preview__titles">
+              <p class="case-preview__kicker">CASE</p>
+              <h2 class="case-preview__title"></h2>
+            </div>
+            <button type="button" class="case-preview__x" data-close aria-label="Cerrar">${iconSvg('close')}</button>
+          </div>
           <p class="case-preview__subtitle"></p>
           <p class="case-preview__teaser"></p>
+          <button type="button" class="case-preview__read" data-read>
+            <span class="case-preview__read-logo">${iconSvg('briefcase')}</span>
+            <span class="case-preview__read-copy">
+              <span class="case-preview__read-label">Read case</span>
+              <span class="case-preview__read-meta">Problem · What I did · Result</span>
+            </span>
+            <span class="case-preview__read-go" aria-hidden="true">${iconSvg('arrowNe')}</span>
+          </button>
+        </div>
+        <div class="case-read" data-read-view hidden>
+          <div class="case-read__bar">
+            <p class="case-read__bar-title"></p>
+            <button type="button" class="case-read__x" data-close aria-label="Cerrar">${iconSvg('close')}</button>
+          </div>
+          <div class="case-read__page">
+            <div class="case-read__hero" aria-hidden="true">
+              <span class="case-read__hero-logo">${iconSvg('briefcase', 20)}</span>
+              <p class="case-read__hero-label"></p>
+            </div>
+            <header class="case-read__intro">
+              <p class="case-read__kicker"></p>
+              <h2 class="case-read__headline"></h2>
+              <p class="case-read__lede"></p>
+            </header>
+          </div>
         </div>
         <h2 class="building-panel__title"></h2>
         <div class="building-panel__body-wrap">
@@ -174,6 +213,12 @@ export class BuildingPanel {
     this.previewTitle = this.el.querySelector('.case-preview__title');
     this.previewSubtitle = this.el.querySelector('.case-preview__subtitle');
     this.previewTeaser = this.el.querySelector('.case-preview__teaser');
+    this.readEl = this.el.querySelector('[data-read-view]') as HTMLElement;
+    this.readBarTitle = this.el.querySelector('.case-read__bar-title');
+    this.readKicker = this.el.querySelector('.case-read__kicker');
+    this.readHeadline = this.el.querySelector('.case-read__headline');
+    this.readLede = this.el.querySelector('.case-read__lede');
+    this.readHeroLabel = this.el.querySelector('.case-read__hero-label');
     this.aboutEl.append(...ABOUT.map(aboutBlockNode));
     // Touch has no hover: a tap shows that logo's colours until another logo (or the same one) is tapped.
     this.workedWithEl.addEventListener('click', (e) => {
@@ -252,8 +297,6 @@ export class BuildingPanel {
     this.sheet.addEventListener('scroll', () => this.syncScrolled(), { passive: true });
     this.sheet.addEventListener('click', (e) => {
       e.stopPropagation();
-      if ((e.target as HTMLElement).closest('[data-close],[data-exit]')) return;
-      if (this.mode === 'preview' && this.peekOnly) this.setPeek(false);
     });
     this.sheet.addEventListener('pointerdown', (e) => e.stopPropagation());
 
@@ -263,17 +306,19 @@ export class BuildingPanel {
     window.addEventListener('pointerup', () => this.onDragEnd());
 
     this.titleEl.addEventListener('click', () => {
-      if (this.peekOnly && (this.isMobile() || this.mode === 'preview')) this.setPeek(false);
+      if (this.peekOnly && this.isMobile() && this.mode === 'interior') this.setPeek(false);
     });
-    this.previewEl?.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).closest('[data-close]')) return;
-      if (this.mode === 'preview' && this.peekOnly) this.setPeek(false);
-    });
-    const closeBtn = this.el.querySelector('[data-close]') as HTMLButtonElement;
-    closeBtn.addEventListener('click', (e) => {
+    this.el.querySelector('[data-read]')?.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      this.closePreview();
+      if (this.mode === 'preview' && this.peekOnly) this.setPeek(false);
+    });
+    this.el.querySelectorAll('[data-close]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.closePreview();
+      });
     });
 
     window.addEventListener('keydown', (e) => {
@@ -308,7 +353,8 @@ export class BuildingPanel {
     this.el.classList.toggle('building-panel--expanded', expanded);
     this.el.classList.toggle('building-panel--preview', preview);
     if (this.previewEl) this.previewEl.hidden = !preview || !this.peekOnly;
-    this.titleEl.hidden = preview && this.peekOnly;
+    if (this.readEl) this.readEl.hidden = !preview || this.peekOnly;
+    this.titleEl.hidden = preview;
   }
 
   private closePreview(): void {
@@ -381,10 +427,26 @@ export class BuildingPanel {
     this.el.classList.remove('building-panel--snap');
     const preview = casePreviewCopy(interiorId);
     const shown = this.renderCase();
-    if (this.previewTitle) this.previewTitle.textContent = preview?.title ?? shown ?? interiorId;
-    if (this.previewSubtitle) this.previewSubtitle.textContent = preview?.subtitle ?? '';
-    if (this.previewTeaser) this.previewTeaser.textContent = preview?.teaser ?? '';
-    this.setTitle(interiorId, preview?.title ?? shown);
+    const title = preview?.title ?? shown ?? interiorId;
+    const subtitle = preview?.subtitle ?? '';
+    const teaser = this.isMobile()
+      ? (preview?.teaser ?? '')
+      : (preview?.teaserFull ?? preview?.teaser ?? '');
+    if (this.previewTitle) this.previewTitle.textContent = title;
+    if (this.previewSubtitle) this.previewSubtitle.textContent = subtitle;
+    if (this.previewTeaser) this.previewTeaser.textContent = teaser;
+    const meta = this.el.querySelector('.case-preview__read-meta');
+    if (meta) meta.textContent = preview?.pillMeta ?? 'Problem · What I did · Result';
+    if (this.readBarTitle) {
+      this.readBarTitle.textContent = this.isMobile() || !subtitle
+        ? title
+        : `${title}: ${subtitle.charAt(0).toLowerCase()}${subtitle.slice(1)}`;
+    }
+    if (this.readKicker) this.readKicker.textContent = preview?.kicker ?? 'CASE';
+    if (this.readHeadline) this.readHeadline.textContent = preview?.teaserFull ?? preview?.teaser ?? title;
+    if (this.readLede) this.readLede.textContent = subtitle;
+    if (this.readHeroLabel) this.readHeroLabel.textContent = preview?.placeholder ?? 'IMAGE PLACEHOLDER';
+    this.setTitle(interiorId, title);
     this.renderWorkedWith();
     this.renderAbout();
     this.el.classList.add('building-panel--open');
@@ -486,6 +548,7 @@ export class BuildingPanel {
     this.mode = 'hidden';
     this.titleEl.hidden = false;
     if (this.previewEl) this.previewEl.hidden = true;
+    if (this.readEl) this.readEl.hidden = true;
     this.el.classList.remove('building-panel--snap');
     if (!opts?.silent) this.onVisibilityChange();
     if (opts?.snap) requestAnimationFrame(() => this.releaseCaseDom());
@@ -543,7 +606,12 @@ export class BuildingPanel {
     if (this.mode === 'preview') {
       const sheet = this.sheet.getBoundingClientRect();
       if (this.isMobile()) {
-        return { left: 0, top: 0, right: 0, bottom: Math.ceil(Math.min(sheet.height, this.peekOnly ? 220 : sheet.height) + 8) };
+        return {
+          left: 0,
+          top: 0,
+          right: 0,
+          bottom: Math.ceil(Math.min(sheet.height, this.peekOnly ? 280 : window.innerHeight) + 8),
+        };
       }
       return { left: 0, top: 0, right: 0, bottom: 0 };
     }
