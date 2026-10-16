@@ -63,8 +63,8 @@ export class Joystick {
     window.addEventListener(
       'touchend',
       (e) => {
-        if (!this.touchActive) return;
-        this.endTouch(e);
+        if (e.touches.length === 0 && this.touchActive) this.release();
+        else if (this.touchActive) this.endTouch(e);
       },
       { passive: true },
     );

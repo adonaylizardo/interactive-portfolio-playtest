@@ -195,6 +195,29 @@ async function run(tag, options, phone) {
     if (phone && boarded.sticks !== 1) throw new Error(`${tag}: expected one stick, got ${boarded.sticks}`);
     if (phone && boarded.joy?.floating) throw new Error(`${tag}: floating stick on Get in`);
 
+    const start = await page.evaluate(() => window.__playtestQa.jac());
+    const goal = await pickDriveGoal(page);
+    if (!goal) throw new Error(`${tag}: no drive goal`);
+    const client = goal.client ?? (await goalClient(page, goal));
+    notes.push({ tapTarget: { goal, client, hit: await page.evaluate((p) => document.elementFromPoint(p.x, p.y)?.id, client) } });
+    if (phone) {
+      await tapClientCdp(cdp, client.x, client.y);
+    } else {
+      await page.mouse.click(client.x, client.y);
+    }
+    await wait(2800);
+    await page.screenshot({ path: path.join(OUT, `${tag}-05-tap-drive.png`) });
+    const afterPath = await page.evaluate(() => ({
+      jac: window.__playtestQa.jac(),
+      entities: window.__playtestQa.jacEntities?.(),
+      goal: window.__playtestQa.jac()?.driveGoal,
+    }));
+    notes.push({ tapDrive: { start: { cx: start?.cx, cy: start?.cy }, goal, client, after: afterPath } });
+    const moved =
+      Math.hypot((afterPath.jac?.cx ?? start.cx) - start.cx, (afterPath.jac?.cy ?? start.cy) - start.cy) > 0.35;
+    if (!moved) throw new Error(`${tag}: tap/click path did not move the van ${JSON.stringify({ start, afterPath })}`);
+    if ((afterPath.entities?.count ?? 0) !== 1) throw new Error(`${tag}: extra van during path follow`);
+
     const followSamples = [];
     if (phone) {
       const box = await holdStickCdp(page, cdp, 8, -46, 3200);
@@ -264,34 +287,6 @@ async function run(tag, options, phone) {
     notes.push({ pip });
     if (!pip.pip) throw new Error(`${tag}: rear PiP has no terrain (var=${pip.variance.toFixed(1)})`);
 
-    await page.evaluate(() => {
-      const e = window.__playtestQa.jacEntities?.();
-      if (e) window.__playtestQa.frameWorld(e.worldX, e.worldY, 1.05);
-    });
-    await wait(250);
-    const start = await page.evaluate(() => window.__playtestQa.jac());
-    const goal = await pickDriveGoal(page);
-    if (!goal) throw new Error(`${tag}: no drive goal`);
-    const client = goal.client ?? (await goalClient(page, goal));
-    notes.push({ tapTarget: { goal, client, hit: await page.evaluate((p) => document.elementFromPoint(p.x, p.y)?.id, client) } });
-    if (phone) {
-      await tapClientCdp(cdp, client.x, client.y);
-    } else {
-      await page.mouse.click(client.x, client.y);
-    }
-    await wait(2800);
-    await page.screenshot({ path: path.join(OUT, `${tag}-05-tap-drive.png`) });
-    const afterPath = await page.evaluate(() => ({
-      jac: window.__playtestQa.jac(),
-      entities: window.__playtestQa.jacEntities?.(),
-      goal: window.__playtestQa.jac()?.driveGoal,
-    }));
-    notes.push({ tapDrive: { start: { cx: start?.cx, cy: start?.cy }, goal, client, after: afterPath } });
-    const moved =
-      Math.hypot((afterPath.jac?.cx ?? start.cx) - start.cx, (afterPath.jac?.cy ?? start.cy) - start.cy) > 0.35;
-    if (!moved) throw new Error(`${tag}: tap/click path did not move the van`);
-    if ((afterPath.entities?.count ?? 0) !== 1) throw new Error(`${tag}: extra van during path follow`);
-
     if (!phone) {
       await page.locator('.jac-dock [data-jac="gear"][data-val="R"]').click();
       await wait(200);
@@ -301,6 +296,7 @@ async function run(tag, options, phone) {
       await page.locator('.jac-dock [data-jac="gear"][data-val="D"]').click();
     }
 
+    const lastDrive = await page.evaluate(() => window.__playtestQa.jac());
     await page.evaluate(() => window.__playtestQa.jacGetOut());
     await wait(400);
     await page.screenshot({ path: path.join(OUT, `${tag}-06-get-out.png`) });
@@ -310,10 +306,10 @@ async function run(tag, options, phone) {
       char: window.__playtestQa.getCharacterTile(),
       joy: window.__playtestQa.joystick(),
     }));
-    notes.push({ afterOut });
+    notes.push({ afterOut, lastDrive });
     if (afterOut.jac?.driving) throw new Error(`${tag}: still driving after Get out`);
     if ((afterOut.entities?.count ?? 0) !== 1) throw new Error(`${tag}: van cloned after Get out`);
-    const parkedNearDrive = Math.hypot(afterOut.jac.cx - afterPath.jac.cx, afterOut.jac.cy - afterPath.jac.cy) < 0.8;
+    const parkedNearDrive = Math.hypot(afterOut.jac.cx - lastDrive.cx, afterOut.jac.cy - lastDrive.cy) < 0.8;
     if (!parkedNearDrive) throw new Error(`${tag}: Get out teleported the van back to spawn`);
 
     await page.evaluate(() => {
