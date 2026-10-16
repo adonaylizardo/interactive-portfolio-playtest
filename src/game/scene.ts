@@ -3780,9 +3780,15 @@ export class IsoScene {
       return;
     }
     this.pendingJacExit = false;
-    this.jac.cancelExit();
+    const snap = this.jac.snapshot();
     const spot = this.jac.exitTile();
+    this.jac.cancelExit();
     this.jac.setMode('parked');
+    if (snap.exitCx != null && snap.exitCy != null) {
+      this.jac.cx = snap.exitCx;
+      this.jac.cy = snap.exitCy;
+      this.jac.applySprite();
+    }
     if (spot) {
       this.charTx = spot.x;
       this.charTy = spot.y;

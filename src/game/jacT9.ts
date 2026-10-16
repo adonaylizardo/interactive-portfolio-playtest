@@ -78,6 +78,8 @@ export type JacSnapshot = {
   visualTx: number;
   visualTy: number;
   bump: number;
+  exitCx: number | null;
+  exitCy: number | null;
   trunkOpen: boolean;
   row: 'apagado' | 'luces' | 'freno';
   bubble: boolean;
@@ -200,6 +202,8 @@ export class JacT9 {
   driveGoal: { x: number; y: number } | null = null;
   private shiftDwell = 0;
   private pendingExit = false;
+  private exitHold = 0;
+  private exitSit: { x: number; y: number } | null = null;
   bumpT = 0;
 
   constructor(obj: MapObject, hooks: JacHooks) {
@@ -274,6 +278,8 @@ export class JacT9 {
       this.rearHold = 0;
       this.shiftDwell = 0;
       this.pendingExit = false;
+      this.exitHold = 0;
+      this.exitSit = null;
       this.bumpT = 0;
       this.clearDrivePath();
       this.applyParkedSolid(false);
@@ -289,6 +295,7 @@ export class JacT9 {
       this.rearHold = 0;
       this.shiftDwell = 0;
       this.pendingExit = false;
+      this.exitHold = 0;
       this.bumpT = 0;
       this.clearDrivePath();
       this.applyParkedSolid(true);
@@ -562,7 +569,17 @@ export class JacT9 {
 
     if (this.pendingExit || (this.gearHeld && (this.gear === 'P' || this.gear === 'N') && want === 0)) {
       this.brakeTowardZero(dt);
-      if (Math.abs(this.vel) <= 0.08) this.vel = 0;
+      if (Math.abs(this.vel) <= 0.08) {
+        this.vel = 0;
+        if (this.pendingExit) {
+          if (!this.exitSit) {
+            this.exitSit = { x: this.cx, y: this.cy };
+            this.exitHold = 0.12;
+          } else {
+            this.exitHold = Math.max(0, this.exitHold - dt);
+          }
+        }
+      }
       return;
     }
 
@@ -625,12 +642,14 @@ export class JacT9 {
 
   requestExit(): void {
     this.pendingExit = true;
+    this.exitHold = 0;
+    this.exitSit = null;
     this.clearDrivePath();
     this.gearHeld = false;
   }
 
   readyToExit(): boolean {
-    return this.pendingExit && Math.abs(this.vel) <= 0.08 && this.mph === 0;
+    return this.pendingExit && Math.abs(this.vel) <= 0.08 && this.mph === 0 && this.exitHold <= 0 && !!this.exitSit;
   }
 
   isMoving(): boolean {
@@ -639,6 +658,8 @@ export class JacT9 {
 
   cancelExit(): void {
     this.pendingExit = false;
+    this.exitHold = 0;
+    this.exitSit = null;
   }
 
   visualCenterWorld(): { x: number; y: number } {
@@ -875,6 +896,8 @@ export class JacT9 {
       visualTx: this.visualCenterTile().x,
       visualTy: this.visualCenterTile().y,
       bump: this.bumpT,
+      exitCx: this.exitSit?.x ?? null,
+      exitCy: this.exitSit?.y ?? null,
       trunkOpen: this.trunkOpen,
       row: this.row,
       bubble: this.bubble,
