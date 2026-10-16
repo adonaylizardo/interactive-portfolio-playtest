@@ -221,6 +221,7 @@ async function main(): Promise<void> {
     findPath,
     getCharacterTile: () => scene.getCharacterTile(),
     getCharacterPos: () => scene.getCharacterPosForQa(),
+    walk: (dx: number, dy: number, sprint = false) => scene.qaWalk(dx, dy, sprint),
     setCharacterTile: (x: number, y: number) => scene.setCharacterTileForQa(x, y),
     walkToBuilding: (name: string) => scene.walkToBuildingForQa(name),
     doorScreenPoint: (name: string) => scene.getDoorScreenClientPoint(name),

@@ -299,12 +299,16 @@ export function applyBillboard(sprite: Container, viewRot: number, viewSx: numbe
   const rest = restPose.get(sprite)!;
   const sx = viewSx || 1;
   const sy = viewSy || 1;
+  const px = sprite.position.x;
+  const py = sprite.position.y;
+  // Invert camera R*S around the sprite origin. Do not bake translation into the
+  // matrix — Sprite pivot/anchor makes decompose shift the feet off the tile.
   billboardMat.identity();
-  billboardMat.translate(sprite.position.x, sprite.position.y);
   billboardMat.scale(1 / sx, 1 / sy);
   billboardMat.rotate(-viewRot);
   billboardMat.scale(rest.sx, rest.sy);
   sprite.setFromMatrix(billboardMat);
+  sprite.position.set(px, py);
 }
 
 export function clearBillboard(sprite: Container): void {
