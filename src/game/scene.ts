@@ -327,7 +327,10 @@ export class IsoScene {
   private jac: JacT9 | null = null;
   private jacBubbleTimer: ReturnType<typeof setTimeout> | null = null;
   private rearRt: RenderTexture | null = null;
+  private rearBlit: HTMLCanvasElement | null = null;
+  private rearScratch: HTMLCanvasElement | null = null;
   private rearCapturing = false;
+  private pendingJacExit = false;
   private events: SceneEvents;
   private objectGraphics = new Map<string, Container>();
   /** Opaque bounding box of each non-building object's sprite, relative to its container. */
@@ -3012,6 +3015,11 @@ export class IsoScene {
     const wantY = oy - t.y + aimWy;
     this.cameraX = wantX;
     this.cameraY = wantY;
+    const bump = this.jac?.bumpT ?? 0;
+    if (bump > 0.02) {
+      this.cameraX += Math.sin(performance.now() * 0.055) * 11 * bump;
+      this.cameraY += Math.cos(performance.now() * 0.07) * 7 * bump;
+    }
     this.applyCamera(false);
     this.shiftGestureBaselines(this.cameraX - camBeforeX, this.cameraY - camBeforeY);
     // Map / room bounds held the camera back: drop the spring's speed on that axis (no wind-up).
@@ -3056,6 +3064,7 @@ export class IsoScene {
         if (dx !== 0 || dy !== 0) this.fireMoveCommand();
       }
       this.jac.update(this.app.ticker.deltaMS / 1000, { dx, dy, autoShift: true });
+      if (this.pendingJacExit && this.jac.readyToExit()) this.finishJacGetOut();
       this.drawPathPreview();
       return;
     }
@@ -3757,6 +3766,21 @@ export class IsoScene {
     if (!this.jac?.driving) return;
     this.pendingJacEnter = false;
     this.pendingJacPanel = false;
+    if (this.jac.isMoving()) {
+      this.pendingJacExit = true;
+      this.jac.requestExit();
+      return;
+    }
+    this.finishJacGetOut();
+  }
+
+  private finishJacGetOut(): void {
+    if (!this.jac?.driving) {
+      this.pendingJacExit = false;
+      return;
+    }
+    this.pendingJacExit = false;
+    this.jac.cancelExit();
     const spot = this.jac.exitTile();
     this.jac.setMode('parked');
     if (spot) {
@@ -3874,34 +3898,36 @@ export class IsoScene {
       }
     }
     if (needRear && this.jac && this.canvasEl) {
-      rear = this.captureRearView() ?? {
-        canvas: this.canvasEl,
-        ...this.jac.rearSource(
-          (x, y) => this.worldToScreen(x, y),
-          this.app.screen.width,
-          this.app.screen.height,
-        ),
-      };
+      rear = this.captureRearView();
     }
     return { menu, bubble, follow, rear };
   }
 
-  /** Off-screen render of the map behind the van (not a crop of the current dashboard view). */
+  /** Off-screen rear view. Never appends a canvas to the DOM (Pixi extract used to flash a white slab). */
   private captureRearView(): { canvas: HTMLCanvasElement; sx: number; sy: number; sw: number; sh: number } | null {
     if (!this.jac || !this.app || this.rearCapturing) return null;
     const look = this.jac.rearLookWorld();
-    const sw = Math.max(64, Math.ceil(this.app.screen.width));
-    const sh = Math.max(64, Math.ceil(this.app.screen.height));
-    if (!this.rearRt || this.rearRt.width !== sw || this.rearRt.height !== sh) {
+    const viewW = Math.max(64, Math.ceil(this.app.screen.width));
+    const viewH = Math.max(64, Math.ceil(this.app.screen.height));
+    const sw = 640;
+    const sh = 220;
+    if (!this.rearRt || this.rearRt.width !== viewW || this.rearRt.height !== viewH) {
       this.rearRt?.destroy(true);
-      this.rearRt = RenderTexture.create({ width: sw, height: sh });
+      this.rearRt = RenderTexture.create({ width: viewW, height: viewH, antialias: false });
+    }
+    if (!this.rearBlit) {
+      this.rearBlit = document.createElement('canvas');
+      this.rearBlit.width = sw;
+      this.rearBlit.height = sh;
+      this.rearBlit.setAttribute('data-jac-rear-src', '1');
     }
     const savedX = this.cameraX;
     const savedY = this.cameraY;
+    const savedZoom = this.zoom;
     const g = this.objectGraphics.get(JAC_ID);
     const pathWas = this.pathGfx.visible;
     this.rearCapturing = true;
-    this.placeWorldAtScreen(look.x, look.y, sw / 2, sh * 0.58);
+    this.placeWorldAtScreen(look.x, look.y, viewW / 2, viewH * 0.58);
     this.applyCamera(false);
     if (g) g.visible = false;
     this.pathGfx.visible = false;
@@ -3910,6 +3936,7 @@ export class IsoScene {
     } catch {
       this.cameraX = savedX;
       this.cameraY = savedY;
+      this.zoom = savedZoom;
       if (g) g.visible = true;
       this.pathGfx.visible = pathWas;
       this.applyCamera(false);
@@ -3918,24 +3945,64 @@ export class IsoScene {
     }
     this.cameraX = savedX;
     this.cameraY = savedY;
+    this.zoom = savedZoom;
     if (g) g.visible = true;
     this.pathGfx.visible = pathWas;
     this.applyCamera(false);
     this.rearCapturing = false;
     try {
-      const canvas = this.app.renderer.extract.canvas({ target: this.rearRt }) as HTMLCanvasElement;
-      const cropW = Math.min(640, Math.max(160, canvas.width * 0.72));
-      const cropH = Math.min(240, Math.max(90, canvas.height * 0.42));
-      return {
-        canvas,
-        sx: (canvas.width - cropW) / 2,
-        sy: Math.max(0, canvas.height * 0.32),
-        sw: cropW,
-        sh: Math.min(cropH, canvas.height - canvas.height * 0.32),
-      };
+      const info = this.app.renderer.extract.pixels({ target: this.rearRt });
+      const ctx = this.rearBlit.getContext('2d');
+      if (!ctx || !info || info.width < 4 || info.height < 4) return null;
+      if (!this.rearScratch) {
+        this.rearScratch = document.createElement('canvas');
+        this.rearScratch.width = 1;
+        this.rearScratch.height = 1;
+        this.rearScratch.setAttribute('data-jac-rear-src', '1');
+      }
+      if (this.rearScratch.width !== info.width || this.rearScratch.height !== info.height) {
+        this.rearScratch.width = info.width;
+        this.rearScratch.height = info.height;
+      }
+      const scratch = this.rearScratch.getContext('2d');
+      if (!scratch) return null;
+      const img = scratch.createImageData(info.width, info.height);
+      img.data.set(info.pixels);
+      scratch.putImageData(img, 0, 0);
+      ctx.fillStyle = '#141518';
+      ctx.fillRect(0, 0, sw, sh);
+      const srcW = Math.min(info.width, Math.max(160, Math.floor(info.width * 0.72)));
+      const srcH = Math.min(info.height, Math.max(90, Math.floor(info.height * 0.42)));
+      const sx = Math.floor((info.width - srcW) / 2);
+      const sy = Math.max(0, Math.floor(info.height * 0.32));
+      ctx.drawImage(this.rearScratch, sx, sy, srcW, srcH, 0, 0, sw, sh);
+      this.reapStrayCanvases();
+      this.app.render();
+      return { canvas: this.rearBlit, sx: 0, sy: 0, sw, sh };
     } catch {
+      this.app.render();
       return null;
     }
+  }
+
+  private reapStrayCanvases(raw?: HTMLCanvasElement): void {
+    if (raw && raw.parentElement) raw.parentElement.removeChild(raw);
+    const keep = new Set<HTMLCanvasElement>();
+    if (this.canvasEl) keep.add(this.canvasEl);
+    if (this.rearBlit) keep.add(this.rearBlit);
+    if (this.rearScratch) keep.add(this.rearScratch);
+    document.querySelectorAll('canvas').forEach((c) => {
+      if (keep.has(c)) return;
+      if (c.closest('.jac-hud, .jac-dock, .jac-rear, .chrome')) return;
+      if (c.id === 'game-canvas') return;
+      if (c.hasAttribute('data-jac-rear-src')) return;
+      if (c.parentElement && c.parentElement !== this.canvasEl?.parentElement && c.parentElement !== document.body) {
+        return;
+      }
+      c.style.cssText =
+        'position:fixed!important;left:-9999px!important;top:-9999px!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important;visibility:hidden!important';
+      c.remove();
+    });
   }
 
   qaJac(): JacSnapshot | null {
