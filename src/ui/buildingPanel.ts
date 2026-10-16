@@ -119,6 +119,7 @@ export class BuildingPanel {
   private previewSubtitle: HTMLElement | null = null;
   private previewTeaser: HTMLElement | null = null;
   private readEl: HTMLElement | null = null;
+  private readBar: HTMLElement | null = null;
   private readBarTitle: HTMLElement | null = null;
   private readKicker: HTMLElement | null = null;
   private readHeadline: HTMLElement | null = null;
@@ -170,11 +171,11 @@ export class BuildingPanel {
             <span class="case-preview__read-go" aria-hidden="true">${iconSvg('arrowNe')}</span>
           </button>
         </div>
+        <div class="case-read__bar" data-read-bar hidden>
+          <p class="case-read__bar-title"></p>
+          <button type="button" class="case-read__x" data-close aria-label="Cerrar">${iconSvg('close')}</button>
+        </div>
         <div class="case-read" data-read-view hidden>
-          <div class="case-read__bar">
-            <p class="case-read__bar-title"></p>
-            <button type="button" class="case-read__x" data-close aria-label="Cerrar">${iconSvg('close')}</button>
-          </div>
           <div class="case-read__page">
             <div class="case-read__hero" aria-hidden="true">
               <span class="case-read__hero-logo">${iconSvg('briefcase', 20)}</span>
@@ -214,6 +215,7 @@ export class BuildingPanel {
     this.previewSubtitle = this.el.querySelector('.case-preview__subtitle');
     this.previewTeaser = this.el.querySelector('.case-preview__teaser');
     this.readEl = this.el.querySelector('[data-read-view]') as HTMLElement;
+    this.readBar = this.el.querySelector('[data-read-bar]') as HTMLElement;
     this.readBarTitle = this.el.querySelector('.case-read__bar-title');
     this.readKicker = this.el.querySelector('.case-read__kicker');
     this.readHeadline = this.el.querySelector('.case-read__headline');
@@ -354,6 +356,7 @@ export class BuildingPanel {
     this.el.classList.toggle('building-panel--preview', preview);
     if (this.previewEl) this.previewEl.hidden = !preview || !this.peekOnly;
     if (this.readEl) this.readEl.hidden = !preview || this.peekOnly;
+    if (this.readBar) this.readBar.hidden = !preview || this.peekOnly;
     this.titleEl.hidden = preview;
   }
 
@@ -553,6 +556,7 @@ export class BuildingPanel {
     this.titleEl.hidden = false;
     if (this.previewEl) this.previewEl.hidden = true;
     if (this.readEl) this.readEl.hidden = true;
+    if (this.readBar) this.readBar.hidden = true;
     this.el.classList.remove('building-panel--snap');
     if (!opts?.silent) this.onVisibilityChange();
     if (opts?.snap) requestAnimationFrame(() => this.releaseCaseDom());

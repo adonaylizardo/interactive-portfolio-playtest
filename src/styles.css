@@ -1199,7 +1199,8 @@ body[data-layout='panel'] .checklist {
 }
 
 .case-preview,
-.case-read {
+.case-read,
+.case-read__bar {
   font-family: Inter, system-ui, sans-serif;
 }
 
