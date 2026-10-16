@@ -131,7 +131,9 @@ export class JacHud {
     const showHint = !this.mobile && snap.mode === 'drive' && performance.now() < this.hintUntil;
     this.hintEl.hidden = !showHint;
     if (!this.mobile && (snap.mode === 'drive' || snap.mode === 'info')) this.drawMini(anchors.follow);
-    if (snap.rearCam && rearBlit) this.blitRear(rearBlit);
+    if (snap.rearCam && rearBlit && rearBlit.canvas !== document.getElementById('game-canvas')) {
+      this.blitRear(rearBlit);
+    }
   }
 
   qaRoot(): HTMLElement {
@@ -179,6 +181,8 @@ export class JacHud {
     this.root.classList.toggle('jac-hud--drive', snap.mode === 'drive');
     this.rearEl.hidden = snap.mode !== 'drive';
     this.rearEl.classList.toggle('is-on', snap.rearCam);
+    if (!snap.rearCam) this.rearEl.setAttribute('aria-hidden', 'true');
+    else this.rearEl.removeAttribute('aria-hidden');
     this.rearEl.classList.toggle('jac-rear--phone', phone);
     this.rearEl.classList.toggle('jac-rear--turn', Math.abs(snap.steering) > 0.25);
     this.steerEl.classList.toggle('is-live', snap.mph > 0);

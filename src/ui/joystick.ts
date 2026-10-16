@@ -16,7 +16,7 @@ function isCoarse(): boolean {
 
 export class Joystick {
   readonly root: HTMLElement;
-  private idle: HTMLButtonElement;
+  private idle: HTMLElement;
   private knob: HTMLElement;
   private pointerId: number | null = null;
   private origin = { x: 0, y: 0 };
@@ -33,7 +33,7 @@ export class Joystick {
     this.root.setAttribute('aria-label', 'Conducir');
     this.root.innerHTML = `
       <div class="joystick__ring" aria-hidden="true"></div>
-      <button type="button" class="joystick__idle" aria-label="Conducir"></button>
+      <div class="joystick__idle" aria-hidden="true"></div>
     `;
     container.appendChild(this.root);
     this.idle = this.root.querySelector('.joystick__idle')!;
