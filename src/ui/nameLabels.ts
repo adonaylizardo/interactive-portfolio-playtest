@@ -48,6 +48,23 @@ export class NameLabels {
     for (const [id, pill] of this.pills) {
       if (!seen.has(id)) pill.hidden = true;
     }
+    this.separatePills();
+  }
+
+  /** Keep pills from stacking when two heads sit on the same screen point. */
+  private separatePills(): void {
+    const visible = [...this.pills.values()].filter((p) => !p.hidden);
+    for (let i = 0; i < visible.length; i++) {
+      for (let j = i + 1; j < visible.length; j++) {
+        const a = visible[i].getBoundingClientRect();
+        const b = visible[j].getBoundingClientRect();
+        const overlapX = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+        const overlapY = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        if (overlapX <= 0 || overlapY <= 0) continue;
+        const cur = visible[j].style.transform;
+        visible[j].style.transform = `${cur} translateY(${Math.ceil(overlapY + 4)}px)`;
+      }
+    }
   }
 
   qa(): { id: string; name: string; visible: boolean; x: number; y: number }[] {

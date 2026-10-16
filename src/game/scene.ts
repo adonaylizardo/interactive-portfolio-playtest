@@ -2868,6 +2868,10 @@ export class IsoScene {
     this.leaveBenchIfStood();
     const stick = this.events.stick?.() ?? { x: 0, y: 0 };
     const stickLive = Math.abs(stick.x) > 0.02 || Math.abs(stick.y) > 0.02;
+    if (stickLive) {
+      this.noteAvatarInput();
+      this.startCameraFollow();
+    }
     if (this.keys.size > 0 || stickLive) {
       let dx = 0;
       let dy = 0;

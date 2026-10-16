@@ -52,6 +52,8 @@ export class Joystick {
     this.line = this.root.querySelector('.joystick__line line')!;
 
     this.idle.addEventListener('pointerdown', (e) => this.begin(e));
+    this.idle.addEventListener('pointermove', (e) => this.move(e));
+    this.idle.addEventListener('pointerup', (e) => this.end(e));
     window.addEventListener('pointermove', (e) => this.move(e));
     window.addEventListener('pointerup', (e) => this.end(e));
     window.addEventListener('pointercancel', (e) => this.end(e));

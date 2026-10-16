@@ -366,8 +366,9 @@ export class StudioAudio {
         this.barkLines.map(async (line) => {
           const file = this.preferOgg ? line.ogg : line.mp3;
           try {
-            const probe = await fetch(`${BARK_DIR}${file}`, { method: 'HEAD' });
-            if (probe.ok) this.barkReady.add(line.id);
+            const probe = await fetch(`${BARK_DIR}${file}`);
+            const type = probe.headers.get('content-type') ?? '';
+            if (probe.ok && /audio/i.test(type)) this.barkReady.add(line.id);
           } catch {
             /* missing file: stay silent */
           }

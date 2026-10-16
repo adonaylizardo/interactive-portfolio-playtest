@@ -1123,15 +1123,17 @@ body[data-layout='panel'] .checklist {
   position: absolute;
   top: 0;
   right: 0;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border: 0;
-  border-radius: 18px;
+  border-radius: 22px;
   background: transparent;
   color: #edeef0;
   font-size: 24px;
   line-height: 1;
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .building-panel--preview .building-panel__exit {
@@ -1191,11 +1193,21 @@ body[data-layout='panel'] .checklist {
 }
 
 .building-panel--preview.building-panel--expanded .building-panel__bar {
-  height: 44px;
+  height: 52px;
+  background: #141518;
 }
 
 .building-panel--preview.building-panel--expanded .building-panel__close {
   top: 4px;
+}
+
+.building-panel--preview.building-panel--expanded .building-panel__title {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin: 0 48px 12px 0;
+  padding: 10px 0 10px;
+  background: #141518;
 }
 
 @media (max-width: 767px) {

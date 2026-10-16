@@ -249,7 +249,11 @@ export class BuildingPanel {
       if (this.isMobile() && this.mode === 'interior') this.setPeek(true);
     });
     this.sheet.addEventListener('scroll', () => this.syncScrolled(), { passive: true });
-    this.sheet.addEventListener('click', (e) => e.stopPropagation());
+    this.sheet.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if ((e.target as HTMLElement).closest('[data-close],[data-exit]')) return;
+      if (this.mode === 'preview' && this.peekOnly) this.setPeek(false);
+    });
     this.sheet.addEventListener('pointerdown', (e) => e.stopPropagation());
 
     const drag = this.el.querySelector('[data-drag]') as HTMLElement;
