@@ -147,7 +147,7 @@ export class JacHud {
       else if (act === 'close') this.callbacks.onClose();
       else if (act === 'engine') this.callbacks.onEngine();
       else if (act === 'lights') this.callbacks.onLights(t.dataset.val as JacLights);
-      else if (act === 'gear') this.callbacks.onGear(t.dataset.val as JacGear);
+      else if (act === 'gear') return;
       else if (act === 'toggle') this.callbacks.onToggle(t.dataset.val as JacToggleId);
       else if (act === 'dial') this.cycleLights();
     });
@@ -167,7 +167,7 @@ export class JacHud {
     this.sheetEl.hidden = !(phone && snap.mode === 'info');
     this.dockEl.hidden = !(!phone && (snap.mode === 'info' || snap.mode === 'drive'));
     this.barEl.hidden = !(phone && snap.mode === 'drive');
-    this.steerEl.hidden = !(phone && snap.mode === 'drive');
+    this.steerEl.hidden = true;
     this.bubbleEl.hidden = true;
     this.root.classList.toggle('jac-hud--drive', snap.mode === 'drive');
     this.rearEl.hidden = !snap.rearCam;
@@ -264,7 +264,7 @@ export class JacHud {
       ${this.gaugeHtml('rpm', snap.rpm, 'rpm')}
       ${this.gaugeHtml('mph', snap.mph, 'mph')}
       <div class="jac-gears" role="group" aria-label="Gear">
-        ${(['P', 'R', 'N', 'D'] as JacGear[]).map((g) => `<button type="button" class="jac-gear${snap.gear === g ? ' is-on' : ''}" data-jac="gear" data-val="${g}">${g}</button>`).join('')}
+        ${(['P', 'R', 'N', 'D'] as JacGear[]).map((g) => `<span class="jac-gear${snap.gear === g ? ' is-on' : ''}" data-jac="gear" data-val="${g}" aria-hidden="true">${g}</span>`).join('')}
       </div>
       ${this.dialHtml(snap)}
       <div class="jac-toggles jac-toggles--dock">${TOGGLES.map((t) => this.toggleHtml(t, snap)).join('')}</div>
@@ -411,7 +411,7 @@ export class JacHud {
       <div class="jac-bar" hidden>
         <span>JAC T9</span>
         <div class="jac-bar__gears" role="group" aria-label="Gear">
-          ${(['P', 'R', 'N', 'D'] as JacGear[]).map((g) => `<button type="button" class="jac-gear" data-jac="gear" data-val="${g}">${g}</button>`).join('')}
+          ${(['P', 'R', 'N', 'D'] as JacGear[]).map((g) => `<span class="jac-gear" data-jac="gear" data-val="${g}" aria-hidden="true">${g}</span>`).join('')}
         </div>
         <button type="button" class="jac-btn jac-btn--primary jac-bar__btn" data-jac="out">Get out</button>
       </div>

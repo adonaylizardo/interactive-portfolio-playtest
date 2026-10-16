@@ -1695,11 +1695,15 @@ body[data-layout='panel'] .checklist {
   }
 }
 
-/* Touch joystick — idle pad, then ring / knob / dotted line. */
+/* One fixed driving stick (Tom John): pad stays bottom-right, knob moves inside it. */
 .joystick {
   position: fixed;
-  inset: 0;
+  right: 16px;
+  bottom: 118px;
   z-index: 19;
+  width: 72px;
+  height: 72px;
+  pointer-events: none;
   touch-action: none;
 }
 
@@ -1707,30 +1711,32 @@ body[data-layout='panel'] .checklist {
   display: none;
 }
 
-.joystick.is-dragging .joystick__idle {
-  opacity: 0;
-}
-
-/* Idle pad sits on the map, never on the Recruiter/Mentoría/Cliente sheet. */
-body:has(.chrome--sheet) .joystick__idle {
-  opacity: 0;
+.joystick__ring {
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgb(255 255 255 / 42%);
+  border-radius: 50%;
   pointer-events: none;
 }
 
 .joystick__idle {
   position: absolute;
-  right: 16px;
-  bottom: 136px;
-  width: 64px;
-  height: 64px;
+  inset: 8px;
+  width: 56px;
+  height: 56px;
   padding: 0;
   border: 0;
-  border-radius: 32px;
+  border-radius: 28px;
   background: #fff;
   box-shadow: 0 2px 10px rgb(0 0 0 / 35%);
   cursor: pointer;
+  pointer-events: auto;
   touch-action: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+.joystick.is-dragging .joystick__idle {
+  opacity: 0;
 }
 
 .joystick__glyph {
@@ -1739,51 +1745,23 @@ body:has(.chrome--sheet) .joystick__idle {
   color: #1a1c20;
 }
 
-.joystick__active {
-  position: fixed;
-  z-index: 9;
+.joystick__knob {
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 30%);
   pointer-events: none;
 }
 
-.joystick__active[hidden] {
+.joystick__knob[hidden] {
   display: none;
 }
 
-.joystick__ring {
-  position: absolute;
-  inset: 0;
-  border: 3px solid rgb(255 255 255 / 55%);
-  border-radius: 50%;
-  background: rgb(255 255 255 / 8%);
-}
-
-.joystick__line {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-.joystick__line line {
-  stroke: #fff;
-  stroke-width: 2;
-  stroke-dasharray: 3 5;
-  stroke-linecap: round;
-}
-
-.joystick__knob {
-  position: absolute;
-  width: 48px;
-  height: 48px;
-  border-radius: 24px;
-  background: #fff;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 30%);
-}
-
 @media (min-width: 768px) {
-  .joystick__idle {
-    right: 280px;
+  .joystick {
+    right: 24px;
     bottom: 24px;
   }
 }
@@ -2216,19 +2194,7 @@ body:has(.chrome--sheet) .joystick__idle {
 }
 
 .jac-steer {
-  position: fixed;
-  top: 76px;
-  right: 12px;
-  width: 44px;
-  height: 44px;
-  border-radius: 22px;
-  border: 1px solid #2a2c31;
-  background: #141518;
-  color: #edeef0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  display: none !important;
 }
 
 .jac-steer.is-live {
@@ -2370,7 +2336,10 @@ body:has(.chrome--sheet) .joystick__idle {
   background: transparent;
   color: #8a8f98;
   font: 600 13px/22px Inter, sans-serif;
-  cursor: pointer;
+  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .jac-gear.is-on {

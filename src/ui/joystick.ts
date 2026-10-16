@@ -1,29 +1,20 @@
 /**
- * Mobile / touch joystick. Idle is a Pixel-kit analog stick; a drag replaces it with a
- * ring + knob + dotted line at the finger. Mouse desktops never see it.
- *
- * Any touch/coarse pointer on open ground starts the stick so a fast swipe cannot pan the camera.
+ * One analog stick, fixed bottom-right, used only while driving (Tom John model).
+ * Knob moves inside the pad. Never spawns a second stick at the finger, never used for walking.
  */
 
 export type StickVector = { x: number; y: number };
 
-const RING_SIZE = 128;
-const KNOB_SIZE = 48;
-const MAX_RADIUS = 48;
-const DEADZONE = 10;
+const PAD = 72;
+const KNOB = 56;
+const MAX_RADIUS = 22;
+const DEADZONE = 8;
 
 function isCoarse(): boolean {
   return window.matchMedia('(pointer: coarse)').matches;
 }
 
-function isChromeHit(target: EventTarget | null): boolean {
-  if (!(target instanceof Element)) return false;
-  return !!target.closest(
-    'button, a, input, textarea, select, .chrome, .checklist, .building-panel, .jac-hud, .name-labels, .toast, .joystick__idle',
-  );
-}
-
-const STICK_GLYPH = `<svg class="joystick__glyph" viewBox="0 0 15 15" width="22" height="22" aria-hidden="true">
+const STICK_GLYPH = `<svg class="joystick__glyph" viewBox="0 0 15 15" width="18" height="18" aria-hidden="true">
   <circle fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" cx="7.5" cy="7.5" r="5.5"/>
   <circle fill="none" stroke="currentColor" stroke-width="1.25" cx="7.5" cy="7.5" r="2"/>
 </svg>`;
@@ -31,15 +22,12 @@ const STICK_GLYPH = `<svg class="joystick__glyph" viewBox="0 0 15 15" width="22"
 export class Joystick {
   readonly root: HTMLElement;
   private idle: HTMLButtonElement;
-  private active: HTMLElement;
-  private ring: HTMLElement;
   private knob: HTMLElement;
-  private line: SVGLineElement;
   private pointerId: number | null = null;
   private origin = { x: 0, y: 0 };
   private vec: StickVector = { x: 0, y: 0 };
   private touchSeen = false;
-  private hidden = false;
+  private hidden = true;
   private onStart: (() => void) | null = null;
 
   constructor(container: HTMLElement) {
@@ -47,36 +35,17 @@ export class Joystick {
     this.root.className = 'joystick';
     this.root.hidden = true;
     this.root.innerHTML = `
-      <button type="button" class="joystick__idle" aria-label="Mover">
+      <div class="joystick__ring" aria-hidden="true"></div>
+      <button type="button" class="joystick__idle" aria-label="Conducir">
         ${STICK_GLYPH}
       </button>
-      <div class="joystick__active" hidden>
-        <div class="joystick__ring"></div>
-        <svg class="joystick__line" viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true">
-          <line x1="0.5" y1="0.5" x2="0.5" y2="0.5" />
-        </svg>
-        <div class="joystick__knob"></div>
-      </div>
+      <div class="joystick__knob" hidden></div>
     `;
     container.appendChild(this.root);
     this.idle = this.root.querySelector('.joystick__idle')!;
-    this.active = this.root.querySelector('.joystick__active')!;
-    this.ring = this.root.querySelector('.joystick__ring')!;
     this.knob = this.root.querySelector('.joystick__knob')!;
-    this.line = this.root.querySelector('.joystick__line line')!;
 
-    this.idle.addEventListener('pointerdown', (e) => this.begin(e, { capture: true, stop: true }));
-    this.idle.addEventListener('pointermove', (e) => this.move(e));
-    this.idle.addEventListener('pointerup', (e) => this.end(e));
-    window.addEventListener(
-      'pointerdown',
-      (e) => {
-        if (!this.wantsPad() || this.hidden || this.pointerId !== null) return;
-        if (isChromeHit(e.target)) return;
-        this.begin(e, { capture: false, stop: false });
-      },
-      { capture: true },
-    );
+    this.idle.addEventListener('pointerdown', (e) => this.begin(e));
     window.addEventListener('pointermove', (e) => this.move(e));
     window.addEventListener('pointerup', (e) => this.end(e));
     window.addEventListener('pointercancel', (e) => this.end(e));
@@ -117,13 +86,16 @@ export class Joystick {
     this.release();
   }
 
-  /** True when the pad is the movement control (coarse/touch, not hidden). */
+  /** True when the driving pad is on screen (coarse/touch, not hidden). */
   isShown(): boolean {
     return this.wantsPad();
   }
 
-  qa(): { visible: boolean; active: boolean; x: number; y: number } {
-    return { visible: !this.root.hidden, active: this.isActive(), x: this.vec.x, y: this.vec.y };
+  qa(): { visible: boolean; active: boolean; x: number; y: number; floating: boolean } {
+    const kn = this.knob.getBoundingClientRect();
+    const pad = this.root.getBoundingClientRect();
+    const floating = this.isActive() && (kn.left < pad.left - 8 || kn.right > pad.right + 8 || kn.top < pad.top - 8 || kn.bottom > pad.bottom + 8);
+    return { visible: !this.root.hidden, active: this.isActive(), x: this.vec.x, y: this.vec.y, floating };
   }
 
   private wantsPad(): boolean {
@@ -135,30 +107,26 @@ export class Joystick {
     if (this.root.hidden) this.release();
   }
 
-  private begin(e: PointerEvent, opts: { capture: boolean; stop: boolean }): void {
+  private padCenter(): { x: number; y: number } {
+    const r = this.root.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+
+  private begin(e: PointerEvent): void {
     if (this.hidden || !this.wantsPad()) return;
     if (this.pointerId !== null) return;
     e.preventDefault();
-    if (opts.stop) {
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-    }
+    e.stopPropagation();
     this.pointerId = e.pointerId;
-    this.origin = { x: e.clientX, y: e.clientY };
+    this.origin = this.padCenter();
     this.root.classList.add('is-dragging');
-    this.active.hidden = false;
-    this.placeActive(this.origin.x, this.origin.y);
+    this.knob.hidden = false;
+    this.idle.style.opacity = '0';
     this.setKnob(0, 0);
-    if (opts.capture) {
-      try {
-        this.root.setPointerCapture(e.pointerId);
-      } catch {
-        try {
-          this.idle.setPointerCapture(e.pointerId);
-        } catch {
-          /* capture is optional */
-        }
-      }
+    try {
+      this.idle.setPointerCapture(e.pointerId);
+    } catch {
+      /* capture is optional */
     }
     this.onStart?.();
   }
@@ -190,29 +158,14 @@ export class Joystick {
     this.pointerId = null;
     this.vec = { x: 0, y: 0 };
     this.root.classList.remove('is-dragging');
-    this.active.hidden = true;
-  }
-
-  private placeActive(cx: number, cy: number): void {
-    const left = cx - RING_SIZE / 2;
-    const top = cy - RING_SIZE / 2;
-    this.active.style.left = `${left}px`;
-    this.active.style.top = `${top}px`;
-    this.active.style.width = `${RING_SIZE}px`;
-    this.active.style.height = `${RING_SIZE}px`;
-    this.ring.style.width = `${RING_SIZE}px`;
-    this.ring.style.height = `${RING_SIZE}px`;
-    this.line.ownerSVGElement?.setAttribute('viewBox', `0 0 ${RING_SIZE} ${RING_SIZE}`);
+    this.knob.hidden = true;
+    this.idle.style.opacity = '';
   }
 
   private setKnob(ox: number, oy: number): void {
-    const cx = RING_SIZE / 2;
-    const cy = RING_SIZE / 2;
-    this.knob.style.left = `${cx + ox - KNOB_SIZE / 2}px`;
-    this.knob.style.top = `${cy + oy - KNOB_SIZE / 2}px`;
-    this.line.setAttribute('x1', String(cx));
-    this.line.setAttribute('y1', String(cy));
-    this.line.setAttribute('x2', String(cx + ox));
-    this.line.setAttribute('y2', String(cy + oy));
+    const cx = PAD / 2 - KNOB / 2;
+    const cy = PAD / 2 - KNOB / 2;
+    this.knob.style.left = `${cx + ox}px`;
+    this.knob.style.top = `${cy + oy}px`;
   }
 }
