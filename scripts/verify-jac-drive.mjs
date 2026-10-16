@@ -112,6 +112,58 @@ async function shot(page, tag, id) {
   return dest;
 }
 
+async function holdStick(page, ox, oy) {
+  const box = await page.locator('.joystick__idle').boundingBox();
+  if (!box) return false;
+  const x0 = box.x + box.width / 2;
+  const y0 = box.y + box.height / 2;
+  await page.evaluate(
+    ({ x0, y0, ox, oy }) => {
+      const el = document.querySelector('.joystick__idle');
+      if (!el) return;
+      el.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          pointerId: 7,
+          pointerType: 'touch',
+          bubbles: true,
+          cancelable: true,
+          clientX: x0,
+          clientY: y0,
+        }),
+      );
+      window.dispatchEvent(
+        new PointerEvent('pointermove', {
+          pointerId: 7,
+          pointerType: 'touch',
+          bubbles: true,
+          cancelable: true,
+          clientX: x0 + ox,
+          clientY: y0 + oy,
+        }),
+      );
+    },
+    { x0, y0, ox, oy },
+  );
+  return true;
+}
+
+async function releaseStick(page) {
+  await page.evaluate(() => {
+    window.dispatchEvent(
+      new PointerEvent('pointerup', {
+        pointerId: 7,
+        pointerType: 'touch',
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  });
+}
+
+function dist(a, b) {
+  return Math.hypot((a?.cx ?? 0) - (b?.cx ?? 0), (a?.cy ?? 0) - (b?.cy ?? 0));
+}
+
 async function applyState(page, id) {
   await page.evaluate(async (id) => {
     const qa = window.__playtestQa;
@@ -271,6 +323,18 @@ async function runViewport(tag, options, phone) {
         continue;
       }
       if (st.id === '1-menu' && jac.mode !== 'menu') errors.push(`${tag} menu: mode ${jac.mode}`);
+      if (st.id === '1-menu') {
+        const pills = await page.evaluate(() =>
+          [...document.querySelectorAll('.jac-menu__row .jac-pill')].map((el) => {
+            const r = el.getBoundingClientRect();
+            return { label: el.textContent?.trim(), h: r.height, w: r.width };
+          }),
+        );
+        notes.push(`${tag} menu-pills ${JSON.stringify(pills)}`);
+        for (const p of pills) {
+          if (p.h < 43.5) errors.push(`${tag} menu: ${p.label} height ${p.h}, want ≥44`);
+        }
+      }
       if (st.id === '2-info-auto' && (jac.mode !== 'info' || jac.lights !== 'auto')) {
         errors.push(`${tag} info-auto: mode=${jac.mode} lights=${jac.lights}`);
       }
@@ -278,6 +342,26 @@ async function runViewport(tag, options, phone) {
         errors.push(`${tag} info-on: mode=${jac.mode} lightsOn=${jac.lightsOn}`);
       }
       if (st.id === '4-drive' && !jac.driving) errors.push(`${tag} drive: not driving`);
+      if (st.id === '4-drive' && phone) {
+        const hud = await page.evaluate(() => {
+          const bar = document.querySelector('.jac-bar');
+          const gears = document.querySelector('.jac-bar__gears');
+          const dock = document.querySelector('.jac-dock');
+          const on = [...document.querySelectorAll('.jac-bar [data-jac="gear"].is-on')].map(
+            (el) => el.getAttribute('data-val'),
+          );
+          return {
+            barHidden: bar?.hidden ?? true,
+            gearsCount: gears?.querySelectorAll('[data-jac="gear"]').length ?? 0,
+            dockHidden: dock?.hidden ?? true,
+            gearOn: on,
+          };
+        });
+        notes.push(`${tag} drive-hud ${JSON.stringify(hud)}`);
+        if (hud.barHidden) errors.push(`${tag} drive: phone bar hidden`);
+        if (hud.dockHidden === false) errors.push(`${tag} drive: desktop dock shown on phone`);
+        if (hud.gearsCount < 4) errors.push(`${tag} drive: compact gears missing`);
+      }
       if (st.id === '5-out' && (jac.driving || jac.bubble)) errors.push(`${tag} out: driving=${jac.driving} bubble=${jac.bubble}`);
       if (st.id === '6-out-bubble' && !jac.bubble) errors.push(`${tag} bubble missing`);
       if (st.id === '7-rearcam-straight' && !jac.rearCam) errors.push(`${tag} rearcam straight missing`);
@@ -295,6 +379,90 @@ async function runViewport(tag, options, phone) {
     if (phone) {
       const stick = await page.evaluate(() => window.__playtestQa.joystick());
       if (!stick?.visible) errors.push(`${tag}: joystick hidden after reset`);
+
+      await resetMap(page);
+      await applyState(page, '4-drive');
+      const open = await page.evaluate(() => {
+        const walk = window.__playtestQa.fill().walk;
+        const clear = (x, y) => {
+          for (let dy = -1; dy <= 2; dy++) {
+            for (let dx = -1; dx <= 2; dx++) {
+              const ch = walk[y + dy]?.[x + dx];
+              if (!ch || ch === '#' || ch === 'x') return false;
+            }
+          }
+          return true;
+        };
+        for (let y = 22; y < 42; y++) {
+          for (let x = 22; x < 42; x++) {
+            if (clear(x, y)) return { x, y };
+          }
+        }
+        return null;
+      });
+      if (open) {
+        await page.evaluate((p) => window.__playtestQa.jacSet({ cx: p.x, cy: p.y, dir: 'se' }), open);
+        await wait(200);
+      }
+      const start = await page.evaluate(() => window.__playtestQa.jac());
+      notes.push(`${tag} stick-start ${JSON.stringify({ gear: start?.gear, cx: start?.cx, cy: start?.cy, open })}`);
+      const heldFwd = await holdStick(page, 0, -46);
+      if (!heldFwd) errors.push(`${tag}: joystick idle missing for forward drive`);
+      await wait(1200);
+      const fwd = await page.evaluate(() => ({
+        jac: window.__playtestQa.jac(),
+        joy: window.__playtestQa.joystick(),
+      }));
+      await shot(page, tag, 'joystick-forward');
+      await releaseStick(page);
+      await wait(280);
+      const held = await page.evaluate(() => window.__playtestQa.jac());
+      const heldBack = await holdStick(page, 0, 46);
+      if (!heldBack) errors.push(`${tag}: joystick idle missing for reverse drive`);
+      await wait(1200);
+      const rev = await page.evaluate(() => {
+        const rear = document.querySelector('.jac-rear');
+        const r = rear?.getBoundingClientRect();
+        return {
+          jac: window.__playtestQa.jac(),
+          joy: window.__playtestQa.joystick(),
+          rear: {
+            hidden: rear?.hidden ?? true,
+            w: r?.width ?? 0,
+            h: r?.height ?? 0,
+            body: document.body.classList.contains('jac-rearcam'),
+          },
+        };
+      });
+      await shot(page, tag, 'joystick-reverse');
+      await releaseStick(page);
+      notes.push(
+        `${tag} stick-fwd ${JSON.stringify({ gear: fwd.jac?.gear, mph: fwd.jac?.mph, cx: fwd.jac?.cx, cy: fwd.jac?.cy, vec: fwd.joy })}`,
+      );
+      notes.push(
+        `${tag} stick-hold ${JSON.stringify({ gear: held?.gear, mph: held?.mph, cx: held?.cx, cy: held?.cy })}`,
+      );
+      notes.push(
+        `${tag} stick-rev ${JSON.stringify({ gear: rev.jac?.gear, rearCam: rev.jac?.rearCam, cx: rev.jac?.cx, cy: rev.jac?.cy, rear: rev.rear })}`,
+      );
+      if (fwd.jac?.gear !== 'D') errors.push(`${tag}: forward stick did not auto-shift to D (gear=${fwd.jac?.gear})`);
+      if (dist(fwd.jac, start) < 0.35) {
+        errors.push(
+          `${tag}: forward stick did not move the van (start ${start?.cx},${start?.cy} → ${fwd.jac?.cx},${fwd.jac?.cy})`,
+        );
+      }
+      if ((held?.mph ?? 1) > 0) errors.push(`${tag}: release did not brake (mph=${held?.mph})`);
+      if (held?.gear !== 'D') errors.push(`${tag}: release dropped gear ${held?.gear}, want hold D`);
+      if (rev.jac?.gear !== 'R') errors.push(`${tag}: reverse stick did not auto-shift to R (gear=${rev.jac?.gear})`);
+      if (!rev.jac?.rearCam) errors.push(`${tag}: reverse stick did not show rear-cam`);
+      if (rev.rear.hidden || rev.rear.w < 40 || rev.rear.h < 40) {
+        errors.push(`${tag}: rear-cam overlay not visible (${JSON.stringify(rev.rear)})`);
+      }
+      if (dist(rev.jac, fwd.jac) < 0.35) {
+        errors.push(
+          `${tag}: reverse stick did not move the van (fwd ${fwd.jac?.cx},${fwd.jac?.cy} → ${rev.jac?.cx},${rev.jac?.cy})`,
+        );
+      }
     }
 
     const casesOk = await page.evaluate(() => {
