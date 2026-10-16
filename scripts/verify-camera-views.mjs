@@ -78,10 +78,14 @@ async function runViewport(tag, options) {
     if (cen.roofsHidden < cen.roofsTotal * 0.8) {
       errors.push(`${tag}: cenital hid ${cen.roofsHidden}/${cen.roofsTotal} iso props`);
     }
-    if (!(cen.adonayScreen.h > cen.adonayScreen.w * 0.7)) {
+    if (!(cen.adonayScreen.h > cen.adonayScreen.w * 1.05)) {
       errors.push(
         `${tag}: cenital Adonay looks squashed/lying down ${JSON.stringify(cen.adonayScreen)}`,
       );
+    }
+    const soundCen = await page.evaluate(() => window.__playtestQa.soundHint?.());
+    if (soundCen?.visible) {
+      errors.push(`${tag}: silent-mode hint still visible in top-down ${JSON.stringify(soundCen)}`);
     }
     const adonayLabel = cen.labels.find((l) => l.id === 'adonay' && l.visible);
     if (adonayLabel && adonayLabel.y > cen.adonayScreen.y + 12) {
@@ -123,6 +127,22 @@ async function runViewport(tag, options) {
     }
     if (persp.charScreen.y + 24 < persp.aim.y) {
       errors.push(`${tag}: perspectiva character not in lower third ${JSON.stringify({ char: persp.charScreen, aim: persp.aim })}`);
+    }
+    if (!(persp.adonayScreen.h > persp.adonayScreen.w * 1.05)) {
+      errors.push(
+        `${tag}: perspectiva Adonay looks squashed/lying down ${JSON.stringify(persp.adonayScreen)}`,
+      );
+    }
+    const minH = tag === '375' ? 70 : 110;
+    if (!(persp.adonayScreen.h > minH)) {
+      errors.push(
+        `${tag}: perspectiva Adonay too small for a low follow cam ${JSON.stringify(persp.adonayScreen)}`,
+      );
+    }
+    if (persp.adonayScreen.y + persp.adonayScreen.h < persp.aim.y - 80) {
+      errors.push(
+        `${tag}: perspectiva Adonay not near lower-center ${JSON.stringify({ sprite: persp.adonayScreen, aim: persp.aim })}`,
+      );
     }
     notes.push(
       `${tag} perspectiva ${JSON.stringify({

@@ -511,6 +511,14 @@ export class ChromeUI {
       if (key !== 'rotate' && key !== 'map') btn.classList.toggle('is-active', key === v.mode);
       if (key === 'map') btn.classList.toggle('is-active', v.overview);
     });
+    this.root.classList.toggle('chrome--alt-view', v.mode !== 'isometrica');
+    const hint = this.root.querySelector('.chrome__sound') as HTMLElement | null;
+    if (hint && v.mode !== 'isometrica' && !hint.hidden) {
+      hint.hidden = true;
+      hint.dataset.hint = '0';
+      hint.setAttribute('aria-hidden', 'true');
+      hint.classList.remove('chrome__sound--fade');
+    }
   }
 
   private placeSubtitle(): void {

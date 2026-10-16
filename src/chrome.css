@@ -565,6 +565,10 @@ body[data-interior='1'] .chrome__column {
   display: none;
 }
 
+.chrome--alt-view .chrome__sound {
+  display: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .chrome__sound {
     transition: none;
