@@ -2080,7 +2080,7 @@ body[data-layout='panel'] .checklist {
   position: absolute;
   left: 43px;
   top: 193px;
-  width: 248px;
+  width: 246px;
   height: 4px;
   border-radius: 2px;
   background: var(--ui-line);
@@ -2103,7 +2103,7 @@ body[data-layout='panel'] .checklist {
 
 .talks-player__time {
   position: absolute;
-  left: 299px;
+  left: 301px;
   top: 188px;
   margin: 0;
   font-family: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
