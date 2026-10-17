@@ -151,21 +151,21 @@ async function driveDoors(page, tag, touch) {
     await page.evaluate((z) => window.__playtestQa.setZoom?.(z), name === 'flor' ? 0.12 : 0.3);
     const pt = await page.evaluate((n) => window.__playtestQa.doorScreenPoint(n), name);
     if (pt) await realTap(page, pt.x, pt.y, touch);
-    if (!(await page.evaluate(() => window.__playtestQa.jac()?.driveGoal))) {
-      await page.evaluate((n) => window.__playtestQa.walkToBuilding(n), name);
-    }
+    await page.evaluate((n) => window.__playtestQa.walkToBuilding(n), name);
     await page.evaluate(() => {
       for (let i = 0; i < 800; i++) {
         window.__playtestQa.jacDriveStep?.(0.05, 0, 0, { render: false });
         const j = window.__playtestQa.jac();
         if (!j?.driving || window.__playtestQa.isInInterior?.()) break;
-        if (!j.driveGoal && j.mph < 1.2) {
-          window.__playtestQa.jacGetOut?.();
-          break;
-        }
+        if (!j.driveGoal && j.mph < 1.2) break;
+      }
+      if (window.__playtestQa.jac()?.driving) window.__playtestQa.jacGetOut?.({ thenEnter: true });
+      for (let i = 0; i < 40; i++) {
+        window.__playtestQa.jacDriveStep?.(0.05, 0, 0, { render: false });
+        if (!window.__playtestQa.jac()?.driving) break;
       }
     });
-    await waitUntil(page, async () => ((await entered(page)) ? true : null), 8000);
+    await waitUntil(page, async () => ((await entered(page)) ? true : null), 10000);
     const snap = await page.evaluate((n) => {
       const b = window.__playtestQa.getEnterableBuildings().find((x) => x.name === n);
       const j = window.__playtestQa.jac();
@@ -212,13 +212,15 @@ async function mentoriaRetap(page, tag, touch) {
       window.__playtestQa.jacDriveStep?.(0.05, 0, 0, { render: false });
       const j = window.__playtestQa.jac();
       if (!j?.driving) break;
-      if (!j.driveGoal && j.mph < 1.2) {
-        window.__playtestQa.jacGetOut?.();
-        break;
-      }
+      if (!j.driveGoal && j.mph < 1.2) break;
+    }
+    if (window.__playtestQa.jac()?.driving) window.__playtestQa.jacGetOut?.({ thenEnter: true });
+    for (let i = 0; i < 40; i++) {
+      window.__playtestQa.jacDriveStep?.(0.05, 0, 0, { render: false });
+      if (!window.__playtestQa.jac()?.driving) break;
     }
   });
-  await waitUntil(page, async () => ((await entered(page)) ? true : null), 8000);
+  await waitUntil(page, async () => ((await entered(page)) ? true : null), 10000);
   await closeCase(page);
   await page.evaluate(() => window.__playtestQa.setZoom?.(0.4));
   const door = await page.evaluate(() => window.__playtestQa.doorScreenPoint('mentoria'));

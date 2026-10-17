@@ -330,7 +330,7 @@ async function main(): Promise<void> {
     tapJac: () => scene.tapJac(),
     jacInfo: () => scene.jacOpenInfo(),
     jacGetIn: () => scene.jacGetIn(),
-    jacGetOut: () => scene.jacGetOut(),
+    jacGetOut: (opts?: { thenEnter?: boolean }) => scene.jacGetOut(opts),
     jacDriveTo: (tx: number, ty: number) => scene.qaDriveTo(tx, ty),
     jacFindDrivePath: (tx: number, ty: number) => scene.qaFindDrivePath(tx, ty),
     lastDriveTap: () => scene.qaLastDriveTap,
