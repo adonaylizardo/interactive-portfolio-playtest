@@ -346,7 +346,8 @@ async function main(): Promise<void> {
     inputReady: () => scene.qaInputReady(),
     parkedFootprint: () => scene.qaParkedFootprint(),
     jacStick: (vec: { x: number; y: number } | null) => scene.qaJacStick(vec),
-    jacDriveStep: (dt: number, dx: number, dy: number) => scene.qaJacDriveStep(dt, dx, dy),
+    jacDriveStep: (dt: number, dx: number, dy: number, opts?: { render?: boolean }) =>
+      scene.qaJacDriveStep(dt, dx, dy, opts),
     viewportLock: () => ({
       scrollX: window.scrollX,
       scrollY: window.scrollY,

@@ -1324,8 +1324,8 @@ export class JacT9 {
     if (err > 2) err -= 4;
     if (err < -2) err += 4;
     const steer = Math.max(-1, Math.min(1, err * 1.8));
-    const turnSlow = 1 - Math.min(0.62, Math.abs(err) * 0.5);
-    const goalSlow = goalDist < 2.8 ? Math.max(0.28, goalDist / 2.8) : 1;
+    const turnSlow = 1 - Math.min(0.88, Math.abs(err) * 0.85);
+    const goalSlow = goalDist < 2.8 ? Math.max(0.22, goalDist / 2.8) : 1;
     const throttle = (reverse ? -1 : 1) * turnSlow * goalSlow;
     if (Math.hypot(ax, ay) < 0.05) this.markStuck(dt);
     else this.stuckT = 0;
@@ -1675,6 +1675,7 @@ export class JacT9 {
 
   /** Current pose with an explicit facing — used to reject a turn that would clip. */
   private sitWith(cx: number, cy: number, dir: FacingDir): boolean {
+    if (this.driving && !this.pendingExit) return this.driveBoxWalkable(cx, cy);
     const size = parkSize(dir);
     return this.driveBoxWalkable(cx, cy) && this.footprintClear(cx, cy, size.w, size.h);
   }
@@ -1725,7 +1726,7 @@ export class JacT9 {
   private overlapCells(): [number, number][] {
     const out: [number, number][] = [];
     const seen = new Set<string>();
-    for (const [x, y] of [...this.solidCells(), ...this.parkCells()]) {
+    for (const [x, y] of this.solidCells()) {
       const key = k(x, y);
       if (seen.has(key) || !PROP_CELLS.has(key)) continue;
       seen.add(key);
@@ -1885,7 +1886,7 @@ export class JacT9 {
 
   /** QA: true when the current solid / parked body covers a prop cell. */
   overlapsProp(): boolean {
-    for (const [x, y] of [...this.solidCells(), ...this.parkCells()]) {
+    for (const [x, y] of this.solidCells()) {
       if (PROP_CELLS.has(k(x, y))) return true;
     }
     return false;

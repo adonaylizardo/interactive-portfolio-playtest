@@ -4421,7 +4421,7 @@ export class IsoScene {
     this.qaStick = vec;
   }
 
-  qaJacDriveStep(dt: number, dx: number, dy: number): {
+  qaJacDriveStep(dt: number, dx: number, dy: number, opts?: { render?: boolean }): {
     cx: number;
     cy: number;
     dir: string;
@@ -4434,8 +4434,12 @@ export class IsoScene {
     this.charTy = this.jac.cy;
     this.startCameraFollow();
     this.updateCameraFollow();
-    this.app?.render();
-    this.events.onFrame?.();
+    if (this.pendingJacExit && this.jac.readyToExit()) this.finishJacGetOut();
+    else this.tryFinishDriveEnter();
+    if (opts?.render !== false) {
+      this.app?.render();
+      this.events.onFrame?.();
+    }
     const s = this.jac.snapshot();
     return { cx: s.cx, cy: s.cy, dir: s.dir, overlap: this.jac.overlapsProp(), mph: s.mph };
   }
