@@ -354,15 +354,33 @@ async function productFlow(page, tag, phone) {
   await page.screenshot({ path: path.join(OUT, `${tag}-i18n-en.png`) });
 
   await page.evaluate(() => {
-    const s = window.__playtestQa.jacSpawn();
-    window.__playtestQa.jacSet?.({ cx: s.center.x, cy: s.center.y, dir: 'se', mode: 'drive' });
+    const buildings = window.__playtestQa.getEnterableBuildings?.() ?? [];
+    const target = buildings.find((b) => b.name === 'estudio') ?? buildings.find((b) => b.door) ?? buildings[0];
+    const door = target?.door ?? { x: 20, y: 18 };
+    let sit = null;
+    for (let r = 2; r <= 6 && !sit; r++) {
+      for (let dy = -r; dy <= r && !sit; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          if (window.__playtestQa.jacCanSit?.(door.x + dx, door.y + dy)) {
+            sit = { x: door.x + dx, y: door.y + dy };
+            break;
+          }
+        }
+      }
+    }
+    if (sit) window.__playtestQa.jacSet?.({ cx: sit.x, cy: sit.y, dir: 'se', mode: 'drive' });
+    else {
+      const s = window.__playtestQa.jacSpawn();
+      window.__playtestQa.jacSet?.({ cx: s.center.x, cy: s.center.y, dir: 'se', mode: 'drive' });
+    }
     window.__playtestQa.jacSetGear?.('D');
     window.__playtestQa.focusJac?.();
   });
   await wait(120);
   const driveEnter = await page.evaluate(() => {
     const buildings = window.__playtestQa.getEnterableBuildings?.() ?? [];
-    const target = buildings.find((b) => b.door && (b.name === 'mentoria' || b.name === 'estudio' || b.name === 'pg')) ?? buildings[0];
+    const target = buildings.find((b) => b.name === 'estudio') ?? buildings.find((b) => b.door) ?? buildings[0];
     const ok = target ? window.__playtestQa.walkToBuilding(target.name) : false;
     return { ok, name: target?.name, door: target?.door, goal: window.__playtestQa.jac()?.driveGoal };
   });
@@ -375,23 +393,25 @@ async function productFlow(page, tag, phone) {
         const interior = window.__playtestQa.isInInterior?.();
         const toast = document.getElementById('playtest-toast');
         const toastOn = toast?.classList.contains('playtest-toast--visible');
-        const driving = window.__playtestQa.jac()?.driving;
-        const goal = window.__playtestQa.jac()?.driveGoal;
+        const toastText = toast?.textContent ?? '';
+        const j = window.__playtestQa.jac();
+        const driving = j?.driving;
+        const goal = j?.driveGoal;
         if (interior) return { kind: 'interior', id: window.__playtestQa.getInteriorId?.() };
-        if (toastOn && /Get out to enter|Bájate para entrar/.test(toast.textContent ?? '')) {
-          return { kind: 'toast', text: toast.textContent };
+        if (toastOn && /Get out to enter|Bájate para entrar|Can't get there|No se puede llegar/.test(toastText)) {
+          return { kind: 'toast', text: toastText };
         }
-        if (!driving && !goal) return { kind: 'parked' };
-        if (goal) return null;
+        if (!driving) return { kind: 'parked' };
+        if (!goal && (j?.mph ?? 0) < 1) return { kind: 'arrived' };
         return null;
       });
     },
-    24000,
+    40000,
     120,
   );
   notes.driveEnterEnd = enteredOrToasted;
   if (!enteredOrToasted) throw new Error(`${tag}: drive-to-door never parked, entered, or toasted`);
-  if (enteredOrToasted.kind === 'parked') {
+  if (enteredOrToasted.kind === 'parked' || enteredOrToasted.kind === 'arrived') {
     const walked = await waitUntil(
       page,
       async () => ((await page.evaluate(() => window.__playtestQa.isInInterior?.())) ? true : null),

@@ -4003,8 +4003,8 @@ export class IsoScene {
       visual: v,
       tapBox: this.objectTapBoxes,
       onStuck: () => {
-        this.pendingDriveEnter = null;
-        this.events.onUnreachable?.();
+        if (this.pendingDriveEnter) this.toastGetOutToEnter();
+        else this.events.onUnreachable?.();
       },
     });
     g.label = JAC_ID;
