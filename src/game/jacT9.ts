@@ -139,12 +139,26 @@ const EDGE_DIRS: [number, number][] = [
   [-1, -1],
 ];
 
-/** Trees, benches, lamps and muro walls — the same cells the avatar cannot walk through. */
+/** Trees, benches, lamps, muro walls and fill solids — never this van's own cells. */
 function buildPropCells(): Set<string> {
-  const out = new Set<string>(muroWallTiles());
-  for (const [x, y] of fill.solidCells) out.add(k(x, y));
+  const self = new Set<string>();
   for (const o of objects) {
-    if (o.flat || !PROP_NAMES.has(o.name)) continue;
+    if (o.id !== JAC_ID) continue;
+    const fx = o.footprintX ?? o.x;
+    const fy = o.footprintY ?? o.y;
+    const w = o.w ?? 1;
+    const h = o.h ?? 1;
+    for (let dy = 0; dy < h; dy++) {
+      for (let dx = 0; dx < w; dx++) self.add(k(fx + dx, fy + dy));
+    }
+  }
+  const out = new Set<string>(muroWallTiles());
+  for (const [x, y] of fill.solidCells) {
+    const key = k(x, y);
+    if (!self.has(key)) out.add(key);
+  }
+  for (const o of objects) {
+    if (o.id === JAC_ID || o.flat || !PROP_NAMES.has(o.name)) continue;
     const fx = o.footprintX ?? o.x;
     const fy = o.footprintY ?? o.y;
     const w = o.w ?? 1;
@@ -519,7 +533,7 @@ export class JacT9 {
   findDrivePath(gx: number, gy: number): { x: number; y: number }[] | null {
     const sx = Math.round(this.cx);
     const sy = Math.round(this.cy);
-    const pass = (x: number, y: number) => this.canDriveSit(x, y) || (x === sx && y === sy);
+    const pass = (x: number, y: number) => this.canSit(x, y) || (x === sx && y === sy);
     const finish = (path: { x: number; y: number }[], tx: number, ty: number) => {
       if (path.length === 0 || path[path.length - 1].x !== tx || path[path.length - 1].y !== ty) {
         return [...path, { x: tx, y: ty }];
@@ -539,7 +553,7 @@ export class JacT9 {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
           const x = gx + dx;
           const y = gy + dy;
-          if (!this.canDriveSit(x, y)) continue;
+          if (!this.canSit(x, y)) continue;
           const path = findPathWith(sx, sy, x, y, pass);
           if (!path) continue;
           const d = Math.abs(dx) + Math.abs(dy);
@@ -1263,14 +1277,6 @@ export class JacT9 {
     return this.driveBoxWalkable(cx, cy) && this.propBodyClear(cx, cy);
   }
 
-  /**
-   * A* sit: same 2×2 walkable box plus both parked AABBs (5×3 and 3×5) so a turn
-   * mid-path cannot clip a prop the current heading would have cleared.
-   */
-  private canDriveSit(cx: number, cy: number): boolean {
-    return this.driveBoxWalkable(cx, cy) && this.propTurnClear(cx, cy);
-  }
-
   /** Last-hop sit: the 2×2 box often clips a wall two tiles short of the tap. */
   private canSitLoose(cx: number, cy: number): boolean {
     const x = Math.round(cx);
@@ -1306,10 +1312,6 @@ export class JacT9 {
   private propBodyClear(cx: number, cy: number): boolean {
     const size = parkSize(this.dir);
     return this.footprintClear(cx, cy, size.w, size.h);
-  }
-
-  private propTurnClear(cx: number, cy: number): boolean {
-    return this.footprintClear(cx, cy, PARK_SE.w, PARK_SE.h) && this.footprintClear(cx, cy, PARK_SW.w, PARK_SW.h);
   }
 
   /** QA: true when the current solid / parked body covers a prop cell. */
