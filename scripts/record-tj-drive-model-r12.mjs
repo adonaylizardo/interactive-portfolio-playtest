@@ -248,6 +248,7 @@ async function driveGoal(page, cdp, tag, phone, goal, i) {
     40,
   );
   if (!started?.goal && !started?.tap) {
+    await clearToast(page);
     const qa = await page.evaluate((g) => window.__playtestQa.jacDriveTo?.(g.x, g.y), goal);
     if (!qa) throw new Error(`${tag} #${i} ${goal.x},${goal.y}: click missed and jacDriveTo failed client=${JSON.stringify(client)}`);
     started = await waitUntil(

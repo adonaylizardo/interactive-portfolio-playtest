@@ -971,8 +971,7 @@ export class JacT9 {
     }
     if (this.drivePath.length === 0) {
       if (this.driveGoal) {
-        const sit = this.sitForVisual(this.driveGoal.x, this.driveGoal.y);
-        this.drivePath.push({ x: sit.x, y: sit.y });
+        this.drivePath.push({ x: this.driveGoal.x, y: this.driveGoal.y });
       } else {
         this.driveGoal = null;
         this.vel = 0;
@@ -981,7 +980,6 @@ export class JacT9 {
         return false;
       }
     }
-    const last = this.drivePath.length === 1;
     if (this.driveGoal && Math.hypot(this.driveGoal.x - this.cx, this.driveGoal.y - this.cy) < 1.35) {
       const sit = this.sitForVisual(this.driveGoal.x, this.driveGoal.y);
       if (this.canSit(sit.x, sit.y) || this.canSitLoose(sit.x, sit.y)) {
@@ -992,7 +990,7 @@ export class JacT9 {
         return this.clearDriveArrival();
       }
     }
-    const t = last && this.driveGoal ? this.sitForVisual(this.driveGoal.x, this.driveGoal.y) : this.drivePath[0];
+    const t = this.drivePath[0];
     const ax = t.x - this.cx;
     const ay = t.y - this.cy;
     const dist = Math.hypot(ax, ay);
@@ -1006,10 +1004,7 @@ export class JacT9 {
     const step = Math.min(dist, speed * Math.max(dt, 1 / 120));
     const ux = (ax / dist) * step;
     const uy = (ay / dist) * step;
-    const ok = (x: number, y: number) =>
-      last
-        ? this.propBodyClear(x, y) && (this.canSitLoose(x, y) || this.canDriveTile(Math.round(x), Math.round(y)))
-        : this.canSit(x, y);
+    const ok = (x: number, y: number) => this.canSit(x, y);
     const next = ok(this.cx + ux, this.cy + uy) ? { x: this.cx + ux, y: this.cy + uy } : slide(this.cx, this.cy, ux, uy, ok);
     if (next.x === this.cx && next.y === this.cy) {
       this.vel = 0;
