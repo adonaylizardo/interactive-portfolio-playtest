@@ -180,41 +180,95 @@ async function clickGetIn(page, cdp, phone, tag, i) {
   else await page.mouse.click(cx, cy);
 }
 
+async function sitByVan(page) {
+  await page.evaluate(() => {
+    const j = window.__playtestQa.jac();
+    const walk = window.__playtestQa.fill().walk;
+    const cx = Math.round(j.cx);
+    const cy = Math.round(j.cy);
+    for (let d = 1; d <= 5; d++) {
+      for (let dy = -d; dy <= d; dy++) {
+        for (let dx = -d; dx <= d; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== d) continue;
+          const x = cx + dx;
+          const y = cy + dy;
+          const ch = walk[y]?.[x];
+          if (!ch || ch === '#' || ch === 'x') continue;
+          window.__playtestQa.setCharacterTile(x, y);
+          return;
+        }
+      }
+    }
+  });
+}
+
 async function ensureDriving(page, cdp, phone, tag) {
   const driving = await page.evaluate(() => window.__playtestQa.jac()?.driving);
   if (driving) return;
   await page.evaluate(() => {
     window.__playtestQa.setLayout?.('map');
     window.__playtestQa.setNpcs?.(false);
+  });
+  await sitByVan(page);
+  await page.evaluate(() => {
     window.__playtestQa.focusJac?.();
     window.__playtestQa.tapJac();
   });
-  await waitUntil(page, async () => ((await page.evaluate(() => window.__playtestQa.jac()?.mode)) === 'menu' ? true : null), 8000);
-  await page.evaluate(() => window.__playtestQa.jacGetIn());
-  await page.waitForFunction(() => window.__playtestQa.jac?.()?.driving, null, { timeout: 12000 });
+  const menu = await waitUntil(
+    page,
+    async () => ((await page.evaluate(() => window.__playtestQa.jac()?.mode)) === 'menu' ? true : null),
+    8000,
+  );
+  if (!menu) await page.evaluate(() => window.__playtestQa.jacGetIn());
+  else await page.evaluate(() => window.__playtestQa.jacGetIn());
+  const boarded = await waitUntil(
+    page,
+    async () => ((await page.evaluate(() => window.__playtestQa.jac()?.driving)) ? true : null),
+    16000,
+  );
+  if (!boarded) throw new Error(`${tag}: ensureDriving never boarded`);
   void cdp;
   void phone;
-  void tag;
 }
 
-async function driveOneSecond(page, cdp, phone) {
-  if (phone) {
-    const held = await holdStickCdp(page, cdp, 4, -48, 1100);
-    if (!held) throw new Error('stick missing for drive');
-    await releaseStickCdp(cdp);
-  } else {
-    await page.evaluate(() => {
-      document.activeElement?.blur?.();
-      document.getElementById('game-canvas')?.focus();
-    });
-    await page.keyboard.down('ArrowUp');
-    await wait(1100);
-    await page.keyboard.up('ArrowUp');
+async function driveOffSit(page, cdp, phone) {
+  const dest = await page.evaluate(() => {
+    const j = window.__playtestQa.jac();
+    const walk = window.__playtestQa.fill().walk;
+    const hits = [];
+    for (let y = Math.round(j.cy) - 12; y <= Math.round(j.cy) + 12; y++) {
+      for (let x = Math.round(j.cx) - 12; x <= Math.round(j.cx) + 12; x++) {
+        const ch = walk[y]?.[x];
+        if (!ch || ch === '#' || ch === 'x') continue;
+        if (!window.__playtestQa.jacDriveTileOk?.(x, y)) continue;
+        const dist = Math.hypot(x - j.cx, y - j.cy);
+        if (dist < 5 || dist > 11) continue;
+        hits.push({ x, y, dist });
+      }
+    }
+    hits.sort((a, b) => a.dist - b.dist);
+    return hits[Math.min(2, hits.length - 1)] ?? hits[0] ?? null;
+  });
+  if (!dest) throw new Error('no drive-off tile');
+  const start = await page.evaluate(() => window.__playtestQa.jac());
+  const ok = await page.evaluate((p) => window.__playtestQa.jacDriveTo?.(p.x, p.y), dest);
+  if (!ok) {
+    const client = await page.evaluate((p) => window.__playtestQa.worldToClient((p.x - p.y) * 64, (p.x + p.y) * 32), dest);
+    if (!client) throw new Error('drive-off client missing');
+    if (phone) await tapClientCdp(cdp, client.x, client.y);
+    else await page.mouse.click(client.x, client.y);
   }
-  await waitUntil(page, async () => {
-    const j = await page.evaluate(() => window.__playtestQa.jac());
-    return (j?.mph ?? 1) === 0 ? j : null;
-  }, 5000);
+  const arrived = await waitUntil(
+    page,
+    async () => {
+      const j = await page.evaluate(() => window.__playtestQa.jac());
+      const moved = Math.hypot((j?.cx ?? 0) - (start.cx ?? 0), (j?.cy ?? 0) - (start.cy ?? 0));
+      if (!j?.driveGoal && (j?.mph ?? 1) === 0 && moved > 0.8) return j;
+      return null;
+    },
+    18000,
+  );
+  if (!arrived) throw new Error(`drive-off never arrived dest=${JSON.stringify(dest)}`);
 }
 
 async function parkClickGetIn(page, cdp, tag, phone, n = 5) {
@@ -226,9 +280,9 @@ async function parkClickGetIn(page, cdp, tag, phone, n = 5) {
     });
     await ensureDriving(page, cdp, phone, tag);
     const beforeDrive = await page.evaluate(() => window.__playtestQa.jac());
-    await driveOneSecond(page, cdp, phone);
+    await driveOffSit(page, cdp, phone);
     const afterDrive = await page.evaluate(() => window.__playtestQa.jac());
-    if (Math.hypot((afterDrive.cx ?? 0) - (beforeDrive.cx ?? 0), (afterDrive.cy ?? 0) - (beforeDrive.cy ?? 0)) < 0.4) {
+    if (Math.hypot((afterDrive.cx ?? 0) - (beforeDrive.cx ?? 0), (afterDrive.cy ?? 0) - (beforeDrive.cy ?? 0)) < 0.8) {
       throw new Error(`${tag}: cycle ${i} did not leave the sit before park`);
     }
     await page.evaluate(() => window.__playtestQa.jacGetOut());
@@ -423,24 +477,39 @@ async function reverseTapToast(page, tag) {
   await ensureDriving(page, null, false, tag);
   await page.evaluate(() => window.__playtestQa.jacSetGear?.('R'));
   await wait(150);
-  await page.evaluate(() => {
-    const list = window.__playtestQa.getEnterableBuildings?.() ?? [];
-    const named = list.find((b) => b.door && b.panelTitle) ?? list[0];
-    if (named) {
-      const tx = named.x + 1;
-      const ty = named.y + 1;
-      window.__playtestQa.frameWorld?.((tx - ty) * 64, (tx + ty) * 32, 0.72);
+  const spots = await page.evaluate(() => {
+    const j = window.__playtestQa.jac();
+    const hits = [];
+    for (let dy = -6; dy <= 6; dy++) {
+      for (let dx = -6; dx <= 6; dx++) {
+        const tx = Math.round(j.cx + dx);
+        const ty = Math.round(j.cy + dy);
+        if (window.__playtestQa.jacDriveTileOk?.(tx, ty)) continue;
+        const w = window.__playtestQa.worldToClient?.((tx - ty) * 64, (tx + ty) * 32);
+        if (!w || w.x < 40 || w.y < 80 || w.x > window.innerWidth - 40 || w.y > 520) continue;
+        const el = document.elementFromPoint(w.x, w.y);
+        if (el && el.id !== 'game-canvas' && !el.closest('#game-canvas')) continue;
+        if (el?.closest?.('.jac-hud, .checklist, .chrome')) continue;
+        hits.push({ tx, ty, client: w, pick: window.__playtestQa.pickAt?.(w.x, w.y) });
+      }
     }
+    return hits.slice(0, 10);
   });
-  await wait(200);
-  const roofs = await roofTargets(page);
-  if (!roofs.length) throw new Error(`${tag}: no R-tap roof`);
+  if (!spots.length) {
+    const roofs = await roofTargets(page);
+    spots.push(...roofs);
+  }
+  if (!spots.length) throw new Error(`${tag}: no R-tap undrivable tile`);
   let toast = null;
-  for (const roof of roofs) {
+  let spot = spots[0];
+  for (spot of spots) {
     await clearToast(page);
-    await page.mouse.click(roof.client.x, roof.client.y);
+    await page.mouse.click(spot.client.x, spot.client.y);
     toast = await waitUntil(page, () => toastVisible(page), 900, 40);
-    if (toast) return { roof, toast };
+    if (toast) return { spot, toast };
+    await page.evaluate((p) => window.__playtestQa.tapScreen?.(p.x, p.y), spot.client);
+    toast = await waitUntil(page, () => toastVisible(page), 700, 40);
+    if (toast) return { spot, toast, via: 'tapScreen' };
   }
   throw new Error(`${tag}: tap while in R produced no toast`);
 }
