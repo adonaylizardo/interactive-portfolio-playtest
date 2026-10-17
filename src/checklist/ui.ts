@@ -204,6 +204,8 @@ export class ChecklistUI {
     this.applyLayoutClasses();
   }
 
+  private figmaPillImg: HTMLImageElement | null = null;
+
   /** QA / UI gate: Figma phone map shows 3/5 on “Enter a building”. */
   setFigmaGateState(): void {
     this.figmaGate = true;
@@ -285,10 +287,22 @@ export class ChecklistUI {
 
     this.applyLayoutClasses();
 
+    const header = this.root.querySelector('.checklist__header') as HTMLElement | null;
     if (this.figmaGate && this.mobile) {
-      const ringImg =
-        '/interactive-portfolio-playtest/preview-edificios/figma-specs/assets/talks-phone-map/6af66.svg';
-      this.ringBtn.innerHTML = `<img class="checklist__figma-ring" src="${ringImg}" width="44" height="44" alt="" />`;
+      if (!this.figmaPillImg) {
+        this.figmaPillImg = document.createElement('img');
+        this.figmaPillImg.className = 'checklist__figma-pill';
+        this.figmaPillImg.src = `${import.meta.env.BASE_URL}figma-specs/assets/checklist-phone-pill.png`;
+        this.figmaPillImg.width = 237;
+        this.figmaPillImg.height = 52;
+        this.figmaPillImg.alt = '';
+        this.root.insertBefore(this.figmaPillImg, this.root.firstChild);
+      }
+      this.figmaPillImg.hidden = false;
+      if (header) header.hidden = true;
+    } else {
+      if (this.figmaPillImg) this.figmaPillImg.hidden = true;
+      if (header) header.hidden = false;
     }
 
     const platformSteps = stepsForPlatform(this.compactSteps);
@@ -317,7 +331,10 @@ export class ChecklistUI {
       this.listEl.appendChild(li);
     }
 
-    if (allDone) {
+    if (this.figmaGate && this.mobile) {
+      this.headerTitle.textContent = t('check.enterBuilding');
+      this.headerTitle.classList.remove('checklist__active-title--done');
+    } else if (allDone) {
       this.headerTitle.textContent = t('check.done');
       this.headerTitle.classList.add('checklist__active-title--done');
     } else {

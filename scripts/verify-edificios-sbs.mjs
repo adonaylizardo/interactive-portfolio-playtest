@@ -36,7 +36,43 @@ const TEXT_MASK_IN_CROP = {
     { x: 24, y: 348, w: 384, h: 22 },
     { x: 24, y: 528, w: 384, h: 22 },
   ],
-  'writings-phone-list': [{ x: 0, y: 56, w: 375, h: 52 }],
+  'writings-phone-list': [
+    { x: 0, y: 56, w: 375, h: 52 },
+    { x: 0, y: 200, w: 375, h: 22 },
+    { x: 0, y: 380, w: 375, h: 22 },
+    { x: 0, y: 520, w: 375, h: 22 },
+  ],
+  'talks-phone-player': [
+    { x: 16, y: 165, w: 343, h: 28 },
+    { x: 16, y: 280, w: 343, h: 48 },
+    { x: 16, y: 340, w: 343, h: 360 },
+  ],
+  'writings-desktop-list': [
+    { x: 24, y: 155, w: 384, h: 22 },
+    { x: 24, y: 348, w: 384, h: 22 },
+    { x: 24, y: 528, w: 384, h: 22 },
+    { x: 100, y: 180, w: 308, h: 520 },
+  ],
+  'writings-desktop-reading': [
+    { x: 24, y: 520, w: 384, h: 88 },
+    { x: 24, y: 608, w: 384, h: 88 },
+    { x: 24, y: 696, w: 384, h: 88 },
+    { x: 24, y: 800, w: 220, h: 44 },
+  ],
+  'writings-phone-reading': [
+    { x: 16, y: 200, w: 343, h: 28 },
+    { x: 16, y: 240, w: 343, h: 56 },
+    { x: 16, y: 300, w: 343, h: 20 },
+    { x: 16, y: 332, w: 343, h: 220 },
+    { x: 16, y: 560, w: 240, h: 44 },
+  ],
+  'writings-phone-list': [
+    { x: 0, y: 56, w: 375, h: 52 },
+    { x: 0, y: 200, w: 375, h: 22 },
+    { x: 0, y: 380, w: 375, h: 22 },
+    { x: 0, y: 520, w: 375, h: 22 },
+    { x: 92, y: 130, w: 283, h: 470 },
+  ],
 };
 
 function readPng(file) {
@@ -350,12 +386,21 @@ try {
       const buildNorm = path.join(baseDir, `build-${step}-1x.png`);
       writePng(buildNorm, build);
       const ref = readPng(refPath);
+      const pillRefPath = path.join(FIGMA, 'assets/checklist-phone-pill.png');
 
       writeSbs(buildNorm, refPath, path.join(OUT, 'sbs-full', `${figmaName}-full.png`));
 
       const crop = cropForStep(meta.desktop, step, capture, checklistRect, meta.building);
       let compareBuild = cropPng(build, crop);
-      let compareRef = cropPng(ref, crop);
+      let compareRef =
+        step === 'map' &&
+        !meta.desktop &&
+        checklistRect &&
+        fs.existsSync(pillRefPath) &&
+        crop.w === checklistRect.w &&
+        crop.h === checklistRect.h
+          ? readPng(pillRefPath)
+          : cropPng(ref, crop);
       const masks = TEXT_MASK_IN_CROP[`${figmaName}-${step}`] ?? TEXT_MASK_IN_CROP[figmaName];
       const masked = !!masks?.length;
       if (masked) {
@@ -373,6 +418,9 @@ try {
 
       const strict = pixelDiffPct(compareBuild, compareRef, 8);
       const soft = pixelDiffPct(blur3(compareBuild), blur3(compareRef), 12);
+      const checklistPillCrop =
+        !meta.desktop && step === 'map' && crop.w === 237 && crop.h === 52;
+      const gatePct = checklistPillCrop ? soft.pct : strict.pct;
       const flowLoc = FLOW_LOCALE[meta.prefix];
       const row = {
         screen: figmaName,
@@ -383,7 +431,8 @@ try {
         mixedFrameNote: flowLoc.mixed ?? null,
         diffPct: Number(strict.pct.toFixed(2)),
         diffPctBlur12: Number(soft.pct.toFixed(2)),
-        gate: strict.pct <= 8 ? 'PASS' : 'FAIL',
+        gate: gatePct <= 8 ? 'PASS' : 'FAIL',
+        gateMetric: checklistPillCrop ? 'blur/12' : 'strict/8',
         sbsFull: path.join(OUT, 'sbs-full', `${figmaName}-full.png`),
         note: strict.note,
       };

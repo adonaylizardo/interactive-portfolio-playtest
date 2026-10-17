@@ -86,6 +86,7 @@ const DICT = {
     'writings.filter.guest': 'Guest',
     'writings.seeAll': 'See all',
     'writings.substack': '↗ Read on Substack',
+    'writings.substackCta': 'Read on Substack',
     'writings.reader.kicker': 'UX SIDEKICK CHRONICLES',
     'writings.reader.p1':
       'First paragraph placeholder — the full article body will load from JSON later.',
@@ -97,7 +98,7 @@ const DICT = {
     'writings.section.uxscDesc': 'One-line description (placeholder).',
     'writings.section.sinergia': 'Academia Sinergia',
     'writings.section.sinergiaDesc': 'One-line description (placeholder).',
-    'writings.section.guest': 'Guest articles',
+    'writings.section.guest': 'Guest Articles',
     'writings.section.guestDesc': 'One-line description (placeholder).',
     'writings.ux1.title': 'Article title (placeholder)',
     'writings.ux1.meta': 'Publicación · Fecha · X min',
@@ -110,7 +111,8 @@ const DICT = {
     'writings.ux3.title':
       'Article title (placeholder), versión larga que ocupa dos líneas como máximo',
     'writings.ux3.meta': 'Publicación · Fecha · X min',
-    'writings.sin2.title': 'Article title (placeholder)',
+    'writings.sin2.title':
+      'Article title (placeholder), versión larga que ocupa dos líneas como máximo',
     'writings.sin2.meta': 'Publicación · Fecha · X min',
     'writings.sin3.title': 'Article title (placeholder)',
     'writings.sin3.meta': 'Publicación · Fecha · X min',
@@ -238,6 +240,7 @@ const DICT = {
     'writings.filter.guest': 'Invitados',
     'writings.seeAll': 'Ver todos',
     'writings.substack': '↗ Leer en Substack',
+    'writings.substackCta': 'Leer en Substack',
     'writings.reader.kicker': 'UX SIDEKICK CHRONICLES',
     'writings.reader.p1':
       'Primer párrafo placeholder — el cuerpo del artículo vendrá de un JSON más adelante.',
@@ -262,7 +265,8 @@ const DICT = {
     'writings.ux3.title':
       'Article title (placeholder), versión larga que ocupa dos líneas como máximo',
     'writings.ux3.meta': 'Publicación · Fecha · X min',
-    'writings.sin2.title': 'Article title (placeholder)',
+    'writings.sin2.title':
+      'Article title (placeholder), versión larga que ocupa dos líneas como máximo',
     'writings.sin2.meta': 'Publicación · Fecha · X min',
     'writings.sin3.title': 'Article title (placeholder)',
     'writings.sin3.meta': 'Publicación · Fecha · X min',

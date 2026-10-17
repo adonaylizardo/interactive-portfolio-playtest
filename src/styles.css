@@ -705,6 +705,11 @@ body[data-layout='panel'] .checklist {
     font-size: 13px;
     font-weight: 500;
     line-height: 16px;
+    letter-spacing: 0;
+  }
+
+  .checklist--figma-gate .checklist__header-text {
+    max-width: none;
   }
 
   .checklist--figma-gate.checklist--mobile-closed .checklist__header-text,
@@ -716,9 +721,35 @@ body[data-layout='panel'] .checklist {
     width: 44px;
     height: 44px;
     flex-shrink: 0;
-    background: transparent
-      url('/interactive-portfolio-playtest/preview-edificios/figma-specs/assets/talks-phone-map/6af66.svg')
-      center / 44px 44px no-repeat;
+    background: transparent;
+    padding: 0;
+  }
+
+  .checklist--figma-gate .checklist__figma-ring {
+    display: block;
+    width: 44px;
+    height: 44px;
+  }
+
+  .checklist--figma-gate .checklist__figma-pill {
+    display: block;
+    width: 237px;
+    height: 52px;
+    object-fit: fill;
+  }
+
+  .checklist--figma-gate.checklist--mobile-closed .checklist__figma-pill {
+    display: block;
+  }
+
+  .checklist--figma-gate.checklist--mobile:has(.checklist__figma-pill:not([hidden])) {
+    box-shadow: none;
+    background: transparent;
+    border-radius: 0;
+    height: 52px;
+    min-height: 52px;
+    padding: 0;
+    overflow: visible;
   }
 
   .checklist--figma-gate .checklist__ring,
@@ -1427,6 +1458,25 @@ body[data-layout='panel'] .checklist {
   .building-panel--experience.building-panel--writings .experience {
     gap: 8px;
   }
+
+  .building-panel--experience.building-panel--writings .experience__row {
+    height: 72px;
+    box-sizing: border-box;
+    overflow: hidden;
+    align-items: center;
+  }
+
+  .building-panel--experience.building-panel--writings .experience__row-title {
+    max-height: 40px;
+  }
+
+  .building-panel--experience.building-panel--writings .experience__section-row {
+    min-height: 32px;
+  }
+
+  .building-panel--experience.building-panel--writings .experience__see-all {
+    min-height: 32px;
+  }
 }
 
 @media (max-width: 767px) {
@@ -1436,14 +1486,16 @@ body[data-layout='panel'] .checklist {
     right: 0;
     bottom: 0;
     padding: 0 16px 24px;
-    padding-top: 0;
+    padding-top: 0 !important;
     border-radius: 16px 16px 0 0;
     border-top: 1px solid var(--ui-line);
     box-shadow: 0 -8px 32px rgb(0 0 0 / 45%);
-    overflow: hidden;
+    overflow: hidden !important;
+    overflow-y: hidden !important;
     display: flex;
     flex-direction: column;
     max-height: none;
+    gap: 0;
   }
 
   .building-panel--experience.building-panel--open:not(.building-panel--peek).building-panel--exp-list
@@ -1573,8 +1625,14 @@ body[data-layout='panel'] .checklist {
     height: 15px;
   }
 
+  .building-panel--experience.building-panel--exp-list .building-panel__body-wrap,
+  .building-panel--experience.building-panel--exp-detail .building-panel__body-wrap {
+    padding-top: 12px;
+  }
+
   .building-panel--experience .building-panel__body-wrap {
     padding: 0;
+    margin: 0;
     flex: 1;
     min-height: 0;
     overflow-x: hidden;
@@ -1598,6 +1656,18 @@ body[data-layout='panel'] .checklist {
     gap: 12px;
   }
 
+  .building-panel--experience .talks-player {
+    gap: 12px;
+  }
+
+  .building-panel--experience .talks-player__title {
+    font-weight: 600;
+  }
+
+  .building-panel--experience .writings-reader {
+    gap: 12px;
+  }
+
   .building-panel--experience .experience__intro {
     line-height: 20px;
     flex-shrink: 0;
@@ -1608,6 +1678,14 @@ body[data-layout='panel'] .checklist {
   }
 
   .building-panel--experience .experience__filter {
+    min-height: 44px;
+  }
+
+  .building-panel--experience.building-panel--writings .experience__section-row {
+    min-height: 44px;
+  }
+
+  .building-panel--experience.building-panel--writings .experience__see-all {
     min-height: 44px;
   }
 
@@ -1779,22 +1857,28 @@ body[data-layout='panel'] .checklist {
 }
 
 .experience__section-head {
-  margin-top: 12px;
+  margin-top: 0;
 }
 
-.experience__section-head:first-child {
-  margin-top: 0;
+.experience__section-divider {
+  margin: 0;
+  border: 0;
+  height: 1px;
+  width: 100%;
+  background: var(--ui-line);
+  flex-shrink: 0;
 }
 
 .experience__section-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 4px;
+  min-height: 32px;
+  margin-bottom: 0;
 }
 
 .experience__section-title {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   margin: 0;
   font-size: 16px;
@@ -1803,6 +1887,7 @@ body[data-layout='panel'] .checklist {
   letter-spacing: normal;
   text-transform: none;
   color: #edeef0;
+  white-space: nowrap;
 }
 
 .experience__section-count {
@@ -1820,12 +1905,14 @@ body[data-layout='panel'] .checklist {
 
 .experience__see-all {
   flex: 0 0 auto;
-  padding: 0;
+  min-height: 32px;
+  padding: 0 4px 0 8px;
   border: 0;
   background: transparent;
   color: #8a8f98;
   font-size: 13px;
   font-weight: 500;
+  line-height: 16px;
   cursor: pointer;
   touch-action: manipulation;
 }
@@ -1837,7 +1924,7 @@ body[data-layout='panel'] .checklist {
 }
 
 .experience__section-desc {
-  margin: 0 0 10px;
+  margin: 0;
   color: #8a8f98;
   font-size: 13px;
   line-height: 18px;
@@ -1860,7 +1947,7 @@ body[data-layout='panel'] .checklist {
 }
 
 .experience__row--compact {
-  padding: 6px 0;
+  padding: 8px 0;
 }
 
 .experience__thumb {
@@ -1886,9 +1973,8 @@ body[data-layout='panel'] .checklist {
 }
 
 @media (max-width: 767px) {
-  .experience__row--compact .experience__thumb--video {
-    width: 80px;
-    height: 45px;
+  .experience__row--compact {
+    padding: 8px 0;
   }
 }
 
@@ -2142,30 +2228,48 @@ body[data-layout='panel'] .checklist {
 
 .writings-reader__p {
   margin: 0;
-  font-size: 14px;
-  line-height: 20px;
-  color: #c8ccd4;
+  font-size: 15px;
+  line-height: 24px;
+  color: var(--ui-text);
 }
 
 .writings-reader__substack {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   align-self: flex-start;
-  padding: 10px 16px;
+  gap: 6px;
+  height: 40px;
+  padding: 0 18px;
   border-radius: 999px;
-  border: 1px solid #2a2c31;
-  background: #1a1c20;
-  color: #edeef0;
-  font-size: 14px;
-  font-weight: 600;
+  border: 0;
+  background: var(--ui-text);
+  color: var(--ui-bg);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 16px;
   text-decoration: none;
   cursor: pointer;
   touch-action: manipulation;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.45),
+    0 3px 6px rgba(0, 0, 0, 0.45);
+}
+
+.writings-reader__substack-icon {
+  display: block;
+  width: 15px;
+  height: 15px;
+}
+
+@media (max-width: 767px) {
+  .writings-reader__substack {
+    height: 44px;
+  }
 }
 
 .writings-reader__substack:hover {
-  border-color: #3a3d44;
-  background: #24262b;
+  filter: brightness(0.95);
 }
 
 /* Case preview — Pixel kit card, then a full reading view. */

@@ -27,4 +27,5 @@ export function figmaFramePng(frame: FigmaFrame): string {
 export const FIGMA_PLAY = figmaAsset('talks-desktop-list', '6a8ac.svg');
 export const FIGMA_PAUSE = figmaAsset('talks-desktop-player', 'd0608.svg');
 export const FIGMA_STAGE = figmaAsset('talks-desktop-player', '0f6fa.png');
-export const FIGMA_DOC = figmaAsset('writings-desktop-list', '53843.png');
+/** Pagina glifo on list/reader cover placeholders (15×15). */
+export const FIGMA_DOC = figmaAsset('writings-desktop-list', 'aef4f.svg');

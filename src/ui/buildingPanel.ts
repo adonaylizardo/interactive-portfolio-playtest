@@ -10,6 +10,7 @@ import { onLangChange, t, type I18nKey } from './i18n';
 const FIGMA_BACK = figmaAsset('talks-desktop-list', '9f9c4.svg');
 const FIGMA_EXPAND = figmaAsset('talks-desktop-list', 'ce7c9.svg');
 const FIGMA_CLOSE = figmaAsset('talks-desktop-list', 'f1b3a.svg');
+const FIGMA_SUBSTACK = figmaAsset('writings-desktop-reading', 'c0026.svg');
 function aboutBlockNode(block: AboutBlock): HTMLElement {
   if (block.kind === 'heading') {
     const h = document.createElement(`h${block.level + 3}`);
@@ -683,7 +684,8 @@ export class BuildingPanel {
     if (!this.experienceDetail) return;
     const title = t(item.titleKey as I18nKey);
     const meta = t(item.metaKey as I18nKey);
-    const upNext = TALKS.filter((x) => x.id !== item.id).slice(0, 4);
+    const upNextLimit = this.isMobile() ? 3 : 4;
+    const upNext = TALKS.filter((x) => x.id !== item.id).slice(0, upNextLimit);
     const wrap = document.createElement('div');
     wrap.className = 'talks-player';
     wrap.innerHTML = `
@@ -746,7 +748,14 @@ export class BuildingPanel {
         : WRITINGS.filter((s) => s.id === this.writingsFilter);
     const frag = document.createDocumentFragment();
     const rowLimit: Record<string, number> = { uxsc: 3, sinergia: 2, guest: 2 };
+    let firstSection = true;
     for (const section of sections) {
+      if (!firstSection) {
+        const divider = document.createElement('hr');
+        divider.className = 'experience__section-divider';
+        frag.appendChild(divider);
+      }
+      firstSection = false;
       const head = document.createElement('div');
       head.className = 'experience__section-head';
       const row = document.createElement('div');
@@ -797,12 +806,13 @@ export class BuildingPanel {
       <p class="writings-reader__kicker"></p>
       <h3 class="writings-reader__title"></h3>
       <p class="writings-reader__meta"></p>
-      <div class="writings-reader__body">
-        <p class="writings-reader__p"></p>
-        <p class="writings-reader__p"></p>
-        <p class="writings-reader__p"></p>
-      </div>
-      <a class="writings-reader__substack" href="#" rel="noopener noreferrer"></a>
+      <p class="writings-reader__p"></p>
+      <p class="writings-reader__p"></p>
+      <p class="writings-reader__p"></p>
+      <a class="writings-reader__substack" href="#" rel="noopener noreferrer">
+        <img class="writings-reader__substack-icon" src="${FIGMA_SUBSTACK}" width="15" height="15" alt="" />
+        <span class="writings-reader__substack-label"></span>
+      </a>
     `;
     wrap.querySelector('.writings-reader__kicker')!.textContent = t('writings.reader.kicker');
     wrap.querySelector('.writings-reader__title')!.textContent = t(item.titleKey as I18nKey);
@@ -812,8 +822,7 @@ export class BuildingPanel {
     paras[1]!.textContent = t('writings.reader.p2');
     paras[2]!.textContent = t('writings.reader.p3');
     const sub = wrap.querySelector('.writings-reader__substack') as HTMLAnchorElement;
-    sub.hidden = true;
-    sub.textContent = t('writings.substack');
+    sub.querySelector('.writings-reader__substack-label')!.textContent = t('writings.substackCta');
     sub.addEventListener('click', (e) => e.preventDefault());
     this.experienceDetail.replaceChildren(wrap);
   }
