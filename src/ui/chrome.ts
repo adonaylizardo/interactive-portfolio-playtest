@@ -4,10 +4,11 @@ import { tileToWorld } from '../iso/math';
 import { isMobileLayout } from '../checklist/ui';
 import { iconSvg, type IconName } from './icons';
 import type { Camera } from '../tokens';
+import { getLang, onLangChange, setLang, t, type Lang } from './i18n';
 
 export type DesktopLayout = 'split' | 'map' | 'panel';
 export type Audience = 'recruiter' | 'mentoria' | 'cliente';
-export type Lang = 'en' | 'es';
+export type { Lang };
 
 export type ChromeCallbacks = {
   onLayoutChange: () => void;
@@ -37,8 +38,9 @@ const CASES_ROWS: { id: string; label: string; nda?: boolean }[] = [
 const CV_HREF = 'https://adonaylizardo.com';
 const CONTACT_HREF = 'mailto:hello@adonaylizardo.com';
 
-function roundBtn(icon: IconName, label: string, extra = ''): string {
-  return `<button type="button" class="ui-round ${extra}" data-icon="${icon}" aria-label="${label}">${iconSvg(icon)}</button>`;
+function roundBtn(icon: IconName, label: string, extra = '', action?: string): string {
+  const act = action ? ` data-action="${action}"` : '';
+  return `<button type="button" class="ui-round ${extra}" data-icon="${icon}"${act} aria-label="${label}">${iconSvg(icon)}</button>`;
 }
 
 export class ChromeUI {
@@ -67,6 +69,8 @@ export class ChromeUI {
     container.appendChild(this.root);
     this.minimap = this.root.querySelector('.chrome__minimap') as HTMLCanvasElement;
     this.bind();
+    this.applyI18n();
+    onLangChange(() => this.applyI18n());
     this.sync();
     studio.onChange(() => {
       this.syncSound();
@@ -159,30 +163,30 @@ export class ChromeUI {
     }).join('');
 
     return `
-      <nav class="chrome__rail" aria-label="Primary">
-        <button type="button" class="ui-round ui-round--avatar chrome__nav" aria-label="Adonay Lizardo">AL</button>
-        ${roundBtn('briefcase', 'Casos', 'chrome__nav')}
-        ${roundBtn('trophy', 'Logros', 'chrome__nav')}
-        ${roundBtn('mail', 'Contacto', 'chrome__nav')}
-        ${roundBtn('search', 'Buscar', 'chrome__nav')}
+      <nav class="chrome__rail" aria-label="Primary" data-i18n-aria="chrome.primary">
+        <button type="button" class="ui-round ui-round--avatar chrome__nav" data-action="home" aria-label="Adonay Lizardo">AL</button>
+        ${roundBtn('briefcase', 'Casos', 'chrome__nav', 'cases')}
+        ${roundBtn('trophy', 'Logros', 'chrome__nav', 'achievements')}
+        ${roundBtn('mail', 'Contacto', 'chrome__nav', 'contact')}
+        ${roundBtn('search', 'Buscar', 'chrome__nav', 'search')}
         <span class="chrome__rail-spacer"></span>
         <div class="chrome__tools-stack">
-          ${roundBtn('download', 'Descargar CV')}
-          ${roundBtn('sound', 'Sonido')}
-          ${roundBtn('page', 'Página completa')}
+          ${roundBtn('download', 'Descargar CV', '', 'download')}
+          ${roundBtn('sound', 'Sonido', '', 'sound')}
+          ${roundBtn('page', 'Página completa', '', 'fullpage')}
         </div>
       </nav>
       <aside class="chrome__column" data-column>
         <header class="chrome__header">
           <p class="chrome__header-name">Adonay Lizardo</p>
           <div class="chrome__header-actions">
-            ${roundBtn('expand', 'Panel only')}
-            ${roundBtn('close', 'Hide panel')}
+            ${roundBtn('expand', 'Panel only', '', 'panel-only')}
+            ${roundBtn('close', 'Hide panel', '', 'hide-panel')}
           </div>
         </header>
         <div class="chrome__intro-body">
           <div class="chrome__lede">
-            <h1 class="chrome__title">Líder de diseño con IA.</h1>
+            <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
             <div class="chrome__skeleton-stack" aria-hidden="true">
               <span class="chrome__skeleton"></span>
               <span class="chrome__skeleton"></span>
@@ -190,126 +194,126 @@ export class ChromeUI {
             </div>
           </div>
           <div class="chrome__ctas">
-            <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer">${iconSvg('download')} Descargar CV</a>
-            <a class="ui-btn ui-btn--secondary" href="${CONTACT_HREF}">${iconSvg('mail')} Contacto</a>
+            <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer">${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
+            <a class="ui-btn ui-btn--secondary" href="${CONTACT_HREF}">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></a>
           </div>
           <div class="chrome__audience">
-            <p class="chrome__label">¿Quién eres?</p>
-            <div class="ui-seg" role="tablist" aria-label="Audience">
+            <p class="chrome__label" data-i18n="chrome.who">¿Quién eres?</p>
+            <div class="ui-seg" role="tablist" aria-label="Audience" data-i18n-aria="chrome.audience">
               <button type="button" class="ui-seg__opt is-active" data-audience="recruiter">Recruiter</button>
-              <button type="button" class="ui-seg__opt" data-audience="mentoria">Mentoría</button>
-              <button type="button" class="ui-seg__opt" data-audience="cliente">Cliente</button>
+              <button type="button" class="ui-seg__opt" data-audience="mentoria" data-i18n="chrome.mentorship">Mentoría</button>
+              <button type="button" class="ui-seg__opt" data-audience="cliente" data-i18n="chrome.client">Cliente</button>
             </div>
           </div>
           <section class="chrome__section" id="chrome-experiencia">
-            <h2>Experiencia</h2>
+            <h2 data-i18n="chrome.experience">Experiencia</h2>
             <div class="chrome__exp">${expRows}</div>
           </section>
           <section class="chrome__section" id="chrome-logros">
             <div class="chrome__section-head">
-              <h2>Logros</h2>
-              <button type="button" class="ui-btn ui-btn--secondary ui-btn--small">Ver todos</button>
+              <h2 data-i18n="chrome.achievements">Logros</h2>
+              <button type="button" class="ui-btn ui-btn--secondary ui-btn--small" data-i18n="chrome.seeAll">Ver todos</button>
             </div>
             <div class="chrome__logros">
               <div class="chrome__logro">
                 <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
-                <p>Mentoría: 30+ personas</p>
+                <p data-i18n="chrome.mentorshipStat">Mentoría: 30+ personas</p>
               </div>
               <div class="chrome__logro chrome__logro--empty">
                 <div class="chrome__logro-art">?</div>
-                <p>Coming soon</p>
+                <p data-i18n="chrome.comingSoon">Coming soon</p>
               </div>
               <div class="chrome__logro chrome__logro--empty">
                 <div class="chrome__logro-art">?</div>
-                <p>Coming soon</p>
+                <p data-i18n="chrome.comingSoon">Coming soon</p>
               </div>
             </div>
           </section>
           <section class="chrome__section" id="chrome-casos">
-            <h2>Casos</h2>
+            <h2 data-i18n="chrome.cases">Casos</h2>
             <div class="chrome__cases">${caseRows}</div>
           </section>
         </div>
       </aside>
-      <button type="button" class="chrome__tab" aria-label="Show panel">${iconSvg('chevron')}</button>
+      <button type="button" class="chrome__tab" data-action="show-panel" aria-label="Show panel">${iconSvg('chevron')}</button>
       <div class="chrome__tools-phone">
-        ${roundBtn('search', 'Buscar')}
-        ${roundBtn('sound', 'Sonido')}
-        ${roundBtn('locate', 'Center on Adonay')}
+        ${roundBtn('search', 'Buscar', '', 'search')}
+        ${roundBtn('sound', 'Sonido', '', 'sound')}
+        ${roundBtn('locate', 'Center on Adonay', '', 'center')}
       </div>
       <div class="chrome__intro" data-intro>
-        <button type="button" class="chrome__intro-close" aria-label="Close">${iconSvg('close')}</button>
+        <button type="button" class="chrome__intro-close" data-action="intro-close" aria-label="Close" data-i18n-aria="jac.close">${iconSvg('close')}</button>
         <div class="chrome__lede">
-          <h1 class="chrome__title">Líder de diseño con IA.</h1>
+          <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
           <div class="chrome__skeleton-stack" aria-hidden="true">
             <span class="chrome__skeleton"></span>
             <span class="chrome__skeleton chrome__skeleton--half"></span>
           </div>
         </div>
         <div class="chrome__audience">
-          <p class="chrome__label">¿Quién eres?</p>
-          <div class="ui-seg ui-seg--phone" role="tablist" aria-label="Audience">
+          <p class="chrome__label" data-i18n="chrome.who">¿Quién eres?</p>
+          <div class="ui-seg ui-seg--phone" role="tablist" aria-label="Audience" data-i18n-aria="chrome.audience">
             <button type="button" class="ui-seg__opt is-active" data-audience="recruiter">Recruiter</button>
-            <button type="button" class="ui-seg__opt" data-audience="mentoria">Mentoría</button>
-            <button type="button" class="ui-seg__opt" data-audience="cliente">Cliente</button>
+            <button type="button" class="ui-seg__opt" data-audience="mentoria" data-i18n="chrome.mentorship">Mentoría</button>
+            <button type="button" class="ui-seg__opt" data-audience="cliente" data-i18n="chrome.client">Cliente</button>
           </div>
         </div>
         <div class="chrome__ctas">
-          <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer">${iconSvg('download')} Descargar CV</a>
-          <a class="ui-btn ui-btn--secondary" href="${CONTACT_HREF}">${iconSvg('mail')} Contacto</a>
+          <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer">${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
+          <a class="ui-btn ui-btn--secondary" href="${CONTACT_HREF}">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></a>
         </div>
         <div class="chrome__card-row">
           <div class="chrome__card-id">
             <span class="chrome__mono">AL</span>
             <span>
               <strong>Adonay Lizardo</strong>
-              <small>Líder de diseño con IA</small>
+              <small data-i18n="chrome.titleShort">Líder de diseño con IA</small>
             </span>
           </div>
-          <button type="button" class="ui-btn ui-btn--secondary" data-details>Detalles</button>
+          <button type="button" class="ui-btn ui-btn--secondary" data-details data-i18n="chrome.details">Detalles</button>
         </div>
       </div>
-      <nav class="chrome__dock" aria-label="Dock">
+      <nav class="chrome__dock" aria-label="Dock" data-i18n-aria="chrome.dock">
         <button type="button" class="ui-round ui-round--lg ui-round--avatar" data-dock="intro" aria-label="Adonay">AL</button>
-        ${roundBtn('briefcase', 'Casos', 'ui-round--lg')}
-        ${roundBtn('trophy', 'Logros', 'ui-round--lg')}
-        ${roundBtn('mail', 'Contacto', 'ui-round--lg')}
-        ${roundBtn('map', 'Map', 'ui-round--lg')}
+        ${roundBtn('briefcase', 'Casos', 'ui-round--lg', 'cases')}
+        ${roundBtn('trophy', 'Logros', 'ui-round--lg', 'achievements')}
+        ${roundBtn('mail', 'Contacto', 'ui-round--lg', 'contact')}
+        ${roundBtn('map', 'Map', 'ui-round--lg', 'map')}
       </nav>
-      <div class="chrome__lang" role="group" aria-label="Language">
+      <div class="chrome__lang" role="group" aria-label="Language" data-i18n-aria="chrome.language">
         <button type="button" class="chrome__lang-opt is-active" data-lang="en">EN</button>
         <button type="button" class="chrome__lang-opt" data-lang="es">ES</button>
       </div>
       <div class="chrome__sound" role="note" data-hint="1">
         ${iconSvg('info')}
-        <span>No sound? Check silent mode</span>
+        <span data-i18n="chrome.soundHint">No sound? Check silent mode</span>
       </div>
       <p class="chrome__subtitle"></p>
       <div class="chrome__views" data-views>
         <div class="chrome__minimap-wrap">
           <canvas class="chrome__minimap" width="248" height="161" aria-hidden="true"></canvas>
-          ${roundBtn('locate', 'Center on Adonay', 'chrome__locate')}
+          ${roundBtn('locate', 'Center on Adonay', 'chrome__locate', 'center')}
         </div>
         <div class="chrome__view-btns">
-          <button type="button" class="ui-view" data-view="rotate" aria-label="Rotate">${iconSvg('rotate')}</button>
-          <button type="button" class="ui-view is-active" data-view="isometrica" aria-label="Isometric">${iconSvg('cube')}</button>
-          <button type="button" class="ui-view" data-view="cenital" aria-label="Top-down">${iconSvg('grid')}</button>
-          <button type="button" class="ui-view" data-view="perspectiva" aria-label="Perspective">${iconSvg('persp')}</button>
-          <button type="button" class="ui-view" data-view="map" aria-label="Map overview">${iconSvg('map')}</button>
+          <button type="button" class="ui-view" data-view="rotate" aria-label="Rotate" data-i18n-aria="chrome.rotate">${iconSvg('rotate')}</button>
+          <button type="button" class="ui-view is-active" data-view="isometrica" aria-label="Isometric" data-i18n-aria="chrome.isometric">${iconSvg('cube')}</button>
+          <button type="button" class="ui-view" data-view="cenital" aria-label="Top-down" data-i18n-aria="chrome.topdown">${iconSvg('grid')}</button>
+          <button type="button" class="ui-view" data-view="perspectiva" aria-label="Perspective" data-i18n-aria="chrome.perspective">${iconSvg('persp')}</button>
+          <button type="button" class="ui-view" data-view="map" aria-label="Map overview" data-i18n-aria="chrome.map">${iconSvg('map')}</button>
         </div>
       </div>
     `;
   }
 
   private bind(): void {
-    this.root.querySelector('[aria-label="Panel only"]')?.addEventListener('click', () => this.setLayout('panel'));
-    this.root.querySelector('[aria-label="Hide panel"]')?.addEventListener('click', () => this.setLayout('map'));
-    this.root.querySelector('.chrome__tab')?.addEventListener('click', () => this.setLayout('split'));
-    this.root.querySelector('.chrome__intro-close')?.addEventListener('click', () => this.setLayout('map'));
+    this.root.querySelector('[data-action="panel-only"]')?.addEventListener('click', () => this.setLayout('panel'));
+    this.root.querySelector('[data-action="hide-panel"]')?.addEventListener('click', () => this.setLayout('map'));
+    this.root.querySelector('[data-action="show-panel"]')?.addEventListener('click', () => this.setLayout('split'));
+    this.root.querySelector('[data-action="intro-close"]')?.addEventListener('click', () => this.setLayout('map'));
     this.root.querySelector('[data-details]')?.addEventListener('click', () => {
       this.root.querySelector('.chrome__intro')?.classList.toggle('chrome__intro--expanded');
     });
-    this.root.querySelector('[aria-label="Adonay Lizardo"]')?.addEventListener('click', () => {
+    this.root.querySelector('[data-action="home"]')?.addEventListener('click', () => {
       this.setLayout('split');
       this.scrollTo('#chrome-experiencia');
     });
@@ -322,10 +326,7 @@ export class ChromeUI {
     this.root.querySelectorAll('[data-lang]').forEach((btn) => {
       btn.addEventListener('click', () => {
         this.lang = (btn as HTMLElement).dataset.lang as Lang;
-        document.documentElement.lang = this.lang;
-        this.root.querySelectorAll('[data-lang]').forEach((b) => {
-          b.classList.toggle('is-active', (b as HTMLElement).dataset.lang === this.lang);
-        });
+        setLang(this.lang);
       });
     });
     this.root.querySelectorAll('[data-locate]').forEach((btn) => {
@@ -342,38 +343,38 @@ export class ChromeUI {
         else this.callbacks.onView(v as Camera);
       });
     });
-    this.root.querySelectorAll('[aria-label="Center on Adonay"]').forEach((btn) => {
+    this.root.querySelectorAll('[data-action="center"]').forEach((btn) => {
       btn.addEventListener('click', () => this.callbacks.onCenter());
     });
     this.root.querySelector('[data-dock="intro"]')?.addEventListener('click', () => this.setLayout('split'));
-    this.root.querySelector('.chrome__dock [aria-label="Casos"]')?.addEventListener('click', () => {
+    this.root.querySelector('.chrome__dock [data-action="cases"]')?.addEventListener('click', () => {
       this.setLayout('split');
     });
-    this.root.querySelector('.chrome__dock [aria-label="Logros"]')?.addEventListener('click', () => {
+    this.root.querySelector('.chrome__dock [data-action="achievements"]')?.addEventListener('click', () => {
       this.setLayout('split');
     });
-    this.root.querySelector('.chrome__dock [aria-label="Contacto"]')?.addEventListener('click', () => {
+    this.root.querySelector('.chrome__dock [data-action="contact"]')?.addEventListener('click', () => {
       studio.playLine('11-contact');
       this.callbacks.onLocate('contacto');
     });
-    this.root.querySelector('.chrome__dock [aria-label="Map"]')?.addEventListener('click', () => this.setLayout('map'));
-    this.root.querySelector('.chrome__rail [aria-label="Casos"]')?.addEventListener('click', () => {
+    this.root.querySelector('.chrome__dock [data-action="map"]')?.addEventListener('click', () => this.setLayout('map'));
+    this.root.querySelector('.chrome__rail [data-action="cases"]')?.addEventListener('click', () => {
       this.setLayout('split');
       this.scrollTo('#chrome-casos');
     });
-    this.root.querySelector('.chrome__rail [aria-label="Logros"]')?.addEventListener('click', () => {
+    this.root.querySelector('.chrome__rail [data-action="achievements"]')?.addEventListener('click', () => {
       this.setLayout('split');
       this.scrollTo('#chrome-logros');
     });
-    this.root.querySelector('.chrome__rail [aria-label="Contacto"]')?.addEventListener('click', () => {
+    this.root.querySelector('.chrome__rail [data-action="contact"]')?.addEventListener('click', () => {
       studio.playLine('11-contact');
       this.callbacks.onLocate('contacto');
     });
-    this.root.querySelector('[aria-label="Página completa"]')?.addEventListener('click', () => {
+    this.root.querySelector('[data-action="fullpage"]')?.addEventListener('click', () => {
       if (this.layout === 'panel') this.setLayout('split');
       else this.setLayout('panel');
     });
-    this.root.querySelectorAll('[aria-label="Sonido"]').forEach((btn) => {
+    this.root.querySelectorAll('[data-action="sound"]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         studio.toggleMute();
@@ -420,11 +421,45 @@ export class ChromeUI {
 
   private syncSound(): void {
     const muted = studio.isMuted();
-    this.root.querySelectorAll('[aria-label="Sonido"]').forEach((btn) => {
+    this.root.querySelectorAll('[data-action="sound"]').forEach((btn) => {
       const el = btn as HTMLElement;
       el.setAttribute('aria-pressed', muted ? 'false' : 'true');
       el.dataset.icon = muted ? 'sound' : 'soundOn';
       el.innerHTML = iconSvg(muted ? 'sound' : 'soundOn');
+    });
+  }
+
+  private applyI18n(): void {
+    this.lang = getLang();
+    document.documentElement.lang = this.lang;
+    this.root.querySelectorAll('[data-lang]').forEach((b) => {
+      b.classList.toggle('is-active', (b as HTMLElement).dataset.lang === this.lang);
+    });
+    this.root.querySelectorAll('[data-i18n]').forEach((el) => {
+      const key = (el as HTMLElement).dataset.i18n as Parameters<typeof t>[0];
+      if (key) el.textContent = t(key);
+    });
+    this.root.querySelectorAll('[data-i18n-aria]').forEach((el) => {
+      const key = (el as HTMLElement).dataset.i18nAria as Parameters<typeof t>[0];
+      if (key) el.setAttribute('aria-label', t(key));
+    });
+    const ariaByAction: Record<string, Parameters<typeof t>[0]> = {
+      cases: 'chrome.cases',
+      achievements: 'chrome.achievements',
+      contact: 'chrome.contact',
+      search: 'chrome.search',
+      download: 'chrome.downloadCv',
+      sound: 'chrome.sound',
+      fullpage: 'chrome.fullPage',
+      'panel-only': 'chrome.panelOnly',
+      'hide-panel': 'chrome.hidePanel',
+      'show-panel': 'chrome.showPanel',
+      center: 'chrome.center',
+      map: 'chrome.map',
+    };
+    this.root.querySelectorAll('[data-action]').forEach((el) => {
+      const key = ariaByAction[(el as HTMLElement).dataset.action ?? ''];
+      if (key) el.setAttribute('aria-label', t(key));
     });
   }
 

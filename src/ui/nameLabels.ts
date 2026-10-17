@@ -1,18 +1,23 @@
 /** HTML name pills — crisp at every zoom, always above the Pixi depth sort. */
 
+import { t } from './i18n';
+
 export type NameLabelTarget = {
   id: 'adonay' | 'pantone' | 'noah' | 'jac';
   name: string;
   x: number;
   y: number;
   visible: boolean;
+  info?: boolean;
 };
 
 export class NameLabels {
   readonly root: HTMLElement;
   private pills = new Map<string, HTMLElement>();
+  private onJacInfo?: () => void;
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, opts?: { onJacInfo?: () => void }) {
+    this.onJacInfo = opts?.onJacInfo;
     this.root = document.createElement('div');
     this.root.className = 'name-labels';
     this.root.setAttribute('aria-hidden', 'true');
@@ -21,9 +26,23 @@ export class NameLabels {
       pill.className = 'name-label';
       pill.dataset.id = id;
       pill.hidden = true;
-      pill.innerHTML = `<i class="name-label__dot"></i><span class="name-label__text"></span>`;
+      pill.innerHTML =
+        `<i class="name-label__dot"></i><span class="name-label__text"></span>` +
+        (id === 'jac'
+          ? `<button type="button" class="name-label__info" hidden aria-label="${t('jac.info')}">i</button>`
+          : '');
       this.root.appendChild(pill);
       this.pills.set(id, pill);
+    }
+    const infoBtn = this.pills.get('jac')?.querySelector('.name-label__info');
+    if (infoBtn) {
+      const open = (e: Event) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.onJacInfo?.();
+      };
+      infoBtn.addEventListener('pointerdown', open);
+      infoBtn.addEventListener('click', open);
     }
     container.appendChild(this.root);
   }
@@ -41,6 +60,11 @@ export class NameLabels {
       if (!pill) continue;
       const text = pill.querySelector('.name-label__text')!;
       if (text.textContent !== t.name) text.textContent = t.name;
+      const infoBtn = pill.querySelector('.name-label__info') as HTMLButtonElement | null;
+      if (infoBtn) {
+        infoBtn.hidden = !t.info;
+        infoBtn.setAttribute('aria-label', t.info ? `${t.name} — ${this.infoLabel()}` : '');
+      }
       const show = t.visible && !this.root.hidden;
       pill.hidden = !show;
       if (!show) continue;
@@ -51,6 +75,10 @@ export class NameLabels {
     }
     this.separatePills();
     this.hideOverChrome();
+  }
+
+  private infoLabel(): string {
+    return t('jac.info');
   }
 
   /** Stack overlapping pills vertically. JAC stays put; Adonay then Pantone then Noah lift. */
@@ -137,15 +165,17 @@ export class NameLabels {
     }
   }
 
-  qa(): { id: string; name: string; visible: boolean; x: number; y: number }[] {
+  qa(): { id: string; name: string; visible: boolean; x: number; y: number; info: boolean }[] {
     return [...this.pills.values()].map((pill) => {
       const r = pill.getBoundingClientRect();
+      const info = pill.querySelector('.name-label__info') as HTMLElement | null;
       return {
         id: pill.dataset.id ?? '',
         name: pill.querySelector('.name-label__text')?.textContent ?? '',
         visible: !pill.hidden && !this.root.hidden,
         x: r.left + r.width / 2,
         y: r.top + r.height / 2,
+        info: !!info && !info.hidden && !pill.hidden,
       };
     });
   }

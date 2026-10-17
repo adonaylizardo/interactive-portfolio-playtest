@@ -3,6 +3,7 @@ import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
 import { CASES, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
 import { iconSvg } from './icons';
+import { onLangChange, t } from './i18n';
 
 function aboutBlockNode(block: AboutBlock): HTMLElement {
   if (block.kind === 'heading') {
@@ -148,8 +149,8 @@ export class BuildingPanel {
       <div class="building-panel__sheet" role="dialog" aria-modal="true">
         <div class="building-panel__drag" data-drag aria-hidden="true"></div>
         <div class="building-panel__bar">
-          <button type="button" class="building-panel__exit" data-exit>Salir</button>
-          <button type="button" class="building-panel__close" data-close aria-label="Cerrar">×</button>
+          <button type="button" class="building-panel__exit" data-exit></button>
+          <button type="button" class="building-panel__close" data-close aria-label="">×</button>
         </div>
         <div class="case-preview" data-preview hidden>
           <div class="case-preview__handle" aria-hidden="true"></div>
@@ -158,14 +159,14 @@ export class BuildingPanel {
               <p class="case-preview__kicker">CASE</p>
               <h2 class="case-preview__title"></h2>
             </div>
-            <button type="button" class="case-preview__x" data-close aria-label="Cerrar">${iconSvg('close')}</button>
+            <button type="button" class="case-preview__x" data-close aria-label="">${iconSvg('close')}</button>
           </div>
           <p class="case-preview__subtitle"></p>
           <p class="case-preview__teaser"></p>
           <button type="button" class="case-preview__read" data-read>
             <span class="case-preview__read-logo">${iconSvg('briefcase')}</span>
             <span class="case-preview__read-copy">
-              <span class="case-preview__read-label">Read case</span>
+              <span class="case-preview__read-label"></span>
               <span class="case-preview__read-meta">Problem · What I did · Result</span>
             </span>
             <span class="case-preview__read-go" aria-hidden="true">${iconSvg('arrowNe')}</span>
@@ -173,7 +174,7 @@ export class BuildingPanel {
         </div>
         <div class="case-read__bar" data-read-bar hidden>
           <p class="case-read__bar-title"></p>
-          <button type="button" class="case-read__x" data-close aria-label="Cerrar">${iconSvg('close')}</button>
+          <button type="button" class="case-read__x" data-close aria-label="">${iconSvg('close')}</button>
         </div>
         <div class="case-read" data-read-view hidden>
           <div class="case-read__page">
@@ -222,6 +223,8 @@ export class BuildingPanel {
     this.readLede = this.el.querySelector('.case-read__lede');
     this.readHeroLabel = this.el.querySelector('.case-read__hero-label');
     this.aboutEl.append(...ABOUT.map(aboutBlockNode));
+    this.applyI18n();
+    onLangChange(() => this.applyI18n());
     // Touch has no hover: a tap shows that logo's colours until another logo (or the same one) is tapped.
     this.workedWithEl.addEventListener('click', (e) => {
       const hit = (e.target as HTMLElement).closest('.worked-with__logo');
@@ -662,5 +665,15 @@ export class BuildingPanel {
     if (this.peekOnly) return false;
     this.setPeek(true);
     return true;
+  }
+
+  private applyI18n(): void {
+    const exit = this.el.querySelector('[data-exit]') as HTMLElement | null;
+    if (exit) exit.textContent = t('panel.exit');
+    this.el.querySelectorAll('[data-close]').forEach((el) => {
+      el.setAttribute('aria-label', t('panel.close'));
+    });
+    const read = this.el.querySelector('.case-preview__read-label');
+    if (read) read.textContent = t('panel.readCase');
   }
 }

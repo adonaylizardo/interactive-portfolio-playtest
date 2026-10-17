@@ -590,6 +590,28 @@ export class JacT9 {
     return null;
   }
 
+  /** Closest sit the van can actually path to beside a door or building tile. */
+  nearestParkSit(tx: number, ty: number, maxR = 8): { x: number; y: number } | null {
+    if (this.canDriveAt(tx, ty)) return { x: tx, y: ty };
+    let best: { x: number; y: number } | null = null;
+    let bestD = Infinity;
+    for (let dy = -maxR; dy <= maxR; dy++) {
+      for (let dx = -maxR; dx <= maxR; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const x = tx + dx;
+        const y = ty + dy;
+        if (!this.canDriveAt(x, y)) continue;
+        const d = Math.abs(dx) + Math.abs(dy);
+        if (d >= bestD) continue;
+        const path = this.findDrivePath(x, y);
+        if (!path) continue;
+        bestD = d;
+        best = { x, y };
+      }
+    }
+    return best;
+  }
+
   /** Nearest walkable tile beside the footprint that `from` can actually path to. */
   driverDoorTile(from?: { x: number; y: number }): { x: number; y: number } | null {
     return this.nearestReachableApproach(Math.round(from?.x ?? this.cx), Math.round(from?.y ?? this.cy));

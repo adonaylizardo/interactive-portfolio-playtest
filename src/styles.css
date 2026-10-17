@@ -154,6 +154,10 @@ body.is-canvas-dragging * {
   pointer-events: none;
 }
 
+#ui-root > .name-labels .name-label__info {
+  pointer-events: auto;
+}
+
 #ui-root > .joystick:not([hidden]) {
   pointer-events: auto;
 }
@@ -1817,6 +1821,28 @@ body[data-layout='panel'] .checklist {
   border-radius: 50%;
   background: #fff;
   flex: 0 0 auto;
+}
+
+.name-label__info {
+  width: 16px;
+  height: 16px;
+  margin-left: 1px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 18%);
+  color: #fff;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 16px;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.name-label__info[hidden] {
+  display: none;
 }
 
 /* JAC T9 HUD — Pixel frames, phone + desktop. */

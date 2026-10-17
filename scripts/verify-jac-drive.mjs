@@ -263,7 +263,7 @@ async function applyState(page, id) {
     if (id === '1-menu') {
       qa.jacClose?.();
       qa.setCharacterTile(27, 19);
-      qa.tapJac();
+      qa.jacSet?.({ mode: 'menu' });
       return;
     }
     if (id === '2-info-auto') {

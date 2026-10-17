@@ -20,6 +20,7 @@ import { JacHud } from './ui/jacHud';
 import { Joystick } from './ui/joystick';
 import { NameLabels } from './ui/nameLabels';
 import { hideToast, showToast } from './ui/toast';
+import { getLang, setLang, t } from './ui/i18n';
 import type { Camera } from './tokens';
 
 async function main(): Promise<void> {
@@ -43,7 +44,7 @@ async function main(): Promise<void> {
   });
 
   const joystick = new Joystick(uiRoot);
-  const labels = new NameLabels(uiRoot);
+  const labels = new NameLabels(uiRoot, { onJacInfo: () => scene.jacOpenInfo() });
   const jacHud = new JacHud(uiRoot, {
     onInfo: () => scene.jacOpenInfo(),
     onGetIn: () => scene.jacGetIn(),
@@ -131,7 +132,8 @@ async function main(): Promise<void> {
       joystick.setHidden(!!id);
       syncInteriorPanel(id);
     },
-    onUnreachable: () => showToast('No se puede llegar'),
+    onUnreachable: () => showToast(t('toast.unreachable')),
+    onGetOutToEnter: () => showToast(t('toast.getOutToEnter')),
     buildingPanel: {
       isOpen: () => panel.isOpen(),
       openTitle: () => panel.openTitle(),
@@ -319,6 +321,9 @@ async function main(): Promise<void> {
     jacSetEngine: () => scene.jacSetEngine(),
     jacSetBubble: (on: boolean) => scene.jacSetBubble(on),
     jacSet: (partial: Parameters<IsoScene['qaJacSet']>[0]) => scene.qaJacSet(partial),
+    setLang: (lang: 'en' | 'es') => setLang(lang),
+    getLang: () => getLang(),
+    t: (key: Parameters<typeof t>[0]) => t(key),
   };
 }
 
@@ -326,6 +331,6 @@ main().catch((err) => {
   console.error(err);
   document.body.insertAdjacentHTML(
     'beforeend',
-    `<p style="padding:16px;color:red">Error al cargar: ${String(err)}</p>`,
+    `<p style="padding:16px;color:red">${t('boot.error')} ${String(err)}</p>`,
   );
 });

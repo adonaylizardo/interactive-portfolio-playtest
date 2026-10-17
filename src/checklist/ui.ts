@@ -1,4 +1,5 @@
 import { studio } from '../audio/studio';
+import { onLangChange, t } from '../ui/i18n';
 import {
   countCompleted,
   isChecklistHidden,
@@ -19,38 +20,40 @@ type StepCopy = {
   detailTouch: string;
 };
 
-const STEP_COPY: Record<ChecklistStepId, StepCopy> = {
-  'walk-around': {
-    id: 'walk-around',
-    title: 'Camina por el mundo',
-    detailDesktop: 'Haz clic en un tile para ir allí. Doble clic o Shift para correr.',
-    detailTouch: 'Toca un tile para ir allí. Doble toque en un tile para correr.',
-  },
-  'walk-keys': {
-    id: 'walk-keys',
-    title: 'Camina con las teclas',
-    detailDesktop: 'Usa WASD o las flechas para mover al personaje. Camina hacia una puerta (o pulsa Enter junto a ella) para entrar.',
-    detailTouch: 'Usa WASD o las flechas para mover al personaje.',
-  },
-  'move-camera': {
-    id: 'move-camera',
-    title: 'Mueve la cámara',
-    detailDesktop: 'Arrastra con el mouse o desliza con dos dedos en el trackpad para desplazar la vista.',
-    detailTouch: 'Pellizca con dos dedos para mover y acercar la vista. El recuadro de recentrar vuelve a Adonay.',
-  },
-  zoom: {
-    id: 'zoom',
-    title: 'Acerca y aleja',
-    detailDesktop: 'Pellizca en el trackpad, o usa Ctrl / ⌘ + rueda del mouse.',
-    detailTouch: 'Pellizca con dos dedos para acercar o alejar.',
-  },
-  'enter-building': {
-    id: 'enter-building',
-    title: 'Entra a un edificio',
-    detailDesktop: 'Haz clic en un edificio para ir a su puerta y abrir el panel.',
-    detailTouch: 'Toca un edificio para ir a su puerta y abrir el panel.',
-  },
-};
+function stepCopy(): Record<ChecklistStepId, StepCopy> {
+  return {
+    'walk-around': {
+      id: 'walk-around',
+      title: t('check.walkAround'),
+      detailDesktop: t('check.walkAround.desk'),
+      detailTouch: t('check.walkAround.touch'),
+    },
+    'walk-keys': {
+      id: 'walk-keys',
+      title: t('check.walkKeys'),
+      detailDesktop: t('check.walkKeys.desk'),
+      detailTouch: t('check.walkKeys.touch'),
+    },
+    'move-camera': {
+      id: 'move-camera',
+      title: t('check.moveCamera'),
+      detailDesktop: t('check.moveCamera.desk'),
+      detailTouch: t('check.moveCamera.touch'),
+    },
+    zoom: {
+      id: 'zoom',
+      title: t('check.zoom'),
+      detailDesktop: t('check.zoom.desk'),
+      detailTouch: t('check.zoom.touch'),
+    },
+    'enter-building': {
+      id: 'enter-building',
+      title: t('check.enterBuilding'),
+      detailDesktop: t('check.enterBuilding.desk'),
+      detailTouch: t('check.enterBuilding.touch'),
+    },
+  };
+}
 
 export function isMobileLayout(): boolean {
   return window.matchMedia('(max-width: 767px)').matches;
@@ -84,12 +87,12 @@ export class ChecklistUI {
     this.root.innerHTML = `
       <header class="checklist__header">
         <div class="checklist__header-text">
-          <span class="checklist__label">Getting started</span>
+          <span class="checklist__label"></span>
           <h2 class="checklist__active-title"></h2>
         </div>
         <div class="checklist__progress-wrap">
           <span class="checklist__counter checklist__counter--label"></span>
-          <button type="button" class="checklist__ring-btn" aria-label="Abrir o cerrar lista de pasos">
+          <button type="button" class="checklist__ring-btn" aria-label="">
             <svg class="checklist__ring" viewBox="0 0 28 28" width="28" height="28" aria-hidden="true">
               <circle class="checklist__ring-bg" cx="14" cy="14" r="11" fill="none" stroke-width="2"/>
               <circle class="checklist__ring-fg" cx="14" cy="14" r="11" fill="none" stroke-width="2.5"
@@ -101,8 +104,8 @@ export class ChecklistUI {
       </header>
       <ul class="checklist__list"></ul>
       <footer class="checklist__footer">
-        <button type="button" class="checklist__skip">Saltar tutorial</button>
-        <button type="button" class="checklist__dismiss" hidden>Cerrar</button>
+        <button type="button" class="checklist__skip"></button>
+        <button type="button" class="checklist__dismiss" hidden></button>
       </footer>
     `;
 
@@ -153,6 +156,7 @@ export class ChecklistUI {
     });
 
     this.render();
+    onLangChange(() => this.render());
   }
 
   private dismiss(callbacks: ChecklistCallbacks): void {
@@ -240,18 +244,24 @@ export class ChecklistUI {
 
     const dismissBtn = this.root.querySelector('.checklist__dismiss') as HTMLButtonElement;
     const skipBtn = this.root.querySelector('.checklist__skip') as HTMLButtonElement;
+    const labelEl = this.root.querySelector('.checklist__label') as HTMLElement;
     const allDone = done >= total;
     dismissBtn.hidden = !allDone;
     skipBtn.hidden = allDone;
+    labelEl.textContent = t('check.label');
+    skipBtn.textContent = t('check.skip');
+    dismissBtn.textContent = t('check.close');
+    this.ringBtn.setAttribute('aria-label', t('check.toggle'));
 
     this.applyLayoutClasses();
 
     const platformSteps = stepsForPlatform(this.compactSteps);
+    const copy = stepCopy();
     this.listEl.replaceChildren();
     let activeStep: StepCopy | null = null;
 
     for (const stepId of platformSteps) {
-      const step = STEP_COPY[stepId];
+      const step = copy[stepId];
       const completed = this.state.completed[step.id];
       if (!completed && !activeStep) activeStep = step;
 
@@ -272,7 +282,7 @@ export class ChecklistUI {
     }
 
     if (allDone) {
-      this.headerTitle.textContent = '¡Listo!';
+      this.headerTitle.textContent = t('check.done');
       this.headerTitle.classList.add('checklist__active-title--done');
     } else {
       this.headerTitle.textContent = activeStep?.title ?? '';

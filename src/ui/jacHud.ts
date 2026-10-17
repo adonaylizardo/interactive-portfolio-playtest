@@ -2,6 +2,7 @@ import { getEnterableBuildings } from '../data/map';
 import { tileToWorld } from '../iso/math';
 import { isMobileLayout } from '../checklist/ui';
 import type { JacGear, JacLights, JacSnapshot, JacToggleId } from '../game/jacT9';
+import { getLang, onLangChange, t } from './i18n';
 
 export type JacHudCallbacks = {
   onInfo: () => void;
@@ -14,8 +15,8 @@ export type JacHudCallbacks = {
   onEngine: () => void;
 };
 
-const TOGGLES: { id: JacToggleId; label: string; icon: string }[] = [
-  { id: 'hazards', label: 'Hazards', icon: 'hazards' },
+const TOGGLES: { id: JacToggleId; labelKey: 'jac.hazards'; icon: string }[] = [
+  { id: 'hazards', labelKey: 'jac.hazards', icon: 'hazards' },
 ];
 
 function glyph(name: string): string {
@@ -75,6 +76,8 @@ export class JacHud {
     this.rearEl = this.root.querySelector('.jac-rear')!;
     this.mini = this.root.querySelector('.jac-dock__mini')!;
     this.hintEl = this.root.querySelector('.jac-hint')!;
+    this.applyLang();
+    onLangChange(() => this.applyLang());
     this.bind();
     window.matchMedia('(max-width: 767px)').addEventListener('change', () => {
       this.mobile = isMobileLayout();
@@ -153,6 +156,12 @@ export class JacHud {
     return this.root;
   }
 
+  private applyLang(): void {
+    this.hintEl.textContent = t('jac.hint');
+    this.lastHtml = '';
+    if (this.snap) this.render(this.snap);
+  }
+
   private bind(): void {
     const fire = (e: Event) => {
       const t = (e.target as HTMLElement).closest('[data-jac]') as HTMLElement | null;
@@ -229,7 +238,7 @@ export class JacHud {
   }
 
   private fillDash(snap: JacSnapshot, phone: boolean): void {
-    const key = `${snap.mode}|${snap.lights}|${snap.gear}|${snap.rpm}|${snap.mph}|${snap.engineOn}|${JSON.stringify(snap.toggles)}|${phone}`;
+    const key = `${getLang()}|${snap.mode}|${snap.lights}|${snap.gear}|${snap.rpm}|${snap.mph}|${snap.engineOn}|${JSON.stringify(snap.toggles)}|${phone}`;
     if (key === this.lastHtml && (snap.mode === 'drive' || snap.mode === 'info')) {
       this.syncLive(snap);
       return;
@@ -242,7 +251,7 @@ export class JacHud {
     }
     if (phone && snap.mode === 'drive') {
       const btn = this.barEl.querySelector('.jac-bar__btn');
-      if (btn) btn.textContent = 'Get out';
+      if (btn) btn.textContent = t('jac.getOut');
     }
     this.syncLive(snap);
   }
@@ -293,15 +302,15 @@ export class JacHud {
       <header class="jac-sheet__head">
         <span class="jac-badge">JAC</span>
         <h2>JAC T9</h2>
-        <button type="button" class="jac-btn jac-btn--primary" data-jac="in">Get in</button>
-        <button type="button" class="jac-icon-btn" data-jac="close" aria-label="Close">${glyph('close')}</button>
+        <button type="button" class="jac-btn jac-btn--primary" data-jac="in">${t('jac.getIn')}</button>
+        <button type="button" class="jac-icon-btn" data-jac="close" aria-label="${t('jac.close')}">${glyph('close')}</button>
       </header>
-      <p class="jac-sheet__desc">JAC T9, la camioneta de la familia.</p>
+      <p class="jac-sheet__desc">${t('jac.desc')}</p>
       <div class="jac-sheet__grid">
         ${this.dialHtml(snap)}
         <div class="jac-toggles">${TOGGLES.map((t) => this.toggleHtml(t, snap)).join('')}</div>
       </div>
-      <div class="jac-length"><span>Length</span><span class="jac-length__dash">5.33 m</span></div>
+      <div class="jac-length"><span>${t('jac.length')}</span><span class="jac-length__dash">5.33 m</span></div>
     `;
   }
 
@@ -309,23 +318,23 @@ export class JacHud {
     const go = snap.mode === 'drive';
     const desc = go
       ? ''
-      : '<p class="jac-sheet__desc jac-dock__desc">JAC T9, la camioneta de la familia.</p>';
+      : `<p class="jac-sheet__desc jac-dock__desc">${t('jac.desc')}</p>`;
     const length = go
       ? ''
-      : '<div class="jac-length jac-dock__length"><span>Length</span><span class="jac-length__dash">5.33 m</span></div>';
+      : `<div class="jac-length jac-dock__length"><span>${t('jac.length')}</span><span class="jac-length__dash">5.33 m</span></div>`;
     return `
       ${this.gaugeHtml('rpm', snap.rpm, 'rpm')}
       ${this.gaugeHtml('mph', snap.mph, 'mph')}
-      <div class="jac-gears" role="group" aria-label="Gear">
+      <div class="jac-gears" role="group" aria-label="${t('jac.gear')}">
         ${(['P', 'R', 'N', 'D'] as JacGear[]).map((g) => `<button type="button" class="jac-gear${snap.gear === g ? ' is-on' : ''}" data-jac="gear" data-val="${g}" aria-pressed="${snap.gear === g}">${g}</button>`).join('')}
       </div>
       ${this.dialHtml(snap)}
-      <div class="jac-toggles jac-toggles--dock">${TOGGLES.map((t) => this.toggleHtml(t, snap)).join('')}</div>
+      <div class="jac-toggles jac-toggles--dock">${TOGGLES.map((item) => this.toggleHtml(item, snap)).join('')}</div>
       <div class="jac-dock__id">
         <span class="jac-badge">JAC</span>
         <span class="jac-dock__name">JAC T9</span>
         ${desc}
-        <button type="button" class="jac-btn jac-btn--primary" data-jac="${go ? 'out' : 'in'}">${go ? 'Get out' : 'Get in'} <kbd>E</kbd></button>
+        <button type="button" class="jac-btn jac-btn--primary" data-jac="${go ? 'out' : 'in'}">${go ? t('jac.getOut') : t('jac.getIn')} <kbd>E</kbd></button>
         ${length}
       </div>
     `;
@@ -333,12 +342,12 @@ export class JacHud {
 
   private dialHtml(snap: JacSnapshot): string {
     return `
-      <div class="jac-dial" data-pos="${snap.lights}" data-jac="dial" role="slider" aria-label="Lights">
-        <span class="jac-dial__auto">Auto</span>
-        <button type="button" class="jac-dial__off" data-jac="lights" data-val="off">Off</button>
-        <button type="button" class="jac-dial__on" data-jac="lights" data-val="on">On</button>
+      <div class="jac-dial" data-pos="${snap.lights}" data-jac="dial" role="slider" aria-label="${t('jac.lights')}">
+        <span class="jac-dial__auto">${t('jac.auto')}</span>
+        <button type="button" class="jac-dial__off" data-jac="lights" data-val="off">${t('jac.off')}</button>
+        <button type="button" class="jac-dial__on" data-jac="lights" data-val="on">${t('jac.on')}</button>
         <span class="jac-dial__knob" aria-hidden="true"></span>
-        <button type="button" class="jac-dial__engine" data-jac="engine" aria-label="Engine">${this.engineMark(snap)}</button>
+        <button type="button" class="jac-dial__engine" data-jac="engine" aria-label="${t('jac.engine')}">${this.engineMark(snap)}</button>
       </div>
     `;
   }
@@ -347,9 +356,9 @@ export class JacHud {
     return snap.engineOn ? 'I' : 'O';
   }
 
-  private toggleHtml(t: { id: JacToggleId; label: string; icon: string }, snap: JacSnapshot): string {
-    const on = snap.toggles[t.id] ? ' is-on' : '';
-    return `<button type="button" class="jac-toggle${on}" data-jac="toggle" data-val="${t.id}" aria-label="${t.label}" aria-pressed="${snap.toggles[t.id]}">${glyph(t.icon)}</button>`;
+  private toggleHtml(item: { id: JacToggleId; labelKey: 'jac.hazards'; icon: string }, snap: JacSnapshot): string {
+    const on = snap.toggles[item.id] ? ' is-on' : '';
+    return `<button type="button" class="jac-toggle${on}" data-jac="toggle" data-val="${item.id}" aria-label="${t(item.labelKey)}" aria-pressed="${snap.toggles[item.id]}">${glyph(item.icon)}</button>`;
   }
 
   private gaugeHtml(kind: string, value: number, unit: string): string {
@@ -431,8 +440,8 @@ export class JacHud {
       <div class="jac-menu" hidden>
         <div class="jac-pill jac-pill--name">JAC T9</div>
         <div class="jac-menu__row">
-          <button type="button" class="jac-pill" data-jac="info"><i>1</i> Info</button>
-          <button type="button" class="jac-pill" data-jac="in"><i>2</i> Get in</button>
+          <button type="button" class="jac-pill" data-jac="info"><i>1</i> ${t('jac.info')}</button>
+          <button type="button" class="jac-pill" data-jac="in"><i>2</i> ${t('jac.getIn')}</button>
         </div>
       </div>
       <section class="jac-sheet" hidden></section>
@@ -452,14 +461,14 @@ export class JacHud {
           <span>JAC T9</span>
           <span class="jac-bar__mph"><b data-mph>0</b> mph</span>
         </span>
-        <div class="jac-bar__gears" role="group" aria-label="Gear">
+        <div class="jac-bar__gears" role="group" aria-label="${t('jac.gear')}">
           ${(['P', 'R', 'N', 'D'] as JacGear[]).map((g) => `<button type="button" class="jac-gear" data-jac="gear" data-val="${g}" aria-pressed="false">${g}</button>`).join('')}
         </div>
-        <button type="button" class="jac-btn jac-btn--primary jac-bar__btn" data-jac="out">Get out</button>
+        <button type="button" class="jac-btn jac-btn--primary jac-bar__btn" data-jac="out">${t('jac.getOut')}</button>
       </div>
       <div class="jac-steer" hidden aria-hidden="true">${glyph('wheel')}</div>
       <div class="jac-bubble" hidden></div>
-      <div class="jac-hint" hidden>Usa flechas o WASD</div>
+      <div class="jac-hint" hidden></div>
       <div class="jac-rear" hidden>
         <div class="jac-rear__tools">
           <span class="jac-icon-btn" aria-hidden="true">${glyph('search')}</span>
