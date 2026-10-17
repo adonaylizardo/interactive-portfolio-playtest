@@ -8,22 +8,25 @@ export type InteriorStageLayout = {
   clipPath: string;
 };
 
-const STAGE_IMG = figmaAsset('talks-desktop-player', '0f6fa.png');
+const STAGE_PLAY = figmaAsset('talks-desktop-player', '6a8ac.svg');
 
 /** Video placeholder composited onto Teresa interior stage (forge pantalla quad). */
 export class InteriorStageScreen {
   private el: HTMLDivElement;
-  private img: HTMLImageElement;
 
   constructor(parent: HTMLElement) {
     this.el = document.createElement('div');
     this.el.className = 'interior-stage-screen';
     this.el.hidden = true;
-    this.img = document.createElement('img');
-    this.img.src = STAGE_IMG;
-    this.img.alt = '';
-    this.img.decoding = 'async';
-    this.el.appendChild(this.img);
+    const poster = document.createElement('div');
+    poster.className = 'interior-stage-screen__poster';
+    const play = document.createElement('img');
+    play.className = 'interior-stage-screen__play';
+    play.src = STAGE_PLAY;
+    play.alt = '';
+    play.decoding = 'async';
+    poster.appendChild(play);
+    this.el.appendChild(poster);
     parent.appendChild(this.el);
   }
 

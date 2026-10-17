@@ -1,4 +1,5 @@
 import { studio } from '../audio/studio';
+import { figmaAsset } from '../ui/figmaAssets';
 import { onLangChange, t } from '../ui/i18n';
 import {
   countCompleted,
@@ -79,8 +80,6 @@ export class ChecklistUI {
   private compactSteps = isMobileOrCoarsePointer();
   private mobile = isMobileLayout();
   private panelOpen = false;
-  /** UI gate: pin phone checklist pill to Figma map chrome (3/5). */
-  private figmaGate = false;
 
   constructor(container: HTMLElement, callbacks: ChecklistCallbacks) {
     this.state = loadChecklist();
@@ -103,6 +102,8 @@ export class ChecklistUI {
                 stroke-dasharray="69.12" stroke-dashoffset="69.12" transform="rotate(-90 14 14)"/>
             </svg>
             <span class="checklist__counter checklist__counter--in-ring"></span>
+            <img class="checklist__ring-figma" src="" width="44" height="44" alt="" aria-hidden="true" />
+            <img class="checklist__clipboard-figma" src="" width="15" height="15" alt="" aria-hidden="true" />
           </button>
         </div>
       </header>
@@ -120,6 +121,10 @@ export class ChecklistUI {
     this.ringEl = this.root.querySelector('.checklist__ring-fg')!;
     this.headerTitle = this.root.querySelector('.checklist__active-title')!;
     this.ringBtn = this.root.querySelector('.checklist__ring-btn')!;
+    const ringFigma = this.root.querySelector('.checklist__ring-figma') as HTMLImageElement;
+    const clipFigma = this.root.querySelector('.checklist__clipboard-figma') as HTMLImageElement;
+    ringFigma.src = figmaAsset('talks-phone-map', '6af66.svg');
+    clipFigma.src = figmaAsset('talks-phone-map', '629bf.svg');
     this.ringBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       if (this.mobile) {
@@ -204,23 +209,13 @@ export class ChecklistUI {
     this.applyLayoutClasses();
   }
 
-  private figmaPillImg: HTMLImageElement | null = null;
-
-  /** QA / UI gate: Figma phone map shows 3/5 on “Enter a building”. */
-  setFigmaGateState(): void {
-    this.figmaGate = true;
+  /** QA: set checklist progress through the real storage API (no render overrides). */
+  setProgressForQa(completed: Partial<Record<ChecklistStepId, boolean>>): void {
     this.state = loadChecklist();
-    this.state.completed = {
-      'walk-around': true,
-      'walk-keys': true,
-      'move-camera': true,
-      zoom: false,
-      'enter-building': false,
-    };
-    this.state.skipped = false;
-    this.state.dismissed = false;
-    this.state.collapsed = false;
-    this.state.mobileExpanded = false;
+    for (const [id, done] of Object.entries(completed) as [ChecklistStepId, boolean][]) {
+      if (done) this.state.completed[id] = true;
+      else this.state.completed[id] = false;
+    }
     saveChecklist(this.state);
     this.render();
   }
@@ -241,7 +236,6 @@ export class ChecklistUI {
     this.root.classList.toggle('checklist--panel-open', this.mobile && this.panelOpen);
     this.root.classList.toggle('checklist--complete', done >= total);
     this.root.classList.toggle('checklist--skipped', this.state.skipped);
-    this.root.classList.toggle('checklist--figma-gate', this.figmaGate && this.mobile);
   }
 
   complete(step: ChecklistStepId): void {
@@ -264,13 +258,11 @@ export class ChecklistUI {
     this.compactSteps = isMobileOrCoarsePointer();
     const total = totalStepsForPlatform(this.compactSteps);
     const done = countCompleted(this.state, this.compactSteps);
-    const gateDone = 3;
-    const gateTotal = 5;
-    const counterText = this.figmaGate ? `${gateDone}/${gateTotal}` : `${done}/${total}`;
+    const counterText = `${done}/${total}`;
     this.counterEl.textContent = counterText;
     this.counterInRing.textContent = counterText;
     const circumference = 69.12;
-    const progress = this.figmaGate ? gateDone / gateTotal : done / total;
+    const progress = done / total;
     const offset = circumference * (1 - progress);
     this.ringEl.style.strokeDashoffset = String(offset);
 
@@ -286,24 +278,6 @@ export class ChecklistUI {
     this.ringBtn.setAttribute('aria-label', t('check.toggle'));
 
     this.applyLayoutClasses();
-
-    const header = this.root.querySelector('.checklist__header') as HTMLElement | null;
-    if (this.figmaGate && this.mobile) {
-      if (!this.figmaPillImg) {
-        this.figmaPillImg = document.createElement('img');
-        this.figmaPillImg.className = 'checklist__figma-pill';
-        this.figmaPillImg.src = `${import.meta.env.BASE_URL}figma-specs/assets/checklist-phone-pill.png`;
-        this.figmaPillImg.width = 237;
-        this.figmaPillImg.height = 52;
-        this.figmaPillImg.alt = '';
-        this.root.insertBefore(this.figmaPillImg, this.root.firstChild);
-      }
-      this.figmaPillImg.hidden = false;
-      if (header) header.hidden = true;
-    } else {
-      if (this.figmaPillImg) this.figmaPillImg.hidden = true;
-      if (header) header.hidden = false;
-    }
 
     const platformSteps = stepsForPlatform(this.compactSteps);
     const copy = stepCopy();
@@ -331,10 +305,7 @@ export class ChecklistUI {
       this.listEl.appendChild(li);
     }
 
-    if (this.figmaGate && this.mobile) {
-      this.headerTitle.textContent = t('check.enterBuilding');
-      this.headerTitle.classList.remove('checklist__active-title--done');
-    } else if (allDone) {
+    if (allDone) {
       this.headerTitle.textContent = t('check.done');
       this.headerTitle.classList.add('checklist__active-title--done');
     } else {

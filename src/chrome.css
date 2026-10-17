@@ -675,6 +675,13 @@ body[data-layout='panel'] #game-canvas {
 
 .chrome--mobile .chrome__lang {
   left: auto;
+  z-index: 20;
+}
+
+body[data-layout='map'] .chrome--mobile .chrome__lang {
+  top: 112px;
+  right: auto;
+  left: 16px;
 }
 
 .chrome--mobile .chrome__intro {

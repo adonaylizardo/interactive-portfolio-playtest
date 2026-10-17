@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * UI gate Run #5: 12 frames vs public/figma-specs PNGs.
- * Per-frame locale; optional text masks for mixed-language Figma exports (layout compare).
+ * UI gate: 12 frames vs public/figma-specs PNGs — real app only (strict 8% diff, no masks).
+ * Default locale es; switch via real EN/ES toggle when the Figma frame is EN.
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -17,62 +17,12 @@ const FIGMA = path.join(ROOT, 'public', 'figma-specs');
 const BASE = `http://127.0.0.1:4195/interactive-portfolio-playtest/preview-edificios/`;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** Locale the Figma frame uses for UI copy (map vs panel may differ). */
+/** Locale per step: use real toggle when Figma export differs from default es. */
 const FLOW_LOCALE = {
   'talks-desktop': { map: 'en', panel: 'es' },
   'talks-phone': { map: 'en', panel: 'es' },
-  'writings-desktop': {
-    map: 'en',
-    panel: 'en',
-    mixed: 'Figma section descriptions are ES in PNG; three desc lines masked for layout gate.',
-  },
+  'writings-desktop': { map: 'en', panel: 'en' },
   'writings-phone': { map: 'en', panel: 'en' },
-};
-
-/** Rectangles in crop coordinates filled before diff (layout-only regions). */
-const TEXT_MASK_IN_CROP = {
-  'writings-desktop-list': [
-    { x: 24, y: 155, w: 384, h: 22 },
-    { x: 24, y: 348, w: 384, h: 22 },
-    { x: 24, y: 528, w: 384, h: 22 },
-  ],
-  'writings-phone-list': [
-    { x: 0, y: 56, w: 375, h: 52 },
-    { x: 0, y: 200, w: 375, h: 22 },
-    { x: 0, y: 380, w: 375, h: 22 },
-    { x: 0, y: 520, w: 375, h: 22 },
-  ],
-  'talks-phone-player': [
-    { x: 16, y: 165, w: 343, h: 28 },
-    { x: 16, y: 280, w: 343, h: 48 },
-    { x: 16, y: 340, w: 343, h: 360 },
-  ],
-  'writings-desktop-list': [
-    { x: 24, y: 155, w: 384, h: 22 },
-    { x: 24, y: 348, w: 384, h: 22 },
-    { x: 24, y: 528, w: 384, h: 22 },
-    { x: 100, y: 180, w: 308, h: 520 },
-  ],
-  'writings-desktop-reading': [
-    { x: 24, y: 520, w: 384, h: 88 },
-    { x: 24, y: 608, w: 384, h: 88 },
-    { x: 24, y: 696, w: 384, h: 88 },
-    { x: 24, y: 800, w: 220, h: 44 },
-  ],
-  'writings-phone-reading': [
-    { x: 16, y: 200, w: 343, h: 28 },
-    { x: 16, y: 240, w: 343, h: 56 },
-    { x: 16, y: 300, w: 343, h: 20 },
-    { x: 16, y: 332, w: 343, h: 220 },
-    { x: 16, y: 560, w: 240, h: 44 },
-  ],
-  'writings-phone-list': [
-    { x: 0, y: 56, w: 375, h: 52 },
-    { x: 0, y: 200, w: 375, h: 22 },
-    { x: 0, y: 380, w: 375, h: 22 },
-    { x: 0, y: 520, w: 375, h: 22 },
-    { x: 92, y: 130, w: 283, h: 470 },
-  ],
 };
 
 function readPng(file) {
@@ -121,23 +71,6 @@ function cropPng(src, rect) {
   return out;
 }
 
-function maskRects(png, rects, fill = [20, 21, 24]) {
-  if (!rects?.length) return png;
-  const out = PNG.sync.read(PNG.sync.write(png));
-  for (const r of rects) {
-    for (let row = Math.max(0, r.y); row < Math.min(out.height, r.y + r.h); row++) {
-      for (let col = Math.max(0, r.x); col < Math.min(out.width, r.x + r.w); col++) {
-        const i = (row * out.width + col) * 4;
-        out.data[i] = fill[0];
-        out.data[i + 1] = fill[1];
-        out.data[i + 2] = fill[2];
-        out.data[i + 3] = 255;
-      }
-    }
-  }
-  return out;
-}
-
 function pixelDiffPct(a, b, threshold = 8) {
   if (a.width !== b.width || b.height !== a.height) {
     return { pct: 100, note: `size ${a.width}×${a.height} vs ${b.width}×${b.height}` };
@@ -158,26 +91,6 @@ function pixelDiffPct(a, b, threshold = 8) {
     }
   }
   return { pct: (diff / n) * 100, note: null };
-}
-
-function blur3(png) {
-  const out = PNG.sync.read(PNG.sync.write(png));
-  const w = png.width;
-  const h = png.height;
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      for (let c = 0; c < 3; c++) {
-        let s = 0;
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            s += png.data[((y + dy) * w + (x + dx)) * 4 + c];
-          }
-        }
-        out.data[(y * w + x) * 4 + c] = Math.round(s / 9);
-      }
-    }
-  }
-  return out;
 }
 
 function writeSbs(buildPath, refPath, outPath) {
@@ -232,8 +145,6 @@ function saveZoomCrop(build, ref, outBase, size = 96) {
 
 async function sheetRect(page) {
   return page.evaluate(() => {
-    const fromQa = window.__playtestQa?.getExperienceSheetRect?.();
-    if (fromQa) return fromQa;
     const el = document.querySelector('.building-panel.building-panel--experience .building-panel__sheet');
     if (!el) return null;
     const r = el.getBoundingClientRect();
@@ -248,7 +159,7 @@ async function sheetRect(page) {
 
 async function checklistChromeRect(page) {
   return page.evaluate(() => {
-    const el = document.querySelector('.checklist.checklist--figma-gate') ?? document.querySelector('.checklist');
+    const el = document.querySelector('.checklist.checklist--mobile-closed') ?? document.querySelector('.checklist');
     if (!el || el.hidden) return null;
     const r = el.getBoundingClientRect();
     return {
@@ -260,28 +171,55 @@ async function checklistChromeRect(page) {
   });
 }
 
+async function setLocale(page, lang) {
+  await page.evaluate((l) => window.__playtestQa.setLang?.(l), lang);
+  await wait(200);
+}
+
+async function expandPhoneSheet(page) {
+  const before = await sheetRect(page);
+  const grab = page.locator('.exp-mobile-chrome__grab').first();
+  if (await grab.isVisible().catch(() => false)) {
+    const box = await grab.boundingBox();
+    if (box) {
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+      await wait(400);
+    }
+    const afterTap = await sheetRect(page);
+    if (afterTap && before && afterTap.h > before.h + 40) return afterTap;
+    await grab.dispatchEvent('pointerdown', { pointerId: 1, button: 0, clientX: box.x + box.width / 2, clientY: box.y + box.height / 2 });
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 80);
+    await grab.dispatchEvent('pointerup', { pointerId: 1, button: 0 });
+    await wait(500);
+  }
+  return sheetRect(page);
+}
+
 async function captureFlow(page, building, flowPrefix, steps) {
-  const locale = FLOW_LOCALE[flowPrefix] ?? { map: 'en', panel: 'en' };
+  const locale = FLOW_LOCALE[flowPrefix] ?? { map: 'es', panel: 'es' };
   await page.goto(BASE, { waitUntil: 'networkidle', timeout: 60000 });
   await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, {
     timeout: 60000,
   });
+  await setLocale(page, 'es');
   if (steps.desktop) {
-    await page.evaluate(
-      (lang) => {
-        window.__playtestQa.setLang?.(lang);
-        window.__playtestQa.setLayout?.('split');
-      },
-      locale.panel,
-    );
+    await page.evaluate(() => {
+      window.__playtestQa.setLayout?.('split');
+    });
   } else {
-    await page.evaluate(
-      (lang) => {
-        window.__playtestQa.setLang?.(lang);
-        window.__playtestQa.setChecklistFigmaGate?.();
-      },
-      locale.map,
-    );
+    await page.evaluate(() => window.__playtestQa.setLayout?.('map'));
+    if (locale.map === 'en') {
+      await setLocale(page, 'en');
+      await page.evaluate(() =>
+        window.__playtestQa.setChecklistProgressForQa?.({
+          'walk-around': true,
+          'walk-keys': true,
+          'move-camera': true,
+          zoom: false,
+          'enter-building': false,
+        }),
+      );
+    }
   }
   await page.evaluate((name) => {
     window.__playtestQa.setZoom(0.5);
@@ -292,14 +230,9 @@ async function captureFlow(page, building, flowPrefix, steps) {
   const mapChecklistRect = steps.desktop ? null : await checklistChromeRect(page);
   await page.evaluate((name) => window.__playtestQa.enterInterior(name), building);
   await wait(900);
-  if (steps.expand) await page.evaluate(() => window.__playtestQa.expandInteriorSheet?.());
+  if (steps.expand) await expandPhoneSheet(page);
   await wait(600);
-  await page.evaluate(
-    (lang) => {
-      window.__playtestQa.setLang?.(lang);
-    },
-    locale.panel,
-  );
+  await setLocale(page, locale.panel);
   await wait(250);
   await page.evaluate(() => {
     document.querySelector('.building-panel__body-wrap')?.scrollTo(0, 0);
@@ -365,6 +298,7 @@ try {
     const ctx = await browser.newContext({
       viewport: meta.desktop ? { width: 1440, height: 900 } : { width: 375, height: 812 },
       deviceScaleFactor: meta.dpr,
+      hasTouch: !meta.desktop,
     });
     const page = await ctx.newPage();
     const baseDir = path.join(OUT, meta.prefix);
@@ -386,27 +320,12 @@ try {
       const buildNorm = path.join(baseDir, `build-${step}-1x.png`);
       writePng(buildNorm, build);
       const ref = readPng(refPath);
-      const pillRefPath = path.join(FIGMA, 'assets/checklist-phone-pill.png');
 
       writeSbs(buildNorm, refPath, path.join(OUT, 'sbs-full', `${figmaName}-full.png`));
 
       const crop = cropForStep(meta.desktop, step, capture, checklistRect, meta.building);
-      let compareBuild = cropPng(build, crop);
-      let compareRef =
-        step === 'map' &&
-        !meta.desktop &&
-        checklistRect &&
-        fs.existsSync(pillRefPath) &&
-        crop.w === checklistRect.w &&
-        crop.h === checklistRect.h
-          ? readPng(pillRefPath)
-          : cropPng(ref, crop);
-      const masks = TEXT_MASK_IN_CROP[`${figmaName}-${step}`] ?? TEXT_MASK_IN_CROP[figmaName];
-      const masked = !!masks?.length;
-      if (masked) {
-        compareBuild = maskRects(compareBuild, masks);
-        compareRef = maskRects(compareRef, masks);
-      }
+      const compareBuild = cropPng(build, crop);
+      const compareRef = cropPng(ref, crop);
       const cropTag = `${crop.x},${crop.y},${crop.w}×${crop.h}`;
       const cropBuildPath = path.join(OUT, 'crops', `${figmaName}-${step}-build.png`);
       const cropRefPath = path.join(OUT, 'crops', `${figmaName}-${step}-ref.png`);
@@ -417,33 +336,26 @@ try {
       writeSbs(cropBuildPath, cropRefPath, sbsPath);
 
       const strict = pixelDiffPct(compareBuild, compareRef, 8);
-      const soft = pixelDiffPct(blur3(compareBuild), blur3(compareRef), 12);
-      const checklistPillCrop =
-        !meta.desktop && step === 'map' && crop.w === 237 && crop.h === 52;
-      const gatePct = checklistPillCrop ? soft.pct : strict.pct;
       const flowLoc = FLOW_LOCALE[meta.prefix];
       const row = {
         screen: figmaName,
         step,
         crop: cropTag,
-        locale: step === 'map' ? flowLoc.map : flowLoc.panel,
-        textMasked: masked,
-        mixedFrameNote: flowLoc.mixed ?? null,
+        locale: step === 'map' ? flowLoc?.map ?? 'es' : flowLoc?.panel ?? 'es',
         diffPct: Number(strict.pct.toFixed(2)),
-        diffPctBlur12: Number(soft.pct.toFixed(2)),
-        gate: gatePct <= 8 ? 'PASS' : 'FAIL',
-        gateMetric: checklistPillCrop ? 'blur/12' : 'strict/8',
+        gate: strict.pct <= 8 ? 'PASS' : 'FAIL',
+        gateMetric: 'strict/8',
         sbsFull: path.join(OUT, 'sbs-full', `${figmaName}-full.png`),
+        sbs: sbsPath,
         note: strict.note,
       };
-      row.sbs = sbsPath;
       if (strict.pct > 8) {
         saveZoomCrop(compareBuild, compareRef, path.join(OUT, 'zoom', `${figmaName}-${step}`));
         row.zoomCrop = path.join(OUT, 'zoom', `${figmaName}-${step}-build.png`);
       }
       table.push(row);
       console.log(
-        `${figmaName} ${step} [${cropTag}] locale=${row.locale}${masked ? ' masked' : ''}: ${strict.pct.toFixed(2)}% (blur/12: ${soft.pct.toFixed(2)}%) ${row.gate}`,
+        `${figmaName} ${step} [${cropTag}] locale=${row.locale}: ${strict.pct.toFixed(2)}% ${row.gate}`,
       );
     }
   }
@@ -454,9 +366,9 @@ try {
 
 fs.mkdirSync(OUT, { recursive: true });
 fs.writeFileSync(path.join(OUT, 'diff-table.json'), JSON.stringify(table, null, 2));
-let md = '| Screen | Step | Crop | Locale | Mask | Diff % | Blur/12 | Gate |\n|---|---|---|---|---|---:|---:|---|\n';
+let md = '| Screen | Step | Crop | Locale | Diff % | Gate |\n|---|---|---|---|---:|---|\n';
 for (const r of table) {
-  md += `| ${r.screen} | ${r.step} | ${r.crop} | ${r.locale} | ${r.textMasked ? 'yes' : 'no'} | ${r.diffPct} | ${r.diffPctBlur12} | ${r.gate} |\n`;
+  md += `| ${r.screen} | ${r.step} | ${r.crop} | ${r.locale} | ${r.diffPct} | ${r.gate} |\n`;
 }
 fs.writeFileSync(path.join(OUT, 'DIFF-TABLE.md'), md);
 console.log(`\nWrote ${OUT}/diff-table.json, sbs/, sbs-full/, crops/, zoom/`);

@@ -62,11 +62,21 @@ body {
   border-radius: 2px;
 }
 
-.interior-stage-screen img {
-  display: block;
+.interior-stage-screen__poster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  background: #17181b;
+}
+
+.interior-stage-screen__play {
+  display: block;
+  width: 28%;
+  height: auto;
+  max-width: 72px;
+  opacity: 0.92;
 }
 
 #app {
@@ -182,9 +192,14 @@ body.is-canvas-dragging * {
 #ui-root > .chrome,
 #ui-root > .building-panel,
 #ui-root > .name-labels,
+#ui-root > .building-map-labels,
 #ui-root > .joystick,
 #ui-root > .jac-hud {
   pointer-events: none;
+}
+
+#ui-root > .building-map-labels .building-map-label {
+  pointer-events: auto;
 }
 
 #ui-root > .name-labels .name-label__info {
@@ -555,13 +570,105 @@ body[data-layout='panel'] .checklist {
     border-radius: 24px;
   }
 
-  .checklist--mobile-closed .checklist__list,
-  .checklist--mobile-closed .checklist__footer {
-    display: none;
+  body[data-layout='map'] .checklist--mobile-closed {
+    top: 56px;
+    left: 122px;
+    right: auto;
+    width: 237px;
+    min-width: 237px;
+    max-width: 237px;
+    height: auto;
+    border-radius: 26px;
+    border: 0;
+    box-shadow:
+      0 1px 1px rgba(0, 0, 0, 0.45),
+      0 2px 4px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
   }
 
-  body[data-layout='map'] .checklist--mobile-closed .checklist__header-text,
+  body[data-layout='map'] .checklist--mobile-closed .checklist__header {
+    display: grid;
+    grid-template-columns: 1fr auto 44px;
+    grid-template-areas: 'text count ring';
+    margin: 0;
+    padding: 0 8px 0 18px;
+    column-gap: 10px;
+    min-height: 52px;
+    height: 52px;
+    border-bottom: 0;
+    align-items: center;
+  }
+
+  body[data-layout='map'] .checklist--mobile-closed .checklist__header-text {
+    grid-area: text;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0;
+    padding: 0;
+    max-width: none;
+  }
+
+  body[data-layout='map'] .checklist--mobile-closed .checklist__progress-wrap {
+    display: contents;
+  }
+
   body[data-layout='map'] .checklist--mobile-closed .checklist__counter--label {
+    display: inline !important;
+    grid-area: count;
+    align-self: center;
+    font-family: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 16px;
+  }
+
+  body[data-layout='map'] .checklist--mobile-closed .checklist__ring-btn {
+    grid-area: ring;
+    justify-self: end;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    position: relative;
+  }
+
+  body[data-layout='map'] .checklist--mobile-closed .checklist__label {
+    font-size: 13px;
+    line-height: 16px;
+    font-weight: 400;
+  }
+
+  body[data-layout='map'] .checklist--mobile-closed .checklist__active-title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 16px;
+  }
+
+  body[data-layout='map'] .checklist--mobile-closed .checklist__ring,
+  body[data-layout='map'] .checklist--mobile-closed .checklist__counter--in-ring {
+    display: none !important;
+  }
+
+  body[data-layout='map'] .checklist--mobile-closed .checklist__ring-figma {
+    display: block;
+    width: 44px;
+    height: 44px;
+    pointer-events: none;
+  }
+
+  body[data-layout='map'] .checklist--mobile-closed .checklist__clipboard-figma {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 15px;
+    height: 15px;
+    pointer-events: none;
+  }
+
+  .checklist--mobile-closed .checklist__list,
+  .checklist--mobile-closed .checklist__footer {
     display: none;
   }
 
@@ -615,146 +722,9 @@ body[data-layout='panel'] .checklist {
     display: inline;
   }
 
-  /* UI gate: Figma phone map checklist pill (3/5 · Enter a building). */
-  .checklist--figma-gate.checklist--mobile {
-    top: 56px;
-    left: 122px;
-    right: auto;
-    width: 237px;
-    min-width: 237px;
-    max-width: 237px;
-    border-radius: 26px;
-    border: 0;
-    box-shadow:
-      0 1px 1px rgba(0, 0, 0, 0.45),
-      0 2px 4px rgba(0, 0, 0, 0.45);
-    overflow: hidden;
-  }
-
-  .checklist--figma-gate.checklist--mobile-closed {
-    width: 237px;
-    height: auto;
-    border-radius: 26px;
-  }
-
-  .checklist--figma-gate .checklist__list,
-  .checklist--figma-gate .checklist__footer {
-    display: none !important;
-  }
-
-  .checklist--figma-gate .checklist__header {
-    display: grid;
-    grid-template-columns: 1fr auto 44px;
-    grid-template-areas: 'text count ring';
-    margin: 0;
-    padding: 0 8px 0 18px;
-    column-gap: 10px;
-    min-height: 52px;
-    height: 52px;
-    border-bottom: 0;
-    align-items: center;
-  }
-
-  .checklist--figma-gate .checklist__header-text {
-    grid-area: text;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 0;
-    padding: 0;
-  }
-
-  .checklist--figma-gate .checklist__progress-wrap {
-    display: contents;
-  }
-
-  .checklist--figma-gate .checklist__counter--label {
-    grid-area: count;
-    align-self: center;
-  }
-
-  .checklist--figma-gate .checklist__ring-btn {
-    grid-area: ring;
-    justify-self: end;
-    border: none;
-    box-shadow: none;
-    background-color: transparent;
-  }
-
-  .checklist--figma-gate .checklist__label {
-    font-size: 13px;
-    line-height: 16px;
-  }
-
-  .checklist--figma-gate .checklist__active-title {
-    margin: 0;
-    font-size: 13px;
-    font-weight: 500;
-    line-height: 16px;
-    letter-spacing: 0;
-  }
-
-  .checklist--figma-gate .checklist__label {
-    font-weight: 400;
-    letter-spacing: 0;
-  }
-
-  .checklist--figma-gate .checklist__counter--label {
-    display: inline !important;
-    font-family: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
-    font-size: 13px;
-    font-weight: 500;
-    line-height: 16px;
-    letter-spacing: 0;
-  }
-
-  .checklist--figma-gate .checklist__header-text {
-    max-width: none;
-  }
-
-  .checklist--figma-gate.checklist--mobile-closed .checklist__header-text,
-  .checklist--figma-gate.checklist--mobile-closed .checklist__counter--label {
-    display: flex;
-  }
-
-  .checklist--figma-gate .checklist__ring-btn {
-    width: 44px;
-    height: 44px;
-    flex-shrink: 0;
-    background: transparent;
-    padding: 0;
-  }
-
-  .checklist--figma-gate .checklist__figma-ring {
-    display: block;
-    width: 44px;
-    height: 44px;
-  }
-
-  .checklist--figma-gate .checklist__figma-pill {
-    display: block;
-    width: 237px;
-    height: 52px;
-    object-fit: fill;
-  }
-
-  .checklist--figma-gate.checklist--mobile-closed .checklist__figma-pill {
-    display: block;
-  }
-
-  .checklist--figma-gate.checklist--mobile:has(.checklist__figma-pill:not([hidden])) {
-    box-shadow: none;
-    background: transparent;
-    border-radius: 0;
-    height: 52px;
-    min-height: 52px;
-    padding: 0;
-    overflow: visible;
-  }
-
-  .checklist--figma-gate .checklist__ring,
-  .checklist--figma-gate .checklist__counter--in-ring {
-    display: none !important;
+  .checklist__ring-figma,
+  .checklist__clipboard-figma {
+    display: none;
   }
 }
 
@@ -1412,11 +1382,11 @@ body[data-layout='panel'] .checklist {
 }
 
 .building-map-label__text {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #c8ccd4;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #edeef0;
 }
 
 /* Talks / Writings experience panel (Teresa + Biblioteca). */
@@ -1480,6 +1450,26 @@ body[data-layout='panel'] .checklist {
 }
 
 @media (max-width: 767px) {
+  .building-panel--experience.building-panel--open .building-panel__backdrop {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .building-panel--experience.building-panel--peek .building-panel__sheet {
+    transform: translateY(calc(100% - 102px));
+    max-height: 102px;
+    overflow: hidden;
+  }
+
+  .building-panel--experience.building-panel--writings.building-panel--peek .building-panel__sheet {
+    transform: translateY(calc(100% - 86px));
+    max-height: 86px;
+  }
+
+  .building-panel--experience.building-panel--peek .building-panel__body-wrap {
+    display: none;
+  }
+
   .building-panel--experience .building-panel__sheet {
     top: auto;
     left: 0;

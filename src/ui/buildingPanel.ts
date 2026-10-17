@@ -392,11 +392,20 @@ export class BuildingPanel {
 
     const drag = this.el.querySelector('[data-drag]') as HTMLElement;
     drag.addEventListener('pointerdown', (e) => this.onDragStart(e));
+    const grab = this.el.querySelector('.exp-mobile-chrome__grab') as HTMLElement | null;
+    grab?.addEventListener('pointerdown', (e) => this.onDragStart(e));
+    this.expMobileChrome?.addEventListener('pointerdown', (e) => {
+      if ((e.target as HTMLElement).closest('button')) return;
+      this.onDragStart(e);
+    });
     window.addEventListener('pointermove', (e) => this.onDragMove(e));
     window.addEventListener('pointerup', () => this.onDragEnd());
 
     this.titleEl.addEventListener('click', () => {
-      if (this.peekOnly && this.isMobile() && this.mode === 'interior') this.setPeek(false);
+      if (this.peekOnly && this.isMobile() && this.isInteriorExperienceSheet()) this.setPeek(false);
+    });
+    this.expMobileTitle?.addEventListener('click', () => {
+      if (this.peekOnly && this.isMobile() && this.isExperienceMode()) this.setPeek(false);
     });
     this.el.querySelector('[data-read]')?.addEventListener('click', (e) => {
       e.preventDefault();
@@ -469,11 +478,23 @@ export class BuildingPanel {
     this.hide();
   }
 
+  private isInteriorExperienceSheet(): boolean {
+    return (
+      this.mode === 'interior' ||
+      this.mode === 'talks' ||
+      this.mode === 'writings'
+    );
+  }
+
   private onDragStart(e: PointerEvent): void {
     if (!this.isMobile() || !this.isOpen() || this.mode === 'preview') return;
     if (performance.now() < this.ignoreDragUntil) return;
     this.dragStartY = e.clientY;
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {
+      /* optional */
+    }
   }
 
   private onDragMove(e: PointerEvent): void {
@@ -756,6 +777,7 @@ export class BuildingPanel {
         frag.appendChild(divider);
       }
       firstSection = false;
+      const limit = rowLimit[section.id] ?? 3;
       const head = document.createElement('div');
       head.className = 'experience__section-head';
       const row = document.createElement('div');
@@ -765,7 +787,7 @@ export class BuildingPanel {
       h.textContent = t(section.titleKey as I18nKey);
       const badge = document.createElement('span');
       badge.className = 'experience__section-count';
-      badge.textContent = '0';
+      badge.textContent = String(Math.min(limit, section.items.length));
       const seeAll = document.createElement('button');
       seeAll.type = 'button';
       seeAll.className = 'experience__see-all';
@@ -779,7 +801,6 @@ export class BuildingPanel {
       p.textContent = t(section.descKey as I18nKey);
       head.append(row, p);
       frag.appendChild(head);
-      const limit = rowLimit[section.id] ?? 3;
       for (const item of section.items.slice(0, limit)) {
         frag.appendChild(this.writingRow(item, section));
       }

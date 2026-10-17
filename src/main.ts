@@ -33,6 +33,7 @@ async function main(): Promise<void> {
   onLangChange(applyCanvasLabel);
 
   const checklist = new ChecklistUI(uiRoot, { onSkip: () => {}, onDismiss: () => {} });
+  if (!isMobileLayout()) checklist.setCollapsed(true);
 
   let scene!: IsoScene;
   const chrome = new ChromeUI(uiRoot, {
@@ -263,7 +264,8 @@ async function main(): Promise<void> {
     enterInterior: (name: string) => scene.enterInterior(name),
     exitInterior: () => scene.exitInterior(),
     dismissBuildingPanel: () => panel.hide(),
-    setChecklistFigmaGate: () => checklist.setFigmaGateState(),
+    setChecklistProgressForQa: (completed: Partial<Record<string, boolean>>) =>
+      checklist.setProgressForQa(completed as Partial<Record<import('./checklist/storage').ChecklistStepId, boolean>>),
     showPanelOverlayForQa: (title: string) => {
       checklist.setBuildingPanelOpen(true);
       panel.showOverlayForQa(title);

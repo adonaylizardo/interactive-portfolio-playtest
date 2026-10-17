@@ -14,14 +14,14 @@
         {
           "id": "ux-example-2",
           "example": true,
-          "titleKey": "writings.ux2.title",
-          "metaKey": "writings.ux2.meta"
+          "titleKey": "writings.ux3.title",
+          "metaKey": "writings.ux3.meta"
         },
         {
           "id": "ux-example-3",
           "example": true,
-          "titleKey": "writings.ux3.title",
-          "metaKey": "writings.ux3.meta"
+          "titleKey": "writings.ux2.title",
+          "metaKey": "writings.ux2.meta"
         }
       ]
     },

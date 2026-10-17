@@ -3768,6 +3768,9 @@ export class IsoScene {
     opts?: { skipFade?: boolean; fromHash?: boolean },
   ): void {
     if (this.interiorActive && this.interiorDef?.id === buildingId) return;
+    if (this.interiorActive && this.interiorDef?.id !== buildingId) {
+      this.exitInterior({ immediate: true, skipFade: true });
+    }
     const def = getInteriorDef(buildingId);
     const building = objects.find((o) => o.type === 'building' && o.name === buildingId);
     const door = building?.door;
