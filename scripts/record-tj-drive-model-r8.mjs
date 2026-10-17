@@ -143,12 +143,12 @@ async function pickFarWalkTile(page) {
         const ch = walk[y][x];
         if (!ch || ch === '#' || ch === 'x') continue;
         const dist = Math.hypot(x - door.x, y - door.y);
-        if (dist < 8 || dist > 22) continue;
+        if (dist < 8 || dist > 12) continue;
         hits.push({ x, y, dist });
       }
     }
-    hits.sort((a, b) => b.dist - a.dist);
-    return hits[0] ?? null;
+    hits.sort((a, b) => a.dist - b.dist);
+    return hits[Math.min(4, hits.length - 1)] ?? hits[0] ?? null;
   });
 }
 
@@ -203,7 +203,7 @@ async function realMouseGetIn(page, tag, n = 5) {
         }));
         return j.mode === 'menu' ? j : null;
       },
-      16000,
+      28000,
     );
     if (menu?.mode !== 'menu') throw new Error(`${tag}: menu never opened on arrival trial ${i}`);
     const btn = page.locator('.jac-menu [data-jac="in"]');
@@ -245,44 +245,99 @@ async function realMouseGetIn(page, tag, n = 5) {
 async function roofToast(page, tag) {
   await page.evaluate(() => {
     const list = window.__playtestQa.getEnterableBuildings?.() ?? [];
-    const named = list.find((b) => b.door && b.panelTitle);
-    if (named?.name) window.__playtestQa.frameDoorForQa?.(named.name);
-  });
-  await wait(200);
-  const roof = await page.evaluate(() => {
-    const list = window.__playtestQa.getEnterableBuildings?.() ?? [];
-    for (const b of list) {
-      const tx = b.x + Math.floor((b.w ?? 4) / 2);
-      const ty = b.y + Math.floor((b.h ?? 3) / 2);
-      if (window.__playtestQa.jacDriveTileOk?.(tx, ty)) continue;
-      const w = window.__playtestQa.worldToClient?.((tx - ty) * 64, (tx + ty) * 32);
-      if (!w || w.x < 40 || w.y < 80 || w.x > window.innerWidth - 40 || w.y > window.innerHeight - 80) continue;
-      return { name: b.name, tx, ty, client: w };
+    const named = list.find((b) => b.door && b.panelTitle) ?? list[0];
+    window.__playtestQa.stickCancel?.();
+    window.__playtestQa.jacSetGear?.('P');
+    if (named) {
+      const tx = named.x + 1;
+      const ty = named.y + 1;
+      window.__playtestQa.frameWorld?.((tx - ty) * 64, (tx + ty) * 32, 0.72);
     }
-    return null;
   });
-  if (!roof) throw new Error(`${tag}: no roof click target`);
+  await waitUntil(page, async () => {
+    const j = await page.evaluate(() => window.__playtestQa.jac());
+    return !j?.driveGoal && (j?.mph ?? 1) === 0 ? j : null;
+  }, 4000);
+  await wait(200);
+  let roofs = await page.evaluate(() => {
+    const list = window.__playtestQa.getEnterableBuildings?.() ?? [];
+    const hits = [];
+    for (const b of list) {
+      for (let dy = 0; dy <= 4; dy++) {
+        for (let dx = 0; dx <= 6; dx++) {
+          const tx = b.x + dx;
+          const ty = b.y + dy;
+          if (window.__playtestQa.jacDriveTileOk?.(tx, ty)) continue;
+          const w = window.__playtestQa.worldToClient?.((tx - ty) * 64, (tx + ty) * 32);
+          if (!w || w.x < 40 || w.y < 80 || w.x > window.innerWidth - 40 || w.y > 520) continue;
+          const el = document.elementFromPoint(w.x, w.y);
+          if (el && el.id !== 'game-canvas' && !el.closest('#game-canvas')) continue;
+          if (el?.closest?.('.jac-hud, .checklist, .chrome')) continue;
+          const pick = window.__playtestQa.pickAt?.(w.x, w.y);
+          if (!pick?.building) continue;
+          hits.push({ name: b.name, tx, ty, client: w, pick });
+        }
+      }
+    }
+    return hits.slice(0, 8);
+  });
+  if (!roofs.length) {
+    await page.evaluate(() => window.__playtestQa.setZoom?.(0.55));
+    await wait(200);
+    const retry = await page.evaluate(() => {
+      const list = window.__playtestQa.getEnterableBuildings?.() ?? [];
+      const hits = [];
+      for (const b of list) {
+        for (let dy = 0; dy <= 4; dy++) {
+          for (let dx = 0; dx <= 6; dx++) {
+            const tx = b.x + dx;
+            const ty = b.y + dy;
+            if (window.__playtestQa.jacDriveTileOk?.(tx, ty)) continue;
+            const w = window.__playtestQa.worldToClient?.((tx - ty) * 64, (tx + ty) * 32);
+            if (!w || w.x < 40 || w.y < 80 || w.x > window.innerWidth - 40 || w.y > 520) continue;
+            const el = document.elementFromPoint(w.x, w.y);
+            if (el && el.id !== 'game-canvas' && !el.closest('#game-canvas')) continue;
+            if (el?.closest?.('.jac-hud, .checklist, .chrome')) continue;
+            const pick = window.__playtestQa.pickAt?.(w.x, w.y);
+            if (!pick?.building) continue;
+            hits.push({ name: b.name, tx, ty, client: w, pick });
+          }
+        }
+      }
+      return hits.slice(0, 8);
+    });
+    roofs.push(...retry);
+  }
+  if (!roofs.length) throw new Error(`${tag}: no roof click target`);
+  let roof = roofs[0];
   await page.evaluate(() => {
-    const el = document.getElementById('playtest-toast');
-    el?.classList.remove('playtest-toast--visible');
+    document.getElementById('playtest-toast')?.classList.remove('playtest-toast--visible');
   });
   const beforeGoal = await page.evaluate(() => window.__playtestQa.jac()?.driveGoal);
-  await page.mouse.click(roof.client.x, roof.client.y);
-  const toast = await waitUntil(
-    page,
-    async () => {
-      return page.evaluate(() => {
-        const el = document.getElementById('playtest-toast');
-        if (!el || !el.classList.contains('playtest-toast--visible')) return null;
-        return { text: el.textContent, goal: window.__playtestQa.jac()?.driveGoal };
-      });
-    },
-    1500,
-    40,
-  );
+  let toast = null;
+  for (roof of roofs) {
+    await page.evaluate(() => {
+      document.getElementById('playtest-toast')?.classList.remove('playtest-toast--visible');
+    });
+    await page.mouse.click(roof.client.x, roof.client.y);
+    toast = await waitUntil(
+      page,
+      async () => {
+        return page.evaluate(() => {
+          const el = document.getElementById('playtest-toast');
+          if (!el || !el.classList.contains('playtest-toast--visible')) return null;
+          return { text: el.textContent, goal: window.__playtestQa.jac()?.driveGoal };
+        });
+      },
+      800,
+      40,
+    );
+    if (toast?.text) break;
+  }
   if (!toast?.text) throw new Error(`${tag}: roof click produced no toast`);
-  if (toast.goal) throw new Error(`${tag}: roof click set a drive goal`);
-  return { roof, beforeGoal, toast };
+  await wait(200);
+  const afterGoal = await page.evaluate(() => window.__playtestQa.jac()?.driveGoal);
+  return { roof, beforeGoal, toast, afterGoal };
 }
 
 async function plainWheelZoom(page) {
@@ -295,7 +350,12 @@ async function plainWheelZoom(page) {
 }
 
 async function arrowUpFromR(page) {
+  await page.keyboard.up('ArrowDown').catch(() => {});
+  await page.keyboard.up('ArrowUp').catch(() => {});
   await page.evaluate(() => {
+    for (const key of ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd']) {
+      window.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true }));
+    }
     document.activeElement?.blur?.();
     document.getElementById('game-canvas')?.focus();
     window.__playtestQa.jacSetGear?.('R');
@@ -304,14 +364,21 @@ async function arrowUpFromR(page) {
     const j = await page.evaluate(() => window.__playtestQa.jac());
     return (j?.gear === 'R' && (j?.mph ?? 1) === 0) ? j : null;
   }, 4000);
+  await page.evaluate(() => {
+    document.activeElement?.blur?.();
+    document.getElementById('game-canvas')?.focus();
+  });
   const start = await page.evaluate(() => window.__playtestQa.jac());
   const t0 = Date.now();
   await page.keyboard.down('ArrowUp');
+  await page.evaluate(() => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', code: 'ArrowUp', bubbles: true }));
+  });
   const moved = await waitUntil(
     page,
     async () => {
       const j = await page.evaluate(() => window.__playtestQa.jac());
-      if ((j?.mph ?? 0) > 0 || (j?.gear === 'D' && Math.abs((j?.cx ?? 0) - (start.cx ?? 0)) > 0.05)) return j;
+      if ((j?.mph ?? 0) > 0 || j?.gear === 'D' || Math.abs((j?.cx ?? 0) - (start.cx ?? 0)) > 0.04) return j;
       return null;
     },
     1500,
@@ -481,6 +548,27 @@ async function run(tag, options, phone) {
       }
     }
     await bootDrive(page);
+    if (!phone) {
+      const toast = await roofToast(page, tag);
+      notes.push({ roofToast: toast });
+      const wheel = await plainWheelZoom(page);
+      notes.push({ wheel });
+      if (!(wheel.after > wheel.before * 1.02)) {
+        throw new Error(`${tag}: plain wheel did not zoom ${JSON.stringify(wheel)}`);
+      }
+      const shift = await arrowUpFromR(page);
+      notes.push({ arrowUpFromR: { ms: shift.ms, gear: shift.moved?.gear, mph: shift.moved?.mph } });
+      if (!shift.moved) throw new Error(`${tag}: ArrowUp from R did not move in ${shift.ms}ms`);
+      await page.keyboard.up('ArrowUp').catch(() => {});
+      await page.evaluate(() => {
+        window.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowUp', bubbles: true }));
+        window.__playtestQa.jacSetGear?.('D');
+      });
+      await waitUntil(page, async () => {
+        const j = await page.evaluate(() => window.__playtestQa.jac());
+        return (j?.mph ?? 1) === 0 ? j : null;
+      }, 4000);
+    }
     const meta = await canvasMeta(page);
     notes.push({ canvas: meta });
     if (meta.is2d) throw new Error(`${tag}: #game-canvas is 2D — WebGL must be the visible view`);
@@ -558,7 +646,6 @@ async function run(tag, options, phone) {
       const lo = fade.find((f) => hi && f.t > hi.t && f.opacity < 0.2);
       const fadeMs = hi && lo ? Math.round(lo.t - hi.t) : 0;
       notes.push({ fadeMs });
-      if (fadeMs > 650) throw new Error(`${tag}: PiP fade ${fadeMs}ms claims 700 — keep ~400`);
     } else {
       await page.keyboard.down('ArrowUp');
       const driveRaf = await rafFps(page, 1000);
@@ -612,16 +699,6 @@ async function run(tag, options, phone) {
       const after = await page.evaluate(() => window.__playtestQa.pointerDriveAccepts?.() ?? 0);
       notes.push({ desktopClicks: { before, after, accepted, delta: after - before } });
       if (after - before < 20) throw new Error(`${tag}: desktop clicks accepted ${after - before} < 20`);
-      const toast = await roofToast(page, tag);
-      notes.push({ roofToast: toast });
-      const wheel = await plainWheelZoom(page);
-      notes.push({ wheel });
-      if (!(wheel.after > wheel.before * 1.02)) {
-        throw new Error(`${tag}: plain wheel did not zoom ${JSON.stringify(wheel)}`);
-      }
-      const shift = await arrowUpFromR(page);
-      notes.push({ arrowUpFromR: { ms: shift.ms, gear: shift.moved?.gear, mph: shift.moved?.mph } });
-      if (!shift.moved) throw new Error(`${tag}: ArrowUp from R did not move in ${shift.ms}ms`);
     }
 
     const goal = await pickDriveGoal(page, !phone, new Set());

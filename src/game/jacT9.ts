@@ -51,7 +51,7 @@ const MOVE_RPM = 2250;
 const MOVE_MPH = 10;
 /** Dwell only while braking from the opposite sign. A cold stop (already 0) flips immediately. */
 const SHIFT_DWELL_S = 0.4;
-const STOPPED_SHIFT_S = 0.18;
+const STOPPED_SHIFT_S = 0;
 
 export type JacVisual = {
   obj: MapObject;

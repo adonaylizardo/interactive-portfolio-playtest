@@ -350,6 +350,7 @@ export class IsoScene {
   private rearFadeTo = 0;
   private rearFadeT0 = 0;
   private pendingJacExit = false;
+  private suppressDriveTapUntil = 0;
   private events: SceneEvents;
   private objectGraphics = new Map<string, Container>();
   /** Opaque bounding box of each non-building object's sprite, relative to its container. */
@@ -1642,6 +1643,13 @@ export class IsoScene {
       return;
     }
     if (this.jac?.driving) {
+      if (performance.now() < this.suppressDriveTapUntil) return;
+      if (this.pickBuildingAtScreen(sx, sy) || this.pickBuildingDoorAtScreen(sx, sy)) {
+        this.jac.clearDrivePath();
+        this.suppressDriveTapUntil = performance.now() + 250;
+        this.events.onUnreachable?.();
+        return;
+      }
       this.requestDriveToScreen(sx, sy);
       return;
     }
@@ -2702,6 +2710,8 @@ export class IsoScene {
           this.armDoorPush();
         }
         this.keys.add(k);
+        const focused = document.activeElement;
+        if (focused instanceof HTMLElement && focused.closest('.jac-hud')) focused.blur();
         // A press shorter than a frame never reaches updateMovement on slow devices.
         if (this.seatedBench && !this.interiorActive) this.standThen(null);
         e.preventDefault();
