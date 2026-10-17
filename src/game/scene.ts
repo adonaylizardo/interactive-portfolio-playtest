@@ -5000,6 +5000,51 @@ export class IsoScene {
     return { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y };
   }
 
+  /** Teresa interior: forge pantalla quad → client rect for stage video placeholder. */
+  interiorStageScreenLayout(): {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+    clipPath: string;
+  } | null {
+    if (!this.interiorActive || this.interiorDef?.id !== 'teresa' || !this.interiorDef.sprite) return null;
+    if (!this.canvasEl || !this.app) return null;
+    const def = this.interiorDef;
+    const tl = interiorSpriteTopLeft(def);
+    const scale = def.scale;
+    const corners1x = [
+      { x: 59.52, y: 173.36 },
+      { x: 206.72, y: 99.76 },
+      { x: 206.72, y: 171.76 },
+      { x: 59.52, y: 245.36 },
+    ];
+    const rect = this.canvasEl.getBoundingClientRect();
+    const sx = rect.width / (this.app.screen.width || 1);
+    const sy = rect.height / (this.app.screen.height || 1);
+    const client = corners1x.map((c) => {
+      const scr = this.worldToScreen(tl.x + c.x * scale, tl.y + c.y * scale);
+      return { x: rect.left + scr.x * sx, y: rect.top + scr.y * sy };
+    });
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const p of client) {
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x);
+      maxY = Math.max(maxY, p.y);
+    }
+    const width = maxX - minX;
+    const height = maxY - minY;
+    if (width < 4 || height < 4) return null;
+    const clipPath = `polygon(${client
+      .map((p) => `${((p.x - minX) / width) * 100}% ${((p.y - minY) / height) * 100}%`)
+      .join(', ')})`;
+    return { left: minX, top: minY, width, height, clipPath };
+  }
+
   /** Client pixels for ▶ Talks / 📄 Writings map pills. */
   buildingMapLabelAnchors(): {
     id: 'teresa' | 'biblioteca';
