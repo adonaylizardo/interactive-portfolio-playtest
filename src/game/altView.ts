@@ -5,6 +5,7 @@
  */
 import { Container, Graphics, Sprite } from 'pixi.js';
 import type { MapObject } from '../data/world';
+import { cells } from '../data/map';
 import { TILE_H, TILE_W } from '../data/world';
 import { mapWorldBounds, tileFootWorld, tileToWorld } from '../iso/math';
 import { C } from './colors';
@@ -114,7 +115,7 @@ function isoDepth(tx: number, ty: number, yaw: number): number {
 }
 
 function usesIsoSprite(o: MapObject): boolean {
-  if (o.id === 'fill/jac-t9') return true;
+  if (o.id === 'fill/jac-t9') return false;
   if (o.flat) return true;
   return false;
 }
@@ -211,13 +212,38 @@ function paintRoof(g: Graphics, o: MapObject, hover: boolean): void {
   g.closePath();
   g.stroke({ width: 1, color: shade(roof, 0.78), alpha: 0.7 });
   if (o.doorFace === '+y') {
-    const door = tileToWorld(fx + (w - 1) / 2, fy + h - 0.15);
-    g.circle(door.x, door.y, 4);
-    g.fill({ color: 0x3a3c42 });
+    const door = tileToWorld(fx + (w - 1) / 2, fy + h - 0.08);
+    const hw = Math.min(22, w * TILE_W * 0.22);
+    g.roundRect(door.x - hw, door.y - 5, hw * 2, 10, 2);
+    g.fill({ color: 0x1e2228, alpha: 0.95 });
+    g.roundRect(door.x - hw * 0.55, door.y - 3.5, hw * 1.1, 7, 1.5);
+    g.fill({ color: 0xc8d0dc });
+    g.rect(door.x + hw * 0.35, door.y - 1.5, 2.5, 3);
+    g.fill({ color: 0xf0b030 });
   } else if (o.doorFace === '+x') {
-    const door = tileToWorld(fx + w - 0.15, fy + (h - 1) / 2);
-    g.circle(door.x, door.y, 4);
-    g.fill({ color: 0x3a3c42 });
+    const door = tileToWorld(fx + w - 0.08, fy + (h - 1) / 2);
+    const hh = Math.min(22, h * TILE_H * 0.22);
+    g.roundRect(door.x - 5, door.y - hh, 10, hh * 2, 2);
+    g.fill({ color: 0x1e2228, alpha: 0.95 });
+    g.roundRect(door.x - 3.5, door.y - hh * 0.55, 7, hh * 1.1, 1.5);
+    g.fill({ color: 0xc8d0dc });
+    g.rect(door.x - 1.5, door.y + hh * 0.35, 3, 2.5);
+    g.fill({ color: 0xf0b030 });
+  }
+}
+
+function paintStreetOverlay(g: Graphics): void {
+  for (let y = 0; y < cells.length; y++) {
+    for (let x = 0; x < cells[y].length; x++) {
+      if (!cells[y][x].groundId.includes('path/street')) continue;
+      const p = tileToWorld(x, y);
+      g.moveTo(p.x, p.y - TILE_H / 2);
+      g.lineTo(p.x + TILE_W / 2, p.y);
+      g.lineTo(p.x, p.y + TILE_H / 2);
+      g.lineTo(p.x - TILE_W / 2, p.y);
+      g.closePath();
+      g.fill({ color: 0x3a424e, alpha: 0.55 });
+    }
   }
 }
 
@@ -300,11 +326,55 @@ export function paintAltView(
       const db = isoDepth(b.footprintX ?? b.x, b.footprintY ?? b.y, yaw);
       return da - db;
     });
+  if (mode === 'cenital') paintStreetOverlay(g);
   for (const o of drawable) {
     const hover = o.id === hoverId || o.name === hoverId;
     if (mode === 'cenital') paintRoof(g, o, hover);
     else paintBox(g, o, hover, yaw);
   }
+}
+
+/** Top-down van body in world space (cenital only). Heading: 0=+x tile (SE). */
+export function paintJacCenital(
+  g: Graphics,
+  cx: number,
+  cy: number,
+  heading: number,
+  _driving: boolean,
+): void {
+  const c = tileToWorld(cx, cy);
+  const len = TILE_W * 2;
+  const wid = TILE_H;
+  const ang = heading * (Math.PI / 2);
+  const cos = Math.cos(ang);
+  const sin = Math.sin(ang);
+  const hw = len / 2;
+  const hh = wid / 2;
+  const body = 0x4a7ab0;
+  const cab = 0x5c90c8;
+  const trim = 0x2e4a66;
+  const corners = [
+    { x: -hw, y: -hh },
+    { x: hw, y: -hh },
+    { x: hw, y: hh },
+    { x: -hw, y: hh },
+  ].map(({ x, y }) => ({ x: c.x + x * cos - y * sin, y: c.y + x * sin + y * cos }));
+  poly(g, corners, body);
+  const cabInset = 0.38;
+  poly(
+    g,
+    corners.map((p) => ({
+      x: c.x + (p.x - c.x) * cabInset + (-hh * 0.15) * sin,
+      y: c.y + (p.y - c.y) * cabInset + (hh * 0.15) * cos,
+    })),
+    cab,
+  );
+  g.moveTo(corners[0].x, corners[0].y);
+  g.lineTo(corners[1].x, corners[1].y);
+  g.stroke({ width: 2.5, color: trim, alpha: 0.85 });
+  const nose = { x: c.x + hw * cos, y: c.y + hw * sin };
+  g.circle(nose.x, nose.y, 5);
+  g.fill({ color: 0xe8eef4 });
 }
 
 export function captureBillboardHome(sprite: Container): BillboardHome {
@@ -398,7 +468,43 @@ export function screenStickToTile(
   const ly = (-dx * sin + dy * cos) / (viewSy || 1);
   const dtx = lx / TILE_W + ly / TILE_H;
   const dty = ly / TILE_H - lx / TILE_W;
-  return { x: dtx, y: dty };
+  const mag = Math.hypot(dtx, dty);
+  if (mag < 1e-6) return { x: 0, y: 0 };
+  return { x: dtx / mag, y: dty / mag };
+}
+
+/** Screen stick for driving: undo view rot/scale, keep screen-up as screen-up (unit length). */
+export function screenStickToDrive(
+  dx: number,
+  dy: number,
+  viewRot: number,
+  viewSx: number,
+  viewSy: number,
+): { x: number; y: number } {
+  const cos = Math.cos(viewRot);
+  const sin = Math.sin(viewRot);
+  const lx = (dx * cos + dy * sin) / (viewSx || 1);
+  const ly = (-dx * sin + dy * cos) / (viewSy || 1);
+  const mag = Math.hypot(lx, ly);
+  if (mag < 1e-6) return { x: 0, y: 0 };
+  return { x: lx / mag, y: ly / mag };
+}
+
+/** Screen drag (px) → camera pan in world units, undoing view rot / non-uniform scale. */
+export function screenDragToCameraDelta(
+  dx: number,
+  dy: number,
+  viewRot: number,
+  viewSx: number,
+  viewSy: number,
+  zoom: number,
+): { dx: number; dy: number } {
+  const cos = Math.cos(-viewRot);
+  const sin = Math.sin(-viewRot);
+  const lx = (dx * cos - dy * sin) / (viewSx || 1);
+  const ly = (dx * sin + dy * cos) / (viewSy || 1);
+  const z = zoom || 1;
+  return { dx: lx / z, dy: ly / z };
 }
 
 export function defaultBillboardScale(): number {

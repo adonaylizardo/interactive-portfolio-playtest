@@ -20,6 +20,7 @@
     "check:cases": "node scripts/check-case-copy.mjs",
     "deploy:gh-pages": "node scripts/deploy-gh-pages.mjs",
     "deploy:preview": "node scripts/deploy-gh-pages.mjs",
+    "deploy:preview-camaras": "DEPLOY_TARGET=preview-camaras node scripts/deploy-gh-pages.mjs",
     "deploy:live": "DEPLOY_TARGET=live node scripts/deploy-gh-pages.mjs"
   },
   "devDependencies": {

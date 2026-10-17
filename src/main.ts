@@ -19,6 +19,7 @@ import { ChromeUI, type DesktopLayout } from './ui/chrome';
 import { JacHud } from './ui/jacHud';
 import { Joystick } from './ui/joystick';
 import { NameLabels } from './ui/nameLabels';
+import { CenitalBuildingLabels } from './ui/cenitalBuildingLabels';
 import { hideToast, showToast } from './ui/toast';
 import { getLang, onLangChange, setLang, t } from './ui/i18n';
 import type { Camera } from './tokens';
@@ -48,6 +49,7 @@ async function main(): Promise<void> {
 
   const joystick = new Joystick(uiRoot);
   const labels = new NameLabels(uiRoot, { onJacInfo: () => scene.jacOpenInfo() });
+  const cenitalLabels = new CenitalBuildingLabels(uiRoot);
   const jacHud = new JacHud(uiRoot, {
     onInfo: () => scene.jacOpenInfo(),
     onGetIn: () => scene.jacGetIn(),
@@ -105,6 +107,12 @@ async function main(): Promise<void> {
     onMoveCommand: () => studio.noteMoveCommand(),
     onFrame: () => {
       labels.update(scene.nameLabelAnchors());
+      if (scene.getViewMode().mode === 'cenital' && !scene.isInInterior()) {
+        cenitalLabels.setHidden(false);
+        cenitalLabels.update(scene.cenitalBuildingLabelAnchors());
+      } else {
+        cenitalLabels.setHidden(true);
+      }
       if (scene.jacHudActive()) {
         const snap = scene.jacSnapshot();
         const anchors = scene.jacHudAnchors();
@@ -296,6 +304,8 @@ async function main(): Promise<void> {
     rotateView: () => scene.rotateView(),
     toggleMapOverview: () => scene.toggleMapOverview(),
     cameraViews: () => scene.qaCameraViews(),
+    cenitalExpectedHeading: (dx: number, dy: number) => scene.qaCenitalExpectedHeading(dx, dy),
+    cenitalBuildingLabels: () => cenitalLabels.qa(),
     isMobileSheetOpen: () => chrome.isMobileSheetOpen(),
     audioMuted: () => studio.isMuted(),
     audioUnlocked: () => studio.isUnlocked(),

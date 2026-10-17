@@ -544,9 +544,9 @@ export class ChromeUI {
   private placeLang(): void {
     const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
     if (!lang) return;
-    if (this.shortLandscape()) {
+    if (this.shortLandscape() || (this.mobile && window.innerWidth > window.innerHeight)) {
       lang.style.top = '12px';
-      lang.style.right = '72px';
+      lang.style.right = '16px';
       lang.style.left = 'auto';
       return;
     }
@@ -569,17 +569,25 @@ export class ChromeUI {
     if (!ctx) return;
     const w = this.minimap.width;
     const h = this.minimap.height;
+    const view = this.getView();
+    const cenital = view.mode === 'cenital';
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = '#0B0C0E';
-    ctx.beginPath();
-    ctx.moveTo(w / 2, 4);
-    ctx.lineTo(w - 4, h / 2);
-    ctx.lineTo(w / 2, h - 4);
-    ctx.lineTo(4, h / 2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = '#2A2C31';
-    ctx.stroke();
+    if (cenital) {
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = '#2A2C31';
+      ctx.strokeRect(2, 2, w - 4, h - 4);
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(w / 2, 4);
+      ctx.lineTo(w - 4, h / 2);
+      ctx.lineTo(w / 2, h - 4);
+      ctx.lineTo(4, h / 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#2A2C31';
+      ctx.stroke();
+    }
 
     const buildings = getEnterableBuildings();
     let minX = Infinity;
@@ -606,7 +614,8 @@ export class ChromeUI {
     ctx.fillStyle = '#24262B';
     for (const { p } of pts) {
       const s = map(p.x, p.y);
-      ctx.fillRect(s.x - 4, s.y - 3, 8, 6);
+      if (cenital) ctx.fillRect(s.x - 5, s.y - 4, 10, 8);
+      else ctx.fillRect(s.x - 4, s.y - 3, 8, 6);
     }
     const t = this.getCharTile();
     const c = map(tileToWorld(t.x, t.y).x, tileToWorld(t.x, t.y).y);

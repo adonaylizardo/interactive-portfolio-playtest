@@ -156,6 +156,7 @@ body.is-canvas-dragging * {
 #ui-root > .chrome,
 #ui-root > .building-panel,
 #ui-root > .name-labels,
+#ui-root > .cenital-building-labels,
 #ui-root > .joystick,
 #ui-root > .jac-hud {
   pointer-events: none;
@@ -1874,6 +1875,36 @@ body[data-layout='panel'] .checklist {
   display: none;
 }
 
+.cenital-building-labels {
+  position: fixed;
+  inset: 0;
+  z-index: 11;
+  pointer-events: none;
+}
+
+.cenital-building-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  max-width: min(220px, 42vw);
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgb(10 11 13 / 78%);
+  color: #f2f4f8;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
+  will-change: transform;
+  box-shadow: 0 1px 0 rgb(255 255 255 / 8% inset);
+}
+
+.cenital-building-label[hidden] {
+  display: none;
+}
+
 .name-label__dot {
   width: 6px;
   height: 6px;
@@ -2695,9 +2726,21 @@ body.jac-menu-open .checklist {
 }
 
 body.jac-info .chrome__views,
-body.jac-drive .chrome__views,
 body.jac-drive .chrome__locate {
   visibility: hidden;
+}
+
+@media (min-width: 768px) {
+  body.jac-drive .chrome__views {
+    visibility: visible;
+    z-index: 130;
+    pointer-events: auto;
+  }
+}
+
+body.jac-drive .chrome__view-btns {
+  z-index: 120;
+  pointer-events: auto;
 }
 
 body.jac-drive .chrome__dock,

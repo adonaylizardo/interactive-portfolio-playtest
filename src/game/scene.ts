@@ -138,7 +138,16 @@ import { FillActors, type FillActorSnapshot } from './fillActors';
 import { NpcCrowd, type NpcSnapshot } from './npcs';
 import { buildTown, type Bench } from './npcRoutines';
 import { Noah, type NoahSnapshot } from './noah';
-import { JacT9, JAC_ID, tileIsStandable, type JacGear, type JacLights, type JacSnapshot, type JacToggleId } from './jacT9';
+import {
+  JacT9,
+  JAC_ID,
+  headingFromTileStick,
+  tileIsStandable,
+  type JacGear,
+  type JacLights,
+  type JacSnapshot,
+  type JacToggleId,
+} from './jacT9';
 import {
   ALT_LABEL_GAP_PX,
   applyScreenBillboard,
@@ -149,8 +158,10 @@ import {
   hideIsoPropSprite,
   isBillboarded,
   paintAltView,
+  paintJacCenital,
   PERSPECTIVE_AIM_DOWN_FRAC,
   perspectiveYaw,
+  screenDragToCameraDelta,
   screenStickToTile,
   zoomMinForView,
 } from './altView';
@@ -295,6 +306,7 @@ export class IsoScene {
   highlightLayer = new Container();
   interiorLayer = new Container();
   private altViewLayer = new Graphics();
+  private altJacLayer = new Graphics();
   private altPaintKey = '';
   private billboardLayer = new Container();
   private perspective = new PerspectiveView();
@@ -504,12 +516,15 @@ export class IsoScene {
     this.world.addChild(this.tilesLayer);
     this.world.addChild(this.pathLayer);
     this.world.addChild(this.altViewLayer);
+    this.world.addChild(this.altJacLayer);
     this.world.addChild(this.objectsLayer);
     this.world.addChild(this.highlightLayer);
     this.world.addChild(this.characterLayer);
     this.world.addChild(this.interiorLayer);
     this.altViewLayer.eventMode = 'none';
     this.altViewLayer.label = 'alt-view';
+    this.altJacLayer.eventMode = 'none';
+    this.altJacLayer.label = 'alt-jac';
     this.interiorLayer.visible = false;
     this.interiorLayer.sortableChildren = true;
     this.interiorFloorGfx.zIndex = 0;
@@ -1417,7 +1432,11 @@ export class IsoScene {
   }
 
   private altViewOn(): boolean {
-    return !this.interiorActive && (this.viewMode === 'cenital' || this.viewMode === 'perspectiva');
+    return !this.interiorActive && this.viewMode === 'cenital';
+  }
+
+  private cenitalOn(): boolean {
+    return !this.interiorActive && this.viewMode === 'cenital';
   }
 
   private identityView(): boolean {
@@ -1441,7 +1460,7 @@ export class IsoScene {
     const sh = this.app.screen.height;
     this.updateCameraFitMargins();
     this.syncViewTransform();
-    this.zoom = this.zoomMinForCurrentView(sw, sh);
+    this.zoom = this.zoomMinForCurrentView(sw, sh) * 0.92;
     const b = mapWorldBounds();
     const aim = this.freeRectCenter();
     this.placeWorldAtScreen((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, aim.x, aim.y);
@@ -2356,24 +2375,34 @@ export class IsoScene {
   }
 
   private syncAltView(): void {
-    const on = this.altViewOn();
-    const roofs = on && !this.perspectiveOn();
-    this.altViewLayer.visible = roofs;
+    const cenital = this.cenitalOn();
+    this.altViewLayer.visible = cenital;
+    this.altJacLayer.visible = cenital;
     for (const v of this.objectVisuals.values()) {
-      if (v.obj.id === JAC_ID) continue;
-      v.sprite.visible = !(on && hideIsoPropSprite(v.obj));
+      if (v.obj.id === JAC_ID) {
+        v.sprite.visible = !cenital;
+        continue;
+      }
+      v.sprite.visible = !(cenital && hideIsoPropSprite(v.obj));
     }
-    if (!roofs) {
+    if (!cenital) {
       this.altViewLayer.clear();
+      this.altJacLayer.clear();
       this.altPaintKey = '';
       return;
     }
     const yaw = this.cameraYawQuarter();
     const hover = this.hoveredObject?.id ?? null;
     const key = `cenital:${yaw}:${hover ?? ''}`;
-    if (key === this.altPaintKey) return;
-    this.altPaintKey = key;
-    paintAltView(this.altViewLayer, objects, 'cenital', yaw, hover);
+    if (key !== this.altPaintKey) {
+      this.altPaintKey = key;
+      paintAltView(this.altViewLayer, objects, 'cenital', yaw, hover);
+    }
+    this.altJacLayer.clear();
+    if (this.jac) {
+      const snap = this.jac.snapshot();
+      paintJacCenital(this.altJacLayer, snap.cx, snap.cy, snap.heading, snap.driving);
+    }
   }
 
   private collectBillboards(): Container[] {
@@ -2383,7 +2412,7 @@ export class IsoScene {
     if (this.noah) out.push(...this.noah.spritesForBillboard());
     if (this.npcs) out.push(...this.npcs.spritesForBillboard());
     if (this.fillActors) out.push(...this.fillActors.spritesForBillboard());
-    if (this.jac) out.push(...this.jac.spritesForBillboard());
+    if (this.jac && !this.cenitalOn()) out.push(...this.jac.spritesForBillboard());
     return out;
   }
 
@@ -2441,6 +2470,12 @@ export class IsoScene {
 
   private remapWalkStick(dx: number, dy: number): { x: number; y: number } {
     if (!this.altViewOn() || (dx === 0 && dy === 0)) return { x: dx, y: dy };
+    this.syncViewTransform();
+    return screenStickToTile(dx, dy, this.viewRot, this.viewSx, this.viewSy);
+  }
+
+  private remapDriveStick(dx: number, dy: number): { x: number; y: number } {
+    if (!this.cenitalOn() || (dx === 0 && dy === 0)) return { x: dx, y: dy };
     this.syncViewTransform();
     return screenStickToTile(dx, dy, this.viewRot, this.viewSx, this.viewSy);
   }
@@ -2682,8 +2717,12 @@ export class IsoScene {
     if (dx === 0 && dy === 0) return;
     if (this.jac?.driving) return;
     this.suspendCameraFollow();
-    this.cameraX += dx / this.zoom;
-    this.cameraY += dy / this.zoom;
+    this.syncViewTransform();
+    const delta = this.identityView()
+      ? { dx: dx / this.zoom, dy: dy / this.zoom }
+      : screenDragToCameraDelta(dx, dy, this.viewRot, this.viewSx, this.viewSy, this.zoom);
+    this.cameraX += delta.dx;
+    this.cameraY += delta.dy;
     this.panDragScreenPx += Math.hypot(dx, dy);
     this.applyCamera();
   }
@@ -3364,8 +3403,12 @@ export class IsoScene {
           this.panMoved = true;
           document.body.classList.add('is-canvas-dragging');
           this.suspendCameraFollow();
-          this.cameraX += dx / this.zoom;
-          this.cameraY += dy / this.zoom;
+          this.syncViewTransform();
+          const delta = this.identityView()
+            ? { dx: dx / this.zoom, dy: dy / this.zoom }
+            : screenDragToCameraDelta(dx, dy, this.viewRot, this.viewSx, this.viewSy, this.zoom);
+          this.cameraX += delta.dx;
+          this.cameraY += delta.dy;
           this.lastPanPos = { x: e.clientX, y: e.clientY };
           this.panDragScreenPx += Math.hypot(dx, dy);
           this.applyCamera();
@@ -3735,7 +3778,7 @@ export class IsoScene {
         dx = 0;
         dy = 0;
       } else {
-        const mapped = this.remapWalkStick(dx, dy);
+        const mapped = this.remapDriveStick(dx, dy);
         dx = mapped.x;
         dy = mapped.y;
       }
@@ -3744,7 +3787,12 @@ export class IsoScene {
       if (dx !== 0 || dy !== 0 || stickHeld || this.jac.drivePath.length > 0) {
         if (dx !== 0 || dy !== 0) this.fireMoveCommand();
       }
-      this.jac.update(this.app.ticker.deltaMS / 1000, { dx, dy, autoShift: true });
+      this.jac.update(this.app.ticker.deltaMS / 1000, {
+        dx,
+        dy,
+        autoShift: true,
+        tileDir: this.cenitalOn(),
+      });
       this.charTx = this.jac.cx;
       this.charTy = this.jac.cy;
       if (this.pendingJacExit && this.jac.readyToExit()) this.finishJacGetOut();
@@ -5442,9 +5490,10 @@ export class IsoScene {
       Math.hypot(this.charTx - this.jac.cx, this.charTy - this.jac.cy) < 4;
     let jacRoof: { x: number; y: number } | null = null;
     if (!this.interiorActive && this.jac && (this.jac.driving || this.jac.mode === 'parked')) {
-      const roof = this.jac.labelAnchorWorld();
-      const s = this.worldToScreen(roof.x, roof.y);
-      jacRoof = { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y - NAME_PILL_GAP_PX };
+      const anchor = this.cenitalOn() ? this.jac.worldCenter() : this.jac.labelAnchorWorld();
+      const s = this.worldToScreen(anchor.x, anchor.y);
+      const jacGap = this.cenitalOn() ? gap + 22 : NAME_PILL_GAP_PX;
+      jacRoof = { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y - jacGap };
     }
     const adonayOverJac =
       !!jacRoof && !this.jac?.driving && Math.hypot(adonay.x - jacRoof.x, adonay.y - jacRoof.y) < 64;
@@ -5490,11 +5539,57 @@ export class IsoScene {
         name: 'JAC T9',
         x: jacRoof.x,
         y: jacRoof.y,
-        visible: onScreen(jacRoof.x - (rect?.left ?? 0), jacRoof.y - (rect?.top ?? 0) + NAME_PILL_GAP_PX),
+        visible: onScreen(jacRoof.x - (rect?.left ?? 0), jacRoof.y - (rect?.top ?? 0)),
         info: !this.jac.driving,
       });
     }
     return out;
+  }
+
+  /** Client pixels for full building names in top-down (HTML overlay). */
+  cenitalBuildingLabelAnchors(): { id: string; name: string; x: number; y: number; visible: boolean }[] {
+    if (!this.cenitalOn() || this.interiorActive) return [];
+    const rect = this.canvasEl?.getBoundingClientRect();
+    const sw = this.app?.screen.width ?? 0;
+    const sh = this.app?.screen.height ?? 0;
+    const zMin = this.zoomMinForCurrentView(sw, sh);
+    const midZoom = this.zoom >= zMin * 0.55 && !this.mapOverview;
+    const onScreen = (sx: number, sy: number) => sx > -60 && sy > -60 && sx < sw + 60 && sy < sh + 60;
+    const out: { id: string; name: string; x: number; y: number; visible: boolean }[] = [];
+    for (const o of objects) {
+      if (o.type !== 'building' || !o.panelTitle) continue;
+      const fx = o.footprintX ?? o.x;
+      const fy = o.footprintY ?? o.y;
+      const w = o.w ?? 1;
+      const h = o.h ?? 1;
+      const p = tileToWorld(fx + (w - 1) / 2, fy + (h - 1) / 2);
+      const s = this.worldToScreen(p.x, p.y);
+      const cx = (rect?.left ?? 0) + s.x;
+      const cy = (rect?.top ?? 0) + s.y;
+      out.push({
+        id: o.name ?? o.id,
+        name: o.panelTitle,
+        x: cx,
+        y: cy,
+        visible: midZoom && onScreen(s.x, s.y),
+      });
+    }
+    return out;
+  }
+
+  /** QA: expected van heading (0–3 quarters) for a screen stick in cenital drive. */
+  qaCenitalExpectedHeading(screenDx: number, screenDy: number): number | null {
+    const mag = Math.hypot(screenDx, screenDy);
+    if (mag < 0.08 || !this.cenitalOn()) return null;
+    this.syncViewTransform();
+    const { x, y } = screenStickToTile(
+      screenDx / mag,
+      screenDy / mag,
+      this.viewRot,
+      this.viewSx,
+      this.viewSy,
+    );
+    return headingFromTileStick(x, y, this.jac?.dir ?? 'se');
   }
 
   /** QA: opaque-top client point vs the HTML pill's bottom (gap should stay ~NAME_PILL_GAP_PX). */

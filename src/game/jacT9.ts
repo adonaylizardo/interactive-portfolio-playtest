@@ -89,7 +89,7 @@ export type JacVisual = {
   zIndex: number;
 };
 
-export type JacInput = { dx: number; dy: number; autoShift?: boolean };
+export type JacInput = { dx: number; dy: number; autoShift?: boolean; tileDir?: boolean };
 
 export type JacSnapshot = {
   mode: JacMode;
@@ -221,6 +221,22 @@ function headingDelta(from: number, to: number): number {
   if (d > 2) d -= 4;
   if (d < -2) d += 4;
   return d;
+}
+
+/** Nearest 4-way facing for a unit stick vector in tile space (screen-mapped). */
+export function facingFromTileDelta(dx: number, dy: number, fallback: FacingDir): FacingDir {
+  const offX = Math.abs(dx) > 0.12;
+  const offY = Math.abs(dy) > 0.12;
+  if (offX && offY) {
+    return Math.abs(dx) <= Math.abs(dy) ? (dx >= 0 ? 'se' : 'nw') : dy >= 0 ? 'sw' : 'ne';
+  }
+  if (offX) return dx >= 0 ? 'se' : 'nw';
+  if (offY) return dy >= 0 ? 'sw' : 'ne';
+  return fallback;
+}
+
+export function headingFromTileStick(dx: number, dy: number, fallback: FacingDir = 'se'): number {
+  return dirIndex(facingFromTileDelta(dx, dy, fallback));
 }
 
 export function tileIsStandable(x: number, y: number): boolean {
@@ -1234,11 +1250,26 @@ export class JacT9 {
 
     const stickMag = Math.min(1, mag);
     let throttle = 0;
-    if (live) {
+    let steer = 0;
+    if (live && input.tileDir) {
+      const wantDir = facingFromTileDelta(dx, dy, this.dir);
+      const want = dirIndex(wantDir);
+      let err = want - this.heading;
+      if (err > 2) err -= 4;
+      if (err < -2) err += 4;
+      steer = Math.max(-1, Math.min(1, err * 2));
+      throttle = stickMag;
+      this.followDir = wantDir;
+      if (this.sitWith(this.cx, this.cy, wantDir)) this.dir = wantDir;
+      if (this.dir !== wantDir) {
+        throttle = 0;
+        if (this.gear === 'R') this.gear = 'D';
+      }
+    } else if (live) {
       const fwd = Math.abs(dy) > 0.02 ? Math.sign(-dy) : 1;
       throttle = fwd * stickMag;
+      steer = dx;
     }
-    let steer = live ? dx : 0;
     const following = !this.pendingExit && !live && (this.drivePath.length > 0 || !!this.driveGoal);
     if (following) {
       const cmd = this.pathFollowStick(dt);
@@ -2314,6 +2345,10 @@ export class JacT9 {
 
   /** Silhouette in front of a roof that is currently hiding the van body. */
   private layoutGhost(wx: number, wy: number, sc: number, vanZ: number): void {
+    if (!this.body.visible) {
+      this.ghost.visible = false;
+      return;
+    }
     this.attachGhost();
     if (!this.ghostOnLayer) return;
     const occluded = vanZ < this.cx + this.cy + 0.05 || this.vanBehindBuilding();
