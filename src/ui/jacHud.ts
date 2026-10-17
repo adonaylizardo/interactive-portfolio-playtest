@@ -181,7 +181,22 @@ export class JacHud {
       fire(e);
     });
     this.root.addEventListener('click', fire);
-    this.root.addEventListener('pointerdown', (e) => e.stopPropagation());
+    this.root.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      const t = (e.target as HTMLElement).closest('[data-jac]') as HTMLElement | null;
+      if (t?.dataset.jac === 'out') fire(e);
+    });
+    this.root.addEventListener(
+      'touchstart',
+      (e) => {
+        const t = (e.target as HTMLElement).closest('[data-jac]') as HTMLElement | null;
+        if (t?.dataset.jac !== 'out') return;
+        e.preventDefault();
+        e.stopPropagation();
+        fire(e);
+      },
+      { passive: false },
+    );
   }
 
   private cycleLights(): void {

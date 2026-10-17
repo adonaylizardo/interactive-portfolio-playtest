@@ -1655,9 +1655,7 @@ export class IsoScene {
         this.pickBuildingDoorAtScreen(sx, sy) ||
         (raw && !this.jac.driveTileOk(raw.x, raw.y))
       ) {
-        this.jac.clearDrivePath();
-        this.suppressDriveTapUntil = performance.now() + 250;
-        this.events.onUnreachable?.();
+        this.toastDriveUnreachable();
         return;
       }
       this.requestDriveToScreen(sx, sy);
@@ -1757,20 +1755,25 @@ export class IsoScene {
     return null;
   }
 
+  private toastDriveUnreachable(): void {
+    this.jac?.clearDrivePath();
+    this.jac?.holdGear();
+    this.suppressDriveTapUntil = performance.now() + 450;
+    this.events.onUnreachable?.();
+  }
+
   private requestDriveToScreen(sx: number, sy: number): void {
     if (!this.jac?.driving || this.jac.isExiting()) return;
     if (performance.now() < this.suppressDriveTapUntil) return;
     if (this.pickBuildingAtScreen(sx, sy) || this.pickBuildingDoorAtScreen(sx, sy)) {
-      this.jac.clearDrivePath();
-      this.suppressDriveTapUntil = performance.now() + 250;
-      this.events.onUnreachable?.();
+      this.toastDriveUnreachable();
       return;
     }
     this.events.stickCancel?.();
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
     const tile = worldToTile(wx, wy);
     if (!tile || !this.jac.driveTileOk(tile.x, tile.y)) {
-      this.events.onUnreachable?.();
+      this.toastDriveUnreachable();
       return;
     }
     this.driveToTile(tile.x, tile.y, true);
@@ -1781,12 +1784,12 @@ export class IsoScene {
     this.events.stickCancel?.();
     this.pendingBuildingEntry = null;
     if (!this.jac.driveTileOk(gx, gy)) {
-      this.events.onUnreachable?.();
+      this.toastDriveUnreachable();
       return false;
     }
     const path = this.jac.findDrivePath(gx, gy);
     if (!path) {
-      this.events.onUnreachable?.();
+      this.toastDriveUnreachable();
       return false;
     }
     this.qaLastDriveTap = { x: gx, y: gy };
@@ -2791,6 +2794,13 @@ export class IsoScene {
       if (this.jac?.driving && e.touches.length === 1) {
         const t = e.touches[0];
         driveTap = { x: t.clientX, y: t.clientY, t: performance.now() };
+        const rect = canvas.getBoundingClientRect();
+        const sx = t.clientX - rect.left;
+        const sy = t.clientY - rect.top;
+        if (this.pickBuildingAtScreen(sx, sy) || this.pickBuildingDoorAtScreen(sx, sy)) {
+          driveTap = null;
+          this.toastDriveUnreachable();
+        }
       } else if (e.touches.length >= 2) {
         driveTap = null;
       }
@@ -3128,7 +3138,9 @@ export class IsoScene {
     sprite.position.set(left - region.sx * scaleX, top - region.sy * scaleY);
     sprite.width = cw * scaleX;
     sprite.height = ch * scaleY;
-    sprite.alpha = this.rearFade;
+    const chrome = document.querySelector('.jac-rear') as HTMLElement | null;
+    const cssFade = chrome ? Number(getComputedStyle(chrome).opacity) : this.rearFade;
+    sprite.alpha = Number.isFinite(cssFade) ? cssFade : this.rearFade;
     if (mask) {
       mask.clear();
       mask.rect(left, top, w, h);

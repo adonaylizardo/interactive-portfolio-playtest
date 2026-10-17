@@ -43,8 +43,9 @@ const DRIVE_TILES_PER_S = WALK_TILES_PER_S * 1.15;
 const REVERSE_TILES_PER_S = WALK_TILES_PER_S * 0.85;
 const ACCEL_TILES_S2 = 14;
 const BRAKE_TILES_S2 = 18;
-const EXIT_BRAKE_TILES_S2 = 140;
-const EXIT_MAX_TRAVEL = 0.55;
+const EXIT_BRAKE_TILES_S2 = 220;
+const EXIT_MAX_TRAVEL = 0.35;
+const BUMP_AMP = 0.22;
 const FRICTION_TILES_S2 = 10;
 const TURN_RATE = 2.4;
 const IDLE_RPM = 700;
@@ -253,7 +254,7 @@ export class JacT9 {
   private rearHold = 0;
 
   get rearCam(): boolean {
-    return this.driving && (this.reversing || this.rearHold > 0.02);
+    return this.driving && (this.gear === 'R' || this.reversing || this.rearHold > 0.02);
   }
 
   private tickRearHold(dt: number): void {
@@ -413,7 +414,10 @@ export class JacT9 {
     this.gear = behind ? 'R' : 'D';
   }
 
-  /** Sit-centre depth, and stay behind a nearby building sprite (catedral wing). */
+  /**
+   * Sit-centre depth, but stay behind a nearby building sprite (catedral wing overhangs
+   * its footprint). Only draw in front once the sit is past both the east and south faces.
+   */
   private sortDepth(): number {
     let z = this.cx + this.cy + 0.2;
     for (const o of objects) {
@@ -422,16 +426,21 @@ export class JacT9 {
       const fy = o.footprintY ?? o.y;
       const w = o.w ?? 1;
       const h = o.h ?? 1;
-      const south = fy + h - 0.5;
-      const east = fx + w - 0.5;
-      const near =
-        this.cx > fx - 2 && this.cx < east + 2.2 && this.cy > fy - 2 && this.cy < south + 2.2;
-      if (!near) continue;
-      if (this.cy <= south + 1.25 && this.cx <= east + 1.25) {
-        z = Math.min(z, fx + w - 1 + fy + h - 1 - 0.15);
+      const front = fx + w - 1 + fy + h - 1;
+      if (this.cx < fx - 4 || this.cy < fy - 4 || this.cx > fx + w + 5 || this.cy > fy + h + 5) {
+        continue;
       }
+      const pastEast = this.cx > fx + w + 0.45;
+      const pastSouth = this.cy > fy + h + 0.45;
+      if (pastEast && pastSouth) continue;
+      z = Math.min(z, front - 0.25);
     }
     return z;
+  }
+
+  /** Freeze D/R so an unreachable tap cannot auto-shift. */
+  holdGear(): void {
+    this.gearHeld = true;
   }
 
   canDriveAt(cx: number, cy: number): boolean {
@@ -571,7 +580,7 @@ export class JacT9 {
       const moved = this.followDrivePath(dt);
       this.steering = 0;
       this.tickRearHold(dt);
-      if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 0.35);
+      if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 0.33);
       this.syncMeters(moved);
       if (this.toggles.hazards) this.hazardT += dt;
       else this.hazardT = 0;
@@ -594,29 +603,33 @@ export class JacT9 {
       this.dir = dirFromHeading(this.heading);
     }
 
-    this.reversing = this.vel < -0.08;
+    this.reversing = this.vel < -0.08 || this.gear === 'R';
     this.tickRearHold(dt);
-    if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 0.35);
+    if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 0.33);
     const fwd = DIR_VEC[this.dir];
     if (moving) {
       const nx = fwd.x * this.vel * dt;
       const ny = fwd.y * this.vel * dt;
-      const next = slide(this.cx, this.cy, nx, ny, (x, y) => this.canSit(x, y));
+      let next = slide(this.cx, this.cy, nx, ny, (x, y) => this.canSit(x, y));
       const moved = Math.hypot(next.x - this.cx, next.y - this.cy);
       const wantStep = Math.hypot(nx, ny);
-      const blocked = wantStep > 0.04 && moved < wantStep * 0.55 && Math.abs(this.vel) > 0.25;
-      if (blocked) {
-        if (this.bumpArmed) {
-          this.noteBump();
-          this.bumpArmed = false;
-          if (moved < 1e-4) this.vel *= 0.35;
-        }
-      } else {
+      const inContact = wantStep > 0.02 && moved < wantStep * 0.55;
+      if (inContact) {
+        if (this.bumpArmed) this.noteBump();
+        this.bumpArmed = false;
+        this.vel = 0;
+        next = { x: this.cx, y: this.cy };
+      } else if (moved > 0.05) {
         this.bumpArmed = true;
       }
       if (this.pendingExit && this.exitFrom) {
         const travel = Math.hypot(next.x - this.exitFrom.x, next.y - this.exitFrom.y);
         if (travel >= EXIT_MAX_TRAVEL) {
+          const ang = Math.atan2(next.y - this.exitFrom.y, next.x - this.exitFrom.x);
+          next = {
+            x: this.exitFrom.x + Math.cos(ang) * EXIT_MAX_TRAVEL,
+            y: this.exitFrom.y + Math.sin(ang) * EXIT_MAX_TRAVEL,
+          };
           this.vel = 0;
         }
       }
@@ -721,7 +734,7 @@ export class JacT9 {
     } catch {
       /* no haptic */
     }
-    this.bumpT = 0.45;
+    this.bumpT = BUMP_AMP;
   }
 
   requestExit(): void {
@@ -732,7 +745,8 @@ export class JacT9 {
     this.clearDrivePath();
     this.gearHeld = false;
     this.qaSteer = null;
-    this.brakeTowardZero(1 / 30, EXIT_BRAKE_TILES_S2);
+    this.brakeTowardZero(1 / 20, EXIT_BRAKE_TILES_S2);
+    if (Math.abs(this.vel) <= 0.35) this.vel = 0;
   }
 
   readyToExit(): boolean {
@@ -883,8 +897,9 @@ export class JacT9 {
     this.heading = dirIndex(this.dir);
     this.vel = reverse ? -speed : speed;
     this.reversing = reverse;
-    if (!reverse) this.gear = 'D';
-    this.gearHeld = false;
+    if (!this.gearHeld) {
+      if (!reverse) this.gear = 'D';
+    }
     this.occupy(this.driveCells());
     this.layout();
     this.wheelAcc += dt * WHEEL_FPS;

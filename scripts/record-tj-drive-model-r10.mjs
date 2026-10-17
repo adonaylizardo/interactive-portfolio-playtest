@@ -220,8 +220,9 @@ async function run(tag, options, phone) {
       }
       notes.push({ pipContent: { content, of: 24 } });
       if (content < 10) throw new Error(`${tag}: PiP content frames ${content}/24`);
-      const fade = [];
       await releaseStickCdp(cdp);
+      await page.evaluate(() => window.__playtestQa.jacSetGear?.('D'));
+      const fade = [];
       const tFade = Date.now();
       while (Date.now() - tFade < 1400) {
         fade.push(
@@ -230,13 +231,13 @@ async function run(tag, options, phone) {
             return { t: performance.now(), opacity: el ? Number(getComputedStyle(el).opacity) : 0, on: el?.classList.contains('is-on') };
           }),
         );
-        await wait(30);
+        await wait(20);
       }
       const hi = fade.find((f) => f.opacity > 0.85);
       const lo = fade.find((f) => hi && f.t > hi.t && f.opacity < 0.15);
       const fadeMs = hi && lo ? Math.round(lo.t - hi.t) : 0;
-      notes.push({ fadeMs });
-      if (fadeMs && (fadeMs < 320 || fadeMs > 700)) throw new Error(`${tag}: PiP fade ${fadeMs}ms not ~400`);
+      notes.push({ fadeMs, fadeHead: fade.slice(0, 3), fadeTail: fade.slice(-3) });
+      if (fadeMs < 320 || fadeMs > 700) throw new Error(`${tag}: PiP fade ${fadeMs}ms not ~400`);
     }
 
     // LOW: Get out via the real pill.
