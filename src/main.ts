@@ -81,7 +81,9 @@ async function main(): Promise<void> {
       if (b?.panelTitle) {
         checklist.setBuildingPanelOpen(true);
         chrome.setInteriorOpen(true);
-        panel.showInterior(b.panelTitle, interiorId);
+        if (interiorId === 'teresa') panel.showTalks(b.panelTitle, interiorId);
+        else if (interiorId === 'biblioteca') panel.showWritings(b.panelTitle, interiorId);
+        else panel.showInterior(b.panelTitle, interiorId);
       }
     } else {
       checklist.setBuildingPanelOpen(false);
@@ -342,7 +344,8 @@ async function main(): Promise<void> {
     jacApproach: () => scene.qaJacApproach(),
     jacOverlapsProp: () => scene.qaJacOverlapsProp(),
     jacCanSit: (cx: number, cy: number) => scene.qaJacCanSit(cx, cy),
-    parkForDoor: (x: number, y: number) => scene.qaParkForDoor(x, y),
+    parkForDoor: (x: number, y: number, buildingName?: string) =>
+      scene.qaParkForDoor(x, y, buildingName),
     parkedFootprint: () => scene.qaParkedFootprint(),
     jacStick: (vec: { x: number; y: number } | null) => scene.qaJacStick(vec),
     jacDriveStep: (dt: number, dx: number, dy: number) => scene.qaJacDriveStep(dt, dx, dy),

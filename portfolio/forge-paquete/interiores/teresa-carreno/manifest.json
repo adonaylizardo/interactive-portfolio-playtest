@@ -1,0 +1,559 @@
+{
+ "asset": "teresa-carreno-interior",
+ "titulo": "Teatro Teresa Carreño · Sala Ríos Reyna en corte (Talks)",
+ "tipo": "edificio (interior)",
+ "estado": "APROBADO",
+ "aprobado_para_mapa": false,
+ "colocacion": {
+  "activa": false,
+  "instrucciones": "Colocación: sea S el punto del mundo en pantalla (edificios: vértice frontal de la huella; tiles: vértice inferior del rombo de la casilla; muebles: su punto de piso). Dibuja el frame con la esquina superior izquierda en (S.x − ancla.x, S.y − ancla.y − offset_y). Con offset_y = 0 el ancla cae justo en S; con offset_y = −24 (tiles de borde) el ancla queda 24 px por debajo de S, así el rombo calza con la grilla y la losa cuelga 24 px. En @2x multiplica todo por 2."
+ },
+ "huella": {
+  "x": 10,
+  "y": 7
+ },
+ "origen": {
+  "tipo": "programático PIL (sin Figma, sin SVG)",
+  "script": "/workspace/portfolio/qa/edificios/teresa-carreno-src/build_teresa_v2.py",
+  "fecha": "2026-10-16",
+  "referencias": "/workspace/portfolio/personaje-refs/teresa-carreno/refs.md",
+  "v1": "/workspace/portfolio/qa/edificios/teresa-carreno-src/build_teresa_v1.py (5×4… 7×5, reemplazado)"
+ },
+ "unidades": "px @1x (multiplica por 2 para @2x)",
+ "nota": "Huella 10×7 tiles (128×64 @2x). Ancla = centro inferior del frame (288,462) @1x. OJO: el vértice frontal del suelo cae en (336,462), +48 px en x respecto del ancla. Vértice trasero [240.0, 190.0]; esquinas laterales [16.0, 302.0] y [560.0, 350.0]. Exterior e interior comparten frame y ancla.",
+ "variantes": [
+  {
+   "nombre": "estado=interior, zoom=cerca",
+   "nodo": null,
+   "archivos": {
+    "png1x": "teresa-carreno-interior__estado-interior_zoom-cerca@1x.png",
+    "png2x": "teresa-carreno-interior__estado-interior_zoom-cerca@2x.png"
+   },
+   "tamano": {
+    "w": 576,
+    "h": 462
+   },
+   "ancla": {
+    "x": 288,
+    "y": 462
+   },
+   "offset_y": 0,
+   "vertice_frontal_suelo": {
+    "x": 336.0,
+    "y": 462.0
+   }
+  },
+  {
+   "nombre": "estado=interior, zoom=lejos",
+   "nodo": null,
+   "archivos": {
+    "png1x": "teresa-carreno-interior__estado-interior_zoom-lejos@1x.png",
+    "png2x": "teresa-carreno-interior__estado-interior_zoom-lejos@2x.png"
+   },
+   "tamano": {
+    "w": 576,
+    "h": 462
+   },
+   "ancla": {
+    "x": 288,
+    "y": 462
+   },
+   "offset_y": 0,
+   "vertice_frontal_suelo": {
+    "x": 336.0,
+    "y": 462.0
+   }
+  }
+ ],
+ "pantalla": {
+  "descripcion": "Rect de video sobre el muro x=0 (cara interior mira +x). En iso es un paralelogramo: lados verticales, lados superior/inferior con pendiente 1:2.",
+  "mascara": {
+   "png1x": "teresa-carreno-interior__mascara-pantalla@1x.png",
+   "png2x": "teresa-carreno-interior__mascara-pantalla@2x.png",
+   "nota": "L 8-bit, 255 = pantalla"
+  },
+  "esquinas_1x": {
+   "tl": [
+    59.52,
+    173.36
+   ],
+   "tr": [
+    206.72,
+    99.76
+   ],
+   "br": [
+    206.72,
+    171.76
+   ],
+   "bl": [
+    59.52,
+    245.36
+   ]
+  },
+  "esquinas_2x": {
+   "tl": [
+    119.04,
+    346.72
+   ],
+   "tr": [
+    413.44,
+    199.52
+   ],
+   "br": [
+    413.44,
+    343.52
+   ],
+   "bl": [
+    119.04,
+    490.72
+   ]
+  },
+  "bbox_1x": {
+   "x": 59.52,
+   "y": 99.76,
+   "w": 147.2,
+   "h": 145.6
+  },
+  "afin_1x": {
+   "formula": "pantalla(u,v) = tl + u·(tr−tl) + v·(bl−tl), u,v ∈ [0,1]",
+   "tr_menos_tl": [
+    147.2,
+    -73.6
+   ],
+   "bl_menos_tl": [
+    0,
+    72.0
+   ]
+  },
+  "relacion_aspecto_mundo": "4,6 tiles × 72 px ≈ 2,0:1 (16:9 con barras laterales finas)"
+ },
+ "elementos": [
+  "escenario de madera (world/wood) con proscenio",
+  "podio con lucecita ámbar",
+  "platea de 7 filas escalonadas que bajan hacia la pantalla",
+  "butacas = muebles/butaca mira=−u (compartida, sin recolorear, grafito como en la sala real)",
+  "pasillo central con alfombra roja (#58 1E 22, apagado)",
+  "boiserie de madera abajo, paneles acústicos arriba",
+  "balcón lateral",
+  "franja de paneles flotantes de cielo raso con spots (solo junto al muro trasero, para no tapar platea/pantalla)"
+ ],
+ "ambar_medido_1x": {
+  "interior_cerca": "0,06 %",
+  "lejos": "0,07 %"
+ },
+ "version": "v2b",
+ "caminabilidad": {
+  "sistema": "casillas de la huella: x 0..9 (eje +x, se aleja de la pantalla), y 0..6 (eje +y). Fila = y, columna = x.",
+  "leyenda": {
+   "S": "escenario, caminable (z=10)",
+   "s": "escalones al escenario, caminable (transición z 0→10)",
+   "A": "pasillo, caminable",
+   "R": "pasillo central con alfombra roja, caminable",
+   "B": "butacas, bloqueado",
+   "M": "bloqueado (podio o esquina de muro)"
+  },
+  "filas_y": [
+   "MSAAAAAAAA",
+   "SSABBBABBB",
+   "SSABBBABBB",
+   "SsRRRRRRRR",
+   "SSABBBABBB",
+   "SMABBBABBB",
+   "MSAAAAAAAA"
+  ],
+  "caminables": [
+   "0,1",
+   "0,2",
+   "0,3",
+   "0,4",
+   "0,5",
+   "1,0",
+   "1,1",
+   "1,2",
+   "1,3",
+   "1,4",
+   "1,6",
+   "2,0",
+   "2,1",
+   "2,2",
+   "2,3",
+   "2,4",
+   "2,5",
+   "2,6",
+   "3,0",
+   "3,3",
+   "3,6",
+   "4,0",
+   "4,3",
+   "4,6",
+   "5,0",
+   "5,3",
+   "5,6",
+   "6,0",
+   "6,1",
+   "6,2",
+   "6,3",
+   "6,4",
+   "6,5",
+   "6,6",
+   "7,0",
+   "7,3",
+   "7,6",
+   "8,0",
+   "8,3",
+   "8,6",
+   "9,0",
+   "9,3",
+   "9,6"
+  ],
+  "bloqueadas": [
+   "0,0",
+   "0,6",
+   "1,5",
+   "3,1",
+   "3,2",
+   "3,4",
+   "3,5",
+   "4,1",
+   "4,2",
+   "4,4",
+   "4,5",
+   "5,1",
+   "5,2",
+   "5,4",
+   "5,5",
+   "7,1",
+   "7,2",
+   "7,4",
+   "7,5",
+   "8,1",
+   "8,2",
+   "8,4",
+   "8,5",
+   "9,1",
+   "9,2",
+   "9,4",
+   "9,5"
+  ],
+  "altura_piso_px_1x_por_columna_x": {
+   "0": 10,
+   "1": 10,
+   "2": 0,
+   "3": 4,
+   "4": 8,
+   "5": 12,
+   "6": 16,
+   "7": 21,
+   "8": 26,
+   "9": 31
+  },
+  "centro_casilla_px_1x": {
+   "0,0": [
+    240.0,
+    196.0
+   ],
+   "1,0": [
+    272.0,
+    212.0
+   ],
+   "2,0": [
+    304.0,
+    238.0
+   ],
+   "3,0": [
+    336.0,
+    250.0
+   ],
+   "4,0": [
+    368.0,
+    262.0
+   ],
+   "5,0": [
+    400.0,
+    274.0
+   ],
+   "6,0": [
+    432.0,
+    286.0
+   ],
+   "7,0": [
+    464.0,
+    297.0
+   ],
+   "8,0": [
+    496.0,
+    308.0
+   ],
+   "9,0": [
+    528.0,
+    319.0
+   ],
+   "0,1": [
+    208.0,
+    212.0
+   ],
+   "1,1": [
+    240.0,
+    228.0
+   ],
+   "2,1": [
+    272.0,
+    254.0
+   ],
+   "3,1": [
+    304.0,
+    266.0
+   ],
+   "4,1": [
+    336.0,
+    278.0
+   ],
+   "5,1": [
+    368.0,
+    290.0
+   ],
+   "6,1": [
+    400.0,
+    302.0
+   ],
+   "7,1": [
+    432.0,
+    313.0
+   ],
+   "8,1": [
+    464.0,
+    324.0
+   ],
+   "9,1": [
+    496.0,
+    335.0
+   ],
+   "0,2": [
+    176.0,
+    228.0
+   ],
+   "1,2": [
+    208.0,
+    244.0
+   ],
+   "2,2": [
+    240.0,
+    270.0
+   ],
+   "3,2": [
+    272.0,
+    282.0
+   ],
+   "4,2": [
+    304.0,
+    294.0
+   ],
+   "5,2": [
+    336.0,
+    306.0
+   ],
+   "6,2": [
+    368.0,
+    318.0
+   ],
+   "7,2": [
+    400.0,
+    329.0
+   ],
+   "8,2": [
+    432.0,
+    340.0
+   ],
+   "9,2": [
+    464.0,
+    351.0
+   ],
+   "0,3": [
+    144.0,
+    244.0
+   ],
+   "1,3": [
+    176.0,
+    260.0
+   ],
+   "2,3": [
+    208.0,
+    286.0
+   ],
+   "3,3": [
+    240.0,
+    298.0
+   ],
+   "4,3": [
+    272.0,
+    310.0
+   ],
+   "5,3": [
+    304.0,
+    322.0
+   ],
+   "6,3": [
+    336.0,
+    334.0
+   ],
+   "7,3": [
+    368.0,
+    345.0
+   ],
+   "8,3": [
+    400.0,
+    356.0
+   ],
+   "9,3": [
+    432.0,
+    367.0
+   ],
+   "0,4": [
+    112.0,
+    260.0
+   ],
+   "1,4": [
+    144.0,
+    276.0
+   ],
+   "2,4": [
+    176.0,
+    302.0
+   ],
+   "3,4": [
+    208.0,
+    314.0
+   ],
+   "4,4": [
+    240.0,
+    326.0
+   ],
+   "5,4": [
+    272.0,
+    338.0
+   ],
+   "6,4": [
+    304.0,
+    350.0
+   ],
+   "7,4": [
+    336.0,
+    361.0
+   ],
+   "8,4": [
+    368.0,
+    372.0
+   ],
+   "9,4": [
+    400.0,
+    383.0
+   ],
+   "0,5": [
+    80.0,
+    276.0
+   ],
+   "1,5": [
+    112.0,
+    292.0
+   ],
+   "2,5": [
+    144.0,
+    318.0
+   ],
+   "3,5": [
+    176.0,
+    330.0
+   ],
+   "4,5": [
+    208.0,
+    342.0
+   ],
+   "5,5": [
+    240.0,
+    354.0
+   ],
+   "6,5": [
+    272.0,
+    366.0
+   ],
+   "7,5": [
+    304.0,
+    377.0
+   ],
+   "8,5": [
+    336.0,
+    388.0
+   ],
+   "9,5": [
+    368.0,
+    399.0
+   ],
+   "0,6": [
+    48.0,
+    292.0
+   ],
+   "1,6": [
+    80.0,
+    308.0
+   ],
+   "2,6": [
+    112.0,
+    334.0
+   ],
+   "3,6": [
+    144.0,
+    346.0
+   ],
+   "4,6": [
+    176.0,
+    358.0
+   ],
+   "5,6": [
+    208.0,
+    370.0
+   ],
+   "6,6": [
+    240.0,
+    382.0
+   ],
+   "7,6": [
+    272.0,
+    393.0
+   ],
+   "8,6": [
+    304.0,
+    404.0
+   ],
+   "9,6": [
+    336.0,
+    415.0
+   ]
+  },
+  "entrada": {
+   "casilla": [
+    8,
+    6
+   ],
+   "borde": "+y (vano en el muñón frontal)",
+   "px_1x": [
+    304.0,
+    404.0
+   ]
+  },
+  "spawn": {
+   "casilla": [
+    8,
+    6
+   ],
+   "mira": "nw (hacia la pantalla por el pasillo lateral)"
+  },
+  "pasillos": {
+   "central": "y=3, de x=2 a x=9 (alfombra roja) y llega a los escalones (1,3)",
+   "laterales": "y=0 y y=6, de x=2 a x=9",
+   "transversal": "x=6, de y=0 a y=6",
+   "frente_escenario": "x=2, de y=0 a y=6",
+   "escenario": "x 0..1 (podio en (1,5), esquinas (0,0) y (0,6) bloqueadas)"
+  },
+  "notas": "Cada casilla mide 128×64 @2x; Adonay (64×96 @2x) cabe holgado en los pasillos de 1 casilla. Al subir por la platea, suma altura_piso a la y de pantalla del personaje (en px @1x; ×2 en @2x)."
+ }
+}

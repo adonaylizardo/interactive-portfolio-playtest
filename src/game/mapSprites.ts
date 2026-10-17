@@ -60,15 +60,27 @@ export function objectSpriteBase(o: MapObject): string | null {
   return null;
 }
 
+const LUZ_BUILDINGS = new Set(['teresa', 'biblioteca']);
+
 /** Sprite key for an object given its state (buildings) and zoom variant. */
 export function objectSpriteKey(
   o: MapObject,
   state: 'default' | 'hover' | 'resaltado',
   lejos: boolean,
+  lightsOn = true,
 ): string | null {
   const base = objectSpriteBase(o);
   if (!base) return null;
   const zoom = lejos ? 'lejos' : 'cerca';
+  if (o.type === 'building' && LUZ_BUILDINGS.has(o.name)) {
+    if (lejos) return `${base}/${state}/${zoom}`;
+    if (state === 'default') {
+      const luz = lightsOn ? 'encendida' : 'apagada';
+      const key = `${base}/${state}/${luz}/${zoom}`;
+      return key;
+    }
+    return `${base}/${state}/${zoom}`;
+  }
   return o.type === 'building' ? `${base}/${state}/${zoom}` : `${base}/${zoom}`;
 }
 

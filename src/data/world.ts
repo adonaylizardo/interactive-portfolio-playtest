@@ -53,6 +53,8 @@ const PANEL_TITLES: Record<string, string> = {
   sambil: 'Sambil',
   catedral: 'Catedral',
   flor: 'Flor de Venezuela',
+  teresa: 'Talks',
+  biblioteca: 'Writings',
 };
 
 type EdificioJson = {
@@ -64,7 +66,19 @@ type EdificioJson = {
   acceso: [number, number];
   paisaje: boolean;
   interior: boolean;
+  /** Approved van sit beside the door (map cell centre). */
+  estacionamiento?: [number, number];
+  estacionamiento_dir?: 'ne' | 'se' | 'sw' | 'nw';
 };
+
+export type BuildingParkPrefer = { x: number; y: number; dir?: 'ne' | 'se' | 'sw' | 'nw' };
+
+export function buildingParkPrefer(buildingId: string): BuildingParkPrefer | null {
+  const ed = mapData.edificios[buildingId as keyof typeof mapData.edificios] as EdificioJson | undefined;
+  if (!ed?.estacionamiento) return null;
+  const [x, y] = ed.estacionamiento;
+  return { x, y, dir: ed.estacionamiento_dir };
+}
 
 function footprintTiles(x: number, y: number, w: number, h: number): { x: number; y: number }[] {
   const out: { x: number; y: number }[] = [];
