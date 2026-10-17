@@ -77,7 +77,7 @@ const SUB_DT = 1 / 60;
 const MAX_FRAME_DT = 0.25;
 /** Stay on the current 4-way sprite until heading is 20° past the 45° line. */
 const DIR_HYSTERESIS = 20 / 90;
-const DIR_HOLD_MS = 250;
+const DIR_HOLD_S = 0.25;
 const STUCK_REPLAN_S = 1.5;
 
 export type JacVisual = {
@@ -101,11 +101,13 @@ export type JacSnapshot = {
   gear: JacGear;
   dir: FacingDir;
   heading: number;
+  vel: number;
   rpm: number;
   mph: number;
   reversing: boolean;
   steering: number;
   driveGoal: { x: number; y: number } | null;
+  pathN: number;
   lastParkMs: number;
   visualTx: number;
   visualTy: number;
@@ -237,12 +239,6 @@ function wrapHeading(h: number): number {
   return x;
 }
 
-/** Continuous heading in tile space: 0=+x (SE), 1=+y (SW), 2=−x (NW), 3=−y (NE). */
-function headingToward(dx: number, dy: number): number {
-  if (Math.abs(dx) < 1e-4 && Math.abs(dy) < 1e-4) return 0;
-  return wrapHeading(Math.atan2(dy, dx) / (Math.PI / 2));
-}
-
 function slide(
   x: number,
   y: number,
@@ -324,9 +320,10 @@ export class JacT9 {
   private lastUnstickAt = 0;
   private replanN = 0;
   private stuckGaveUp = false;
-  private dirHoldUntil = 0;
+  private dirHoldT = 0;
   /** Door-park routes may use the 2×2 drive box, not both parked AABBs. */
   private followLoose = false;
+  private followDir: FacingDir | null = null;
   private goalBest = Infinity;
   private noProgressT = 0;
   bumpT = 0;
@@ -546,6 +543,7 @@ export class JacT9 {
     this.driveHadSpeed = false;
     this.lastUnstickAt = 0;
     this.followLoose = false;
+    this.followDir = null;
     this.goalBest = Infinity;
     this.noProgressT = 0;
   }
@@ -560,6 +558,7 @@ export class JacT9 {
     this.unstickHold = 0;
     this.stuckGaveUp = false;
     this.followLoose = !!opts?.loose;
+    this.followDir = null;
     this.goalBest = Math.hypot(this.cx - goal.x, this.cy - goal.y);
     this.noProgressT = 0;
     this.applyPathGear(false);
@@ -689,15 +688,18 @@ export class JacT9 {
     const sy = Math.round(this.cy);
     const usable = this.sitsForDoor(doorX, doorY);
     const doorSide = usable.filter((c) => c.along >= 0);
-    const front = doorSide.filter((c) => c.along >= 1 && c.doorD >= 3 && c.doorD <= 5);
-    const close = doorSide.filter((c) => c.along >= 0.5 && c.doorD <= 5);
-    const near = doorSide.filter((c) => c.doorD <= 8);
-    const pool = front.length ? front : close.length ? close : near.length ? near : doorSide.length ? doorSide : usable;
+    const closeEnough = doorSide.filter((c) => Math.hypot(c.x - doorX, c.y - doorY) <= 8);
+    const front = closeEnough.filter((c) => c.along >= 1 && c.doorD >= 3 && c.doorD <= 5);
+    const pool = front.length ? front : closeEnough.length ? closeEnough : doorSide.length ? doorSide : usable;
     const prefer = (c: DoorSit) => (cells[c.y]?.[c.x]?.groundId?.includes('park') ? 0 : 1);
     const closeness = (c: DoorSit) => Math.abs(c.doorD - 3.5);
     const doorHug = (c: DoorSit) => (this.parkTouchesDoor(c.x, c.y, c.heading, doorX, doorY) ? 1 : 0);
-    const reach = (c: DoorSit) => Math.abs(c.x - sx) + Math.abs(c.y - sy) + closeness(c) * 2 + c.walkD * 0.15;
     const origin = k(sx, sy);
+    const pathLen = (c: DoorSit) => {
+      const cached = this.pathsFrom === origin ? this.pathToSit.get(k(c.x, c.y)) : undefined;
+      return cached ? cached.length : Math.abs(c.x - sx) + Math.abs(c.y - sy);
+    };
+    const reach = (c: DoorSit) => pathLen(c) + closeness(c) * 2 + c.walkD * 0.15;
     const ranked = pool.filter((c) => !doorHug(c));
     const order = (ranked.length ? ranked : pool).slice().sort(
       (a, b) =>
@@ -1221,6 +1223,7 @@ export class JacT9 {
       dy = 0;
     }
     if (this.unstickHold > 0) this.unstickHold = Math.max(0, this.unstickHold - dt);
+    if (this.dirHoldT > 0) this.dirHoldT = Math.max(0, this.dirHoldT - dt);
     const live = !this.pendingExit && mag > 0.15 && this.unstickHold <= 0;
     if (live) {
       this.clearDrivePath();
@@ -1251,10 +1254,14 @@ export class JacT9 {
     this.applyThrottle(dt, throttle, input.autoShift !== false);
 
     const moving = Math.abs(this.vel) > 0.08;
-    const canTurn = moving || live || (following && Math.abs(throttle) > 0.08);
+    const canTurn = moving || live || following;
+    const turningInPlace = following && Math.abs(this.steering) > 0.35 && Math.abs(this.vel) < 0.3;
     if (canTurn && Math.abs(this.steering) > 0.08) {
       const sign = Math.abs(this.vel) > 0.08 ? (this.vel >= 0 ? 1 : -1) : throttle >= 0 ? 1 : -1;
       this.applyHeading(this.heading + this.steering * TURN_RATE * sign * dt);
+    }
+    if (following && this.followDir && this.sitWith(this.cx, this.cy, this.followDir)) {
+      this.dir = this.followDir;
     }
 
     this.reversing = this.vel < -0.08;
@@ -1264,12 +1271,19 @@ export class JacT9 {
     const oy = this.cy;
     const fwd = DIR_VEC[this.dir];
     if (moving) {
-      const ang = this.heading * (Math.PI / 2);
-      const mx = following ? Math.cos(ang) : fwd.x;
-      const my = following ? Math.sin(ang) : fwd.y;
+      const mx = fwd.x;
+      const my = fwd.y;
       const nx = mx * this.vel * dt;
       const ny = my * this.vel * dt;
       let next = slide(this.cx, this.cy, nx, ny, (x, y) => this.canSit(x, y));
+      if (following && this.drivePath[0] && next.x === this.cx && next.y === this.cy) {
+        const a = this.drivePath[0];
+        const cap = Math.max(Math.abs(this.vel) * dt, DRIVE_TILES_PER_S * dt);
+        const lx = Math.max(-cap, Math.min(cap, a.x - this.cx));
+        const ly = Math.max(-cap, Math.min(cap, a.y - this.cy));
+        if (lx && this.canSit(this.cx + lx, this.cy)) next = { x: this.cx + lx, y: this.cy };
+        else if (ly && this.canSit(this.cx, this.cy + ly)) next = { x: this.cx, y: this.cy + ly };
+      }
       const slid = Math.hypot(next.x - this.cx, next.y - this.cy);
       const wantStep = Math.hypot(nx, ny);
       const inContact = wantStep > 0.02 && slid < wantStep * 0.55;
@@ -1277,11 +1291,8 @@ export class JacT9 {
         if (this.bumpArmed) this.noteBump();
         this.bumpArmed = false;
         if (following) {
-          this.stuckT += dt;
-          if (this.stuckT >= 0.2) {
-            this.gear = 'R';
-            this.vel = Math.max(-REVERSE_TILES_PER_S, Math.min(this.vel, -1.6));
-            this.unstickHold = 0.35;
+          if (!turningInPlace) this.stuckT += dt;
+          if (this.stuckT >= STUCK_REPLAN_S) {
             this.stuckT = 0;
             this.tryReplan();
           }
@@ -1318,11 +1329,8 @@ export class JacT9 {
         this.wheelAcc -= 1;
       }
     } else if (following && this.driveGoal) {
-      this.stuckT += dt;
-      if (this.stuckT >= 0.2) {
-        this.gear = 'R';
-        this.vel = Math.max(-REVERSE_TILES_PER_S, Math.min(this.vel, -1.6));
-        this.unstickHold = 0.35;
+      if (!turningInPlace) this.stuckT += dt;
+      if (this.stuckT >= STUCK_REPLAN_S) {
         this.stuckT = 0;
         this.tryReplan();
       }
@@ -1391,13 +1399,15 @@ export class JacT9 {
         return;
       }
       if (autoShift && this.gear !== need) {
-        const dwell = Math.max(SHIFT_DWELL_S, STOPPED_SHIFT_S);
-        if (!this.shiftArmedAt) this.shiftArmedAt = performance.now();
-        if (this.shiftDwell <= 0) this.shiftDwell = dwell;
-        this.shiftDwell = Math.max(0, this.shiftDwell - dt);
-        if (performance.now() - this.shiftArmedAt < dwell * 1000) return;
-        if (this.shiftDwell > 0) return;
-        this.gear = need;
+        if (this.driveGoal) {
+          this.gear = need;
+        } else {
+          const dwell = Math.max(SHIFT_DWELL_S, STOPPED_SHIFT_S);
+          if (this.shiftDwell <= 0) this.shiftDwell = dwell;
+          this.shiftDwell = Math.max(0, this.shiftDwell - dt);
+          if (this.shiftDwell > 0) return;
+          this.gear = need;
+        }
       } else if (autoShift && !this.gearHeld) {
         this.gear = need;
       }
@@ -1533,7 +1543,7 @@ export class JacT9 {
       const behind = (goal.x - this.cx) * fwd.x + (goal.y - this.cy) * fwd.y < -0.05;
       if (
         this.visualOnTile(goal.x, goal.y) ||
-        goalDist < PATH_ARRIVE + 0.5 ||
+        goalDist < PATH_ARRIVE + 0.78 ||
         (goalDist < 1.55 && behind)
       ) {
         this.clearDriveArrival();
@@ -1555,31 +1565,36 @@ export class JacT9 {
       this.markStuck(dt);
       return { throttle: 0, steer: 0 };
     }
-    this.applyPathGear(this.unstickHold > 0 || this.stuckT > 0.2 || this.gear === 'R' || this.replanN > 0);
-    const reverse = this.gear === 'R' || this.unstickHold > 0;
-    const ax = look.x - this.cx;
-    const ay = look.y - this.cy;
-    const want = headingToward(reverse ? -ax : ax, reverse ? -ay : ay);
+    this.applyPathGear(false);
+    const first = this.drivePath[0] ?? look;
+    const ax = first.x - this.cx;
+    const ay = first.y - this.cy;
+    const boxOrigin = (c: number) => Math.round(c - (DRIVE_BOX - 1) / 2);
+    const wantDir: FacingDir = (() => {
+      if (boxOrigin(this.cx) !== boxOrigin(first.x)) return ax >= 0 ? 'se' : 'nw';
+      if (boxOrigin(this.cy) !== boxOrigin(first.y)) return ay >= 0 ? 'sw' : 'ne';
+      const offX = Math.abs(ax) > 0.12;
+      const offY = Math.abs(ay) > 0.12;
+      if (offX && offY) {
+        return Math.abs(ax) <= Math.abs(ay) ? (ax >= 0 ? 'se' : 'nw') : ay >= 0 ? 'sw' : 'ne';
+      }
+      if (offX) return ax >= 0 ? 'se' : 'nw';
+      if (offY) return ay >= 0 ? 'sw' : 'ne';
+      return Math.abs(ax) >= Math.abs(ay) ? (ax >= 0 ? 'se' : 'nw') : ay >= 0 ? 'sw' : 'ne';
+    })();
+    const want = dirIndex(wantDir);
     let err = want - this.heading;
     if (err > 2) err -= 4;
     if (err < -2) err += 4;
-    if (Math.abs(err) > 0.55) {
-      const snap = dirFromHeading(want);
-      if (snap !== this.dir && this.sitWith(this.cx, this.cy, snap)) {
-        this.dir = snap;
-        this.dirHoldUntil = 0;
-      }
-    }
-    const steer = Math.max(-1, Math.min(1, err * 1.8));
-    const turnSlow = 1 - Math.min(0.92, Math.abs(err) * 1.05);
-    const cornerSlow = this.upcomingCornerSlow();
-    const goalSlow = goalDist < 2.8 ? Math.max(0.22, goalDist / 2.8) : 1;
-    let throttle = (reverse ? -1 : 1) * turnSlow * goalSlow * cornerSlow;
-    if (!reverse && cornerSlow < 0.5) {
-      const cap = 1.4 + cornerSlow * 2.2;
-      if (this.vel > cap) this.vel = cap;
-      if (this.vel < -cap) this.vel = -cap;
-      if (Math.abs(this.vel) > 2) throttle = 0;
+    const steer = Math.max(-1, Math.min(1, err * 2));
+    const goalSlow = goalDist < 2.2 ? Math.max(0.28, goalDist / 2.2) : 1;
+    this.followDir = wantDir;
+    if (this.sitWith(this.cx, this.cy, wantDir)) this.dir = wantDir;
+    let throttle = goalSlow;
+    if (this.dir !== wantDir) {
+      throttle = 0;
+      this.stuckT = 0;
+      if (this.gear === 'R') this.gear = 'D';
     }
     if (Math.hypot(ax, ay) < 0.05) this.markStuck(dt);
     else if (Math.abs(this.vel) > 0.08) this.stuckT = 0;
@@ -1626,45 +1641,16 @@ export class JacT9 {
   /** Rebuild a collapsed polyline. Position stays on the integrator — no hops. */
   private recoverPathFollow(): void {
     if (!this.driveGoal) return;
+    if (this.drivePath.length === 0) {
+      const path = this.findDrivePath(this.driveGoal.x, this.driveGoal.y);
+      if (path && path.length > 0) this.drivePath = path;
+      return;
+    }
     const first = this.drivePath[0];
-    const far =
-      !first ||
-      this.drivePath.length <= 1 ||
-      Math.abs(first.x - this.cx) + Math.abs(first.y - this.cy) > 2.5;
+    const far = Math.abs(first.x - this.cx) + Math.abs(first.y - this.cy) > 4;
     if (!far) return;
     const path = this.findDrivePath(this.driveGoal.x, this.driveGoal.y);
     if (path && path.length > 0) this.drivePath = path;
-  }
-
-  /** Brake before a 90° polyline bend so a 2-tile jog is not blown at 10 mph. */
-  private upcomingCornerSlow(): number {
-    const pts = this.drivePath;
-    if (pts.length < 2) return 1;
-    let x = this.cx;
-    let y = this.cy;
-    let best = 1;
-    const n = Math.min(pts.length - 1, 5);
-    for (let i = 0; i < n; i++) {
-      const a = pts[i];
-      const b = pts[i + 1];
-      const da = { x: a.x - x, y: a.y - y };
-      const db = { x: b.x - a.x, y: b.y - a.y };
-      const la = Math.hypot(da.x, da.y);
-      const lb = Math.hypot(db.x, db.y);
-      if (la < 1e-4 || lb < 1e-4) {
-        x = a.x;
-        y = a.y;
-        continue;
-      }
-      const dot = (da.x * db.x + da.y * db.y) / (la * lb);
-      if (dot <= 0.35) {
-        const dist = Math.hypot(this.cx - a.x, this.cy - a.y);
-        best = Math.min(best, dist < 3 ? Math.max(0.16, dist / 3) : 0.4);
-      }
-      x = a.x;
-      y = a.y;
-    }
-    return best;
   }
 
   private pathLookAhead(): { x: number; y: number } | null {
@@ -1745,46 +1731,22 @@ export class JacT9 {
     this.reversing = false;
     this.stuckT = 0;
     this.followLoose = false;
+    this.followDir = null;
     return false;
   }
 
   /** Re-path from the current sit after a stall. Door-follow routes re-plan too. */
   private tryReplan(): boolean {
-    if (!this.driveGoal || this.replanN >= 8) return false;
+    if (!this.driveGoal || this.replanN >= (this.followLoose ? 24 : 8)) return false;
     this.replanN += 1;
-    const back = this.reverseOutHop();
     const path = this.findDrivePath(this.driveGoal.x, this.driveGoal.y);
-    if (back && path) {
-      this.drivePath = [back, ...path.filter((p) => p.x !== back.x || p.y !== back.y)];
-      this.applyPathGear(true);
-      this.stuckT = 0;
-      return this.drivePath.length > 0;
-    }
     if (path && path.length > 0) {
-      const first = path[0];
-      const sameHop =
-        this.drivePath[0] && first.x === this.drivePath[0].x && first.y === this.drivePath[0].y;
-      this.drivePath = sameHop && path.length > 1 ? path.slice(1) : path;
-      this.applyPathGear(true);
-      this.stuckT = 0;
-      return this.drivePath.length > 0;
-    }
-    if (back) {
-      this.drivePath = [back, this.driveGoal];
-      this.applyPathGear(true);
+      this.drivePath = path;
+      this.applyPathGear(false);
       this.stuckT = 0;
       return true;
     }
     return false;
-  }
-
-  private reverseOutHop(): { x: number; y: number } | null {
-    const fwd = DIR_VEC[this.dir];
-    const x = Math.round(this.cx - fwd.x);
-    const y = Math.round(this.cy - fwd.y);
-    if (!this.pathSit(x, y)) return null;
-    if (Math.hypot(x - this.cx, y - this.cy) < 0.2) return null;
-    return { x, y };
   }
 
   private markStuck(dt: number): void {
@@ -1794,8 +1756,9 @@ export class JacT9 {
     if (this.stuckT < STUCK_REPLAN_S || !this.driveGoal) return;
     if (this.tryReplan()) return;
     const far = Math.hypot(this.cx - this.driveGoal.x, this.cy - this.driveGoal.y) > 4;
-    if (this.followLoose && far && this.replanN < 8) {
+    if (this.followLoose && far) {
       this.stuckT = 0;
+      this.tryReplan();
       return;
     }
     this.drivePath = [];
@@ -1899,11 +1862,13 @@ export class JacT9 {
       gear: this.gear,
       dir: this.dir,
       heading: this.heading,
+      vel: this.vel,
       rpm: Math.round(this.rpm),
       mph: Math.round(this.mph),
       reversing: this.reversing,
       steering: this.steering,
       driveGoal: this.driveGoal,
+      pathN: this.drivePath.length,
       lastParkMs: this.lastParkMs,
       visualTx: this.visualCenterTile().x,
       visualTy: this.visualCenterTile().y,
@@ -1935,11 +1900,17 @@ export class JacT9 {
     this.heading = dirIndex(dir);
     this.cx = cx;
     this.cy = cy;
+    this.vel = 0;
+    this.mph = 0;
+    this.gear = driving ? 'D' : 'P';
+    this.gearHeld = false;
+    this.clearDrivePath();
     this.resolveOverlap();
     if (driving) {
       this.mode = 'drive';
       this.engineOn = true;
       this.occupy(this.driveCells());
+      this.ensurePathsFromHere();
     } else {
       this.mode = this.mode === 'drive' ? 'parked' : this.mode;
       this.applyParkedSolid(true);
@@ -2038,10 +2009,10 @@ export class JacT9 {
 
   private commitFacing(want: FacingDir): void {
     if (want === this.dir) return;
-    if (performance.now() < this.dirHoldUntil) return;
+    if (this.dirHoldT > 0) return;
     if (!this.sitWith(this.cx, this.cy, want) && !this.pathSit(this.cx, this.cy)) return;
     this.dir = want;
-    this.dirHoldUntil = performance.now() + DIR_HOLD_MS;
+    this.dirHoldT = DIR_HOLD_S;
   }
 
   private headingAgainstBoundary(want: number): number {

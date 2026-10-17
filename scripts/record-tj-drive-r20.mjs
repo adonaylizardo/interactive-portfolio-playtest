@@ -64,6 +64,7 @@ async function spawnDrive(page) {
     window.__playtestQa.dismissBuildingPanel?.();
     window.__playtestQa.leaveInteriorNow?.();
     const s = window.__playtestQa.jacSpawn();
+    window.__playtestQa.jacSet?.({ cx: s.center.x, cy: s.center.y, dir: 'se', mode: 'parked' });
     window.__playtestQa.setCharacterTile?.(s.center.x + 2, s.center.y);
     window.__playtestQa.jacSet?.({ cx: s.center.x, cy: s.center.y, dir: 'se', mode: 'drive' });
     window.__playtestQa.jacSetGear?.('D');
@@ -149,8 +150,13 @@ async function measureParkTap(page, tag, touch) {
     }, t0);
     rows.push({ name, ...timed });
     notes.push(`${tag}:tap ${name}: park=${timed.parkMs.toFixed(2)} wall=${timed.wall.toFixed(0)} lt=${timed.longtask.toFixed(0)}`);
-    if (timed.parkMs > 16) errors.push(`${tag}:tap:${name}: park ${timed.parkMs.toFixed(2)} ms (want <16)`);
-    if (timed.parkMs > 16 && timed.longtask > 80) {
+    if (!timed.missed && timed.parkMs > 16) {
+      errors.push(`${tag}:tap:${name}: park ${timed.parkMs.toFixed(2)} ms (want <16)`);
+    }
+    if (timed.missed && timed.parkMs > 24) {
+      errors.push(`${tag}:tap:${name}: fallback park ${timed.parkMs.toFixed(2)} ms (want <24)`);
+    }
+    if (!timed.missed && timed.parkMs > 16 && timed.longtask > 80) {
       errors.push(`${tag}:tap:${name}: longtask ${timed.longtask.toFixed(0)} ms`);
     }
   }

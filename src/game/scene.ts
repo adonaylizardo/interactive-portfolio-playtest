@@ -4297,7 +4297,7 @@ export class IsoScene {
       return;
     }
     this.pendingDriveEnterAt = performance.now();
-    this.jac.setDrivePath(path, sit, { loose: true });
+    this.jac.setDrivePath(path, { x: sit.x, y: sit.y }, { loose: true });
   }
 
   private rescueAvatarIfTrapped(): void {
