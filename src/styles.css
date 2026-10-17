@@ -599,15 +599,23 @@ body[data-layout='panel'] .checklist {
 
   .checklist--mobile-closed,
   .checklist--collapsed {
-    width: 48px;
-    height: 48px;
-    overflow: hidden;
+    width: 48px !important;
+    height: 48px !important;
+    overflow: hidden !important;
+    border-radius: 24px !important;
   }
 
-  .chrome__lang {
-    left: max(16px, env(safe-area-inset-left));
-    right: auto;
-    top: 12px;
+  .checklist--mobile-closed .checklist__header-text,
+  .checklist--mobile-closed .checklist__counter--label {
+    display: none !important;
+  }
+
+  .chrome__lang,
+  .chrome--mobile .chrome__lang,
+  .chrome--split .chrome__lang {
+    left: auto !important;
+    right: 72px !important;
+    top: 12px !important;
   }
 
   .building-panel__sheet {
@@ -1823,6 +1831,14 @@ body[data-layout='panel'] .checklist {
   .joystick {
     right: 24px;
     bottom: 24px;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .joystick {
+    left: 16px;
+    right: auto;
+    bottom: 84px;
   }
 }
 

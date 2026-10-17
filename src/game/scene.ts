@@ -995,7 +995,9 @@ export class IsoScene {
         if (obj.type === 'building' && obj.panelTitle && !this.prepareMapTap(obj)) return;
         const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
         if (obj.type === 'building' && obj.door && obj.panelTitle) {
-          this.requestWalk(obj.door.x, obj.door.y, sprint, { walkOnly: true });
+          this.requestWalk(obj.door.x, obj.door.y, sprint, {
+            buildingEntry: { panelTitle: obj.panelTitle, door: obj.door },
+          });
           return;
         }
         this.pendingBuildingEntry = null;
@@ -1409,7 +1411,6 @@ export class IsoScene {
     sprint: boolean,
     opts?: {
       buildingEntry?: { panelTitle: string; door: { x: number; y: number } };
-      walkOnly?: boolean;
     },
   ): void {
     if (this.jac?.driving) {
@@ -1432,10 +1433,8 @@ export class IsoScene {
     }
     const walkTx = tx;
     const walkTy = ty;
-    const entry = opts?.walkOnly
-      ? null
-      : (opts?.buildingEntry ??
-        resolveBuildingEntryFromTile(walkTx, walkTy, this.roundedCharTile()));
+    const entry =
+      opts?.buildingEntry ?? resolveBuildingEntryFromTile(walkTx, walkTy, this.roundedCharTile());
     this.pendingBuildingEntry = entry;
     const walkable = !!cells[walkTy]?.[walkTx]?.walkable;
     const target = walkable ? { x: walkTx, y: walkTy } : resolveWalkTarget(walkTx, walkTy);
@@ -1708,16 +1707,16 @@ export class IsoScene {
       this.jacClose();
       return;
     }
-    if (this.pickJacAtScreen(sx, sy)) {
-      this.tapJac();
-      return;
-    }
     const doorFirst = this.pickBuildingDoorAtScreen(sx, sy);
     if (doorFirst?.door && doorFirst.panelTitle) {
       if (!this.prepareMapTap(doorFirst)) return;
       this.requestWalk(doorFirst.door.x, doorFirst.door.y, sprint, {
         buildingEntry: { panelTitle: doorFirst.panelTitle, door: doorFirst.door },
       });
+      return;
+    }
+    if (this.pickJacAtScreen(sx, sy)) {
+      this.tapJac();
       return;
     }
     const sceneryTile = this.pickSceneryAtScreen(sx, sy);
@@ -1729,7 +1728,9 @@ export class IsoScene {
     const building = this.pickBuildingAtScreen(sx, sy);
     if (building?.door && building.panelTitle) {
       if (!this.prepareMapTap(building)) return;
-      this.requestWalk(building.door.x, building.door.y, sprint, { walkOnly: true });
+      this.requestWalk(building.door.x, building.door.y, sprint, {
+        buildingEntry: { panelTitle: building.panelTitle, door: building.door },
+      });
       return;
     }
     const bench = this.pickBenchAtScreen(sx, sy);
@@ -1827,7 +1828,14 @@ export class IsoScene {
     this.pendingDriveEnter = entry;
     this.pendingDriveEnterAt = performance.now();
     const dest = path.length > 0 ? path[path.length - 1] : sit;
-    if (path.length === 0 || (Math.hypot(this.jac.cx - dest.x, this.jac.cy - dest.y) < 1.2 && this.jac.mph < 1)) {
+    const alongNow = this.jac.doorSideAlong(entry.door.x, entry.door.y);
+    const distDoorNow = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
+    const atSit = path.length === 0 || (Math.hypot(this.jac.cx - dest.x, this.jac.cy - dest.y) < 1.2 && this.jac.mph < 1);
+    if (atSit && alongNow >= 0 && distDoorNow <= 5.5) {
+      this.jacGetOut({ thenEnter: true });
+      return true;
+    }
+    if (path.length === 0) {
       this.jacGetOut({ thenEnter: true });
       return true;
     }
@@ -4040,23 +4048,28 @@ export class IsoScene {
       visual: v,
       tapBox: this.objectTapBoxes,
       onStuck: () => {
-        if (this.pendingDriveEnter) this.jacGetOut({ thenEnter: true });
+        if (this.pendingDriveEnter) this.retryDriveEnterOrGetOut();
         else this.events.onUnreachable?.();
       },
     });
     g.label = JAC_ID;
   }
 
-  /** A tap on the van sprite always wins, even under a building or tile. */
+  /** Van sprite wins over ground, but a door tap always beats the parked van. */
   private claimJacTap(e: { clientX?: number; clientY?: number; global?: { x: number; y: number }; nativeEvent?: unknown }): boolean {
     if (!this.jac || this.jac.driving) return false;
     const local = this.federatedToCanvas(e);
-    return !!local && this.pickJacAtScreen(local.x, local.y);
+    if (!local) return false;
+    if (this.pickBuildingDoorAtScreen(local.x, local.y)) return false;
+    return this.pickJacAtScreen(local.x, local.y);
   }
 
   private pickJacAtScreen(sx: number, sy: number): boolean {
     if (!this.jac || this.interiorActive) return false;
+    if (this.pickBuildingDoorAtScreen(sx, sy)) return false;
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
+    const doorTile = worldToTile(wx, wy);
+    if (doorTile && getBuildingAtDoor(doorTile.x, doorTile.y)) return false;
     const g = this.objectGraphics.get(this.jac.obj.id);
     if (g) {
       const lx = wx - g.x;
@@ -4070,7 +4083,7 @@ export class IsoScene {
     if (tile && this.jac.tapHitsTile(tile.x, tile.y)) return true;
     const c = this.jac.worldCenter();
     const s = this.worldToScreen(c.x, c.y);
-    return Math.hypot(sx - s.x, sy - s.y) < 92;
+    return Math.hypot(sx - s.x, sy - s.y) < 32;
   }
 
   tapJac(): void {
@@ -4244,23 +4257,47 @@ export class IsoScene {
   private tryFinishDriveEnter(): void {
     if (!this.pendingDriveEnter || !this.jac?.driving || this.jac.isExiting()) return;
     const door = this.pendingDriveEnter.door;
-    const goal = this.jac.driveGoal ?? door;
-    const distGoal = Math.hypot(this.jac.cx - goal.x, this.jac.cy - goal.y);
+    const sit = this.jac.driveGoal;
+    const distSit = sit ? Math.hypot(this.jac.cx - sit.x, this.jac.cy - sit.y) : Infinity;
     const distDoor = Math.hypot(this.jac.cx - door.x, this.jac.cy - door.y);
     const idle = this.jac.drivePath.length === 0 && !this.jac.driveGoal;
-    const arrived = distGoal < 1.8 && this.jac.mph < 1.2;
-    const nearDoor = distDoor < 5 && this.jac.mph < 1;
-    const stalledNear = idle && this.jac.mph <= 0.25 && distDoor < 8;
-    const waiting = this.pendingDriveEnterAt > 0 ? performance.now() - this.pendingDriveEnterAt : 0;
-    if (arrived || nearDoor || stalledNear) {
+    const along = this.jac.doorSideAlong(door.x, door.y);
+    const arrived = sit && distSit < 1.15 && this.jac.mph < 1.2;
+    const doorSideSit = idle && this.jac.mph < 1.2 && along >= 0 && distDoor <= 6.2;
+    if (arrived || doorSideSit) {
       this.jacGetOut({ thenEnter: true });
       return;
     }
-    if (waiting > 22000 && idle) {
-      this.pendingDriveEnter = null;
-      this.pendingDriveEnterAt = 0;
-      this.moveCommandArmed = true;
+    if (this.jac.mph < 0.8 && distSit > 2.5) {
+      this.jac.unstickIfStopped();
     }
+    if (idle && this.jac.mph < 1.2) {
+      this.retryDriveEnterOrGetOut();
+    }
+  }
+
+  /** Stay on the door-side sit. A mid-route stall re-plans instead of getting out behind a house. */
+  private retryDriveEnterOrGetOut(): void {
+    const entry = this.pendingDriveEnter;
+    if (!entry || !this.jac?.driving) return;
+    const along = this.jac.doorSideAlong(entry.door.x, entry.door.y);
+    const dist = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
+    if (along >= 0 && dist <= 6.2) {
+      this.jacGetOut({ thenEnter: true });
+      return;
+    }
+    const sit = this.jac.parkForDoor(entry.door.x, entry.door.y);
+    if (!sit) {
+      this.jacGetOut({ thenEnter: true });
+      return;
+    }
+    const path = sit.path.length > 0 ? sit.path : this.jac.findDrivePath(sit.x, sit.y);
+    if (!path || path.length === 0) {
+      this.jacGetOut({ thenEnter: true });
+      return;
+    }
+    this.pendingDriveEnterAt = performance.now();
+    this.jac.setDrivePath(path, sit, { loose: true });
   }
 
   private rescueAvatarIfTrapped(): void {
@@ -4395,7 +4432,7 @@ export class IsoScene {
     this.qaStick = vec;
   }
 
-  qaJacDriveStep(dt: number, dx: number, dy: number): {
+  qaJacDriveStep(dt: number, dx: number, dy: number, opts?: { render?: boolean }): {
     cx: number;
     cy: number;
     dir: string;
@@ -4408,8 +4445,12 @@ export class IsoScene {
     this.charTy = this.jac.cy;
     this.startCameraFollow();
     this.updateCameraFollow();
-    this.app?.render();
-    this.events.onFrame?.();
+    if (this.pendingJacExit && this.jac.readyToExit()) this.finishJacGetOut();
+    else this.tryFinishDriveEnter();
+    if (opts?.render !== false) {
+      this.app?.render();
+      this.events.onFrame?.();
+    }
     const s = this.jac.snapshot();
     return { cx: s.cx, cy: s.cy, dir: s.dir, overlap: this.jac.overlapsProp(), mph: s.mph };
   }
