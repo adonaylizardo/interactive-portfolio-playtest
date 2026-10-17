@@ -211,23 +211,27 @@ async function main() {
     }
 
     // Van must not park on building footprint (Teresa door).
-    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-    const page = await ctx.newPage();
-    await page.goto(BASE, { waitUntil: 'networkidle', timeout: 60000 });
-    await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, {
-      timeout: 60000,
-    });
-    const overlap = await page.evaluate(() => {
-      const b = window.__playtestQa.getEnterableBuildings().find((x) => x.name === 'teresa');
-      if (!b?.door) return 'no door';
-      const sit = window.__playtestQa.parkForDoor(b.door.x, b.door.y, 'teresa');
-      if (!sit) return 'no sit';
-      const inFp = (x, y) => x >= 26 && x <= 35 && y >= 8 && y <= 14;
-      if (inFp(sit.x, sit.y)) return `sit on footprint ${sit.x},${sit.y}`;
-      return 'ok';
-    });
-    if (overlap !== 'ok') errors.push(`teresa park: ${overlap}`);
-    await ctx.close();
+    try {
+      const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+      const page = await ctx.newPage();
+      await page.goto(BASE, { waitUntil: 'networkidle', timeout: 60000 });
+      await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, {
+        timeout: 60000,
+      });
+      const overlap = await page.evaluate(() => {
+        const b = window.__playtestQa.getEnterableBuildings().find((x) => x.name === 'teresa');
+        if (!b?.door) return 'no door';
+        const sit = window.__playtestQa.parkForDoor(b.door.x, b.door.y, 'teresa');
+        if (!sit) return 'no sit';
+        const inFp = (x, y) => x >= 26 && x <= 35 && y >= 8 && y <= 14;
+        if (inFp(sit.x, sit.y)) return `sit on footprint ${sit.x},${sit.y}`;
+        return 'ok';
+      });
+      if (overlap !== 'ok') errors.push(`teresa park: ${overlap}`);
+      await ctx.close();
+    } catch (e) {
+      errors.push(`teresa park check: ${e}`);
+    }
   } finally {
     await browser.close();
     preview?.kill();
