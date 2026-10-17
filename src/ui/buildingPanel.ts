@@ -3,9 +3,13 @@ import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
 import { CASES, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
 import { TALKS, WRITINGS, type TalkItem, type WritingSection } from '../data/experiences';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
+import { FIGMA_DOC, FIGMA_PAUSE, FIGMA_PLAY, FIGMA_STAGE, figmaAsset } from './figmaAssets';
 import { iconSvg } from './icons';
 import { onLangChange, t, type I18nKey } from './i18n';
 
+const FIGMA_BACK = figmaAsset('talks-desktop-list', '9f9c4.svg');
+const FIGMA_EXPAND = figmaAsset('talks-desktop-list', 'ce7c9.svg');
+const FIGMA_CLOSE = figmaAsset('talks-desktop-list', 'f1b3a.svg');
 function aboutBlockNode(block: AboutBlock): HTMLElement {
   if (block.kind === 'heading') {
     const h = document.createElement(`h${block.level + 3}`);
@@ -162,11 +166,17 @@ export class BuildingPanel {
       <div class="building-panel__sheet" role="dialog" aria-modal="true">
         <div class="building-panel__drag" data-drag aria-hidden="true"></div>
         <header class="exp-header" data-exp-header hidden>
-          <button type="button" class="exp-header__btn exp-header__back" data-exp-back aria-label="">‹</button>
+          <button type="button" class="exp-header__btn exp-header__back" data-exp-back aria-label="">
+            <img class="exp-header__icon" src="${FIGMA_BACK}" width="15" height="15" alt="" />
+          </button>
           <h2 class="exp-header__title"></h2>
           <div class="exp-header__actions">
-            <button type="button" class="exp-header__btn" data-exp-expand aria-label="">${iconSvg('expand')}</button>
-            <button type="button" class="exp-header__btn exp-header__close" data-close aria-label="">×</button>
+            <button type="button" class="exp-header__btn" data-exp-expand aria-label="">
+              <img class="exp-header__icon" src="${FIGMA_EXPAND}" width="15" height="15" alt="" />
+            </button>
+            <button type="button" class="exp-header__btn exp-header__close" data-close aria-label="">
+              <img class="exp-header__icon" src="${FIGMA_CLOSE}" width="15" height="15" alt="" />
+            </button>
           </div>
         </header>
         <div class="building-panel__bar">
@@ -541,6 +551,10 @@ export class BuildingPanel {
     if (this.experienceIntro) {
       this.experienceIntro.hidden = this.mode !== 'talks' || view !== 'list';
     }
+    const back = this.el.querySelector('[data-exp-back]') as HTMLElement | null;
+    const expand = this.el.querySelector('[data-exp-expand]') as HTMLElement | null;
+    if (back) back.hidden = view !== 'detail';
+    if (expand) expand.hidden = !this.isMobile();
     if (view === 'list') {
       this.activeTalkId = null;
       this.activeWriting = null;
@@ -574,9 +588,21 @@ export class BuildingPanel {
         : 'experience__thumb experience__thumb--video';
     thumb.setAttribute('aria-hidden', 'true');
     if (kind === 'writing') {
-      thumb.innerHTML = iconSvg('page', compact ? 14 : 18);
+      const doc = document.createElement('img');
+      doc.className = 'experience__doc-icon';
+      doc.src = FIGMA_DOC;
+      doc.width = compact ? 28 : 36;
+      doc.height = compact ? 28 : 36;
+      doc.alt = '';
+      thumb.append(doc);
     } else {
-      thumb.innerHTML = '<span class="experience__play" aria-hidden="true">▶</span>';
+      const play = document.createElement('img');
+      play.className = 'experience__play-icon';
+      play.src = FIGMA_PLAY;
+      play.width = compact ? 20 : 24;
+      play.height = compact ? 20 : 24;
+      play.alt = '';
+      thumb.append(play);
     }
     const copy = document.createElement('span');
     copy.className = 'experience__copy';
@@ -617,11 +643,10 @@ export class BuildingPanel {
     wrap.className = 'talks-player';
     wrap.innerHTML = `
       <div class="talks-player__stage">
+        <img class="talks-player__stage-art" src="${FIGMA_STAGE}" alt="" />
         <p class="talks-player__label">${t('talks.videoLabel')}</p>
         <button type="button" class="talks-player__pause" aria-label="">
-          <svg class="talks-player__pause-icon" viewBox="0 0 14 14" width="14" height="14" fill="currentColor" aria-hidden="true">
-            <rect x="3" y="2" width="3" height="10" rx="1"/><rect x="8" y="2" width="3" height="10" rx="1"/>
-          </svg>
+          <img class="talks-player__pause-icon" src="${FIGMA_PAUSE}" width="14" height="14" alt="" />
         </button>
         <div class="talks-player__progress" aria-hidden="true"><span class="talks-player__progress-fill"></span></div>
         <p class="talks-player__time">0:00 / 0:00</p>
@@ -687,7 +712,7 @@ export class BuildingPanel {
       h.textContent = t(section.titleKey as I18nKey);
       const badge = document.createElement('span');
       badge.className = 'experience__section-count';
-      badge.textContent = '0';
+      badge.textContent = String(section.items.length);
       const seeAll = document.createElement('button');
       seeAll.type = 'button';
       seeAll.className = 'experience__see-all';
@@ -718,7 +743,9 @@ export class BuildingPanel {
     const wrap = document.createElement('article');
     wrap.className = 'writings-reader';
     wrap.innerHTML = `
-      <div class="writings-reader__hero" aria-hidden="true">${iconSvg('page', 28)}</div>
+      <div class="writings-reader__hero" aria-hidden="true">
+        <img class="writings-reader__hero-icon" src="${FIGMA_DOC}" width="36" height="36" alt="" />
+      </div>
       <p class="writings-reader__kicker"></p>
       <h3 class="writings-reader__title"></h3>
       <p class="writings-reader__meta"></p>

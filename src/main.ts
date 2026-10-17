@@ -1,5 +1,5 @@
 import { studio } from './audio/studio';
-import { ChecklistUI } from './checklist/ui';
+import { ChecklistUI, isMobileLayout } from './checklist/ui';
 import { isCaseHouse } from './data/cases';
 import {
   doorInwardStep,
@@ -19,6 +19,7 @@ import { ChromeUI, type DesktopLayout } from './ui/chrome';
 import { JacHud } from './ui/jacHud';
 import { Joystick } from './ui/joystick';
 import { BuildingMapLabels } from './ui/buildingMapLabels';
+import { InteriorStageScreen } from './ui/interiorStageScreen';
 import { NameLabels } from './ui/nameLabels';
 import { hideToast, showToast } from './ui/toast';
 import { getLang, onLangChange, setLang, t } from './ui/i18n';
@@ -60,12 +61,18 @@ async function main(): Promise<void> {
     onToggle: (id) => scene.jacSetToggle(id),
     onEngine: () => scene.jacSetEngine(),
   });
+  const stageScreen = new InteriorStageScreen(document.body);
   const panel = new BuildingPanel(
     uiRoot,
     () => {
       const open = panel.isInteriorMode();
       checklist.setBuildingPanelOpen(open);
-      chrome.setInteriorOpen(open);
+      if (panel.isExperienceMode()) {
+        chrome.setInteriorOpen(false, { skipLayout: true });
+        if (!isMobileLayout() && open) chrome.setLayout('split');
+      } else {
+        chrome.setInteriorOpen(open);
+      }
       joystick.setHidden(open || panel.isPreviewExpanded());
       if (panel.isPreviewExpanded()) checklist.setCollapsed(true);
       scene?.applyCameraFromUi();
@@ -85,10 +92,12 @@ async function main(): Promise<void> {
         if (interiorId === 'teresa') {
           studio.clearSubtitle();
           chrome.setInteriorOpen(false, { skipLayout: true });
+          if (!isMobileLayout()) chrome.setLayout('split');
           panel.showTalks(b.panelTitle, interiorId);
         } else if (interiorId === 'biblioteca') {
           studio.clearSubtitle();
           chrome.setInteriorOpen(false, { skipLayout: true });
+          if (!isMobileLayout()) chrome.setLayout('split');
           panel.showWritings(b.panelTitle, interiorId);
         } else {
           chrome.setInteriorOpen(true);
@@ -116,6 +125,7 @@ async function main(): Promise<void> {
     },
     onMoveCommand: () => studio.noteMoveCommand(),
     onFrame: () => {
+      stageScreen.apply(scene.interiorStageScreenLayout());
       labels.update(scene.nameLabelAnchors());
       mapLabels.setHidden(!!scene.isInInterior());
       mapLabels.update(

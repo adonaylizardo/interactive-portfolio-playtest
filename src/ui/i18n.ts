@@ -201,7 +201,8 @@ const DICT = {
       'Placeholder del reproductor — el video o las diapositivas vendrán de un JSON más adelante.',
     'talks.item1.title': 'Título de la charla (placeholder)',
     'talks.item1.meta': 'Proyecto · Fecha',
-    'talks.item2.title': 'Otro título de charla (placeholder, dos líneas si es largo)',
+    'talks.item2.title':
+      'Título de charla (placeholder), versión larga que ocupa dos líneas como máximo',
     'talks.item2.meta': 'Evento · Fecha',
     'talks.item3.title': 'Charla corta (placeholder)',
     'talks.item3.meta': 'Taller · Fecha',
