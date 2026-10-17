@@ -48,7 +48,7 @@ export class ChromeUI {
   private layout: DesktopLayout = 'split';
   private mobileSheet = true;
   private audience: Audience = 'recruiter';
-  private lang: Lang = 'en';
+  private lang: Lang = getLang();
   private interiorOpen = false;
   private mobile = isMobileLayout();
   private callbacks: ChromeCallbacks;
@@ -281,8 +281,8 @@ export class ChromeUI {
         ${roundBtn('map', 'Map', 'ui-round--lg', 'map')}
       </nav>
       <div class="chrome__lang" role="group" aria-label="Language" data-i18n-aria="chrome.language">
-        <button type="button" class="chrome__lang-opt is-active" data-lang="en">EN</button>
-        <button type="button" class="chrome__lang-opt" data-lang="es">ES</button>
+        <button type="button" class="chrome__lang-opt" data-lang="en">EN</button>
+        <button type="button" class="chrome__lang-opt is-active" data-lang="es">ES</button>
       </div>
       <div class="chrome__sound" role="note" data-hint="1">
         ${iconSvg('info')}

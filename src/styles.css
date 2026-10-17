@@ -1824,21 +1824,35 @@ body[data-layout='panel'] .checklist {
 }
 
 .name-label__info {
-  width: 16px;
-  height: 16px;
-  margin-left: 1px;
+  position: relative;
+  width: 44px;
+  height: 44px;
+  margin: -14px -14px -14px -13px;
   padding: 0;
   border: 0;
-  border-radius: 50%;
-  background: rgb(255 255 255 / 18%);
+  border-radius: 0;
+  background: transparent;
   color: #fff;
   font-family: Inter, system-ui, sans-serif;
   font-size: 10px;
   font-weight: 700;
   font-style: italic;
-  line-height: 16px;
+  line-height: 44px;
   letter-spacing: 0;
   cursor: pointer;
+}
+
+.name-label__info::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 18%);
+  pointer-events: none;
 }
 
 .name-label__info[hidden] {

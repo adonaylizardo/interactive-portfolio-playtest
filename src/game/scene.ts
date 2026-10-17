@@ -43,7 +43,7 @@ import {
 import { isTouchPrimary, type ChecklistStepId } from '../checklist/storage';
 import { muroWallTiles, OBELISCO_ACCESS, OBELISCO_SOLID_TILES } from '../data/world';
 import { mapWorldBounds, sortKey, tileFootWorld, tileToWorld, worldToTile } from '../iso/math';
-import { findPath, findPathOrNearest } from '../iso/pathfinding';
+import { findPathOrNearestWith, findPathWith } from '../iso/pathfinding';
 import { C } from './colors';
 import { deskTopFillColor, treeCanopyTrunkOverlap } from './draw';
 import {
@@ -1467,13 +1467,25 @@ export class IsoScene {
     const sy = Math.round(this.charTy);
     const destWalkable = !!cells[ty]?.[tx]?.walkable;
     const scenery = !!getSceneryAt(tx, ty);
-    const result = destWalkable
+    const extra = this.vanWalkBlock();
+    const pass = (x: number, y: number) => {
+      if (extra.has(`${x},${y}`)) return false;
+      return !!cells[y]?.[x]?.walkable;
+    };
+    const destOk = destWalkable && pass(tx, ty);
+    const wantDoor =
+      !!this.pendingBuildingEntry &&
+      this.pendingBuildingEntry.door.x === tx &&
+      this.pendingBuildingEntry.door.y === ty;
+    const result = destOk
       ? (() => {
-          const path = findPath(sx, sy, tx, ty);
-          return path ? { path, target: { x: tx, y: ty }, direct: true } : null;
+          const path = findPathWith(sx, sy, tx, ty, pass);
+          return path
+            ? { path, target: { x: tx, y: ty }, direct: true }
+            : findPathOrNearestWith(sx, sy, tx, ty, pass);
         })()
-      : scenery
-        ? findPathOrNearest(sx, sy, tx, ty)
+      : scenery || wantDoor
+        ? findPathOrNearestWith(sx, sy, tx, ty, pass)
         : null;
     if (!result) {
       this.pendingBuildingEntry = null;
@@ -1485,7 +1497,8 @@ export class IsoScene {
     }
     if (!result.direct && this.pendingBuildingEntry) {
       const d = this.pendingBuildingEntry.door;
-      if (result.target.x !== d.x || result.target.y !== d.y) this.pendingBuildingEntry = null;
+      const near = Math.abs(result.target.x - d.x) + Math.abs(result.target.y - d.y) <= 2;
+      if (!near && !wantDoor) this.pendingBuildingEntry = null;
     }
     this.path = result.path;
     if (
@@ -1782,26 +1795,25 @@ export class IsoScene {
     this.events.onUnreachable?.();
   }
 
-  private toastGetOutToEnter(): void {
-    this.pendingDriveEnter = null;
-    this.jac?.clearDrivePath();
-    this.jac?.holdGear();
-    this.suppressDriveTapUntil = performance.now() + 450;
-    (this.events.onGetOutToEnter ?? this.events.onUnreachable)?.();
+  private vanWalkBlock(): Set<string> {
+    if (!this.jac || this.jac.driving) return new Set();
+    return this.jac.parkedFootprintKeys();
   }
 
   private requestDriveToEnter(entry: { panelTitle: string; door: { x: number; y: number } }): boolean {
     if (!this.jac?.driving || this.jac.isExiting()) return false;
     if (performance.now() < this.suppressDriveTapUntil) return false;
-    const sit = this.jac.nearestParkSit(entry.door.x, entry.door.y);
+    const sit = this.jac.parkForDoor(entry.door.x, entry.door.y);
     if (!sit) {
-      this.toastGetOutToEnter();
-      return false;
+      this.pendingDriveEnter = entry;
+      this.jacGetOut({ thenEnter: true });
+      return true;
     }
     const path = this.jac.findDrivePath(sit.x, sit.y);
     if (!path) {
-      this.toastGetOutToEnter();
-      return false;
+      this.pendingDriveEnter = entry;
+      this.jacGetOut({ thenEnter: true });
+      return true;
     }
     this.events.stickCancel?.();
     this.pendingBuildingEntry = null;
@@ -3572,7 +3584,7 @@ export class IsoScene {
     const d = this.pendingBuildingEntry.door;
     const onPendingDoor = tx === d.x && ty === d.y;
     const adjacentPending =
-      Math.abs(tx - d.x) + Math.abs(ty - d.y) === 1 &&
+      Math.abs(tx - d.x) + Math.abs(ty - d.y) <= 2 &&
       getBuildingAtDoor(d.x, d.y)?.panelTitle === this.pendingBuildingEntry.panelTitle;
     if (!onPendingDoor && !adjacentPending) return;
     if (!onPendingDoor) {
@@ -4003,7 +4015,7 @@ export class IsoScene {
       visual: v,
       tapBox: this.objectTapBoxes,
       onStuck: () => {
-        if (this.pendingDriveEnter) this.toastGetOutToEnter();
+        if (this.pendingDriveEnter) this.jacGetOut({ thenEnter: true });
         else this.events.onUnreachable?.();
       },
     });
@@ -4203,13 +4215,7 @@ export class IsoScene {
     if (!this.pendingDriveEnter || !this.jac?.driving || this.jac.isExiting()) return;
     const idle = this.jac.drivePath.length === 0 && !this.jac.driveGoal;
     if (!idle) return;
-    const door = this.pendingDriveEnter.door;
-    const near = Math.hypot(this.jac.cx - door.x, this.jac.cy - door.y) < 10;
-    if (!near && this.jac.mph > 0) return;
-    if (!near) {
-      this.toastGetOutToEnter();
-      return;
-    }
+    if (this.jac.mph > 0.4) return;
     this.jacGetOut({ thenEnter: true });
   }
 
@@ -4255,6 +4261,18 @@ export class IsoScene {
 
   qaJacCanSit(cx: number, cy: number): boolean {
     return this.jac?.canDriveAt(cx, cy) ?? false;
+  }
+
+  qaParkForDoor(doorX: number, doorY: number): { x: number; y: number } | null {
+    return this.jac?.parkForDoor(doorX, doorY) ?? null;
+  }
+
+  qaParkedFootprint(): { x: number; y: number }[] {
+    if (!this.jac) return [];
+    return [...this.jac.parkedFootprintKeys()].map((key) => {
+      const [x, y] = key.split(',').map(Number);
+      return { x, y };
+    });
   }
 
   qaJacStick(vec: { x: number; y: number } | null): void {

@@ -100,7 +100,18 @@ export function findPathOrNearest(
   gx: number,
   gy: number,
 ): PathResult | null {
-  const direct = findPath(sx, sy, gx, gy);
+  return findPathOrNearestWith(sx, sy, gx, gy, (x, y) => !!cells[y]?.[x]?.walkable);
+}
+
+/** Same as findPathOrNearest with an explicit walkable test (van footprint, etc.). */
+export function findPathOrNearestWith(
+  sx: number,
+  sy: number,
+  gx: number,
+  gy: number,
+  passable: (x: number, y: number) => boolean,
+): PathResult | null {
+  const direct = findPathWith(sx, sy, gx, gy, passable);
   if (direct) {
     return { path: direct, target: { x: gx, y: gy }, direct: true };
   }
@@ -112,7 +123,7 @@ export function findPathOrNearest(
       const x = gx + dx;
       const y = gy + dy;
       if (!inBounds(x, y)) continue;
-      if (!cells[y][x].walkable) continue;
+      if (!passable(x, y)) continue;
       candidates.push({ x, y, dist: Math.abs(dx) + Math.abs(dy) });
     }
   }
@@ -120,7 +131,7 @@ export function findPathOrNearest(
 
   let best: PathResult | null = null;
   for (const c of candidates) {
-    const path = findPath(sx, sy, c.x, c.y);
+    const path = findPathWith(sx, sy, c.x, c.y, passable);
     if (!path) continue;
     if (!best) {
       best = { path, target: { x: c.x, y: c.y }, direct: false };

@@ -20,12 +20,15 @@ import { JacHud } from './ui/jacHud';
 import { Joystick } from './ui/joystick';
 import { NameLabels } from './ui/nameLabels';
 import { hideToast, showToast } from './ui/toast';
-import { getLang, setLang, t } from './ui/i18n';
+import { getLang, onLangChange, setLang, t } from './ui/i18n';
 import type { Camera } from './tokens';
 
 async function main(): Promise<void> {
   const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
   const uiRoot = document.getElementById('ui-root')!;
+  const applyCanvasLabel = () => canvas.setAttribute('aria-label', t('canvas.label'));
+  applyCanvasLabel();
+  onLangChange(applyCanvasLabel);
 
   const checklist = new ChecklistUI(uiRoot, { onSkip: () => {}, onDismiss: () => {} });
 
@@ -311,6 +314,8 @@ async function main(): Promise<void> {
     jacApproach: () => scene.qaJacApproach(),
     jacOverlapsProp: () => scene.qaJacOverlapsProp(),
     jacCanSit: (cx: number, cy: number) => scene.qaJacCanSit(cx, cy),
+    parkForDoor: (x: number, y: number) => scene.qaParkForDoor(x, y),
+    parkedFootprint: () => scene.qaParkedFootprint(),
     jacStick: (vec: { x: number; y: number } | null) => scene.qaJacStick(vec),
     jacDriveStep: (dt: number, dx: number, dy: number) => scene.qaJacDriveStep(dt, dx, dy),
     jacClose: () => scene.jacClose(),

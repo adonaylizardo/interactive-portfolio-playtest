@@ -590,26 +590,86 @@ export class JacT9 {
     return null;
   }
 
-  /** Closest sit the van can actually path to beside a door or building tile. */
-  nearestParkSit(tx: number, ty: number, maxR = 8): { x: number; y: number } | null {
-    if (this.canDriveAt(tx, ty)) return { x: tx, y: ty };
-    let best: { x: number; y: number } | null = null;
-    let bestD = Infinity;
-    for (let dy = -maxR; dy <= maxR; dy++) {
-      for (let dx = -maxR; dx <= maxR; dx++) {
-        if (dx === 0 && dy === 0) continue;
-        const x = tx + dx;
-        const y = ty + dy;
-        if (!this.canDriveAt(x, y)) continue;
-        const d = Math.abs(dx) + Math.abs(dy);
-        if (d >= bestD) continue;
-        const path = this.findDrivePath(x, y);
-        if (!path) continue;
-        bestD = d;
-        best = { x, y };
+  /**
+   * Closest reachable pathSit beside a door. Never lands on the door or a walkable
+   * approach tile (parked 5×3 / 3×5 must stay clear). If no clear sit exists, the
+   * closest reachable pathSit so the walker can finish on foot.
+   */
+  parkForDoor(doorX: number, doorY: number): { x: number; y: number } | null {
+    const keep = new Set<string>([k(doorX, doorY)]);
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
+      const x = doorX + dx;
+      const y = doorY + dy;
+      if (x < 0 || y < 0 || x >= MAP_WIDTH || y >= MAP_HEIGHT) continue;
+      const c = cells[y]?.[x];
+      if (c?.walkable || this.claimed.has(k(x, y))) keep.add(k(x, y));
+    }
+
+    const sx = Math.round(this.cx);
+    const sy = Math.round(this.cy);
+    const pass = (x: number, y: number) => this.pathSit(x, y) || (x === sx && y === sy);
+    type Cand = { x: number; y: number; doorD: number; pathD: number };
+    let bestClear: Cand | null = null;
+    let bestAny: Cand | null = null;
+    const better = (cur: Cand | null, next: Cand) => {
+      if (!cur) return true;
+      if (next.doorD !== cur.doorD) return next.doorD < cur.doorD;
+      return next.pathD < cur.pathD;
+    };
+
+    const seen = new Set<string>([k(sx, sy)]);
+    const q: { x: number; y: number; d: number }[] = [{ x: sx, y: sy, d: 0 }];
+    for (let qi = 0; qi < q.length; qi++) {
+      const cur = q[qi];
+      if (this.pathSit(cur.x, cur.y)) {
+        const cand: Cand = {
+          x: cur.x,
+          y: cur.y,
+          doorD: Math.abs(cur.x - doorX) + Math.abs(cur.y - doorY),
+          pathD: cur.d,
+        };
+        if (better(bestAny, cand)) bestAny = cand;
+        if (!this.sitCoversKeep(cur.x, cur.y, keep) && better(bestClear, cand)) bestClear = cand;
+      }
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ] as const) {
+        const nx = cur.x + dx;
+        const ny = cur.y + dy;
+        const key = k(nx, ny);
+        if (seen.has(key)) continue;
+        if (nx < 0 || ny < 0 || nx >= MAP_WIDTH || ny >= MAP_HEIGHT) continue;
+        if (!pass(nx, ny)) continue;
+        seen.add(key);
+        q.push({ x: nx, y: ny, d: cur.d + 1 });
       }
     }
-    return best;
+    const pick = bestClear ?? bestAny;
+    return pick ? { x: pick.x, y: pick.y } : null;
+  }
+
+  /** Parked 5×3 / 3×5 cells the walker must go around. */
+  parkedFootprintKeys(): Set<string> {
+    return new Set(this.parkCells().map(([x, y]) => k(x, y)));
+  }
+
+  private sitCoversKeep(cx: number, cy: number, keep: Set<string>): boolean {
+    for (const size of [PARK_SE, PARK_SW]) {
+      const ox = Math.round(cx - (size.w - 1) / 2);
+      const oy = Math.round(cy - (size.h - 1) / 2);
+      for (const [x, y] of this.rect(ox, oy, size.w, size.h)) {
+        if (keep.has(k(x, y))) return true;
+      }
+    }
+    return false;
   }
 
   /** Nearest walkable tile beside the footprint that `from` can actually path to. */

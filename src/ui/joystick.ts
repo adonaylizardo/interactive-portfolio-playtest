@@ -3,6 +3,8 @@
  * Knob stays inside the pad. Never spawns a second stick at the finger, never used for walking.
  */
 
+import { onLangChange, t } from './i18n';
+
 export type StickVector = { x: number; y: number };
 
 const PAD = 112;
@@ -30,12 +32,13 @@ export class Joystick {
     this.root = document.createElement('div');
     this.root.className = 'joystick';
     this.root.hidden = true;
-    this.root.setAttribute('aria-label', 'Conducir');
+    this.root.setAttribute('aria-label', t('jac.drive'));
     this.root.innerHTML = `
       <div class="joystick__ring" aria-hidden="true"></div>
       <div class="joystick__idle" aria-hidden="true"></div>
     `;
     container.appendChild(this.root);
+    onLangChange(() => this.root.setAttribute('aria-label', t('jac.drive')));
     this.idle = this.root.querySelector('.joystick__idle')!;
     this.knob = this.idle;
 

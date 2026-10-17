@@ -40,7 +40,10 @@ const DICT = {
     'jac.auto': 'Auto',
     'jac.off': 'Off',
     'jac.on': 'On',
+    'jac.drive': 'Drive',
     'jac.hazards': 'Hazards',
+
+    'canvas.label': 'Isometric playtest world',
 
     'panel.exit': 'Exit',
     'panel.close': 'Close',
@@ -117,9 +120,12 @@ const DICT = {
     'jac.engine': 'Motor',
     'jac.gear': 'Marcha',
     'jac.auto': 'Auto',
-    'jac.off': 'Off',
-    'jac.on': 'On',
+    'jac.off': 'Apagado',
+    'jac.on': 'Encendido',
+    'jac.drive': 'Conducir',
     'jac.hazards': 'Balizas',
+
+    'canvas.label': 'Mundo isométrico de prueba',
 
     'panel.exit': 'Salir',
     'panel.close': 'Cerrar',
@@ -154,7 +160,7 @@ const DICT = {
     'chrome.perspective': 'Perspectiva',
     'chrome.map': 'Mapa',
     'chrome.primary': 'Principal',
-    'chrome.dock': 'Dock',
+    'chrome.dock': 'Barra',
     'chrome.audience': 'Audiencia',
 
     'boot.error': 'Error al cargar:',
@@ -163,7 +169,7 @@ const DICT = {
 
 export type I18nKey = keyof typeof DICT.en;
 
-let lang: Lang = 'en';
+let lang: Lang = 'es';
 const listeners = new Set<() => void>();
 
 export function getLang(): Lang {
