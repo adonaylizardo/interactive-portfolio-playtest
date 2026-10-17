@@ -473,15 +473,10 @@ export class JacT9 {
     this.applyPathGear();
   }
 
-  /** D/R from the next hop, not the goal — an around-path must not reverse into a prop. */
+  /** Click-to-drive follows the sit-aware path in D and turns to face each hop. */
   private applyPathGear(): void {
     if (this.gearHeld || this.drivePath.length === 0) return;
-    const t = this.drivePath[0];
-    const ax = t.x - this.cx;
-    const ay = t.y - this.cy;
-    if (Math.hypot(ax, ay) < 1e-4) return;
-    const fwd = DIR_VEC[this.dir];
-    this.gear = fwd.x * ax + fwd.y * ay < -0.2 ? 'R' : 'D';
+    this.gear = 'D';
   }
 
   /**
@@ -957,11 +952,13 @@ export class JacT9 {
   private followDrivePath(dt: number): boolean {
     if (this.driveGoal && Math.hypot(this.driveGoal.x - this.cx, this.driveGoal.y - this.cy) < 1.35) {
       const sit = this.sitForVisual(this.driveGoal.x, this.driveGoal.y);
-      this.cx = sit.x;
-      this.cy = sit.y;
-      this.occupy(this.driveCells());
-      this.layout();
-      return this.clearDriveArrival();
+      if (this.canSit(sit.x, sit.y) || this.canSitLoose(sit.x, sit.y)) {
+        this.cx = sit.x;
+        this.cy = sit.y;
+        this.occupy(this.driveCells());
+        this.layout();
+        return this.clearDriveArrival();
+      }
     }
     while (this.drivePath.length > 0) {
       const t = this.drivePath[0];
@@ -987,11 +984,13 @@ export class JacT9 {
     const last = this.drivePath.length === 1;
     if (this.driveGoal && Math.hypot(this.driveGoal.x - this.cx, this.driveGoal.y - this.cy) < 1.35) {
       const sit = this.sitForVisual(this.driveGoal.x, this.driveGoal.y);
-      this.cx = sit.x;
-      this.cy = sit.y;
-      this.occupy(this.driveCells());
-      this.layout();
-      return this.clearDriveArrival();
+      if (this.canSit(sit.x, sit.y) || this.canSitLoose(sit.x, sit.y)) {
+        this.cx = sit.x;
+        this.cy = sit.y;
+        this.occupy(this.driveCells());
+        this.layout();
+        return this.clearDriveArrival();
+      }
     }
     const t = last && this.driveGoal ? this.sitForVisual(this.driveGoal.x, this.driveGoal.y) : this.drivePath[0];
     const ax = t.x - this.cx;
@@ -1002,7 +1001,7 @@ export class JacT9 {
       return this.followDrivePath(dt);
     }
     this.applyPathGear();
-    const reverse = this.gear === 'R';
+    const reverse = this.gearHeld && this.gear === 'R';
     const speed = (reverse ? REVERSE_TILES_PER_S : DRIVE_TILES_PER_S) * 0.92;
     const step = Math.min(dist, speed * Math.max(dt, 1 / 120));
     const ux = (ax / dist) * step;

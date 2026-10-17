@@ -1802,7 +1802,7 @@ export class IsoScene {
     }
     this.qaLastDriveTap = { x: gx, y: gy };
     if (fromPointer) this.qaPointerDriveAccepts += 1;
-    const dest = { x: gx, y: gy };
+    const dest = path.length > 0 ? path[path.length - 1] : { x: gx, y: gy };
     this.jac.setDrivePath(path.length > 0 ? path : [dest], dest);
     this.startCameraFollow();
     this.drawPathPreview();
