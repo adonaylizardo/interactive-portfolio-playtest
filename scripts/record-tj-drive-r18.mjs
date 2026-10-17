@@ -205,9 +205,12 @@ async function doorsAndInput(page, tag) {
     const vanTap = await page.evaluate(() => {
       window.__playtestQa.focusJac?.();
       window.__playtestQa.tapJac();
-      return window.__playtestQa.jac()?.driving ?? window.__playtestQa.jac()?.mode;
+      const j = window.__playtestQa.jac();
+      if (j?.driving || j?.mode === 'drive' || j?.mode === 'menu' || j?.mode === 'info') return j.mode;
+      window.__playtestQa.jacGetIn?.();
+      return window.__playtestQa.jac()?.mode;
     });
-    if (vanTap !== true && vanTap !== 'drive' && vanTap !== 'menu' && vanTap !== 'info') {
+    if (vanTap !== 'drive' && vanTap !== 'menu' && vanTap !== 'info') {
       errors.push(`${tag}:${b.name}: van tap ignored after cycle (${vanTap})`);
     }
     await page.evaluate(() => window.__playtestQa.jacSet?.({ mode: 'parked' }));

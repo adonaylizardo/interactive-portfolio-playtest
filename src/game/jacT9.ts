@@ -709,11 +709,11 @@ export class JacT9 {
       }
     }
 
-    const doorSide = usable.filter((c) => c.along >= -0.2 && c.doorD <= 8);
-    const ranked = (doorSide.length ? doorSide : usable.filter((c) => c.along >= -0.2)).concat();
-    const pool = ranked.length ? ranked : usable.filter((c) => c.doorD <= 6);
-    pool.sort((a, b) => b.along - a.along || a.doorD - b.doorD || a.pathD - b.pathD);
-    const pick = pool[0] ?? usable.sort((a, b) => a.doorD - b.doorD || a.pathD - b.pathD)[0];
+    const doorSide = usable.filter((c) => c.along >= -0.2);
+    const close = doorSide.filter((c) => c.doorD <= 8);
+    const pool = close.length ? close : doorSide.length ? doorSide : usable;
+    pool.sort((a, b) => a.doorD - b.doorD || b.along - a.along || a.pathD - b.pathD);
+    const pick = pool[0];
     if (!pick) return null;
     return { x: pick.x, y: pick.y, path: this.nodesToPath(pick.node) };
   }
