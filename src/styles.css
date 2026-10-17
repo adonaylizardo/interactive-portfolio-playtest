@@ -468,7 +468,7 @@ body[data-layout='panel'] .checklist {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease, transform 0.2s ease;
-  z-index: 30;
+  z-index: 80;
 }
 
 .playtest-toast--visible {
@@ -2495,7 +2495,7 @@ body.jac-menu-open .checklist {
 }
 
 .jac-rear.is-on {
-  opacity: 1;
+  /* Opacity is driven by JacHud.tickRearFade (~400ms). Do not snap visible. */
 }
 
 .jac-rear--phone {

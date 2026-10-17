@@ -43,15 +43,15 @@ const DRIVE_TILES_PER_S = WALK_TILES_PER_S * 1.15;
 const REVERSE_TILES_PER_S = WALK_TILES_PER_S * 0.85;
 const ACCEL_TILES_S2 = 14;
 const BRAKE_TILES_S2 = 18;
-const EXIT_BRAKE_TILES_S2 = 56;
+const EXIT_BRAKE_TILES_S2 = 90;
 const FRICTION_TILES_S2 = 10;
 const TURN_RATE = 2.4;
 const IDLE_RPM = 700;
 const MOVE_RPM = 2250;
 const MOVE_MPH = 10;
-/** Dwell only while braking from the opposite sign. A cold stop (already 0) flips immediately. */
-const SHIFT_DWELL_S = 0.4;
-const STOPPED_SHIFT_S = 0;
+/** Hold at 0 for at least this long before auto-shifting D↔R (cold stop or brake). */
+const SHIFT_DWELL_S = 0.45;
+const STOPPED_SHIFT_S = 0.45;
 
 export type JacVisual = {
   obj: MapObject;
@@ -308,7 +308,8 @@ export class JacT9 {
       this.stuckT = 0;
       this.bumpT = 0;
       this.clearDrivePath();
-      this.applyParkedSolid(true);
+      this.relayoutParked();
+      return;
     }
     if (mode === 'info') void this.ensureLoaded();
     if (mode === 'drive') void this.ensureLoaded();
@@ -625,8 +626,8 @@ export class JacT9 {
       this.brakeTowardZero(dt, FRICTION_TILES_S2);
       if (Math.abs(this.vel) <= 0.08) {
         this.vel = 0;
-        this.shiftDwell = 0;
-        this.shiftArmedAt = 0;
+        if (!this.shiftArmedAt) this.shiftArmedAt = performance.now();
+        if (this.shiftDwell <= 0) this.shiftDwell = SHIFT_DWELL_S;
       }
       return;
     }
@@ -646,12 +647,11 @@ export class JacT9 {
       this.vel = 0;
       const need: JacGear = want > 0 ? 'D' : 'R';
       if (autoShift && this.gear !== need) {
-        const fromBrake = this.shiftArmedAt > 0;
-        const dwell = fromBrake ? SHIFT_DWELL_S : STOPPED_SHIFT_S;
+        const dwell = Math.max(SHIFT_DWELL_S, STOPPED_SHIFT_S);
         if (!this.shiftArmedAt) this.shiftArmedAt = performance.now();
         if (this.shiftDwell <= 0) this.shiftDwell = dwell;
         this.shiftDwell = Math.max(0, this.shiftDwell - dt);
-        if (fromBrake && performance.now() - this.shiftArmedAt < SHIFT_DWELL_S * 1000) return;
+        if (performance.now() - this.shiftArmedAt < dwell * 1000) return;
         if (this.shiftDwell > 0) return;
         this.gear = need;
       } else if (autoShift) {
@@ -692,14 +692,25 @@ export class JacT9 {
     this.exitSit = null;
     this.clearDrivePath();
     this.gearHeld = false;
+    this.qaSteer = null;
   }
 
   readyToExit(): boolean {
     return this.pendingExit && Math.abs(this.vel) <= 0.08 && this.mph === 0 && this.exitHold <= 0 && !!this.exitSit;
   }
 
+  isExiting(): boolean {
+    return this.pendingExit;
+  }
+
   isMoving(): boolean {
-    return Math.abs(this.vel) > 0.08 || this.mph > 0;
+    return (
+      Math.abs(this.vel) > 0.08 ||
+      this.mph > 0 ||
+      this.pendingExit ||
+      this.drivePath.length > 0 ||
+      !!this.driveGoal
+    );
   }
 
   cancelExit(): void {
@@ -1069,6 +1080,14 @@ export class JacT9 {
     return c.walkable || this.claimed.has(k(x, y));
   }
 
+  /** Reclaim the parked footprint, refresh the live hit box, and retarget the door. */
+  relayoutParked(): void {
+    this.applyParkedSolid(true);
+    this.layout();
+    this.applySprite();
+    this.hooks.onChange?.();
+  }
+
   private applyParkedSolid(park: boolean): void {
     this.occupy(park ? this.usableParkCells() : this.driveCells());
   }
@@ -1141,15 +1160,13 @@ export class JacT9 {
       x1: foot.x + lx + CELL_1X.w * sc + 8,
       y1: foot.y + ly + CELL_1X.h * sc + 8,
     };
-    // Driving: sit above street dashes / flat fill that share the footprint's front row.
-    v.zIndex = objectDepth(this.obj) + (this.driving ? 24 : 0.2);
+    // Iso front-cell depth only — do not restack above buildings (café overlap).
+    v.zIndex = objectDepth(this.obj) + 0.2;
     this.hooks.container.zIndex = v.zIndex;
-    const parent = this.hooks.container.parent;
-    if (this.driving && parent && parent.children[parent.children.length - 1] !== this.hooks.container) {
-      parent.addChild(this.hooks.container);
-    }
     const box = new Rectangle(lx + 40 * sc, ly + 8 * sc, 200 * sc, 120 * sc);
     this.hooks.tapBox.set(this.obj.id, box);
+    this.hooks.container.hitArea = box;
+    this.hooks.container.eventMode = 'static';
   }
 
   /** Skip empty / off-sheet frames so a bad wheel cell never blanks the van. */

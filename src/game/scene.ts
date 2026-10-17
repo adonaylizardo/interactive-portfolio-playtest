@@ -979,9 +979,7 @@ export class IsoScene {
         if (obj.type === 'building' && obj.panelTitle && !this.prepareMapTap(obj)) return;
         const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
         if (obj.type === 'building' && obj.door && obj.panelTitle) {
-          this.requestWalk(obj.door.x, obj.door.y, sprint, {
-            buildingEntry: { panelTitle: obj.panelTitle, door: obj.door },
-          });
+          this.requestWalk(obj.door.x, obj.door.y, sprint, { walkOnly: true });
           return;
         }
         this.pendingBuildingEntry = null;
@@ -1393,7 +1391,10 @@ export class IsoScene {
     tx: number,
     ty: number,
     sprint: boolean,
-    opts?: { buildingEntry?: { panelTitle: string; door: { x: number; y: number } } },
+    opts?: {
+      buildingEntry?: { panelTitle: string; door: { x: number; y: number } };
+      walkOnly?: boolean;
+    },
   ): void {
     if (this.jac?.driving) {
       this.driveToTile(tx, ty, true);
@@ -1410,9 +1411,10 @@ export class IsoScene {
     }
     const walkTx = tx;
     const walkTy = ty;
-    const entry =
-      opts?.buildingEntry ??
-      resolveBuildingEntryFromTile(walkTx, walkTy, this.roundedCharTile());
+    const entry = opts?.walkOnly
+      ? null
+      : (opts?.buildingEntry ??
+        resolveBuildingEntryFromTile(walkTx, walkTy, this.roundedCharTile()));
     this.pendingBuildingEntry = entry;
     const walkable = !!cells[walkTy]?.[walkTx]?.walkable;
     const target = walkable ? { x: walkTx, y: walkTy } : resolveWalkTarget(walkTx, walkTy);
@@ -1643,8 +1645,15 @@ export class IsoScene {
       return;
     }
     if (this.jac?.driving) {
+      if (this.jac.isExiting()) return;
       if (performance.now() < this.suppressDriveTapUntil) return;
-      if (this.pickBuildingAtScreen(sx, sy) || this.pickBuildingDoorAtScreen(sx, sy)) {
+      const { x: wx, y: wy } = this.screenToWorld(sx, sy);
+      const raw = worldToTile(wx, wy);
+      if (
+        this.pickBuildingAtScreen(sx, sy) ||
+        this.pickBuildingDoorAtScreen(sx, sy) ||
+        (raw && !this.jac.driveTileOk(raw.x, raw.y))
+      ) {
         this.jac.clearDrivePath();
         this.suppressDriveTapUntil = performance.now() + 250;
         this.events.onUnreachable?.();
@@ -1682,9 +1691,7 @@ export class IsoScene {
     const building = this.pickBuildingAtScreen(sx, sy);
     if (building?.door && building.panelTitle) {
       if (!this.prepareMapTap(building)) return;
-      this.requestWalk(building.door.x, building.door.y, sprint, {
-        buildingEntry: { panelTitle: building.panelTitle, door: building.door },
-      });
+      this.requestWalk(building.door.x, building.door.y, sprint, { walkOnly: true });
       return;
     }
     const bench = this.pickBenchAtScreen(sx, sy);
@@ -1750,11 +1757,11 @@ export class IsoScene {
   }
 
   private requestDriveToScreen(sx: number, sy: number): void {
-    if (!this.jac?.driving) return;
+    if (!this.jac?.driving || this.jac.isExiting()) return;
     this.events.stickCancel?.();
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
-    const tile = this.resolveGroundTap(wx, wy);
-    if (!tile) {
+    const tile = worldToTile(wx, wy);
+    if (!tile || !this.jac.driveTileOk(tile.x, tile.y)) {
       this.events.onUnreachable?.();
       return;
     }
@@ -1762,7 +1769,7 @@ export class IsoScene {
   }
 
   private driveToTile(gx: number, gy: number, fromPointer = false): boolean {
-    if (!this.jac?.driving) return false;
+    if (!this.jac?.driving || this.jac.isExiting()) return false;
     this.events.stickCancel?.();
     this.pendingBuildingEntry = null;
     if (!this.jac.driveTileOk(gx, gy)) {
@@ -2842,7 +2849,7 @@ export class IsoScene {
           const dt = performance.now() - driveTap.t;
           const dist = Math.hypot(t.clientX - driveTap.x, t.clientY - driveTap.y);
           driveTap = null;
-          if (dt < 450 && dist < 22) {
+          if (dt < 450 && dist < 22 && !this.jac.isExiting()) {
             const rect = canvas.getBoundingClientRect();
             this.requestDriveToScreen(t.clientX - rect.left, t.clientY - rect.top);
           }
@@ -3256,9 +3263,13 @@ export class IsoScene {
       if (this.keys.has('s') || this.keys.has('arrowdown')) dy += 1;
       if (this.keys.has('a') || this.keys.has('arrowleft')) dx -= 1;
       if (this.keys.has('d') || this.keys.has('arrowright')) dx += 1;
-      if (dx === 0 && dy === 0 && (stickLive || stickHeld)) {
+      if (dx === 0 && dy === 0 && (stickLive || stickHeld) && !this.jac.isExiting()) {
         dx = stick.x;
         dy = stick.y;
+      }
+      if (this.jac.isExiting()) {
+        dx = 0;
+        dy = 0;
       }
       this.startCameraFollow();
       if (dx !== 0 || dy !== 0 || stickHeld || this.jac.drivePath.length > 0) {
@@ -3882,8 +3893,17 @@ export class IsoScene {
 
   private pickJacAtScreen(sx: number, sy: number): boolean {
     if (!this.jac || this.interiorActive) return false;
-    const { x, y } = this.screenToWorld(sx, sy);
-    return spriteAlphaHit(this.jac.obj, x, y);
+    const { x: wx, y: wy } = this.screenToWorld(sx, sy);
+    const g = this.objectGraphics.get(this.jac.obj.id);
+    if (g) {
+      const lx = wx - g.x;
+      const ly = wy - g.y;
+      const hit = g.hitArea;
+      if (hit && typeof hit.contains === 'function' && hit.contains(lx, ly)) return true;
+      const box = this.objectTapBoxes.get(this.jac.obj.id);
+      if (box?.contains(lx, ly)) return true;
+    }
+    return false;
   }
 
   tapJac(): void {
@@ -4028,12 +4048,12 @@ export class IsoScene {
     const snap = this.jac.snapshot();
     const spot = this.jac.exitTile();
     this.jac.cancelExit();
-    this.jac.setMode('parked');
     if (snap.exitCx != null && snap.exitCy != null) {
       this.jac.cx = snap.exitCx;
       this.jac.cy = snap.exitCy;
-      this.jac.applySprite();
     }
+    this.jac.setMode('parked');
+    this.jac.relayoutParked();
     if (spot) {
       this.charTx = spot.x;
       this.charTy = spot.y;
@@ -4560,13 +4580,14 @@ export class IsoScene {
   }
 
   /** QA: what a tap at client (x, y) would pick, without acting on it. */
-  qaPickAt(cx: number, cy: number): { door: string | null; building: string | null } {
+  qaPickAt(cx: number, cy: number): { door: string | null; building: string | null; jac: boolean } {
     const rect = this.canvasEl?.getBoundingClientRect();
     const sx = cx - (rect?.left ?? 0);
     const sy = cy - (rect?.top ?? 0);
     return {
       door: this.pickBuildingDoorAtScreen(sx, sy)?.name ?? null,
       building: this.pickBuildingAtScreen(sx, sy)?.name ?? null,
+      jac: this.pickJacAtScreen(sx, sy),
     };
   }
 
