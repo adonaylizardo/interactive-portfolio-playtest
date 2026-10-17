@@ -1821,6 +1821,14 @@ body[data-layout='panel'] .checklist {
   color: #edeef0;
 }
 
+body.jac-menu-open .jac-hud {
+  z-index: 40;
+}
+
+body.jac-menu-open .checklist {
+  pointer-events: none !important;
+}
+
 .jac-hud [hidden] {
   display: none !important;
 }
@@ -1887,15 +1895,18 @@ body[data-layout='panel'] .checklist {
   position: absolute;
   left: 0;
   top: 0;
+  z-index: 40;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .jac-menu .jac-pill {
   pointer-events: auto;
+  position: relative;
+  z-index: 41;
 }
 
 .jac-menu__row {
@@ -2179,8 +2190,9 @@ body[data-layout='panel'] .checklist {
 
 @keyframes jac-bump-flash {
   0% {
-    box-shadow: 0 0 0 6px #ffb547, 0 0 28px #ffb547;
-    background: #3a3228;
+    box-shadow: 0 0 0 10px #ffb547, 0 0 40px #ffb547;
+    background: #5a4020;
+    border-color: #ffd27a;
   }
   100% {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
@@ -2189,10 +2201,10 @@ body[data-layout='panel'] .checklist {
 
 .jac-bar.is-bump,
 .jac-dock.is-bump {
-  animation: jac-bump-flash 220ms ease-out;
-  box-shadow: 0 0 0 4px #ffb547, 0 4px 20px rgba(0, 0, 0, 0.45);
+  animation: jac-bump-flash 420ms ease-out;
+  box-shadow: 0 0 0 8px #ffb547, 0 0 28px #ffb547, 0 4px 20px rgba(0, 0, 0, 0.45);
   border-color: #ffb547;
-  background: #2a241c;
+  background: #4a3420;
 }
 
 .jac-bar > span,

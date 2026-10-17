@@ -51,6 +51,7 @@ export class JacHud {
   private mini: HTMLCanvasElement;
   private hintEl: HTMLElement;
   private lastHtml = '';
+  private lastActAt = 0;
   private hintUntil = 0;
   private rearFade = 0;
   private rearFadeFrom = 0;
@@ -85,7 +86,7 @@ export class JacHud {
     if (this.root.hidden && !document.body.classList.contains('jac-hud-open')) return;
     this.root.hidden = true;
     this.root.setAttribute('inert', '');
-    document.body.classList.remove('jac-info', 'jac-drive', 'jac-rearcam', 'jac-hud-open');
+    document.body.classList.remove('jac-info', 'jac-drive', 'jac-rearcam', 'jac-hud-open', 'jac-menu-open');
     this.bubbleEl.hidden = true;
     this.bubbleEl.style.transform = '';
     this.hintEl.hidden = true;
@@ -117,6 +118,7 @@ export class JacHud {
     this.root.hidden = false;
     this.root.removeAttribute('inert');
     document.body.classList.toggle('jac-hud-open', snap.mode === 'info' || snap.mode === 'drive');
+    document.body.classList.toggle('jac-menu-open', snap.mode === 'menu');
     document.body.classList.toggle('jac-info', snap.mode === 'info');
     document.body.classList.toggle('jac-drive', snap.mode === 'drive');
     document.body.classList.toggle('jac-rearcam', snap.rearCam);
@@ -127,7 +129,13 @@ export class JacHud {
       const menuW = Math.max(this.menuEl.offsetWidth || 0, 220);
       const half = menuW / 2;
       const pad = 12;
-      const rightReserve = phone ? 88 : 16;
+      const check = document.querySelector('.checklist') as HTMLElement | null;
+      const checkBox = check && !check.hidden ? check.getBoundingClientRect() : null;
+      const checkReserve =
+        !phone && checkBox && checkBox.width > 8 && checkBox.top < 160
+          ? Math.max(0, window.innerWidth - checkBox.left + 12)
+          : 0;
+      const rightReserve = phone ? 88 : Math.max(16, checkReserve);
       const x = Math.max(pad + half, Math.min(window.innerWidth - rightReserve - half, anchors.menu.x));
       const y = Math.max(56, Math.min(window.innerHeight - 96, anchors.menu.y));
       this.menuEl.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px) translate(-50%, -100%)`;
@@ -146,13 +154,16 @@ export class JacHud {
   }
 
   private bind(): void {
-    this.root.addEventListener('click', (e) => {
+    const fire = (e: Event) => {
       const t = (e.target as HTMLElement).closest('[data-jac]') as HTMLElement | null;
       if (!t) return;
       const act = t.dataset.jac;
       e.preventDefault();
       e.stopPropagation();
       (t as HTMLElement).blur();
+      const now = performance.now();
+      if (now - this.lastActAt < 200) return;
+      this.lastActAt = now;
       if (act === 'info') this.callbacks.onInfo();
       else if (act === 'in') {
         this.hintUntil = performance.now() + 5000;
@@ -164,7 +175,12 @@ export class JacHud {
       else if (act === 'gear') this.callbacks.onGear(t.dataset.val as JacGear);
       else if (act === 'toggle') this.callbacks.onToggle(t.dataset.val as JacToggleId);
       else if (act === 'dial') this.cycleLights();
+    };
+    this.root.addEventListener('pointerup', (e) => {
+      if ('button' in e && (e as PointerEvent).button !== 0) return;
+      fire(e);
     });
+    this.root.addEventListener('click', fire);
     this.root.addEventListener('pointerdown', (e) => e.stopPropagation());
   }
 
@@ -188,8 +204,8 @@ export class JacHud {
     this.rearEl.classList.toggle('is-on', this.rearFade > 0.02);
     if (this.rearFade < 0.02) this.rearEl.setAttribute('aria-hidden', 'true');
     else this.rearEl.removeAttribute('aria-hidden');
-    this.barEl.classList.toggle('is-bump', snap.bump > 0.25);
-    this.dockEl.classList.toggle('is-bump', snap.bump > 0.25);
+    this.barEl.classList.toggle('is-bump', snap.bump > 0.08);
+    this.dockEl.classList.toggle('is-bump', snap.bump > 0.08);
     this.rearEl.classList.toggle('jac-rear--phone', phone);
     this.rearEl.classList.toggle('jac-rear--turn', Math.abs(snap.steering) > 0.25);
     this.steerEl.classList.toggle('is-live', snap.mph > 0);
@@ -342,7 +358,7 @@ export class JacHud {
       this.rearFadeTo = want;
       this.rearFadeT0 = performance.now();
     }
-    const t = Math.min(1, (performance.now() - this.rearFadeT0) / 700);
+    const t = Math.min(1, (performance.now() - this.rearFadeT0) / 400);
     this.rearFade = this.rearFadeFrom + (this.rearFadeTo - this.rearFadeFrom) * t;
     this.rearEl.style.transition = 'none';
     this.rearEl.style.opacity = String(this.rearFade);

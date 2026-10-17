@@ -49,7 +49,9 @@ const TURN_RATE = 2.4;
 const IDLE_RPM = 700;
 const MOVE_RPM = 2250;
 const MOVE_MPH = 10;
-const SHIFT_DWELL_S = 0.45;
+/** Dwell only while braking from the opposite sign. A cold stop (already 0) flips immediately. */
+const SHIFT_DWELL_S = 0.4;
+const STOPPED_SHIFT_S = 0.18;
 
 export type JacVisual = {
   obj: MapObject;
@@ -430,12 +432,13 @@ export class JacT9 {
       }
       return path;
     };
+    if (!pass(gx, gy) && !(sx === gx && sy === gy)) return null;
     if (pass(gx, gy) || (sx === gx && sy === gy)) {
       const direct = findPathWith(sx, sy, gx, gy, pass);
       if (direct) return finish(direct, gx, gy);
       if (sx === gx && sy === gy) return [];
     }
-    for (let r = 1; r <= 24; r++) {
+    for (let r = 1; r <= 2; r++) {
       let best: { x: number; y: number }[] | null = null;
       let bestD = Infinity;
       for (let dy = -r; dy <= r; dy++) {
@@ -523,17 +526,23 @@ export class JacT9 {
       dx /= mag;
       dy /= mag;
     }
-    const live = mag > 0.15;
+    if (this.pendingExit) {
+      this.clearDrivePath();
+      this.qaSteer = null;
+      dx = 0;
+      dy = 0;
+    }
+    const live = !this.pendingExit && mag > 0.15;
     if (live) {
       this.clearDrivePath();
       this.qaSteer = null;
     }
 
-    if (!live && (this.drivePath.length > 0 || this.driveGoal)) {
+    if (!this.pendingExit && !live && (this.drivePath.length > 0 || this.driveGoal)) {
       const moved = this.followDrivePath(dt);
       this.steering = 0;
       this.tickRearHold(dt);
-      if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 0.55);
+      if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 0.35);
       this.syncMeters(moved);
       if (this.toggles.hazards) this.hazardT += dt;
       else this.hazardT = 0;
@@ -558,7 +567,7 @@ export class JacT9 {
 
     this.reversing = this.vel < -0.08;
     this.tickRearHold(dt);
-    if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 0.55);
+    if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 0.35);
     const fwd = DIR_VEC[this.dir];
     if (moving) {
       const nx = fwd.x * this.vel * dt;
@@ -637,10 +646,12 @@ export class JacT9 {
       this.vel = 0;
       const need: JacGear = want > 0 ? 'D' : 'R';
       if (autoShift && this.gear !== need) {
+        const fromBrake = this.shiftArmedAt > 0;
+        const dwell = fromBrake ? SHIFT_DWELL_S : STOPPED_SHIFT_S;
         if (!this.shiftArmedAt) this.shiftArmedAt = performance.now();
-        if (this.shiftDwell <= 0) this.shiftDwell = SHIFT_DWELL_S;
+        if (this.shiftDwell <= 0) this.shiftDwell = dwell;
         this.shiftDwell = Math.max(0, this.shiftDwell - dt);
-        if (performance.now() - this.shiftArmedAt < SHIFT_DWELL_S * 1000) return;
+        if (fromBrake && performance.now() - this.shiftArmedAt < SHIFT_DWELL_S * 1000) return;
         if (this.shiftDwell > 0) return;
         this.gear = need;
       } else if (autoShift) {
@@ -672,7 +683,7 @@ export class JacT9 {
         /* no haptic */
       }
     }
-    this.bumpT = 1;
+    this.bumpT = 1.35;
   }
 
   requestExit(): void {

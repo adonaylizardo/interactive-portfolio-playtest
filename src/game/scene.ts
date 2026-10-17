@@ -43,7 +43,7 @@ import {
 import { isTouchPrimary, type ChecklistStepId } from '../checklist/storage';
 import { muroWallTiles, OBELISCO_ACCESS, OBELISCO_SOLID_TILES } from '../data/world';
 import { mapWorldBounds, sortKey, tileFootWorld, tileToWorld, worldToTile } from '../iso/math';
-import { findPathOrNearest } from '../iso/pathfinding';
+import { findPath, findPathOrNearest } from '../iso/pathfinding';
 import { C } from './colors';
 import { deskTopFillColor, treeCanopyTrunkOverlap } from './draw';
 import {
@@ -645,14 +645,10 @@ export class IsoScene {
       if (!this.interiorActive) return;
       if (this.shouldBlockTap()) return;
       this.pixiTapGestureSerial = this.pointerGestureSerial;
-      const canvas = this.canvasEl;
-      if (!canvas) return;
-      const native = e.nativeEvent as PointerEvent | undefined;
-      const clientX = native?.clientX ?? 0;
-      const clientY = native?.clientY ?? 0;
-      const rect = canvas.getBoundingClientRect();
+      const local = this.federatedToCanvas(e);
+      if (!local) return;
       const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
-      this.handleScreenTap(clientX - rect.left, clientY - rect.top, sprint);
+      this.handleScreenTap(local.x, local.y, sprint);
     });
   }
 
@@ -727,13 +723,9 @@ export class IsoScene {
       this.pixiTapGestureSerial = this.pointerGestureSerial;
       const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
       if (this.interiorActive || this.jac?.driving) {
-        const canvas = this.canvasEl;
-        if (!canvas) return;
-        const native = e.nativeEvent as PointerEvent | undefined;
-        const clientX = native?.clientX ?? 0;
-        const clientY = native?.clientY ?? 0;
-        const rect = canvas.getBoundingClientRect();
-        this.handleScreenTap(clientX - rect.left, clientY - rect.top, sprint);
+        const local = this.federatedToCanvas(e);
+        if (!local) return;
+        this.handleScreenTap(local.x, local.y, sprint);
         return;
       }
       const pos = e.getLocalPosition(this.world);
@@ -811,11 +803,9 @@ export class IsoScene {
       if (this.shouldBlockTap()) return;
       this.pixiTapGestureSerial = this.pointerGestureSerial;
       if (this.jac?.driving) {
-        const canvas = this.canvasEl;
-        if (!canvas) return;
-        const native = e.nativeEvent as PointerEvent | undefined;
-        const rect = canvas.getBoundingClientRect();
-        this.handleScreenTap((native?.clientX ?? 0) - rect.left, (native?.clientY ?? 0) - rect.top, false);
+        const local = this.federatedToCanvas(e);
+        if (!local) return;
+        this.handleScreenTap(local.x, local.y, false);
         return;
       }
       if (!this.prepareMapTap(undefined, tx, ty)) return;
@@ -976,11 +966,9 @@ export class IsoScene {
         e.stopPropagation();
         this.pixiTapGestureSerial = this.pointerGestureSerial;
         if (this.jac?.driving) {
-          const canvas = this.canvasEl;
-          if (!canvas) return;
-          const native = e.nativeEvent as PointerEvent | undefined;
-          const rect = canvas.getBoundingClientRect();
-          this.handleScreenTap((native?.clientX ?? 0) - rect.left, (native?.clientY ?? 0) - rect.top, false);
+          const local = this.federatedToCanvas(e);
+          if (!local) return;
+          this.handleScreenTap(local.x, local.y, false);
           return;
         }
         if (obj.id === JAC_ID) {
@@ -1425,7 +1413,8 @@ export class IsoScene {
       opts?.buildingEntry ??
       resolveBuildingEntryFromTile(walkTx, walkTy, this.roundedCharTile());
     this.pendingBuildingEntry = entry;
-    const target = resolveWalkTarget(walkTx, walkTy);
+    const walkable = !!cells[walkTy]?.[walkTx]?.walkable;
+    const target = walkable ? { x: walkTx, y: walkTy } : resolveWalkTarget(walkTx, walkTy);
     this.walkToTile(target.x, target.y, sprint);
   }
 
@@ -1456,9 +1445,20 @@ export class IsoScene {
     }
     const sx = Math.round(this.charTx);
     const sy = Math.round(this.charTy);
-    const result = findPathOrNearest(sx, sy, tx, ty);
+    const destWalkable = !!cells[ty]?.[tx]?.walkable;
+    const scenery = !!getSceneryAt(tx, ty);
+    const result = destWalkable
+      ? (() => {
+          const path = findPath(sx, sy, tx, ty);
+          return path ? { path, target: { x: tx, y: ty }, direct: true } : null;
+        })()
+      : scenery
+        ? findPathOrNearest(sx, sy, tx, ty)
+        : null;
     if (!result) {
       this.pendingBuildingEntry = null;
+      this.pendingJacPanel = false;
+      this.pendingJacEnter = false;
       this.clearWalkPreview();
       this.events.onUnreachable?.();
       return;
@@ -1468,6 +1468,15 @@ export class IsoScene {
       if (result.target.x !== d.x || result.target.y !== d.y) this.pendingBuildingEntry = null;
     }
     this.path = result.path;
+    if (
+      destWalkable &&
+      (this.path.length === 0 ||
+        this.path[this.path.length - 1].x !== tx ||
+        this.path[this.path.length - 1].y !== ty) &&
+      (sx !== tx || sy !== ty)
+    ) {
+      this.path = [...this.path, { x: tx, y: ty }];
+    }
     this.sprint = sprint;
     this.charState = sprint ? 'sprint' : 'walk';
     if (!opts?.keepView) this.startCameraFollow();
@@ -1478,11 +1487,12 @@ export class IsoScene {
       this.charState = 'idle';
       this.sprint = false;
       this.syncCharacterGraphic();
+      this.snapToWalkGoal();
       const rtx = Math.round(this.charTx);
       const rty = Math.round(this.charTy);
       this.tryArriveAtDoorTile(rtx, rty);
-      if (this.pendingJacEnter) this.seatInJac();
-      else if (this.pendingJacPanel) this.openJacMenu();
+      if (this.pendingJacEnter) this.trySeatInJac();
+      else if (this.pendingJacPanel) this.tryOpenJacMenu();
     }
   }
 
@@ -1712,6 +1722,25 @@ export class IsoScene {
     return { x: rect.left + sx, y: rect.top + sy };
   }
 
+  private federatedToCanvas(e: {
+    clientX?: number;
+    clientY?: number;
+    global?: { x: number; y: number };
+    nativeEvent?: unknown;
+  }): { x: number; y: number } | null {
+    const canvas = this.canvasEl;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const native = e.nativeEvent as { clientX?: number; clientY?: number } | undefined;
+    const cx = Number.isFinite(e.clientX) ? e.clientX : native?.clientX;
+    const cy = Number.isFinite(e.clientY) ? e.clientY : native?.clientY;
+    if (typeof cx === 'number' && typeof cy === 'number') {
+      return { x: cx - rect.left, y: cy - rect.top };
+    }
+    if (e.global) return { x: e.global.x, y: e.global.y };
+    return null;
+  }
+
   private requestDriveToScreen(sx: number, sy: number): void {
     if (!this.jac?.driving) return;
     this.events.stickCancel?.();
@@ -1728,6 +1757,10 @@ export class IsoScene {
     if (!this.jac?.driving) return false;
     this.events.stickCancel?.();
     this.pendingBuildingEntry = null;
+    if (!this.jac.driveTileOk(gx, gy)) {
+      this.events.onUnreachable?.();
+      return false;
+    }
     const path = this.jac.findDrivePath(gx, gy);
     if (!path) {
       this.events.onUnreachable?.();
@@ -2705,20 +2738,20 @@ export class IsoScene {
           e.deltaMode === WheelEvent.DOM_DELTA_LINE ? 24 : e.deltaMode === WheelEvent.DOM_DELTA_PAGE ? 480 : 1;
         let dx = e.deltaX * unit;
         let dy = e.deltaY * unit;
-        // Trackpad pinch arrives as ctrl+wheel; ctrl/cmd + mouse wheel zooms too. Everything else pans.
-        if (e.ctrlKey || e.metaKey) {
+        // Plain mouse wheel zooms (Tom John). ctrl/meta is trackpad pinch — also zoom.
+        // Shift+wheel or a mostly-horizontal trackpad swipe still pans.
+        if (e.shiftKey && dx === 0) {
+          dx = dy;
+          dy = 0;
+        }
+        if (e.ctrlKey || e.metaKey || Math.abs(dy) >= Math.abs(dx)) {
           this.zoomSource = 'wheel';
-          // Pinch deltas are small and frequent; mouse notches are ~100 px.
           const rate = Math.abs(dy) < 50 ? 1 / 100 : 1 / 450;
           const d = Math.max(-240, Math.min(240, dy));
           const rect = canvas.getBoundingClientRect();
           this.setZoom(this.zoom * Math.pow(2, -d * rate), { x: e.clientX - rect.left, y: e.clientY - rect.top });
           this.zoomSource = 'none';
           return;
-        }
-        if (e.shiftKey && dx === 0) {
-          dx = dy;
-          dy = 0;
         }
         this.panByScreen(-dx, -dy);
       },
@@ -2966,7 +2999,7 @@ export class IsoScene {
       this.rearFadeTo = want;
       this.rearFadeT0 = performance.now();
     }
-    const t = Math.min(1, (performance.now() - this.rearFadeT0) / 700);
+    const t = Math.min(1, (performance.now() - this.rearFadeT0) / 400);
     this.rearFade = this.rearFadeFrom + (this.rearFadeTo - this.rearFadeFrom) * t;
     const drewRear = !!this.jac?.rearCam;
     if (drewRear) this.renderRearTexture();
@@ -3175,8 +3208,8 @@ export class IsoScene {
     this.cameraY = wantY;
     const bump = this.jac?.bumpT ?? 0;
     if (bump > 0.02) {
-      this.cameraX += Math.sin(performance.now() * 0.028) * 56 * bump;
-      this.cameraY += Math.cos(performance.now() * 0.034) * 36 * bump;
+      this.cameraX += Math.sin(performance.now() * 0.045) * 140 * bump;
+      this.cameraY += Math.cos(performance.now() * 0.052) * 96 * bump;
     }
     this.applyCamera(false);
     this.shiftGestureBaselines(this.cameraX - camBeforeX, this.cameraY - camBeforeY);
@@ -3325,9 +3358,10 @@ export class IsoScene {
         if (this.path.length === 0) {
           this.charState = 'idle';
           this.sprint = false;
+          this.snapToWalkGoal();
           this.tryArriveAtDoorTile(Math.round(this.charTx), Math.round(this.charTy));
-          if (this.pendingJacEnter) this.seatInJac();
-          else if (this.pendingJacPanel) this.openJacMenu();
+          if (this.pendingJacEnter) this.trySeatInJac();
+          else if (this.pendingJacPanel) this.tryOpenJacMenu();
           if (this.pendingNoahTalk) {
             this.pendingNoahTalk = false;
             const s = this.noahTalkSpot;
@@ -3846,28 +3880,64 @@ export class IsoScene {
     if (!this.jac || this.interiorActive || this.jac.driving) return;
     this.pendingBuildingEntry = null;
     const door = this.jac.driverDoorTile();
-    const dist = door ? Math.hypot(this.charTx - door.x, this.charTy - door.y) : 0;
-    if (!door || dist < 1.6) {
+    if (!door) {
+      this.events.onUnreachable?.();
+      return;
+    }
+    if (this.atJacDoor(1.6)) {
       this.openJacMenu();
       return;
     }
     this.pendingJacPanel = true;
     this.pendingJacEnter = false;
-    const keepView = !this.characterOnScreen();
-    this.walkToTile(door.x, door.y, false, { keepView });
-    if (this.path.length === 0) this.openJacMenu();
+    this.walkToTile(door.x, door.y, false);
+    if (this.path.length === 0) this.tryOpenJacMenu();
   }
 
-  private characterOnScreen(): boolean {
-    const s = this.followTargetScreen();
-    const sw = this.app.screen.width;
-    const sh = this.app.screen.height;
-    return s.x > 40 && s.y > 40 && s.x < sw - 40 && s.y < sh - 40;
+  private atJacDoor(maxDist: number): boolean {
+    const door = this.jac?.driverDoorTile();
+    if (!door) return false;
+    return Math.hypot(this.charTx - door.x, this.charTy - door.y) < maxDist;
+  }
+
+  private tryOpenJacMenu(): void {
+    if (!this.atJacDoor(1.6)) {
+      this.pendingJacPanel = false;
+      return;
+    }
+    this.openJacMenu();
+  }
+
+  private trySeatInJac(): void {
+    if (!this.atJacDoor(1.2)) {
+      this.pendingJacEnter = false;
+      return;
+    }
+    this.seatInJac();
+  }
+
+  private snapToWalkGoal(): void {
+    const raw = this.canvasEl?.dataset.walkGoal;
+    if (!raw) return;
+    try {
+      const goal = JSON.parse(raw) as { x?: number; y?: number };
+      if (typeof goal.x !== 'number' || typeof goal.y !== 'number') return;
+      if (!cells[goal.y]?.[goal.x]?.walkable) return;
+      const d = Math.hypot(this.charTx - goal.x, this.charTy - goal.y);
+      if (d > 0.04 && d < 1.2) {
+        this.charTx = goal.x;
+        this.charTy = goal.y;
+        this.syncCharacterGraphic();
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   private openJacMenu(): void {
     this.pendingJacPanel = false;
     if (!this.jac || this.jac.driving) return;
+    if (!this.atJacDoor(1.6)) return;
     this.path = [];
     this.drawPathPreview();
     this.jac.openMenu();
@@ -3894,8 +3964,11 @@ export class IsoScene {
       return;
     }
     const door = this.jac.driverDoorTile();
-    const dist = door ? Math.hypot(this.charTx - door.x, this.charTy - door.y) : 0;
-    if (!door || dist < 1.2) {
+    if (!door) {
+      this.events.onUnreachable?.();
+      return;
+    }
+    if (this.atJacDoor(1.2)) {
       this.seatInJac();
       return;
     }
@@ -3903,9 +3976,8 @@ export class IsoScene {
     this.pendingJacPanel = false;
     if (this.jac.mode === 'menu' || this.jac.mode === 'info') this.jac.closeToMap();
     this.events.chrome?.onJacHud?.();
-    const keepView = !this.characterOnScreen();
-    this.walkToTile(door.x, door.y, false, { keepView });
-    if (this.path.length === 0) this.seatInJac();
+    this.walkToTile(door.x, door.y, false);
+    if (this.path.length === 0) this.trySeatInJac();
   }
 
   private seatInJac(): void {
