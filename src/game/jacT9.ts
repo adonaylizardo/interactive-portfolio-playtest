@@ -5,6 +5,7 @@ import {
   fill,
   getBuildingAt,
   getBuildingAtDoor,
+  getEnterableBuildings,
   MAP_HEIGHT,
   MAP_WIDTH,
   TILE_H,
@@ -130,6 +131,15 @@ type JacHooks = {
   tapBox: Map<string, Rectangle>;
   onChange?: () => void;
   onStuck?: () => void;
+};
+
+type DoorSit = {
+  x: number;
+  y: number;
+  doorD: number;
+  along: number;
+  walkD: number;
+  heading: FacingDir;
 };
 
 function vfsOf(dir: FacingDir): { x: number; y: number } {
@@ -326,6 +336,9 @@ export class JacT9 {
   lastParkMs = 0;
   lastParkHeading: FacingDir | null = null;
   private walkDistCache = new Map<string, Map<string, number>>();
+  private doorSitCache = new Map<string, DoorSit[]>();
+  private pathsFrom = '';
+  private pathToSit = new Map<string, { x: number; y: number }[]>();
 
   constructor(obj: MapObject, hooks: JacHooks) {
     this.obj = obj;
@@ -352,6 +365,7 @@ export class JacT9 {
     hooks.container.addChild(this.haze);
     this.snapshotClaimFromGrid();
     this.attachGhost();
+    this.precomputeDoorSits();
   }
 
   get driving(): boolean {
@@ -415,6 +429,8 @@ export class JacT9 {
       this.exitFrom = null;
       this.clearDrivePath();
       this.applyParkedSolid(false);
+      this.precomputeDoorSits();
+      this.ensurePathsFromHere();
     } else if (wasDrive) {
       this.engineOn = false;
       this.gear = 'P';
@@ -669,22 +685,105 @@ export class JacT9 {
     heading: FacingDir;
   } | null {
     const t0 = performance.now();
-    const keep = this.doorKeepClear(doorX, doorY);
     const sx = Math.round(this.cx);
     const sy = Math.round(this.cy);
+    const usable = this.sitsForDoor(doorX, doorY);
+    const doorSide = usable.filter((c) => c.along >= 0);
+    const front = doorSide.filter((c) => c.along >= 1 && c.doorD >= 3 && c.doorD <= 5);
+    const close = doorSide.filter((c) => c.along >= 0.5 && c.doorD <= 5);
+    const near = doorSide.filter((c) => c.doorD <= 8);
+    const pool = front.length ? front : close.length ? close : near.length ? near : doorSide.length ? doorSide : usable;
+    const prefer = (c: DoorSit) => (cells[c.y]?.[c.x]?.groundId?.includes('park') ? 0 : 1);
+    const closeness = (c: DoorSit) => Math.abs(c.doorD - 3.5);
+    const doorHug = (c: DoorSit) => (this.parkTouchesDoor(c.x, c.y, c.heading, doorX, doorY) ? 1 : 0);
+    const reach = (c: DoorSit) => Math.abs(c.x - sx) + Math.abs(c.y - sy) + closeness(c) * 2 + c.walkD * 0.15;
+    const origin = k(sx, sy);
+    const ranked = pool.filter((c) => !doorHug(c));
+    const order = (ranked.length ? ranked : pool).slice().sort(
+      (a, b) =>
+        doorHug(a) - doorHug(b) || prefer(a) - prefer(b) || reach(a) - reach(b) || b.along - a.along,
+    );
+    let pick: DoorSit | null = null;
+    let path: { x: number; y: number }[] | null = null;
+    for (const cand of order) {
+      const cached = this.pathsFrom === origin ? this.pathToSit.get(k(cand.x, cand.y)) : undefined;
+      const found = cached ?? this.driveBfsTo(cand.x, cand.y);
+      if (!found) continue;
+      pick = cand;
+      path = found;
+      break;
+    }
+    this.lastParkMs = performance.now() - t0;
+    if (!pick || !path) {
+      this.lastParkHeading = null;
+      return null;
+    }
+    this.lastParkHeading = pick.heading;
+    return { x: pick.x, y: pick.y, path, heading: pick.heading };
+  }
+
+  private precomputeDoorSits(): void {
+    for (const b of getEnterableBuildings()) {
+      if (b.door) this.sitsForDoor(b.door.x, b.door.y);
+    }
+  }
+
+  private ensurePathsFromHere(): void {
+    const origin = k(Math.round(this.cx), Math.round(this.cy));
+    if (this.pathsFrom === origin && this.pathToSit.size > 0) return;
+    this.pathsFrom = origin;
+    this.pathToSit.clear();
+    const targets = new Set<string>();
+    for (const sits of this.doorSitCache.values()) {
+      for (const s of sits) targets.add(k(s.x, s.y));
+    }
+    if (targets.size === 0) return;
+    const sx = Math.round(this.cx);
+    const sy = Math.round(this.cy);
+    const pass = (x: number, y: number) => this.driveBoxWalkable(x, y) || (x === sx && y === sy);
+    type Node = { x: number; y: number; parent: Node | null };
+    const seen = new Set<string>([k(sx, sy)]);
+    const q: Node[] = [{ x: sx, y: sy, parent: null }];
+    const toPath = (node: Node) => {
+      const path: { x: number; y: number }[] = [];
+      let n: Node | null = node;
+      while (n) {
+        path.push({ x: n.x, y: n.y });
+        n = n.parent;
+      }
+      path.reverse();
+      if (path[0]?.x === sx && path[0]?.y === sy) path.shift();
+      return path;
+    };
+    this.pathToSit.set(k(sx, sy), []);
+    targets.delete(k(sx, sy));
+    for (let i = 0; i < q.length && targets.size; i++) {
+      const cur = q[i];
+      for (const [dx, dy] of CARDINALS) {
+        const nx = cur.x + dx;
+        const ny = cur.y + dy;
+        const id = k(nx, ny);
+        if (seen.has(id) || !pass(nx, ny)) continue;
+        seen.add(id);
+        const node = { x: nx, y: ny, parent: cur };
+        q.push(node);
+        if (targets.has(id)) {
+          this.pathToSit.set(id, toPath(node));
+          targets.delete(id);
+        }
+      }
+    }
+  }
+
+  private sitsForDoor(doorX: number, doorY: number): DoorSit[] {
+    const key = k(doorX, doorY);
+    const hit = this.doorSitCache.get(key);
+    if (hit) return hit;
+    const keep = this.doorKeepClear(doorX, doorY);
     const building = getBuildingAtDoor(doorX, doorY);
     const inward = building ? doorInwardStep(building) : null;
     const out = inward ? { x: -inward.x, y: -inward.y } : { x: 0, y: 1 };
-    type Cand = {
-      x: number;
-      y: number;
-      doorD: number;
-      pathD: number;
-      along: number;
-      walkD: number;
-      heading: FacingDir | null;
-    };
-    const usable: Cand[] = [];
+    const usable: DoorSit[] = [];
     const SCAN = 12;
     const x0 = Math.max(0, doorX - SCAN);
     const x1 = Math.min(MAP_WIDTH - 1, doorX + SCAN);
@@ -693,56 +792,110 @@ export class JacT9 {
     const walk = this.walkDistFromDoor(doorX, doorY);
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
-        if (!this.driveBoxWalkable(x, y) && !(x === sx && y === sy)) continue;
+        if (!this.driveBoxWalkable(x, y)) continue;
         const heading = this.parkHeadingAt(x, y, keep);
         if (!heading) continue;
         if (this.sitOverlapsBuilding(x, y, heading)) continue;
-        if (!this.exitFromPark(x, y, heading)) continue;
+        if (!this.hasParkExit(x, y, heading)) continue;
         const walkD = this.walkDistParkToDoor(x, y, heading, walk);
         if (!Number.isFinite(walkD)) continue;
         usable.push({
           x,
           y,
           doorD: Math.abs(x - doorX) + Math.abs(y - doorY),
-          pathD: Math.abs(x - sx) + Math.abs(y - sy),
           along: (x - doorX) * out.x + (y - doorY) * out.y,
           walkD,
           heading,
         });
       }
     }
+    this.doorSitCache.set(key, usable);
+    return usable;
+  }
 
-    const doorSide = usable.filter((c) => c.along >= 0);
-    const front = doorSide.filter((c) => c.along >= 1 && c.doorD >= 3 && c.doorD <= 5);
-    const close = doorSide.filter((c) => c.along >= 0.5 && c.doorD <= 5);
-    const near = doorSide.filter((c) => c.doorD <= 8);
-    const pool = front.length ? front : close.length ? close : near.length ? near : doorSide.length ? doorSide : usable;
-    const prefer = (c: Cand) => (cells[c.y]?.[c.x]?.groundId?.includes('park') ? 0 : 1);
-    const closeness = (c: Cand) => Math.abs(c.doorD - 3.5);
-    const doorHug = (c: Cand) => (c.heading && this.parkTouchesDoor(c.x, c.y, c.heading, doorX, doorY) ? 1 : 0);
-    const reach = (c: Cand) => c.pathD + closeness(c) * 2 + c.walkD * 0.15;
-    pool.sort(
-      (a, b) =>
-        doorHug(a) - doorHug(b) || prefer(a) - prefer(b) || reach(a) - reach(b) || b.along - a.along,
-    );
-    const ranked = pool.filter((c) => !doorHug(c));
-    const order = ranked.length ? ranked : pool;
-    let pick: Cand | null = null;
-    let path: { x: number; y: number }[] | null = null;
-    for (const cand of order) {
-      const found = this.findDrivePath(cand.x, cand.y);
-      if (!found) continue;
-      pick = cand;
-      path = found;
-      break;
+  private hasParkExit(cx: number, cy: number, dir: FacingDir): boolean {
+    const blocked = new Set(this.parkCellsAt(cx, cy, dir).map(([x, y]) => k(x, y)));
+    for (const [x, y] of this.parkCellsAt(cx, cy, dir)) {
+      for (const [dx, dy] of CARDINALS) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (blocked.has(k(nx, ny))) continue;
+        if (this.staticWalkable(nx, ny)) return true;
+      }
     }
-    this.lastParkMs = performance.now() - t0;
-    if (!pick || !path || !pick.heading) {
-      this.lastParkHeading = null;
-      return null;
+    return false;
+  }
+
+  /** Cardinal BFS on the 2×2 drive grid — no sorted A*. */
+  private driveBfsTo(tx: number, ty: number): { x: number; y: number }[] | null {
+    const sx = Math.round(this.cx);
+    const sy = Math.round(this.cy);
+    if (sx === tx && sy === ty) return [];
+    const pass = (x: number, y: number) => this.driveBoxWalkable(x, y) || (x === sx && y === sy);
+    if (!pass(tx, ty)) return null;
+    const cheap = this.axisDrivePath(sx, sy, tx, ty, pass);
+    if (cheap) return cheap;
+    const seen = new Set<string>([k(sx, sy)]);
+    type Node = { x: number; y: number; parent: Node | null };
+    const q: Node[] = [{ x: sx, y: sy, parent: null }];
+    for (let i = 0; i < q.length; i++) {
+      const cur = q[i];
+      if (cur.x === tx && cur.y === ty) {
+        const path: { x: number; y: number }[] = [];
+        let n: Node | null = cur;
+        while (n) {
+          path.push({ x: n.x, y: n.y });
+          n = n.parent;
+        }
+        path.reverse();
+        if (path[0]?.x === sx && path[0]?.y === sy) path.shift();
+        return path;
+      }
+      for (const [dx, dy] of CARDINALS) {
+        const nx = cur.x + dx;
+        const ny = cur.y + dy;
+        const id = k(nx, ny);
+        if (seen.has(id) || !pass(nx, ny)) continue;
+        seen.add(id);
+        q.push({ x: nx, y: ny, parent: cur });
+      }
     }
-    this.lastParkHeading = pick.heading;
-    return { x: pick.x, y: pick.y, path, heading: pick.heading };
+    return null;
+  }
+
+  private axisDrivePath(
+    sx: number,
+    sy: number,
+    tx: number,
+    ty: number,
+    pass: (x: number, y: number) => boolean,
+  ): { x: number; y: number }[] | null {
+    const run = (firstX: boolean): { x: number; y: number }[] | null => {
+      const path: { x: number; y: number }[] = [];
+      let x = sx;
+      let y = sy;
+      const stepX = () => {
+        while (x !== tx) {
+          x += Math.sign(tx - x);
+          if (!pass(x, y)) return false;
+          path.push({ x, y });
+        }
+        return true;
+      };
+      const stepY = () => {
+        while (y !== ty) {
+          y += Math.sign(ty - y);
+          if (!pass(x, y)) return false;
+          path.push({ x, y });
+        }
+        return true;
+      };
+      if (firstX) {
+        if (!stepX() || !stepY()) return null;
+      } else if (!stepY() || !stepX()) return null;
+      return path;
+    };
+    return run(true) ?? run(false);
   }
 
   /** + along the outward door axis (door side). Negative is behind the house. */
@@ -870,6 +1023,7 @@ export class JacT9 {
     if (hit) return hit;
     const dist = new Map<string, number>();
     const q: { x: number; y: number }[] = [];
+    const LIMIT = 14;
     const seed = (x: number, y: number) => {
       const id = k(x, y);
       if (dist.has(id)) return;
@@ -882,6 +1036,7 @@ export class JacT9 {
     for (let i = 0; i < q.length; i++) {
       const cur = q[i];
       const d = dist.get(k(cur.x, cur.y)) ?? 0;
+      if (d >= LIMIT) continue;
       for (const [dx, dy] of CARDINALS) {
         const nx = cur.x + dx;
         const ny = cur.y + dy;
