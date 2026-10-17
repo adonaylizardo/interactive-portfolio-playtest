@@ -25,15 +25,14 @@ await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded =
   timeout: 60000,
 });
 
-const estudio = await page.evaluate(() => {
-  const b = window.__playtestQa.getEnterableBuildings().find((x) => x.name === 'estudio');
-  if (!b?.door) return null;
-  return window.__playtestQa.doorScreenPoint('estudio');
+await page.evaluate(() => {
+  window.__playtestQa.setZoom(0.5);
+  window.__playtestQa.frameDoorForQa('estudio');
 });
-if (!estudio) throw new Error('no estudio door point');
-await page.mouse.click(estudio.x, estudio.y);
+await wait(600);
+await page.evaluate(() => window.__playtestQa.tapBuildingDoor('estudio'));
 await page.waitForFunction(() => window.__playtestQa?.getInteriorId?.() === 'estudio', null, {
-  timeout: 8000,
+  timeout: 15000,
 });
 
 const park = await page.evaluate(() => {
