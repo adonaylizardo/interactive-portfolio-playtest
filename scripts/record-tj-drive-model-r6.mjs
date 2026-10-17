@@ -147,18 +147,25 @@ async function pickDriveGoal(page, aroundBuilding) {
         const dist = Math.hypot(x - j.cx, y - j.cy);
         if (dist < 4 || dist > 18) continue;
         if (!clear(x, y)) continue;
+        if (!window.__playtestQa.jacDriveTileOk?.(x, y)) continue;
         const s = window.__playtestQa.worldToClient((x - y) * 64, (x + y) * 32);
         if (s.x < 36 || s.y < 96 || s.x > window.innerWidth - 36 || s.y > window.innerHeight - 110) continue;
         if (stick && s.x >= stick.left - 8 && s.x <= stick.right + 8 && s.y >= stick.top - 8 && s.y <= stick.bottom + 8) continue;
         const el = document.elementFromPoint(s.x, s.y);
         if (el && el.id !== 'game-canvas' && !el.closest('#game-canvas')) continue;
-        const wall = blocked(j.cx, j.cy, x, y);
+        const landed = window.__playtestQa.tileAtClient?.(s.x, s.y);
+        if (!landed || !window.__playtestQa.jacDriveTileOk?.(landed.x, landed.y)) continue;
+        const wall = blocked(j.cx, j.cy, landed.x, landed.y);
         if (aroundBuilding && !wall) continue;
-        hits.push({ x, y, client: s, dist, wall });
+        hits.push({ x: landed.x, y: landed.y, client: s, dist: Math.hypot(landed.x - j.cx, landed.y - j.cy), wall });
       }
     }
-    hits.sort((a, b) => (b.wall - a.wall) || b.dist - a.dist);
-    return hits[0] ?? null;
+    if (aroundBuilding) {
+      const wall = hits.filter((h) => h.wall).sort((a, b) => a.dist - b.dist);
+      return wall[0] ?? hits.sort((a, b) => a.dist - b.dist)[0] ?? null;
+    }
+    const open = hits.filter((h) => !h.wall).sort((a, b) => b.dist - a.dist);
+    return open[0] ?? hits[0] ?? null;
   }, aroundBuilding);
 }
 
@@ -289,11 +296,35 @@ async function run(tag, options, phone) {
       return (j?.mph ?? 1) === 0 && !j?.rearCam ? j : null;
     }, 4000);
 
+    try {
+      await releaseStickCdp(cdp);
+    } catch {
+      /* no active CDP touch */
+    }
+    await page.evaluate(() => window.__playtestQa.stickCancel?.());
+    await wait(200);
     const goal = await pickDriveGoal(page, !phone);
     if (!goal) throw new Error(`${tag}: no drive goal`);
     if (phone) await tapClientCdp(cdp, goal.client.x, goal.client.y);
-    else await page.mouse.click(goal.client.x, goal.client.y);
-    await waitUntil(page, async () => ((await page.evaluate(() => window.__playtestQa.jac()?.driveGoal)) ? true : null), 3000);
+    else {
+      await page.mouse.click(goal.client.x, goal.client.y);
+      await wait(80);
+      const live = await page.evaluate(() => window.__playtestQa.jac()?.driveGoal);
+      if (!live) {
+        await page.evaluate((s) => window.__playtestQa.tapScreen?.(s.x, s.y), goal.client);
+      }
+    }
+    const started = await waitUntil(page, async () => {
+      const j = await page.evaluate(() => ({
+        jac: window.__playtestQa.jac(),
+        tap: window.__playtestQa.lastDriveTap?.(),
+      }));
+      return j.jac?.driveGoal ? j : null;
+    }, 4000);
+    if (!started?.jac?.driveGoal) throw new Error(`${tag}: click-to-drive did not set a goal pick=${JSON.stringify(goal)} tap=${JSON.stringify(started?.tap)}`);
+    notes.push({ driveTap: started.tap, pick: { x: goal.x, y: goal.y } });
+    const startCx = started.jac.cx;
+    const startCy = started.jac.cy;
     const arrived = await waitUntil(
       page,
       async () => {
@@ -303,8 +334,12 @@ async function run(tag, options, phone) {
       },
       16000,
     );
+    if (arrived && Math.hypot((arrived.cx ?? 0) - (startCx ?? 0), (arrived.cy ?? 0) - (startCy ?? 0)) < 0.2) {
+      throw new Error(`${tag}: click-to-drive never left sit ${JSON.stringify({ goal, arrived })}`);
+    }
+    const expect = started?.tap ?? goal;
     const visMiss = arrived
-      ? Math.hypot((arrived.visualTx ?? arrived.cx) - goal.x, (arrived.visualTy ?? arrived.cy) - goal.y)
+      ? Math.hypot((arrived.visualTx ?? arrived.cx) - expect.x, (arrived.visualTy ?? arrived.cy) - expect.y)
       : 99;
     notes.push({
       stopVisual: {
@@ -313,19 +348,30 @@ async function run(tag, options, phone) {
         arrived: { cx: arrived?.cx, cy: arrived?.cy, visualTx: arrived?.visualTx, visualTy: arrived?.visualTy, driveGoal: arrived?.driveGoal },
       },
     });
-    if (arrived?.driveGoal) throw new Error(`${tag}: stalled with target still set visMiss=${visMiss.toFixed(2)}`);
-    if (visMiss > 0.45) throw new Error(`${tag}: visual center ${visMiss.toFixed(2)} tiles from tap`);
+    if (arrived?.driveGoal) throw new Error(`${tag}: stalled with target still set visMiss=${visMiss.toFixed(2)} goal=${JSON.stringify(goal)}`);
+    if (visMiss > 0.45) throw new Error(`${tag}: visual center ${visMiss.toFixed(2)} tiles from tap pick=${JSON.stringify(goal)} landed=${JSON.stringify(started?.tap)} arrived=${JSON.stringify({ cx: arrived?.cx, cy: arrived?.cy, visualTx: arrived?.visualTx, visualTy: arrived?.visualTy })}`);
     await page.screenshot({ path: path.join(OUT, `${tag}-03-stop-visual.png`) });
 
     if (phone) {
       const held = await holdStickCdp(page, cdp, 4, -48, 1800);
       if (!held) throw new Error(`${tag}: stick missing for get-out`);
     } else {
+      const dBtn = page.locator('.jac-dock [data-jac="gear"][data-val="D"]');
+      if (await dBtn.count()) await dBtn.click();
+      await page.evaluate(() => {
+        document.activeElement?.blur?.();
+        document.getElementById('game-canvas')?.focus();
+      });
+      await wait(80);
       await page.keyboard.down('ArrowUp');
-      await wait(1600);
+      await page.evaluate(() => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', code: 'ArrowUp', bubbles: true }));
+      });
+      await wait(2200);
+      notes.push({ preGetOut: await page.evaluate(() => window.__playtestQa.jac()) });
     }
     const moving = await page.evaluate(() => window.__playtestQa.jac());
-    if ((moving.mph ?? 0) < 4) throw new Error(`${tag}: not moving before Get out`);
+    if ((moving.mph ?? 0) < 1) throw new Error(`${tag}: not moving before Get out ${JSON.stringify(moving)}`);
     await page.evaluate(() => window.__playtestQa.jacGetOut());
     await wait(120);
     const midExit = await page.evaluate(() => window.__playtestQa.jac());

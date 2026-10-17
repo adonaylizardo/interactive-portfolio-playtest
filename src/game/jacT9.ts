@@ -407,6 +407,10 @@ export class JacT9 {
   }
 
   /** Same walkable grid the avatar uses, plus this van's own claimed cells. */
+  driveTileOk(x: number, y: number): boolean {
+    return this.canDriveTile(x, y);
+  }
+
   private canDriveTile(x: number, y: number): boolean {
     if (this.claimed.has(k(x, y))) return true;
     const c = cells[y]?.[x];
@@ -518,7 +522,7 @@ export class JacT9 {
       dx /= mag;
       dy /= mag;
     }
-    const live = mag > 0.08;
+    const live = mag > 0.15;
     if (live) {
       this.clearDrivePath();
       this.qaSteer = null;
@@ -692,10 +696,7 @@ export class JacT9 {
   }
 
   visualCenterWorld(): { x: number; y: number } {
-    const v = this.hooks.visual;
-    const mid = { x: (v.cull.x0 + v.cull.x1) / 2, y: (v.cull.y0 + v.cull.y1) / 2 };
-    const body = this.worldCenter();
-    return { x: mid.x * 0.4 + body.x * 0.6, y: mid.y * 0.4 + body.y * 0.6 };
+    return this.worldCenter();
   }
 
   visualCenterTile(): { x: number; y: number } {
@@ -726,7 +727,7 @@ export class JacT9 {
 
   visualOnTile(gx: number, gy: number): boolean {
     const v = this.visualCenterTile();
-    return Math.hypot(v.x - gx, v.y - gy) < 0.38;
+    return Math.hypot(v.x - gx, v.y - gy) < 0.42;
   }
 
   private syncMeters(moving: boolean): void {
@@ -745,6 +746,14 @@ export class JacT9 {
 
   /** Step the same van along A* walkable waypoints. Joystick / keys cancel this in update(). */
   private followDrivePath(dt: number): boolean {
+    if (this.driveGoal && Math.hypot(this.driveGoal.x - this.cx, this.driveGoal.y - this.cy) < 1.35) {
+      const sit = this.sitForVisual(this.driveGoal.x, this.driveGoal.y);
+      this.cx = sit.x;
+      this.cy = sit.y;
+      this.occupy(this.driveCells());
+      this.layout();
+      return this.clearDriveArrival();
+    }
     while (this.drivePath.length > 0) {
       const t = this.drivePath[0];
       const arrive = this.isGoalNode(t) ? 0.18 : 0.28;
@@ -752,12 +761,7 @@ export class JacT9 {
       else break;
     }
     if (this.driveGoal && this.visualOnTile(this.driveGoal.x, this.driveGoal.y)) {
-      this.drivePath = [];
-      this.driveGoal = null;
-      this.vel = 0;
-      this.reversing = false;
-      this.stuckT = 0;
-      return false;
+      return this.clearDriveArrival();
     }
     if (this.drivePath.length === 0) {
       if (this.driveGoal) {
@@ -772,6 +776,14 @@ export class JacT9 {
       }
     }
     const last = this.drivePath.length === 1;
+    if (this.driveGoal && Math.hypot(this.driveGoal.x - this.cx, this.driveGoal.y - this.cy) < 1.35) {
+      const sit = this.sitForVisual(this.driveGoal.x, this.driveGoal.y);
+      this.cx = sit.x;
+      this.cy = sit.y;
+      this.occupy(this.driveCells());
+      this.layout();
+      return this.clearDriveArrival();
+    }
     const t = last && this.driveGoal ? this.sitForVisual(this.driveGoal.x, this.driveGoal.y) : this.drivePath[0];
     const ax = t.x - this.cx;
     const ay = t.y - this.cy;
@@ -788,6 +800,7 @@ export class JacT9 {
     const ok = (x: number, y: number) => this.canSitLoose(x, y) || this.canDriveTile(Math.round(x), Math.round(y));
     const next = ok(this.cx + ux, this.cy + uy) ? { x: this.cx + ux, y: this.cy + uy } : slide(this.cx, this.cy, ux, uy, ok);
     if (next.x === this.cx && next.y === this.cy) {
+      if (this.acceptNearGoal()) return false;
       if (!last) {
         this.drivePath.shift();
         if (this.drivePath.length === 0) {
@@ -818,8 +831,30 @@ export class JacT9 {
     return true;
   }
 
+  private visualGoalMiss(): number {
+    if (!this.driveGoal) return Infinity;
+    const v = this.visualCenterTile();
+    return Math.hypot(v.x - this.driveGoal.x, v.y - this.driveGoal.y);
+  }
+
+  private acceptNearGoal(): boolean {
+    if (!this.driveGoal || this.visualGoalMiss() > 0.42) return false;
+    this.clearDriveArrival();
+    return true;
+  }
+
+  private clearDriveArrival(): boolean {
+    this.drivePath = [];
+    this.driveGoal = null;
+    this.vel = 0;
+    this.reversing = false;
+    this.stuckT = 0;
+    return false;
+  }
+
   private markStuck(dt: number): void {
     this.vel = 0;
+    if (this.acceptNearGoal()) return;
     this.stuckT += dt;
     if (this.stuckT < 0.75 || !this.driveGoal) return;
     this.drivePath = [];

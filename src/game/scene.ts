@@ -337,6 +337,7 @@ export class IsoScene {
   private fillActors!: FillActors;
   private jac: JacT9 | null = null;
   private jacBubbleTimer: ReturnType<typeof setTimeout> | null = null;
+  qaLastDriveTap: { x: number; y: number } | null = null;
   private rearBlit: HTMLCanvasElement | null = null;
   private rearBlitReady = false;
   /** Off-DOM WebGL view. Never shown — we blit it onto the opaque 2D #game-canvas. */
@@ -442,8 +443,6 @@ export class IsoScene {
     const glView = document.createElement('canvas');
     glView.setAttribute('data-jac-gl', '1');
     glView.setAttribute('aria-hidden', 'true');
-    glView.style.cssText =
-      'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none';
     glView.width = Math.max(1, canvas.clientWidth || window.innerWidth);
     glView.height = Math.max(1, canvas.clientHeight || window.innerHeight);
     this.glView = glView;
@@ -1730,7 +1729,8 @@ export class IsoScene {
       this.events.onUnreachable?.();
       return false;
     }
-    const dest = path.length > 0 ? path[path.length - 1] : { x: gx, y: gy };
+    this.qaLastDriveTap = { x: gx, y: gy };
+    const dest = { x: gx, y: gy };
     this.jac.setDrivePath(path.length > 0 ? path : [dest], dest);
     this.startCameraFollow();
     this.drawPathPreview();
@@ -3871,6 +3871,17 @@ export class IsoScene {
 
   qaDriveTo(tx: number, ty: number): boolean {
     return this.driveToTile(tx, ty);
+  }
+
+  qaTileAtClient(clientX: number, clientY: number): { x: number; y: number } | null {
+    const rect = this.canvasEl?.getBoundingClientRect();
+    if (!rect) return null;
+    const { x: wx, y: wy } = this.screenToWorld(clientX - rect.left, clientY - rect.top);
+    return this.resolveGroundTap(wx, wy);
+  }
+
+  qaDriveTileOk(x: number, y: number): boolean {
+    return this.jac?.driveTileOk(x, y) ?? false;
   }
 
   jacSetLights(lights: JacLights): void {

@@ -280,6 +280,7 @@ async function main(): Promise<void> {
         r.height > 0;
       return { present: true, visible, opacity: Number(style.opacity), hint: el.dataset.hint ?? '' };
     },
+    stickCancel: () => joystick.cancel(),
     joystick: () => joystick.qa(),
     nameLabels: () => labels.qa(),
     namePillHeads: () => scene.qaNamePillHeads(),
@@ -298,6 +299,9 @@ async function main(): Promise<void> {
     jacGetIn: () => scene.jacGetIn(),
     jacGetOut: () => scene.jacGetOut(),
     jacDriveTo: (tx: number, ty: number) => scene.qaDriveTo(tx, ty),
+    lastDriveTap: () => scene.qaLastDriveTap,
+    tileAtClient: (x: number, y: number) => scene.qaTileAtClient(x, y),
+    jacDriveTileOk: (x: number, y: number) => scene.qaDriveTileOk(x, y),
     jacClose: () => scene.jacClose(),
     jacSetLights: (lights: 'off' | 'auto' | 'on') => scene.jacSetLights(lights),
     jacSetGear: (gear: 'P' | 'R' | 'N' | 'D') => scene.jacSetGear(gear),
