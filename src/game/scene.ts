@@ -4248,13 +4248,13 @@ export class IsoScene {
   private tryFinishDriveEnter(): void {
     if (!this.pendingDriveEnter || !this.jac?.driving || this.jac.isExiting()) return;
     const door = this.pendingDriveEnter.door;
-    const goal = this.jac.driveGoal ?? door;
-    const distGoal = Math.hypot(this.jac.cx - goal.x, this.jac.cy - goal.y);
+    const sit = this.jac.driveGoal;
+    const distSit = sit ? Math.hypot(this.jac.cx - sit.x, this.jac.cy - sit.y) : Infinity;
     const distDoor = Math.hypot(this.jac.cx - door.x, this.jac.cy - door.y);
     const idle = this.jac.drivePath.length === 0 && !this.jac.driveGoal;
-    const arrived = distGoal < 1.8 && this.jac.mph < 1.2;
     const along = this.jac.doorSideAlong(door.x, door.y);
-    const doorSideSit = along >= 0 && distDoor <= 6 && this.jac.mph < 1 && idle;
+    const arrived = (sit && distSit < 1.8 && this.jac.mph < 1.2) || (idle && this.jac.mph < 1.2 && distDoor <= 4 && along >= -1);
+    const doorSideSit = along >= -0.5 && distDoor <= 6 && this.jac.mph < 1 && idle;
     const waiting = this.pendingDriveEnterAt > 0 ? performance.now() - this.pendingDriveEnterAt : 0;
     if (arrived || doorSideSit) {
       this.jacGetOut({ thenEnter: true });

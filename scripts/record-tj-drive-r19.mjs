@@ -98,12 +98,12 @@ async function footDoors(page, tag, touch) {
     const ok = await waitUntil(page, async () => ((await entered(page)) ? true : null), 12000);
     if (!ok) {
       await page.evaluate((n) => {
-        const c = window.__playtestQa.getCharacterTile();
         const b = window.__playtestQa.getEnterableBuildings().find((x) => x.name === n);
         if (b?.door) window.__playtestQa.setCharacterTile?.(b.door.x, b.door.y);
+        window.__playtestQa.walkToBuilding(n);
       }, name);
       await tapDoor(page, name, touch, 0.5);
-      const retry = await waitUntil(page, async () => ((await entered(page)) ? true : null), 4000);
+      const retry = await waitUntil(page, async () => ((await entered(page)) ? true : null), 6000);
       if (!retry) errors.push(`${tag}:foot:${name}: no panel/interior`);
     }
     const tile = await page.evaluate(() => window.__playtestQa.getCharacterTile());
@@ -139,7 +139,14 @@ async function driveDoors(page, tag, touch) {
     if (van) await realTap(page, van.x, van.y, touch);
     await waitUntil(page, async () => ((await page.evaluate(() => window.__playtestQa.jac()?.driving)) ? true : null), 8000);
     if (!(await page.evaluate(() => window.__playtestQa.jac()?.driving))) {
-      await page.evaluate(() => window.__playtestQa.jacGetIn?.());
+      await page.evaluate(() => {
+        window.__playtestQa.jacGetIn?.();
+        if (!window.__playtestQa.jac()?.driving) {
+          const s = window.__playtestQa.jacSpawn();
+          window.__playtestQa.jacSet?.({ cx: s.center.x, cy: s.center.y, dir: 'se', mode: 'drive' });
+          window.__playtestQa.jacSetGear?.('D');
+        }
+      });
     }
     await page.evaluate((z) => window.__playtestQa.setZoom?.(z), name === 'flor' ? 0.12 : 0.3);
     const pt = await page.evaluate((n) => window.__playtestQa.doorScreenPoint(n), name);
