@@ -254,7 +254,7 @@ export class JacT9 {
   private rearHold = 0;
 
   get rearCam(): boolean {
-    return this.driving && (this.gear === 'R' || this.reversing || this.rearHold > 0.02);
+    return this.driving && this.gear === 'R';
   }
 
   private tickRearHold(dt: number): void {
@@ -603,7 +603,7 @@ export class JacT9 {
       this.dir = dirFromHeading(this.heading);
     }
 
-    this.reversing = this.vel < -0.08 || this.gear === 'R';
+    this.reversing = this.vel < -0.08;
     this.tickRearHold(dt);
     if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 0.33);
     const fwd = DIR_VEC[this.dir];

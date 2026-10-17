@@ -52,9 +52,11 @@ async function cdpTouch(cdp, type, points) {
 }
 
 async function tapClientCdp(cdp, x, y) {
-  await cdpTouch(cdp, 'touchStart', [{ x, y }]);
-  await wait(40);
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
+  await cdpTouch(cdp, 'touchStart', [{ x, y, id: 3 }]);
+  await wait(50);
   await cdpTouch(cdp, 'touchEnd', []);
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
 }
 
 async function holdStickCdp(page, cdp, ox, oy, ms) {
@@ -155,45 +157,53 @@ async function run(tag, options, phone) {
     await ensureDriving(page, tag);
 
     // MED: one bump per wall contact, van stays on screen, PiP has content.
-    await placeNear(page, 22, 18, 'se');
+    // Catedral east face is x=16. Sit just east, face SE, reverse (−x) into the wall.
+    await placeNear(page, 18.8, 16.2, 'se');
     await page.evaluate(() => window.__playtestQa.jacSetGear?.('R'));
     await wait(120);
     const bumpHits = [];
     let lastBump = 0;
     let edges = 0;
+    const sampleBump = async () => {
+      const s = await page.evaluate(() => {
+        const j = window.__playtestQa.jac();
+        const e = window.__playtestQa.jacEntities();
+        const c = document.getElementById('game-canvas')?.getBoundingClientRect();
+        return {
+          bump: j?.bump ?? 0,
+          cx: j?.cx,
+          cy: j?.cy,
+          sx: e?.sx,
+          sy: e?.sy,
+          cw: c?.width,
+          ch: c?.height,
+        };
+      });
+      bumpHits.push(s);
+      if (s.bump > 0.08 && lastBump <= 0.08) edges += 1;
+      lastBump = s.bump;
+      return s;
+    };
     if (phone) {
-      const held = await holdStickCdp(page, cdp, 4, 52, 2200);
-      if (!held) throw new Error(`${tag}: stick missing`);
+      const box = await page.locator('.joystick').boundingBox();
+      if (!box) throw new Error(`${tag}: stick missing`);
+      const x0 = box.x + box.width / 2;
+      const y0 = box.y + box.height / 2;
+      await cdpTouch(cdp, 'touchStart', [{ x: x0, y: y0 }]);
       const t0 = Date.now();
-      while (Date.now() - t0 < 2000) {
-        const s = await page.evaluate(() => {
-          const j = window.__playtestQa.jac();
-          const e = window.__playtestQa.jacEntities();
-          const c = document.getElementById('game-canvas')?.getBoundingClientRect();
-          return {
-            bump: j?.bump ?? 0,
-            cx: j?.cx,
-            cy: j?.cy,
-            sx: e?.sx,
-            sy: e?.sy,
-            cw: c?.width,
-            ch: c?.height,
-          };
-        });
-        bumpHits.push(s);
-        if (s.bump > 0.08 && lastBump <= 0.08) edges += 1;
-        lastBump = s.bump;
+      while (Date.now() - t0 < 2200) {
+        const u = Math.min(1, (Date.now() - t0) / 400);
+        await cdpTouch(cdp, 'touchMove', [{ x: x0 + 4 * u, y: y0 + 52 * u }]);
+        await sampleBump();
         await wait(50);
       }
       await releaseStickCdp(cdp);
     } else {
+      await page.evaluate(() => document.getElementById('game-canvas')?.focus());
       await page.keyboard.down('ArrowDown');
       const t0 = Date.now();
-      while (Date.now() - t0 < 2000) {
-        const s = await page.evaluate(() => window.__playtestQa.jac());
-        bumpHits.push(s);
-        if ((s?.bump ?? 0) > 0.08 && lastBump <= 0.08) edges += 1;
-        lastBump = s?.bump ?? 0;
+      while (Date.now() - t0 < 2200) {
+        await sampleBump();
         await wait(50);
       }
       await page.keyboard.up('ArrowDown');
@@ -201,6 +211,7 @@ async function run(tag, options, phone) {
     const last = bumpHits[bumpHits.length - 1];
     const onScreen = last && last.sx > 24 && last.sy > 24 && last.sx < (last.cw ?? 800) - 24 && last.sy < (last.ch ?? 600) - 24;
     notes.push({ bump: { edges, samples: bumpHits.length, last: { bump: last?.bump, cx: last?.cx, cy: last?.cy, sx: last?.sx, sy: last?.sy }, onScreen } });
+    if (phone && edges < 1) throw new Error(`${tag}: bump never fired`);
     if (edges > 2) throw new Error(`${tag}: bump retriggered ${edges} times`);
     if (phone && last && !onScreen) throw new Error(`${tag}: van left the screen during bump ${JSON.stringify(last)}`);
 
@@ -255,8 +266,14 @@ async function run(tag, options, phone) {
       return (j?.mph ?? 0) >= 6 ? j : null;
     }, 4000);
     if (!moving) throw new Error(`${tag}: not moving before Get out`);
-    const exitFrom = { cx: moving.cx, cy: moving.cy, mph: moving.mph };
-    const pill = page.locator('.jac-bar [data-jac="out"], .jac-dock [data-jac="out"]');
+    if (phone) await releaseStickCdp(cdp);
+    else await page.keyboard.up('ArrowUp');
+    await wait(80);
+    const exitFrom = await page.evaluate(() => {
+      const j = window.__playtestQa.jac();
+      return { cx: j.cx, cy: j.cy, mph: j.mph };
+    });
+    const pill = page.locator('.jac-bar [data-jac="out"], .jac-dock [data-jac="out"]').locator('visible=true').first();
     await pill.waitFor({ state: 'visible', timeout: 4000 });
     const box = await pill.boundingBox();
     if (!box) throw new Error(`${tag}: Get out pill missing`);
@@ -274,49 +291,38 @@ async function run(tag, options, phone) {
     notes.push({ getOutPill: { from: exitFrom, travel, parked: !!parked } });
     if (!parked) throw new Error(`${tag}: Get out pill did not park`);
     if (travel > 0.8) throw new Error(`${tag}: Get out pill travelled ${travel.toFixed(2)} tiles`);
-    if (phone) await releaseStickCdp(cdp);
-    else await page.keyboard.up('ArrowUp');
 
     // LOW: roof tap in R keeps R.
     await ensureDriving(page, tag);
-    await page.evaluate(() => {
+    const rTap = await page.evaluate(() => {
       window.__playtestQa.jacSetGear?.('R');
       const list = window.__playtestQa.getEnterableBuildings?.() ?? [];
-      const named = list.find((b) => b.door && b.panelTitle) ?? list[0];
-      if (named) window.__playtestQa.frameWorld?.((named.x - named.y) * 64, (named.x + named.y) * 32, 0.72);
-    });
-    await wait(200);
-    const roof = await page.evaluate(() => {
-      const list = window.__playtestQa.getEnterableBuildings?.() ?? [];
-      for (const b of list) {
+      const prefer = [...list].sort((a, b) => (a.name === 'catedral' ? -1 : b.name === 'catedral' ? 1 : 0));
+      for (const b of prefer) {
+        window.__playtestQa.frameWorld?.((b.x - b.y) * 64, (b.x + b.y) * 32, 0.72);
         for (let dy = 0; dy <= 4; dy++) {
           for (let dx = 0; dx <= 6; dx++) {
-            const tx = b.x + dx;
-            const ty = b.y + dy;
-            const w = window.__playtestQa.worldToClient?.((tx - ty) * 64, (tx + ty) * 32);
+            const w = window.__playtestQa.worldToClient?.((b.x + dx - (b.y + dy)) * 64, (b.x + dx + b.y + dy) * 32);
             if (!w || w.x < 40 || w.y < 80 || w.x > window.innerWidth - 40 || w.y > 500) continue;
-            const el = document.elementFromPoint(w.x, w.y);
-            if (el && el.id !== 'game-canvas' && !el.closest('#game-canvas')) continue;
             const pick = window.__playtestQa.pickAt?.(w.x, w.y);
-            if (pick?.building) return { name: b.name, client: w, pick };
+            if (!pick?.building) continue;
+            window.__playtestQa.tapScreen?.(w.x, w.y);
+            return {
+              roof: { name: b.name, client: w, pick },
+              gear: window.__playtestQa.jac()?.gear,
+              toast: document.getElementById('playtest-toast')?.classList.contains('playtest-toast--visible')
+                ? document.getElementById('playtest-toast')?.textContent
+                : '',
+            };
           }
         }
       }
-      return null;
+      return { roof: null, gear: window.__playtestQa.jac()?.gear, toast: '' };
     });
-    if (!roof) throw new Error(`${tag}: no roof for R-tap`);
-    if (phone) await tapClientCdp(cdp, roof.client.x, roof.client.y);
-    else await page.mouse.click(roof.client.x, roof.client.y);
-    await wait(350);
-    const afterR = await page.evaluate(() => ({
-      gear: window.__playtestQa.jac()?.gear,
-      toast: document.getElementById('playtest-toast')?.classList.contains('playtest-toast--visible')
-        ? document.getElementById('playtest-toast')?.textContent
-        : '',
-    }));
-    notes.push({ rTap: { roof, afterR } });
-    if (afterR.gear !== 'R') throw new Error(`${tag}: R-tap changed gear to ${afterR.gear}`);
-    if (!afterR.toast) throw new Error(`${tag}: R-tap produced no toast`);
+    notes.push({ rTap });
+    if (!rTap.roof) throw new Error(`${tag}: no roof for R-tap`);
+    if (rTap.gear !== 'R') throw new Error(`${tag}: R-tap changed gear to ${rTap.gear}`);
+    if (!rTap.toast) throw new Error(`${tag}: R-tap produced no toast`);
 
     // LOW: van depth vs catedral.
     await page.evaluate(() => {

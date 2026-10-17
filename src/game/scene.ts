@@ -2848,6 +2848,39 @@ export class IsoScene {
       this.endZoomGesture();
     };
 
+    const noteUnreachableAtClient = (clientX: number, clientY: number, target: EventTarget | null) => {
+      if (!this.jac?.driving || this.jac.isExiting()) return false;
+      if (performance.now() < this.suppressDriveTapUntil) return false;
+      if (target instanceof HTMLElement && target.closest('[data-jac], .joystick, .checklist, .chrome')) {
+        return false;
+      }
+      const rect = canvas.getBoundingClientRect();
+      const sx = clientX - rect.left;
+      const sy = clientY - rect.top;
+      if (this.pickBuildingAtScreen(sx, sy) || this.pickBuildingDoorAtScreen(sx, sy)) {
+        driveTap = null;
+        this.toastDriveUnreachable();
+        return true;
+      }
+      return false;
+    };
+    window.addEventListener(
+      'touchstart',
+      (e) => {
+        if (e.touches.length !== 1) return;
+        const t = e.touches[0];
+        noteUnreachableAtClient(t.clientX, t.clientY, e.target);
+      },
+      { capture: true, passive: true },
+    );
+    window.addEventListener(
+      'pointerdown',
+      (e) => {
+        if (e.button !== 0) return;
+        noteUnreachableAtClient(e.clientX, e.clientY, e.target);
+      },
+      { capture: true },
+    );
     canvas.addEventListener('touchstart', onTouchPinchStartPassive, { passive: true });
     canvas.addEventListener('touchstart', onTouchPinchStart, { passive: false });
     canvas.addEventListener('touchmove', onTouchPinchMove, { passive: false });
