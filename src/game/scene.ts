@@ -349,6 +349,7 @@ export class IsoScene {
   private rearFadeFrom = 0;
   private rearFadeTo = 0;
   private rearFadeT0 = 0;
+  private static readonly REAR_FADE_MS = 400;
   private pendingJacExit = false;
   private suppressDriveTapUntil = 0;
   private events: SceneEvents;
@@ -1758,6 +1759,13 @@ export class IsoScene {
 
   private requestDriveToScreen(sx: number, sy: number): void {
     if (!this.jac?.driving || this.jac.isExiting()) return;
+    if (performance.now() < this.suppressDriveTapUntil) return;
+    if (this.pickBuildingAtScreen(sx, sy) || this.pickBuildingDoorAtScreen(sx, sy)) {
+      this.jac.clearDrivePath();
+      this.suppressDriveTapUntil = performance.now() + 250;
+      this.events.onUnreachable?.();
+      return;
+    }
     this.events.stickCancel?.();
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
     const tile = worldToTile(wx, wy);
@@ -2849,7 +2857,12 @@ export class IsoScene {
           const dt = performance.now() - driveTap.t;
           const dist = Math.hypot(t.clientX - driveTap.x, t.clientY - driveTap.y);
           driveTap = null;
-          if (dt < 450 && dist < 22 && !this.jac.isExiting()) {
+          if (
+            dt < 450 &&
+            dist < 22 &&
+            !this.jac.isExiting() &&
+            performance.now() >= this.suppressDriveTapUntil
+          ) {
             const rect = canvas.getBoundingClientRect();
             this.requestDriveToScreen(t.clientX - rect.left, t.clientY - rect.top);
           }
@@ -3016,7 +3029,7 @@ export class IsoScene {
       this.rearFadeTo = want;
       this.rearFadeT0 = performance.now();
     }
-    const t = Math.min(1, (performance.now() - this.rearFadeT0) / 400);
+    const t = Math.min(1, (performance.now() - this.rearFadeT0) / IsoScene.REAR_FADE_MS);
     this.rearFade = this.rearFadeFrom + (this.rearFadeTo - this.rearFadeFrom) * t;
     const drewRear = !!this.jac?.rearCam;
     if (drewRear) this.renderRearTexture();
@@ -3223,11 +3236,6 @@ export class IsoScene {
     const wantY = oy - t.y + aimWy;
     this.cameraX = wantX;
     this.cameraY = wantY;
-    const bump = this.jac?.bumpT ?? 0;
-    if (bump > 0.02) {
-      this.cameraX += Math.sin(performance.now() * 0.045) * 140 * bump;
-      this.cameraY += Math.cos(performance.now() * 0.052) * 96 * bump;
-    }
     this.applyCamera(false);
     this.shiftGestureBaselines(this.cameraX - camBeforeX, this.cameraY - camBeforeY);
     // Map / room bounds held the camera back: drop the spring's speed on that axis (no wind-up).
@@ -4031,12 +4039,10 @@ export class IsoScene {
     if (!this.jac?.driving) return;
     this.pendingJacEnter = false;
     this.pendingJacPanel = false;
-    if (this.jac.isMoving()) {
-      this.pendingJacExit = true;
-      this.jac.requestExit();
-      return;
-    }
-    this.finishJacGetOut();
+    this.events.stickCancel?.();
+    this.suppressDriveTapUntil = performance.now() + 800;
+    this.pendingJacExit = true;
+    this.jac.requestExit();
   }
 
   private finishJacGetOut(): void {

@@ -1,8 +1,8 @@
 import { Assets, Container, Rectangle, Sprite, Texture } from 'pixi.js';
-import { cells, MAP_HEIGHT, MAP_WIDTH, TILE_H, TILE_W, type MapObject } from '../data/map';
+import { cells, MAP_HEIGHT, MAP_WIDTH, TILE_H, TILE_W, objects, type MapObject } from '../data/map';
 import { tileFootWorld, tileToWorld } from '../iso/math';
 import { findPathWith } from '../iso/pathfinding';
-import { objectDepth, objectOccluder, objectSpriteScale, type OccluderBox } from './mapSprites';
+import { objectOccluder, objectSpriteScale, type OccluderBox } from './mapSprites';
 import { spriteResolution } from './sprites';
 import { WALK_TILES_PER_S, type FacingDir } from './player';
 
@@ -43,7 +43,8 @@ const DRIVE_TILES_PER_S = WALK_TILES_PER_S * 1.15;
 const REVERSE_TILES_PER_S = WALK_TILES_PER_S * 0.85;
 const ACCEL_TILES_S2 = 14;
 const BRAKE_TILES_S2 = 18;
-const EXIT_BRAKE_TILES_S2 = 90;
+const EXIT_BRAKE_TILES_S2 = 140;
+const EXIT_MAX_TRAVEL = 0.55;
 const FRICTION_TILES_S2 = 10;
 const TURN_RATE = 2.4;
 const IDLE_RPM = 700;
@@ -211,6 +212,8 @@ export class JacT9 {
   private exitSit: { x: number; y: number } | null = null;
   private stuckT = 0;
   bumpT = 0;
+  private bumpArmed = true;
+  private exitFrom: { x: number; y: number } | null = null;
 
   constructor(obj: MapObject, hooks: JacHooks) {
     this.obj = obj;
@@ -289,6 +292,8 @@ export class JacT9 {
       this.exitSit = null;
       this.stuckT = 0;
       this.bumpT = 0;
+      this.bumpArmed = true;
+      this.exitFrom = null;
       this.clearDrivePath();
       this.applyParkedSolid(false);
     } else if (wasDrive) {
@@ -307,6 +312,8 @@ export class JacT9 {
       this.exitHold = 0;
       this.stuckT = 0;
       this.bumpT = 0;
+      this.bumpArmed = true;
+      this.exitFrom = null;
       this.clearDrivePath();
       this.relayoutParked();
       return;
@@ -404,6 +411,27 @@ export class JacT9 {
     const fwd = DIR_VEC[this.dir];
     const behind = fwd.x * ax + fwd.y * ay < -0.35 && Math.hypot(ax, ay) < 5;
     this.gear = behind ? 'R' : 'D';
+  }
+
+  /** Sit-centre depth, and stay behind a nearby building sprite (catedral wing). */
+  private sortDepth(): number {
+    let z = this.cx + this.cy + 0.2;
+    for (const o of objects) {
+      if (o.type !== 'building' || o.flat) continue;
+      const fx = o.footprintX ?? o.x;
+      const fy = o.footprintY ?? o.y;
+      const w = o.w ?? 1;
+      const h = o.h ?? 1;
+      const south = fy + h - 0.5;
+      const east = fx + w - 0.5;
+      const near =
+        this.cx > fx - 2 && this.cx < east + 2.2 && this.cy > fy - 2 && this.cy < south + 2.2;
+      if (!near) continue;
+      if (this.cy <= south + 1.25 && this.cx <= east + 1.25) {
+        z = Math.min(z, fx + w - 1 + fy + h - 1 - 0.15);
+      }
+    }
+    return z;
   }
 
   canDriveAt(cx: number, cy: number): boolean {
@@ -576,9 +604,21 @@ export class JacT9 {
       const next = slide(this.cx, this.cy, nx, ny, (x, y) => this.canSit(x, y));
       const moved = Math.hypot(next.x - this.cx, next.y - this.cy);
       const wantStep = Math.hypot(nx, ny);
-      if (wantStep > 0.04 && moved < wantStep * 0.55 && Math.abs(this.vel) > 0.25) {
-        this.noteBump();
-        if (moved < 1e-4) this.vel *= 0.35;
+      const blocked = wantStep > 0.04 && moved < wantStep * 0.55 && Math.abs(this.vel) > 0.25;
+      if (blocked) {
+        if (this.bumpArmed) {
+          this.noteBump();
+          this.bumpArmed = false;
+          if (moved < 1e-4) this.vel *= 0.35;
+        }
+      } else {
+        this.bumpArmed = true;
+      }
+      if (this.pendingExit && this.exitFrom) {
+        const travel = Math.hypot(next.x - this.exitFrom.x, next.y - this.exitFrom.y);
+        if (travel >= EXIT_MAX_TRAVEL) {
+          this.vel = 0;
+        }
       }
       if (next.x !== this.cx || next.y !== this.cy) {
         this.cx = next.x;
@@ -676,23 +716,23 @@ export class JacT9 {
   }
 
   private noteBump(): void {
-    if (this.bumpT < 0.25) {
-      try {
-        navigator.vibrate?.(40);
-      } catch {
-        /* no haptic */
-      }
+    try {
+      navigator.vibrate?.(40);
+    } catch {
+      /* no haptic */
     }
-    this.bumpT = 1.35;
+    this.bumpT = 0.45;
   }
 
   requestExit(): void {
     this.pendingExit = true;
     this.exitHold = 0;
     this.exitSit = null;
+    this.exitFrom = { x: this.cx, y: this.cy };
     this.clearDrivePath();
     this.gearHeld = false;
     this.qaSteer = null;
+    this.brakeTowardZero(1 / 30, EXIT_BRAKE_TILES_S2);
   }
 
   readyToExit(): boolean {
@@ -1160,8 +1200,7 @@ export class JacT9 {
       x1: foot.x + lx + CELL_1X.w * sc + 8,
       y1: foot.y + ly + CELL_1X.h * sc + 8,
     };
-    // Iso front-cell depth only — do not restack above buildings (café overlap).
-    v.zIndex = objectDepth(this.obj) + 0.2;
+    v.zIndex = this.sortDepth();
     this.hooks.container.zIndex = v.zIndex;
     const box = new Rectangle(lx + 40 * sc, ly + 8 * sc, 200 * sc, 120 * sc);
     this.hooks.tapBox.set(this.obj.id, box);

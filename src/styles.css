@@ -2491,11 +2491,11 @@ body.jac-menu-open .checklist {
   opacity: 0;
   pointer-events: none;
   visibility: visible;
-  transition: none;
+  transition: opacity 400ms linear;
 }
 
 .jac-rear.is-on {
-  /* Opacity is driven by JacHud.tickRearFade (~400ms). Do not snap visible. */
+  opacity: 1;
 }
 
 .jac-rear--phone {

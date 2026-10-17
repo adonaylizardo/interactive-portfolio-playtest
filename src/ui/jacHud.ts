@@ -201,7 +201,7 @@ export class JacHud {
     this.bubbleEl.hidden = true;
     this.root.classList.toggle('jac-hud--drive', snap.mode === 'drive');
     this.rearEl.hidden = snap.mode !== 'drive' && this.rearFade < 0.02;
-    this.rearEl.classList.toggle('is-on', this.rearFade > 0.02);
+    this.rearEl.classList.toggle('is-on', snap.rearCam);
     if (this.rearFade < 0.02) this.rearEl.setAttribute('aria-hidden', 'true');
     else this.rearEl.removeAttribute('aria-hidden');
     this.barEl.classList.toggle('is-bump', snap.bump > 0.08);
@@ -360,8 +360,8 @@ export class JacHud {
     }
     const t = Math.min(1, (performance.now() - this.rearFadeT0) / 400);
     this.rearFade = this.rearFadeFrom + (this.rearFadeTo - this.rearFadeFrom) * t;
-    this.rearEl.style.transition = 'none';
-    this.rearEl.style.opacity = String(this.rearFade);
+    this.rearEl.style.removeProperty('opacity');
+    this.rearEl.style.removeProperty('transition');
   }
 
   private drawMini(follow: { x: number; y: number }): void {
