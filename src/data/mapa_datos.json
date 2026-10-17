@@ -552,6 +552,42 @@
    ],
    "paisaje": true,
    "interior": false
+  },
+  "teresa": {
+   "x": 26,
+   "y": 8,
+   "w": 10,
+   "h": 7,
+   "cara_puerta": "+y",
+   "acceso": [
+    34,
+    15
+   ],
+   "estacionamiento": [
+    34,
+    18
+   ],
+   "estacionamiento_dir": "se",
+   "paisaje": false,
+   "interior": true
+  },
+  "biblioteca": {
+   "x": 1,
+   "y": 22,
+   "w": 10,
+   "h": 8,
+   "cara_puerta": "+y",
+   "acceso": [
+    6,
+    30
+   ],
+   "estacionamiento": [
+    6,
+    33
+   ],
+   "estacionamiento_dir": "se",
+   "paisaje": false,
+   "interior": true
   }
  },
  "separacion": {

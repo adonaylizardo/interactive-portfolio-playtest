@@ -654,7 +654,28 @@ export class JacT9 {
    * whose 5×3 / 3×5 never covers the door or a walkable approach. If no clear
    * sit exists, the closest reachable drive cell so the walker can finish.
    */
-  parkForDoor(doorX: number, doorY: number): { x: number; y: number; path: { x: number; y: number }[] } | null {
+  parkForDoor(
+    doorX: number,
+    doorY: number,
+    prefer?: { x: number; y: number; dir?: FacingDir },
+  ): { x: number; y: number; path: { x: number; y: number }[] } | null {
+    if (prefer) {
+      const heading = prefer.dir ?? this.parkHeadingAt(prefer.x, prefer.y, this.doorKeepClear(doorX, doorY));
+      if (
+        heading &&
+        this.sitWith(prefer.x, prefer.y, heading) &&
+        this.walkFromParkToDoor(prefer.x, prefer.y, heading, doorX, doorY)
+      ) {
+        const path = this.findDrivePath(prefer.x, prefer.y);
+        if (path) {
+          if (prefer.dir) {
+            this.dir = prefer.dir;
+            this.heading = dirIndex(prefer.dir);
+          }
+          return { x: prefer.x, y: prefer.y, path };
+        }
+      }
+    }
     const keep = this.doorKeepClear(doorX, doorY);
     const sx = Math.round(this.cx);
     const sy = Math.round(this.cy);
@@ -1827,7 +1848,8 @@ export class JacT9 {
       if (PROP_CELLS.has(k(x, y))) return false;
       const c = cells[y]?.[x];
       if (!c || c.walkable) continue;
-      if (c.groundId.includes('borde') || c.groundId.includes('building/footprint')) continue;
+      if (c.groundId.includes('borde')) return false;
+      if (c.groundId.includes('building/footprint')) return false;
       return false;
     }
     return true;

@@ -1,0 +1,43 @@
+{
+  "sections": [
+    {
+      "id": "uxsc",
+      "titleKey": "writings.section.uxsc",
+      "descKey": "writings.section.uxscDesc",
+      "items": [
+        {
+          "id": "ux-example-1",
+          "example": true,
+          "titleKey": "writings.ux1.title",
+          "metaKey": "writings.ux1.meta"
+        }
+      ]
+    },
+    {
+      "id": "sinergia",
+      "titleKey": "writings.section.sinergia",
+      "descKey": "writings.section.sinergiaDesc",
+      "items": [
+        {
+          "id": "sin-example-1",
+          "example": true,
+          "titleKey": "writings.sin1.title",
+          "metaKey": "writings.sin1.meta"
+        }
+      ]
+    },
+    {
+      "id": "guest",
+      "titleKey": "writings.section.guest",
+      "descKey": "writings.section.guestDesc",
+      "items": [
+        {
+          "id": "guest-example-1",
+          "example": true,
+          "titleKey": "writings.guest1.title",
+          "metaKey": "writings.guest1.meta"
+        }
+      ]
+    }
+  ]
+}

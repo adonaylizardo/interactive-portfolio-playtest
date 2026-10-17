@@ -1,9 +1,10 @@
 import { studio } from '../audio/studio';
 import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
 import { CASES, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
+import { TALKS, WRITINGS, type TalkItem, type WritingSection } from '../data/experiences';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
 import { iconSvg } from './icons';
-import { onLangChange, t } from './i18n';
+import { onLangChange, t, type I18nKey } from './i18n';
 
 function aboutBlockNode(block: AboutBlock): HTMLElement {
   if (block.kind === 'heading') {
@@ -114,7 +115,15 @@ export class BuildingPanel {
   private interiorId: string | null = null;
   private onVisibilityChange: () => void;
   private onSalir: () => void;
-  private mode: 'hidden' | 'interior' | 'preview' = 'hidden';
+  private mode: 'hidden' | 'interior' | 'preview' | 'talks' | 'writings' = 'hidden';
+  private experienceEl: HTMLElement | null = null;
+  private experienceIntro: HTMLElement | null = null;
+  private experienceList: HTMLElement | null = null;
+  private experienceDetail: HTMLElement | null = null;
+  private experienceDetailTitle: HTMLElement | null = null;
+  private experienceDetailMeta: HTMLElement | null = null;
+  private experienceDetailBody: HTMLElement | null = null;
+  private experienceBack: HTMLButtonElement | null = null;
   private previewEl: HTMLElement | null = null;
   private previewTitle: HTMLElement | null = null;
   private previewSubtitle: HTMLElement | null = null;
@@ -202,6 +211,20 @@ export class BuildingPanel {
           <section class="about" lang="en" aria-labelledby="about-title" hidden>
             <h3 class="about__title" id="about-title">About me</h3>
           </section>
+          <section class="experience" data-experience hidden>
+            <p class="experience__intro"></p>
+            <div class="experience__filters" data-exp-filters hidden></div>
+            <div class="experience__list" data-exp-list></div>
+            <div class="experience__detail" data-exp-detail hidden>
+              <button type="button" class="experience__back" data-exp-back></button>
+              <div class="experience__player" aria-hidden="true">
+                <span class="experience__player-icon">${iconSvg('briefcase')}</span>
+              </div>
+              <h3 class="experience__detail-title"></h3>
+              <p class="experience__detail-meta"></p>
+              <p class="experience__detail-body"></p>
+            </div>
+          </section>
         </div>
       </div>
     `;
@@ -223,8 +246,25 @@ export class BuildingPanel {
     this.readLede = this.el.querySelector('.case-read__lede');
     this.readHeroLabel = this.el.querySelector('.case-read__hero-label');
     this.aboutEl.append(...ABOUT.map(aboutBlockNode));
+    this.experienceEl = this.el.querySelector('[data-experience]');
+    this.experienceIntro = this.el.querySelector('.experience__intro');
+    this.experienceList = this.el.querySelector('[data-exp-list]');
+    this.experienceDetail = this.el.querySelector('[data-exp-detail]');
+    this.experienceDetailTitle = this.el.querySelector('.experience__detail-title');
+    this.experienceDetailMeta = this.el.querySelector('.experience__detail-meta');
+    this.experienceDetailBody = this.el.querySelector('.experience__detail-body');
+    this.experienceBack = this.el.querySelector('[data-exp-back]') as HTMLButtonElement;
+    this.experienceBack?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.setExperienceView('list');
+    });
     this.applyI18n();
-    onLangChange(() => this.applyI18n());
+    onLangChange(() => {
+      this.applyI18n();
+      if (this.mode === 'talks') this.renderTalksList();
+      if (this.mode === 'writings') this.renderWritingsList();
+    });
     // Touch has no hover: a tap shows that logo's colours until another logo (or the same one) is tapped.
     this.workedWithEl.addEventListener('click', (e) => {
       const hit = (e.target as HTMLElement).closest('.worked-with__logo');
@@ -351,7 +391,8 @@ export class BuildingPanel {
 
   private syncPeekClass(): void {
     const preview = this.mode === 'preview' && this.isOpen();
-    const mobileInterior = this.isMobile() && this.mode === 'interior' && this.isOpen();
+    const mobileInterior =
+      this.isMobile() && (this.mode === 'interior' || this.mode === 'talks' || this.mode === 'writings') && this.isOpen();
     const peek = (preview || mobileInterior) && this.peekOnly;
     const expanded = (preview || mobileInterior) && !this.peekOnly;
     this.el.classList.toggle('building-panel--peek', peek);
@@ -391,6 +432,133 @@ export class BuildingPanel {
     this.dragStartY = 0;
   }
 
+  showTalks(title: string, interiorId: string | null = 'teresa'): void {
+    this.openExperience('talks', title, interiorId);
+    this.renderTalksList();
+  }
+
+  showWritings(title: string, interiorId: string | null = 'biblioteca'): void {
+    this.openExperience('writings', title, interiorId);
+    this.renderWritingsList();
+  }
+
+  private openExperience(mode: 'talks' | 'writings', title: string, interiorId: string | null): void {
+    this.leaveArmed = false;
+    this.exitPress = null;
+    this.exitFromPointer = false;
+    this.mode = mode;
+    this.interiorId = interiorId;
+    this.peekOnly = this.isMobile();
+    this.el.classList.remove('building-panel--preview');
+    this.titleEl.hidden = false;
+    this.caseEl.hidden = true;
+    this.aboutEl.hidden = true;
+    this.workedWithEl.hidden = true;
+    if (this.previewEl) this.previewEl.hidden = true;
+    if (this.readEl) this.readEl.hidden = true;
+    if (this.readBar) this.readBar.hidden = true;
+    this.experienceEl!.hidden = false;
+    this.el.hidden = false;
+    this.el.style.visibility = '';
+    this.el.style.pointerEvents = '';
+    this.el.removeAttribute('inert');
+    this.el.classList.remove('building-panel--snap');
+    this.setTitle(interiorId ?? mode, title);
+    if (this.experienceIntro) {
+      this.experienceIntro.textContent = t(mode === 'talks' ? 'talks.intro' : 'writings.intro');
+    }
+    this.el.classList.add('building-panel--open', 'building-panel--experience');
+    this.syncPeekClass();
+    this.setExperienceView('list');
+    this.onVisibilityChange();
+    studio.playClick();
+  }
+
+  private setExperienceView(view: 'list' | 'detail'): void {
+    if (!this.experienceList || !this.experienceDetail) return;
+    this.experienceList.hidden = view !== 'list';
+    this.experienceDetail.hidden = view !== 'detail';
+    if (this.experienceBack) this.experienceBack.textContent = t('experience.back');
+  }
+
+  private renderTalksList(): void {
+    if (!this.experienceList) return;
+    this.experienceList.replaceChildren(
+      ...TALKS.map((item) => this.talkRow(item, () => this.openTalk(item))),
+    );
+  }
+
+  private talkRow(item: TalkItem, onOpen: () => void): HTMLElement {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'experience__row';
+    const thumb = document.createElement('span');
+    thumb.className = 'experience__thumb';
+    thumb.setAttribute('aria-hidden', 'true');
+    thumb.innerHTML = iconSvg('briefcase');
+    const copy = document.createElement('span');
+    copy.className = 'experience__copy';
+    const title = document.createElement('span');
+    title.className = 'experience__row-title';
+    title.textContent = t(item.titleKey as I18nKey);
+    const meta = document.createElement('span');
+    meta.className = 'experience__row-meta';
+    meta.textContent = t(item.metaKey as I18nKey);
+    copy.append(title, meta);
+    if (item.example) {
+      const pill = document.createElement('span');
+      pill.className = 'experience__pill';
+      pill.textContent = t('experience.example');
+      copy.appendChild(pill);
+    }
+    btn.append(thumb, copy);
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onOpen();
+    });
+    return btn;
+  }
+
+  private openTalk(item: TalkItem): void {
+    if (this.experienceDetailTitle) this.experienceDetailTitle.textContent = t(item.titleKey as I18nKey);
+    if (this.experienceDetailMeta) this.experienceDetailMeta.textContent = t(item.metaKey as I18nKey);
+    if (this.experienceDetailBody) this.experienceDetailBody.textContent = t('talks.playerPlaceholder');
+    this.setExperienceView('detail');
+    if (this.isMobile() && this.peekOnly) this.setPeek(false);
+  }
+
+  private renderWritingsList(): void {
+    if (!this.experienceList) return;
+    const frag = document.createDocumentFragment();
+    for (const section of WRITINGS) {
+      const head = document.createElement('div');
+      head.className = 'experience__section-head';
+      const h = document.createElement('h3');
+      h.className = 'experience__section-title';
+      h.textContent = t(section.titleKey as I18nKey);
+      const p = document.createElement('p');
+      p.className = 'experience__section-desc';
+      p.textContent = t(section.descKey as I18nKey);
+      head.append(h, p);
+      frag.appendChild(head);
+      for (const item of section.items) {
+        frag.appendChild(
+          this.talkRow(item, () => this.openWriting(section, item)),
+        );
+      }
+    }
+    this.experienceList.replaceChildren(frag);
+  }
+
+  private openWriting(_section: WritingSection, item: TalkItem): void {
+    if (this.experienceDetailTitle) this.experienceDetailTitle.textContent = t(item.titleKey as I18nKey);
+    if (this.experienceDetailMeta) this.experienceDetailMeta.textContent = t(item.metaKey as I18nKey);
+    if (this.experienceDetailBody) this.experienceDetailBody.textContent = t('writings.readerPlaceholder');
+    this.setExperienceView('detail');
+    if (this.isMobile() && this.peekOnly) this.setPeek(false);
+  }
+
   showInterior(title: string, interiorId: string | null = null): void {
     this.leaveArmed = false;
     this.exitPress = null;
@@ -398,7 +566,8 @@ export class BuildingPanel {
     this.mode = 'interior';
     this.interiorId = interiorId;
     this.peekOnly = this.isMobile();
-    this.el.classList.remove('building-panel--preview');
+    this.el.classList.remove('building-panel--preview', 'building-panel--experience');
+    if (this.experienceEl) this.experienceEl.hidden = true;
     this.titleEl.hidden = false;
     this.el.hidden = false;
     this.el.style.visibility = '';
@@ -549,6 +718,7 @@ export class BuildingPanel {
       'building-panel--peek',
       'building-panel--expanded',
       'building-panel--preview',
+      'building-panel--experience',
     );
     this.el.setAttribute('inert', '');
     this.el.style.visibility = 'hidden';
@@ -584,7 +754,11 @@ export class BuildingPanel {
   }
 
   isInteriorMode(): boolean {
-    return this.mode === 'interior' && this.isOpen();
+    return (this.mode === 'interior' || this.mode === 'talks' || this.mode === 'writings') && this.isOpen();
+  }
+
+  isExperienceMode(): boolean {
+    return (this.mode === 'talks' || this.mode === 'writings') && this.isOpen();
   }
 
   isPreviewMode(): boolean {
@@ -611,7 +785,10 @@ export class BuildingPanel {
 
   /** Peek / sheet inset for interior camera fit. */
   layoutInsets(): { left: number; top: number; right: number; bottom: number } {
-    if (!this.isOpen() || (this.mode !== 'interior' && this.mode !== 'preview')) {
+    if (
+      !this.isOpen() ||
+      (this.mode !== 'interior' && this.mode !== 'preview' && this.mode !== 'talks' && this.mode !== 'writings')
+    ) {
       return { left: 0, top: 0, right: 0, bottom: 0 };
     }
     if (this.mode === 'preview') {
@@ -660,7 +837,7 @@ export class BuildingPanel {
   }
 
   consumeInteriorCanvasTap(clientX: number, clientY: number): boolean {
-    if (!this.isOpen() || this.mode !== 'interior' || !this.isMobile()) return false;
+    if (!this.isOpen() || !this.isInteriorMode() || !this.isMobile()) return false;
     if (this.containsSheetPoint(clientX, clientY)) return false;
     if (this.peekOnly) return false;
     this.setPeek(true);
@@ -675,5 +852,6 @@ export class BuildingPanel {
     });
     const read = this.el.querySelector('.case-preview__read-label');
     if (read) read.textContent = t('panel.readCase');
+    if (this.experienceBack) this.experienceBack.textContent = t('experience.back');
   }
 }

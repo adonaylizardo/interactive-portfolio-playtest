@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "id": "talk-example-1",
+      "example": true,
+      "titleKey": "talks.item1.title",
+      "metaKey": "talks.item1.meta"
+    },
+    {
+      "id": "talk-example-2",
+      "example": true,
+      "titleKey": "talks.item2.title",
+      "metaKey": "talks.item2.meta"
+    },
+    {
+      "id": "talk-example-3",
+      "example": true,
+      "titleKey": "talks.item3.title",
+      "metaKey": "talks.item3.meta"
+    }
+  ]
+}

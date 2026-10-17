@@ -33,7 +33,18 @@ export function isLejosZoom(zoom: number, zoomMin: number): boolean {
   return zoom < lejosZoomThreshold(zoomMin);
 }
 
-export type BuildingSpriteId = 'estudio' | 'volaris' | 'bain' | 'mentoria' | 'finoa' | 'pg' | 'flor' | 'catedral' | 'sambil';
+export type BuildingSpriteId =
+  | 'estudio'
+  | 'volaris'
+  | 'bain'
+  | 'mentoria'
+  | 'finoa'
+  | 'pg'
+  | 'flor'
+  | 'catedral'
+  | 'sambil'
+  | 'teresa'
+  | 'biblioteca';
 export type BuildingSpriteState = 'default' | 'hover' | 'resaltado';
 
 export function spriteAsset(key: string): SpriteAsset {
@@ -68,7 +79,7 @@ export function buildingSpriteKey(id: string, state: BuildingSpriteState, lejos:
 }
 
 /** Landmark cutaways' `lejos` frame is the closed exterior silhouette, so their rooms stay on `cerca`. */
-const CERCA_ONLY_INTERIORS = new Set(['flor', 'catedral', 'sambil']);
+const CERCA_ONLY_INTERIORS = new Set(['flor', 'catedral', 'sambil', 'teresa', 'biblioteca']);
 
 export function interiorSpriteKey(id: string, lejos: boolean): string {
   return `int/${id}/${lejos && !CERCA_ONLY_INTERIORS.has(id) ? 'lejos' : 'cerca'}`;

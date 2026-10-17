@@ -7,3 +7,4 @@ artifacts/qa-screenshots/*
 .DS_Store
 *.local
 .env
+artifacts/

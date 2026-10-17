@@ -20,14 +20,20 @@ const pushDir = path.join(root, '.gh-pages-push');
 
 const LIVE_BASE = '/interactive-portfolio-playtest/';
 const PREVIEW_BASE = '/interactive-portfolio-playtest/preview/';
+const PREVIEW_EDIFICIOS_BASE = '/interactive-portfolio-playtest/preview-edificios/';
 const LIVE_URL = 'https://adonaylizardo.github.io/interactive-portfolio-playtest/';
 const PREVIEW_URL = 'https://adonaylizardo.github.io/interactive-portfolio-playtest/preview/';
+const PREVIEW_EDIFICIOS_URL =
+  'https://adonaylizardo.github.io/interactive-portfolio-playtest/preview-edificios/';
 
 const argv = process.argv.slice(2);
-const target =
-  process.env.DEPLOY_TARGET === 'live' || argv.includes('--live') || argv.includes('live')
+const target = argv.includes('--preview-edificios')
+  ? 'preview-edificios'
+  : process.env.DEPLOY_TARGET === 'live' || argv.includes('--live') || argv.includes('live')
     ? 'live'
-    : 'preview';
+    : process.env.DEPLOY_TARGET === 'preview-edificios'
+      ? 'preview-edificios'
+      : 'preview';
 
 if (target === 'live' && process.env.DEPLOY_LIVE_APPROVED !== '1') {
   console.error(
@@ -39,8 +45,9 @@ if (target === 'live' && process.env.DEPLOY_LIVE_APPROVED !== '1') {
   process.exit(1);
 }
 
-const base = target === 'live' ? LIVE_BASE : PREVIEW_BASE;
-const url = target === 'live' ? LIVE_URL : PREVIEW_URL;
+const base =
+  target === 'live' ? LIVE_BASE : target === 'preview-edificios' ? PREVIEW_EDIFICIOS_BASE : PREVIEW_BASE;
+const url = target === 'live' ? LIVE_URL : target === 'preview-edificios' ? PREVIEW_EDIFICIOS_URL : PREVIEW_URL;
 
 function run(cmd, cwd = root) {
   execSync(cmd, { cwd, stdio: 'inherit' });
@@ -64,8 +71,8 @@ run('git fetch origin gh-pages');
 run(`git worktree add --detach ${pushDir} origin/gh-pages`);
 
 try {
-  if (target === 'preview') {
-    const dest = path.join(pushDir, 'preview');
+  if (target === 'preview' || target === 'preview-edificios') {
+    const dest = path.join(pushDir, target === 'preview-edificios' ? 'preview-edificios' : 'preview');
     rmSync(dest, { recursive: true, force: true });
     mkdirSync(dest, { recursive: true });
     cpSync(dist, dest, { recursive: true });
@@ -86,9 +93,11 @@ try {
     console.log(`No gh-pages changes for ${target} (${url})`);
   } else {
     const msg =
-      target === 'preview'
-        ? 'Deploy candidate to /preview/ (live root unchanged)'
-        : 'Promote approved candidate to live gh-pages root';
+      target === 'preview-edificios'
+        ? 'Deploy Teatro/Biblioteca candidate to /preview-edificios/'
+        : target === 'preview'
+          ? 'Deploy candidate to /preview/ (live root unchanged)'
+          : 'Promote approved candidate to live gh-pages root';
     run('git -c user.email=agent@cursor.com -c user.name="Cursor Agent" commit -m "' + msg + '"', pushDir);
     run('git push origin HEAD:gh-pages', pushDir);
   }

@@ -1221,6 +1221,158 @@ body[data-layout='panel'] .checklist {
   }
 }
 
+/* Talks / Writings experience panel (Teresa + Biblioteca). */
+.building-panel--experience .case,
+.building-panel--experience .about,
+.building-panel--experience .worked-with {
+  display: none !important;
+}
+
+.experience {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.experience[hidden] {
+  display: none;
+}
+
+.experience__intro {
+  margin: 0;
+  color: #8a8f98;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.experience__section-head {
+  margin-top: 8px;
+}
+
+.experience__section-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #edeef0;
+}
+
+.experience__section-desc {
+  margin: 0 0 8px;
+  color: #8a8f98;
+  font-size: 13px;
+}
+
+.experience__row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border: 1px solid #2a2c31;
+  border-radius: 12px;
+  background: #141518;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.experience__thumb {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  background: #1a1c20;
+  display: grid;
+  place-items: center;
+  color: #ffb547;
+}
+
+.experience__copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.experience__row-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #edeef0;
+  line-height: 1.35;
+}
+
+.experience__row-meta {
+  font-size: 13px;
+  color: #8a8f98;
+}
+
+.experience__pill {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  background: rgb(255 181 71 / 12%);
+  color: #ffb547;
+}
+
+.experience__detail[hidden] {
+  display: none;
+}
+
+.experience__back {
+  align-self: flex-start;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border: 1px solid #2a2c31;
+  border-radius: 8px;
+  background: transparent;
+  color: #edeef0;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.experience__player {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  background: #1a1c20;
+  border: 1px solid #2a2c31;
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+  color: #ffb547;
+}
+
+.experience__detail-title {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #edeef0;
+}
+
+.experience__detail-meta {
+  margin: 0 0 12px;
+  color: #8a8f98;
+  font-size: 13px;
+}
+
+.experience__detail-body {
+  margin: 0;
+  color: #c8ccd4;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
 /* Case preview — Pixel kit card, then a full reading view. */
 .building-panel__close {
   display: none;

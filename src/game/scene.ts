@@ -41,7 +41,7 @@ import {
   type HistoryNavigationState,
 } from '../camera/hash';
 import { isTouchPrimary, type ChecklistStepId } from '../checklist/storage';
-import { muroWallTiles, OBELISCO_ACCESS, OBELISCO_SOLID_TILES } from '../data/world';
+import { buildingParkPrefer, muroWallTiles, OBELISCO_ACCESS, OBELISCO_SOLID_TILES } from '../data/world';
 import { mapWorldBounds, sortKey, tileFootWorld, tileToWorld, worldToTile } from '../iso/math';
 import { findPathOrNearestWith, findPathWith } from '../iso/pathfinding';
 import { C } from './colors';
@@ -365,6 +365,7 @@ export class IsoScene {
       sprite: Sprite;
       key: string;
       state: BuildingSpriteState;
+      lightsOn?: boolean;
       cull: { x0: number; y0: number; x1: number; y1: number };
       occluder: OccluderBox | null;
       zIndex: number;
@@ -1048,14 +1049,19 @@ export class IsoScene {
         continue;
       }
       const state = v.obj.type === 'building' ? this.buildingSpriteState(v.obj) : 'default';
-      if (!force && !lodChanged && state === v.state) continue;
-      const key = objectSpriteKey(v.obj, state, lejos);
+      const lightsOn = this.jac?.lightsOn ?? true;
+      if (!force && !lodChanged && state === v.state && v.lightsOn === lightsOn) continue;
+      let key = objectSpriteKey(v.obj, state, lejos, lightsOn);
+      if (key && !hasSprite(key) && v.obj.type === 'building') {
+        key = objectSpriteKey(v.obj, state, lejos, true);
+      }
       if (!key) continue;
       if (!spritesLoaded(key)) {
         void loadKeys([key]).then(() => this.syncObjectSprites(true));
         continue;
       }
       v.state = state;
+      v.lightsOn = lightsOn;
       v.key = key;
       v.sprite.texture = spriteTexture(key);
     }
@@ -1810,7 +1816,11 @@ export class IsoScene {
   private requestDriveToEnter(entry: { panelTitle: string; door: { x: number; y: number } }): boolean {
     if (!this.jac?.driving || this.jac.isExiting()) return false;
     if (performance.now() < this.suppressDriveTapUntil) return false;
-    const sit = this.jac.parkForDoor(entry.door.x, entry.door.y);
+    const building = objects.find(
+      (o) => o.type === 'building' && o.door?.x === entry.door.x && o.door?.y === entry.door.y,
+    );
+    const prefer = building ? buildingParkPrefer(building.name) : null;
+    const sit = this.jac.parkForDoor(entry.door.x, entry.door.y, prefer ?? undefined);
     if (!sit) {
       this.pendingDriveEnter = entry;
       this.jacGetOut({ thenEnter: true });
@@ -4355,8 +4365,13 @@ export class IsoScene {
     return this.jac?.canDriveAt(cx, cy) ?? false;
   }
 
-  qaParkForDoor(doorX: number, doorY: number): { x: number; y: number; path?: { x: number; y: number }[] } | null {
-    const sit = this.jac?.parkForDoor(doorX, doorY);
+  qaParkForDoor(
+    doorX: number,
+    doorY: number,
+    buildingName?: string,
+  ): { x: number; y: number; path?: { x: number; y: number }[] } | null {
+    const prefer = buildingName ? buildingParkPrefer(buildingName) : null;
+    const sit = this.jac?.parkForDoor(doorX, doorY, prefer ?? undefined);
     return sit ? { x: sit.x, y: sit.y, path: sit.path } : null;
   }
 
@@ -4415,7 +4430,9 @@ export class IsoScene {
   }
 
   jacSetLights(lights: JacLights): void {
+    const prev = this.jac?.lightsOn;
     this.jac?.setLights(lights);
+    if (prev !== this.jac?.lightsOn) this.syncObjectSprites(true);
   }
 
   jacSetGear(gear: JacGear): void {

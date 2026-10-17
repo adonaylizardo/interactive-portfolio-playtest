@@ -14,6 +14,8 @@ export const INTERIOR_BUILDING_IDS = [
   'sambil',
   'catedral',
   'flor',
+  'teresa',
+  'biblioteca',
 ] as const;
 
 export type InteriorBuildingId = (typeof INTERIOR_BUILDING_IDS)[number];
@@ -95,7 +97,7 @@ type ArtRoom = { scale: number; lift: number; exitFace: '+x' | '+y'; mask: strin
  * Landmark interiors: the pack's `estado=interior` cutaway of the building, scaled up so each map
  * tile becomes 2×2 room cells. Walk masks are hand-authored against the art (src/data/interior-rooms.json).
  */
-function artRoom(id: 'flor' | 'catedral' | 'sambil'): InteriorDef {
+function artRoom(id: 'flor' | 'catedral' | 'sambil' | 'teresa' | 'biblioteca'): InteriorDef {
   const r = (roomData as Record<string, ArtRoom>)[id];
   return def(id, r.mask[0].length, r.mask.length, {
     ...maskCells(r.mask),
@@ -118,6 +120,8 @@ const LAYOUTS: Record<InteriorBuildingId, InteriorDef> = {
   sambil: artRoom('sambil'),
   catedral: artRoom('catedral'),
   flor: artRoom('flor'),
+  teresa: artRoom('teresa'),
+  biblioteca: artRoom('biblioteca'),
 };
 
 export function getInteriorDef(id: string): InteriorDef | null {
