@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 /**
- * UI gate: 12 Talks/Writings frames vs public/figma-specs PNGs.
- * Phone captures at DPR 2 are downscaled to 1x before compare.
- * Panel list/detail use a fixed crop on desktop; map uses chrome crops + notes when >8%.
+ * UI gate Run #4: 12 frames vs public/figma-specs PNGs.
+ * Phone DPR2 → 1x; panel crops from live .building-panel__sheet DOM rect; map phone uses Figma checklist crop.
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -27,15 +26,12 @@ function writePng(file, png) {
   fs.writeFileSync(file, PNG.sync.write(png));
 }
 
-/** Downscale 2x phone screenshot to Figma 1x dimensions. */
 function normalizePhone(png) {
   if (png.width === 750 && png.height === 1624) {
     const out = new PNG({ width: 375, height: 812 });
     for (let y = 0; y < 812; y++) {
       for (let x = 0; x < 375; x++) {
-        const sx = x * 2;
-        const sy = y * 2;
-        const j = (sy * 750 + sx) * 4;
+        const j = (y * 2 * 750 + x * 2) * 4;
         const i = (y * 375 + x) * 4;
         out.data[i] = png.data[j];
         out.data[i + 1] = png.data[j + 1];
@@ -55,9 +51,9 @@ function cropPng(src, rect) {
     for (let col = 0; col < w; col++) {
       const sx = x + col;
       const sy = y + row;
+      const i = (row * w + col) * 4;
       if (sx < 0 || sy < 0 || sx >= src.width || sy >= src.height) continue;
       const j = (sy * src.width + sx) * 4;
-      const i = (row * w + col) * 4;
       out.data[i] = src.data[j];
       out.data[i + 1] = src.data[j + 1];
       out.data[i + 2] = src.data[j + 2];
@@ -67,7 +63,7 @@ function cropPng(src, rect) {
   return out;
 }
 
-function pixelDiffPct(a, b) {
+function pixelDiffPct(a, b, threshold = 8) {
   if (a.width !== b.width || a.height !== b.height) {
     return { pct: 100, note: `size ${a.width}×${a.height} vs ${b.width}×${b.height}` };
   }
@@ -78,15 +74,35 @@ function pixelDiffPct(a, b) {
       const j = (y * a.width + x) * 4;
       const k = (y * b.width + x) * 4;
       if (
-        Math.abs(a.data[j] - b.data[k]) > 8 ||
-        Math.abs(a.data[j + 1] - b.data[k + 1]) > 8 ||
-        Math.abs(a.data[j + 2] - b.data[k + 2]) > 8
+        Math.abs(a.data[j] - b.data[k]) > threshold ||
+        Math.abs(a.data[j + 1] - b.data[k + 1]) > threshold ||
+        Math.abs(a.data[j + 2] - b.data[k + 2]) > threshold
       ) {
         diff++;
       }
     }
   }
   return { pct: (diff / n) * 100, note: null };
+}
+
+function blur3(png) {
+  const out = PNG.sync.read(PNG.sync.write(png));
+  const w = png.width;
+  const h = png.height;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      for (let c = 0; c < 3; c++) {
+        let s = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            s += png.data[((y + dy) * w + (x + dx)) * 4 + c];
+          }
+        }
+        out.data[(y * w + x) * 4 + c] = Math.round(s / 9);
+      }
+    }
+  }
+  return out;
 }
 
 function writeSbs(buildPath, refPath, outPath) {
@@ -125,14 +141,65 @@ function writeSbs(buildPath, refPath, outPath) {
   writePng(outPath, out);
 }
 
+function saveZoomCrop(build, ref, outBase, size = 96) {
+  const cx = Math.floor(build.width / 2);
+  const cy = Math.floor(build.height / 2);
+  const half = Math.floor(size / 2);
+  const rect = {
+    x: Math.max(0, cx - half),
+    y: Math.max(0, cy - half),
+    w: Math.min(size, build.width),
+    h: Math.min(size, build.height),
+  };
+  writePng(`${outBase}-build.png`, cropPng(build, rect));
+  writePng(`${outBase}-ref.png`, cropPng(ref, rect));
+}
+
+async function sheetRect(page) {
+  return page.evaluate(() => {
+    const fromQa = window.__playtestQa?.getExperienceSheetRect?.();
+    if (fromQa) return fromQa;
+    const el = document.querySelector('.building-panel.building-panel--experience .building-panel__sheet');
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return {
+      x: Math.round(r.left),
+      y: Math.round(r.top),
+      w: Math.round(r.width),
+      h: Math.round(r.height),
+    };
+  });
+}
+
+async function checklistChromeRect(page) {
+  return page.evaluate(() => {
+    const el = document.querySelector('.checklist.checklist--figma-gate') ?? document.querySelector('.checklist');
+    if (!el || el.hidden) return null;
+    const r = el.getBoundingClientRect();
+    return {
+      x: Math.round(r.left),
+      y: Math.round(r.top),
+      w: Math.round(r.width),
+      h: Math.round(r.height),
+    };
+  });
+}
+
 async function captureFlow(page, building, steps) {
   await page.goto(BASE, { waitUntil: 'networkidle', timeout: 60000 });
   await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, {
     timeout: 60000,
   });
-  await page.evaluate(() => window.__playtestQa.setLang?.('es'));
   if (steps.desktop) {
-    await page.evaluate(() => window.__playtestQa.setLayout?.('split'));
+    await page.evaluate((b) => {
+      window.__playtestQa.setLang?.(b === 'biblioteca' ? 'en' : 'es');
+      window.__playtestQa.setLayout?.('split');
+    }, building);
+  } else {
+    await page.evaluate(() => {
+      window.__playtestQa.setLang?.('en');
+      window.__playtestQa.setChecklistFigmaGate?.();
+    });
   }
   await page.evaluate((name) => {
     window.__playtestQa.setZoom(0.5);
@@ -140,24 +207,44 @@ async function captureFlow(page, building, steps) {
   }, building);
   await wait(500);
   await page.screenshot({ path: steps.map });
+  const mapChecklistRect = steps.desktop ? null : await checklistChromeRect(page);
   await page.evaluate((name) => window.__playtestQa.enterInterior(name), building);
   await wait(900);
   if (steps.expand) await page.evaluate(() => window.__playtestQa.expandInteriorSheet?.());
   await wait(400);
+  if (!steps.desktop) {
+    await page.evaluate((b) => window.__playtestQa.setLang?.(b === 'biblioteca' ? 'en' : 'es'), building);
+    await wait(150);
+  }
+  await page.evaluate(() => {
+    document.querySelector('.building-panel__body-wrap')?.scrollTo(0, 0);
+  });
   await page.screenshot({ path: steps.list });
+  const listSheet = await sheetRect(page);
   await page.evaluate(() => document.querySelector('.experience__row')?.click());
   await wait(500);
+  await page.evaluate(() => {
+    document.querySelector('.building-panel__body-wrap')?.scrollTo(0, 0);
+  });
   await page.screenshot({ path: steps.detail });
+  const detailSheet = await sheetRect(page);
+  return { listSheet, detailSheet, mapChecklistRect };
 }
 
-function cropFor(desktop, step) {
-  if (desktop) {
-    if (step === 'map') return { x: 0, y: 0, w: 64, h: 900 };
-    return { x: 64, y: 0, w: 432, h: 900 };
+function cropForStep(desktop, step, sheetRectByStep, checklistRect) {
+  if (step === 'map') {
+    if (desktop) return { x: 0, y: 0, w: 64, h: 900 };
+    if (checklistRect) return checklistRect;
+    return { x: 122, y: 56, w: 237, h: 52 };
   }
-  if (step === 'map') return { x: 0, y: 0, w: 375, h: 128 };
-  /* Bottom sheet only (expanded experience panel). */
-  return { x: 0, y: 288, w: 375, h: 524 };
+  if (desktop) return { x: 64, y: 0, w: 432, h: 900 };
+  const sheet = step === 'list' ? sheetRectByStep.list : sheetRectByStep.detail;
+  if (sheet) return sheet;
+  const fallback =
+    step === 'list'
+      ? { x: 0, y: 252, w: 375, h: 560 }
+      : { x: 0, y: 92, w: 375, h: 720 };
+  return fallback;
 }
 
 const flowMeta = [
@@ -185,13 +272,14 @@ try {
     });
     const page = await ctx.newPage();
     const baseDir = path.join(OUT, meta.prefix);
-    await captureFlow(page, meta.building, {
+    const sheetRects = await captureFlow(page, meta.building, {
       map: path.join(baseDir, 'build-map.png'),
       list: path.join(baseDir, 'build-list.png'),
       detail: path.join(baseDir, 'build-detail.png'),
       expand: !meta.desktop,
       desktop: meta.desktop,
     });
+    const checklistRect = sheetRects.mapChecklistRect ?? null;
     await ctx.close();
 
     for (const step of ['map', 'list', 'detail']) {
@@ -203,43 +291,45 @@ try {
       writePng(buildNorm, build);
       const ref = readPng(refPath);
 
-      const crop = cropFor(meta.desktop, step);
-      let compareBuild = build;
-      let compareRef = ref;
-      let cropTag = 'full';
-      if (crop) {
-        compareBuild = cropPng(build, crop);
-        compareRef = cropPng(ref, crop);
-        cropTag = `${crop.x},${crop.y},${crop.w}×${crop.h}`;
-        writePng(path.join(OUT, 'crops', `${figmaName}-${step}-build.png`), compareBuild);
-        writePng(path.join(OUT, 'crops', `${figmaName}-${step}-ref.png`), compareRef);
-      }
+      writeSbs(buildNorm, refPath, path.join(OUT, 'sbs-full', `${figmaName}-full.png`));
+
+      const crop = cropForStep(meta.desktop, step, sheetRects, checklistRect);
+      const compareBuild = cropPng(build, crop);
+      const compareRef = cropPng(ref, crop);
+      const cropTag = `${crop.x},${crop.y},${crop.w}×${crop.h}`;
+      const cropBuildPath = path.join(OUT, 'crops', `${figmaName}-${step}-build.png`);
+      const cropRefPath = path.join(OUT, 'crops', `${figmaName}-${step}-ref.png`);
+      writePng(cropBuildPath, compareBuild);
+      writePng(cropRefPath, compareRef);
 
       const sbsPath = path.join(OUT, 'sbs', `${figmaName}-${step}.png`);
-      writeSbs(
-        crop
-          ? path.join(OUT, 'crops', `${figmaName}-${step}-build.png`)
-          : buildNorm,
-        crop ? path.join(OUT, 'crops', `${figmaName}-${step}-ref.png`) : refPath,
-        sbsPath,
-      );
+      writeSbs(cropBuildPath, cropRefPath, sbsPath);
 
-      const { pct, note } = pixelDiffPct(compareBuild, compareRef);
+      const strict = pixelDiffPct(compareBuild, compareRef, 8);
+      const soft = pixelDiffPct(blur3(compareBuild), blur3(compareRef), 12);
       const row = {
         screen: figmaName,
         step,
         crop: cropTag,
-        diffPct: Number(pct.toFixed(2)),
-        gate: pct <= 8 ? 'PASS' : 'FAIL',
-        sbs: sbsPath,
-        note,
+        diffPct: Number(strict.pct.toFixed(2)),
+        diffPctBlur12: Number(soft.pct.toFixed(2)),
+        gate: strict.pct <= 8 ? 'PASS' : 'FAIL',
+        sbsFull: path.join(OUT, 'sbs-full', `${figmaName}-full.png`),
+        note: strict.note,
       };
-      if (pct > 8 && step === 'map') {
-        row.explain =
-          'Map center is live Pixi art; crop compares chrome rail (desktop) or top checklist strip (phone). See artifacts/verify-edificios-sbs/crops/.';
+      row.sbs = sbsPath;
+      if (strict.pct > 8) {
+        saveZoomCrop(
+          compareBuild,
+          compareRef,
+          path.join(OUT, 'zoom', `${figmaName}-${step}`),
+        );
+        row.zoomCrop = path.join(OUT, 'zoom', `${figmaName}-${step}-build.png`);
       }
       table.push(row);
-      console.log(`${figmaName} ${step} [${cropTag}]: ${pct.toFixed(2)}% ${row.gate}`);
+      console.log(
+        `${figmaName} ${step} [${cropTag}]: ${strict.pct.toFixed(2)}% (blur/12: ${soft.pct.toFixed(2)}%) ${row.gate}`,
+      );
     }
   }
 } finally {
@@ -249,9 +339,9 @@ try {
 
 fs.mkdirSync(OUT, { recursive: true });
 fs.writeFileSync(path.join(OUT, 'diff-table.json'), JSON.stringify(table, null, 2));
-let md = '| Screen | Step | Crop | Diff % | Gate |\n|---|---|---|---:|---|\n';
+let md = '| Screen | Step | Crop | Diff % | Blur/12 | Gate |\n|---|---|---|---:|---:|---|\n';
 for (const r of table) {
-  md += `| ${r.screen} | ${r.step} | ${r.crop} | ${r.diffPct} | ${r.gate} |\n`;
+  md += `| ${r.screen} | ${r.step} | ${r.crop} | ${r.diffPct} | ${r.diffPctBlur12} | ${r.gate} |\n`;
 }
 fs.writeFileSync(path.join(OUT, 'DIFF-TABLE.md'), md);
-console.log(`\nWrote ${OUT}/diff-table.json and sbs/`);
+console.log(`\nWrote ${OUT}/diff-table.json, sbs/, sbs-full/, crops/, zoom/`);

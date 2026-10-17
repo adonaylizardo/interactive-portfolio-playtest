@@ -263,6 +263,7 @@ async function main(): Promise<void> {
     enterInterior: (name: string) => scene.enterInterior(name),
     exitInterior: () => scene.exitInterior(),
     dismissBuildingPanel: () => panel.hide(),
+    setChecklistFigmaGate: () => checklist.setFigmaGateState(),
     showPanelOverlayForQa: (title: string) => {
       checklist.setBuildingPanelOpen(true);
       panel.showOverlayForQa(title);
@@ -284,6 +285,7 @@ async function main(): Promise<void> {
     interiorPixelProbes: () => scene.getInteriorPixelProbesClient(),
     tapInteriorTile: (tx: number, ty: number) => scene.tapInteriorTileForQa(tx, ty),
     expandInteriorSheet: () => panel.expandInteriorSheetForQa(),
+    getExperienceSheetRect: () => panel.getExperienceSheetRectForQa(),
     leaveInteriorNow: () => scene.leaveInteriorNow(),
     collapseInteriorSheetToPeek: () => panel.collapseToPeekOnly(),
     reframeMobileDefault: () => scene.reframeMobileDefaultViewForQa(),

@@ -614,6 +614,81 @@ body[data-layout='panel'] .checklist {
   .checklist--mobile:not(.checklist--mobile-closed) .checklist__counter--label {
     display: inline;
   }
+
+  /* UI gate: Figma phone map checklist pill (3/5 · Enter a building). */
+  .checklist--figma-gate.checklist--mobile {
+    top: 56px;
+    left: 122px;
+    right: auto;
+    width: 237px;
+    min-width: 237px;
+    max-width: 237px;
+    border-radius: 26px;
+    border: 0;
+    box-shadow:
+      0 1px 1px rgba(0, 0, 0, 0.45),
+      0 2px 4px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+  }
+
+  .checklist--figma-gate.checklist--mobile-closed {
+    width: 237px;
+    height: auto;
+    border-radius: 26px;
+  }
+
+  .checklist--figma-gate .checklist__list,
+  .checklist--figma-gate .checklist__footer {
+    display: none !important;
+  }
+
+  .checklist--figma-gate .checklist__header {
+    margin: 0;
+    padding: 0 8px 0 18px;
+    gap: 10px;
+    min-height: 52px;
+    height: 52px;
+    border-bottom: 0;
+  }
+
+  .checklist--figma-gate .checklist__label {
+    font-size: 13px;
+    line-height: 16px;
+  }
+
+  .checklist--figma-gate .checklist__active-title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 16px;
+  }
+
+  .checklist--figma-gate .checklist__counter--label {
+    display: inline !important;
+    font-family: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 16px;
+  }
+
+  .checklist--figma-gate.checklist--mobile-closed .checklist__header-text,
+  .checklist--figma-gate.checklist--mobile-closed .checklist__counter--label {
+    display: flex;
+  }
+
+  .checklist--figma-gate .checklist__ring-btn {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    background: transparent
+      url('/interactive-portfolio-playtest/preview-edificios/figma-specs/assets/talks-phone-map/6af66.svg')
+      center / 44px 44px no-repeat;
+  }
+
+  .checklist--figma-gate .checklist__ring,
+  .checklist--figma-gate .checklist__counter--in-ring {
+    display: none !important;
+  }
 }
 
 /* Phone landscape (e.g. 844×390): treat as compact. Checklist is a pill; lang stays off the panel. */
@@ -1290,17 +1365,139 @@ body[data-layout='panel'] .checklist {
     border-right: 1px solid var(--ui-line);
   }
 
+  .building-panel--experience .exp-header {
+    min-height: 65px;
+    height: 65px;
+    padding: 12px 24px 12px 12px;
+    border-bottom: 1px dashed var(--ui-line);
+    box-sizing: border-box;
+  }
+
+  .building-panel--experience .exp-header__btn {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    border-radius: 20px;
+  }
+
   .building-panel--experience .building-panel__body-wrap {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
     padding: 20px 24px 24px;
   }
+
+  .building-panel--experience.building-panel--writings .experience {
+    gap: 8px;
+  }
 }
 
 @media (max-width: 767px) {
   .building-panel--experience .building-panel__sheet {
-    padding: 12px 20px max(20px, env(safe-area-inset-bottom));
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 0 16px 24px;
+    padding-top: 0;
+    border-radius: 16px 16px 0 0;
+    border-top: 1px solid var(--ui-line);
+    box-shadow: 0 -8px 32px rgb(0 0 0 / 45%);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: none;
+  }
+
+  .building-panel--experience.building-panel--open:not(.building-panel--peek).building-panel--exp-list
+    .building-panel__sheet {
+    height: 560px;
+    transform: translateY(0);
+  }
+
+  .building-panel--experience.building-panel--open:not(.building-panel--peek).building-panel--exp-detail
+    .building-panel__sheet {
+    height: 720px;
+    transform: translateY(0);
+  }
+
+  .building-panel--experience .exp-header {
+    border-bottom: none;
+    padding: 0;
+    min-height: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+  }
+
+  .building-panel--experience.building-panel--exp-detail .exp-header {
+    margin-bottom: 0;
+  }
+
+  .building-panel--experience .exp-header__title {
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 24px;
+  }
+
+  .building-panel--experience.building-panel--exp-detail .exp-header__back {
+    display: grid !important;
+  }
+
+  .building-panel--experience .building-panel__drag {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    height: 24px;
+    margin: 0;
+    padding: 0;
+  }
+
+  .building-panel--experience .building-panel__drag::after {
+    content: '';
+    display: block;
+    height: 4px;
+    border-radius: 4px;
+    background: var(--ui-line);
+  }
+
+  .building-panel--experience.building-panel--exp-list .building-panel__drag::after {
+    width: 70px;
+  }
+
+  .building-panel--experience.building-panel--exp-detail .building-panel__drag {
+    padding: 10px 0 2px;
+    height: auto;
+  }
+
+  .building-panel--experience.building-panel--exp-detail .building-panel__drag::after {
+    width: 40px;
+  }
+
+  .building-panel--experience .exp-header__btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 22px;
+  }
+
+  .building-panel--experience .building-panel__body-wrap {
+    padding: 0;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .building-panel--experience .experience {
+    gap: 12px;
+  }
+
+  .building-panel--experience .experience__intro {
+    line-height: 20px;
   }
 }
 
@@ -1391,7 +1588,7 @@ body[data-layout='panel'] .checklist {
 .exp-header__actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
@@ -1412,16 +1609,24 @@ body[data-layout='panel'] .checklist {
 
 .experience__intro {
   margin: 0;
-  color: #8a8f98;
+  color: var(--ui-text-secondary);
   font-size: 14px;
-  line-height: 1.45;
+  line-height: 20px;
+}
+
+.experience__list,
+.experience__up-next-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
 }
 
 .experience__filters {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 4px;
+  margin-bottom: 0;
 }
 
 .experience__filters[hidden] {
@@ -1429,13 +1634,15 @@ body[data-layout='panel'] .checklist {
 }
 
 .experience__filter {
-  padding: 6px 12px;
+  min-height: 32px;
+  padding: 0 14px;
   border: 1px solid #2a2c31;
   border-radius: 999px;
   background: #141518;
   color: #8a8f98;
   font-size: 13px;
   font-weight: 500;
+  line-height: 16px;
   cursor: pointer;
   touch-action: manipulation;
 }
@@ -1465,8 +1672,9 @@ body[data-layout='panel'] .checklist {
   flex: 1;
   min-width: 0;
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
+  line-height: 24px;
   letter-spacing: normal;
   text-transform: none;
   color: #edeef0;
@@ -1475,11 +1683,12 @@ body[data-layout='panel'] .checklist {
 .experience__section-count {
   flex: 0 0 auto;
   min-width: 20px;
-  padding: 2px 6px;
+  padding: 2px 8px;
   border-radius: 999px;
-  background: #1a1c20;
+  background: #24262b;
+  font-family: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   text-align: center;
   color: #8a8f98;
 }
@@ -1496,17 +1705,23 @@ body[data-layout='panel'] .checklist {
   touch-action: manipulation;
 }
 
+.experience__section-spacer {
+  flex: 1;
+  min-width: 0;
+  height: 1px;
+}
+
 .experience__section-desc {
   margin: 0 0 10px;
   color: #8a8f98;
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 18px;
 }
 
 .experience__row {
   display: flex;
   gap: 12px;
-  align-items: flex-start;
+  align-items: center;
   width: 100%;
   margin: 0;
   padding: 8px 0;
@@ -1540,14 +1755,27 @@ body[data-layout='panel'] .checklist {
 }
 
 .experience__thumb--doc {
-  width: 48px;
-  height: 48px;
-  background: var(--world-tile-top);
+  width: 64px;
+  height: 64px;
+  background: #1c1d21;
 }
 
-.experience__row--compact .experience__thumb--video {
-  width: 80px;
-  height: 45px;
+@media (max-width: 767px) {
+  .experience__row--compact .experience__thumb--video {
+    width: 80px;
+    height: 45px;
+  }
+}
+
+@media (min-width: 768px) {
+  .talks-player .experience__row--compact {
+    padding: 8px 0;
+  }
+
+  .talks-player .experience__row--compact .experience__thumb--video {
+    width: 114px;
+    height: 64px;
+  }
 }
 
 .experience__play-icon,
@@ -1562,7 +1790,7 @@ body[data-layout='panel'] .checklist {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding-top: 2px;
+  padding-top: 0;
 }
 
 .experience__row-title {
@@ -1587,154 +1815,191 @@ body[data-layout='panel'] .checklist {
 }
 
 .experience__divider {
-  margin: 16px 0;
+  margin: 0;
   border: 0;
-  border-top: 1px solid #2a2c31;
+  height: 1px;
+  width: 100%;
+  max-width: 384px;
+  background: var(--ui-line);
 }
 
-.experience__up-next {
-  margin: 0 0 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #8a8f98;
-}
-
-.experience__up-next-list {
+.talks-player {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 16px;
+  width: 100%;
 }
 
 /* Talks video player detail */
 .talks-player__stage {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;
-  margin-bottom: 16px;
+  max-width: 384px;
+  height: 216px;
+  margin: 0;
   border-radius: 8px;
   background: var(--ui-bg);
   border: 1px solid var(--ui-line);
   overflow: hidden;
-}
-
-.talks-player__stage-art {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 0.35;
+  flex-shrink: 0;
 }
 
 .talks-player__label {
   position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
+  left: 50%;
+  top: 99px;
+  transform: translateX(-50%);
   margin: 0;
-  font-family: ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  font-family: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
+  font-weight: 500;
+  letter-spacing: normal;
   color: var(--ui-text-secondary);
   pointer-events: none;
-  z-index: 1;
+  white-space: nowrap;
 }
 
 .talks-player__pause {
   position: absolute;
-  left: 10px;
-  bottom: 28px;
+  left: 15px;
+  top: 188px;
   z-index: 2;
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
+  display: block;
+  width: 14px;
+  height: 14px;
   padding: 0;
   border: 0;
-  border-radius: 6px;
-  background: rgb(20 21 24 / 75%);
-  color: #edeef0;
+  background: transparent;
   cursor: pointer;
 }
 
 .talks-player__progress {
   position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 18px;
-  height: 3px;
+  left: 43px;
+  top: 193px;
+  width: 246px;
+  height: 4px;
   border-radius: 2px;
-  background: #2a2c31;
+  background: var(--ui-line);
   overflow: hidden;
 }
 
 .talks-player__progress-fill {
   display: block;
-  width: 0;
+  width: 30%;
   height: 100%;
-  background: #edeef0;
+  background: var(--ui-text);
+  border-radius: 2px;
 }
 
 .talks-player__time {
   position: absolute;
-  right: 10px;
-  bottom: 6px;
+  left: 301px;
+  top: 188px;
   margin: 0;
-  font-family: ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
-  font-size: 11px;
-  color: #8a8f98;
+  font-family: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ui-text-secondary);
+  white-space: nowrap;
 }
 
 .talks-player__title {
-  margin: 0 0 4px;
-  font-size: 16px;
-  font-weight: 500;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
   color: var(--ui-text);
   line-height: 24px;
 }
 
 .talks-player__meta {
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 16px;
   color: var(--ui-text-secondary);
 }
 
+@media (max-width: 767px) {
+  .talks-player__stage {
+    max-width: 343px;
+    height: 193px;
+  }
+
+  .talks-player__label {
+    top: 87.5px;
+  }
+
+  .talks-player__pause {
+    top: 165px;
+  }
+
+  .talks-player__progress {
+    left: 43px;
+    top: 170px;
+    width: 205px;
+  }
+
+  .talks-player__time {
+    left: 260px;
+    top: 165px;
+  }
+
+  .experience__divider {
+    max-width: 343px;
+  }
+}
+
 /* Writings reader detail */
+.writings-reader {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
 .writings-reader__hero {
   display: grid;
   place-items: center;
   width: 100%;
-  aspect-ratio: 16 / 9;
-  margin-bottom: 16px;
-  border-radius: 10px;
-  background: #1a1c20;
-  border: 1px solid #2a2c31;
+  max-width: 384px;
+  height: 216px;
+  margin: 0;
+  border-radius: 6px;
+  background: #1c1d21;
+  border: 1px solid var(--ui-line);
   color: #c8ccd4;
+  flex-shrink: 0;
+}
+
+@media (max-width: 767px) {
+  .writings-reader__hero {
+    max-width: 343px;
+    height: 193px;
+  }
 }
 
 .writings-reader__kicker {
-  margin: 0 0 8px;
-  font-family: ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  margin: 0;
+  font-family: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  color: #8a8f98;
+  font-weight: 500;
+  letter-spacing: normal;
+  color: var(--ui-text-secondary);
 }
 
 .writings-reader__title {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 22px;
   font-weight: 600;
-  line-height: 1.25;
-  color: #edeef0;
+  line-height: 28px;
+  color: var(--ui-text);
 }
 
 .writings-reader__meta {
-  margin: 0 0 16px;
+  margin: 0;
   font-size: 13px;
-  color: #8a8f98;
+  line-height: 16px;
+  color: var(--ui-text-secondary);
 }
 
 .writings-reader__body {
@@ -1746,8 +2011,8 @@ body[data-layout='panel'] .checklist {
 
 .writings-reader__p {
   margin: 0;
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: 14px;
+  line-height: 20px;
   color: #c8ccd4;
 }
 

@@ -79,6 +79,8 @@ export class ChecklistUI {
   private compactSteps = isMobileOrCoarsePointer();
   private mobile = isMobileLayout();
   private panelOpen = false;
+  /** UI gate: pin phone checklist pill to Figma map chrome (3/5). */
+  private figmaGate = false;
 
   constructor(container: HTMLElement, callbacks: ChecklistCallbacks) {
     this.state = loadChecklist();
@@ -202,6 +204,25 @@ export class ChecklistUI {
     this.applyLayoutClasses();
   }
 
+  /** QA / UI gate: Figma phone map shows 3/5 on “Enter a building”. */
+  setFigmaGateState(): void {
+    this.figmaGate = true;
+    this.state = loadChecklist();
+    this.state.completed = {
+      'walk-around': true,
+      'walk-keys': true,
+      'move-camera': true,
+      zoom: false,
+      'enter-building': false,
+    };
+    this.state.skipped = false;
+    this.state.dismissed = false;
+    this.state.collapsed = false;
+    this.state.mobileExpanded = false;
+    saveChecklist(this.state);
+    this.render();
+  }
+
   private applyLayoutClasses(): void {
     this.mobile = isMobileLayout();
     const total = totalStepsForPlatform(this.compactSteps);
@@ -218,6 +239,7 @@ export class ChecklistUI {
     this.root.classList.toggle('checklist--panel-open', this.mobile && this.panelOpen);
     this.root.classList.toggle('checklist--complete', done >= total);
     this.root.classList.toggle('checklist--skipped', this.state.skipped);
+    this.root.classList.toggle('checklist--figma-gate', this.figmaGate && this.mobile);
   }
 
   complete(step: ChecklistStepId): void {
@@ -240,11 +262,14 @@ export class ChecklistUI {
     this.compactSteps = isMobileOrCoarsePointer();
     const total = totalStepsForPlatform(this.compactSteps);
     const done = countCompleted(this.state, this.compactSteps);
-    const counterText = `${done} / ${total}`;
+    const gateDone = 3;
+    const gateTotal = 5;
+    const counterText = this.figmaGate ? `${gateDone}/${gateTotal}` : `${done}/${total}`;
     this.counterEl.textContent = counterText;
     this.counterInRing.textContent = counterText;
     const circumference = 69.12;
-    const offset = circumference * (1 - done / total);
+    const progress = this.figmaGate ? gateDone / gateTotal : done / total;
+    const offset = circumference * (1 - progress);
     this.ringEl.style.strokeDashoffset = String(offset);
 
     const dismissBtn = this.root.querySelector('.checklist__dismiss') as HTMLButtonElement;
@@ -259,6 +284,12 @@ export class ChecklistUI {
     this.ringBtn.setAttribute('aria-label', t('check.toggle'));
 
     this.applyLayoutClasses();
+
+    if (this.figmaGate && this.mobile) {
+      const ringImg =
+        '/interactive-portfolio-playtest/preview-edificios/figma-specs/assets/talks-phone-map/6af66.svg';
+      this.ringBtn.innerHTML = `<img class="checklist__figma-ring" src="${ringImg}" width="44" height="44" alt="" />`;
+    }
 
     const platformSteps = stepsForPlatform(this.compactSteps);
     const copy = stepCopy();

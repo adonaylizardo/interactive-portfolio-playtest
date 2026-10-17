@@ -3,7 +3,7 @@ import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
 import { CASES, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
 import { TALKS, WRITINGS, type TalkItem, type WritingSection } from '../data/experiences';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
-import { FIGMA_DOC, FIGMA_PAUSE, FIGMA_PLAY, FIGMA_STAGE, figmaAsset } from './figmaAssets';
+import { FIGMA_DOC, FIGMA_PAUSE, FIGMA_PLAY, figmaAsset } from './figmaAssets';
 import { iconSvg } from './icons';
 import { onLangChange, t, type I18nKey } from './i18n';
 
@@ -553,8 +553,10 @@ export class BuildingPanel {
     }
     const back = this.el.querySelector('[data-exp-back]') as HTMLElement | null;
     const expand = this.el.querySelector('[data-exp-expand]') as HTMLElement | null;
-    if (back) back.hidden = view !== 'detail';
-    if (expand) expand.hidden = !this.isMobile();
+    if (back) back.hidden = this.isMobile() && view === 'list';
+    if (expand) expand.hidden = this.isMobile();
+    this.el.classList.toggle('building-panel--exp-list', view === 'list');
+    this.el.classList.toggle('building-panel--exp-detail', view === 'detail');
     if (view === 'list') {
       this.activeTalkId = null;
       this.activeWriting = null;
@@ -566,8 +568,9 @@ export class BuildingPanel {
 
   private renderTalksList(): void {
     if (!this.experienceList) return;
+    const count = this.isMobile() ? 7 : 9;
     this.experienceList.replaceChildren(
-      ...TALKS.slice(0, 5).map((item) => this.talkRow(item, () => this.openTalk(item))),
+      ...TALKS.slice(0, count).map((item) => this.talkRow(item, () => this.openTalk(item))),
     );
   }
 
@@ -591,16 +594,16 @@ export class BuildingPanel {
       const doc = document.createElement('img');
       doc.className = 'experience__doc-icon';
       doc.src = FIGMA_DOC;
-      doc.width = compact ? 28 : 36;
-      doc.height = compact ? 28 : 36;
+      doc.width = compact ? 15 : 15;
+      doc.height = compact ? 15 : 15;
       doc.alt = '';
       thumb.append(doc);
     } else {
       const play = document.createElement('img');
       play.className = 'experience__play-icon';
       play.src = FIGMA_PLAY;
-      play.width = compact ? 20 : 24;
-      play.height = compact ? 20 : 24;
+      play.width = 12;
+      play.height = 12;
       play.alt = '';
       thumb.append(play);
     }
@@ -638,12 +641,11 @@ export class BuildingPanel {
     if (!this.experienceDetail) return;
     const title = t(item.titleKey as I18nKey);
     const meta = t(item.metaKey as I18nKey);
-    const upNext = TALKS.filter((x) => x.id !== item.id).slice(0, 3);
+    const upNext = TALKS.filter((x) => x.id !== item.id).slice(0, 4);
     const wrap = document.createElement('div');
     wrap.className = 'talks-player';
     wrap.innerHTML = `
       <div class="talks-player__stage">
-        <img class="talks-player__stage-art" src="${FIGMA_STAGE}" alt="" />
         <p class="talks-player__label">${t('talks.videoLabel')}</p>
         <button type="button" class="talks-player__pause" aria-label="">
           <img class="talks-player__pause-icon" src="${FIGMA_PAUSE}" width="14" height="14" alt="" />
@@ -654,7 +656,6 @@ export class BuildingPanel {
       <h3 class="talks-player__title"></h3>
       <p class="talks-player__meta"></p>
       <hr class="experience__divider" />
-      <h4 class="experience__up-next">${t('talks.upNext')}</h4>
       <div class="experience__up-next-list" data-up-next></div>
     `;
     wrap.querySelector('.talks-player__title')!.textContent = title;
@@ -702,6 +703,7 @@ export class BuildingPanel {
         ? WRITINGS
         : WRITINGS.filter((s) => s.id === this.writingsFilter);
     const frag = document.createDocumentFragment();
+    const rowLimit: Record<string, number> = { uxsc: 3, sinergia: 2, guest: 2 };
     for (const section of sections) {
       const head = document.createElement('div');
       head.className = 'experience__section-head';
@@ -712,18 +714,22 @@ export class BuildingPanel {
       h.textContent = t(section.titleKey as I18nKey);
       const badge = document.createElement('span');
       badge.className = 'experience__section-count';
-      badge.textContent = String(section.items.length);
+      badge.textContent = '0';
       const seeAll = document.createElement('button');
       seeAll.type = 'button';
       seeAll.className = 'experience__see-all';
-      seeAll.textContent = t('chrome.seeAll');
-      row.append(h, badge, seeAll);
+      seeAll.textContent = t('writings.seeAll');
+      const spacer = document.createElement('div');
+      spacer.className = 'experience__section-spacer';
+      spacer.setAttribute('aria-hidden', 'true');
+      row.append(h, badge, spacer, seeAll);
       const p = document.createElement('p');
       p.className = 'experience__section-desc';
       p.textContent = t(section.descKey as I18nKey);
       head.append(row, p);
       frag.appendChild(head);
-      for (const item of section.items.slice(0, 3)) {
+      const limit = rowLimit[section.id] ?? 3;
+      for (const item of section.items.slice(0, limit)) {
         frag.appendChild(this.writingRow(item, section));
       }
     }
@@ -744,7 +750,7 @@ export class BuildingPanel {
     wrap.className = 'writings-reader';
     wrap.innerHTML = `
       <div class="writings-reader__hero" aria-hidden="true">
-        <img class="writings-reader__hero-icon" src="${FIGMA_DOC}" width="36" height="36" alt="" />
+        <img class="writings-reader__hero-icon" src="${FIGMA_DOC}" width="15" height="15" alt="" />
       </div>
       <p class="writings-reader__kicker"></p>
       <h3 class="writings-reader__title"></h3>
@@ -764,6 +770,7 @@ export class BuildingPanel {
     paras[1]!.textContent = t('writings.reader.p2');
     paras[2]!.textContent = t('writings.reader.p3');
     const sub = wrap.querySelector('.writings-reader__substack') as HTMLAnchorElement;
+    sub.hidden = true;
     sub.textContent = t('writings.substack');
     sub.addEventListener('click', (e) => e.preventDefault());
     this.experienceDetail.replaceChildren(wrap);
@@ -1042,6 +1049,17 @@ export class BuildingPanel {
     this.peekOnly = false;
     this.syncPeekClass();
     this.onVisibilityChange();
+  }
+
+  getExperienceSheetRectForQa(): { x: number; y: number; w: number; h: number } | null {
+    if (!this.isOpen() || !this.isExperienceMode()) return null;
+    const r = this.sheet.getBoundingClientRect();
+    return {
+      x: Math.round(r.left),
+      y: Math.round(r.top),
+      w: Math.round(r.width),
+      h: Math.round(r.height),
+    };
   }
 
   collapseToPeekOnly(): void {

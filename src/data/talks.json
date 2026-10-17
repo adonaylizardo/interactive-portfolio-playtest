@@ -29,6 +29,30 @@
       "example": true,
       "titleKey": "talks.item5.title",
       "metaKey": "talks.item5.meta"
+    },
+    {
+      "id": "talk-example-6",
+      "example": true,
+      "titleKey": "talks.item6.title",
+      "metaKey": "talks.item6.meta"
+    },
+    {
+      "id": "talk-example-7",
+      "example": true,
+      "titleKey": "talks.item7.title",
+      "metaKey": "talks.item7.meta"
+    },
+    {
+      "id": "talk-example-8",
+      "example": true,
+      "titleKey": "talks.item8.title",
+      "metaKey": "talks.item8.meta"
+    },
+    {
+      "id": "talk-example-9",
+      "example": true,
+      "titleKey": "talks.item9.title",
+      "metaKey": "talks.item9.meta"
     }
   ]
 }
