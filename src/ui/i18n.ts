@@ -120,8 +120,8 @@ const DICT = {
     'jac.engine': 'Motor',
     'jac.gear': 'Marcha',
     'jac.auto': 'Auto',
-    'jac.off': 'Apagado',
-    'jac.on': 'Encendido',
+    'jac.off': 'Apag.',
+    'jac.on': 'Enc.',
     'jac.drive': 'Conducir',
     'jac.hazards': 'Balizas',
 

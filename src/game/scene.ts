@@ -351,7 +351,7 @@ export class IsoScene {
   private rearFadeFrom = 0;
   private rearFadeTo = 0;
   private rearFadeT0 = 0;
-  private static readonly REAR_FADE_MS = 400;
+  private static readonly REAR_FADE_MS = 120;
   private pendingJacExit = false;
   private suppressDriveTapUntil = 0;
   private events: SceneEvents;
@@ -415,6 +415,7 @@ export class IsoScene {
   private pendingBuildingEntry: { panelTitle: string; door: { x: number; y: number } } | null =
     null;
   private pendingDriveEnter: { panelTitle: string; door: { x: number; y: number } } | null = null;
+  private pendingDriveEnterAt = 0;
   private pendingJacEnter = false;
   private pendingJacPanel = false;
   private tileCullEntries: { g: Sprite; tx: number; ty: number }[] = [];
@@ -581,9 +582,11 @@ export class IsoScene {
     this.app.ticker.add(() => this.events.onFrame?.(), undefined, UPDATE_PRIORITY.UTILITY);
     window.addEventListener('resize', () => this.onWindowViewportChange());
     window.visualViewport?.addEventListener('resize', () => this.onWindowViewportChange());
-    window.visualViewport?.addEventListener('scroll', () => {
-      window.scrollTo(0, 0);
-    });
+    const lockViewport = () => {
+      if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
+    };
+    window.visualViewport?.addEventListener('scroll', lockViewport);
+    window.addEventListener('scroll', lockViewport, { passive: true });
     window.addEventListener('hashchange', () => {
       if (this.historySyncInProgress) return;
       this.applyHashNavigation(null);
@@ -1818,6 +1821,7 @@ export class IsoScene {
     this.events.stickCancel?.();
     this.pendingBuildingEntry = null;
     this.pendingDriveEnter = entry;
+    this.pendingDriveEnterAt = performance.now();
     const dest = path.length > 0 ? path[path.length - 1] : sit;
     if (path.length === 0 || (Math.hypot(this.jac.cx - dest.x, this.jac.cy - dest.y) < 1.2 && this.jac.mph < 1)) {
       this.jacGetOut({ thenEnter: true });
@@ -2954,6 +2958,13 @@ export class IsoScene {
       },
       { capture: true },
     );
+    canvas.addEventListener(
+      'touchstart',
+      (e) => {
+        e.preventDefault();
+      },
+      { passive: false },
+    );
     canvas.addEventListener('touchstart', onTouchPinchStartPassive, { passive: true });
     canvas.addEventListener('touchstart', onTouchPinchStart, { passive: false });
     canvas.addEventListener('touchmove', onTouchPinchMove, { passive: false });
@@ -3140,13 +3151,19 @@ export class IsoScene {
    */
   private composeRearPass(): void {
     const want = this.jac?.rearCam ? 1 : 0;
-    if (want !== this.rearFadeTo) {
+    if (want === 0) {
+      this.rearFade = 0;
+      this.rearFadeFrom = 0;
+      this.rearFadeTo = 0;
+    } else if (want !== this.rearFadeTo) {
       this.rearFadeFrom = this.rearFade;
       this.rearFadeTo = want;
       this.rearFadeT0 = performance.now();
     }
-    const t = Math.min(1, (performance.now() - this.rearFadeT0) / IsoScene.REAR_FADE_MS);
-    this.rearFade = this.rearFadeFrom + (this.rearFadeTo - this.rearFadeFrom) * t;
+    if (want === 1) {
+      const t = Math.min(1, (performance.now() - this.rearFadeT0) / IsoScene.REAR_FADE_MS);
+      this.rearFade = this.rearFadeFrom + (this.rearFadeTo - this.rearFadeFrom) * t;
+    }
     const drewRear = !!this.jac?.rearCam;
     if (drewRear) this.renderRearTexture();
     this.layoutRearSprite();
@@ -3403,6 +3420,8 @@ export class IsoScene {
         if (dx !== 0 || dy !== 0) this.fireMoveCommand();
       }
       this.jac.update(this.app.ticker.deltaMS / 1000, { dx, dy, autoShift: true });
+      this.charTx = this.jac.cx;
+      this.charTy = this.jac.cy;
       if (this.pendingJacExit && this.jac.readyToExit()) this.finishJacGetOut();
       else this.tryFinishDriveEnter();
       this.drawPathPreview();
@@ -4216,9 +4235,12 @@ export class IsoScene {
 
   private tryFinishDriveEnter(): void {
     if (!this.pendingDriveEnter || !this.jac?.driving || this.jac.isExiting()) return;
+    const door = this.pendingDriveEnter.door;
+    const dist = Math.hypot(this.jac.cx - door.x, this.jac.cy - door.y);
     const idle = this.jac.drivePath.length === 0 && !this.jac.driveGoal;
-    if (!idle) return;
-    if (this.jac.mph > 0.4) return;
+    const near = dist < 7 && this.jac.mph < 1;
+    const timedOut = this.pendingDriveEnterAt > 0 && performance.now() - this.pendingDriveEnterAt > 12000;
+    if (!near && !timedOut && !(idle && this.jac.mph <= 0.4)) return;
     this.jacGetOut({ thenEnter: true });
   }
 
@@ -4450,6 +4472,10 @@ export class IsoScene {
     cy: number;
     worldX: number;
     worldY: number;
+    ghostVisible: boolean;
+    spawnSprites: number;
+    labels: number;
+    rearVisible: boolean;
   } {
     const ids: string[] = [];
     for (const id of this.objectGraphics.keys()) if (id === JAC_ID || id.includes('jac')) ids.push(id);
@@ -4474,10 +4500,37 @@ export class IsoScene {
       frame.x + frame.width <= src.width + 0.5 &&
       frame.y + frame.height <= src.height + 0.5
     );
+    let worldSprites = 0;
+    let spawnSprites = 0;
+    let ghostVisible = false;
+    const spawn = this.jac?.spawn.center;
+    const spawnW = spawn ? tileToWorld(spawn.x, spawn.y) : null;
+    const walk = (node: { label?: string; visible?: boolean; worldTransform?: { tx: number; ty: number }; children?: Iterable<{ label?: string }> }) => {
+      const label = node.label ?? '';
+      const vis = node.visible !== false;
+      if (vis && (label === JAC_ID || label.includes('jac-t9') || label.startsWith('fill:jac'))) {
+        worldSprites += 1;
+        const wt = node.worldTransform;
+        if (spawnW && wt && Math.hypot(wt.tx - spawnW.x, wt.ty - spawnW.y) < 80) spawnSprites += 1;
+      }
+      if (vis && label.includes('ghost')) ghostVisible = true;
+      const kids = (node as { children?: Iterable<typeof node> }).children;
+      if (kids) for (const c of kids) walk(c);
+    };
+    if (this.objectsLayer) walk(this.objectsLayer);
+    if (!worldSprites && bodyOn) worldSprites = 1;
+    const labels = [...document.querySelectorAll('.name-label, .jac-pill--name')].filter((el) => {
+      const html = el as HTMLElement;
+      if (html.hidden || html.closest('[hidden]')) return false;
+      const text = html.textContent ?? '';
+      return /JAC T9/i.test(text) && getComputedStyle(html).display !== 'none';
+    }).length;
+    const rearChrome = document.querySelector('.jac-rear') as HTMLElement | null;
+    const rearOn = !!rearChrome && !rearChrome.hidden && rearChrome.classList.contains('is-on');
     return {
-      count: ids.length,
+      count: Math.max(ids.length, worldSprites || (bodyOn ? 1 : 0)),
       ids,
-      sprites: bodyOn ? 1 : 0,
+      sprites: worldSprites || (bodyOn ? 1 : 0),
       onScreen: vanOnScreen && bodyOn && frameOk ? 1 : 0,
       frameOk,
       texW: frame?.width ?? 0,
@@ -4488,6 +4541,10 @@ export class IsoScene {
       cy: this.jac?.cy ?? NaN,
       worldX: w.x,
       worldY: w.y,
+      ghostVisible,
+      spawnSprites,
+      labels,
+      rearVisible: rearOn || this.rearFade > 0.05,
     };
   }
 

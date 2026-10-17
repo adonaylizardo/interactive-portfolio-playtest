@@ -163,6 +163,33 @@ async function main(): Promise<void> {
     getCharTile: () => scene.getCharacterTile(),
     getView: () => scene.getViewMode(),
   });
+  const lockViewport = () => {
+    if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
+  };
+  window.addEventListener('scroll', lockViewport, { passive: true });
+  window.visualViewport?.addEventListener('scroll', lockViewport);
+  window.visualViewport?.addEventListener('resize', lockViewport);
+  document.addEventListener(
+    'touchstart',
+    (e) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (t.closest('.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock')) return;
+      if (t === canvas || t.closest('#app, .joystick, #game-canvas, #ui-root')) {
+        if (joystick.isActive() || scene?.jacSnapshot()?.driving) e.preventDefault();
+      }
+    },
+    { passive: false, capture: true },
+  );
+  document.addEventListener(
+    'touchmove',
+    (e) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest('.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock')) return;
+      if (joystick.isActive() || scene?.jacSnapshot()?.driving) e.preventDefault();
+    },
+    { passive: false, capture: true },
+  );
   await scene.init(canvas);
   chrome.beginSoundHint();
   const bootFocus = new URLSearchParams(location.search).get('focus');
@@ -319,6 +346,13 @@ async function main(): Promise<void> {
     parkedFootprint: () => scene.qaParkedFootprint(),
     jacStick: (vec: { x: number; y: number } | null) => scene.qaJacStick(vec),
     jacDriveStep: (dt: number, dx: number, dy: number) => scene.qaJacDriveStep(dt, dx, dy),
+    viewportLock: () => ({
+      scrollX: window.scrollX,
+      scrollY: window.scrollY,
+      vvOffsetTop: window.visualViewport?.offsetTop ?? 0,
+      vvOffsetLeft: window.visualViewport?.offsetLeft ?? 0,
+      vvScale: window.visualViewport?.scale ?? 1,
+    }),
     jacClose: () => scene.jacClose(),
     jacSetLights: (lights: 'off' | 'auto' | 'on') => scene.jacSetLights(lights),
     jacSetGear: (gear: 'P' | 'R' | 'N' | 'D') => scene.jacSetGear(gear),
