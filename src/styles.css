@@ -128,15 +128,6 @@ body > canvas:not(#game-canvas),
   -webkit-user-select: none;
 }
 
-canvas[data-jac-gl] {
-  position: fixed !important;
-  left: -9999px !important;
-  top: 0 !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-  visibility: hidden !important;
-}
-
 body.is-canvas-dragging,
 body.is-canvas-dragging * {
   user-select: none !important;
@@ -2186,10 +2177,22 @@ body[data-layout='panel'] .checklist {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
 }
 
+@keyframes jac-bump-flash {
+  0% {
+    box-shadow: 0 0 0 6px #ffb547, 0 0 28px #ffb547;
+    background: #3a3228;
+  }
+  100% {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+  }
+}
+
 .jac-bar.is-bump,
 .jac-dock.is-bump {
-  box-shadow: 0 0 0 3px #edeef0, 0 4px 20px rgba(0, 0, 0, 0.45);
-  border-color: #edeef0;
+  animation: jac-bump-flash 220ms ease-out;
+  box-shadow: 0 0 0 4px #ffb547, 0 4px 20px rgba(0, 0, 0, 0.45);
+  border-color: #ffb547;
+  background: #2a241c;
 }
 
 .jac-bar > span,
@@ -2470,7 +2473,7 @@ body[data-layout='panel'] .checklist {
   transform: translateX(-50%);
   border-radius: 16px;
   border: 1px solid #edeef0;
-  background: #141518;
+  background: transparent;
   overflow: hidden;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   opacity: 0;
@@ -2493,7 +2496,8 @@ body[data-layout='panel'] .checklist {
   display: block;
   width: 100%;
   height: 128px;
-  background: #101114;
+  background: transparent;
+  opacity: 0;
 }
 
 .jac-rear--phone .jac-rear__view {

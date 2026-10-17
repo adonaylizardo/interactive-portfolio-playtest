@@ -43,12 +43,13 @@ const DRIVE_TILES_PER_S = WALK_TILES_PER_S * 1.15;
 const REVERSE_TILES_PER_S = WALK_TILES_PER_S * 0.85;
 const ACCEL_TILES_S2 = 14;
 const BRAKE_TILES_S2 = 18;
+const EXIT_BRAKE_TILES_S2 = 56;
 const FRICTION_TILES_S2 = 10;
 const TURN_RATE = 2.4;
 const IDLE_RPM = 700;
 const MOVE_RPM = 2250;
 const MOVE_MPH = 10;
-const SHIFT_DWELL_S = 0.25;
+const SHIFT_DWELL_S = 0.45;
 
 export type JacVisual = {
   obj: MapObject;
@@ -532,7 +533,7 @@ export class JacT9 {
       const moved = this.followDrivePath(dt);
       this.steering = 0;
       this.tickRearHold(dt);
-      if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 1.4);
+      if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 0.55);
       this.syncMeters(moved);
       if (this.toggles.hazards) this.hazardT += dt;
       else this.hazardT = 0;
@@ -557,7 +558,7 @@ export class JacT9 {
 
     this.reversing = this.vel < -0.08;
     this.tickRearHold(dt);
-    if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 1.4);
+    if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 0.55);
     const fwd = DIR_VEC[this.dir];
     if (moving) {
       const nx = fwd.x * this.vel * dt;
@@ -596,7 +597,7 @@ export class JacT9 {
     if (want !== 0) this.gearHeld = false;
 
     if (this.pendingExit || (this.gearHeld && (this.gear === 'P' || this.gear === 'N') && want === 0)) {
-      this.brakeTowardZero(dt);
+      this.brakeTowardZero(dt, this.pendingExit ? EXIT_BRAKE_TILES_S2 : BRAKE_TILES_S2);
       if (Math.abs(this.vel) <= 0.08) {
         this.vel = 0;
         if (this.pendingExit) {
@@ -638,8 +639,9 @@ export class JacT9 {
       if (autoShift && this.gear !== need) {
         if (!this.shiftArmedAt) this.shiftArmedAt = performance.now();
         if (this.shiftDwell <= 0) this.shiftDwell = SHIFT_DWELL_S;
-        this.shiftDwell -= dt;
-        if (performance.now() - this.shiftArmedAt < SHIFT_DWELL_S * 1000 || this.shiftDwell > 0) return;
+        this.shiftDwell = Math.max(0, this.shiftDwell - dt);
+        if (performance.now() - this.shiftArmedAt < SHIFT_DWELL_S * 1000) return;
+        if (this.shiftDwell > 0) return;
         this.gear = need;
       } else if (autoShift) {
         this.gear = need;

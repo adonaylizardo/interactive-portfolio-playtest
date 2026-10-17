@@ -48,7 +48,6 @@ export class JacHud {
   private steerEl: HTMLElement;
   private bubbleEl: HTMLElement;
   private rearEl: HTMLElement;
-  private rearView: HTMLCanvasElement;
   private mini: HTMLCanvasElement;
   private hintEl: HTMLElement;
   private lastHtml = '';
@@ -73,7 +72,6 @@ export class JacHud {
     this.steerEl = this.root.querySelector('.jac-steer')!;
     this.bubbleEl = this.root.querySelector('.jac-bubble')!;
     this.rearEl = this.root.querySelector('.jac-rear')!;
-    this.rearView = this.root.querySelector('.jac-rear__view')!;
     this.mini = this.root.querySelector('.jac-dock__mini')!;
     this.hintEl = this.root.querySelector('.jac-hint')!;
     this.bind();
@@ -140,9 +138,7 @@ export class JacHud {
     const showHint = !this.mobile && snap.mode === 'drive' && performance.now() < this.hintUntil;
     this.hintEl.hidden = !showHint;
     if (!this.mobile && (snap.mode === 'drive' || snap.mode === 'info')) this.drawMini(anchors.follow);
-    if (snap.rearCam && rearBlit && rearBlit.canvas !== document.getElementById('game-canvas')) {
-      this.blitRear(rearBlit);
-    }
+    void rearBlit;
   }
 
   qaRoot(): HTMLElement {
@@ -346,38 +342,10 @@ export class JacHud {
       this.rearFadeTo = want;
       this.rearFadeT0 = performance.now();
     }
-    const t = Math.min(1, (performance.now() - this.rearFadeT0) / 500);
+    const t = Math.min(1, (performance.now() - this.rearFadeT0) / 700);
     this.rearFade = this.rearFadeFrom + (this.rearFadeTo - this.rearFadeFrom) * t;
     this.rearEl.style.transition = 'none';
     this.rearEl.style.opacity = String(this.rearFade);
-  }
-
-  private blitRear(src: { canvas: HTMLCanvasElement; sx: number; sy: number; sw: number; sh: number }): void {
-    const dst = this.rearView;
-    const w = dst.width;
-    const h = dst.height;
-    const ctx = dst.getContext('2d');
-    if (!ctx || src.sw < 4 || src.sh < 4) return;
-    const native = src.canvas.width;
-    const displayed = src.canvas.clientWidth > 0 ? src.canvas.clientWidth : native;
-    const res = native / Math.max(1, displayed);
-    ctx.fillStyle = '#141518';
-    ctx.fillRect(0, 0, w, h);
-    try {
-      ctx.drawImage(
-        src.canvas,
-        src.sx * res,
-        src.sy * res,
-        src.sw * res,
-        src.sh * res,
-        0,
-        0,
-        w,
-        h,
-      );
-    } catch {
-      /* canvas tainted */
-    }
   }
 
   private drawMini(follow: { x: number; y: number }): void {

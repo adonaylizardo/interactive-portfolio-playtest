@@ -300,6 +300,8 @@ async function main(): Promise<void> {
     jacGetOut: () => scene.jacGetOut(),
     jacDriveTo: (tx: number, ty: number) => scene.qaDriveTo(tx, ty),
     lastDriveTap: () => scene.qaLastDriveTap,
+    pointerDriveAccepts: () => scene.qaPointerDriveAccepts,
+    fps: () => scene.qaFps(),
     tileAtClient: (x: number, y: number) => scene.qaTileAtClient(x, y),
     jacDriveTileOk: (x: number, y: number) => scene.qaDriveTileOk(x, y),
     jacClose: () => scene.jacClose(),

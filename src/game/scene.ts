@@ -2,9 +2,11 @@ import {
   Application,
   Container,
   Graphics,
+  Matrix,
   Point,
   Polygon,
   Rectangle,
+  RenderTexture,
   Sprite,
   Texture,
   TilingSprite,
@@ -338,11 +340,15 @@ export class IsoScene {
   private jac: JacT9 | null = null;
   private jacBubbleTimer: ReturnType<typeof setTimeout> | null = null;
   qaLastDriveTap: { x: number; y: number } | null = null;
-  private rearBlit: HTMLCanvasElement | null = null;
-  private rearBlitReady = false;
-  /** Off-DOM WebGL view. Never shown — we blit it onto the opaque 2D #game-canvas. */
-  private glView: HTMLCanvasElement | null = null;
-  private presentCtx: CanvasRenderingContext2D | null = null;
+  qaPointerDriveAccepts = 0;
+  /** GPU rear crop. Shown as a stage sprite — never readPixels / drawImage of the game GL view. */
+  private rearRT: RenderTexture | null = null;
+  private rearSprite: Sprite | null = null;
+  private rearLayer: Container | null = null;
+  private rearFade = 0;
+  private rearFadeFrom = 0;
+  private rearFadeTo = 0;
+  private rearFadeT0 = 0;
   private pendingJacExit = false;
   private events: SceneEvents;
   private objectGraphics = new Map<string, Container>();
@@ -440,15 +446,9 @@ export class IsoScene {
 
   async init(canvas: HTMLCanvasElement): Promise<void> {
     this.canvasEl = canvas;
-    const glView = document.createElement('canvas');
-    glView.setAttribute('data-jac-gl', '1');
-    glView.setAttribute('aria-hidden', 'true');
-    glView.width = Math.max(1, canvas.clientWidth || window.innerWidth);
-    glView.height = Math.max(1, canvas.clientHeight || window.innerHeight);
-    this.glView = glView;
     this.app = new Application();
     await this.app.init({
-      canvas: glView,
+      canvas,
       background: worldBackgroundColor(),
       backgroundAlpha: 1,
       antialias: true,
@@ -456,11 +456,14 @@ export class IsoScene {
       premultipliedAlpha: true,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
       resizeTo: window,
-      preserveDrawingBuffer: true,
       preference: 'webgl',
     });
 
+    this.rearLayer = new Container();
+    this.rearLayer.eventMode = 'none';
+    this.rearLayer.label = 'jac-rear';
     this.app.stage.addChild(this.camera);
+    this.app.stage.addChild(this.rearLayer);
     this.camera.addChild(this.world);
     this.world.addChild(this.tilesLayer);
     this.world.addChild(this.pathLayer);
@@ -569,7 +572,8 @@ export class IsoScene {
     focusCanvas();
     requestAnimationFrame(focusCanvas);
     this.app.ticker.add(() => this.update(), undefined, UPDATE_PRIORITY.NORMAL);
-    this.app.ticker.add(() => this.presentAndHud(), undefined, UPDATE_PRIORITY.UTILITY);
+    this.app.ticker.add(() => this.composeRearPass(), undefined, UPDATE_PRIORITY.NORMAL);
+    this.app.ticker.add(() => this.events.onFrame?.(), undefined, UPDATE_PRIORITY.UTILITY);
     window.addEventListener('resize', () => this.onWindowViewportChange());
     window.visualViewport?.addEventListener('resize', () => this.onWindowViewportChange());
     window.visualViewport?.addEventListener('scroll', () => {
@@ -591,7 +595,7 @@ export class IsoScene {
     setHashWriteSuppressed(false);
     this.applyCamera(true);
     this.app.render();
-    this.presentAndHud();
+    this.events.onFrame?.();
     dismissBootScreen();
     this.hydrateMap();
   }
@@ -1403,7 +1407,7 @@ export class IsoScene {
     opts?: { buildingEntry?: { panelTitle: string; door: { x: number; y: number } } },
   ): void {
     if (this.jac?.driving) {
-      this.driveToTile(tx, ty);
+      this.driveToTile(tx, ty, true);
       return;
     }
     this.pendingJacPanel = false;
@@ -1717,10 +1721,10 @@ export class IsoScene {
       this.events.onUnreachable?.();
       return;
     }
-    this.driveToTile(tile.x, tile.y);
+    this.driveToTile(tile.x, tile.y, true);
   }
 
-  private driveToTile(gx: number, gy: number): boolean {
+  private driveToTile(gx: number, gy: number, fromPointer = false): boolean {
     if (!this.jac?.driving) return false;
     this.events.stickCancel?.();
     this.pendingBuildingEntry = null;
@@ -1730,6 +1734,7 @@ export class IsoScene {
       return false;
     }
     this.qaLastDriveTap = { x: gx, y: gy };
+    if (fromPointer) this.qaPointerDriveAccepts += 1;
     const dest = { x: gx, y: gy };
     this.jac.setDrivePath(path.length > 0 ? path : [dest], dest);
     this.startCameraFollow();
@@ -2949,40 +2954,113 @@ export class IsoScene {
     }
   }
 
-  /** After Pixi presents the off-DOM GL view: copy onto #game-canvas, then HUD. */
-  private presentAndHud(): void {
-    this.presentGameCanvas();
-    this.grabRearFromLastFrame();
-    this.events.onFrame?.();
+  /**
+   * Rear PiP: render the world into a RenderTexture, then restore the main canvas
+   * with an opaque clear. Pixi's LOW ticker then presents the stage (including the
+   * PiP sprite). Never readPixels / drawImage the game WebGL view.
+   */
+  private composeRearPass(): void {
+    const want = this.jac?.rearCam ? 1 : 0;
+    if (want !== this.rearFadeTo) {
+      this.rearFadeFrom = this.rearFade;
+      this.rearFadeTo = want;
+      this.rearFadeT0 = performance.now();
+    }
+    const t = Math.min(1, (performance.now() - this.rearFadeT0) / 700);
+    this.rearFade = this.rearFadeFrom + (this.rearFadeTo - this.rearFadeFrom) * t;
+    if (this.jac?.rearCam) this.renderRearTexture();
+    this.layoutRearSprite();
+    this.restoreMainTarget();
   }
 
-  /**
-   * #game-canvas is a 2D surface with no alpha. Playwright / video read this bitmap,
-   * never the WebGL backbuffer — that is what punched the reverse-cam hole.
-   */
-  private presentGameCanvas(): void {
-    const src = this.app?.canvas as HTMLCanvasElement | undefined;
-    const dst = this.canvasEl;
-    if (!src || !dst || src === dst) return;
-    if (dst.width !== src.width || dst.height !== src.height) {
-      dst.width = src.width;
-      dst.height = src.height;
-      this.presentCtx = null;
+  private opaqueBgRgba(): [number, number, number, number] {
+    const bg = worldBackgroundColor();
+    return [((bg >> 16) & 255) / 255, ((bg >> 8) & 255) / 255, (bg & 255) / 255, 1];
+  }
+
+  private ensureRearTexture(): RenderTexture {
+    if (!this.rearRT) {
+      this.rearRT = RenderTexture.create({ width: 640, height: 220 });
+      this.rearSprite = new Sprite(this.rearRT);
+      this.rearSprite.eventMode = 'none';
+      this.rearLayer?.addChild(this.rearSprite);
     }
-    if (!this.presentCtx) {
-      this.presentCtx = dst.getContext('2d', { alpha: false, desynchronized: true });
-    }
-    const ctx = this.presentCtx;
-    if (!ctx) return;
-    ctx.globalCompositeOperation = 'copy';
+    return this.rearRT;
+  }
+
+  private renderRearTexture(): void {
+    if (!this.jac || !this.app) return;
+    const cw = this.app.screen.width || 1;
+    const ch = this.app.screen.height || 1;
+    const region = this.jac.rearSource((x, y) => this.worldToScreen(x, y), cw, ch);
+    if (region.sw < 4 || region.sh < 4) return;
+    const rt = this.ensureRearTexture();
+    const sprite = this.rearSprite;
+    if (sprite) sprite.visible = false;
+    const sx = rt.width / Math.max(1, region.sw);
+    const sy = rt.height / Math.max(1, region.sh);
+    const crop = new Matrix();
+    crop.a = sx;
+    crop.d = sy;
+    crop.tx = -region.sx * sx;
+    crop.ty = -region.sy * sy;
+    crop.append(this.camera.worldTransform);
     try {
-      ctx.drawImage(src, 0, 0);
+      this.app.renderer.render({
+        container: this.world,
+        target: rt,
+        transform: crop,
+        clear: true,
+        clearColor: [0.063, 0.067, 0.078, 1],
+      });
     } catch {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = '#0b0c0e';
-      ctx.fillRect(0, 0, dst.width, dst.height);
+      /* rear RT skip */
     }
-    ctx.globalCompositeOperation = 'source-over';
+    if (sprite) sprite.visible = true;
+  }
+
+  private layoutRearSprite(): void {
+    const sprite = this.rearSprite;
+    const layer = this.rearLayer;
+    const canvas = this.canvasEl;
+    if (!sprite || !layer || !canvas) return;
+    if (this.rearFade < 0.01) {
+      layer.visible = false;
+      return;
+    }
+    layer.visible = true;
+    const cr = canvas.getBoundingClientRect();
+    const slot = document.querySelector('.jac-rear__view') as HTMLElement | null;
+    let left = 16;
+    let top = cr.width <= 767 ? 80 : 12;
+    let w = Math.min(420, Math.max(120, cr.width - 32));
+    let h = cr.width <= 767 ? 110 : 128;
+    if (slot) {
+      const sr = slot.getBoundingClientRect();
+      if (sr.width > 8 && sr.height > 8) {
+        left = sr.left - cr.left;
+        top = sr.top - cr.top;
+        w = sr.width;
+        h = sr.height;
+      } else {
+        left = (cr.width - w) / 2;
+      }
+    } else {
+      left = (cr.width - w) / 2;
+    }
+    sprite.position.set(left, top);
+    sprite.width = w;
+    sprite.height = h;
+    sprite.alpha = this.rearFade;
+  }
+
+  private restoreMainTarget(): void {
+    if (!this.app || !this.canvasEl) return;
+    try {
+      this.app.renderer.renderTarget.bind(this.canvasEl, true, this.opaqueBgRgba());
+    } catch {
+      /* next ticker present still targets the canvas */
+    }
   }
 
   private followTargetWorld(): { x: number; y: number } {
@@ -3078,8 +3156,8 @@ export class IsoScene {
     this.cameraY = wantY;
     const bump = this.jac?.bumpT ?? 0;
     if (bump > 0.02) {
-      this.cameraX += Math.sin(performance.now() * 0.045) * 38 * bump;
-      this.cameraY += Math.cos(performance.now() * 0.06) * 24 * bump;
+      this.cameraX += Math.sin(performance.now() * 0.028) * 56 * bump;
+      this.cameraY += Math.cos(performance.now() * 0.034) * 36 * bump;
     }
     this.applyCamera(false);
     this.shiftGestureBaselines(this.cameraX - camBeforeX, this.cameraY - camBeforeY);
@@ -3870,7 +3948,15 @@ export class IsoScene {
   }
 
   qaDriveTo(tx: number, ty: number): boolean {
-    return this.driveToTile(tx, ty);
+    return this.driveToTile(tx, ty, false);
+  }
+
+  qaFps(): { fps: number; elapsedMS: number; sameCanvas: boolean } {
+    return {
+      fps: this.app?.ticker.FPS ?? 0,
+      elapsedMS: this.app?.ticker.elapsedMS ?? 0,
+      sameCanvas: !!this.app && this.app.canvas === this.canvasEl,
+    };
   }
 
   qaTileAtClient(clientX: number, clientY: number): { x: number; y: number } | null {
@@ -3953,7 +4039,6 @@ export class IsoScene {
   } {
     const follow = this.jac?.driving ? this.jac.worldCenter() : tileToWorld(this.charTx, this.charTy);
     const needClient = this.jac?.mode === 'menu' || !!this.jac?.bubble;
-    const needRear = !!this.jac?.rearCam;
     let menu: { x: number; y: number } | null = null;
     let bubble: { x: number; y: number } | null = null;
     let rear: { canvas: HTMLCanvasElement; sx: number; sy: number; sw: number; sh: number } | null = null;
@@ -3980,75 +4065,7 @@ export class IsoScene {
         bubble = { x: (rect?.left ?? 0) + head.x, y: (rect?.top ?? 0) + head.y };
       }
     }
-    if (needRear && this.rearBlitReady && this.rearBlit) {
-      rear = { canvas: this.rearBlit, sx: 0, sy: 0, sw: this.rearBlit.width, sh: this.rearBlit.height };
-    }
     return { menu, bubble, follow, rear };
-  }
-
-  /**
-   * Rear PiP crops the already-presented 2D #game-canvas. Never render-to-texture
-   * or readPixels / drawImage the WebGL view — that punches a hole in the backbuffer.
-   */
-  private grabRearFromLastFrame(): void {
-    if (!this.jac?.rearCam || !this.canvasEl) {
-      this.rearBlitReady = false;
-      return;
-    }
-    const src = this.canvasEl;
-    const cw = src.clientWidth || 1;
-    const ch = src.clientHeight || 1;
-    const region = this.jac.rearSource((x, y) => this.worldToScreen(x, y), cw, ch);
-    const sw = 640;
-    const sh = 220;
-    if (!this.rearBlit) {
-      this.rearBlit = document.createElement('canvas');
-      this.rearBlit.width = sw;
-      this.rearBlit.height = sh;
-      this.rearBlit.setAttribute('data-jac-rear-src', '1');
-    }
-    const ctx = this.rearBlit.getContext('2d');
-    if (!ctx || region.sw < 4 || region.sh < 4) return;
-    const res = src.width / Math.max(1, cw);
-    ctx.fillStyle = '#101114';
-    ctx.fillRect(0, 0, sw, sh);
-    try {
-      ctx.drawImage(
-        src,
-        region.sx * res,
-        region.sy * res,
-        region.sw * res,
-        region.sh * res,
-        0,
-        0,
-        sw,
-        sh,
-      );
-    } catch {
-      /* canvas unread */
-    }
-    this.rearBlitReady = true;
-    this.reapStrayCanvases();
-  }
-
-  private reapStrayCanvases(raw?: HTMLCanvasElement): void {
-    if (raw && raw.parentElement) raw.parentElement.removeChild(raw);
-    const keep = new Set<HTMLCanvasElement>();
-    if (this.canvasEl) keep.add(this.canvasEl);
-    if (this.rearBlit) keep.add(this.rearBlit);
-    if (this.glView) keep.add(this.glView);
-    document.querySelectorAll('canvas').forEach((c) => {
-      if (keep.has(c)) return;
-      if (c.closest('.jac-hud, .jac-dock, .jac-rear, .chrome')) return;
-      if (c.id === 'game-canvas') return;
-      if (c.hasAttribute('data-jac-rear-src') || c.hasAttribute('data-jac-gl')) return;
-      if (c.parentElement && c.parentElement !== this.canvasEl?.parentElement && c.parentElement !== document.body) {
-        return;
-      }
-      c.style.cssText =
-        'position:fixed!important;left:-9999px!important;top:-9999px!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important;visibility:hidden!important';
-      c.remove();
-    });
   }
 
   qaJac(): JacSnapshot | null {
@@ -4755,7 +4772,6 @@ export class IsoScene {
     const canvas = this.canvasEl;
     if (!canvas) return points.map(() => null);
     this.app.render();
-    this.presentGameCanvas();
     const rect = canvas.getBoundingClientRect();
     const tmp = document.createElement('canvas');
     tmp.width = canvas.width;
@@ -4781,7 +4797,6 @@ export class IsoScene {
     const canvas = this.canvasEl;
     if (!canvas) return null;
     this.app.render();
-    this.presentGameCanvas();
     const rect = canvas.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return null;
     const sx = (clientX - rect.left) * (canvas.width / rect.width);
