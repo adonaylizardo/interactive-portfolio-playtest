@@ -1,7 +1,7 @@
 {
   "ok": true,
   "bundle": "index-C4WjvzeX.js",
-  "base": "http://127.0.0.1:4173/interactive-portfolio-playtest/preview-camaras/",
+  "base": "https://adonaylizardo.github.io/interactive-portfolio-playtest/preview-camaras/",
   "results": [
     {
       "tag": "390",
@@ -11,7 +11,7 @@
         "390: enter sambil cenital {\"ok\":true,\"readyBefore\":false,\"readyAfter\":false,\"ms\":400}",
         "390: enter estudio cenital {\"ok\":true,\"readyBefore\":false,\"readyAfter\":true,\"ms\":7600}",
         "390: enter estudio iso {\"ok\":true,\"readyBefore\":false,\"readyAfter\":false,\"ms\":0}",
-        "390: drive dist 0.69 gear D"
+        "390: drive dist 0.90 gear D"
       ],
       "bundle": "index-C4WjvzeX.js"
     },
@@ -23,7 +23,7 @@
         "1280: enter sambil cenital {\"ok\":true,\"readyBefore\":false,\"readyAfter\":false,\"ms\":400}",
         "1280: enter estudio cenital {\"ok\":true,\"readyBefore\":false,\"readyAfter\":true,\"ms\":8000}",
         "1280: enter estudio iso {\"ok\":true,\"readyBefore\":false,\"readyAfter\":false,\"ms\":0}",
-        "1280: drive dist 2.04 gear D"
+        "1280: drive dist 2.01 gear D"
       ],
       "bundle": "index-C4WjvzeX.js"
     }
