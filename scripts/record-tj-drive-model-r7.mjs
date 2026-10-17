@@ -452,11 +452,12 @@ async function run(tag, options, phone) {
 
     await page.evaluate(() => {
       window.__playtestQa.setCharacterTile(27, 19);
+      window.__playtestQa.focusJac?.();
       window.__playtestQa.tapJac();
     });
-    await waitUntil(page, async () => ((await page.evaluate(() => window.__playtestQa.jac()?.mode)) === 'menu' ? true : null), 6000);
+    await waitUntil(page, async () => ((await page.evaluate(() => window.__playtestQa.jac()?.mode)) === 'menu' ? true : null), 10000);
     await page.evaluate(() => window.__playtestQa.jacGetIn());
-    await page.waitForFunction(() => window.__playtestQa.jac?.()?.driving, null, { timeout: 10000 });
+    await page.waitForFunction(() => window.__playtestQa.jac?.()?.driving, null, { timeout: 20000 });
     const door = await page.evaluate(() => {
       const list = window.__playtestQa.getEnterableBuildings?.() ?? [];
       const named = list.find((b) => b.door && b.panelTitle);
@@ -487,28 +488,42 @@ async function run(tag, options, phone) {
       notes.push({ video: dest });
     }
     return { tag, notes };
+  } catch (err) {
+    notes.push({ error: String(err) });
+    fs.writeFileSync(path.join(OUT, `${tag}-fail.json`), JSON.stringify(notes, null, 2));
+    throw err;
   } finally {
     await browser.close();
   }
 }
 
-const livePhone = await sampleLiveFps({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true }).catch((e) => ({ error: String(e) }));
-const liveDesktop = await sampleLiveFps({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 }).catch((e) => ({ error: String(e) }));
+const only = process.env.R7_ONLY ?? '';
+const skipLive = process.env.R7_SKIP_LIVE === '1';
+const livePhone = skipLive
+  ? { skipped: true }
+  : await sampleLiveFps({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true }).catch((e) => ({ error: String(e) }));
+const liveDesktop = skipLive
+  ? { skipped: true }
+  : await sampleLiveFps({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 }).catch((e) => ({ error: String(e) }));
 console.log('live fps', JSON.stringify({ livePhone, liveDesktop }));
 
 const results = [
   { tag: 'live-fps', notes: [{ phone: livePhone, desktop: liveDesktop }] },
 ];
-results.push(
-  await run(
-    'phone-390',
-    { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true },
-    true,
-  ),
-);
-results.push(
-  await run('desktop-1280', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 }, false),
-);
+if (only !== 'desktop') {
+  results.push(
+    await run(
+      'phone-390',
+      { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true },
+      true,
+    ),
+  );
+}
+if (only !== 'phone') {
+  results.push(
+    await run('desktop-1280', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 }, false),
+  );
+}
 const liveIdle = liveDesktop?.idle?.fps ?? livePhone?.idle?.fps;
 const previewIdle = results
   .flatMap((r) => r.notes)
