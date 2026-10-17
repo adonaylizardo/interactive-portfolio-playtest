@@ -4392,9 +4392,16 @@ export class IsoScene {
     return this.jac?.canDriveAt(cx, cy) ?? false;
   }
 
-  qaParkForDoor(doorX: number, doorY: number): { x: number; y: number; path?: { x: number; y: number }[] } | null {
+  qaParkForDoor(doorX: number, doorY: number): {
+    x: number;
+    y: number;
+    path?: { x: number; y: number }[];
+    heading?: string;
+    ms: number;
+  } | null {
     const sit = this.jac?.parkForDoor(doorX, doorY);
-    return sit ? { x: sit.x, y: sit.y, path: sit.path } : null;
+    const ms = this.jac?.lastParkMs ?? 0;
+    return sit ? { x: sit.x, y: sit.y, path: sit.path, heading: sit.heading, ms } : null;
   }
 
   qaInputReady(): {
@@ -5047,6 +5054,14 @@ export class IsoScene {
       !!this.jac &&
       !this.jac.driving &&
       Math.hypot(this.charTx - this.jac.cx, this.charTy - this.jac.cy) < 4;
+    let jacRoof: { x: number; y: number } | null = null;
+    if (!this.interiorActive && this.jac && (this.jac.driving || this.jac.mode === 'parked')) {
+      const roof = this.jac.labelAnchorWorld();
+      const s = this.worldToScreen(roof.x, roof.y);
+      jacRoof = { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y - NAME_PILL_GAP_PX };
+    }
+    const adonayOverJac =
+      !!jacRoof && !this.jac?.driving && Math.hypot(adonay.x - jacRoof.x, adonay.y - jacRoof.y) < 64;
     const out: {
       id: 'adonay' | 'pantone' | 'noah' | 'jac';
       name: string;
@@ -5060,7 +5075,7 @@ export class IsoScene {
         name: 'Adonay',
         x: adonay.x,
         y: nearJac ? adonay.y - 18 : adonay.y,
-        visible: this.jac?.driving
+        visible: this.jac?.driving || adonayOverJac
           ? false
           : snap.adonay.visible && onScreen(adonay.sx, adonay.sy),
       },
@@ -5083,17 +5098,13 @@ export class IsoScene {
         visible: n.visible && n.loaded && onScreen(head.sx, head.sy),
       });
     }
-    if (!this.interiorActive && this.jac && (this.jac.driving || this.jac.mode === 'parked')) {
-      const roof = this.jac.labelAnchorWorld();
-      const s = this.worldToScreen(roof.x, roof.y);
-      const x = (rect?.left ?? 0) + s.x;
-      const y = (rect?.top ?? 0) + s.y - NAME_PILL_GAP_PX;
+    if (!this.interiorActive && this.jac && jacRoof) {
       out.push({
         id: 'jac',
         name: 'JAC T9',
-        x,
-        y,
-        visible: onScreen(s.x, s.y),
+        x: jacRoof.x,
+        y: jacRoof.y,
+        visible: onScreen(jacRoof.x - (rect?.left ?? 0), jacRoof.y - (rect?.top ?? 0) + NAME_PILL_GAP_PX),
         info: !this.jac.driving,
       });
     }
