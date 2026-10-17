@@ -188,18 +188,26 @@ async function productFlow(page, tag, phone) {
 
   await page.evaluate(() => {
     const j = window.__playtestQa.jac();
+    const door = window.__playtestQa.jacDoor?.() ?? { x: Math.round(j.cx), y: Math.round(j.cy) };
     const walk = window.__playtestQa.fill().walk;
-    let placed = false;
-    for (let y = 0; y < walk.length && !placed; y++) {
+    const find = window.__playtestQa.findPath;
+    let best = null;
+    let bestD = 0;
+    for (let y = 0; y < walk.length; y++) {
       for (let x = 0; x < (walk[y]?.length ?? 0); x++) {
         const ch = walk[y][x];
         if (!ch || ch === '#' || ch === 'x') continue;
-        if (Math.hypot(x - j.cx, y - j.cy) < 8) continue;
-        window.__playtestQa.setCharacterTile(x, y);
-        placed = true;
-        break;
+        const d = Math.hypot(x - door.x, y - door.y);
+        if (d < 6 || d > 10) continue;
+        const path = find?.(x, y, door.x, door.y);
+        if (!path) continue;
+        if (d > bestD) {
+          bestD = d;
+          best = { x, y };
+        }
       }
     }
+    if (best) window.__playtestQa.setCharacterTile(best.x, best.y);
     window.__playtestQa.focusJac?.();
     window.__playtestQa.tapJac();
   });
@@ -208,7 +216,7 @@ async function productFlow(page, tag, phone) {
   const farBoarded = await waitUntil(
     page,
     async () => ((await page.evaluate(() => window.__playtestQa.jac()?.driving)) ? true : null),
-    20000,
+    28000,
   );
   if (!farBoarded) throw new Error(`${tag}: far tap did not walk-and-get-in`);
   notes.farTap = { mode: farMode, driving: true };

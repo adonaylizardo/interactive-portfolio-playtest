@@ -4060,9 +4060,15 @@ export class IsoScene {
   }
 
   private trySeatInJac(): void {
-    if (!this.atJacDoor(1.2)) {
+    if (!this.atJacDoor(1.6)) {
       this.pendingJacEnter = false;
       return;
+    }
+    const door = this.jac?.driverDoorTile({ x: this.charTx, y: this.charTy });
+    if (door && Math.hypot(this.charTx - door.x, this.charTy - door.y) > 0.2) {
+      this.charTx = door.x;
+      this.charTy = door.y;
+      this.syncCharacterGraphic();
     }
     this.seatInJac();
   }
