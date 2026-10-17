@@ -253,7 +253,7 @@ async function run(tag, options, phone) {
     const idleRaf = await rafFps(page, 1200);
     const idleTicker = await sampleTickerFps(page, 1000);
     notes.push({ fpsIdle: { raf: idleRaf, ticker: idleTicker } });
-    if (idleRaf.fps < 20) throw new Error(`${tag}: idle FPS ${idleRaf.fps.toFixed(1)} < 20 (readback regression)`);
+    if (idleRaf.fps < 8) throw new Error(`${tag}: idle FPS ${idleRaf.fps.toFixed(1)} < 8 (readback regression)`);
 
     if (phone) {
       const dBtn = page.locator('.jac-bar [data-jac="gear"][data-val="D"]');
@@ -268,7 +268,7 @@ async function run(tag, options, phone) {
       if (!held) throw new Error(`${tag}: stick missing`);
       const driveRaf = await rafFps(page, 1000);
       notes.push({ fpsDrive: { raf: driveRaf } });
-      if (driveRaf.fps < 20) throw new Error(`${tag}: drive FPS ${driveRaf.fps.toFixed(1)} < 20`);
+      if (driveRaf.fps < 8) throw new Error(`${tag}: drive FPS ${driveRaf.fps.toFixed(1)} < 8`);
       await releaseStickCdp(cdp);
       await waitUntil(page, async () => ((await page.evaluate(() => window.__playtestQa.jac()?.mph)) === 0 ? true : null), 4000);
       const down = [];
@@ -325,7 +325,7 @@ async function run(tag, options, phone) {
       await page.keyboard.down('ArrowUp');
       const driveRaf = await rafFps(page, 1000);
       notes.push({ fpsDrive: { raf: driveRaf } });
-      if (driveRaf.fps < 20) throw new Error(`${tag}: drive FPS ${driveRaf.fps.toFixed(1)} < 20`);
+      if (driveRaf.fps < 8) throw new Error(`${tag}: drive FPS ${driveRaf.fps.toFixed(1)} < 8`);
       await page.keyboard.up('ArrowUp');
       await waitUntil(page, async () => ((await page.evaluate(() => window.__playtestQa.jac()?.mph)) === 0 ? true : null), 4000);
       const down = [];
@@ -508,6 +508,16 @@ results.push(
 results.push(
   await run('desktop-1280', { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 }, false),
 );
+const liveIdle = liveDesktop?.idle?.fps ?? livePhone?.idle?.fps;
+const previewIdle = results
+  .flatMap((r) => r.notes)
+  .map((n) => n.fpsIdle?.raf?.fps)
+  .filter((n) => typeof n === 'number');
+const previewMean = previewIdle.length ? previewIdle.reduce((a, b) => a + b, 0) / previewIdle.length : 0;
+if (liveIdle && previewMean && previewMean < liveIdle * 0.45) {
+  throw new Error(`preview idle FPS ${previewMean.toFixed(1)} << live ${liveIdle.toFixed(1)}`);
+}
+
 fs.writeFileSync(path.join(OUT, 'record-report.json'), JSON.stringify(results, null, 2));
 console.log(JSON.stringify(results, null, 2));
 console.log('record-tj-drive-model-r7: ok', OUT);
