@@ -12,6 +12,7 @@
 
 html {
   overscroll-behavior: none;
+  touch-action: none;
   height: 100%;
 }
 
@@ -22,9 +23,11 @@ body {
   inset: 0;
   width: 100%;
   height: 100dvh;
+  max-height: 100dvh;
   overflow: hidden;
   overflow-x: hidden;
   overscroll-behavior: none;
+  touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   font-family:
@@ -43,7 +46,11 @@ body {
 #app {
   position: fixed;
   inset: 0;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
   touch-action: none;
+  overscroll-behavior: none;
 }
 
 body > canvas:not(#game-canvas),
@@ -580,6 +587,39 @@ body[data-layout='panel'] .checklist {
 
   .checklist--mobile:not(.checklist--mobile-closed) .checklist__counter--label {
     display: inline;
+  }
+}
+
+/* Phone landscape (e.g. 844×390): treat as compact. Checklist is a pill; lang stays off the panel. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .checklist:not(.checklist--mobile-closed) {
+    max-height: min(70vh, 220px);
+    max-width: min(260px, calc(100vw - 160px));
+  }
+
+  .checklist--mobile-closed,
+  .checklist--collapsed {
+    width: 48px;
+    height: 48px;
+    overflow: hidden;
+  }
+
+  .chrome__lang {
+    left: max(16px, env(safe-area-inset-left));
+    right: auto;
+    top: 12px;
+  }
+
+  .building-panel__sheet {
+    max-width: min(360px, 42vw);
+  }
+
+  body[data-layout='map'] .building-panel--open .building-panel__sheet {
+    pointer-events: auto;
+  }
+
+  body[data-layout='map'] .building-panel:not(.building-panel--preview) .building-panel__backdrop {
+    pointer-events: none;
   }
 }
 
@@ -1726,9 +1766,12 @@ body[data-layout='panel'] .checklist {
   width: 112px;
   height: 112px;
   overflow: hidden;
+  clip-path: circle(50%);
+  contain: strict;
   background: transparent;
   pointer-events: auto;
   touch-action: none;
+  overscroll-behavior: none;
 }
 
 .joystick[hidden] {
@@ -1824,10 +1867,12 @@ body[data-layout='panel'] .checklist {
 }
 
 .name-label__info {
-  position: relative;
+  position: absolute;
+  left: 100%;
+  bottom: calc(100% + 2px);
   width: 44px;
   height: 44px;
-  margin: -14px -14px -14px -13px;
+  margin: 0;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -2107,12 +2152,15 @@ body.jac-menu-open .checklist {
 .jac-dial__off,
 .jac-dial__on {
   position: absolute;
-  font-size: 10px;
+  font-size: 8px;
+  line-height: 1.15;
+  max-width: 34px;
   color: #8a8f98;
   background: none;
   border: 0;
   padding: 0;
   cursor: pointer;
+  text-align: center;
 }
 
 .jac-dial__auto {
@@ -2122,13 +2170,13 @@ body.jac-menu-open .checklist {
 }
 
 .jac-dial__off {
-  left: 8px;
-  bottom: 22px;
+  left: 4px;
+  bottom: 16px;
 }
 
 .jac-dial__on {
-  right: 8px;
-  bottom: 22px;
+  right: 4px;
+  bottom: 16px;
 }
 
 .jac-dial__knob {
@@ -2543,6 +2591,13 @@ body.jac-menu-open .checklist {
 
 .jac-rear.is-on {
   opacity: 1;
+  visibility: visible;
+}
+
+.jac-rear:not(.is-on) {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

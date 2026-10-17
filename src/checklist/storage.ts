@@ -34,7 +34,11 @@ export function isTouchPrimary(): boolean {
 }
 
 export function isMobileOrCoarsePointer(): boolean {
-  return isTouchPrimary() || matchMedia('(max-width: 767px)').matches;
+  return (
+    isTouchPrimary() ||
+    matchMedia('(max-width: 767px)').matches ||
+    matchMedia('(max-height: 500px)').matches
+  );
 }
 
 export function stepsForPlatform(compact = isMobileOrCoarsePointer()): ChecklistStepId[] {

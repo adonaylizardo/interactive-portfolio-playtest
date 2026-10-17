@@ -45,7 +45,12 @@ export class Joystick {
     this.root.addEventListener('pointerdown', (e) => this.beginPointer(e));
     window.addEventListener('pointermove', (e) => this.movePointer(e));
     window.addEventListener('pointerup', (e) => this.endPointer(e));
-    window.addEventListener('pointercancel', (e) => this.endPointer(e));
+    window.addEventListener('pointercancel', () => this.release());
+    this.root.addEventListener('lostpointercapture', () => this.release());
+    window.addEventListener('blur', () => this.release());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.release();
+    });
     this.root.addEventListener(
       'touchstart',
       (e) => {
@@ -57,7 +62,7 @@ export class Joystick {
     window.addEventListener(
       'touchmove',
       (e) => {
-        if (!this.touchActive) return;
+        if (!this.touchActive && this.pointerId === null) return;
         e.preventDefault();
         this.moveTouch(e);
       },
@@ -66,18 +71,17 @@ export class Joystick {
     window.addEventListener(
       'touchend',
       (e) => {
-        if (e.touches.length === 0 && this.touchActive) this.release();
+        if (e.touches.length === 0 && (this.touchActive || this.pointerId !== null)) this.release();
         else if (this.touchActive) this.endTouch(e);
       },
-      { passive: true },
+      { passive: false },
     );
     window.addEventListener(
       'touchcancel',
-      (e) => {
-        if (!this.touchActive) return;
-        this.endTouch(e);
+      () => {
+        if (this.touchActive || this.pointerId !== null) this.release();
       },
-      { passive: true },
+      { passive: false },
     );
 
     window.addEventListener(
@@ -92,7 +96,7 @@ export class Joystick {
 
   setHidden(hidden: boolean): void {
     if (this.hidden === hidden) {
-      if (hidden && this.pointerId !== null) this.release();
+      if (hidden && (this.pointerId !== null || this.touchActive)) this.release();
       return;
     }
     this.hidden = hidden;
@@ -121,7 +125,7 @@ export class Joystick {
     return this.wantsPad();
   }
 
-  qa(): { visible: boolean; active: boolean; x: number; y: number; floating: boolean } {
+  qa(): { visible: boolean; active: boolean; x: number; y: number; floating: boolean; knobR: number } {
     const kn = this.knob.getBoundingClientRect();
     const pad = this.root.getBoundingClientRect();
     const slop = 4;
@@ -131,7 +135,18 @@ export class Joystick {
         kn.right > pad.right + slop ||
         kn.top < pad.top - slop ||
         kn.bottom > pad.bottom + slop);
-    return { visible: !this.root.hidden, active: this.isActive(), x: this.vec.x, y: this.vec.y, floating };
+    const cx = pad.left + pad.width / 2;
+    const cy = pad.top + pad.height / 2;
+    const kx = kn.left + kn.width / 2;
+    const ky = kn.top + kn.height / 2;
+    return {
+      visible: !this.root.hidden,
+      active: this.isActive(),
+      x: this.vec.x,
+      y: this.vec.y,
+      floating,
+      knobR: Math.hypot(kx - cx, ky - cy),
+    };
   }
 
   private wantsPad(): boolean {
@@ -163,7 +178,7 @@ export class Joystick {
     this.pointerId = e.pointerId;
     this.origin = this.padCenter();
     this.root.classList.add('is-dragging');
-    this.applyDelta(e.clientX - this.origin.x, e.clientY - this.origin.y);
+    this.applyFromClient(e.clientX, e.clientY);
     try {
       this.root.setPointerCapture(e.pointerId);
     } catch {
@@ -174,12 +189,13 @@ export class Joystick {
 
   private movePointer(e: PointerEvent): void {
     if (this.touchActive || this.pointerId !== e.pointerId) return;
+    e.preventDefault();
     e.stopPropagation();
-    this.applyDelta(e.clientX - this.origin.x, e.clientY - this.origin.y);
+    this.applyFromClient(e.clientX, e.clientY);
   }
 
   private endPointer(e: PointerEvent): void {
-    if (this.pointerId !== e.pointerId) return;
+    if (this.pointerId !== null && this.pointerId !== e.pointerId) return;
     this.release();
   }
 
@@ -193,25 +209,30 @@ export class Joystick {
     this.touchActive = true;
     this.origin = this.padCenter();
     this.root.classList.add('is-dragging');
-    this.applyDelta(t.clientX - this.origin.x, t.clientY - this.origin.y);
+    this.applyFromClient(t.clientX, t.clientY);
     this.onStart?.();
   }
 
   private moveTouch(e: TouchEvent): void {
-    if (!this.touchActive) return;
+    if (!this.touchActive && this.pointerId === null) return;
     const t = e.touches[0] ?? e.changedTouches[0];
     if (!t) return;
-    this.applyDelta(t.clientX - this.origin.x, t.clientY - this.origin.y);
+    this.applyFromClient(t.clientX, t.clientY);
   }
 
   private endTouch(e: TouchEvent): void {
     if (!this.touchActive) return;
     if (e.touches.length > 0) {
       const t = e.touches[0];
-      this.applyDelta(t.clientX - this.origin.x, t.clientY - this.origin.y);
+      this.applyFromClient(t.clientX, t.clientY);
       return;
     }
     this.release();
+  }
+
+  private applyFromClient(clientX: number, clientY: number): void {
+    this.origin = this.padCenter();
+    this.applyDelta(clientX - this.origin.x, clientY - this.origin.y);
   }
 
   private applyDelta(dx: number, dy: number): void {
@@ -229,6 +250,13 @@ export class Joystick {
   }
 
   private release(): void {
+    if (this.pointerId !== null) {
+      try {
+        this.root.releasePointerCapture(this.pointerId);
+      } catch {
+        /* already released */
+      }
+    }
     this.pointerId = null;
     this.touchActive = false;
     this.vec = { x: 0, y: 0 };
@@ -237,9 +265,14 @@ export class Joystick {
   }
 
   private setKnob(ox: number, oy: number): void {
+    const r = Math.hypot(ox, oy);
+    const clamp = r > MAX_RADIUS && r > 0 ? MAX_RADIUS / r : 1;
+    const x = ox * clamp;
+    const y = oy * clamp;
     const cx = PAD / 2 - KNOB / 2;
     const cy = PAD / 2 - KNOB / 2;
-    this.idle.style.left = `${cx + ox}px`;
-    this.idle.style.top = `${cy + oy}px`;
+    this.idle.style.left = `${cx + x}px`;
+    this.idle.style.top = `${cy + y}px`;
+    this.idle.style.transform = 'none';
   }
 }

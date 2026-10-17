@@ -55,8 +55,10 @@ function stepCopy(): Record<ChecklistStepId, StepCopy> {
   };
 }
 
+export const COMPACT_LAYOUT_MQ = '(max-width: 767px), (max-height: 500px)';
+
 export function isMobileLayout(): boolean {
-  return window.matchMedia('(max-width: 767px)').matches;
+  return window.matchMedia(COMPACT_LAYOUT_MQ).matches;
 }
 
 export type ChecklistCallbacks = {
@@ -142,12 +144,15 @@ export class ChecklistUI {
       this.dismiss(callbacks);
     });
 
-    window.matchMedia('(max-width: 767px)').addEventListener('change', () => {
+    const onLayout = () => {
       this.mobile = isMobileLayout();
       this.compactSteps = isMobileOrCoarsePointer();
+      if (window.matchMedia('(max-height: 500px)').matches) this.state.mobileExpanded = false;
       this.applyLayoutClasses();
       this.render();
-    });
+    };
+    window.matchMedia('(max-width: 767px)').addEventListener('change', onLayout);
+    window.matchMedia('(max-height: 500px)').addEventListener('change', onLayout);
 
     window.matchMedia('(hover: none) and (pointer: coarse)').addEventListener('change', () => {
       this.touch = isTouchPrimary();

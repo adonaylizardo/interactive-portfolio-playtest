@@ -79,10 +79,12 @@ export class JacHud {
     this.applyLang();
     onLangChange(() => this.applyLang());
     this.bind();
-    window.matchMedia('(max-width: 767px)').addEventListener('change', () => {
+    const onLayout = () => {
       this.mobile = isMobileLayout();
       if (this.snap) this.render(this.snap);
-    });
+    };
+    window.matchMedia('(max-width: 767px)').addEventListener('change', onLayout);
+    window.matchMedia('(max-height: 500px)').addEventListener('change', onLayout);
   }
 
   park(): void {
@@ -125,6 +127,15 @@ export class JacHud {
     document.body.classList.toggle('jac-info', snap.mode === 'info');
     document.body.classList.toggle('jac-drive', snap.mode === 'drive');
     document.body.classList.toggle('jac-rearcam', snap.rearCam);
+    if (!snap.rearCam) {
+      this.rearFade = 0;
+      this.rearFadeFrom = 0;
+      this.rearFadeTo = 0;
+      this.rearEl.classList.remove('is-on');
+      this.rearEl.hidden = true;
+      this.rearEl.style.opacity = '0';
+      this.rearEl.setAttribute('aria-hidden', 'true');
+    }
     this.tickRearFade(snap.rearCam);
     this.render(snap);
     if (anchors.menu && snap.mode === 'menu') {
@@ -158,6 +169,9 @@ export class JacHud {
 
   private applyLang(): void {
     this.hintEl.textContent = t('jac.hint');
+    this.root.querySelectorAll('.jac-gears, .jac-bar__gears').forEach((el) => {
+      el.setAttribute('aria-label', t('jac.gear'));
+    });
     this.lastHtml = '';
     if (this.snap) this.render(this.snap);
   }
@@ -224,7 +238,7 @@ export class JacHud {
     this.steerEl.hidden = true;
     this.bubbleEl.hidden = true;
     this.root.classList.toggle('jac-hud--drive', snap.mode === 'drive');
-    this.rearEl.hidden = snap.mode !== 'drive' && this.rearFade < 0.02;
+    this.rearEl.hidden = !snap.rearCam;
     this.rearEl.classList.toggle('is-on', snap.rearCam);
     if (this.rearFade < 0.02) this.rearEl.setAttribute('aria-hidden', 'true');
     else this.rearEl.removeAttribute('aria-hidden');
