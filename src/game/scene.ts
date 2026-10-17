@@ -3962,7 +3962,7 @@ export class IsoScene {
   tapJac(): void {
     if (!this.jac || this.interiorActive || this.jac.driving) return;
     this.pendingBuildingEntry = null;
-    const door = this.jac.driverDoorTile();
+    const door = this.jac.driverDoorTile({ x: this.charTx, y: this.charTy });
     if (!door) {
       this.events.onUnreachable?.();
       return;
@@ -3978,7 +3978,11 @@ export class IsoScene {
   }
 
   private atJacDoor(maxDist: number): boolean {
-    const door = this.jac?.driverDoorTile();
+    if (!this.jac) return false;
+    if (this.jac.approachTiles().some((s) => Math.hypot(this.charTx - s.x, this.charTy - s.y) < maxDist)) {
+      return true;
+    }
+    const door = this.jac.driverDoorTile({ x: this.charTx, y: this.charTy });
     if (!door) return false;
     return Math.hypot(this.charTx - door.x, this.charTy - door.y) < maxDist;
   }
@@ -4046,7 +4050,7 @@ export class IsoScene {
       this.standThen(() => this.jacGetIn());
       return;
     }
-    const door = this.jac.driverDoorTile();
+    const door = this.jac.driverDoorTile({ x: this.charTx, y: this.charTy });
     if (!door) {
       this.events.onUnreachable?.();
       return;
@@ -4140,6 +4144,23 @@ export class IsoScene {
 
   qaDriveTileOk(x: number, y: number): boolean {
     return this.jac?.driveTileOk(x, y) ?? false;
+  }
+
+  qaJacDoor(from?: { x: number; y: number }): { x: number; y: number } | null {
+    if (!this.jac) return null;
+    return this.jac.driverDoorTile(from ?? { x: this.charTx, y: this.charTy });
+  }
+
+  qaJacApproach(): { x: number; y: number }[] {
+    return this.jac?.approachTiles() ?? [];
+  }
+
+  qaJacOverlapsProp(): boolean {
+    return this.jac?.overlapsProp() ?? false;
+  }
+
+  qaJacCanSit(cx: number, cy: number): boolean {
+    return this.jac?.canDriveAt(cx, cy) ?? false;
   }
 
   jacSetLights(lights: JacLights): void {
@@ -4710,7 +4731,7 @@ export class IsoScene {
       });
     }
     if (!this.interiorActive && this.jac && (this.jac.driving || this.jac.mode === 'parked')) {
-      const roof = this.jac.worldRoof();
+      const roof = this.jac.labelAnchorWorld();
       const s = this.worldToScreen(roof.x, roof.y);
       const x = (rect?.left ?? 0) + s.x;
       const y = (rect?.top ?? 0) + s.y - NAME_PILL_GAP_PX;
@@ -4736,6 +4757,11 @@ export class IsoScene {
     };
     const heads = [of('adonay', avatar.adonay.sprite), of('pantone', avatar.pantone.sprite)];
     if (!this.interiorActive && this.noah) heads.push(of('noah', this.noah.sprite));
+    if (!this.interiorActive && this.jac && !this.jac.driving) {
+      const top = this.jac.labelAnchorWorld();
+      const s = this.worldToScreen(top.x, top.y);
+      heads.push({ id: 'jac', headX: (rect?.left ?? 0) + s.x, headY: (rect?.top ?? 0) + s.y });
+    }
     const pills = [...document.querySelectorAll('.name-label')];
     return heads.map((h) => {
       const pill = pills.find((p) => (p as HTMLElement).dataset.id === h.id) as HTMLElement | undefined;

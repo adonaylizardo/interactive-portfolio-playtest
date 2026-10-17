@@ -1,8 +1,10 @@
 import { Assets, Container, Rectangle, Sprite, Texture } from 'pixi.js';
 import { cells, MAP_HEIGHT, MAP_WIDTH, TILE_H, TILE_W, objects, type MapObject } from '../data/map';
+import { muroWallTiles } from '../data/world';
 import { tileFootWorld, tileToWorld } from '../iso/math';
 import { findPathWith } from '../iso/pathfinding';
 import { objectOccluder, objectSpriteScale, type OccluderBox } from './mapSprites';
+import { spriteOpaqueTopWorld } from './spriteTop';
 import { spriteResolution } from './sprites';
 import { WALK_TILES_PER_S, type FacingDir } from './player';
 
@@ -118,6 +120,41 @@ function parkSize(dir: FacingDir): { w: number; h: number } {
 function k(x: number, y: number): string {
   return `${x},${y}`;
 }
+
+const PROP_NAMES = new Set(['tree', 'bench', 'lamp', 'muro']);
+const CARDINALS: [number, number][] = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+];
+const EDGE_DIRS: [number, number][] = [
+  [1, 0],
+  [0, 1],
+  [-1, 0],
+  [0, -1],
+  [1, 1],
+  [-1, 1],
+  [1, -1],
+  [-1, -1],
+];
+
+/** Trees, benches, lamps and muro walls — the same cells the avatar cannot walk through. */
+function buildPropCells(): Set<string> {
+  const out = new Set<string>(muroWallTiles());
+  for (const o of objects) {
+    if (o.flat || !PROP_NAMES.has(o.name)) continue;
+    const fx = o.footprintX ?? o.x;
+    const fy = o.footprintY ?? o.y;
+    const w = o.w ?? 1;
+    const h = o.h ?? 1;
+    for (let dy = 0; dy < h; dy++) {
+      for (let dx = 0; dx < w; dx++) out.add(k(fx + dx, fy + dy));
+    }
+  }
+  return out;
+}
+const PROP_CELLS = buildPropCells();
 
 function facingFrom(dx: number, dy: number, prev: FacingDir): FacingDir {
   if (Math.abs(dx) < 1e-4 && Math.abs(dy) < 1e-4) return prev;
@@ -499,49 +536,104 @@ export class JacT9 {
     return null;
   }
 
-  /** Walkable tile beside the driver door (same hunt as get-out). */
-  driverDoorTile(): { x: number; y: number } | null {
-    return this.exitTile();
+  /** Nearest walkable tile beside the footprint that `from` can actually path to. */
+  driverDoorTile(from?: { x: number; y: number }): { x: number; y: number } | null {
+    return this.nearestReachableApproach(Math.round(from?.x ?? this.cx), Math.round(from?.y ?? this.cy));
+  }
+
+  /** Walkable cells touching the current solid footprint (door + every edge). */
+  approachTiles(): { x: number; y: number }[] {
+    const blocked = new Set(this.solidCells().map(([x, y]) => k(x, y)));
+    const pass = (x: number, y: number) => {
+      if (blocked.has(k(x, y))) return false;
+      return !!cells[y]?.[x]?.walkable;
+    };
+    return this.edgeWalkable(pass);
   }
 
   /** Walkable tile beside the van, or null if none. Prefers the near/south side so the avatar stays on screen. */
   exitTile(): { x: number; y: number } | null {
-    const foot = this.solidCells();
-    const blocked = new Set(foot.map(([x, y]) => k(x, y)));
-    const tryCell = (x: number, y: number) => {
-      const c = cells[y]?.[x];
-      if (!c || blocked.has(k(x, y))) return false;
-      return c.walkable;
-    };
-    const found: { x: number; y: number }[] = [];
-    for (const [sx, sy] of foot) {
-      for (const [dx, dy] of [
-        [1, 0],
-        [0, 1],
-        [1, 1],
-        [-1, 1],
-        [1, -1],
-        [-1, 0],
-        [0, -1],
-        [-1, -1],
-      ] as const) {
-        const x = sx + dx;
-        const y = sy + dy;
-        if (tryCell(x, y) && !found.some((p) => p.x === x && p.y === y)) found.push({ x, y });
-      }
-    }
+    const found = this.approachTiles();
     found.sort((a, b) => b.x + b.y - (a.x + a.y));
     if (found[0]) return found[0];
+    const blocked = new Set(this.solidCells().map(([x, y]) => k(x, y)));
     for (let d = 1; d <= 3; d++) {
       for (let dy = -d; dy <= d; dy++) {
         for (let dx = -d; dx <= d; dx++) {
           const x = Math.round(this.cx + dx);
           const y = Math.round(this.cy + dy);
-          if (tryCell(x, y)) return { x, y };
+          if (blocked.has(k(x, y))) continue;
+          if (cells[y]?.[x]?.walkable) return { x, y };
         }
       }
     }
     return null;
+  }
+
+  /**
+   * BFS from the door/edges to the nearest tile the walker can path to.
+   * Never returns a blocked or island cell.
+   */
+  private nearestReachableApproach(fromX: number, fromY: number): { x: number; y: number } | null {
+    const blocked = new Set(this.solidCells().map(([x, y]) => k(x, y)));
+    const pass = (x: number, y: number) => {
+      if (x < 0 || y < 0 || x >= MAP_WIDTH || y >= MAP_HEIGHT) return false;
+      if (blocked.has(k(x, y))) return false;
+      return !!cells[y]?.[x]?.walkable;
+    };
+    if (pass(fromX, fromY) && this.touchesFootprint(fromX, fromY)) return { x: fromX, y: fromY };
+
+    const seen = new Set<string>();
+    let layer = this.edgeWalkable(pass);
+    for (const s of layer) seen.add(k(s.x, s.y));
+
+    while (layer.length && seen.size < 480) {
+      const reachable: { x: number; y: number; len: number }[] = [];
+      for (const s of layer) {
+        if (s.x === fromX && s.y === fromY) return s;
+        const path = findPathWith(fromX, fromY, s.x, s.y, pass);
+        if (path) reachable.push({ x: s.x, y: s.y, len: path.length });
+      }
+      if (reachable.length) {
+        reachable.sort((a, b) => a.len - b.len || b.x + b.y - (a.x + a.y));
+        return { x: reachable[0].x, y: reachable[0].y };
+      }
+      const next: { x: number; y: number }[] = [];
+      for (const s of layer) {
+        for (const [dx, dy] of CARDINALS) {
+          const x = s.x + dx;
+          const y = s.y + dy;
+          if (seen.has(k(x, y)) || !pass(x, y)) continue;
+          seen.add(k(x, y));
+          next.push({ x, y });
+        }
+      }
+      layer = next;
+    }
+    return null;
+  }
+
+  private edgeWalkable(pass: (x: number, y: number) => boolean): { x: number; y: number }[] {
+    const found: { x: number; y: number }[] = [];
+    const seen = new Set<string>();
+    for (const [sx, sy] of this.solidCells()) {
+      for (const [dx, dy] of EDGE_DIRS) {
+        const x = sx + dx;
+        const y = sy + dy;
+        const key = k(x, y);
+        if (seen.has(key) || !pass(x, y)) continue;
+        seen.add(key);
+        found.push({ x, y });
+      }
+    }
+    return found;
+  }
+
+  private touchesFootprint(x: number, y: number): boolean {
+    for (const [sx, sy] of this.solidCells()) {
+      if (Math.max(Math.abs(sx - x), Math.abs(sy - y)) <= 1 && (sx !== x || sy !== y)) return true;
+    }
+    return false;
   }
 
   update(dt: number, input: JacInput): void {
@@ -793,7 +885,9 @@ export class JacT9 {
     const wy = tw.y - off.y;
     const tx = (wx / (TILE_W / 2) + wy / (TILE_H / 2)) / 2;
     const ty = (wy / (TILE_H / 2) - wx / (TILE_W / 2)) / 2;
-    if (this.canSitLoose(tx, ty) || this.canDriveTile(Math.round(tx), Math.round(ty))) return { x: tx, y: ty };
+    if (this.propBodyClear(tx, ty) && (this.canSitLoose(tx, ty) || this.canDriveTile(Math.round(tx), Math.round(ty)))) {
+      return { x: tx, y: ty };
+    }
     return { x: gx, y: gy };
   }
 
@@ -875,7 +969,8 @@ export class JacT9 {
     const step = Math.min(dist, speed * Math.max(dt, 1 / 120));
     const ux = (ax / dist) * step;
     const uy = (ay / dist) * step;
-    const ok = (x: number, y: number) => this.canSitLoose(x, y) || this.canDriveTile(Math.round(x), Math.round(y));
+    const ok = (x: number, y: number) =>
+      this.propBodyClear(x, y) && (this.canSitLoose(x, y) || this.canDriveTile(Math.round(x), Math.round(y)));
     const next = ok(this.cx + ux, this.cy + uy) ? { x: this.cx + ux, y: this.cy + uy } : slide(this.cx, this.cy, ux, uy, ok);
     if (next.x === this.cx && next.y === this.cy) {
       if (this.acceptNearGoal()) return false;
@@ -955,6 +1050,15 @@ export class JacT9 {
   worldRoof(): { x: number; y: number } {
     const c = this.worldCenter();
     return { x: c.x, y: c.y - 90 * objectSpriteScale(this.obj) };
+  }
+
+  /** Parked name pill sits on the body sprite's opaque top; driving keeps the cab roof. */
+  labelAnchorWorld(): { x: number; y: number } {
+    if (this.driving) return this.worldRoof();
+    const local = spriteOpaqueTopWorld(this.body);
+    const parent = this.body.parent;
+    if (parent) return { x: parent.x + local.x, y: parent.y + local.y };
+    return local;
   }
 
   /** World point looking behind the van (opposite facing), in iso tile space. */
@@ -1121,7 +1225,7 @@ export class JacT9 {
       if (c.groundId.includes('borde')) return false;
       if (!c.walkable && !this.claimed.has(k(x, y))) return false;
     }
-    return true;
+    return this.propBodyClear(cx, cy);
   }
 
   /** Last-hop sit: the 2×2 box often clips a wall two tiles short of the tap. */
@@ -1132,7 +1236,37 @@ export class JacT9 {
     const c = cells[y]?.[x];
     if (!c) return false;
     if (c.groundId.includes('borde') || c.groundId.includes('building/footprint')) return false;
-    return c.walkable || this.claimed.has(k(x, y));
+    if (!(c.walkable || this.claimed.has(k(x, y)))) return false;
+    return this.propBodyClear(cx, cy);
+  }
+
+  /**
+   * Parked AABB (5×3 / 3×5) must not cover a tree, bench, lamp or muro cell —
+   * the same footprint the character cannot walk through.
+   */
+  private propBodyClear(cx: number, cy: number): boolean {
+    const size = parkSize(this.dir);
+    const o = {
+      x: Math.round(cx - (size.w - 1) / 2),
+      y: Math.round(cy - (size.h - 1) / 2),
+    };
+    for (const [x, y] of this.rect(o.x, o.y, size.w, size.h)) {
+      if (this.claimed.has(k(x, y))) continue;
+      if (PROP_CELLS.has(k(x, y))) return false;
+      const c = cells[y]?.[x];
+      if (!c || c.walkable) continue;
+      if (c.groundId.includes('borde') || c.groundId.includes('building/footprint')) continue;
+      return false;
+    }
+    return true;
+  }
+
+  /** QA: true when the current solid / parked body covers a prop cell. */
+  overlapsProp(): boolean {
+    for (const [x, y] of [...this.solidCells(), ...this.parkCells()]) {
+      if (PROP_CELLS.has(k(x, y))) return true;
+    }
+    return false;
   }
 
   /** Reclaim the parked footprint, refresh the live hit box, and retarget the door. */
