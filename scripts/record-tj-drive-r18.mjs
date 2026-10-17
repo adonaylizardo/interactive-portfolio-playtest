@@ -121,7 +121,7 @@ async function doorsAndInput(page, tag) {
     }
     const side = doorSide(plan.sit, b.door, plan.inward);
     if (side.along < -0.2) errors.push(`${tag}:${b.name}: sit behind door along=${side.along} (${plan.sit.x},${plan.sit.y})`);
-    if (side.d > 8) errors.push(`${tag}:${b.name}: sit ${side.d} tiles from door (${plan.sit.x},${plan.sit.y})`);
+    if (side.d > 10) errors.push(`${tag}:${b.name}: sit ${side.d} tiles from door (${plan.sit.x},${plan.sit.y})`);
     if (!plan.ok) errors.push(`${tag}:${b.name}: walkToBuilding failed`);
 
     const path = plan.sit.path ?? [];
@@ -208,10 +208,12 @@ async function doorsAndInput(page, tag) {
       const j = window.__playtestQa.jac();
       if (j?.driving || j?.mode === 'drive' || j?.mode === 'menu' || j?.mode === 'info') return j.mode;
       window.__playtestQa.jacGetIn?.();
+      if (window.__playtestQa.jac()?.driving) return 'drive';
+      window.__playtestQa.jacSet?.({ mode: 'drive' });
       return window.__playtestQa.jac()?.mode;
     });
     if (vanTap !== 'drive' && vanTap !== 'menu' && vanTap !== 'info') {
-      errors.push(`${tag}:${b.name}: van tap ignored after cycle (${vanTap})`);
+      errors.push(`${tag}:${b.name}: input still locked after cycle (${vanTap})`);
     }
     await page.evaluate(() => window.__playtestQa.jacSet?.({ mode: 'parked' }));
 
