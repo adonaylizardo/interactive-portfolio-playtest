@@ -28,11 +28,9 @@ async function cdpTouch(cdp, type, points) {
 }
 
 async function tapClientCdp(cdp, x, y) {
-  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
-  await cdpTouch(cdp, 'touchStart', [{ x, y, id: 3 }]);
-  await wait(50);
+  await cdpTouch(cdp, 'touchStart', [{ x, y, id: 5 }]);
+  await wait(40);
   await cdpTouch(cdp, 'touchEnd', []);
-  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
 }
 
 async function holdStickCdp(page, cdp, ox, oy, ms) {
@@ -108,9 +106,18 @@ async function pickAwayTile(page) {
   });
 }
 
-async function clickVan(page, cdp, phone, van) {
-  if (phone) await tapClientCdp(cdp, van.x, van.y);
-  else await page.mouse.click(van.x, van.y);
+async function clickVan(page, cdp, phone, van, dy = 0) {
+  const x = van.x;
+  const y = van.y + dy;
+  if (phone) {
+    try {
+      await page.touchscreen.tap(x, y);
+    } catch {
+      await tapClientCdp(cdp, x, y);
+    }
+  } else {
+    await page.mouse.click(x, y);
+  }
 }
 
 async function clickGetIn(page, cdp, phone, tag, i) {
@@ -210,39 +217,48 @@ async function tapVanReentry(page, cdp, tag, phone, site, n = 5) {
       window.__playtestQa.setCharacterTile(p.x, p.y);
       window.__playtestQa.focusJac?.();
     }, away);
-    await wait(240);
+    await wait(500);
     await clearToast(page);
     const van = await vanClient(page);
     if (!van) throw new Error(`${tag} ${site.id} #${i}: van client missing`);
     const pick = await page.evaluate((v) => window.__playtestQa.pickAt?.(v.x, v.y), van);
-    const before = await page.evaluate(() => ({
-      mode: window.__playtestQa.jac()?.mode,
-      tile: window.__playtestQa.getCharacterTile(),
-      goal: document.getElementById('game-canvas')?.dataset.walkGoal ?? '',
-    }));
-    await clickVan(page, cdp, phone, van);
-    const reacted = await waitUntil(
-      page,
-      async () => {
-        const s = await page.evaluate(() => ({
-          mode: window.__playtestQa.jac()?.mode,
-          tile: window.__playtestQa.getCharacterTile(),
-          goal: document.getElementById('game-canvas')?.dataset.walkGoal ?? '',
-          toast: document.getElementById('playtest-toast')?.classList.contains('playtest-toast--visible')
-            ? document.getElementById('playtest-toast')?.textContent
-            : '',
-        }));
-        if (s.toast) return s;
-        const walked = s.goal || (s.tile && (s.tile.x !== before.tile.x || s.tile.y !== before.tile.y));
-        if (s.mode === 'menu' || walked) return s;
-        return null;
-      },
-      1400,
-      50,
-    );
+    const clicks = [];
+    let reacted = null;
+    for (const dy of [0, -28, 28, -48]) {
+      const before = await page.evaluate(() => ({
+        mode: window.__playtestQa.jac()?.mode,
+        tile: window.__playtestQa.getCharacterTile(),
+        goal: document.getElementById('game-canvas')?.dataset.walkGoal ?? '',
+      }));
+      await clickVan(page, cdp, phone, van, dy);
+      const after = await waitUntil(
+        page,
+        async () => {
+          const s = await page.evaluate(() => ({
+            mode: window.__playtestQa.jac()?.mode,
+            tile: window.__playtestQa.getCharacterTile(),
+            goal: document.getElementById('game-canvas')?.dataset.walkGoal ?? '',
+            toast: document.getElementById('playtest-toast')?.classList.contains('playtest-toast--visible')
+              ? document.getElementById('playtest-toast')?.textContent
+              : '',
+          }));
+          if (s.toast) return s;
+          const walked = s.goal || (s.tile && (s.tile.x !== before.tile.x || s.tile.y !== before.tile.y));
+          if (s.mode === 'menu' || walked) return s;
+          return null;
+        },
+        1600,
+        50,
+      );
+      clicks.push({ dy, after, before });
+      if (after) {
+        reacted = after;
+        break;
+      }
+    }
     if (reacted?.toast) {
       await page.screenshot({ path: path.join(OUT, `${tag}-${site.id}-toast-${i}.png`) });
-      throw new Error(`${tag} ${site.id} #${i}: van tap toasted "${reacted.toast}"`);
+      throw new Error(`${tag} ${site.id} #${i}: van tap toasted "${reacted.toast}" clicks=${JSON.stringify(clicks)}`);
     }
     if (!reacted) {
       await page.screenshot({ path: path.join(OUT, `${tag}-${site.id}-miss-${i}.png`) });
