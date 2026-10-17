@@ -978,10 +978,8 @@ export class JacT9 {
   /** Step the same van along A* walkable waypoints. Joystick / keys cancel this in update(). */
   private followDrivePath(dt: number): boolean {
     if (this.driveGoal && Math.hypot(this.driveGoal.x - this.cx, this.driveGoal.y - this.cy) < 1.35) {
-      const sit = this.canSit(this.driveGoal.x, this.driveGoal.y) || this.canSitLoose(this.driveGoal.x, this.driveGoal.y)
-        ? this.driveGoal
-        : this.sitForVisual(this.driveGoal.x, this.driveGoal.y);
-      if (this.canSit(sit.x, sit.y) || this.canSitLoose(sit.x, sit.y)) {
+      if (this.pathSit(this.driveGoal.x, this.driveGoal.y)) {
+        const sit = this.clampSit(this.driveGoal.x, this.driveGoal.y);
         this.cx = sit.x;
         this.cy = sit.y;
         this.occupy(this.driveCells());
@@ -992,8 +990,14 @@ export class JacT9 {
     while (this.drivePath.length > 0) {
       const t = this.drivePath[0];
       const arrive = this.isGoalNode(t) ? 0.18 : 0.28;
-      if (Math.hypot(t.x - this.cx, t.y - this.cy) < arrive) this.drivePath.shift();
-      else break;
+      if (Math.hypot(t.x - this.cx, t.y - this.cy) >= arrive) break;
+      if (this.pathSit(t.x, t.y)) {
+        const sit = this.clampSit(t.x, t.y);
+        this.cx = sit.x;
+        this.cy = sit.y;
+        this.occupy(this.driveCells());
+      }
+      this.drivePath.shift();
     }
     if (this.driveGoal && this.visualOnTile(this.driveGoal.x, this.driveGoal.y)) {
       return this.clearDriveArrival();
@@ -1010,10 +1014,8 @@ export class JacT9 {
       }
     }
     if (this.driveGoal && Math.hypot(this.driveGoal.x - this.cx, this.driveGoal.y - this.cy) < 1.35) {
-      const sit = this.canSit(this.driveGoal.x, this.driveGoal.y) || this.canSitLoose(this.driveGoal.x, this.driveGoal.y)
-        ? this.driveGoal
-        : this.sitForVisual(this.driveGoal.x, this.driveGoal.y);
-      if (this.canSit(sit.x, sit.y) || this.canSitLoose(sit.x, sit.y)) {
+      if (this.pathSit(this.driveGoal.x, this.driveGoal.y)) {
+        const sit = this.clampSit(this.driveGoal.x, this.driveGoal.y);
         this.cx = sit.x;
         this.cy = sit.y;
         this.occupy(this.driveCells());
@@ -1043,7 +1045,9 @@ export class JacT9 {
       this.markStuck(dt);
       return false;
     }
-    this.stuckT = 0;
+    const moved = Math.hypot(next.x - this.cx, next.y - this.cy);
+    if (moved < 0.05) this.markStuck(dt);
+    else this.stuckT = 0;
     const sit = this.clampSit(next.x, next.y);
     this.cx = sit.x;
     this.cy = sit.y;

@@ -160,13 +160,11 @@ async function acaciaRepro(page, tag, i) {
   if (c.toastN > 1) throw new Error(`${tag} acacia #${i}: toast fired ${c.toastN} times`);
   if (!c.ok) throw new Error(`${tag} acacia #${i}: planner rejected (10,17)`);
   if (!c.arrived) throw new Error(`${tag} acacia #${i}: stalled with no arrival and no single toast`);
-  if (c.arrived.gaveUp && c.toastN !== 1) {
-    throw new Error(`${tag} acacia #${i}: give-up must toast once, got ${c.toastN}`);
+  if (c.arrived.gaveUp) {
+    throw new Error(`${tag} acacia #${i}: gave up at ${(c.arrived.cx)?.toFixed?.(2)},${(c.arrived.cy)?.toFixed?.(2)}`);
   }
-  if (!c.arrived.gaveUp) {
-    const miss = Math.hypot((c.arrived.cx ?? 0) - (c.dest?.x ?? 10), (c.arrived.cy ?? 0) - (c.dest?.y ?? 17));
-    if (miss > 2.6) throw new Error(`${tag} acacia #${i}: stopped ${miss.toFixed(2)} from dest`);
-  }
+  const miss = Math.hypot((c.arrived.cx ?? 0) - (c.dest?.x ?? 10), (c.arrived.cy ?? 0) - (c.dest?.y ?? 17));
+  if (miss > 2.6) throw new Error(`${tag} acacia #${i}: stopped ${miss.toFixed(2)} from dest`);
   return { i, dest: c.dest, arrived: { cx: c.arrived.cx, cy: c.arrived.cy }, toastN: c.toastN, maxMph: c.maxMph };
 }
 
@@ -196,7 +194,8 @@ async function pickAroundGoals(page) {
     const used = new Set();
     for (const r of required) {
       const path = window.__playtestQa.jacFindDrivePath?.(r.x, r.y);
-      out.push({ ...r, pathLen: path?.length ?? 0, dest: path?.[path.length - 1] ?? null });
+      if (!path) continue;
+      out.push({ ...r, pathLen: path.length, dest: path[path.length - 1] ?? null });
       used.add(`${r.x},${r.y}`);
     }
     for (const h of hits) {
