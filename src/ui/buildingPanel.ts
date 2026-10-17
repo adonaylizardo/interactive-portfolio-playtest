@@ -3,9 +3,14 @@ import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
 import { CASES, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
 import { TALKS, WRITINGS, type TalkItem, type WritingSection } from '../data/experiences';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
+import { FIGMA_DOC, FIGMA_PAUSE, FIGMA_PLAY, figmaAsset } from './figmaAssets';
 import { iconSvg } from './icons';
 import { onLangChange, t, type I18nKey } from './i18n';
 
+const FIGMA_BACK = figmaAsset('talks-desktop-list', '9f9c4.svg');
+const FIGMA_EXPAND = figmaAsset('talks-desktop-list', 'ce7c9.svg');
+const FIGMA_CLOSE = figmaAsset('talks-desktop-list', 'f1b3a.svg');
+const FIGMA_SUBSTACK = figmaAsset('writings-desktop-reading', 'c0026.svg');
 function aboutBlockNode(block: AboutBlock): HTMLElement {
   if (block.kind === 'heading') {
     const h = document.createElement(`h${block.level + 3}`);
@@ -123,6 +128,8 @@ export class BuildingPanel {
   private experienceDetail: HTMLElement | null = null;
   private expHeader: HTMLElement | null = null;
   private expHeaderTitle: HTMLElement | null = null;
+  private expMobileChrome: HTMLElement | null = null;
+  private expMobileTitle: HTMLElement | null = null;
   private experienceView: 'list' | 'detail' = 'list';
   private experiencePanelTitle = '';
   private writingsFilter: 'all' | 'uxsc' | 'sinergia' | 'guest' = 'all';
@@ -161,12 +168,30 @@ export class BuildingPanel {
       <div class="building-panel__backdrop" data-backdrop></div>
       <div class="building-panel__sheet" role="dialog" aria-modal="true">
         <div class="building-panel__drag" data-drag aria-hidden="true"></div>
+        <div class="exp-mobile-chrome" data-exp-mobile-chrome hidden>
+          <div class="exp-mobile-chrome__grab" aria-hidden="true"><span class="exp-mobile-chrome__bar"></span></div>
+          <div class="exp-mobile-chrome__row">
+            <button type="button" class="exp-mobile-chrome__btn exp-mobile-chrome__back" data-exp-mobile-back aria-label="">
+              <img class="exp-mobile-chrome__icon" src="${FIGMA_BACK}" width="15" height="15" alt="" />
+            </button>
+            <h2 class="exp-mobile-chrome__title"></h2>
+            <button type="button" class="exp-mobile-chrome__btn exp-mobile-chrome__close" data-exp-mobile-close aria-label="">
+              <img class="exp-mobile-chrome__icon" src="${FIGMA_CLOSE}" width="15" height="15" alt="" />
+            </button>
+          </div>
+        </div>
         <header class="exp-header" data-exp-header hidden>
-          <button type="button" class="exp-header__btn exp-header__back" data-exp-back aria-label="">‹</button>
+          <button type="button" class="exp-header__btn exp-header__back" data-exp-back aria-label="">
+            <img class="exp-header__icon" src="${FIGMA_BACK}" width="15" height="15" alt="" />
+          </button>
           <h2 class="exp-header__title"></h2>
           <div class="exp-header__actions">
-            <button type="button" class="exp-header__btn" data-exp-expand aria-label="">${iconSvg('expand')}</button>
-            <button type="button" class="exp-header__btn exp-header__close" data-close aria-label="">×</button>
+            <button type="button" class="exp-header__btn" data-exp-expand aria-label="">
+              <img class="exp-header__icon" src="${FIGMA_EXPAND}" width="15" height="15" alt="" />
+            </button>
+            <button type="button" class="exp-header__btn exp-header__close" data-close aria-label="">
+              <img class="exp-header__icon" src="${FIGMA_CLOSE}" width="15" height="15" alt="" />
+            </button>
           </div>
         </header>
         <div class="building-panel__bar">
@@ -257,6 +282,18 @@ export class BuildingPanel {
     this.experienceDetail = this.el.querySelector('[data-exp-detail]');
     this.expHeader = this.el.querySelector('[data-exp-header]');
     this.expHeaderTitle = this.el.querySelector('.exp-header__title');
+    this.expMobileChrome = this.el.querySelector('[data-exp-mobile-chrome]');
+    this.expMobileTitle = this.el.querySelector('.exp-mobile-chrome__title');
+    this.el.querySelector('[data-exp-mobile-back]')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.onExperienceBack();
+    });
+    this.el.querySelector('[data-exp-mobile-close]')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.onCloseClick();
+    });
     this.el.querySelector('[data-exp-back]')?.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -355,11 +392,20 @@ export class BuildingPanel {
 
     const drag = this.el.querySelector('[data-drag]') as HTMLElement;
     drag.addEventListener('pointerdown', (e) => this.onDragStart(e));
+    const grab = this.el.querySelector('.exp-mobile-chrome__grab') as HTMLElement | null;
+    grab?.addEventListener('pointerdown', (e) => this.onDragStart(e));
+    this.expMobileChrome?.addEventListener('pointerdown', (e) => {
+      if ((e.target as HTMLElement).closest('button')) return;
+      this.onDragStart(e);
+    });
     window.addEventListener('pointermove', (e) => this.onDragMove(e));
     window.addEventListener('pointerup', () => this.onDragEnd());
 
     this.titleEl.addEventListener('click', () => {
-      if (this.peekOnly && this.isMobile() && this.mode === 'interior') this.setPeek(false);
+      if (this.peekOnly && this.isMobile() && this.isInteriorExperienceSheet()) this.setPeek(false);
+    });
+    this.expMobileTitle?.addEventListener('click', () => {
+      if (this.peekOnly && this.isMobile() && this.isExperienceMode()) this.setPeek(false);
     });
     this.el.querySelector('[data-read]')?.addEventListener('click', (e) => {
       e.preventDefault();
@@ -432,11 +478,23 @@ export class BuildingPanel {
     this.hide();
   }
 
+  private isInteriorExperienceSheet(): boolean {
+    return (
+      this.mode === 'interior' ||
+      this.mode === 'talks' ||
+      this.mode === 'writings'
+    );
+  }
+
   private onDragStart(e: PointerEvent): void {
     if (!this.isMobile() || !this.isOpen() || this.mode === 'preview') return;
     if (performance.now() < this.ignoreDragUntil) return;
     this.dragStartY = e.clientY;
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {
+      /* optional */
+    }
   }
 
   private onDragMove(e: PointerEvent): void {
@@ -479,7 +537,7 @@ export class BuildingPanel {
     if (this.previewEl) this.previewEl.hidden = true;
     if (this.readEl) this.readEl.hidden = true;
     if (this.readBar) this.readBar.hidden = true;
-    if (this.expHeader) this.expHeader.hidden = false;
+    if (this.expHeader) this.expHeader.hidden = this.isMobile();
     this.experienceEl!.hidden = false;
     this.el.hidden = false;
     this.el.style.visibility = '';
@@ -531,6 +589,21 @@ export class BuildingPanel {
     }
   }
 
+  private syncMobileExperienceChrome(): void {
+    const mobile = this.isMobile() && this.isExperienceMode() && this.isOpen();
+    if (this.expMobileChrome) this.expMobileChrome.hidden = !mobile;
+    if (this.expHeader) this.expHeader.hidden = mobile || !this.isExperienceMode();
+    if (!mobile || !this.expMobileChrome) return;
+    if (this.expMobileTitle) this.expMobileTitle.textContent = this.experiencePanelTitle;
+    const back = this.expMobileChrome.querySelector('[data-exp-mobile-back]') as HTMLElement | null;
+    const showBack = this.experienceView === 'detail';
+    if (back) back.hidden = !showBack;
+    const talksList = this.mode === 'talks' && this.experienceView === 'list';
+    this.expMobileChrome.classList.toggle('exp-mobile-chrome--grab-wide', talksList);
+    this.expMobileChrome.classList.toggle('exp-mobile-chrome--grab-compact', !talksList);
+    this.expMobileChrome.classList.toggle('exp-mobile-chrome--list-pad', talksList);
+  }
+
   private setExperienceView(view: 'list' | 'detail'): void {
     if (!this.experienceList || !this.experienceDetail || !this.experienceFilters) return;
     this.experienceView = view;
@@ -541,6 +614,13 @@ export class BuildingPanel {
     if (this.experienceIntro) {
       this.experienceIntro.hidden = this.mode !== 'talks' || view !== 'list';
     }
+    const back = this.el.querySelector('[data-exp-back]') as HTMLElement | null;
+    const expand = this.el.querySelector('[data-exp-expand]') as HTMLElement | null;
+    if (back) back.hidden = this.isMobile() && view === 'list';
+    if (expand) expand.hidden = this.isMobile();
+    this.el.classList.toggle('building-panel--exp-list', view === 'list');
+    this.el.classList.toggle('building-panel--exp-detail', view === 'detail');
+    this.syncMobileExperienceChrome();
     if (view === 'list') {
       this.activeTalkId = null;
       this.activeWriting = null;
@@ -552,8 +632,9 @@ export class BuildingPanel {
 
   private renderTalksList(): void {
     if (!this.experienceList) return;
+    const count = this.isMobile() ? 7 : 9;
     this.experienceList.replaceChildren(
-      ...TALKS.slice(0, 5).map((item) => this.talkRow(item, () => this.openTalk(item))),
+      ...TALKS.slice(0, count).map((item) => this.talkRow(item, () => this.openTalk(item))),
     );
   }
 
@@ -574,9 +655,21 @@ export class BuildingPanel {
         : 'experience__thumb experience__thumb--video';
     thumb.setAttribute('aria-hidden', 'true');
     if (kind === 'writing') {
-      thumb.innerHTML = iconSvg('page', compact ? 14 : 18);
+      const doc = document.createElement('img');
+      doc.className = 'experience__doc-icon';
+      doc.src = FIGMA_DOC;
+      doc.width = compact ? 15 : 15;
+      doc.height = compact ? 15 : 15;
+      doc.alt = '';
+      thumb.append(doc);
     } else {
-      thumb.innerHTML = '<span class="experience__play" aria-hidden="true">▶</span>';
+      const play = document.createElement('img');
+      play.className = 'experience__play-icon';
+      play.src = FIGMA_PLAY;
+      play.width = 12;
+      play.height = 12;
+      play.alt = '';
+      thumb.append(play);
     }
     const copy = document.createElement('span');
     copy.className = 'experience__copy';
@@ -612,16 +705,15 @@ export class BuildingPanel {
     if (!this.experienceDetail) return;
     const title = t(item.titleKey as I18nKey);
     const meta = t(item.metaKey as I18nKey);
-    const upNext = TALKS.filter((x) => x.id !== item.id).slice(0, 3);
+    const upNextLimit = this.isMobile() ? 3 : 4;
+    const upNext = TALKS.filter((x) => x.id !== item.id).slice(0, upNextLimit);
     const wrap = document.createElement('div');
     wrap.className = 'talks-player';
     wrap.innerHTML = `
       <div class="talks-player__stage">
         <p class="talks-player__label">${t('talks.videoLabel')}</p>
         <button type="button" class="talks-player__pause" aria-label="">
-          <svg class="talks-player__pause-icon" viewBox="0 0 14 14" width="14" height="14" fill="currentColor" aria-hidden="true">
-            <rect x="3" y="2" width="3" height="10" rx="1"/><rect x="8" y="2" width="3" height="10" rx="1"/>
-          </svg>
+          <img class="talks-player__pause-icon" src="${FIGMA_PAUSE}" width="14" height="14" alt="" />
         </button>
         <div class="talks-player__progress" aria-hidden="true"><span class="talks-player__progress-fill"></span></div>
         <p class="talks-player__time">0:00 / 0:00</p>
@@ -629,7 +721,6 @@ export class BuildingPanel {
       <h3 class="talks-player__title"></h3>
       <p class="talks-player__meta"></p>
       <hr class="experience__divider" />
-      <h4 class="experience__up-next">${t('talks.upNext')}</h4>
       <div class="experience__up-next-list" data-up-next></div>
     `;
     wrap.querySelector('.talks-player__title')!.textContent = title;
@@ -677,7 +768,16 @@ export class BuildingPanel {
         ? WRITINGS
         : WRITINGS.filter((s) => s.id === this.writingsFilter);
     const frag = document.createDocumentFragment();
+    const rowLimit: Record<string, number> = { uxsc: 3, sinergia: 2, guest: 2 };
+    let firstSection = true;
     for (const section of sections) {
+      if (!firstSection) {
+        const divider = document.createElement('hr');
+        divider.className = 'experience__section-divider';
+        frag.appendChild(divider);
+      }
+      firstSection = false;
+      const limit = rowLimit[section.id] ?? 3;
       const head = document.createElement('div');
       head.className = 'experience__section-head';
       const row = document.createElement('div');
@@ -687,18 +787,21 @@ export class BuildingPanel {
       h.textContent = t(section.titleKey as I18nKey);
       const badge = document.createElement('span');
       badge.className = 'experience__section-count';
-      badge.textContent = '0';
+      badge.textContent = String(Math.min(limit, section.items.length));
       const seeAll = document.createElement('button');
       seeAll.type = 'button';
       seeAll.className = 'experience__see-all';
-      seeAll.textContent = t('chrome.seeAll');
-      row.append(h, badge, seeAll);
+      seeAll.textContent = t('writings.seeAll');
+      const spacer = document.createElement('div');
+      spacer.className = 'experience__section-spacer';
+      spacer.setAttribute('aria-hidden', 'true');
+      row.append(h, badge, spacer, seeAll);
       const p = document.createElement('p');
       p.className = 'experience__section-desc';
       p.textContent = t(section.descKey as I18nKey);
       head.append(row, p);
       frag.appendChild(head);
-      for (const item of section.items.slice(0, 3)) {
+      for (const item of section.items.slice(0, limit)) {
         frag.appendChild(this.writingRow(item, section));
       }
     }
@@ -718,16 +821,19 @@ export class BuildingPanel {
     const wrap = document.createElement('article');
     wrap.className = 'writings-reader';
     wrap.innerHTML = `
-      <div class="writings-reader__hero" aria-hidden="true">${iconSvg('page', 28)}</div>
+      <div class="writings-reader__hero" aria-hidden="true">
+        <img class="writings-reader__hero-icon" src="${FIGMA_DOC}" width="15" height="15" alt="" />
+      </div>
       <p class="writings-reader__kicker"></p>
       <h3 class="writings-reader__title"></h3>
       <p class="writings-reader__meta"></p>
-      <div class="writings-reader__body">
-        <p class="writings-reader__p"></p>
-        <p class="writings-reader__p"></p>
-        <p class="writings-reader__p"></p>
-      </div>
-      <a class="writings-reader__substack" href="#" rel="noopener noreferrer"></a>
+      <p class="writings-reader__p"></p>
+      <p class="writings-reader__p"></p>
+      <p class="writings-reader__p"></p>
+      <a class="writings-reader__substack" href="#" rel="noopener noreferrer">
+        <img class="writings-reader__substack-icon" src="${FIGMA_SUBSTACK}" width="15" height="15" alt="" />
+        <span class="writings-reader__substack-label"></span>
+      </a>
     `;
     wrap.querySelector('.writings-reader__kicker')!.textContent = t('writings.reader.kicker');
     wrap.querySelector('.writings-reader__title')!.textContent = t(item.titleKey as I18nKey);
@@ -737,7 +843,7 @@ export class BuildingPanel {
     paras[1]!.textContent = t('writings.reader.p2');
     paras[2]!.textContent = t('writings.reader.p3');
     const sub = wrap.querySelector('.writings-reader__substack') as HTMLAnchorElement;
-    sub.textContent = t('writings.substack');
+    sub.querySelector('.writings-reader__substack-label')!.textContent = t('writings.substackCta');
     sub.addEventListener('click', (e) => e.preventDefault());
     this.experienceDetail.replaceChildren(wrap);
   }
@@ -1015,6 +1121,17 @@ export class BuildingPanel {
     this.peekOnly = false;
     this.syncPeekClass();
     this.onVisibilityChange();
+  }
+
+  getExperienceSheetRectForQa(): { x: number; y: number; w: number; h: number } | null {
+    if (!this.isOpen() || !this.isExperienceMode()) return null;
+    const r = this.sheet.getBoundingClientRect();
+    return {
+      x: Math.round(r.left),
+      y: Math.round(r.top),
+      w: Math.round(r.width),
+      h: Math.round(r.height),
+    };
   }
 
   collapseToPeekOnly(): void {

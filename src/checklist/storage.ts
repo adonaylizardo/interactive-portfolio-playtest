@@ -41,10 +41,7 @@ export function isMobileOrCoarsePointer(): boolean {
   );
 }
 
-export function stepsForPlatform(compact = isMobileOrCoarsePointer()): ChecklistStepId[] {
-  if (compact) {
-    return ['walk-around', 'move-camera', 'zoom', 'enter-building'];
-  }
+export function stepsForPlatform(_compact = isMobileOrCoarsePointer()): ChecklistStepId[] {
   return ['walk-around', 'walk-keys', 'move-camera', 'zoom', 'enter-building'];
 }
 

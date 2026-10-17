@@ -1,4 +1,5 @@
 import { studio } from '../audio/studio';
+import { figmaAsset } from '../ui/figmaAssets';
 import { onLangChange, t } from '../ui/i18n';
 import {
   countCompleted,
@@ -101,6 +102,8 @@ export class ChecklistUI {
                 stroke-dasharray="69.12" stroke-dashoffset="69.12" transform="rotate(-90 14 14)"/>
             </svg>
             <span class="checklist__counter checklist__counter--in-ring"></span>
+            <img class="checklist__ring-figma" src="" width="44" height="44" alt="" aria-hidden="true" />
+            <img class="checklist__clipboard-figma" src="" width="15" height="15" alt="" aria-hidden="true" />
           </button>
         </div>
       </header>
@@ -118,6 +121,10 @@ export class ChecklistUI {
     this.ringEl = this.root.querySelector('.checklist__ring-fg')!;
     this.headerTitle = this.root.querySelector('.checklist__active-title')!;
     this.ringBtn = this.root.querySelector('.checklist__ring-btn')!;
+    const ringFigma = this.root.querySelector('.checklist__ring-figma') as HTMLImageElement;
+    const clipFigma = this.root.querySelector('.checklist__clipboard-figma') as HTMLImageElement;
+    ringFigma.src = figmaAsset('talks-phone-map', '6af66.svg');
+    clipFigma.src = figmaAsset('talks-phone-map', '629bf.svg');
     this.ringBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       if (this.mobile) {
@@ -202,6 +209,17 @@ export class ChecklistUI {
     this.applyLayoutClasses();
   }
 
+  /** QA: set checklist progress through the real storage API (no render overrides). */
+  setProgressForQa(completed: Partial<Record<ChecklistStepId, boolean>>): void {
+    this.state = loadChecklist();
+    for (const [id, done] of Object.entries(completed) as [ChecklistStepId, boolean][]) {
+      if (done) this.state.completed[id] = true;
+      else this.state.completed[id] = false;
+    }
+    saveChecklist(this.state);
+    this.render();
+  }
+
   private applyLayoutClasses(): void {
     this.mobile = isMobileLayout();
     const total = totalStepsForPlatform(this.compactSteps);
@@ -240,11 +258,12 @@ export class ChecklistUI {
     this.compactSteps = isMobileOrCoarsePointer();
     const total = totalStepsForPlatform(this.compactSteps);
     const done = countCompleted(this.state, this.compactSteps);
-    const counterText = `${done} / ${total}`;
+    const counterText = `${done}/${total}`;
     this.counterEl.textContent = counterText;
     this.counterInRing.textContent = counterText;
     const circumference = 69.12;
-    const offset = circumference * (1 - done / total);
+    const progress = done / total;
+    const offset = circumference * (1 - progress);
     this.ringEl.style.strokeDashoffset = String(offset);
 
     const dismissBtn = this.root.querySelector('.checklist__dismiss') as HTMLButtonElement;

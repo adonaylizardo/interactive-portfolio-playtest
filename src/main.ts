@@ -1,5 +1,5 @@
 import { studio } from './audio/studio';
-import { ChecklistUI } from './checklist/ui';
+import { ChecklistUI, isMobileLayout } from './checklist/ui';
 import { isCaseHouse } from './data/cases';
 import {
   doorInwardStep,
@@ -19,6 +19,7 @@ import { ChromeUI, type DesktopLayout } from './ui/chrome';
 import { JacHud } from './ui/jacHud';
 import { Joystick } from './ui/joystick';
 import { BuildingMapLabels } from './ui/buildingMapLabels';
+import { InteriorStageScreen } from './ui/interiorStageScreen';
 import { NameLabels } from './ui/nameLabels';
 import { hideToast, showToast } from './ui/toast';
 import { getLang, onLangChange, setLang, t } from './ui/i18n';
@@ -32,6 +33,7 @@ async function main(): Promise<void> {
   onLangChange(applyCanvasLabel);
 
   const checklist = new ChecklistUI(uiRoot, { onSkip: () => {}, onDismiss: () => {} });
+  if (!isMobileLayout()) checklist.setCollapsed(true);
 
   let scene!: IsoScene;
   const chrome = new ChromeUI(uiRoot, {
@@ -60,12 +62,18 @@ async function main(): Promise<void> {
     onToggle: (id) => scene.jacSetToggle(id),
     onEngine: () => scene.jacSetEngine(),
   });
+  const stageScreen = new InteriorStageScreen(document.body);
   const panel = new BuildingPanel(
     uiRoot,
     () => {
       const open = panel.isInteriorMode();
       checklist.setBuildingPanelOpen(open);
-      chrome.setInteriorOpen(open);
+      if (panel.isExperienceMode()) {
+        chrome.setInteriorOpen(false, { skipLayout: true });
+        if (!isMobileLayout() && open) chrome.setLayout('split');
+      } else {
+        chrome.setInteriorOpen(open);
+      }
       joystick.setHidden(open || panel.isPreviewExpanded());
       if (panel.isPreviewExpanded()) checklist.setCollapsed(true);
       scene?.applyCameraFromUi();
@@ -85,10 +93,12 @@ async function main(): Promise<void> {
         if (interiorId === 'teresa') {
           studio.clearSubtitle();
           chrome.setInteriorOpen(false, { skipLayout: true });
+          if (!isMobileLayout()) chrome.setLayout('split');
           panel.showTalks(b.panelTitle, interiorId);
         } else if (interiorId === 'biblioteca') {
           studio.clearSubtitle();
           chrome.setInteriorOpen(false, { skipLayout: true });
+          if (!isMobileLayout()) chrome.setLayout('split');
           panel.showWritings(b.panelTitle, interiorId);
         } else {
           chrome.setInteriorOpen(true);
@@ -116,6 +126,7 @@ async function main(): Promise<void> {
     },
     onMoveCommand: () => studio.noteMoveCommand(),
     onFrame: () => {
+      stageScreen.apply(scene.interiorStageScreenLayout());
       labels.update(scene.nameLabelAnchors());
       mapLabels.setHidden(!!scene.isInInterior());
       mapLabels.update(
@@ -244,6 +255,7 @@ async function main(): Promise<void> {
     walkToBuilding: (name: string) => scene.walkToBuildingForQa(name),
     doorScreenPoint: (name: string) => scene.getDoorScreenClientPoint(name),
     frameDoorForQa: (name: string) => scene.frameBuildingDoorForQa(name),
+    prepareDoorEntryForQa: (name: string) => scene.prepareDoorEntryForQa(name),
     tapBuildingDoor: (name: string) => scene.tapBuildingDoor(name),
     setSuppressTap: (ms: number) => scene.setSuppressTapForQa(ms),
     tapMapTile: (tx: number, ty: number) => scene.tapMapTileForQa(tx, ty),
@@ -253,6 +265,9 @@ async function main(): Promise<void> {
     enterInterior: (name: string) => scene.enterInterior(name),
     exitInterior: () => scene.exitInterior(),
     dismissBuildingPanel: () => panel.hide(),
+    setChecklistProgressForQa: (completed: Partial<Record<string, boolean>>) =>
+      checklist.setProgressForQa(completed as Partial<Record<import('./checklist/storage').ChecklistStepId, boolean>>),
+    collapseChecklistForQa: () => checklist.collapseMobile(),
     showPanelOverlayForQa: (title: string) => {
       checklist.setBuildingPanelOpen(true);
       panel.showOverlayForQa(title);
@@ -274,6 +289,7 @@ async function main(): Promise<void> {
     interiorPixelProbes: () => scene.getInteriorPixelProbesClient(),
     tapInteriorTile: (tx: number, ty: number) => scene.tapInteriorTileForQa(tx, ty),
     expandInteriorSheet: () => panel.expandInteriorSheetForQa(),
+    getExperienceSheetRect: () => panel.getExperienceSheetRectForQa(),
     leaveInteriorNow: () => scene.leaveInteriorNow(),
     collapseInteriorSheetToPeek: () => panel.collapseToPeekOnly(),
     reframeMobileDefault: () => scene.reframeMobileDefaultViewForQa(),
@@ -301,6 +317,7 @@ async function main(): Promise<void> {
     npcTown: () => scene.qaNpcTown(),
     advanceNpcs: (seconds: number) => scene.qaAdvanceNpcs(seconds),
     playerAvatar: () => scene.qaPlayerAvatar(),
+    qaInputReady: () => scene.qaInputReady(),
     setAnim: (dir: 'se' | 'sw' | 'ne' | 'nw', walk: boolean, frame = 0) => scene.qaSetAnim(dir, walk, frame),
     clearAnim: () => scene.qaClearAnim(),
     benches: () => scene.qaBenches(),

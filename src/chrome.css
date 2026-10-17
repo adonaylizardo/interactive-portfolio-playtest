@@ -516,6 +516,11 @@ body[data-interior='1'] .chrome__column {
   z-index: 5;
 }
 
+/* Lang sits above the map checklist pill (z-index 14) on phone map dock. */
+.chrome--mobile.chrome--dock {
+  z-index: 16;
+}
+
 .chrome--split .chrome__lang {
   right: 16px;
 }
@@ -675,6 +680,13 @@ body[data-layout='panel'] #game-canvas {
 
 .chrome--mobile .chrome__lang {
   left: auto;
+  z-index: 20;
+}
+
+body[data-layout='map'] .chrome--mobile .chrome__lang {
+  top: 112px;
+  right: auto;
+  left: 16px;
 }
 
 .chrome--mobile .chrome__intro {
