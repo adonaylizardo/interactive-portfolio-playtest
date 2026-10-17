@@ -4142,6 +4142,10 @@ export class IsoScene {
     return this.driveToTile(tx, ty, false);
   }
 
+  qaFindDrivePath(tx: number, ty: number): { x: number; y: number }[] | null {
+    return this.jac?.findDrivePath(tx, ty) ?? null;
+  }
+
   qaFps(): { fps: number; elapsedMS: number; sameCanvas: boolean } {
     return {
       fps: this.app?.ticker.FPS ?? 0,

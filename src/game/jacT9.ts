@@ -1,9 +1,9 @@
 import { Assets, Container, Rectangle, Sprite, Texture } from 'pixi.js';
-import { cells, MAP_HEIGHT, MAP_WIDTH, TILE_H, TILE_W, objects, type MapObject } from '../data/map';
+import { cells, fill, MAP_HEIGHT, MAP_WIDTH, TILE_H, TILE_W, objects, type MapObject } from '../data/map';
 import { muroWallTiles } from '../data/world';
 import { tileFootWorld, tileToWorld } from '../iso/math';
 import { findPathWith } from '../iso/pathfinding';
-import { objectOccluder, objectSpriteScale, type OccluderBox } from './mapSprites';
+import { objectOccluder, objectSpriteScale, playerBehind, type OccluderBox } from './mapSprites';
 import { spriteOpaqueTopWorld } from './spriteTop';
 import { spriteResolution } from './sprites';
 import { WALK_TILES_PER_S, type FacingDir } from './player';
@@ -142,6 +142,7 @@ const EDGE_DIRS: [number, number][] = [
 /** Trees, benches, lamps and muro walls — the same cells the avatar cannot walk through. */
 function buildPropCells(): Set<string> {
   const out = new Set<string>(muroWallTiles());
+  for (const [x, y] of fill.solidCells) out.add(k(x, y));
   for (const o of objects) {
     if (o.flat || !PROP_NAMES.has(o.name)) continue;
     const fx = o.footprintX ?? o.x;
@@ -196,6 +197,8 @@ export class JacT9 {
   private body!: Sprite;
   private cone = new Sprite();
   private haze = new Sprite();
+  private ghost = new Sprite();
+  private ghostOnLayer = false;
   private loaded = false;
   private loading: Promise<void> | null = null;
   private textures = new Map<string, Texture>();
@@ -249,6 +252,7 @@ export class JacT9 {
   private exitHold = 0;
   private exitSit: { x: number; y: number } | null = null;
   private stuckT = 0;
+  private replanN = 0;
   bumpT = 0;
   private bumpArmed = true;
   private exitFrom: { x: number; y: number } | null = null;
@@ -267,11 +271,16 @@ export class JacT9 {
     };
     this.cone.visible = false;
     this.haze.visible = false;
+    this.ghost.visible = false;
     this.cone.eventMode = 'none';
     this.haze.eventMode = 'none';
+    this.ghost.eventMode = 'none';
+    this.ghost.alpha = 0.62;
+    this.ghost.tint = 0xf4f6f8;
     hooks.container.addChildAt(this.cone, 0);
     hooks.container.addChild(this.haze);
     this.snapshotClaimFromGrid();
+    this.attachGhost();
   }
 
   get driving(): boolean {
@@ -438,17 +447,27 @@ export class JacT9 {
   clearDrivePath(): void {
     this.drivePath = [];
     this.driveGoal = null;
+    this.replanN = 0;
   }
 
   setDrivePath(path: { x: number; y: number }[], goal: { x: number; y: number }): void {
     this.drivePath = path;
     this.driveGoal = goal;
     this.gearHeld = false;
-    const ax = goal.x - this.cx;
-    const ay = goal.y - this.cy;
+    this.replanN = 0;
+    this.stuckT = 0;
+    this.applyPathGear();
+  }
+
+  /** D/R from the next hop, not the goal — an around-path must not reverse into a prop. */
+  private applyPathGear(): void {
+    if (this.gearHeld || this.drivePath.length === 0) return;
+    const t = this.drivePath[0];
+    const ax = t.x - this.cx;
+    const ay = t.y - this.cy;
+    if (Math.hypot(ax, ay) < 1e-4) return;
     const fwd = DIR_VEC[this.dir];
-    const behind = fwd.x * ax + fwd.y * ay < -0.35 && Math.hypot(ax, ay) < 5;
-    this.gear = behind ? 'R' : 'D';
+    this.gear = fwd.x * ax + fwd.y * ay < -0.2 ? 'R' : 'D';
   }
 
   /**
@@ -500,20 +519,19 @@ export class JacT9 {
   findDrivePath(gx: number, gy: number): { x: number; y: number }[] | null {
     const sx = Math.round(this.cx);
     const sy = Math.round(this.cy);
-    const pass = (x: number, y: number) => this.canDriveTile(x, y);
+    const pass = (x: number, y: number) => this.canDriveSit(x, y) || (x === sx && y === sy);
     const finish = (path: { x: number; y: number }[], tx: number, ty: number) => {
       if (path.length === 0 || path[path.length - 1].x !== tx || path[path.length - 1].y !== ty) {
         return [...path, { x: tx, y: ty }];
       }
       return path;
     };
-    if (!pass(gx, gy) && !(sx === gx && sy === gy)) return null;
     if (pass(gx, gy) || (sx === gx && sy === gy)) {
       const direct = findPathWith(sx, sy, gx, gy, pass);
       if (direct) return finish(direct, gx, gy);
       if (sx === gx && sy === gy) return [];
     }
-    for (let r = 1; r <= 2; r++) {
+    for (let r = 1; r <= 6; r++) {
       let best: { x: number; y: number }[] | null = null;
       let bestD = Infinity;
       for (let dy = -r; dy <= r; dy++) {
@@ -521,7 +539,7 @@ export class JacT9 {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
           const x = gx + dx;
           const y = gy + dy;
-          if (!pass(x, y)) continue;
+          if (!this.canDriveSit(x, y)) continue;
           const path = findPathWith(sx, sy, x, y, pass);
           if (!path) continue;
           const d = Math.abs(dx) + Math.abs(dy);
@@ -669,11 +687,13 @@ export class JacT9 {
     }
 
     if (!this.pendingExit && !live && (this.drivePath.length > 0 || this.driveGoal)) {
-      const moved = this.followDrivePath(dt);
+      const ox = this.cx;
+      const oy = this.cy;
+      this.followDrivePath(dt);
       this.steering = 0;
       this.tickRearHold(dt);
       if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 0.33);
-      this.syncMeters(moved);
+      this.syncMeters(Math.hypot(this.cx - ox, this.cy - oy), dt);
       if (this.toggles.hazards) this.hazardT += dt;
       else this.hazardT = 0;
       this.applySprite();
@@ -698,6 +718,8 @@ export class JacT9 {
     this.reversing = this.vel < -0.08;
     this.tickRearHold(dt);
     if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 0.33);
+    const ox = this.cx;
+    const oy = this.cy;
     const fwd = DIR_VEC[this.dir];
     if (moving) {
       const nx = fwd.x * this.vel * dt;
@@ -736,11 +758,10 @@ export class JacT9 {
         this.wheel = (this.wheel + 1) & 3;
         this.wheelAcc -= 1;
       }
-      this.syncMeters(true);
     } else {
-      this.syncMeters(false);
       this.wheelAcc = 0;
     }
+    this.syncMeters(Math.hypot(this.cx - ox, this.cy - oy), dt);
     if (this.toggles.hazards) this.hazardT += dt;
     else this.hazardT = 0;
     this.applySprite();
@@ -902,10 +923,12 @@ export class JacT9 {
     return Math.hypot(v.x - gx, v.y - gy) < 0.42;
   }
 
-  private syncMeters(moving: boolean): void {
-    if (moving) {
+  /** Speed from actual sit displacement. Blocked contact reads 0, never the commanded vel. */
+  private syncMeters(movedTiles: number, dt: number): void {
+    const speed = dt > 1e-4 ? movedTiles / dt : 0;
+    if (speed > 0.08) {
       this.rpm = MOVE_RPM;
-      this.mph = Math.max(1, Math.round((Math.abs(this.vel) / DRIVE_TILES_PER_S) * MOVE_MPH));
+      this.mph = Math.max(1, Math.round((speed / DRIVE_TILES_PER_S) * MOVE_MPH));
     } else {
       this.rpm = this.engineOn ? IDLE_RPM : 0;
       this.mph = 0;
@@ -964,24 +987,21 @@ export class JacT9 {
       this.drivePath.shift();
       return this.followDrivePath(dt);
     }
+    this.applyPathGear();
     const reverse = this.gear === 'R';
     const speed = (reverse ? REVERSE_TILES_PER_S : DRIVE_TILES_PER_S) * 0.92;
     const step = Math.min(dist, speed * Math.max(dt, 1 / 120));
     const ux = (ax / dist) * step;
     const uy = (ay / dist) * step;
     const ok = (x: number, y: number) =>
-      this.propBodyClear(x, y) && (this.canSitLoose(x, y) || this.canDriveTile(Math.round(x), Math.round(y)));
+      last
+        ? this.propBodyClear(x, y) && (this.canSitLoose(x, y) || this.canDriveTile(Math.round(x), Math.round(y)))
+        : this.canSit(x, y);
     const next = ok(this.cx + ux, this.cy + uy) ? { x: this.cx + ux, y: this.cy + uy } : slide(this.cx, this.cy, ux, uy, ok);
     if (next.x === this.cx && next.y === this.cy) {
+      this.vel = 0;
       if (this.acceptNearGoal()) return false;
-      if (!last) {
-        this.drivePath.shift();
-        if (this.drivePath.length === 0) {
-          this.markStuck(dt);
-          return false;
-        }
-        return this.followDrivePath(dt);
-      }
+      if (this.tryReplan()) return false;
       this.markStuck(dt);
       return false;
     }
@@ -992,9 +1012,6 @@ export class JacT9 {
     this.heading = dirIndex(this.dir);
     this.vel = reverse ? -speed : speed;
     this.reversing = reverse;
-    if (!this.gearHeld) {
-      if (!reverse) this.gear = 'D';
-    }
     this.occupy(this.driveCells());
     this.layout();
     this.wheelAcc += dt * WHEEL_FPS;
@@ -1026,6 +1043,19 @@ export class JacT9 {
     return false;
   }
 
+  private tryReplan(): boolean {
+    if (!this.driveGoal || this.replanN >= 6) return false;
+    this.replanN += 1;
+    const path = this.findDrivePath(this.driveGoal.x, this.driveGoal.y);
+    if (!path || path.length === 0) return false;
+    const first = path[0];
+    const sameHop =
+      this.drivePath[0] && first.x === this.drivePath[0].x && first.y === this.drivePath[0].y;
+    this.drivePath = sameHop && path.length > 1 ? path.slice(1) : path;
+    this.applyPathGear();
+    return this.drivePath.length > 0;
+  }
+
   private markStuck(dt: number): void {
     this.vel = 0;
     if (this.acceptNearGoal()) return;
@@ -1034,6 +1064,7 @@ export class JacT9 {
     this.drivePath = [];
     this.driveGoal = null;
     this.stuckT = 0;
+    this.replanN = 0;
     this.hooks.onStuck?.();
   }
 
@@ -1213,7 +1244,7 @@ export class JacT9 {
     return out;
   }
 
-  private canSit(cx: number, cy: number): boolean {
+  private driveBoxWalkable(cx: number, cy: number): boolean {
     const o = {
       x: Math.round(cx - (DRIVE_BOX - 1) / 2),
       y: Math.round(cy - (DRIVE_BOX - 1) / 2),
@@ -1225,7 +1256,19 @@ export class JacT9 {
       if (c.groundId.includes('borde')) return false;
       if (!c.walkable && !this.claimed.has(k(x, y))) return false;
     }
-    return this.propBodyClear(cx, cy);
+    return true;
+  }
+
+  private canSit(cx: number, cy: number): boolean {
+    return this.driveBoxWalkable(cx, cy) && this.propBodyClear(cx, cy);
+  }
+
+  /**
+   * A* sit: same 2×2 walkable box plus both parked AABBs (5×3 and 3×5) so a turn
+   * mid-path cannot clip a prop the current heading would have cleared.
+   */
+  private canDriveSit(cx: number, cy: number): boolean {
+    return this.driveBoxWalkable(cx, cy) && this.propTurnClear(cx, cy);
   }
 
   /** Last-hop sit: the 2×2 box often clips a wall two tiles short of the tap. */
@@ -1244,13 +1287,12 @@ export class JacT9 {
    * Parked AABB (5×3 / 3×5) must not cover a tree, bench, lamp or muro cell —
    * the same footprint the character cannot walk through.
    */
-  private propBodyClear(cx: number, cy: number): boolean {
-    const size = parkSize(this.dir);
+  private footprintClear(cx: number, cy: number, w: number, h: number): boolean {
     const o = {
-      x: Math.round(cx - (size.w - 1) / 2),
-      y: Math.round(cy - (size.h - 1) / 2),
+      x: Math.round(cx - (w - 1) / 2),
+      y: Math.round(cy - (h - 1) / 2),
     };
-    for (const [x, y] of this.rect(o.x, o.y, size.w, size.h)) {
+    for (const [x, y] of this.rect(o.x, o.y, w, h)) {
       if (this.claimed.has(k(x, y))) continue;
       if (PROP_CELLS.has(k(x, y))) return false;
       const c = cells[y]?.[x];
@@ -1259,6 +1301,15 @@ export class JacT9 {
       return false;
     }
     return true;
+  }
+
+  private propBodyClear(cx: number, cy: number): boolean {
+    const size = parkSize(this.dir);
+    return this.footprintClear(cx, cy, size.w, size.h);
+  }
+
+  private propTurnClear(cx: number, cy: number): boolean {
+    return this.footprintClear(cx, cy, PARK_SE.w, PARK_SE.h) && this.footprintClear(cx, cy, PARK_SW.w, PARK_SW.h);
   }
 
   /** QA: true when the current solid / parked body covers a prop cell. */
@@ -1351,10 +1402,43 @@ export class JacT9 {
     };
     v.zIndex = this.sortDepth();
     this.hooks.container.zIndex = v.zIndex;
+    this.layoutGhost(foot.x + lx, foot.y + ly, sc, v.zIndex);
     const box = new Rectangle(lx + 40 * sc, ly + 8 * sc, 200 * sc, 120 * sc);
     this.hooks.tapBox.set(this.obj.id, box);
     this.hooks.container.hitArea = box;
     this.hooks.container.eventMode = 'static';
+  }
+
+  private vanBehindBuilding(): boolean {
+    for (const o of objects) {
+      if (o.type !== 'building' || o.flat) continue;
+      const box = objectOccluder(o);
+      if (box && playerBehind(box, this.cx, this.cy)) return true;
+    }
+    return false;
+  }
+
+  private attachGhost(): void {
+    if (this.ghostOnLayer) return;
+    const layer = this.hooks.container.parent;
+    if (!layer) return;
+    layer.addChild(this.ghost);
+    this.ghostOnLayer = true;
+  }
+
+  /** Silhouette in front of a roof that is currently hiding the van body. */
+  private layoutGhost(wx: number, wy: number, sc: number, vanZ: number): void {
+    this.attachGhost();
+    if (!this.ghostOnLayer) return;
+    const occluded = vanZ < this.cx + this.cy + 0.05 || this.vanBehindBuilding();
+    const tex = this.body.texture;
+    const ready = !!tex && tex.frame.width > 8 && tex.frame.height > 8;
+    this.ghost.visible = occluded && ready;
+    if (!this.ghost.visible) return;
+    this.ghost.texture = tex;
+    this.ghost.scale.set(sc);
+    this.ghost.position.set(wx, wy);
+    this.ghost.zIndex = 1_000_000;
   }
 
   /** Skip empty / off-sheet frames so a bad wheel cell never blanks the van. */

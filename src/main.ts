@@ -299,6 +299,7 @@ async function main(): Promise<void> {
     jacGetIn: () => scene.jacGetIn(),
     jacGetOut: () => scene.jacGetOut(),
     jacDriveTo: (tx: number, ty: number) => scene.qaDriveTo(tx, ty),
+    jacFindDrivePath: (tx: number, ty: number) => scene.qaFindDrivePath(tx, ty),
     lastDriveTap: () => scene.qaLastDriveTap,
     pointerDriveAccepts: () => scene.qaPointerDriveAccepts,
     fps: () => scene.qaFps(),
