@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:preview-edificios": "tsc && vite build --base /interactive-portfolio-playtest/preview-edificios/",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "qa": "npm run build && node scripts/qa.mjs",
@@ -14,7 +15,7 @@
     "qa:smoke": "npm run build && node scripts/qa-smoke.mjs",
     "qa:gate": "npm run build && npm run typecheck && node scripts/check-logos.mjs && node scripts/check-case-copy.mjs && node scripts/qa-sprites.mjs && node scripts/qa-smoke.mjs",
     "verify:jac-drive": "node scripts/verify-jac-drive.mjs",
-    "verify:edificios": "npm run build && node scripts/verify-edificios.mjs",
+    "verify:edificios": "npm run build:preview-edificios && node scripts/verify-edificios.mjs",
     "compress:sprites": "node scripts/compress-sprites.mjs",
     "check:logos": "node scripts/check-logos.mjs",
     "check:cases": "node scripts/check-case-copy.mjs",

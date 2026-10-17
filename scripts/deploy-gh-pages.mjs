@@ -58,7 +58,7 @@ if (process.env.DEPLOY_GATE_PASSED === '1') {
   run(`npx vite build --base ${base}`);
 } else {
   run('npm run qa:gate');
-  if (target === 'preview') run(`npx vite build --base ${base}`);
+  if (target === 'preview' || target === 'preview-edificios') run(`npx vite build --base ${base}`);
 }
 
 if (!existsSync(path.join(dist, 'index.html'))) {
