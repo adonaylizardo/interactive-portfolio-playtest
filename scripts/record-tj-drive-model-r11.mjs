@@ -16,8 +16,8 @@ fs.mkdirSync(OUT, { recursive: true });
 
 const SITES = [
   { id: 'tree', cx: 37, cy: 17, dir: 'se', prop: { x: 40, y: 18 } },
-  { id: 'wall', cx: 34, cy: 35, dir: 'se', prop: { x: 35, y: 37 } },
-  { id: 'corner', cx: 19, cy: 17, dir: 'se', prop: { x: 16, y: 16 } },
+  { id: 'wall', cx: 32, cy: 34, dir: 'se', prop: { x: 32, y: 37 } },
+  { id: 'corner', cx: 17, cy: 16, dir: 'se', prop: { x: 16, y: 16 } },
 ];
 
 async function cdpTouch(cdp, type, points) {
