@@ -3971,7 +3971,11 @@ export class IsoScene {
       const box = this.objectTapBoxes.get(this.jac.obj.id);
       if (box?.contains(lx, ly)) return true;
     }
-    return false;
+    const tile = worldToTile(wx, wy);
+    if (tile && this.jac.tapHitsTile(tile.x, tile.y)) return true;
+    const c = this.jac.worldCenter();
+    const s = this.worldToScreen(c.x, c.y);
+    return Math.hypot(sx - s.x, sy - s.y) < 92;
   }
 
   tapJac(): void {

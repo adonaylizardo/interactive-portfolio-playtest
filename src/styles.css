@@ -478,15 +478,15 @@ body[data-layout='panel'] .checklist {
 
 @media (min-width: 768px) {
   .playtest-toast {
-    bottom: auto;
-    top: max(56px, calc(env(safe-area-inset-top) + 40px));
-    left: auto;
-    right: max(24px, env(safe-area-inset-right));
-    transform: translateY(8px);
+    top: auto;
+    left: 50%;
+    right: auto;
+    bottom: max(148px, calc(env(safe-area-inset-bottom) + 136px));
+    transform: translateX(-50%) translateY(8px);
   }
 
   .playtest-toast--visible {
-    transform: translateY(0);
+    transform: translateX(-50%) translateY(0);
   }
 }
 

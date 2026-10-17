@@ -1,4 +1,9 @@
+let lastToast = { text: '', at: 0 };
+
 export function showToast(message: string, durationMs = 2200): void {
+  const now = performance.now();
+  if (message === lastToast.text && now - lastToast.at < 2200) return;
+  lastToast = { text: message, at: now };
   let el = document.getElementById('playtest-toast');
   if (!el) {
     el = document.createElement('div');

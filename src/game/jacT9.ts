@@ -267,6 +267,8 @@ export class JacT9 {
   private exitSit: { x: number; y: number } | null = null;
   private stuckT = 0;
   private replanN = 0;
+  private replanArmed = false;
+  private stuckGaveUp = false;
   bumpT = 0;
   private bumpArmed = true;
   private exitFrom: { x: number; y: number } | null = null;
@@ -462,6 +464,9 @@ export class JacT9 {
     this.drivePath = [];
     this.driveGoal = null;
     this.replanN = 0;
+    this.stuckT = 0;
+    this.replanArmed = false;
+    this.stuckGaveUp = false;
   }
 
   setDrivePath(path: { x: number; y: number }[], goal: { x: number; y: number }): void {
@@ -470,13 +475,27 @@ export class JacT9 {
     this.gearHeld = false;
     this.replanN = 0;
     this.stuckT = 0;
-    this.applyPathGear();
+    this.replanArmed = false;
+    this.stuckGaveUp = false;
+    this.applyPathGear(false);
   }
 
-  /** Click-to-drive follows the sit-aware path in D and turns to face each hop. */
-  private applyPathGear(): void {
+  /** Click-to-drive follows in D; a stuck replan may reverse out of a nose-in. */
+  private applyPathGear(allowReverse: boolean): void {
     if (this.gearHeld || this.drivePath.length === 0) return;
-    this.gear = 'D';
+    if (!allowReverse) {
+      this.gear = 'D';
+      return;
+    }
+    const t = this.drivePath[0];
+    const ax = t.x - this.cx;
+    const ay = t.y - this.cy;
+    if (Math.hypot(ax, ay) < 1e-4) {
+      this.gear = 'D';
+      return;
+    }
+    const fwd = DIR_VEC[this.dir];
+    this.gear = fwd.x * ax + fwd.y * ay < -0.2 ? 'R' : 'D';
   }
 
   /**
@@ -534,20 +553,19 @@ export class JacT9 {
       }
       return path;
     };
+    const pass = (x: number, y: number) => this.pathSit(x, y) || (x === sx && y === sy);
     const routeTo = (tx: number, ty: number) => {
-      const pass = (x: number, y: number) =>
-        this.canDriveSit(x, y) || (x === sx && y === sy) || (x === tx && y === ty && this.canSit(x, y));
       if (sx === tx && sy === ty) return [];
       if (!pass(tx, ty)) return null;
       const path = findPathWith(sx, sy, tx, ty, pass);
       return path ? finish(path, tx, ty) : null;
     };
-    if (this.canSit(gx, gy) || (sx === gx && sy === gy)) {
+    if (this.pathSit(gx, gy) || (sx === gx && sy === gy)) {
       const direct = routeTo(gx, gy);
       if (direct) return direct;
       if (sx === gx && sy === gy) return [];
     }
-    for (let r = 1; r <= 6; r++) {
+    for (let r = 1; r <= 8; r++) {
       let best: { x: number; y: number }[] | null = null;
       let bestD = Infinity;
       for (let dy = -r; dy <= r; dy++) {
@@ -555,10 +573,11 @@ export class JacT9 {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
           const x = gx + dx;
           const y = gy + dy;
-          if (!this.canSit(x, y)) continue;
+          if (!this.pathSit(x, y)) continue;
           const path = routeTo(x, y);
           if (!path) continue;
           const d = Math.abs(dx) + Math.abs(dy);
+          if (d > 2.5) continue;
           if (d < bestD) {
             bestD = d;
             best = path;
@@ -939,16 +958,17 @@ export class JacT9 {
     return Math.hypot(v.x - gx, v.y - gy) < 0.42;
   }
 
-  /** Speed from actual sit displacement. Blocked contact reads 0, never the commanded vel. */
+  /** Speed from actual sit displacement, capped at MOVE_MPH. Blocked contact reads 0. */
   private syncMeters(movedTiles: number, dt: number): void {
-    const speed = dt > 1e-4 ? movedTiles / dt : 0;
-    if (speed > 0.08) {
-      this.rpm = MOVE_RPM;
-      this.mph = Math.max(1, Math.round((speed / DRIVE_TILES_PER_S) * MOVE_MPH));
-    } else {
+    const raw = dt > 1e-4 ? movedTiles / dt : 0;
+    const speed = Math.min(raw, DRIVE_TILES_PER_S * 1.05);
+    if (movedTiles < 0.05 || speed < 0.55) {
       this.rpm = this.engineOn ? IDLE_RPM : 0;
       this.mph = 0;
+      return;
     }
+    this.rpm = MOVE_RPM;
+    this.mph = Math.max(1, Math.min(MOVE_MPH, Math.round((speed / DRIVE_TILES_PER_S) * MOVE_MPH)));
   }
 
   private isGoalNode(t: { x: number; y: number }): boolean {
@@ -1009,24 +1029,24 @@ export class JacT9 {
       this.drivePath.shift();
       return this.followDrivePath(dt);
     }
-    this.applyPathGear();
-    const reverse = this.gearHeld && this.gear === 'R';
+    this.applyPathGear(this.replanArmed && this.gear === 'R');
+    const reverse = this.gear === 'R';
     const speed = (reverse ? REVERSE_TILES_PER_S : DRIVE_TILES_PER_S) * 0.92;
-    const step = Math.min(dist, speed * Math.max(dt, 1 / 120));
+    const step = Math.min(dist, speed * dt);
     const ux = (ax / dist) * step;
     const uy = (ay / dist) * step;
-    const ok = (x: number, y: number) => this.canDriveSit(x, y) || this.canSit(x, y);
+    const ok = (x: number, y: number) => this.pathSit(x, y);
     const next = ok(this.cx + ux, this.cy + uy) ? { x: this.cx + ux, y: this.cy + uy } : slide(this.cx, this.cy, ux, uy, ok);
     if (next.x === this.cx && next.y === this.cy) {
       this.vel = 0;
       if (this.acceptNearGoal()) return false;
-      if (this.tryReplan()) return false;
       this.markStuck(dt);
       return false;
     }
     this.stuckT = 0;
-    this.cx = next.x;
-    this.cy = next.y;
+    const sit = this.clampSit(next.x, next.y);
+    this.cx = sit.x;
+    this.cy = sit.y;
     this.dir = reverse ? facingFrom(-ax, -ay, this.dir) : facingFrom(ax, ay, this.dir);
     this.heading = dirIndex(this.dir);
     this.vel = reverse ? -speed : speed;
@@ -1062,28 +1082,55 @@ export class JacT9 {
     return false;
   }
 
+  /** One reverse-out replan from the current pose after a 0.75 s stall. */
   private tryReplan(): boolean {
-    if (!this.driveGoal || this.replanN >= 6) return false;
+    if (!this.driveGoal || this.replanArmed) return false;
+    this.replanArmed = true;
     this.replanN += 1;
+    const back = this.reverseOutHop();
     const path = this.findDrivePath(this.driveGoal.x, this.driveGoal.y);
+    if (back && path) {
+      this.drivePath = [back, ...path.filter((p) => p.x !== back.x || p.y !== back.y)];
+      this.applyPathGear(true);
+      this.stuckT = 0;
+      return this.drivePath.length > 0;
+    }
+    if (back) {
+      this.drivePath = [back, ...(this.driveGoal ? [this.driveGoal] : [])];
+      this.applyPathGear(true);
+      this.stuckT = 0;
+      return true;
+    }
     if (!path || path.length === 0) return false;
     const first = path[0];
     const sameHop =
       this.drivePath[0] && first.x === this.drivePath[0].x && first.y === this.drivePath[0].y;
     this.drivePath = sameHop && path.length > 1 ? path.slice(1) : path;
-    this.applyPathGear();
+    this.applyPathGear(true);
+    this.stuckT = 0;
     return this.drivePath.length > 0;
+  }
+
+  private reverseOutHop(): { x: number; y: number } | null {
+    const fwd = DIR_VEC[this.dir];
+    const x = Math.round(this.cx - fwd.x);
+    const y = Math.round(this.cy - fwd.y);
+    if (!this.pathSit(x, y)) return null;
+    if (Math.hypot(x - this.cx, y - this.cy) < 0.2) return null;
+    return { x, y };
   }
 
   private markStuck(dt: number): void {
     this.vel = 0;
+    if (this.stuckGaveUp) return;
     if (this.acceptNearGoal()) return;
     this.stuckT += dt;
     if (this.stuckT < 0.75 || !this.driveGoal) return;
+    if (!this.replanArmed && this.tryReplan()) return;
     this.drivePath = [];
     this.driveGoal = null;
     this.stuckT = 0;
-    this.replanN = 0;
+    this.stuckGaveUp = true;
     this.hooks.onStuck?.();
   }
 
@@ -1291,6 +1338,11 @@ export class JacT9 {
     );
   }
 
+  /** Same collider the planner and the follower use. */
+  private pathSit(cx: number, cy: number): boolean {
+    return this.canDriveSit(cx, cy);
+  }
+
   /** Last-hop sit: the 2×2 box often clips a wall two tiles short of the tap. */
   private canSitLoose(cx: number, cy: number): boolean {
     const x = Math.round(cx);
@@ -1313,6 +1365,7 @@ export class JacT9 {
       y: Math.round(cy - (h - 1) / 2),
     };
     for (const [x, y] of this.rect(o.x, o.y, w, h)) {
+      if (x < 0 || y < 0 || x >= MAP_WIDTH || y >= MAP_HEIGHT) return false;
       if (this.claimed.has(k(x, y))) continue;
       if (PROP_CELLS.has(k(x, y))) return false;
       const c = cells[y]?.[x];
@@ -1326,6 +1379,23 @@ export class JacT9 {
   private propBodyClear(cx: number, cy: number): boolean {
     const size = parkSize(this.dir);
     return this.footprintClear(cx, cy, size.w, size.h);
+  }
+
+  private clampSit(cx: number, cy: number): { x: number; y: number } {
+    const hw = (Math.max(PARK_SE.w, PARK_SW.w) - 1) / 2;
+    const hh = (Math.max(PARK_SE.h, PARK_SW.h) - 1) / 2;
+    return {
+      x: Math.min(MAP_WIDTH - 1 - hw, Math.max(hw, cx)),
+      y: Math.min(MAP_HEIGHT - 1 - hh, Math.max(hh, cy)),
+    };
+  }
+
+  /** Parked tap: the footprint plus a one-tile ring, so a roof tap can still claim the van. */
+  tapHitsTile(tx: number, ty: number): boolean {
+    for (const [x, y] of this.parkCells()) {
+      if (Math.max(Math.abs(x - tx), Math.abs(y - ty)) <= 1) return true;
+    }
+    return false;
   }
 
   /** QA: true when the current solid / parked body covers a prop cell. */
@@ -1419,7 +1489,8 @@ export class JacT9 {
     v.zIndex = this.sortDepth();
     this.hooks.container.zIndex = v.zIndex;
     this.layoutGhost(foot.x + lx, foot.y + ly, sc, v.zIndex);
-    const box = new Rectangle(lx + 40 * sc, ly + 8 * sc, 200 * sc, 120 * sc);
+    const pad = this.driving ? 0 : 36 * sc;
+    const box = new Rectangle(lx + 40 * sc - pad, ly + 8 * sc - pad, 200 * sc + pad * 2, 120 * sc + pad * 2);
     this.hooks.tapBox.set(this.obj.id, box);
     this.hooks.container.hitArea = box;
     this.hooks.container.eventMode = 'static';
