@@ -309,6 +309,8 @@ async function main(): Promise<void> {
     jacApproach: () => scene.qaJacApproach(),
     jacOverlapsProp: () => scene.qaJacOverlapsProp(),
     jacCanSit: (cx: number, cy: number) => scene.qaJacCanSit(cx, cy),
+    jacStick: (vec: { x: number; y: number } | null) => scene.qaJacStick(vec),
+    jacDriveStep: (dt: number, dx: number, dy: number) => scene.qaJacDriveStep(dt, dx, dy),
     jacClose: () => scene.jacClose(),
     jacSetLights: (lights: 'off' | 'auto' | 'on') => scene.jacSetLights(lights),
     jacSetGear: (gear: 'P' | 'R' | 'N' | 'D') => scene.jacSetGear(gear),

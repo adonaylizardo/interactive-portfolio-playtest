@@ -452,6 +452,7 @@ export class JacT9 {
 
   setDir(dir: FacingDir): void {
     if (this.dir === dir) return;
+    if (!this.sitWith(this.cx, this.cy, dir) && !this.pathSit(this.cx, this.cy)) return;
     this.dir = dir;
     this.heading = dirIndex(dir);
     if (!this.driving) this.applyParkedSolid(true);
@@ -721,10 +722,13 @@ export class JacT9 {
       this.qaSteer = null;
     }
 
+    this.resolveOverlap();
+
     if (!this.pendingExit && !live && (this.drivePath.length > 0 || this.driveGoal)) {
       const ox = this.cx;
       const oy = this.cy;
       this.followDrivePath(dt);
+      this.resolveOverlap();
       this.steering = 0;
       this.tickRearHold(dt);
       if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 0.33);
@@ -746,8 +750,7 @@ export class JacT9 {
     const moving = Math.abs(this.vel) > 0.08;
     if (moving && Math.abs(this.steering) > 0.08) {
       const sign = this.vel >= 0 ? 1 : -1;
-      this.heading = wrapHeading(this.heading + this.steering * TURN_RATE * sign * dt);
-      this.dir = dirFromHeading(this.heading);
+      this.applyHeading(this.heading + this.steering * TURN_RATE * sign * dt);
     }
 
     this.reversing = this.vel < -0.08;
@@ -788,6 +791,7 @@ export class JacT9 {
         this.occupy(this.driveCells());
         this.layout();
       }
+      this.resolveOverlap();
       this.wheelAcc += dt * WHEEL_FPS * Math.min(1.4, Math.abs(this.vel) / DRIVE_TILES_PER_S);
       while (this.wheelAcc >= 1) {
         this.wheel = (this.wheel + 1) & 3;
@@ -1051,8 +1055,7 @@ export class JacT9 {
     const sit = this.clampSit(next.x, next.y);
     this.cx = sit.x;
     this.cy = sit.y;
-    this.dir = reverse ? facingFrom(-ax, -ay, this.dir) : facingFrom(ax, ay, this.dir);
-    this.heading = dirIndex(this.dir);
+    this.tryFace(reverse ? facingFrom(-ax, -ay, this.dir) : facingFrom(ax, ay, this.dir));
     this.vel = reverse ? -speed : speed;
     this.reversing = reverse;
     this.occupy(this.driveCells());
@@ -1266,6 +1269,7 @@ export class JacT9 {
     this.heading = dirIndex(dir);
     this.cx = cx;
     this.cy = cy;
+    this.resolveOverlap();
     if (driving) {
       this.mode = 'drive';
       this.engineOn = true;
@@ -1330,7 +1334,132 @@ export class JacT9 {
   }
 
   private canSit(cx: number, cy: number): boolean {
-    return this.driveBoxWalkable(cx, cy) && this.propBodyClear(cx, cy);
+    return this.sitWith(cx, cy, this.dir);
+  }
+
+  /** Current pose with an explicit facing — used to reject a turn that would clip. */
+  private sitWith(cx: number, cy: number, dir: FacingDir): boolean {
+    const size = parkSize(dir);
+    return this.driveBoxWalkable(cx, cy) && this.footprintClear(cx, cy, size.w, size.h);
+  }
+
+  /** Stick / keys / path-follow: never apply a heading whose footprint is blocked. */
+  private applyHeading(next: number): void {
+    const want = wrapHeading(next);
+    const wantDir = dirFromHeading(want);
+    if (wantDir === this.dir || this.sitWith(this.cx, this.cy, wantDir)) {
+      this.heading = want;
+      if (wantDir !== this.dir) this.dir = wantDir;
+      return;
+    }
+    this.heading = this.headingAgainstBoundary(want);
+  }
+
+  private headingAgainstBoundary(want: number): number {
+    const idx = dirIndex(this.dir);
+    let delta = want - this.heading;
+    if (delta > 2) delta -= 4;
+    if (delta < -2) delta += 4;
+    const edge = delta >= 0 ? idx + 0.5 - 1e-3 : idx - 0.5 + 1e-3;
+    return wrapHeading(edge);
+  }
+
+  private tryFace(dir: FacingDir): void {
+    if (dir === this.dir) return;
+    if (!this.sitWith(this.cx, this.cy, dir) && !this.pathSit(this.cx, this.cy)) return;
+    this.dir = dir;
+    this.heading = dirIndex(dir);
+  }
+
+  private overlapCells(): [number, number][] {
+    const out: [number, number][] = [];
+    const seen = new Set<string>();
+    for (const [x, y] of [...this.solidCells(), ...this.parkCells()]) {
+      const key = k(x, y);
+      if (seen.has(key) || !PROP_CELLS.has(key)) continue;
+      seen.add(key);
+      out.push([x, y]);
+    }
+    return out;
+  }
+
+  /** Smallest axis push that separates the parked AABB from overlapping prop cells. */
+  private mtvFor(hit: [number, number][]): { x: number; y: number } {
+    const size = parkSize(this.dir);
+    const ox = Math.round(this.cx - (size.w - 1) / 2);
+    const oy = Math.round(this.cy - (size.h - 1) / 2);
+    let minx = Infinity;
+    let maxx = -Infinity;
+    let miny = Infinity;
+    let maxy = -Infinity;
+    for (const [x, y] of hit) {
+      if (x < minx) minx = x;
+      if (x > maxx) maxx = x;
+      if (y < miny) miny = y;
+      if (y > maxy) maxy = y;
+    }
+    const opts = [
+      { x: -(ox + size.w - minx), y: 0 },
+      { x: maxx + 1 - ox, y: 0 },
+      { x: 0, y: -(oy + size.h - miny) },
+      { x: 0, y: maxy + 1 - oy },
+    ];
+    opts.sort((a, b) => Math.hypot(a.x, a.y) - Math.hypot(b.x, b.y));
+    const best = opts[0];
+    const pad = 0.08;
+    return {
+      x: best.x === 0 ? 0 : best.x + Math.sign(best.x) * pad,
+      y: best.y === 0 ? 0 : best.y + Math.sign(best.y) * pad,
+    };
+  }
+
+  private nearestClearSit(): { x: number; y: number; dir: FacingDir } | null {
+    const dirs: FacingDir[] = [this.dir, ...DIRS.filter((d) => d !== this.dir)];
+    for (let r = 0; r <= 6; r += 0.25) {
+      const steps = r === 0 ? 1 : 16;
+      for (let i = 0; i < steps; i++) {
+        const a = (Math.PI * 2 * i) / Math.max(1, steps);
+        const sit = this.clampSit(this.cx + Math.cos(a) * r, this.cy + Math.sin(a) * r);
+        for (const dir of dirs) {
+          if (this.sitWith(sit.x, sit.y, dir)) return { x: sit.x, y: sit.y, dir };
+        }
+      }
+    }
+    return null;
+  }
+
+  /** If the van is inside a prop, push out along the MTV so it can never stay wedged. */
+  resolveOverlap(): boolean {
+    if (!this.overlapsProp()) return true;
+    for (let i = 0; i < 12; i++) {
+      const hit = this.overlapCells();
+      if (hit.length === 0) break;
+      const mtv = this.mtvFor(hit);
+      const cand = this.clampSit(this.cx + mtv.x, this.cy + mtv.y);
+      if (this.sitWith(cand.x, cand.y, this.dir)) {
+        this.cx = cand.x;
+        this.cy = cand.y;
+        continue;
+      }
+      const found = this.nearestClearSit();
+      if (!found) break;
+      this.cx = found.x;
+      this.cy = found.y;
+      this.dir = found.dir;
+      this.heading = dirIndex(found.dir);
+    }
+    if (this.overlapsProp()) {
+      const found = this.nearestClearSit();
+      if (found) {
+        this.cx = found.x;
+        this.cy = found.y;
+        this.dir = found.dir;
+        this.heading = dirIndex(found.dir);
+      }
+    }
+    this.occupy(this.driving ? this.driveCells() : this.usableParkCells());
+    this.layout();
+    return !this.overlapsProp();
   }
 
   /** A* sit: 2×2 walkable plus both parked AABBs so a turn cannot clip a prop. */

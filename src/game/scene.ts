@@ -340,6 +340,7 @@ export class IsoScene {
   private jacBubbleTimer: ReturnType<typeof setTimeout> | null = null;
   qaLastDriveTap: { x: number; y: number } | null = null;
   qaPointerDriveAccepts = 0;
+  private qaStick: { x: number; y: number } | null = null;
   /** GPU rear crop. Shown as a stage sprite — never readPixels / drawImage of the game GL view. */
   private rearRT: RenderTexture | null = null;
   private rearSprite: Sprite | null = null;
@@ -3314,8 +3315,8 @@ export class IsoScene {
       this.doorCooldown -= this.app.ticker.deltaMS;
     }
     this.leaveBenchIfStood();
-    const stick = this.events.stick?.() ?? { x: 0, y: 0 };
-    const stickHeld = !!this.events.stickActive?.();
+    const stick = this.qaStick ?? this.events.stick?.() ?? { x: 0, y: 0 };
+    const stickHeld = !!this.qaStick || !!this.events.stickActive?.();
     const stickLive = Math.abs(stick.x) > 0.02 || Math.abs(stick.y) > 0.02;
     if (this.jac?.driving && !this.interiorActive) {
       let dx = 0;
@@ -4184,6 +4185,23 @@ export class IsoScene {
 
   qaJacCanSit(cx: number, cy: number): boolean {
     return this.jac?.canDriveAt(cx, cy) ?? false;
+  }
+
+  qaJacStick(vec: { x: number; y: number } | null): void {
+    this.qaStick = vec;
+  }
+
+  qaJacDriveStep(dt: number, dx: number, dy: number): {
+    cx: number;
+    cy: number;
+    dir: string;
+    overlap: boolean;
+    mph: number;
+  } | null {
+    if (!this.jac?.driving) return null;
+    this.jac.update(dt, { dx, dy, autoShift: true });
+    const s = this.jac.snapshot();
+    return { cx: s.cx, cy: s.cy, dir: s.dir, overlap: this.jac.overlapsProp(), mph: s.mph };
   }
 
   jacSetLights(lights: JacLights): void {

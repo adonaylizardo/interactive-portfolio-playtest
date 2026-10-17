@@ -481,7 +481,7 @@ body[data-layout='panel'] .checklist {
     top: auto;
     left: 50%;
     right: auto;
-    bottom: max(148px, calc(env(safe-area-inset-bottom) + 136px));
+    bottom: max(252px, calc(env(safe-area-inset-bottom) + 240px));
     transform: translateX(-50%) translateY(8px);
   }
 
