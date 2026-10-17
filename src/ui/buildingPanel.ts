@@ -118,12 +118,16 @@ export class BuildingPanel {
   private mode: 'hidden' | 'interior' | 'preview' | 'talks' | 'writings' = 'hidden';
   private experienceEl: HTMLElement | null = null;
   private experienceIntro: HTMLElement | null = null;
+  private experienceFilters: HTMLElement | null = null;
   private experienceList: HTMLElement | null = null;
   private experienceDetail: HTMLElement | null = null;
-  private experienceDetailTitle: HTMLElement | null = null;
-  private experienceDetailMeta: HTMLElement | null = null;
-  private experienceDetailBody: HTMLElement | null = null;
-  private experienceBack: HTMLButtonElement | null = null;
+  private expHeader: HTMLElement | null = null;
+  private expHeaderTitle: HTMLElement | null = null;
+  private experienceView: 'list' | 'detail' = 'list';
+  private experiencePanelTitle = '';
+  private writingsFilter: 'all' | 'uxsc' | 'sinergia' | 'guest' = 'all';
+  private activeTalkId: string | null = null;
+  private activeWriting: { sectionId: string; itemId: string } | null = null;
   private previewEl: HTMLElement | null = null;
   private previewTitle: HTMLElement | null = null;
   private previewSubtitle: HTMLElement | null = null;
@@ -157,6 +161,14 @@ export class BuildingPanel {
       <div class="building-panel__backdrop" data-backdrop></div>
       <div class="building-panel__sheet" role="dialog" aria-modal="true">
         <div class="building-panel__drag" data-drag aria-hidden="true"></div>
+        <header class="exp-header" data-exp-header hidden>
+          <button type="button" class="exp-header__btn exp-header__back" data-exp-back aria-label="">‹</button>
+          <h2 class="exp-header__title"></h2>
+          <div class="exp-header__actions">
+            <button type="button" class="exp-header__btn" data-exp-expand aria-label="">${iconSvg('expand')}</button>
+            <button type="button" class="exp-header__btn exp-header__close" data-close aria-label="">×</button>
+          </div>
+        </header>
         <div class="building-panel__bar">
           <button type="button" class="building-panel__exit" data-exit></button>
           <button type="button" class="building-panel__close" data-close aria-label="">×</button>
@@ -215,15 +227,7 @@ export class BuildingPanel {
             <p class="experience__intro"></p>
             <div class="experience__filters" data-exp-filters hidden></div>
             <div class="experience__list" data-exp-list></div>
-            <div class="experience__detail" data-exp-detail hidden>
-              <button type="button" class="experience__back" data-exp-back></button>
-              <div class="experience__player" aria-hidden="true">
-                <span class="experience__player-icon">${iconSvg('briefcase')}</span>
-              </div>
-              <h3 class="experience__detail-title"></h3>
-              <p class="experience__detail-meta"></p>
-              <p class="experience__detail-body"></p>
-            </div>
+            <div class="experience__detail" data-exp-detail hidden></div>
           </section>
         </div>
       </div>
@@ -248,22 +252,26 @@ export class BuildingPanel {
     this.aboutEl.append(...ABOUT.map(aboutBlockNode));
     this.experienceEl = this.el.querySelector('[data-experience]');
     this.experienceIntro = this.el.querySelector('.experience__intro');
+    this.experienceFilters = this.el.querySelector('[data-exp-filters]');
     this.experienceList = this.el.querySelector('[data-exp-list]');
     this.experienceDetail = this.el.querySelector('[data-exp-detail]');
-    this.experienceDetailTitle = this.el.querySelector('.experience__detail-title');
-    this.experienceDetailMeta = this.el.querySelector('.experience__detail-meta');
-    this.experienceDetailBody = this.el.querySelector('.experience__detail-body');
-    this.experienceBack = this.el.querySelector('[data-exp-back]') as HTMLButtonElement;
-    this.experienceBack?.addEventListener('click', (e) => {
+    this.expHeader = this.el.querySelector('[data-exp-header]');
+    this.expHeaderTitle = this.el.querySelector('.exp-header__title');
+    this.el.querySelector('[data-exp-back]')?.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      this.setExperienceView('list');
+      this.onExperienceBack();
+    });
+    this.el.querySelector('[data-exp-expand]')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!this.isExperienceMode() || !this.isMobile()) return;
+      this.setPeek(!this.peekOnly);
     });
     this.applyI18n();
     onLangChange(() => {
       this.applyI18n();
-      if (this.mode === 'talks') this.renderTalksList();
-      if (this.mode === 'writings') this.renderWritingsList();
+      this.refreshExperienceCopy();
     });
     // Touch has no hover: a tap shows that logo's colours until another logo (or the same one) is tapped.
     this.workedWithEl.addEventListener('click', (e) => {
@@ -362,7 +370,7 @@ export class BuildingPanel {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        this.closePreview();
+        this.onCloseClick();
       });
     });
 
@@ -401,7 +409,18 @@ export class BuildingPanel {
     if (this.previewEl) this.previewEl.hidden = !preview || !this.peekOnly;
     if (this.readEl) this.readEl.hidden = !preview || this.peekOnly;
     if (this.readBar) this.readBar.hidden = !preview || this.peekOnly;
-    this.titleEl.hidden = preview;
+    this.titleEl.hidden = preview || this.mode === 'talks' || this.mode === 'writings';
+  }
+
+  private onCloseClick(): void {
+    if (this.mode === 'preview') this.closePreview();
+    else if (this.mode === 'talks' || this.mode === 'writings') this.salir();
+  }
+
+  private onExperienceBack(): void {
+    if (!this.isExperienceMode()) return;
+    if (this.experienceView === 'detail') this.setExperienceView('list');
+    else this.salir();
   }
 
   private closePreview(): void {
@@ -448,54 +467,117 @@ export class BuildingPanel {
     this.exitFromPointer = false;
     this.mode = mode;
     this.interiorId = interiorId;
+    this.writingsFilter = 'all';
+    this.activeTalkId = null;
+    this.activeWriting = null;
     this.peekOnly = this.isMobile();
     this.el.classList.remove('building-panel--preview');
-    this.titleEl.hidden = false;
+    this.titleEl.hidden = true;
     this.caseEl.hidden = true;
     this.aboutEl.hidden = true;
     this.workedWithEl.hidden = true;
     if (this.previewEl) this.previewEl.hidden = true;
     if (this.readEl) this.readEl.hidden = true;
     if (this.readBar) this.readBar.hidden = true;
+    if (this.expHeader) this.expHeader.hidden = false;
     this.experienceEl!.hidden = false;
     this.el.hidden = false;
     this.el.style.visibility = '';
     this.el.style.pointerEvents = '';
     this.el.removeAttribute('inert');
     this.el.classList.remove('building-panel--snap');
+    this.experiencePanelTitle = title;
     this.setTitle(interiorId ?? mode, title);
-    if (this.experienceIntro) {
-      this.experienceIntro.textContent = t(mode === 'talks' ? 'talks.intro' : 'writings.intro');
-    }
+    this.syncExperienceIntro();
+    if (this.expHeaderTitle) this.expHeaderTitle.textContent = title;
     this.el.classList.add('building-panel--open', 'building-panel--experience');
+    this.el.classList.toggle('building-panel--writings', mode === 'writings');
     this.syncPeekClass();
     this.setExperienceView('list');
+    if (mode === 'talks') this.renderTalksList();
+    else {
+      this.renderWritingsFilters();
+      this.renderWritingsList();
+    }
     this.onVisibilityChange();
     studio.playClick();
   }
 
+  private syncExperienceIntro(): void {
+    if (!this.experienceIntro) return;
+    const showTalksIntro = this.mode === 'talks';
+    this.experienceIntro.hidden = !showTalksIntro;
+    if (showTalksIntro) this.experienceIntro.textContent = t('talks.intro');
+  }
+
+  private refreshExperienceCopy(): void {
+    if (!this.isExperienceMode()) return;
+    this.syncExperienceIntro();
+    if (this.expHeaderTitle) this.expHeaderTitle.textContent = this.experiencePanelTitle;
+    if (this.mode === 'writings') this.renderWritingsFilters();
+    if (this.experienceView === 'list') {
+      if (this.mode === 'talks') this.renderTalksList();
+      else this.renderWritingsList();
+      return;
+    }
+    if (this.mode === 'talks' && this.activeTalkId) {
+      const item = TALKS.find((x) => x.id === this.activeTalkId);
+      if (item) this.renderTalkPlayer(item);
+    }
+    if (this.mode === 'writings' && this.activeWriting) {
+      const section = WRITINGS.find((s) => s.id === this.activeWriting!.sectionId);
+      const item = section?.items.find((x) => x.id === this.activeWriting!.itemId);
+      if (section && item) this.renderWritingReader(section, item);
+    }
+  }
+
   private setExperienceView(view: 'list' | 'detail'): void {
-    if (!this.experienceList || !this.experienceDetail) return;
+    if (!this.experienceList || !this.experienceDetail || !this.experienceFilters) return;
+    this.experienceView = view;
     this.experienceList.hidden = view !== 'list';
     this.experienceDetail.hidden = view !== 'detail';
-    if (this.experienceBack) this.experienceBack.textContent = t('experience.back');
+    const showFilters = this.mode === 'writings' && view === 'list';
+    this.experienceFilters.hidden = !showFilters;
+    if (this.experienceIntro) {
+      this.experienceIntro.hidden = this.mode !== 'talks' || view !== 'list';
+    }
+    if (view === 'list') {
+      this.activeTalkId = null;
+      this.activeWriting = null;
+      if (this.experienceDetail) this.experienceDetail.replaceChildren();
+      if (this.mode === 'talks') this.renderTalksList();
+      else this.renderWritingsList();
+    }
   }
 
   private renderTalksList(): void {
     if (!this.experienceList) return;
     this.experienceList.replaceChildren(
-      ...TALKS.map((item) => this.talkRow(item, () => this.openTalk(item))),
+      ...TALKS.slice(0, 5).map((item) => this.talkRow(item, () => this.openTalk(item))),
     );
   }
 
-  private talkRow(item: TalkItem, onOpen: () => void): HTMLElement {
+  private talkRow(
+    item: TalkItem,
+    onOpen: () => void,
+    opts?: { compact?: boolean; kind?: 'talk' | 'writing' },
+  ): HTMLElement {
+    const compact = opts?.compact ?? false;
+    const kind = opts?.kind ?? 'talk';
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'experience__row';
+    btn.className = compact ? 'experience__row experience__row--compact' : 'experience__row';
     const thumb = document.createElement('span');
-    thumb.className = 'experience__thumb';
+    thumb.className =
+      kind === 'writing'
+        ? 'experience__thumb experience__thumb--doc'
+        : 'experience__thumb experience__thumb--video';
     thumb.setAttribute('aria-hidden', 'true');
-    thumb.innerHTML = iconSvg('briefcase');
+    if (kind === 'writing') {
+      thumb.innerHTML = iconSvg('page', compact ? 14 : 18);
+    } else {
+      thumb.innerHTML = '<span class="experience__play" aria-hidden="true">▶</span>';
+    }
     const copy = document.createElement('span');
     copy.className = 'experience__copy';
     const title = document.createElement('span');
@@ -505,12 +587,6 @@ export class BuildingPanel {
     meta.className = 'experience__row-meta';
     meta.textContent = t(item.metaKey as I18nKey);
     copy.append(title, meta);
-    if (item.example) {
-      const pill = document.createElement('span');
-      pill.className = 'experience__pill';
-      pill.textContent = t('experience.example');
-      copy.appendChild(pill);
-    }
     btn.append(thumb, copy);
     btn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -520,43 +596,150 @@ export class BuildingPanel {
     return btn;
   }
 
+  private writingRow(item: TalkItem, section: WritingSection, compact = false): HTMLElement {
+    return this.talkRow(item, () => this.openWriting(section, item), { compact, kind: 'writing' });
+  }
+
   private openTalk(item: TalkItem): void {
-    if (this.experienceDetailTitle) this.experienceDetailTitle.textContent = t(item.titleKey as I18nKey);
-    if (this.experienceDetailMeta) this.experienceDetailMeta.textContent = t(item.metaKey as I18nKey);
-    if (this.experienceDetailBody) this.experienceDetailBody.textContent = t('talks.playerPlaceholder');
+    this.activeTalkId = item.id;
+    this.activeWriting = null;
+    this.renderTalkPlayer(item);
     this.setExperienceView('detail');
     if (this.isMobile() && this.peekOnly) this.setPeek(false);
   }
 
+  private renderTalkPlayer(item: TalkItem): void {
+    if (!this.experienceDetail) return;
+    const title = t(item.titleKey as I18nKey);
+    const meta = t(item.metaKey as I18nKey);
+    const upNext = TALKS.filter((x) => x.id !== item.id).slice(0, 3);
+    const wrap = document.createElement('div');
+    wrap.className = 'talks-player';
+    wrap.innerHTML = `
+      <div class="talks-player__stage">
+        <p class="talks-player__label">${t('talks.videoLabel')}</p>
+        <button type="button" class="talks-player__pause" aria-label="">
+          <svg class="talks-player__pause-icon" viewBox="0 0 14 14" width="14" height="14" fill="currentColor" aria-hidden="true">
+            <rect x="3" y="2" width="3" height="10" rx="1"/><rect x="8" y="2" width="3" height="10" rx="1"/>
+          </svg>
+        </button>
+        <div class="talks-player__progress" aria-hidden="true"><span class="talks-player__progress-fill"></span></div>
+        <p class="talks-player__time">0:00 / 0:00</p>
+      </div>
+      <h3 class="talks-player__title"></h3>
+      <p class="talks-player__meta"></p>
+      <hr class="experience__divider" />
+      <h4 class="experience__up-next">${t('talks.upNext')}</h4>
+      <div class="experience__up-next-list" data-up-next></div>
+    `;
+    wrap.querySelector('.talks-player__title')!.textContent = title;
+    wrap.querySelector('.talks-player__meta')!.textContent = meta;
+    const list = wrap.querySelector('[data-up-next]')!;
+    list.replaceChildren(
+      ...upNext.map((talk) => this.talkRow(talk, () => this.openTalk(talk), { compact: true })),
+    );
+    this.experienceDetail.replaceChildren(wrap);
+  }
+
+  private renderWritingsFilters(): void {
+    if (!this.experienceFilters) return;
+    type WritingsFilterId = 'all' | 'uxsc' | 'sinergia' | 'guest';
+    const filters: { id: WritingsFilterId; key: I18nKey }[] = [
+      { id: 'all', key: 'writings.filter.all' },
+      { id: 'uxsc', key: 'writings.filter.uxsc' },
+      { id: 'sinergia', key: 'writings.filter.sinergia' },
+      { id: 'guest', key: 'writings.filter.guest' },
+    ];
+    this.experienceFilters.replaceChildren(
+      ...filters.map(({ id, key }) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'experience__filter';
+        if (id === this.writingsFilter) btn.classList.add('is-active');
+        btn.textContent = t(key);
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (this.writingsFilter === id) return;
+          this.writingsFilter = id;
+          this.renderWritingsFilters();
+          this.renderWritingsList();
+        });
+        return btn;
+      }),
+    );
+  }
+
   private renderWritingsList(): void {
     if (!this.experienceList) return;
+    const sections =
+      this.writingsFilter === 'all'
+        ? WRITINGS
+        : WRITINGS.filter((s) => s.id === this.writingsFilter);
     const frag = document.createDocumentFragment();
-    for (const section of WRITINGS) {
+    for (const section of sections) {
       const head = document.createElement('div');
       head.className = 'experience__section-head';
+      const row = document.createElement('div');
+      row.className = 'experience__section-row';
       const h = document.createElement('h3');
       h.className = 'experience__section-title';
       h.textContent = t(section.titleKey as I18nKey);
+      const badge = document.createElement('span');
+      badge.className = 'experience__section-count';
+      badge.textContent = '0';
+      const seeAll = document.createElement('button');
+      seeAll.type = 'button';
+      seeAll.className = 'experience__see-all';
+      seeAll.textContent = t('chrome.seeAll');
+      row.append(h, badge, seeAll);
       const p = document.createElement('p');
       p.className = 'experience__section-desc';
       p.textContent = t(section.descKey as I18nKey);
-      head.append(h, p);
+      head.append(row, p);
       frag.appendChild(head);
-      for (const item of section.items) {
-        frag.appendChild(
-          this.talkRow(item, () => this.openWriting(section, item)),
-        );
+      for (const item of section.items.slice(0, 3)) {
+        frag.appendChild(this.writingRow(item, section));
       }
     }
     this.experienceList.replaceChildren(frag);
   }
 
-  private openWriting(_section: WritingSection, item: TalkItem): void {
-    if (this.experienceDetailTitle) this.experienceDetailTitle.textContent = t(item.titleKey as I18nKey);
-    if (this.experienceDetailMeta) this.experienceDetailMeta.textContent = t(item.metaKey as I18nKey);
-    if (this.experienceDetailBody) this.experienceDetailBody.textContent = t('writings.readerPlaceholder');
+  private openWriting(section: WritingSection, item: TalkItem): void {
+    this.activeWriting = { sectionId: section.id, itemId: item.id };
+    this.activeTalkId = null;
+    this.renderWritingReader(section, item);
     this.setExperienceView('detail');
     if (this.isMobile() && this.peekOnly) this.setPeek(false);
+  }
+
+  private renderWritingReader(_section: WritingSection, item: TalkItem): void {
+    if (!this.experienceDetail) return;
+    const wrap = document.createElement('article');
+    wrap.className = 'writings-reader';
+    wrap.innerHTML = `
+      <div class="writings-reader__hero" aria-hidden="true">${iconSvg('page', 28)}</div>
+      <p class="writings-reader__kicker"></p>
+      <h3 class="writings-reader__title"></h3>
+      <p class="writings-reader__meta"></p>
+      <div class="writings-reader__body">
+        <p class="writings-reader__p"></p>
+        <p class="writings-reader__p"></p>
+        <p class="writings-reader__p"></p>
+      </div>
+      <a class="writings-reader__substack" href="#" rel="noopener noreferrer"></a>
+    `;
+    wrap.querySelector('.writings-reader__kicker')!.textContent = t('writings.reader.kicker');
+    wrap.querySelector('.writings-reader__title')!.textContent = t(item.titleKey as I18nKey);
+    wrap.querySelector('.writings-reader__meta')!.textContent = t(item.metaKey as I18nKey);
+    const paras = wrap.querySelectorAll('.writings-reader__p');
+    paras[0]!.textContent = t('writings.reader.p1');
+    paras[1]!.textContent = t('writings.reader.p2');
+    paras[2]!.textContent = t('writings.reader.p3');
+    const sub = wrap.querySelector('.writings-reader__substack') as HTMLAnchorElement;
+    sub.textContent = t('writings.substack');
+    sub.addEventListener('click', (e) => e.preventDefault());
+    this.experienceDetail.replaceChildren(wrap);
   }
 
   showInterior(title: string, interiorId: string | null = null): void {
@@ -566,7 +749,8 @@ export class BuildingPanel {
     this.mode = 'interior';
     this.interiorId = interiorId;
     this.peekOnly = this.isMobile();
-    this.el.classList.remove('building-panel--preview', 'building-panel--experience');
+    this.el.classList.remove('building-panel--preview', 'building-panel--experience', 'building-panel--writings');
+    if (this.expHeader) this.expHeader.hidden = true;
     if (this.experienceEl) this.experienceEl.hidden = true;
     this.titleEl.hidden = false;
     this.el.hidden = false;
@@ -719,7 +903,9 @@ export class BuildingPanel {
       'building-panel--expanded',
       'building-panel--preview',
       'building-panel--experience',
+      'building-panel--writings',
     );
+    if (this.expHeader) this.expHeader.hidden = true;
     this.el.setAttribute('inert', '');
     this.el.style.visibility = 'hidden';
     this.el.style.pointerEvents = 'none';
@@ -852,6 +1038,7 @@ export class BuildingPanel {
     });
     const read = this.el.querySelector('.case-preview__read-label');
     if (read) read.textContent = t('panel.readCase');
-    if (this.experienceBack) this.experienceBack.textContent = t('experience.back');
+    const back = this.el.querySelector('[data-exp-back]') as HTMLElement | null;
+    if (back) back.setAttribute('aria-label', t('experience.back'));
   }
 }
