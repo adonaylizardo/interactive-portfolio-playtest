@@ -4068,6 +4068,8 @@ export class IsoScene {
     if (!this.jac || this.interiorActive) return false;
     if (this.pickBuildingDoorAtScreen(sx, sy)) return false;
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
+    const doorTile = worldToTile(wx, wy);
+    if (doorTile && getBuildingAtDoor(doorTile.x, doorTile.y)) return false;
     const g = this.objectGraphics.get(this.jac.obj.id);
     if (g) {
       const lx = wx - g.x;
@@ -4265,6 +4267,9 @@ export class IsoScene {
     if (arrived || doorSideSit) {
       this.jacGetOut({ thenEnter: true });
       return;
+    }
+    if (this.jac.mph < 0.8 && distSit > 2.5) {
+      this.jac.unstickIfStopped();
     }
     if (idle && this.jac.mph < 1.2) {
       this.retryDriveEnterOrGetOut();

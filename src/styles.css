@@ -610,10 +610,12 @@ body[data-layout='panel'] .checklist {
     display: none !important;
   }
 
-  .chrome__lang {
-    left: auto;
-    right: 72px;
-    top: 12px;
+  .chrome__lang,
+  .chrome--mobile .chrome__lang,
+  .chrome--split .chrome__lang {
+    left: auto !important;
+    right: 72px !important;
+    top: 12px !important;
   }
 
   .building-panel__sheet {
