@@ -494,15 +494,12 @@ export class IsoScene {
     this.rearLayer.eventMode = 'none';
     this.rearLayer.label = 'jac-rear';
     this.app.stage.addChild(this.camera);
-<<<<<<< HEAD
     this.app.stage.addChild(this.rearLayer);
-=======
     this.app.stage.addChild(this.perspective.layer);
     this.app.stage.addChild(this.billboardLayer);
     this.billboardLayer.sortableChildren = true;
     this.billboardLayer.eventMode = 'passive';
     this.billboardLayer.label = 'billboards';
->>>>>>> b192477 (Fix camera-views QA: upright top-down, paletted roofs, low follow cam.)
     this.camera.addChild(this.world);
     this.world.addChild(this.tilesLayer);
     this.world.addChild(this.pathLayer);

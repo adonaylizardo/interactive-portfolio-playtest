@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "bundle": "index-d2cD4VCu.js",
+  "base": "http://127.0.0.1:4173/interactive-portfolio-playtest/preview-camaras/",
+  "results": [
+    {
+      "tag": "390",
+      "errors": [],
+      "notes": [
+        "390 boot {\"tag\":\"390\",\"loadMs\":993,\"bundle\":\"index-d2cD4VCu.js\"}",
+        "390: buildings in cenital: estudio, sambil, catedral"
+      ],
+      "bundle": "index-d2cD4VCu.js"
+    },
+    {
+      "tag": "1280",
+      "errors": [],
+      "notes": [
+        "1280 boot {\"tag\":\"1280\",\"loadMs\":1504,\"bundle\":\"index-d2cD4VCu.js\"}",
+        "1280: buildings in cenital: estudio, sambil, catedral"
+      ],
+      "bundle": "index-d2cD4VCu.js"
+    }
+  ]
+}
