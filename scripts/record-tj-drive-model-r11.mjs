@@ -96,13 +96,15 @@ async function pickAwayTile(page) {
         const ch = walk[y][x];
         if (!ch || ch === '#' || ch === 'x') continue;
         const dist = Math.hypot(x - j.cx, y - j.cy);
-        if (dist < 6 || dist > 10) continue;
+        if (dist < 3.4 || dist > 6.5) continue;
         if (door && x === door.x && y === door.y) continue;
-        hits.push({ x, y, dist });
+        const path = door ? window.__playtestQa.findPath(x, y, door.x, door.y) : null;
+        if (door && !path) continue;
+        hits.push({ x, y, dist, path: path?.length ?? 99 });
       }
     }
-    hits.sort((a, b) => a.dist - b.dist);
-    return hits[Math.min(2, hits.length - 1)] ?? hits[0] ?? null;
+    hits.sort((a, b) => a.path - b.path || a.dist - b.dist);
+    return hits[0] ?? null;
   });
 }
 
@@ -272,7 +274,7 @@ async function tapVanReentry(page, cdp, tag, phone, site, n = 5) {
             const j = await page.evaluate(() => window.__playtestQa.jac()?.mode);
             return j === 'menu' ? { mode: j } : null;
           },
-          28000,
+          40000,
         );
     if (menu?.mode !== 'menu') throw new Error(`${tag} ${site.id} #${i}: menu never opened`);
     await page.screenshot({ path: path.join(OUT, `${tag}-${site.id}-menu-${i}.png`) });
