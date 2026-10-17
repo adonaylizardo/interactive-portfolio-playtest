@@ -864,3 +864,21 @@ body[data-layout='panel'] #game-canvas {
   bottom: 24px;
   top: auto;
 }
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .chrome--sheet .chrome__intro {
+    pointer-events: none;
+    max-height: min(42vh, 168px);
+  }
+
+  .chrome--sheet .chrome__intro button,
+  .chrome--sheet .chrome__intro a {
+    pointer-events: auto;
+  }
+
+  .chrome__lang {
+    left: auto;
+    right: 72px;
+    top: 12px;
+  }
+}

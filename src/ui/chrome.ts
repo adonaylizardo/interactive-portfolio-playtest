@@ -71,6 +71,7 @@ export class ChromeUI {
     this.bind();
     this.applyI18n();
     onLangChange(() => this.applyI18n());
+    if (this.shortLandscape()) this.mobileSheet = false;
     this.sync();
     studio.onChange(() => {
       this.syncSound();
@@ -78,11 +79,13 @@ export class ChromeUI {
     });
     const onLayout = () => {
       this.mobile = isMobileLayout();
+      if (this.shortLandscape()) this.mobileSheet = false;
       this.sync();
       this.callbacks.onLayoutChange();
     };
     window.matchMedia('(max-width: 767px)').addEventListener('change', onLayout);
     window.matchMedia('(max-height: 500px)').addEventListener('change', onLayout);
+    window.matchMedia('(orientation: landscape)').addEventListener('change', onLayout);
     const draw = () => {
       this.drawMinimap();
       this.syncViewButtons();
@@ -526,14 +529,17 @@ export class ChromeUI {
     sub.style.top = '';
   }
 
+  private shortLandscape(): boolean {
+    return window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
+  }
+
   private placeLang(): void {
     const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
     if (!lang) return;
-    const shortLand = window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
-    if (shortLand) {
+    if (this.shortLandscape()) {
       lang.style.top = '12px';
-      lang.style.left = '16px';
-      lang.style.right = 'auto';
+      lang.style.right = '72px';
+      lang.style.left = 'auto';
       return;
     }
     lang.style.left = '';

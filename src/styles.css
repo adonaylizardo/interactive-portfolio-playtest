@@ -599,14 +599,20 @@ body[data-layout='panel'] .checklist {
 
   .checklist--mobile-closed,
   .checklist--collapsed {
-    width: 48px;
-    height: 48px;
-    overflow: hidden;
+    width: 48px !important;
+    height: 48px !important;
+    overflow: hidden !important;
+    border-radius: 24px !important;
+  }
+
+  .checklist--mobile-closed .checklist__header-text,
+  .checklist--mobile-closed .checklist__counter--label {
+    display: none !important;
   }
 
   .chrome__lang {
-    left: max(16px, env(safe-area-inset-left));
-    right: auto;
+    left: auto;
+    right: 72px;
     top: 12px;
   }
 
@@ -1823,6 +1829,14 @@ body[data-layout='panel'] .checklist {
   .joystick {
     right: 24px;
     bottom: 24px;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .joystick {
+    left: 16px;
+    right: auto;
+    bottom: 16px;
   }
 }
 

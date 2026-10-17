@@ -709,13 +709,25 @@ export class JacT9 {
       }
     }
 
-    const doorSide = usable.filter((c) => c.along >= -0.2);
-    const close = doorSide.filter((c) => c.doorD <= 8);
-    const pool = close.length ? close : doorSide.length ? doorSide : usable;
-    pool.sort((a, b) => a.doorD - b.doorD || b.along - a.along || a.pathD - b.pathD);
+    const doorSide = usable.filter((c) => c.along >= 0);
+    const close = doorSide.filter((c) => c.doorD <= 5);
+    const near = doorSide.filter((c) => c.doorD <= 8);
+    const pool = close.length ? close : near.length ? near : doorSide.length ? doorSide : usable;
+    const prefer = (c: Cand) => (cells[c.y]?.[c.x]?.groundId?.includes('park') ? 0 : 1);
+    pool.sort(
+      (a, b) => a.doorD - b.doorD || prefer(a) - prefer(b) || b.along - a.along || a.pathD - b.pathD,
+    );
     const pick = pool[0];
     if (!pick) return null;
     return { x: pick.x, y: pick.y, path: this.nodesToPath(pick.node) };
+  }
+
+  /** + along the outward door axis (door side). Negative is behind the house. */
+  doorSideAlong(doorX: number, doorY: number): number {
+    const building = getBuildingAtDoor(doorX, doorY);
+    const inward = building ? doorInwardStep(building) : null;
+    const out = inward ? { x: -inward.x, y: -inward.y } : { x: 0, y: 1 };
+    return (this.cx - doorX) * out.x + (this.cy - doorY) * out.y;
   }
 
   /** Parked 5×3 / 3×5 cells the walker must go around. */
@@ -780,7 +792,12 @@ export class JacT9 {
       }
     }
     found.sort((a, b) => b.x + b.y - (a.x + a.y));
-    if (found[0]) return found[0];
+    const reach = (spot: { x: number; y: number }) => {
+      const pass = (x: number, y: number) => !blocked.has(k(x, y)) && tileIsStandable(x, y);
+      return pass(spot.x, spot.y);
+    };
+    const first = found.find(reach);
+    if (first) return first;
     for (let d = 1; d <= 6; d++) {
       for (let dy = -d; dy <= d; dy++) {
         for (let dx = -d; dx <= d; dx++) {
@@ -808,7 +825,7 @@ export class JacT9 {
     const blocked = new Set(this.parkCellsAt(cx, cy, dir).map(([x, y]) => k(x, y)));
     const pass = (x: number, y: number) => {
       if (blocked.has(k(x, y))) return false;
-      return !!cells[y]?.[x]?.walkable;
+      return tileIsStandable(x, y);
     };
     const starts: { x: number; y: number }[] = [];
     for (const [x, y] of this.parkCellsAt(cx, cy, dir)) {
@@ -1271,9 +1288,17 @@ export class JacT9 {
     this.dropPassedPathNodes();
     const goal = this.driveGoal;
     const goalDist = goal ? Math.hypot(goal.x - this.cx, goal.y - this.cy) : Infinity;
-    if (goal && (this.visualOnTile(goal.x, goal.y) || (goalDist < PATH_ARRIVE && Math.abs(this.vel) < 0.7))) {
-      this.clearDriveArrival();
-      return { throttle: 0, steer: 0 };
+    if (goal) {
+      const fwd = DIR_VEC[this.dir];
+      const behind = (goal.x - this.cx) * fwd.x + (goal.y - this.cy) * fwd.y < -0.05;
+      if (
+        this.visualOnTile(goal.x, goal.y) ||
+        goalDist < PATH_ARRIVE + 0.43 ||
+        (goalDist < 1.35 && (behind || Math.abs(this.vel) < 1.4))
+      ) {
+        this.clearDriveArrival();
+        return { throttle: 0, steer: 0 };
+      }
     }
     if (this.drivePath.length === 0) {
       if (goal) this.drivePath.push({ x: goal.x, y: goal.y });
@@ -1353,7 +1378,7 @@ export class JacT9 {
   }
 
   private noteGoalProgress(dt: number): void {
-    if (!this.followLoose || !this.driveGoal || this.stuckGaveUp) return;
+    if (this.followLoose || !this.driveGoal || this.stuckGaveUp) return;
     const d = Math.hypot(this.cx - this.driveGoal.x, this.cy - this.driveGoal.y);
     if (d < this.goalBest - 0.2) {
       this.goalBest = d;
@@ -1361,12 +1386,14 @@ export class JacT9 {
       return;
     }
     this.noProgressT += dt;
-    if (this.noProgressT < 3.2) return;
-    this.drivePath = [];
-    this.driveGoal = null;
-    this.followLoose = false;
-    this.stuckGaveUp = true;
-    this.hooks.onStuck?.();
+    if (this.noProgressT < 6) return;
+    if (d < 1.4) {
+      this.clearDriveArrival();
+      return;
+    }
+    this.stuckT = Math.max(this.stuckT, STUCK_REPLAN_S);
+    this.tryReplan();
+    this.noProgressT = 0;
   }
 
   private visualGoalMiss(): number {
@@ -1847,10 +1874,11 @@ export class JacT9 {
     };
   }
 
-  /** Parked tap: the footprint plus a one-tile ring, so a roof tap can still claim the van. */
+  /** Parked tap: the footprint only. Door tiles never belong to the van. */
   tapHitsTile(tx: number, ty: number): boolean {
+    if (getBuildingAtDoor(tx, ty)) return false;
     for (const [x, y] of this.parkCells()) {
-      if (Math.max(Math.abs(x - tx), Math.abs(y - ty)) <= 1) return true;
+      if (x === tx && y === ty) return true;
     }
     return false;
   }
@@ -1946,7 +1974,7 @@ export class JacT9 {
     v.zIndex = this.sortDepth();
     this.hooks.container.zIndex = v.zIndex;
     this.layoutGhost(foot.x + lx, foot.y + ly, sc, v.zIndex);
-    const pad = this.driving ? 0 : 36 * sc;
+    const pad = this.driving ? 0 : 8 * sc;
     const box = new Rectangle(lx + 40 * sc - pad, ly + 8 * sc - pad, 200 * sc + pad * 2, 120 * sc + pad * 2);
     this.hooks.tapBox.set(this.obj.id, box);
     this.hooks.container.hitArea = box;
