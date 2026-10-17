@@ -138,7 +138,7 @@ import { FillActors, type FillActorSnapshot } from './fillActors';
 import { NpcCrowd, type NpcSnapshot } from './npcs';
 import { buildTown, type Bench } from './npcRoutines';
 import { Noah, type NoahSnapshot } from './noah';
-import { JacT9, JAC_ID, type JacGear, type JacLights, type JacSnapshot, type JacToggleId } from './jacT9';
+import { JacT9, JAC_ID, tileIsStandable, type JacGear, type JacLights, type JacSnapshot, type JacToggleId } from './jacT9';
 import {
   loadPlayerSheets,
   loadRestSheets,
@@ -416,6 +416,7 @@ export class IsoScene {
     null;
   private pendingDriveEnter: { panelTitle: string; door: { x: number; y: number } } | null = null;
   private pendingDriveEnterAt = 0;
+  private pendingWalkInAt = 0;
   private pendingJacEnter = false;
   private pendingJacPanel = false;
   private tileCullEntries: { g: Sprite; tx: number; ty: number }[] = [];
@@ -1465,6 +1466,9 @@ export class IsoScene {
       if (this.canvasEl) this.canvasEl.dataset.walkGoal = '';
       this.events.onUnreachable?.();
       return;
+    }
+    if (!tileIsStandable(Math.round(this.charTx), Math.round(this.charTy))) {
+      this.rescueAvatarIfTrapped();
     }
     const sx = Math.round(this.charTx);
     const sy = Math.round(this.charTy);
@@ -3134,6 +3138,8 @@ export class IsoScene {
   }
 
   private update(): void {
+    this.rescueAvatarIfTrapped();
+    this.releaseFailedScript();
     this.updateMovement();
     this.updateAvatars(Math.min(0.25, this.app.ticker.elapsedMS / 1000));
     this.updateCameraFollow();
@@ -4225,10 +4231,12 @@ export class IsoScene {
       clearTimeout(this.jacBubbleTimer);
       this.jacBubbleTimer = null;
     }
+    this.rescueAvatarIfTrapped();
     this.startCameraFollow();
     const entry = this.pendingDriveEnter;
     this.pendingDriveEnter = null;
     if (entry) {
+      this.pendingWalkInAt = performance.now();
       this.requestWalk(entry.door.x, entry.door.y, false, { buildingEntry: entry });
     }
   }
@@ -4236,12 +4244,71 @@ export class IsoScene {
   private tryFinishDriveEnter(): void {
     if (!this.pendingDriveEnter || !this.jac?.driving || this.jac.isExiting()) return;
     const door = this.pendingDriveEnter.door;
-    const dist = Math.hypot(this.jac.cx - door.x, this.jac.cy - door.y);
+    const goal = this.jac.driveGoal ?? door;
+    const distGoal = Math.hypot(this.jac.cx - goal.x, this.jac.cy - goal.y);
+    const distDoor = Math.hypot(this.jac.cx - door.x, this.jac.cy - door.y);
     const idle = this.jac.drivePath.length === 0 && !this.jac.driveGoal;
-    const near = dist < 7 && this.jac.mph < 1;
-    const timedOut = this.pendingDriveEnterAt > 0 && performance.now() - this.pendingDriveEnterAt > 12000;
-    if (!near && !timedOut && !(idle && this.jac.mph <= 0.4)) return;
-    this.jacGetOut({ thenEnter: true });
+    const arrived = distGoal < 1.8 && this.jac.mph < 1.2;
+    const nearDoor = distDoor < 5 && this.jac.mph < 1;
+    const stalledNear = idle && this.jac.mph <= 0.25 && distDoor < 8;
+    const waiting = this.pendingDriveEnterAt > 0 ? performance.now() - this.pendingDriveEnterAt : 0;
+    if (arrived || nearDoor || stalledNear) {
+      this.jacGetOut({ thenEnter: true });
+      return;
+    }
+    if (waiting > 22000 && idle) {
+      this.pendingDriveEnter = null;
+      this.pendingDriveEnterAt = 0;
+      this.moveCommandArmed = true;
+    }
+  }
+
+  private rescueAvatarIfTrapped(): void {
+    if (this.interiorActive || this.jac?.driving) return;
+    const tx = Math.round(this.charTx);
+    const ty = Math.round(this.charTy);
+    if (tileIsStandable(tx, ty)) return;
+    const spot = this.nearestStandable(tx, ty);
+    if (!spot) return;
+    this.charTx = spot.x;
+    this.charTy = spot.y;
+    this.syncCharacterGraphic();
+  }
+
+  private nearestStandable(fromX: number, fromY: number): { x: number; y: number } | null {
+    if (tileIsStandable(fromX, fromY)) return { x: fromX, y: fromY };
+    for (let d = 1; d <= 12; d++) {
+      for (let dy = -d; dy <= d; dy++) {
+        for (let dx = -d; dx <= d; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== d) continue;
+          const x = fromX + dx;
+          const y = fromY + dy;
+          if (tileIsStandable(x, y)) return { x, y };
+        }
+      }
+    }
+    return null;
+  }
+
+  private releaseFailedScript(): void {
+    if (this.jac?.driving && this.pendingDriveEnter && this.pendingDriveEnterAt) {
+      return;
+    }
+    if (!this.pendingWalkInAt || this.interiorActive) return;
+    if (this.pendingBuildingEntry && performance.now() - this.pendingWalkInAt < 8000) return;
+    if (!this.pendingBuildingEntry && !this.pendingJacExit) {
+      this.pendingWalkInAt = 0;
+      return;
+    }
+    if (this.pendingWalkInAt && performance.now() - this.pendingWalkInAt < 8000) return;
+    this.pendingBuildingEntry = null;
+    this.pendingDriveEnter = null;
+    this.pendingWalkInAt = 0;
+    this.pendingJacExit = false;
+    this.jac?.cancelExit();
+    this.path = [];
+    this.moveCommandArmed = true;
+    this.rescueAvatarIfTrapped();
   }
 
   qaDriveTo(tx: number, ty: number): boolean {
@@ -4291,6 +4358,29 @@ export class IsoScene {
   qaParkForDoor(doorX: number, doorY: number): { x: number; y: number; path?: { x: number; y: number }[] } | null {
     const sit = this.jac?.parkForDoor(doorX, doorY);
     return sit ? { x: sit.x, y: sit.y, path: sit.path } : null;
+  }
+
+  qaInputReady(): {
+    driving: boolean;
+    exiting: boolean;
+    pendingDrive: boolean;
+    pendingWalk: boolean;
+    interior: boolean;
+    standable: boolean;
+    char: { x: number; y: number };
+    moveArmed: boolean;
+  } {
+    const char = { x: Math.round(this.charTx), y: Math.round(this.charTy) };
+    return {
+      driving: !!this.jac?.driving,
+      exiting: !!this.jac?.isExiting(),
+      pendingDrive: !!this.pendingDriveEnter,
+      pendingWalk: !!this.pendingBuildingEntry,
+      interior: this.interiorActive,
+      standable: tileIsStandable(char.x, char.y),
+      char,
+      moveArmed: this.moveCommandArmed,
+    };
   }
 
   qaParkedFootprint(): { x: number; y: number }[] {

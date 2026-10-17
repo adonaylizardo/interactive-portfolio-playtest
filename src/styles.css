@@ -590,6 +590,39 @@ body[data-layout='panel'] .checklist {
   }
 }
 
+/* Phone landscape (e.g. 844×390): treat as compact. Checklist is a pill; lang stays off the panel. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .checklist:not(.checklist--mobile-closed) {
+    max-height: min(70vh, 220px);
+    max-width: min(260px, calc(100vw - 160px));
+  }
+
+  .checklist--mobile-closed,
+  .checklist--collapsed {
+    width: 48px;
+    height: 48px;
+    overflow: hidden;
+  }
+
+  .chrome__lang {
+    left: max(16px, env(safe-area-inset-left));
+    right: auto;
+    top: 12px;
+  }
+
+  .building-panel__sheet {
+    max-width: min(360px, 42vw);
+  }
+
+  body[data-layout='map'] .building-panel--open .building-panel__sheet {
+    pointer-events: auto;
+  }
+
+  body[data-layout='map'] .building-panel:not(.building-panel--preview) .building-panel__backdrop {
+    pointer-events: none;
+  }
+}
+
 @media (min-width: 768px) {
   .checklist__counter--label {
     font-size: 14px;

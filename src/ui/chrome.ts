@@ -76,11 +76,13 @@ export class ChromeUI {
       this.syncSound();
       this.syncSubtitle();
     });
-    window.matchMedia('(max-width: 767px)').addEventListener('change', () => {
+    const onLayout = () => {
       this.mobile = isMobileLayout();
       this.sync();
       this.callbacks.onLayoutChange();
-    });
+    };
+    window.matchMedia('(max-width: 767px)').addEventListener('change', onLayout);
+    window.matchMedia('(max-height: 500px)').addEventListener('change', onLayout);
     const draw = () => {
       this.drawMinimap();
       this.syncViewButtons();
@@ -527,6 +529,14 @@ export class ChromeUI {
   private placeLang(): void {
     const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
     if (!lang) return;
+    const shortLand = window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
+    if (shortLand) {
+      lang.style.top = '12px';
+      lang.style.left = '16px';
+      lang.style.right = 'auto';
+      return;
+    }
+    lang.style.left = '';
     const cl = document.querySelector('.checklist') as HTMLElement | null;
     const ring = cl && !cl.hidden ? cl.getBoundingClientRect() : null;
     if (ring && ring.width > 8) {

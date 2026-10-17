@@ -79,10 +79,12 @@ export class JacHud {
     this.applyLang();
     onLangChange(() => this.applyLang());
     this.bind();
-    window.matchMedia('(max-width: 767px)').addEventListener('change', () => {
+    const onLayout = () => {
       this.mobile = isMobileLayout();
       if (this.snap) this.render(this.snap);
-    });
+    };
+    window.matchMedia('(max-width: 767px)').addEventListener('change', onLayout);
+    window.matchMedia('(max-height: 500px)').addEventListener('change', onLayout);
   }
 
   park(): void {
