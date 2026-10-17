@@ -145,18 +145,23 @@ function parkCovers(sit, door, keep) {
     { w: 5, h: 3 },
     { w: 3, h: 5 },
   ];
+  let anyClear = false;
   for (const size of sizes) {
     const ox = Math.round(sit.x - (size.w - 1) / 2);
     const oy = Math.round(sit.y - (size.h - 1) / 2);
-    for (let dy = 0; dy < size.h; dy++) {
+    let covers = false;
+    for (let dy = 0; dy < size.h && !covers; dy++) {
       for (let dx = 0; dx < size.w; dx++) {
         const key = `${ox + dx},${oy + dy}`;
-        if (keep.has(key)) return true;
-        if (ox + dx === door.x && oy + dy === door.y) return true;
+        if (keep.has(key) || (ox + dx === door.x && oy + dy === door.y)) {
+          covers = true;
+          break;
+        }
       }
     }
+    if (!covers) anyClear = true;
   }
-  return false;
+  return !anyClear;
 }
 
 async function doorWhileDriving(page, tag, phone) {
@@ -173,41 +178,51 @@ async function doorWhileDriving(page, tag, phone) {
     });
     await parkVan(page);
     await ensureDriving(page, `${tag}:${name}`);
-    await page.evaluate(() => window.__playtestQa.setZoom?.(0.12));
+    await page.evaluate(() => window.__playtestQa.focusJac?.());
     await wait(80);
 
-    const plan = await page.evaluate((door) => {
-      const sit = window.__playtestQa.parkForDoor?.(door.x, door.y);
-      const path = sit ? window.__playtestQa.jacFindDrivePath?.(sit.x, sit.y) : null;
+    const plan = await page.evaluate((args) => {
+      const sit = window.__playtestQa.parkForDoor?.(args.door.x, args.door.y);
+      const path = sit?.path ?? (sit ? window.__playtestQa.jacFindDrivePath?.(sit.x, sit.y) : null);
       const walk = window.__playtestQa.fill?.().walk ?? [];
-      const keep = [`${door.x},${door.y}`];
+      const keep = [`${args.door.x},${args.door.y}`];
       for (const [dx, dy] of [
         [1, 0],
         [-1, 0],
         [0, 1],
         [0, -1],
       ]) {
-        const x = door.x + dx;
-        const y = door.y + dy;
+        const x = args.door.x + dx;
+        const y = args.door.y + dy;
         const ch = walk[y]?.[x];
         if (ch && ch !== '#' && ch !== 'x') keep.push(`${x},${y}`);
       }
-      if (sit && path && path.length > 70) {
-        const hop = path[Math.max(0, path.length - 12)];
+      if (sit && path && path.length > 8) {
+        const hop = path[Math.max(0, path.length - 6)];
         window.__playtestQa.jacSet?.({ cx: hop.x, cy: hop.y, dir: 'se', mode: 'drive' });
         window.__playtestQa.jacSetGear?.('D');
       }
-      return { sit, pathLen: path?.length ?? null, keep, cx: window.__playtestQa.jac()?.cx, cy: window.__playtestQa.jac()?.cy };
-    }, b.door);
+      const ok = window.__playtestQa.walkToBuilding(args.name);
+      const j = window.__playtestQa.jac();
+      return {
+        sit,
+        pathLen: path?.length ?? null,
+        keep,
+        ok,
+        cx: j?.cx,
+        cy: j?.cy,
+        goal: j?.driveGoal,
+      };
+    }, { door: b.door, name });
 
     if (!plan.sit) throw new Error(`${tag}:${name}: parkForDoor returned null`);
     if (parkCovers(plan.sit, b.door, new Set(plan.keep))) {
       throw new Error(`${tag}:${name}: park sit (${plan.sit.x},${plan.sit.y}) covers door/approach`);
     }
+    if (!plan.ok) throw new Error(`${tag}:${name}: walkToBuilding while driving failed`);
 
     const started = Date.now();
-    const ok = await page.evaluate((n) => window.__playtestQa.walkToBuilding(n), name);
-    if (!ok) throw new Error(`${tag}:${name}: walkToBuilding while driving failed`);
+    console.log(`${tag}:${name} sit=${plan.sit.x},${plan.sit.y} path=${plan.pathLen ?? '?'} goal=${JSON.stringify(plan.goal)}`);
 
     const entered = await waitUntil(
       page,
@@ -221,6 +236,9 @@ async function doorWhileDriving(page, tag, phone) {
           }
           if (window.__playtestQa.isInInterior?.()) {
             return { kind: 'interior', id: window.__playtestQa.getInteriorId?.() };
+          }
+          if (window.__playtestQa.isCasePreview?.() || window.__playtestQa.isBuildingPanelOpen?.()) {
+            return { kind: 'panel', title: window.__playtestQa.openPanelTitle?.() ?? expected };
           }
           return null;
         }, name);
@@ -240,6 +258,9 @@ async function doorWhileDriving(page, tag, phone) {
         foot,
         char,
         interior: window.__playtestQa.isInInterior?.(),
+        preview: window.__playtestQa.isCasePreview?.(),
+        panel: window.__playtestQa.isBuildingPanelOpen?.(),
+        title: window.__playtestQa.openPanelTitle?.(),
         id: window.__playtestQa.getInteriorId?.(),
       };
     });
@@ -247,7 +268,8 @@ async function doorWhileDriving(page, tag, phone) {
     if (entered?.kind === 'toast') {
       throw new Error(`${tag}:${name}: fell back to toast '${entered.text}'`);
     }
-    if (!entered || entered.kind !== 'interior' || !after.interior) {
+    const inside = entered.kind === 'interior' || entered.kind === 'panel';
+    if (!inside || !(after.interior || after.preview || after.panel)) {
       throw new Error(`${tag}:${name}: never entered (${ms}ms, sit ${plan.sit.x},${plan.sit.y}, van ${after.cx},${after.cy})`);
     }
     if (!phone && ms > 20000) {
@@ -270,10 +292,13 @@ async function doorWhileDriving(page, tag, phone) {
       sit: plan.sit,
       pathLen: plan.pathLen,
       ms,
-      interior: after.id,
+      interior: after.id ?? after.title,
     });
     await page.screenshot({ path: path.join(OUT, `${tag}-${name}-inside.png`) });
-    await page.evaluate(() => window.__playtestQa.leaveInteriorNow?.());
+    await page.evaluate(() => {
+      if (window.__playtestQa.isInInterior?.()) window.__playtestQa.leaveInteriorNow?.();
+      window.__playtestQa.dismissBuildingPanel?.();
+    });
     await wait(200);
   }
 

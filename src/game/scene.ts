@@ -1809,7 +1809,7 @@ export class IsoScene {
       this.jacGetOut({ thenEnter: true });
       return true;
     }
-    const path = this.jac.findDrivePath(sit.x, sit.y);
+    const path = sit.path.length > 0 ? sit.path : this.jac.findDrivePath(sit.x, sit.y);
     if (!path) {
       this.pendingDriveEnter = entry;
       this.jacGetOut({ thenEnter: true });
@@ -1825,7 +1825,7 @@ export class IsoScene {
     }
     this.qaLastDriveTap = { x: dest.x, y: dest.y };
     this.qaPointerDriveAccepts += 1;
-    this.jac.setDrivePath(path, dest);
+    this.jac.setDrivePath(path, dest, { loose: true });
     this.startCameraFollow();
     this.drawPathPreview();
     this.fireMoveCommand();
@@ -4190,6 +4190,9 @@ export class IsoScene {
       this.jac.cx = snap.exitCx;
       this.jac.cy = snap.exitCy;
     }
+    if (this.pendingDriveEnter) {
+      this.jac.faceClearOfDoor(this.pendingDriveEnter.door.x, this.pendingDriveEnter.door.y);
+    }
     this.jac.setMode('parked');
     this.jac.relayoutParked();
     if (spot) {
@@ -4263,8 +4266,9 @@ export class IsoScene {
     return this.jac?.canDriveAt(cx, cy) ?? false;
   }
 
-  qaParkForDoor(doorX: number, doorY: number): { x: number; y: number } | null {
-    return this.jac?.parkForDoor(doorX, doorY) ?? null;
+  qaParkForDoor(doorX: number, doorY: number): { x: number; y: number; path?: { x: number; y: number }[] } | null {
+    const sit = this.jac?.parkForDoor(doorX, doorY);
+    return sit ? { x: sit.x, y: sit.y, path: sit.path } : null;
   }
 
   qaParkedFootprint(): { x: number; y: number }[] {

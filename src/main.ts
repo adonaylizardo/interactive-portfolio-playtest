@@ -291,6 +291,7 @@ async function main(): Promise<void> {
     namePillHeads: () => scene.qaNamePillHeads(),
     barks: () => studio.qaBarks(),
     isCasePreview: () => panel.isPreviewMode(),
+    openPanelTitle: () => panel.openTitle(),
     isCasePreviewExpanded: () => panel.isPreviewExpanded(),
     showCasePreview: (id: string) => panel.showPreview(id),
     expandCasePreview: () => panel.expandPreviewForQa(),
