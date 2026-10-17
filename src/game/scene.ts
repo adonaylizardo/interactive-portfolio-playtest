@@ -730,6 +730,10 @@ export class IsoScene {
         this.handleScreenTap(local.x, local.y, sprint);
         return;
       }
+      if (this.claimJacTap(e)) {
+        this.tapJac();
+        return;
+      }
       const pos = e.getLocalPosition(this.world);
       const tile = worldToTile(pos.x, pos.y);
       if (!tile) {
@@ -808,6 +812,10 @@ export class IsoScene {
         const local = this.federatedToCanvas(e);
         if (!local) return;
         this.handleScreenTap(local.x, local.y, false);
+        return;
+      }
+      if (this.claimJacTap(e)) {
+        this.tapJac();
         return;
       }
       if (!this.prepareMapTap(undefined, tx, ty)) return;
@@ -973,7 +981,7 @@ export class IsoScene {
           this.handleScreenTap(local.x, local.y, false);
           return;
         }
-        if (obj.id === JAC_ID) {
+        if (obj.id === JAC_ID || this.claimJacTap(e)) {
           this.tapJac();
           return;
         }
@@ -3942,6 +3950,13 @@ export class IsoScene {
       onStuck: () => this.events.onUnreachable?.(),
     });
     g.label = JAC_ID;
+  }
+
+  /** A tap on the van sprite always wins, even under a building or tile. */
+  private claimJacTap(e: { clientX?: number; clientY?: number; global?: { x: number; y: number }; nativeEvent?: unknown }): boolean {
+    if (!this.jac || this.jac.driving) return false;
+    const local = this.federatedToCanvas(e);
+    return !!local && this.pickJacAtScreen(local.x, local.y);
   }
 
   private pickJacAtScreen(sx: number, sy: number): boolean {

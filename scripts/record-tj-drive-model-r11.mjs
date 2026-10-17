@@ -98,6 +98,7 @@ async function pickAwayTile(page) {
         const dist = Math.hypot(x - j.cx, y - j.cy);
         if (dist < 3.4 || dist > 6.5) continue;
         if (door && x === door.x && y === door.y) continue;
+        if ((window.__playtestQa.jacApproach?.() ?? []).some((s) => s.x === x && s.y === y)) continue;
         const path = door ? window.__playtestQa.findPath(x, y, door.x, door.y) : null;
         if (door && !path) continue;
         hits.push({ x, y, dist, path: path?.length ?? 99 });
