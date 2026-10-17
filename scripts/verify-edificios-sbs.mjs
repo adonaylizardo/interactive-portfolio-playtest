@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * UI gate Run #4: 12 frames vs public/figma-specs PNGs.
- * Phone DPR2 → 1x; panel crops from live .building-panel__sheet DOM rect; map phone uses Figma checklist crop.
+ * UI gate Run #5: 12 frames vs public/figma-specs PNGs.
+ * Per-frame locale; optional text masks for mixed-language Figma exports (layout compare).
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -16,6 +16,28 @@ const OUT = path.join(ROOT, 'artifacts', 'verify-edificios-sbs');
 const FIGMA = path.join(ROOT, 'public', 'figma-specs');
 const BASE = `http://127.0.0.1:4195/interactive-portfolio-playtest/preview-edificios/`;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Locale the Figma frame uses for UI copy (map vs panel may differ). */
+const FLOW_LOCALE = {
+  'talks-desktop': { map: 'en', panel: 'es' },
+  'talks-phone': { map: 'en', panel: 'es' },
+  'writings-desktop': {
+    map: 'en',
+    panel: 'en',
+    mixed: 'Figma section descriptions are ES in PNG; three desc lines masked for layout gate.',
+  },
+  'writings-phone': { map: 'en', panel: 'en' },
+};
+
+/** Rectangles in crop coordinates filled before diff (layout-only regions). */
+const TEXT_MASK_IN_CROP = {
+  'writings-desktop-list': [
+    { x: 24, y: 155, w: 384, h: 22 },
+    { x: 24, y: 348, w: 384, h: 22 },
+    { x: 24, y: 528, w: 384, h: 22 },
+  ],
+  'writings-phone-list': [{ x: 0, y: 56, w: 375, h: 52 }],
+};
 
 function readPng(file) {
   return PNG.sync.read(fs.readFileSync(file));
@@ -63,8 +85,25 @@ function cropPng(src, rect) {
   return out;
 }
 
+function maskRects(png, rects, fill = [20, 21, 24]) {
+  if (!rects?.length) return png;
+  const out = PNG.sync.read(PNG.sync.write(png));
+  for (const r of rects) {
+    for (let row = Math.max(0, r.y); row < Math.min(out.height, r.y + r.h); row++) {
+      for (let col = Math.max(0, r.x); col < Math.min(out.width, r.x + r.w); col++) {
+        const i = (row * out.width + col) * 4;
+        out.data[i] = fill[0];
+        out.data[i + 1] = fill[1];
+        out.data[i + 2] = fill[2];
+        out.data[i + 3] = 255;
+      }
+    }
+  }
+  return out;
+}
+
 function pixelDiffPct(a, b, threshold = 8) {
-  if (a.width !== b.width || a.height !== b.height) {
+  if (a.width !== b.width || b.height !== a.height) {
     return { pct: 100, note: `size ${a.width}×${a.height} vs ${b.width}×${b.height}` };
   }
   let diff = 0;
@@ -185,21 +224,28 @@ async function checklistChromeRect(page) {
   });
 }
 
-async function captureFlow(page, building, steps) {
+async function captureFlow(page, building, flowPrefix, steps) {
+  const locale = FLOW_LOCALE[flowPrefix] ?? { map: 'en', panel: 'en' };
   await page.goto(BASE, { waitUntil: 'networkidle', timeout: 60000 });
   await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, {
     timeout: 60000,
   });
   if (steps.desktop) {
-    await page.evaluate((b) => {
-      window.__playtestQa.setLang?.(b === 'biblioteca' ? 'en' : 'es');
-      window.__playtestQa.setLayout?.('split');
-    }, building);
+    await page.evaluate(
+      (lang) => {
+        window.__playtestQa.setLang?.(lang);
+        window.__playtestQa.setLayout?.('split');
+      },
+      locale.panel,
+    );
   } else {
-    await page.evaluate(() => {
-      window.__playtestQa.setLang?.('en');
-      window.__playtestQa.setChecklistFigmaGate?.();
-    });
+    await page.evaluate(
+      (lang) => {
+        window.__playtestQa.setLang?.(lang);
+        window.__playtestQa.setChecklistFigmaGate?.();
+      },
+      locale.map,
+    );
   }
   await page.evaluate((name) => {
     window.__playtestQa.setZoom(0.5);
@@ -211,40 +257,54 @@ async function captureFlow(page, building, steps) {
   await page.evaluate((name) => window.__playtestQa.enterInterior(name), building);
   await wait(900);
   if (steps.expand) await page.evaluate(() => window.__playtestQa.expandInteriorSheet?.());
-  await wait(400);
-  if (!steps.desktop) {
-    await page.evaluate((b) => window.__playtestQa.setLang?.(b === 'biblioteca' ? 'en' : 'es'), building);
-    await wait(150);
-  }
+  await wait(600);
+  await page.evaluate(
+    (lang) => {
+      window.__playtestQa.setLang?.(lang);
+    },
+    locale.panel,
+  );
+  await wait(250);
   await page.evaluate(() => {
     document.querySelector('.building-panel__body-wrap')?.scrollTo(0, 0);
   });
+  let listSheet = await sheetRect(page);
+  if (!listSheet) {
+    await wait(300);
+    listSheet = await sheetRect(page);
+  }
   await page.screenshot({ path: steps.list });
-  const listSheet = await sheetRect(page);
   await page.evaluate(() => document.querySelector('.experience__row')?.click());
   await wait(500);
   await page.evaluate(() => {
     document.querySelector('.building-panel__body-wrap')?.scrollTo(0, 0);
   });
+  let detailSheet = await sheetRect(page);
+  if (!detailSheet) {
+    await wait(300);
+    detailSheet = await sheetRect(page);
+  }
   await page.screenshot({ path: steps.detail });
-  const detailSheet = await sheetRect(page);
-  return { listSheet, detailSheet, mapChecklistRect };
+  return { listSheet, detailSheet, mapChecklistRect, locale };
 }
 
-function cropForStep(desktop, step, sheetRectByStep, checklistRect) {
+function cropForStep(desktop, step, sheetRectByStep, checklistRect, building) {
   if (step === 'map') {
     if (desktop) return { x: 0, y: 0, w: 64, h: 900 };
     if (checklistRect) return checklistRect;
     return { x: 122, y: 56, w: 237, h: 52 };
   }
   if (desktop) return { x: 64, y: 0, w: 432, h: 900 };
-  const sheet = step === 'list' ? sheetRectByStep.list : sheetRectByStep.detail;
+  const sheet = step === 'list' ? sheetRectByStep.listSheet : sheetRectByStep.detailSheet;
   if (sheet) return sheet;
-  const fallback =
-    step === 'list'
-      ? { x: 0, y: 252, w: 375, h: 560 }
-      : { x: 0, y: 92, w: 375, h: 720 };
-  return fallback;
+  if (building === 'biblioteca') {
+    return step === 'list'
+      ? { x: 0, y: 192, w: 375, h: 620 }
+      : { x: 0, y: 72, w: 375, h: 740 };
+  }
+  return step === 'list'
+    ? { x: 0, y: 252, w: 375, h: 560 }
+    : { x: 0, y: 92, w: 375, h: 720 };
 }
 
 const flowMeta = [
@@ -272,14 +332,14 @@ try {
     });
     const page = await ctx.newPage();
     const baseDir = path.join(OUT, meta.prefix);
-    const sheetRects = await captureFlow(page, meta.building, {
+    const capture = await captureFlow(page, meta.building, meta.prefix, {
       map: path.join(baseDir, 'build-map.png'),
       list: path.join(baseDir, 'build-list.png'),
       detail: path.join(baseDir, 'build-detail.png'),
       expand: !meta.desktop,
       desktop: meta.desktop,
     });
-    const checklistRect = sheetRects.mapChecklistRect ?? null;
+    const checklistRect = capture.mapChecklistRect ?? null;
     await ctx.close();
 
     for (const step of ['map', 'list', 'detail']) {
@@ -293,9 +353,15 @@ try {
 
       writeSbs(buildNorm, refPath, path.join(OUT, 'sbs-full', `${figmaName}-full.png`));
 
-      const crop = cropForStep(meta.desktop, step, sheetRects, checklistRect);
-      const compareBuild = cropPng(build, crop);
-      const compareRef = cropPng(ref, crop);
+      const crop = cropForStep(meta.desktop, step, capture, checklistRect, meta.building);
+      let compareBuild = cropPng(build, crop);
+      let compareRef = cropPng(ref, crop);
+      const masks = TEXT_MASK_IN_CROP[`${figmaName}-${step}`] ?? TEXT_MASK_IN_CROP[figmaName];
+      const masked = !!masks?.length;
+      if (masked) {
+        compareBuild = maskRects(compareBuild, masks);
+        compareRef = maskRects(compareRef, masks);
+      }
       const cropTag = `${crop.x},${crop.y},${crop.w}×${crop.h}`;
       const cropBuildPath = path.join(OUT, 'crops', `${figmaName}-${step}-build.png`);
       const cropRefPath = path.join(OUT, 'crops', `${figmaName}-${step}-ref.png`);
@@ -307,10 +373,14 @@ try {
 
       const strict = pixelDiffPct(compareBuild, compareRef, 8);
       const soft = pixelDiffPct(blur3(compareBuild), blur3(compareRef), 12);
+      const flowLoc = FLOW_LOCALE[meta.prefix];
       const row = {
         screen: figmaName,
         step,
         crop: cropTag,
+        locale: step === 'map' ? flowLoc.map : flowLoc.panel,
+        textMasked: masked,
+        mixedFrameNote: flowLoc.mixed ?? null,
         diffPct: Number(strict.pct.toFixed(2)),
         diffPctBlur12: Number(soft.pct.toFixed(2)),
         gate: strict.pct <= 8 ? 'PASS' : 'FAIL',
@@ -319,16 +389,12 @@ try {
       };
       row.sbs = sbsPath;
       if (strict.pct > 8) {
-        saveZoomCrop(
-          compareBuild,
-          compareRef,
-          path.join(OUT, 'zoom', `${figmaName}-${step}`),
-        );
+        saveZoomCrop(compareBuild, compareRef, path.join(OUT, 'zoom', `${figmaName}-${step}`));
         row.zoomCrop = path.join(OUT, 'zoom', `${figmaName}-${step}-build.png`);
       }
       table.push(row);
       console.log(
-        `${figmaName} ${step} [${cropTag}]: ${strict.pct.toFixed(2)}% (blur/12: ${soft.pct.toFixed(2)}%) ${row.gate}`,
+        `${figmaName} ${step} [${cropTag}] locale=${row.locale}${masked ? ' masked' : ''}: ${strict.pct.toFixed(2)}% (blur/12: ${soft.pct.toFixed(2)}%) ${row.gate}`,
       );
     }
   }
@@ -339,9 +405,9 @@ try {
 
 fs.mkdirSync(OUT, { recursive: true });
 fs.writeFileSync(path.join(OUT, 'diff-table.json'), JSON.stringify(table, null, 2));
-let md = '| Screen | Step | Crop | Diff % | Blur/12 | Gate |\n|---|---|---|---:|---:|---|\n';
+let md = '| Screen | Step | Crop | Locale | Mask | Diff % | Blur/12 | Gate |\n|---|---|---|---|---|---:|---:|---|\n';
 for (const r of table) {
-  md += `| ${r.screen} | ${r.step} | ${r.crop} | ${r.diffPct} | ${r.diffPctBlur12} | ${r.gate} |\n`;
+  md += `| ${r.screen} | ${r.step} | ${r.crop} | ${r.locale} | ${r.textMasked ? 'yes' : 'no'} | ${r.diffPct} | ${r.diffPctBlur12} | ${r.gate} |\n`;
 }
 fs.writeFileSync(path.join(OUT, 'DIFF-TABLE.md'), md);
 console.log(`\nWrote ${OUT}/diff-table.json, sbs/, sbs-full/, crops/, zoom/`);

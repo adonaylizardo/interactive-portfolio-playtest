@@ -127,6 +127,8 @@ export class BuildingPanel {
   private experienceDetail: HTMLElement | null = null;
   private expHeader: HTMLElement | null = null;
   private expHeaderTitle: HTMLElement | null = null;
+  private expMobileChrome: HTMLElement | null = null;
+  private expMobileTitle: HTMLElement | null = null;
   private experienceView: 'list' | 'detail' = 'list';
   private experiencePanelTitle = '';
   private writingsFilter: 'all' | 'uxsc' | 'sinergia' | 'guest' = 'all';
@@ -165,6 +167,18 @@ export class BuildingPanel {
       <div class="building-panel__backdrop" data-backdrop></div>
       <div class="building-panel__sheet" role="dialog" aria-modal="true">
         <div class="building-panel__drag" data-drag aria-hidden="true"></div>
+        <div class="exp-mobile-chrome" data-exp-mobile-chrome hidden>
+          <div class="exp-mobile-chrome__grab" aria-hidden="true"><span class="exp-mobile-chrome__bar"></span></div>
+          <div class="exp-mobile-chrome__row">
+            <button type="button" class="exp-mobile-chrome__btn exp-mobile-chrome__back" data-exp-mobile-back aria-label="">
+              <img class="exp-mobile-chrome__icon" src="${FIGMA_BACK}" width="15" height="15" alt="" />
+            </button>
+            <h2 class="exp-mobile-chrome__title"></h2>
+            <button type="button" class="exp-mobile-chrome__btn exp-mobile-chrome__close" data-exp-mobile-close aria-label="">
+              <img class="exp-mobile-chrome__icon" src="${FIGMA_CLOSE}" width="15" height="15" alt="" />
+            </button>
+          </div>
+        </div>
         <header class="exp-header" data-exp-header hidden>
           <button type="button" class="exp-header__btn exp-header__back" data-exp-back aria-label="">
             <img class="exp-header__icon" src="${FIGMA_BACK}" width="15" height="15" alt="" />
@@ -267,6 +281,18 @@ export class BuildingPanel {
     this.experienceDetail = this.el.querySelector('[data-exp-detail]');
     this.expHeader = this.el.querySelector('[data-exp-header]');
     this.expHeaderTitle = this.el.querySelector('.exp-header__title');
+    this.expMobileChrome = this.el.querySelector('[data-exp-mobile-chrome]');
+    this.expMobileTitle = this.el.querySelector('.exp-mobile-chrome__title');
+    this.el.querySelector('[data-exp-mobile-back]')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.onExperienceBack();
+    });
+    this.el.querySelector('[data-exp-mobile-close]')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.onCloseClick();
+    });
     this.el.querySelector('[data-exp-back]')?.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -489,7 +515,7 @@ export class BuildingPanel {
     if (this.previewEl) this.previewEl.hidden = true;
     if (this.readEl) this.readEl.hidden = true;
     if (this.readBar) this.readBar.hidden = true;
-    if (this.expHeader) this.expHeader.hidden = false;
+    if (this.expHeader) this.expHeader.hidden = this.isMobile();
     this.experienceEl!.hidden = false;
     this.el.hidden = false;
     this.el.style.visibility = '';
@@ -541,6 +567,21 @@ export class BuildingPanel {
     }
   }
 
+  private syncMobileExperienceChrome(): void {
+    const mobile = this.isMobile() && this.isExperienceMode() && this.isOpen();
+    if (this.expMobileChrome) this.expMobileChrome.hidden = !mobile;
+    if (this.expHeader) this.expHeader.hidden = mobile || !this.isExperienceMode();
+    if (!mobile || !this.expMobileChrome) return;
+    if (this.expMobileTitle) this.expMobileTitle.textContent = this.experiencePanelTitle;
+    const back = this.expMobileChrome.querySelector('[data-exp-mobile-back]') as HTMLElement | null;
+    const showBack = this.experienceView === 'detail';
+    if (back) back.hidden = !showBack;
+    const talksList = this.mode === 'talks' && this.experienceView === 'list';
+    this.expMobileChrome.classList.toggle('exp-mobile-chrome--grab-wide', talksList);
+    this.expMobileChrome.classList.toggle('exp-mobile-chrome--grab-compact', !talksList);
+    this.expMobileChrome.classList.toggle('exp-mobile-chrome--list-pad', talksList);
+  }
+
   private setExperienceView(view: 'list' | 'detail'): void {
     if (!this.experienceList || !this.experienceDetail || !this.experienceFilters) return;
     this.experienceView = view;
@@ -557,6 +598,7 @@ export class BuildingPanel {
     if (expand) expand.hidden = this.isMobile();
     this.el.classList.toggle('building-panel--exp-list', view === 'list');
     this.el.classList.toggle('building-panel--exp-detail', view === 'detail');
+    this.syncMobileExperienceChrome();
     if (view === 'list') {
       this.activeTalkId = null;
       this.activeWriting = null;

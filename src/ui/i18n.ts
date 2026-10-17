@@ -232,7 +232,7 @@ const DICT = {
     'talks.upNext': 'Más charlas',
 
     'writings.intro': 'Artículos y notas (placeholder).',
-    'writings.filter.all': 'All',
+    'writings.filter.all': 'Todos',
     'writings.filter.uxsc': 'UXSC',
     'writings.filter.sinergia': 'Sinergia',
     'writings.filter.guest': 'Invitados',
