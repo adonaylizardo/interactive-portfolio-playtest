@@ -176,23 +176,59 @@ async function setLocale(page, lang) {
   await wait(200);
 }
 
-async function expandPhoneSheet(page) {
-  const before = await sheetRect(page);
-  const grab = page.locator('.exp-mobile-chrome__grab').first();
-  if (await grab.isVisible().catch(() => false)) {
+async function sheetHeight(page) {
+  return page.evaluate(() => {
+    const el = document.querySelector('.building-panel--experience .building-panel__sheet');
+    return el ? Math.round(el.getBoundingClientRect().height) : 0;
+  });
+}
+
+async function expandPhoneSheet(page, minHeight = 520) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await page.evaluate(() => window.__playtestQa.expandInteriorSheet?.());
+    await wait(200);
+    const h = await sheetHeight(page);
+    if (h >= minHeight) break;
+    const title = page.locator('.exp-mobile-chrome__title').first();
+    if (await title.isVisible().catch(() => false)) {
+      const tb = await title.boundingBox();
+      if (tb) await page.touchscreen.tap(tb.x + tb.width / 2, tb.y + tb.height / 2);
+      await wait(450);
+    }
+    const h2 = await sheetHeight(page);
+    if (h2 >= minHeight) break;
+    const grab = page.locator('.exp-mobile-chrome__grab').first();
     const box = await grab.boundingBox();
     if (box) {
-      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
-      await wait(400);
+      const x = box.x + box.width / 2;
+      const y = box.y + box.height / 2;
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      await page.mouse.move(x, y - 220, { steps: 14 });
+      await page.mouse.up();
+      await wait(550);
     }
-    const afterTap = await sheetRect(page);
-    if (afterTap && before && afterTap.h > before.h + 40) return afterTap;
-    await grab.dispatchEvent('pointerdown', { pointerId: 1, button: 0, clientX: box.x + box.width / 2, clientY: box.y + box.height / 2 });
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 80);
-    await grab.dispatchEvent('pointerup', { pointerId: 1, button: 0 });
-    await wait(500);
   }
   return sheetRect(page);
+}
+
+async function enterPhoneBuilding(page, name) {
+  await page.evaluate(() => window.__playtestQa.collapseChecklistForQa?.());
+  await wait(150);
+  await page.evaluate((n) => window.__playtestQa.prepareDoorEntryForQa(n), name);
+  await wait(450);
+  const pt = await page.evaluate((n) => window.__playtestQa.doorScreenPoint(n), name);
+  await page.touchscreen.tap(pt.x, pt.y);
+  await page.waitForFunction(
+    (n) => {
+      const interior = window.__playtestQa.getInteriorId?.();
+      const preview = document.querySelector('.building-panel--preview.building-panel--open');
+      const exp = document.querySelector('.building-panel--experience.building-panel--open');
+      return interior === n || !!exp || !!preview;
+    },
+    name,
+    { timeout: 45000 },
+  );
 }
 
 async function captureFlow(page, building, flowPrefix, steps) {
@@ -209,7 +245,10 @@ async function captureFlow(page, building, flowPrefix, steps) {
   } else {
     await page.evaluate(() => window.__playtestQa.setLayout?.('map'));
     if (locale.map === 'en') {
-      await setLocale(page, 'en');
+      await page.locator('.chrome__lang [data-lang="en"]').click();
+      await wait(250);
+      await page.evaluate(() => window.__playtestQa.collapseChecklistForQa?.());
+      await wait(150);
       await page.evaluate(() =>
         window.__playtestQa.setChecklistProgressForQa?.({
           'walk-around': true,
@@ -219,6 +258,7 @@ async function captureFlow(page, building, flowPrefix, steps) {
           'enter-building': false,
         }),
       );
+      await wait(150);
     }
   }
   await page.evaluate((name) => {
@@ -228,9 +268,21 @@ async function captureFlow(page, building, flowPrefix, steps) {
   await wait(500);
   await page.screenshot({ path: steps.map });
   const mapChecklistRect = steps.desktop ? null : await checklistChromeRect(page);
-  await page.evaluate((name) => window.__playtestQa.enterInterior(name), building);
-  await wait(900);
-  if (steps.expand) await expandPhoneSheet(page);
+  if (steps.expand) {
+    // Map capture uses frameDoorForQa + low zoom; reload so the next real door tap is aligned.
+    await page.goto(BASE, { waitUntil: 'networkidle', timeout: 60000 });
+    await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, {
+      timeout: 60000,
+    });
+    // Real door taps succeed on the default phone sheet layout; map dock misaligns doorScreenPoint.
+    await enterPhoneBuilding(page, building);
+  } else {
+    await page.evaluate((name) => window.__playtestQa.enterInterior(name), building);
+    await wait(900);
+  }
+  if (steps.expand) {
+    await expandPhoneSheet(page, building === 'biblioteca' ? 580 : 540);
+  }
   await wait(600);
   await setLocale(page, locale.panel);
   await wait(250);

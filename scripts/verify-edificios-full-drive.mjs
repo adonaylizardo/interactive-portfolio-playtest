@@ -3,7 +3,7 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium, devices } from 'playwright';
+import { chromium } from 'playwright';
 import { launchBrowser } from './qa-ready.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -21,28 +21,52 @@ function trackConsole(page) {
   return logs;
 }
 
-async function enterBuilding(page, name) {
-  await page.evaluate((n) => {
-    window.__playtestQa.setCharacterTile(31, 37);
-    window.__playtestQa.frameDoorForQa(n);
-  }, name);
-  await wait(350);
-  const tapped = await page.evaluate((n) => window.__playtestQa.tapBuildingDoor(n), name);
-  if (!tapped) {
-    await page.evaluate((n) => window.__playtestQa.walkToBuilding(n), name);
+async function waitEntered(page, name, timeoutMs = 45000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeoutMs) {
+    const state = await page.evaluate((n) => ({
+      interior: window.__playtestQa.getInteriorId?.(),
+      preview: !!document.querySelector('.building-panel--preview.building-panel--open'),
+      exp: !!document.querySelector('.building-panel--experience.building-panel--open'),
+    }), name);
+    if (CASE_HOUSES.has(name) && state.preview) return true;
+    if (!CASE_HOUSES.has(name) && state.interior === name) return true;
+    if ((name === 'teresa' || name === 'biblioteca') && state.exp) return true;
+    await wait(200);
   }
-  if (CASE_HOUSES.has(name)) {
-    await page.waitForFunction(
-      () => document.querySelector('.building-panel--preview.building-panel--open'),
-      null,
-      { timeout: 60000 },
-    );
-  } else {
-    await page.waitForFunction(
-      (n) => window.__playtestQa?.getInteriorId?.() === n,
-      name,
-      { timeout: 120000 },
-    );
+  return false;
+}
+
+async function enterBuilding(page, name, touch) {
+  const ok = await page.evaluate((n) => window.__playtestQa.prepareDoorEntryForQa(n), name);
+  if (!ok) throw new Error(`prepareDoorEntryForQa(${name}) failed`);
+  await wait(450);
+  const pt = await page.evaluate((n) => window.__playtestQa.doorScreenPoint(n), name);
+  if (!pt) throw new Error(`doorScreenPoint(${name}) null`);
+  if (touch) await page.touchscreen.tap(pt.x, pt.y);
+  else await page.mouse.click(pt.x, pt.y);
+  if (!(await waitEntered(page, name))) {
+    throw new Error(`enter timeout for ${name}`);
+  }
+}
+
+async function expandExperienceSheet(page) {
+  const title = page.locator('.exp-mobile-chrome__title').first();
+  if (await title.isVisible().catch(() => false)) {
+    const box = await title.boundingBox();
+    if (box) await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+    await wait(400);
+  }
+  const grab = page.locator('.exp-mobile-chrome__grab').first();
+  const box = await grab.boundingBox();
+  if (box) {
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y - 120, { steps: 10 });
+    await page.mouse.up();
+    await wait(500);
   }
 }
 
@@ -56,25 +80,27 @@ async function leaveBuilding(page, name, touch) {
     );
   } else {
     if (touch && (name === 'teresa' || name === 'biblioteca')) {
-      await page.evaluate(() => window.__playtestQa.expandInteriorSheet?.());
+      await expandExperienceSheet(page);
       await wait(200);
+      const salir = page.locator('.building-panel__exit').first();
+      if (await salir.isVisible()) {
+        const b = await salir.boundingBox();
+        if (b) await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
+      } else {
+        await page.evaluate(() => window.__playtestQa.exitInterior());
+      }
+    } else {
+      await page.evaluate(() => window.__playtestQa.exitInterior());
     }
-    await page.evaluate(() => window.__playtestQa.exitInterior());
     await page.waitForFunction(() => !window.__playtestQa?.getInteriorId?.(), null, { timeout: 30000 });
   }
   await wait(400);
 }
 
-async function enterExitDesktop(page, name) {
-  await enterBuilding(page, name);
+async function enterExit(page, name, touch) {
+  await enterBuilding(page, name, touch);
   await wait(400);
-  await leaveBuilding(page, name, false);
-}
-
-async function enterExitTouch(page, name) {
-  await enterBuilding(page, name);
-  await wait(400);
-  await leaveBuilding(page, name, true);
+  await leaveBuilding(page, name, touch);
 }
 
 async function runSuite(page, tag, touch) {
@@ -86,13 +112,21 @@ async function runSuite(page, tag, touch) {
     window.__playtestQa.getEnterableBuildings().map((b) => b.name).sort(),
   );
   for (const name of names) {
-    if (touch) await enterExitTouch(page, name);
-    else await enterExitDesktop(page, name);
+    // Phone: fresh navigation per door — after a case preview the camera/viewport can leave
+    // doorScreenPoint misaligned for the next building (walk goal ≠ prepared door). Desktop
+    // chains in one session; phone matches prove-map-input (11/11 real taps).
+    if (touch) {
+      await page.goto(BASE, { waitUntil: 'networkidle', timeout: 60000 });
+      await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, {
+        timeout: 60000,
+      });
+    }
+    await enterExit(page, name, touch);
   }
   return names;
 }
 
-const preview = spawn('node', ['scripts/serve-preview-edificios.mjs'], {
+const preview = spawn(process.execPath, ['scripts/serve-preview-edificios.mjs'], {
   cwd: ROOT,
   stdio: 'ignore',
   env: { ...process.env, PREVIEW_PORT: String(PREVIEW_PORT) },
@@ -104,11 +138,7 @@ const browser = await launchBrowser(chromium);
 try {
   for (const { tag, viewport, touch } of [
     { tag: 'desktop', viewport: { width: 1280, height: 800 }, touch: false },
-    {
-      tag: 'phone390',
-      viewport: { width: 390, height: 844 },
-      touch: true,
-    },
+    { tag: 'phone390', viewport: { width: 390, height: 844 }, touch: true },
   ]) {
     const ctx = await browser.newContext({
       viewport,

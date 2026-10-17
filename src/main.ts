@@ -255,6 +255,7 @@ async function main(): Promise<void> {
     walkToBuilding: (name: string) => scene.walkToBuildingForQa(name),
     doorScreenPoint: (name: string) => scene.getDoorScreenClientPoint(name),
     frameDoorForQa: (name: string) => scene.frameBuildingDoorForQa(name),
+    prepareDoorEntryForQa: (name: string) => scene.prepareDoorEntryForQa(name),
     tapBuildingDoor: (name: string) => scene.tapBuildingDoor(name),
     setSuppressTap: (ms: number) => scene.setSuppressTapForQa(ms),
     tapMapTile: (tx: number, ty: number) => scene.tapMapTileForQa(tx, ty),
@@ -266,6 +267,7 @@ async function main(): Promise<void> {
     dismissBuildingPanel: () => panel.hide(),
     setChecklistProgressForQa: (completed: Partial<Record<string, boolean>>) =>
       checklist.setProgressForQa(completed as Partial<Record<import('./checklist/storage').ChecklistStepId, boolean>>),
+    collapseChecklistForQa: () => checklist.collapseMobile(),
     showPanelOverlayForQa: (title: string) => {
       checklist.setBuildingPanelOpen(true);
       panel.showOverlayForQa(title);
@@ -315,6 +317,7 @@ async function main(): Promise<void> {
     npcTown: () => scene.qaNpcTown(),
     advanceNpcs: (seconds: number) => scene.qaAdvanceNpcs(seconds),
     playerAvatar: () => scene.qaPlayerAvatar(),
+    qaInputReady: () => scene.qaInputReady(),
     setAnim: (dir: 'se' | 'sw' | 'ne' | 'nw', walk: boolean, frame = 0) => scene.qaSetAnim(dir, walk, frame),
     clearAnim: () => scene.qaClearAnim(),
     benches: () => scene.qaBenches(),

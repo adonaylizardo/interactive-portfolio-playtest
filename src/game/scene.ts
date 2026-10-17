@@ -743,14 +743,9 @@ export class IsoScene {
         this.tapJac();
         return;
       }
-      const pos = e.getLocalPosition(this.world);
-      const tile = worldToTile(pos.x, pos.y);
-      if (!tile) {
-        this.tapBeyondMapEdge(pos.x, pos.y, sprint);
-        return;
-      }
-      if (!this.prepareMapTap(undefined, tile.x, tile.y)) return;
-      this.requestWalk(tile.x, tile.y, sprint);
+      const local = this.federatedToCanvas(e);
+      if (!local) return;
+      this.handleScreenTap(local.x, local.y, sprint);
     });
     this.world.addChildAt(g, 0);
   }
@@ -827,9 +822,10 @@ export class IsoScene {
         this.tapJac();
         return;
       }
-      if (!this.prepareMapTap(undefined, tx, ty)) return;
+      const local = this.federatedToCanvas(e);
+      if (!local) return;
       const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
-      this.requestWalk(tx, ty, sprint);
+      this.handleScreenTap(local.x, local.y, sprint);
     });
     this.tilesLayer.addChild(g);
     const entry = { g, tx, ty };
@@ -984,37 +980,10 @@ export class IsoScene {
         if (this.shouldBlockTap()) return;
         e.stopPropagation();
         this.pixiTapGestureSerial = this.pointerGestureSerial;
-        if (this.jac?.driving) {
-          const local = this.federatedToCanvas(e);
-          if (!local) return;
-          this.handleScreenTap(local.x, local.y, false);
-          return;
-        }
-        if (obj.id === JAC_ID || this.claimJacTap(e)) {
-          this.tapJac();
-          return;
-        }
-        if (obj.type === 'building' && obj.panelTitle && !this.prepareMapTap(obj)) return;
+        const local = this.federatedToCanvas(e);
+        if (!local) return;
         const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
-        if (obj.type === 'building' && obj.door && obj.panelTitle) {
-          this.requestWalk(obj.door.x, obj.door.y, sprint, { walkOnly: true });
-          return;
-        }
-        this.pendingBuildingEntry = null;
-        const pos = e.getLocalPosition(this.world);
-        const bench = obj.name === 'bench' ? this.benchAtSeat(obj.x, obj.y) : obj.type !== 'building' ? this.pickBenchAtWorld(pos.x, pos.y) : undefined;
-        if (bench) {
-          if (!this.prepareMapTap(undefined, bench.seat.x, bench.seat.y)) return;
-          if (this.sitOnBench(bench, sprint)) return;
-        }
-        const tile = this.resolveGroundTap(pos.x, pos.y);
-        const scenery = obj.name === 'obelisco' || obj.name === 'redoma' || obj.name === 'muro';
-        if (tile && (scenery || cells[tile.y][tile.x].walkable)) {
-          if (!this.prepareMapTap(undefined, tile.x, tile.y)) return;
-          this.requestWalk(tile.x, tile.y, sprint);
-          return;
-        }
-        this.requestWalk(obj.x, obj.y, sprint);
+        this.handleScreenTap(local.x, local.y, sprint);
       });
       this.objectGraphics.set(obj.id, g);
       this.objectsLayer.addChild(g);
@@ -4775,11 +4744,35 @@ export class IsoScene {
   setCharacterTileForQa(tx: number, ty: number): void {
     if (!cells[ty]?.[tx]?.walkable) return;
     this.path = [];
+    this.pendingBuildingEntry = null;
+    this.doorCooldown = 0;
     this.charTx = tx;
     this.charTy = ty;
     this.syncCharacterGraphic();
     this.drawPathPreview();
     this.centerOnCharacter(false);
+  }
+
+  /** Stand on the tile in front of the door, frame camera — for real pointer entry tests. */
+  prepareDoorEntryForQa(name: string): boolean {
+    const obj = objects.find((o) => o.type === 'building' && o.name === name);
+    if (!obj?.door || !obj.panelTitle) return false;
+    const inward = doorInwardStep(obj);
+    const candidates: { x: number; y: number }[] = [];
+    if (inward) {
+      candidates.push({ x: obj.door.x - inward.x, y: obj.door.y - inward.y });
+    }
+    candidates.push({ x: obj.door.x, y: obj.door.y });
+    let placed = false;
+    for (const c of candidates) {
+      if (!cells[c.y]?.[c.x]?.walkable) continue;
+      this.setCharacterTileForQa(c.x, c.y);
+      placed = true;
+      break;
+    }
+    if (!placed) return false;
+    this.frameBuildingDoorForQa(name);
+    return true;
   }
 
   /** QA: same entry path as tapping a building (walk to door + open panel). */

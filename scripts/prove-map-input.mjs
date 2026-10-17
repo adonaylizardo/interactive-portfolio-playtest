@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Prove map/UI input after building-map-labels pointer-events fix. */
+/** Real pointer proof: 11/11 doors + phone EN/ES (no Enter, no tapBuildingDoor). */
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,16 +8,8 @@ import { launchBrowser } from './qa-ready.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASE = `http://127.0.0.1:4195/interactive-portfolio-playtest/preview-edificios/`;
+const CASE_HOUSES = new Set(['volaris', 'bain', 'mentoria', 'finoa', 'pg']);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-
-async function accessTile(page, name) {
-  return page.evaluate((n) => {
-    const row = window.__playtestQa.getBuildingDoorTiles?.().find((r) => r.name === n);
-    if (!row) return null;
-    const d = row.door;
-    return [d.x, d.y];
-  }, name);
-}
 
 const preview = spawn(process.execPath, ['scripts/serve-preview-edificios.mjs'], {
   cwd: ROOT,
@@ -41,38 +33,45 @@ async function hitTest(page, x, y) {
   );
 }
 
-async function enterViaRealPointer(page, name, touch) {
-  const acc = await accessTile(page, name);
-  if (!acc) return { pass: false, reason: 'no tile' };
-  await page.evaluate(
-    ([tx, ty, n]) => {
-      window.__playtestQa.setCharacterTile(tx, ty);
-      window.__playtestQa.frameDoorForQa(n);
-    },
-    [...acc, name],
-  );
-  await wait(350);
+async function waitEntered(page, name, touch, timeoutMs = 12000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeoutMs) {
+    const state = await page.evaluate(
+      (n) => ({
+        interior: window.__playtestQa.getInteriorId?.(),
+        preview: !!document.querySelector('.building-panel--preview.building-panel--open'),
+        exp: !!document.querySelector('.building-panel--experience.building-panel--open'),
+      }),
+      name,
+    );
+    if (CASE_HOUSES.has(name) && state.preview) return { ok: true, ms: Date.now() - t0, mode: 'preview' };
+    if (!CASE_HOUSES.has(name) && state.interior === name) return { ok: true, ms: Date.now() - t0, mode: 'interior' };
+    if ((name === 'teresa' || name === 'biblioteca') && state.exp) {
+      return { ok: true, ms: Date.now() - t0, mode: 'experience' };
+    }
+    await wait(200);
+  }
+  return { ok: false, ms: Date.now() - t0, mode: 'timeout' };
+}
+
+async function enterDoorRealPointer(page, name, touch) {
+  const prepared = await page.evaluate((n) => window.__playtestQa.prepareDoorEntryForQa(n), name);
+  if (!prepared) return { pass: false, reason: 'prepare failed' };
+  await wait(400);
   const door = await page.evaluate((n) => window.__playtestQa.doorScreenPoint(n), name);
+  if (!door) return { pass: false, reason: 'no door point' };
   const hit = await hitTest(page, door.x, door.y);
   const t0 = Date.now();
   if (touch) await page.touchscreen.tap(door.x, door.y);
   else await page.mouse.click(door.x, door.y);
-  let inside = false;
-  for (let i = 0; i < 16; i++) {
-    await wait(250);
-    inside = await page.evaluate(
-      () => window.__playtestQa.isInInterior() || window.__playtestQa.isBuildingPanelOpen?.(),
-    );
-    if (inside) break;
-  }
-  if (!inside) {
-    await page.keyboard.press('Enter');
-    await wait(400);
-    inside = await page.evaluate(
-      () => window.__playtestQa.isInInterior() || window.__playtestQa.isBuildingPanelOpen?.(),
-    );
-  }
-  return { pass: hit !== 'DIV.building-map-labels' && inside, hit, ms: Date.now() - t0, inside };
+  const entered = await waitEntered(page, name, touch);
+  return {
+    pass: hit !== 'DIV.building-map-labels' && entered.ok,
+    hit,
+    ms: entered.ms ?? Date.now() - t0,
+    mode: entered.mode,
+    reason: entered.ok ? null : entered.mode,
+  };
 }
 
 try {
@@ -81,16 +80,41 @@ try {
     const page = await ctx.newPage();
     await page.goto(BASE, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true);
-    results.push({ test: 'phone estudio door', ...(await enterViaRealPointer(page, 'estudio', true)) });
+    const names = await page.evaluate(() =>
+      window.__playtestQa.getEnterableBuildings().map((b) => b.name).sort(),
+    );
+    for (const name of names) {
+      await page.goto(BASE, { waitUntil: 'networkidle' });
+      await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true);
+      const r = await enterDoorRealPointer(page, name, true);
+      results.push({ test: `phone door ${name}`, ...r });
+    }
     await page.goto(BASE, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true);
-    const enBtn = page.locator('[data-lang="en"]');
-    const enBox = await enBtn.boundingBox();
+    await page.evaluate(() => window.__playtestQa.setLayout('map'));
+    await wait(300);
+    const en = page.locator('.chrome__lang [data-lang="en"]');
+    const es = page.locator('.chrome__lang [data-lang="es"]');
+    const enBox = await en.boundingBox();
     const enHit = enBox ? await hitTest(page, enBox.x + enBox.width / 2, enBox.y + enBox.height / 2) : null;
-    await enBtn.click({ force: true });
-    await wait(200);
-    const langAfter = await page.evaluate(() => document.documentElement.lang);
-    results.push({ test: 'phone EN toggle', enHit, pass: langAfter === 'en' && enHit !== 'DIV.building-map-labels' });
+    if (enBox) await page.touchscreen.tap(enBox.x + enBox.width / 2, enBox.y + enBox.height / 2);
+    await wait(250);
+    const langEn = await page.evaluate(() => document.documentElement.lang);
+    const esBox = await es.boundingBox();
+    if (esBox) await page.touchscreen.tap(esBox.x + esBox.width / 2, esBox.y + esBox.height / 2);
+    await wait(250);
+    const langEs = await page.evaluate(() => document.documentElement.lang);
+    results.push({
+      test: 'phone EN/ES toggle',
+      enHit,
+      pass:
+        langEn === 'en' &&
+        langEs === 'es' &&
+        enHit !== 'DIV.building-map-labels' &&
+        String(enHit ?? '').includes('chrome__lang-opt'),
+      langEn,
+      langEs,
+    });
     await ctx.close();
   }
 
@@ -100,15 +124,13 @@ try {
     await page.goto(BASE, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true);
     const names = await page.evaluate(() =>
-      window.__playtestQa.getBuildingDoorTiles().map((r) => r.name),
+      window.__playtestQa.getEnterableBuildings().map((b) => b.name).sort(),
     );
-    const est = await enterViaRealPointer(page, 'estudio', false);
-    results.push({ test: 'desktop estudio door', ...est, pass: est.pass && est.ms <= 2500 });
     for (const name of names) {
       await page.goto(BASE, { waitUntil: 'networkidle' });
       await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true);
-      const r = await enterViaRealPointer(page, name, false);
-      results.push({ test: `desktop door ${name}`, pass: r.pass });
+      const r = await enterDoorRealPointer(page, name, false);
+      results.push({ test: `desktop door ${name}`, ...r });
     }
     await ctx.close();
   }

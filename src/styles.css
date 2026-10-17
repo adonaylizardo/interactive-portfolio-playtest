@@ -571,6 +571,7 @@ body[data-layout='panel'] .checklist {
   }
 
   body[data-layout='map'] .checklist--mobile-closed {
+    pointer-events: none;
     top: 56px;
     left: 122px;
     right: auto;
@@ -630,6 +631,7 @@ body[data-layout='panel'] .checklist {
     height: 44px;
     flex-shrink: 0;
     position: relative;
+    pointer-events: auto;
   }
 
   body[data-layout='map'] .checklist--mobile-closed .checklist__label {
@@ -2078,7 +2080,7 @@ body[data-layout='panel'] .checklist {
   position: absolute;
   left: 43px;
   top: 193px;
-  width: 246px;
+  width: 248px;
   height: 4px;
   border-radius: 2px;
   background: var(--ui-line);
@@ -2101,7 +2103,7 @@ body[data-layout='panel'] .checklist {
 
 .talks-player__time {
   position: absolute;
-  left: 301px;
+  left: 299px;
   top: 188px;
   margin: 0;
   font-family: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
