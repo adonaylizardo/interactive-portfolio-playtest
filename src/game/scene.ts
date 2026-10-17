@@ -4314,6 +4314,12 @@ export class IsoScene {
   } | null {
     if (!this.jac?.driving) return null;
     this.jac.update(dt, { dx, dy, autoShift: true });
+    this.charTx = this.jac.cx;
+    this.charTy = this.jac.cy;
+    this.startCameraFollow();
+    this.updateCameraFollow();
+    this.app?.render();
+    this.events.onFrame?.();
     const s = this.jac.snapshot();
     return { cx: s.cx, cy: s.cy, dir: s.dir, overlap: this.jac.overlapsProp(), mph: s.mph };
   }

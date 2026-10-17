@@ -173,13 +173,17 @@ async function main() {
   await parkVan(page);
   await ensureDriving(page, 'r17-record');
   await page.evaluate(() => {
-    window.__playtestQa.jacDriveTo(30, 24);
+    window.__playtestQa.jacDriveTo(32, 22);
   });
+  let midMph = 0;
   for (let i = 0; i < 90; i++) {
-    await page.evaluate(() => window.__playtestQa.jacDriveStep?.(1 / 60, 0, 0));
-    if (i % 8 === 0) await wait(16);
+    const step = await page.evaluate(() => window.__playtestQa.jacDriveStep?.(1 / 60, 0, 0));
+    midMph = Math.max(midMph, step?.mph ?? 0);
+    if (i === 24) await page.screenshot({ path: path.join(OUT, 'phone-390-tap-drive.png') });
+    await wait(16);
   }
-  await page.screenshot({ path: path.join(OUT, 'phone-390-tap-drive.png') });
+  notes.push(`tap-drive visual mph=${midMph}`);
+  if (midMph < 1) errors.push(`tap-drive: HUD never rose above 1 mph (${midMph})`);
 
   const stick = await page.evaluate(async () => {
     const qa = window.__playtestQa;
@@ -239,21 +243,36 @@ async function main() {
 
   await parkVan(page);
   await ensureDriving(page, 'r17-pip');
-  const pip = await page.evaluate(() => {
+  await page.evaluate(() => {
     const qa = window.__playtestQa;
     qa.jacSetGear?.('R');
     qa.jacStick?.({ x: 0, y: 0.9 });
-    for (let i = 0; i < 8; i++) qa.jacDriveStep?.(0.05, 0, 0.9);
-    const inR = {
+  });
+  for (let i = 0; i < 8; i++) {
+    await page.evaluate(() => window.__playtestQa.jacDriveStep?.(0.05, 0, 0.9));
+    await wait(16);
+  }
+  const inR = await page.evaluate(() => {
+    const qa = window.__playtestQa;
+    return {
       gear: qa.jac()?.gear,
       rearCam: qa.jac()?.rearCam,
       rear: qa.jacEntities()?.rearVisible,
       on: document.querySelector('.jac-rear')?.classList.contains('is-on'),
       hidden: document.querySelector('.jac-rear')?.hidden,
     };
+  });
+  await page.screenshot({ path: path.join(OUT, 'phone-390-pip-r.png') });
+  await page.evaluate(() => {
+    const qa = window.__playtestQa;
     qa.jacStick?.(null);
     qa.jacSetGear?.('D');
-    const inD = {
+  });
+  await page.evaluate(() => window.__playtestQa.jacDriveStep?.(1 / 60, 0, 0));
+  await wait(50);
+  const inD = await page.evaluate(() => {
+    const qa = window.__playtestQa;
+    return {
       gear: qa.jac()?.gear,
       rearCam: qa.jac()?.rearCam,
       rear: qa.jacEntities()?.rearVisible,
@@ -261,8 +280,8 @@ async function main() {
       hidden: document.querySelector('.jac-rear')?.hidden,
       body: document.body.classList.contains('jac-rearcam'),
     };
-    return { inR, inD };
   });
+  const pip = { inR, inD };
   notes.push(`pip ${JSON.stringify(pip)}`);
   if (!pip.inR.rearCam && !pip.inR.on) errors.push('pip: R did not show rear-cam');
   if (pip.inD.rearCam || pip.inD.on || pip.inD.rear || pip.inD.body || pip.inD.hidden === false) {
@@ -378,12 +397,12 @@ async function main() {
   };
   fs.writeFileSync(path.join(OUT, 'record-report.json'), JSON.stringify(report, null, 2));
   await page.screenshot({ path: path.join(OUT, 'phone-390-done.png') });
+  const video = page.video();
   await context.close();
-  await browser.close();
-  const videos = fs.readdirSync(path.join(OUT, 'clips')).filter((f) => f.endsWith('.webm'));
-  if (videos[0]) {
-    fs.copyFileSync(path.join(OUT, 'clips', videos[0]), path.join(OUT, 'phone-390-tap-drive.webm'));
+  if (video) {
+    await video.saveAs(path.join(OUT, 'phone-390-tap-drive.webm'));
   }
+  await browser.close();
   console.log(JSON.stringify({ errors, pathStats, out: OUT }, null, 2));
   if (errors.length) process.exit(1);
 }
