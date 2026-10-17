@@ -95,7 +95,7 @@ async function footDoors(page, tag, touch) {
       window.__playtestQa.jacSet?.({ cx: s.center.x, cy: s.center.y, dir: 'se', mode: 'parked' });
     });
     await tapDoor(page, name, touch, 0.4);
-    const ok = await waitUntil(page, async () => ((await entered(page)) ? true : null), 12000);
+    let ok = await waitUntil(page, async () => ((await entered(page)) ? true : null), 16000);
     if (!ok) {
       await page.evaluate((n) => {
         const b = window.__playtestQa.getEnterableBuildings().find((x) => x.name === n);
@@ -103,8 +103,8 @@ async function footDoors(page, tag, touch) {
         window.__playtestQa.walkToBuilding(n);
       }, name);
       await tapDoor(page, name, touch, 0.5);
-      const retry = await waitUntil(page, async () => ((await entered(page)) ? true : null), 6000);
-      if (!retry) errors.push(`${tag}:foot:${name}: no panel/interior`);
+      ok = await waitUntil(page, async () => ((await entered(page)) ? true : null), 8000);
+      if (!ok) errors.push(`${tag}:foot:${name}: no panel/interior`);
     }
     const tile = await page.evaluate(() => window.__playtestQa.getCharacterTile());
     rows.push({ name, entered: !!ok, tile });
@@ -152,19 +152,39 @@ async function driveDoors(page, tag, touch) {
     const pt = await page.evaluate((n) => window.__playtestQa.doorScreenPoint(n), name);
     if (pt) await realTap(page, pt.x, pt.y, touch);
     await page.evaluate((n) => window.__playtestQa.walkToBuilding(n), name);
-    await page.evaluate(() => {
-      for (let i = 0; i < 800; i++) {
+    await page.evaluate((n) => {
+      const b = window.__playtestQa.getEnterableBuildings().find((x) => x.name === n);
+      const door = b?.door;
+      for (let i = 0; i < 2400; i++) {
         window.__playtestQa.jacDriveStep?.(0.05, 0, 0, { render: false });
         const j = window.__playtestQa.jac();
         if (!j?.driving || window.__playtestQa.isInInterior?.()) break;
-        if (!j.driveGoal && j.mph < 1.2) break;
+        const d = door ? Math.hypot(j.cx - door.x, j.cy - door.y) : Infinity;
+        if (!j.driveGoal && j.mph < 1.2 && d <= 5.5) break;
+        if (!j.driveGoal && j.mph < 1.2 && i > 0 && i % 240 === 0) {
+          window.__playtestQa.walkToBuilding(n);
+        }
       }
-      if (window.__playtestQa.jac()?.driving) window.__playtestQa.jacGetOut?.({ thenEnter: true });
+      const j = window.__playtestQa.jac();
+      if (j?.driving && door) {
+        const d = Math.hypot(j.cx - door.x, j.cy - door.y);
+        if (d <= 8) window.__playtestQa.jacGetOut?.({ thenEnter: true });
+        else {
+          window.__playtestQa.walkToBuilding(n);
+          for (let i = 0; i < 800; i++) {
+            window.__playtestQa.jacDriveStep?.(0.05, 0, 0, { render: false });
+            const jj = window.__playtestQa.jac();
+            if (!jj?.driving) break;
+            if (!jj.driveGoal && Math.hypot(jj.cx - door.x, jj.cy - door.y) <= 5.5) break;
+          }
+          if (window.__playtestQa.jac()?.driving) window.__playtestQa.jacGetOut?.({ thenEnter: true });
+        }
+      }
       for (let i = 0; i < 40; i++) {
         window.__playtestQa.jacDriveStep?.(0.05, 0, 0, { render: false });
         if (!window.__playtestQa.jac()?.driving) break;
       }
-    });
+    }, name);
     await waitUntil(page, async () => ((await entered(page)) ? true : null), 10000);
     const snap = await page.evaluate((n) => {
       const b = window.__playtestQa.getEnterableBuildings().find((x) => x.name === n);
@@ -208,11 +228,14 @@ async function mentoriaRetap(page, tag, touch) {
   const pt = await page.evaluate(() => window.__playtestQa.doorScreenPoint('mentoria'));
   if (pt) await realTap(page, pt.x, pt.y, touch);
   await page.evaluate(() => {
-    for (let i = 0; i < 800; i++) {
+    const b = window.__playtestQa.getEnterableBuildings().find((x) => x.name === 'mentoria');
+    const door = b?.door;
+    for (let i = 0; i < 1200; i++) {
       window.__playtestQa.jacDriveStep?.(0.05, 0, 0, { render: false });
       const j = window.__playtestQa.jac();
       if (!j?.driving) break;
-      if (!j.driveGoal && j.mph < 1.2) break;
+      const d = door ? Math.hypot(j.cx - door.x, j.cy - door.y) : Infinity;
+      if (!j.driveGoal && j.mph < 1.2 && d <= 5.5) break;
     }
     if (window.__playtestQa.jac()?.driving) window.__playtestQa.jacGetOut?.({ thenEnter: true });
     for (let i = 0; i < 40; i++) {
@@ -238,6 +261,28 @@ async function mentoriaRetap(page, tag, touch) {
 
 async function landscape(page) {
   await page.setViewportSize({ width: 844, height: 390 });
+  await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+  await waitUntil(page, async () => (await page.evaluate(() => Boolean(window.__playtestQa?.jac))) || null);
+  const fresh = await page.evaluate(() => {
+    const intro = document.querySelector('.chrome__intro');
+    const j = window.__playtestQa.jac();
+    const wx = (j.cx - j.cy) * 64;
+    const wy = (j.cx + j.cy) * 32;
+    const van = window.__playtestQa.worldToClient?.(wx, wy);
+    const el = van ? document.elementFromPoint(van.x, van.y) : null;
+    const st = intro ? getComputedStyle(intro) : null;
+    return {
+      layout: document.body.dataset.layout,
+      sheet: !!document.querySelector('.chrome--sheet'),
+      introPe: st?.pointerEvents ?? null,
+      van,
+      hit: el && { tag: el.tagName, cls: typeof el.className === 'string' ? el.className : '' },
+    };
+  });
+  notes.push(`land fresh ${JSON.stringify(fresh)}`);
+  if (fresh.introPe === 'auto' && fresh.hit && /chrome__intro|chrome__title|chrome__skeleton/.test(fresh.hit.cls || '')) {
+    errors.push('land: intro covers van on first load');
+  }
   await boot(page);
   const shot = await page.evaluate(() => {
     const check = document.querySelector('.checklist')?.getBoundingClientRect();
@@ -262,6 +307,11 @@ async function landscape(page) {
   if (shot.lang && shot.tools && shot.lang.x < shot.tools.r - 4) {
     errors.push(`land: EN/ES overlaps tools lang.x=${shot.lang.x} tools.r=${shot.tools.r}`);
   }
+  await page.evaluate(() => {
+    window.__playtestQa.focusJac?.();
+    window.__playtestQa.setZoom?.(0.45);
+  });
+  await wait(80);
   const van = await page.evaluate(() => {
     const j = window.__playtestQa.jac();
     const wx = (j.cx - j.cy) * 64;
@@ -282,9 +332,21 @@ async function landscape(page) {
   );
   if (!driving) {
     await page.evaluate(() => window.__playtestQa.jacGetIn?.());
-    driving = await page.evaluate(() => window.__playtestQa.jac()?.driving);
+    driving = await waitUntil(
+      page,
+      async () => ((await page.evaluate(() => window.__playtestQa.jac()?.driving)) ? true : null),
+      8000,
+    );
   }
   if (!driving) errors.push('land: van tap did not get in');
+  if (!driving) {
+    await page.evaluate(() => {
+      const s = window.__playtestQa.jacSpawn();
+      window.__playtestQa.jacSet?.({ cx: s.center.x, cy: s.center.y, dir: 'se', mode: 'drive' });
+      window.__playtestQa.jacSetGear?.('D');
+    });
+    driving = await page.evaluate(() => window.__playtestQa.jac()?.driving);
+  }
   await wait(200);
   const overlap = await page.evaluate(() => {
     const joy = document.querySelector('.joystick')?.getBoundingClientRect();

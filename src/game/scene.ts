@@ -1828,7 +1828,14 @@ export class IsoScene {
     this.pendingDriveEnter = entry;
     this.pendingDriveEnterAt = performance.now();
     const dest = path.length > 0 ? path[path.length - 1] : sit;
-    if (path.length === 0 || (Math.hypot(this.jac.cx - dest.x, this.jac.cy - dest.y) < 1.2 && this.jac.mph < 1)) {
+    const alongNow = this.jac.doorSideAlong(entry.door.x, entry.door.y);
+    const distDoorNow = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
+    const atSit = path.length === 0 || (Math.hypot(this.jac.cx - dest.x, this.jac.cy - dest.y) < 1.2 && this.jac.mph < 1);
+    if (atSit && alongNow >= 0 && distDoorNow <= 5.5) {
+      this.jacGetOut({ thenEnter: true });
+      return true;
+    }
+    if (path.length === 0) {
       this.jacGetOut({ thenEnter: true });
       return true;
     }
@@ -4074,7 +4081,7 @@ export class IsoScene {
     if (tile && this.jac.tapHitsTile(tile.x, tile.y)) return true;
     const c = this.jac.worldCenter();
     const s = this.worldToScreen(c.x, c.y);
-    return Math.hypot(sx - s.x, sy - s.y) < 56;
+    return Math.hypot(sx - s.x, sy - s.y) < 32;
   }
 
   tapJac(): void {
@@ -4253,14 +4260,13 @@ export class IsoScene {
     const distDoor = Math.hypot(this.jac.cx - door.x, this.jac.cy - door.y);
     const idle = this.jac.drivePath.length === 0 && !this.jac.driveGoal;
     const along = this.jac.doorSideAlong(door.x, door.y);
-    const arrived = (sit && distSit < 1.8 && this.jac.mph < 1.2) || (idle && this.jac.mph < 1.2 && distDoor <= 4 && along >= -1);
-    const doorSideSit = along >= -0.5 && distDoor <= 6 && this.jac.mph < 1 && idle;
-    const waiting = this.pendingDriveEnterAt > 0 ? performance.now() - this.pendingDriveEnterAt : 0;
+    const arrived = sit && distSit < 1.15 && this.jac.mph < 1.2;
+    const doorSideSit = idle && this.jac.mph < 1.2 && along >= 0 && distDoor <= 5.2;
     if (arrived || doorSideSit) {
       this.jacGetOut({ thenEnter: true });
       return;
     }
-    if (waiting > 28000 && idle) {
+    if (idle && this.jac.mph < 1.2) {
       this.retryDriveEnterOrGetOut();
     }
   }
@@ -4271,7 +4277,7 @@ export class IsoScene {
     if (!entry || !this.jac?.driving) return;
     const along = this.jac.doorSideAlong(entry.door.x, entry.door.y);
     const dist = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
-    if (along >= 0 && dist <= 6) {
+    if (along >= 0 && dist <= 5.2) {
       this.jacGetOut({ thenEnter: true });
       return;
     }

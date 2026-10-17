@@ -710,12 +710,14 @@ export class JacT9 {
     }
 
     const doorSide = usable.filter((c) => c.along >= 0);
-    const close = doorSide.filter((c) => c.doorD <= 5);
+    const front = doorSide.filter((c) => c.along >= 1 && c.doorD >= 2 && c.doorD <= 5);
+    const close = doorSide.filter((c) => c.along >= 0.5 && c.doorD <= 5);
     const near = doorSide.filter((c) => c.doorD <= 8);
-    const pool = close.length ? close : near.length ? near : doorSide.length ? doorSide : usable;
+    const pool = front.length ? front : close.length ? close : near.length ? near : doorSide.length ? doorSide : usable;
     const prefer = (c: Cand) => (cells[c.y]?.[c.x]?.groundId?.includes('park') ? 0 : 1);
+    const closeness = (c: Cand) => Math.abs(c.doorD - 3.5);
     pool.sort(
-      (a, b) => a.doorD - b.doorD || prefer(a) - prefer(b) || b.along - a.along || a.pathD - b.pathD,
+      (a, b) => prefer(a) - prefer(b) || closeness(a) - closeness(b) || b.along - a.along || a.pathD - b.pathD,
     );
     const pick = pool[0];
     if (!pick) return null;
@@ -1293,8 +1295,8 @@ export class JacT9 {
       const behind = (goal.x - this.cx) * fwd.x + (goal.y - this.cy) * fwd.y < -0.05;
       if (
         this.visualOnTile(goal.x, goal.y) ||
-        goalDist < PATH_ARRIVE + 0.43 ||
-        (goalDist < 1.35 && (behind || Math.abs(this.vel) < 1.4))
+        goalDist < PATH_ARRIVE + 0.5 ||
+        (goalDist < 1.55 && behind)
       ) {
         this.clearDriveArrival();
         return { throttle: 0, steer: 0 };
@@ -1342,9 +1344,18 @@ export class JacT9 {
       const dy = t.y - this.cy;
       const dist = Math.hypot(dx, dy);
       const arrive = this.followLoose || this.isGoalNode(t) ? 0.55 : 0.4;
-      const behind = dx * fwd.x + dy * fwd.y < -0.05;
-      if (dist >= arrive && !(this.drivePath.length > 1 && behind && dist < 1.4)) break;
-      this.drivePath.shift();
+      if (dist < arrive) {
+        this.drivePath.shift();
+        continue;
+      }
+      const ahead = dx * fwd.x + dy * fwd.y;
+      const behind = ahead < -0.05;
+      const aligned = dist > 1e-4 && ahead / dist < -0.7;
+      if (this.drivePath.length > 1 && behind && dist < 0.7 && aligned) {
+        this.drivePath.shift();
+        continue;
+      }
+      break;
     }
   }
 
@@ -1814,18 +1825,9 @@ export class JacT9 {
     return !this.overlapsProp();
   }
 
-  /** A* sit: 2×2 walkable plus both parked AABBs so a turn cannot clip a prop. */
-  private canDriveSit(cx: number, cy: number): boolean {
-    return (
-      this.driveBoxWalkable(cx, cy) &&
-      this.footprintClear(cx, cy, PARK_SE.w, PARK_SE.h) &&
-      this.footprintClear(cx, cy, PARK_SW.w, PARK_SW.h)
-    );
-  }
-
-  /** Same collider the planner and the follower use. */
+  /** Planner / replan: same 2×2 box the van actually drives with, so tight door corridors stay open. */
   private pathSit(cx: number, cy: number): boolean {
-    return this.canDriveSit(cx, cy);
+    return this.driveBoxWalkable(cx, cy);
   }
 
   /** Last-hop sit: the 2×2 box often clips a wall two tiles short of the tap. */

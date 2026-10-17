@@ -123,6 +123,7 @@ export class ChromeUI {
   setLayout(next: DesktopLayout): void {
     if (this.mobile) {
       this.mobileSheet = next !== 'map';
+      if (this.shortLandscape()) this.mobileSheet = false;
     } else {
       this.layout = next;
     }
