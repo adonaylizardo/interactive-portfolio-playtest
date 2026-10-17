@@ -75,7 +75,8 @@ function exteriorKey(id, p) {
   const zoom = p.zoom ?? 'cerca';
   if (zoom === 'lejos') return `ext/${id}/${state}/${zoom}`;
   if (state === 'default' && p.luz) {
-    const luz = p.luz === 'luz-apagada' ? 'apagada' : 'encendida';
+    const raw = p.luz;
+    const luz = raw.includes('apagada') ? 'apagada' : 'encendida';
     return `ext/${id}/${state}/${luz}/${zoom}`;
   }
   return `ext/${id}/${state}/${zoom}`;
@@ -131,6 +132,15 @@ for (const g of GROUPS) {
     };
     added++;
     if (key.startsWith('ext/')) orAlphaMask(masks, maskBase(key), png1);
+  }
+}
+
+for (const id of ['teresa', 'biblioteca']) {
+  const enc = spritesJson.assets[`ext/${id}/default/encendida/cerca`];
+  const apg = spritesJson.assets[`ext/${id}/default/apagada/cerca`];
+  if (enc) spritesJson.assets[`ext/${id}/default/cerca`] = { ...enc };
+  if (apg && !spritesJson.assets[`ext/${id}/default/apagada/cerca`]) {
+    spritesJson.assets[`ext/${id}/default/apagada/cerca`] = { ...apg };
   }
 }
 

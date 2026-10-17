@@ -1885,8 +1885,8 @@
     "x1": 556,
     "y1": 460
    },
-   "f1": "exteriores/teresa-carreno/teresa-carreno__estado-default_luz-apagada_zoom-cerca@1x.png",
-   "f2": "exteriores/teresa-carreno/teresa-carreno__estado-default_luz-apagada_zoom-cerca@2x.png"
+   "f1": "exteriores/teresa-carreno/teresa-carreno__estado-default_luz-encendida_zoom-cerca@1x.png",
+   "f2": "exteriores/teresa-carreno/teresa-carreno__estado-default_luz-encendida_zoom-cerca@2x.png"
   },
   "ext/teresa/hover/cerca": {
    "w": 576,
@@ -1949,8 +1949,8 @@
     "x1": 590,
     "y1": 437
    },
-   "f1": "exteriores/biblioteca-ingenieria/biblioteca-ingenieria__estado-default_luz-apagada_zoom-cerca@1x.png",
-   "f2": "exteriores/biblioteca-ingenieria/biblioteca-ingenieria__estado-default_luz-apagada_zoom-cerca@2x.png"
+   "f1": "exteriores/biblioteca-ingenieria/biblioteca-ingenieria__estado-default_luz-encendida_zoom-cerca@1x.png",
+   "f2": "exteriores/biblioteca-ingenieria/biblioteca-ingenieria__estado-default_luz-encendida_zoom-cerca@2x.png"
   },
   "ext/biblioteca/hover/cerca": {
    "w": 608,
@@ -2063,6 +2063,70 @@
    },
    "f1": "interiores/biblioteca-ingenieria/biblioteca-ingenieria-interior__estado-interior_zoom-lejos@1x.png",
    "f2": "interiores/biblioteca-ingenieria/biblioteca-ingenieria-interior__estado-interior_zoom-lejos@2x.png"
+  },
+  "ext/teresa/default/cerca": {
+   "w": 576,
+   "h": 462,
+   "vfs": {
+    "x": 336,
+    "y": 462
+   },
+   "bbox": {
+    "x0": 20,
+    "y0": 48,
+    "x1": 556,
+    "y1": 460
+   },
+   "f1": "exteriores/teresa-carreno/teresa-carreno__estado-default_luz-encendida_zoom-cerca@1x.png",
+   "f2": "exteriores/teresa-carreno/teresa-carreno__estado-default_luz-encendida_zoom-cerca@2x.png"
+  },
+  "ext/biblioteca/default/cerca": {
+   "w": 608,
+   "h": 438,
+   "vfs": {
+    "x": 336,
+    "y": 438
+   },
+   "bbox": {
+    "x0": 18,
+    "y0": 81,
+    "x1": 590,
+    "y1": 437
+   },
+   "f1": "exteriores/biblioteca-ingenieria/biblioteca-ingenieria__estado-default_luz-encendida_zoom-cerca@1x.png",
+   "f2": "exteriores/biblioteca-ingenieria/biblioteca-ingenieria__estado-default_luz-encendida_zoom-cerca@2x.png"
+  },
+  "ext/teresa/default/apagada/cerca": {
+   "w": 576,
+   "h": 462,
+   "vfs": {
+    "x": 336,
+    "y": 462
+   },
+   "bbox": {
+    "x0": 20,
+    "y0": 48,
+    "x1": 556,
+    "y1": 460
+   },
+   "f1": "exteriores/teresa-carreno/teresa-carreno__estado-default_luz-apagada_zoom-cerca@1x.png",
+   "f2": "exteriores/teresa-carreno/teresa-carreno__estado-default_luz-apagada_zoom-cerca@2x.png"
+  },
+  "ext/biblioteca/default/apagada/cerca": {
+   "w": 608,
+   "h": 438,
+   "vfs": {
+    "x": 336,
+    "y": 438
+   },
+   "bbox": {
+    "x0": 18,
+    "y0": 81,
+    "x1": 590,
+    "y1": 437
+   },
+   "f1": "exteriores/biblioteca-ingenieria/biblioteca-ingenieria__estado-default_luz-apagada_zoom-cerca@1x.png",
+   "f2": "exteriores/biblioteca-ingenieria/biblioteca-ingenieria__estado-default_luz-apagada_zoom-cerca@2x.png"
   }
  },
  "meta": {

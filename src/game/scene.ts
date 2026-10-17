@@ -61,6 +61,7 @@ import {
   streetOpenSides,
   objectDepth,
   objectOccluder,
+  buildingPickSpriteKey,
   objectSpriteKey,
   objectSpriteScale,
   objectSpriteTopLeft,
@@ -1721,6 +1722,15 @@ export class IsoScene {
     const doorFirst = this.pickBuildingDoorAtScreen(sx, sy);
     if (doorFirst?.door && doorFirst.panelTitle) {
       if (!this.prepareMapTap(doorFirst)) return;
+      const here = this.roundedCharTile();
+      if (here.x === doorFirst.door.x && here.y === doorFirst.door.y) {
+        this.pendingBuildingEntry = {
+          panelTitle: doorFirst.panelTitle,
+          door: doorFirst.door,
+        };
+        this.tryArriveAtDoorTile(here.x, here.y);
+        return;
+      }
       this.requestWalk(doorFirst.door.x, doorFirst.door.y, sprint, {
         buildingEntry: { panelTitle: doorFirst.panelTitle, door: doorFirst.door },
       });
@@ -4988,6 +4998,46 @@ export class IsoScene {
     const rect = this.canvasEl?.getBoundingClientRect();
     const s = this.worldToScreen(wx, wy);
     return { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y };
+  }
+
+  /** Client pixels for ▶ Talks / 📄 Writings map pills. */
+  buildingMapLabelAnchors(): {
+    id: 'teresa' | 'biblioteca';
+    x: number;
+    y: number;
+    visible: boolean;
+  }[] {
+    if (this.interiorActive) return [];
+    const rect = this.canvasEl?.getBoundingClientRect();
+    const sw = this.app?.screen.width ?? 0;
+    const sh = this.app?.screen.height ?? 0;
+    const lightsOn = this.jac?.lightsOn ?? true;
+    const out: {
+      id: 'teresa' | 'biblioteca';
+      x: number;
+      y: number;
+      visible: boolean;
+    }[] = [];
+    for (const id of ['teresa', 'biblioteca'] as const) {
+      const obj = objects.find((o) => o.name === id);
+      if (!obj) continue;
+      const key = buildingPickSpriteKey(obj, lightsOn);
+      if (!key) continue;
+      const tl = objectSpriteTopLeft(obj, key);
+      const asset = spriteAsset(key);
+      const sc = objectSpriteScale(obj);
+      const cx = tl.x + ((asset.bbox.x0 + asset.bbox.x1) / 2) * sc;
+      const cy = tl.y + asset.bbox.y0 * sc - 16;
+      const s = this.worldToScreen(cx, cy);
+      const onScreen = s.x > -60 && s.y > -60 && s.x < sw + 60 && s.y < sh + 60;
+      out.push({
+        id,
+        x: (rect?.left ?? 0) + s.x,
+        y: (rect?.top ?? 0) + s.y,
+        visible: onScreen,
+      });
+    }
+    return out;
   }
 
   /** Client pixels of the name-pill anchors (just above each head). */

@@ -104,6 +104,12 @@ export class StudioAudio {
     return this.subtitleText;
   }
 
+  /** Clear chrome subtitle (e.g. experience rooms without a case voice line). */
+  clearSubtitle(): void {
+    this.stopVoice();
+    this.emit();
+  }
+
   onChange(fn: () => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);

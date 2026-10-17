@@ -335,6 +335,7 @@ export function buildWorld(): {
       door: { x: ax, y: ay },
       doorFace: ed.cara_puerta ?? '+y',
       panelTitle: PANEL_TITLES[id] ?? id,
+      ...(id === 'teresa' || id === 'biblioteca' ? { scale: 2 } : {}),
     });
   }
 

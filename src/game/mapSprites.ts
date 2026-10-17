@@ -62,6 +62,21 @@ export function objectSpriteBase(o: MapObject): string | null {
 
 const LUZ_BUILDINGS = new Set(['teresa', 'biblioteca']);
 
+export function buildingUsesLuz(id: string): boolean {
+  return LUZ_BUILDINGS.has(id);
+}
+
+/** Alpha hit-test and door geometry for buildings (always default / cerca). */
+export function buildingPickSpriteKey(o: MapObject, lightsOn = true): string | null {
+  const base = objectSpriteBase(o);
+  if (!base || o.type !== 'building') return null;
+  if (LUZ_BUILDINGS.has(o.name)) {
+    const luz = lightsOn ? 'encendida' : 'apagada';
+    return `${base}/default/${luz}/cerca`;
+  }
+  return `${base}/default/cerca`;
+}
+
 /** Sprite key for an object given its state (buildings) and zoom variant. */
 export function objectSpriteKey(
   o: MapObject,

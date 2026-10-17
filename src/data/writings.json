@@ -10,6 +10,18 @@
           "example": true,
           "titleKey": "writings.ux1.title",
           "metaKey": "writings.ux1.meta"
+        },
+        {
+          "id": "ux-example-2",
+          "example": true,
+          "titleKey": "writings.ux2.title",
+          "metaKey": "writings.ux2.meta"
+        },
+        {
+          "id": "ux-example-3",
+          "example": true,
+          "titleKey": "writings.ux3.title",
+          "metaKey": "writings.ux3.meta"
         }
       ]
     },
@@ -23,6 +35,18 @@
           "example": true,
           "titleKey": "writings.sin1.title",
           "metaKey": "writings.sin1.meta"
+        },
+        {
+          "id": "sin-example-2",
+          "example": true,
+          "titleKey": "writings.sin2.title",
+          "metaKey": "writings.sin2.meta"
+        },
+        {
+          "id": "sin-example-3",
+          "example": true,
+          "titleKey": "writings.sin3.title",
+          "metaKey": "writings.sin3.meta"
         }
       ]
     },
@@ -36,6 +60,18 @@
           "example": true,
           "titleKey": "writings.guest1.title",
           "metaKey": "writings.guest1.meta"
+        },
+        {
+          "id": "guest-example-2",
+          "example": true,
+          "titleKey": "writings.guest2.title",
+          "metaKey": "writings.guest2.meta"
+        },
+        {
+          "id": "guest-example-3",
+          "example": true,
+          "titleKey": "writings.guest3.title",
+          "metaKey": "writings.guest3.meta"
         }
       ]
     }

@@ -17,6 +17,18 @@
       "example": true,
       "titleKey": "talks.item3.title",
       "metaKey": "talks.item3.meta"
+    },
+    {
+      "id": "talk-example-4",
+      "example": true,
+      "titleKey": "talks.item4.title",
+      "metaKey": "talks.item4.meta"
+    },
+    {
+      "id": "talk-example-5",
+      "example": true,
+      "titleKey": "talks.item5.title",
+      "metaKey": "talks.item5.meta"
     }
   ]
 }

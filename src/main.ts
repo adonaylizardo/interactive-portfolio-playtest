@@ -18,6 +18,7 @@ import { BuildingPanel } from './ui/buildingPanel';
 import { ChromeUI, type DesktopLayout } from './ui/chrome';
 import { JacHud } from './ui/jacHud';
 import { Joystick } from './ui/joystick';
+import { BuildingMapLabels } from './ui/buildingMapLabels';
 import { NameLabels } from './ui/nameLabels';
 import { hideToast, showToast } from './ui/toast';
 import { getLang, onLangChange, setLang, t } from './ui/i18n';
@@ -48,6 +49,7 @@ async function main(): Promise<void> {
 
   const joystick = new Joystick(uiRoot);
   const labels = new NameLabels(uiRoot, { onJacInfo: () => scene.jacOpenInfo() });
+  const mapLabels = new BuildingMapLabels(uiRoot);
   const jacHud = new JacHud(uiRoot, {
     onInfo: () => scene.jacOpenInfo(),
     onGetIn: () => scene.jacGetIn(),
@@ -80,10 +82,18 @@ async function main(): Promise<void> {
       const b = getBuildingByName(interiorId);
       if (b?.panelTitle) {
         checklist.setBuildingPanelOpen(true);
-        chrome.setInteriorOpen(true);
-        if (interiorId === 'teresa') panel.showTalks(b.panelTitle, interiorId);
-        else if (interiorId === 'biblioteca') panel.showWritings(b.panelTitle, interiorId);
-        else panel.showInterior(b.panelTitle, interiorId);
+        if (interiorId === 'teresa') {
+          studio.clearSubtitle();
+          chrome.setInteriorOpen(false, { skipLayout: true });
+          panel.showTalks(b.panelTitle, interiorId);
+        } else if (interiorId === 'biblioteca') {
+          studio.clearSubtitle();
+          chrome.setInteriorOpen(false, { skipLayout: true });
+          panel.showWritings(b.panelTitle, interiorId);
+        } else {
+          chrome.setInteriorOpen(true);
+          panel.showInterior(b.panelTitle, interiorId);
+        }
       }
     } else {
       checklist.setBuildingPanelOpen(false);
@@ -107,6 +117,13 @@ async function main(): Promise<void> {
     onMoveCommand: () => studio.noteMoveCommand(),
     onFrame: () => {
       labels.update(scene.nameLabelAnchors());
+      mapLabels.setHidden(!!scene.isInInterior());
+      mapLabels.update(
+        scene.buildingMapLabelAnchors().map((a) => ({
+          ...a,
+          label: a.id === 'teresa' ? `▶ ${t('panel.talks')}` : `📄 ${t('panel.writings')}`,
+        })),
+      );
       if (scene.jacHudActive()) {
         const snap = scene.jacSnapshot();
         const anchors = scene.jacHudAnchors();

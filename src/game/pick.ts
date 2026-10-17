@@ -4,7 +4,14 @@ import spritesJson from '../data/sprites.json';
 import type { MapObject } from '../data/world';
 import { TILE_H, TILE_W } from '../data/world';
 import { tileFootWorld, tileToWorld } from '../iso/math';
-import { objectDepth, objectSpriteBase, objectSpriteScale, objectSpriteTopLeft } from './mapSprites';
+import {
+  buildingPickSpriteKey,
+  objectDepth,
+  objectSpriteBase,
+  objectSpriteScale,
+  objectSpriteTopLeft,
+} from './mapSprites';
+import { hasSprite } from './sprites';
 
 type Pt = { x: number; y: number };
 type Rect = { x0: number; y0: number; x1: number; y1: number };
@@ -64,9 +71,9 @@ export function footprintHit(o: MapObject, wx: number, wy: number): boolean {
 }
 
 function maskKey(o: MapObject): string | null {
+  if (o.type === 'building') return buildingPickSpriteKey(o, true);
   const base = objectSpriteBase(o);
-  if (!base) return null;
-  return o.type === 'building' ? `${base}/default/cerca` : `${base}/cerca`;
+  return base ? `${base}/cerca` : null;
 }
 
 export function hasSpriteMask(o: MapObject): boolean {
@@ -79,7 +86,7 @@ export function spriteAlphaHit(o: MapObject, wx: number, wy: number): boolean {
   const base = objectSpriteBase(o);
   const key = maskKey(o);
   const m = base ? mask(base) : null;
-  if (!m || !key) return false;
+  if (!m || !key || !hasSprite(key)) return false;
   const tl = objectSpriteTopLeft(o, key);
   const cell = m.cell * objectSpriteScale(o);
   const cx = Math.floor((wx - tl.x) / cell);
@@ -105,7 +112,9 @@ export function doorBottomCentre(o: MapObject): Pt | null {
   if (!o.door) return null;
   const puerta = meta[`ext/${o.name}`]?.puerta;
   if (puerta) {
-    const tl = objectSpriteTopLeft(o, `ext/${o.name}/default/cerca`);
+    const pickKey = buildingPickSpriteKey(o, true) ?? `ext/${o.name}/default/cerca`;
+    if (!hasSprite(pickKey)) return null;
+    const tl = objectSpriteTopLeft(o, pickKey);
     return { x: tl.x + puerta.x, y: tl.y + puerta.y };
   }
   const c = tileToWorld(o.door.x, o.door.y);
