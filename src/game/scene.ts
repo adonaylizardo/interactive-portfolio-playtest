@@ -4573,8 +4573,12 @@ export class IsoScene {
     if (partial.mode === 'menu') this.openJacMenu();
     else if (partial.mode === 'info') this.jacOpenInfo();
     else if (partial.mode === 'drive') this.seatInJac();
-    else if (partial.mode === 'parked' && this.jac.driving) this.jacGetOut();
-    else if (partial.mode === 'parked') this.jacClose();
+    else if (partial.mode === 'parked' && this.jac.driving) {
+      this.jac.cancelExit();
+      this.pendingJacExit = false;
+      this.avatar.setVisible(true);
+      this.jac.setMode('parked');
+    } else if (partial.mode === 'parked') this.jacClose();
     if (partial.reversing !== undefined) this.jac.reversing = partial.reversing;
     if (partial.steering !== undefined) this.jac.setQaSteer(partial.steering);
     this.jac.applySprite();

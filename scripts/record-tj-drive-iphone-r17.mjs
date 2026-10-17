@@ -58,7 +58,11 @@ async function parkVan(page) {
     window.__playtestQa.jacStick?.(null);
     window.__playtestQa.focusJac?.();
   });
-  await wait(80);
+  await waitUntil(
+    page,
+    async () => ((await page.evaluate(() => window.__playtestQa.jac()?.driving === false)) ? true : null),
+    4000,
+  );
 }
 
 async function ensureDriving(page, tag) {
@@ -269,12 +273,37 @@ async function main() {
   await parkVan(page);
   await ensureDriving(page, 'r17-dup');
   const spawn = await page.evaluate(() => window.__playtestQa.jacSpawn());
-  await page.evaluate(() => window.__playtestQa.jacDriveTo(20, 28));
-  for (let i = 0; i < 160; i++) {
+  const drove = await page.evaluate((spawn) => {
+    const qa = window.__playtestQa;
+    qa.jacSet?.({ cx: spawn.center.x, cy: spawn.center.y, dir: 'se', mode: 'drive' });
+    const dests = [
+      [32, 22],
+      [30, 24],
+      [28, 22],
+      [18, 20],
+    ];
+    for (const [x, y] of dests) {
+      if (qa.jacDriveTo(x, y)) return { ok: true, x, y };
+    }
+    return { ok: false, tile: qa.jacDriveTileOk?.(32, 22), path: qa.jacFindDrivePath?.(32, 22) };
+  }, spawn);
+  notes.push(`dup-drive ${JSON.stringify(drove)}`);
+  if (!drove?.ok) errors.push(`dup: drive-away path not accepted ${JSON.stringify(drove)}`);
+  for (let i = 0; i < 200; i++) {
     await page.evaluate(() => window.__playtestQa.jacDriveStep?.(1 / 60, 0, 0));
   }
+  const midDrive = await page.evaluate((spawn) => {
+    const j = window.__playtestQa.jac();
+    return { cx: j?.cx, cy: j?.cy, away: Math.hypot((j?.cx ?? 0) - spawn.center.x, (j?.cy ?? 0) - spawn.center.y) };
+  }, spawn);
+  notes.push(`dup-mid ${JSON.stringify(midDrive)}`);
+  if ((midDrive.away ?? 0) < 4) errors.push(`dup: van did not leave spawn before get-out (${midDrive.away})`);
   await page.evaluate(() => window.__playtestQa.jacGetOut());
-  await wait(400);
+  await waitUntil(
+    page,
+    async () => ((await page.evaluate(() => window.__playtestQa.jac()?.driving === false)) ? true : null),
+    4000,
+  );
   await page.evaluate(() => {
     window.dispatchEvent(new Event('resize'));
     window.visualViewport?.dispatchEvent(new Event('resize'));
