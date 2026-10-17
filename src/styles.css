@@ -1188,11 +1188,120 @@ body[data-layout='panel'] .checklist {
   }
 }
 
+/* Map pills above Talks / Writings buildings (Pixel kit). */
+.building-map-labels {
+  position: fixed;
+  inset: 0;
+  z-index: 12;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.building-map-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #3a3d44;
+  background: rgb(11 12 14 / 88%);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 35%);
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.building-map-label__text {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #c8ccd4;
+}
+
 /* Talks / Writings experience panel (Teresa + Biblioteca). */
 .building-panel--experience .case,
 .building-panel--experience .about,
-.building-panel--experience .worked-with {
+.building-panel--experience .worked-with,
+.building-panel--experience .building-panel__title,
+.building-panel--experience .building-panel__exit {
   display: none !important;
+}
+
+.building-panel--experience .building-panel__close {
+  display: none;
+}
+
+.building-panel--experience .building-panel__drag {
+  cursor: grab;
+  touch-action: none;
+}
+
+.building-panel--experience .building-panel__drag:active {
+  cursor: grabbing;
+}
+
+@media (max-width: 767px) {
+  .building-panel--experience.building-panel--peek .exp-header__title {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+
+.exp-header {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding-right: 0;
+}
+
+.building-panel--experience .exp-header {
+  display: flex;
+}
+
+.exp-header__btn {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #edeef0;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.exp-header__back {
+  font-size: 26px;
+  font-weight: 300;
+}
+
+.exp-header__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #edeef0;
+}
+
+.exp-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.exp-header__close {
+  font-size: 24px;
 }
 
 .experience {
@@ -1213,23 +1322,90 @@ body[data-layout='panel'] .checklist {
   line-height: 1.45;
 }
 
+.experience__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.experience__filters[hidden] {
+  display: none;
+}
+
+.experience__filter {
+  padding: 6px 12px;
+  border: 1px solid #2a2c31;
+  border-radius: 999px;
+  background: #141518;
+  color: #8a8f98;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.experience__filter.is-active {
+  border-color: #edeef0;
+  background: #edeef0;
+  color: #0b0c0e;
+}
+
 .experience__section-head {
-  margin-top: 8px;
+  margin-top: 12px;
+}
+
+.experience__section-head:first-child {
+  margin-top: 0;
+}
+
+.experience__section-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
 }
 
 .experience__section-title {
-  margin: 0 0 4px;
-  font-size: 13px;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: normal;
+  text-transform: none;
   color: #edeef0;
 }
 
-.experience__section-desc {
-  margin: 0 0 8px;
+.experience__section-count {
+  flex: 0 0 auto;
+  min-width: 20px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #1a1c20;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  color: #8a8f98;
+}
+
+.experience__see-all {
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: #8a8f98;
   font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.experience__section-desc {
+  margin: 0 0 10px;
+  color: #8a8f98;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .experience__row {
@@ -1237,26 +1413,50 @@ body[data-layout='panel'] .checklist {
   gap: 12px;
   align-items: flex-start;
   width: 100%;
-  margin: 0 0 8px;
-  padding: 10px 12px;
-  border: 1px solid #2a2c31;
-  border-radius: 12px;
-  background: #141518;
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: inherit;
   text-align: left;
   cursor: pointer;
   touch-action: manipulation;
 }
 
+.experience__row--compact {
+  margin-bottom: 10px;
+}
+
 .experience__thumb {
-  flex: 0 0 56px;
-  width: 56px;
-  height: 56px;
-  border-radius: 10px;
-  background: #1a1c20;
+  flex: 0 0 auto;
   display: grid;
   place-items: center;
-  color: #ffb547;
+  border-radius: 8px;
+  background: #1a1c20;
+  color: #edeef0;
+  overflow: hidden;
+}
+
+.experience__thumb--video {
+  width: 112px;
+  aspect-ratio: 16 / 9;
+}
+
+.experience__thumb--doc {
+  width: 48px;
+  height: 48px;
+  color: #c8ccd4;
+}
+
+.experience__row--compact .experience__thumb--video {
+  width: 80px;
+}
+
+.experience__play {
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.9;
 }
 
 .experience__copy {
@@ -1265,6 +1465,7 @@ body[data-layout='panel'] .checklist {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding-top: 2px;
 }
 
 .experience__row-title {
@@ -1272,6 +1473,10 @@ body[data-layout='panel'] .checklist {
   font-weight: 600;
   color: #edeef0;
   line-height: 1.35;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .experience__row-meta {
@@ -1279,65 +1484,182 @@ body[data-layout='panel'] .checklist {
   color: #8a8f98;
 }
 
-.experience__pill {
-  align-self: flex-start;
-  margin-top: 4px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  background: rgb(255 181 71 / 12%);
-  color: #ffb547;
-}
-
 .experience__detail[hidden] {
   display: none;
 }
 
-.experience__back {
-  align-self: flex-start;
-  margin-bottom: 8px;
-  padding: 6px 10px;
-  border: 1px solid #2a2c31;
-  border-radius: 8px;
-  background: transparent;
-  color: #edeef0;
+.experience__divider {
+  margin: 16px 0;
+  border: 0;
+  border-top: 1px solid #2a2c31;
+}
+
+.experience__up-next {
+  margin: 0 0 10px;
   font-size: 13px;
+  font-weight: 600;
+  color: #8a8f98;
+}
+
+.experience__up-next-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Talks video player detail */
+.talks-player__stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin-bottom: 14px;
+  border-radius: 10px;
+  background: #0b0c0e;
+  border: 1px solid #2a2c31;
+  overflow: hidden;
+}
+
+.talks-player__label {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  font-family: ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: #8a8f98;
+  pointer-events: none;
+}
+
+.talks-player__pause {
+  position: absolute;
+  left: 10px;
+  bottom: 28px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: rgb(20 21 24 / 75%);
+  color: #edeef0;
   cursor: pointer;
 }
 
-.experience__player {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  border-radius: 12px;
-  background: #1a1c20;
-  border: 1px solid #2a2c31;
-  display: grid;
-  place-items: center;
-  margin-bottom: 12px;
-  color: #ffb547;
+.talks-player__progress {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 18px;
+  height: 3px;
+  border-radius: 2px;
+  background: #2a2c31;
+  overflow: hidden;
 }
 
-.experience__detail-title {
+.talks-player__progress-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: #edeef0;
+}
+
+.talks-player__time {
+  position: absolute;
+  right: 10px;
+  bottom: 6px;
+  margin: 0;
+  font-family: ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  color: #8a8f98;
+}
+
+.talks-player__title {
   margin: 0 0 6px;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
+  color: #edeef0;
+  line-height: 1.3;
+}
+
+.talks-player__meta {
+  margin: 0;
+  font-size: 13px;
+  color: #8a8f98;
+}
+
+/* Writings reader detail */
+.writings-reader__hero {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin-bottom: 16px;
+  border-radius: 10px;
+  background: #1a1c20;
+  border: 1px solid #2a2c31;
+  color: #c8ccd4;
+}
+
+.writings-reader__kicker {
+  margin: 0 0 8px;
+  font-family: ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: #8a8f98;
+}
+
+.writings-reader__title {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.25;
   color: #edeef0;
 }
 
-.experience__detail-meta {
-  margin: 0 0 12px;
-  color: #8a8f98;
+.writings-reader__meta {
+  margin: 0 0 16px;
   font-size: 13px;
+  color: #8a8f98;
 }
 
-.experience__detail-body {
+.writings-reader__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.writings-reader__p {
   margin: 0;
-  color: #c8ccd4;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.55;
+  color: #c8ccd4;
+}
+
+.writings-reader__substack {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid #2a2c31;
+  background: #1a1c20;
+  color: #edeef0;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.writings-reader__substack:hover {
+  border-color: #3a3d44;
+  background: #24262b;
 }
 
 /* Case preview — Pixel kit card, then a full reading view. */
