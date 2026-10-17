@@ -4263,7 +4263,7 @@ export class IsoScene {
     const idle = this.jac.drivePath.length === 0 && !this.jac.driveGoal;
     const along = this.jac.doorSideAlong(door.x, door.y);
     const arrived = sit && distSit < 1.15 && this.jac.mph < 1.2;
-    const doorSideSit = idle && this.jac.mph < 1.2 && along >= 0 && distDoor <= 5.2;
+    const doorSideSit = idle && this.jac.mph < 1.2 && along >= 0 && distDoor <= 6.2;
     if (arrived || doorSideSit) {
       this.jacGetOut({ thenEnter: true });
       return;
@@ -4282,7 +4282,7 @@ export class IsoScene {
     if (!entry || !this.jac?.driving) return;
     const along = this.jac.doorSideAlong(entry.door.x, entry.door.y);
     const dist = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
-    if (along >= 0 && dist <= 5.2) {
+    if (along >= 0 && dist <= 6.2) {
       this.jacGetOut({ thenEnter: true });
       return;
     }

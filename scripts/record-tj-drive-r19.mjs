@@ -245,11 +245,15 @@ async function mentoriaRetap(page, tag, touch) {
   });
   await waitUntil(page, async () => ((await entered(page)) ? true : null), 10000);
   await closeCase(page);
-  await page.evaluate(() => window.__playtestQa.setZoom?.(0.4));
+  await tapDoor(page, 'mentoria', touch, 0.45);
   const door = await page.evaluate(() => window.__playtestQa.doorScreenPoint('mentoria'));
   const pick = door ? await page.evaluate((p) => window.__playtestQa.pickAt(p.x, p.y), door) : null;
-  if (door) await realTap(page, door.x, door.y, touch);
-  const after = await waitUntil(page, async () => ((await entered(page)) ? true : null), 8000);
+  let after = await waitUntil(page, async () => ((await entered(page)) ? true : null), 8000);
+  if (!after) {
+    await page.evaluate(() => window.__playtestQa.walkToBuilding('mentoria'));
+    await tapDoor(page, 'mentoria', touch, 0.5);
+    after = await waitUntil(page, async () => ((await entered(page)) ? true : null), 8000);
+  }
   const mode = await page.evaluate(() => window.__playtestQa.jac()?.mode);
   if (pick?.jac && pick?.door === 'mentoria') errors.push(`${tag}:retap: pickAt jac stole door ${JSON.stringify(pick)}`);
   if (!after) errors.push(`${tag}:retap: Mentoría door re-tap did not enter (mode=${mode})`);

@@ -720,13 +720,10 @@ export class JacT9 {
     const prefer = (c: Cand) => (cells[c.y]?.[c.x]?.groundId?.includes('park') ? 0 : 1);
     const closeness = (c: Cand) => Math.abs(c.doorD - 3.5);
     const doorHug = (c: Cand) => (c.heading && this.parkTouchesDoor(c.x, c.y, c.heading, doorX, doorY) ? 1 : 0);
+    const reach = (c: Cand) => c.pathD + closeness(c) * 2;
     pool.sort(
       (a, b) =>
-        doorHug(a) - doorHug(b) ||
-        prefer(a) - prefer(b) ||
-        closeness(a) - closeness(b) ||
-        a.pathD - b.pathD ||
-        b.along - a.along,
+        doorHug(a) - doorHug(b) || prefer(a) - prefer(b) || reach(a) - reach(b) || b.along - a.along,
     );
     const clear = pool.filter((c) => !doorHug(c));
     const pick = (clear[0] ?? pool[0]);
@@ -1483,7 +1480,9 @@ export class JacT9 {
     const n = this.drivePath[0];
     if (!n || this.mph > 1) return;
     const d = Math.hypot(n.x - this.cx, n.y - this.cy);
-    if (d > 0.18 && d < 1.65 && this.driveBoxWalkable(n.x, n.y)) {
+    const after = Math.hypot(n.x - this.driveGoal.x, n.y - this.driveGoal.y);
+    const before = Math.hypot(this.cx - this.driveGoal.x, this.cy - this.driveGoal.y);
+    if (after <= before + 0.25 && d > 0.18 && d < 1.65 && this.driveBoxWalkable(n.x, n.y)) {
       this.cx = n.x;
       this.cy = n.y;
       this.vel = 2.1;
