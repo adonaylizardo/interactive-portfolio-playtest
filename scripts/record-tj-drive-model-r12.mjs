@@ -121,6 +121,7 @@ async function resetSpawn(page) {
     window.__playtestQa.jacSetGear?.('D');
     window.__playtestQa.focusJac?.();
   });
+  await clearToast(page);
   await wait(160);
 }
 
@@ -156,7 +157,7 @@ async function pickAroundGoals(page) {
         const dist = Math.hypot(x - j.cx, y - j.cy);
         if (dist < 3.2 || dist > 11) continue;
         const path = window.__playtestQa.jacFindDrivePath?.(x, y);
-        if (!path || path.length < 2) continue;
+        if (!path || path.length < 2 || path.length > 20) continue;
         let needsAround = !window.__playtestQa.jacCanSit?.(x, y);
         const steps = Math.max(3, Math.round(dist * 2));
         for (let i = 1; i < steps && !needsAround; i++) {
@@ -231,17 +232,20 @@ async function driveGoal(page, cdp, tag, phone, goal, i) {
   let started = await waitUntil(
     page,
     async () => {
-      const s = await page.evaluate(() => {
+      const s = await page.evaluate((g) => {
         const j = window.__playtestQa.jac();
+        const tap = window.__playtestQa.lastDriveTap?.();
+        const tapMatch = tap && tap.x === g.x && tap.y === g.y;
         return {
           goal: j?.driveGoal,
-          tap: window.__playtestQa.lastDriveTap?.(),
+          tap,
+          tapMatch,
           mph: j?.mph,
           cx: j?.cx,
           cy: j?.cy,
         };
-      });
-      if (s.goal || s.tap) return s;
+      }, goal);
+      if (s.goal) return s;
       return null;
     },
     2500,

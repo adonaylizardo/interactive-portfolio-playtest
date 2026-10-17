@@ -528,16 +528,23 @@ export class JacT9 {
   findDrivePath(gx: number, gy: number): { x: number; y: number }[] | null {
     const sx = Math.round(this.cx);
     const sy = Math.round(this.cy);
-    const pass = (x: number, y: number) => this.canSit(x, y) || (x === sx && y === sy);
     const finish = (path: { x: number; y: number }[], tx: number, ty: number) => {
       if (path.length === 0 || path[path.length - 1].x !== tx || path[path.length - 1].y !== ty) {
         return [...path, { x: tx, y: ty }];
       }
       return path;
     };
-    if (pass(gx, gy) || (sx === gx && sy === gy)) {
-      const direct = findPathWith(sx, sy, gx, gy, pass);
-      if (direct) return finish(direct, gx, gy);
+    const routeTo = (tx: number, ty: number) => {
+      const pass = (x: number, y: number) =>
+        this.canDriveSit(x, y) || (x === sx && y === sy) || (x === tx && y === ty && this.canSit(x, y));
+      if (sx === tx && sy === ty) return [];
+      if (!pass(tx, ty)) return null;
+      const path = findPathWith(sx, sy, tx, ty, pass);
+      return path ? finish(path, tx, ty) : null;
+    };
+    if (this.canSit(gx, gy) || (sx === gx && sy === gy)) {
+      const direct = routeTo(gx, gy);
+      if (direct) return direct;
       if (sx === gx && sy === gy) return [];
     }
     for (let r = 1; r <= 6; r++) {
@@ -549,12 +556,12 @@ export class JacT9 {
           const x = gx + dx;
           const y = gy + dy;
           if (!this.canSit(x, y)) continue;
-          const path = findPathWith(sx, sy, x, y, pass);
+          const path = routeTo(x, y);
           if (!path) continue;
           const d = Math.abs(dx) + Math.abs(dy);
           if (d < bestD) {
             bestD = d;
-            best = finish(path, x, y);
+            best = path;
           }
         }
       }
@@ -951,7 +958,9 @@ export class JacT9 {
   /** Step the same van along A* walkable waypoints. Joystick / keys cancel this in update(). */
   private followDrivePath(dt: number): boolean {
     if (this.driveGoal && Math.hypot(this.driveGoal.x - this.cx, this.driveGoal.y - this.cy) < 1.35) {
-      const sit = this.sitForVisual(this.driveGoal.x, this.driveGoal.y);
+      const sit = this.canSit(this.driveGoal.x, this.driveGoal.y) || this.canSitLoose(this.driveGoal.x, this.driveGoal.y)
+        ? this.driveGoal
+        : this.sitForVisual(this.driveGoal.x, this.driveGoal.y);
       if (this.canSit(sit.x, sit.y) || this.canSitLoose(sit.x, sit.y)) {
         this.cx = sit.x;
         this.cy = sit.y;
@@ -981,7 +990,9 @@ export class JacT9 {
       }
     }
     if (this.driveGoal && Math.hypot(this.driveGoal.x - this.cx, this.driveGoal.y - this.cy) < 1.35) {
-      const sit = this.sitForVisual(this.driveGoal.x, this.driveGoal.y);
+      const sit = this.canSit(this.driveGoal.x, this.driveGoal.y) || this.canSitLoose(this.driveGoal.x, this.driveGoal.y)
+        ? this.driveGoal
+        : this.sitForVisual(this.driveGoal.x, this.driveGoal.y);
       if (this.canSit(sit.x, sit.y) || this.canSitLoose(sit.x, sit.y)) {
         this.cx = sit.x;
         this.cy = sit.y;
@@ -1004,7 +1015,7 @@ export class JacT9 {
     const step = Math.min(dist, speed * Math.max(dt, 1 / 120));
     const ux = (ax / dist) * step;
     const uy = (ay / dist) * step;
-    const ok = (x: number, y: number) => this.canSit(x, y);
+    const ok = (x: number, y: number) => this.canDriveSit(x, y) || this.canSit(x, y);
     const next = ok(this.cx + ux, this.cy + uy) ? { x: this.cx + ux, y: this.cy + uy } : slide(this.cx, this.cy, ux, uy, ok);
     if (next.x === this.cx && next.y === this.cy) {
       this.vel = 0;
@@ -1269,6 +1280,15 @@ export class JacT9 {
 
   private canSit(cx: number, cy: number): boolean {
     return this.driveBoxWalkable(cx, cy) && this.propBodyClear(cx, cy);
+  }
+
+  /** A* sit: 2×2 walkable plus both parked AABBs so a turn cannot clip a prop. */
+  private canDriveSit(cx: number, cy: number): boolean {
+    return (
+      this.driveBoxWalkable(cx, cy) &&
+      this.footprintClear(cx, cy, PARK_SE.w, PARK_SE.h) &&
+      this.footprintClear(cx, cy, PARK_SW.w, PARK_SW.h)
+    );
   }
 
   /** Last-hop sit: the 2×2 box often clips a wall two tiles short of the tap. */
