@@ -2,7 +2,6 @@ import {
   Application,
   Container,
   Graphics,
-  Matrix,
   Point,
   Polygon,
   Rectangle,
@@ -344,6 +343,7 @@ export class IsoScene {
   /** GPU rear crop. Shown as a stage sprite — never readPixels / drawImage of the game GL view. */
   private rearRT: RenderTexture | null = null;
   private rearSprite: Sprite | null = null;
+  private rearMask: Graphics | null = null;
   private rearLayer: Container | null = null;
   private rearFade = 0;
   private rearFadeFrom = 0;
@@ -2968,9 +2968,10 @@ export class IsoScene {
     }
     const t = Math.min(1, (performance.now() - this.rearFadeT0) / 700);
     this.rearFade = this.rearFadeFrom + (this.rearFadeTo - this.rearFadeFrom) * t;
-    if (this.jac?.rearCam) this.renderRearTexture();
+    const drewRear = !!this.jac?.rearCam;
+    if (drewRear) this.renderRearTexture();
     this.layoutRearSprite();
-    this.restoreMainTarget();
+    if (drewRear) this.restoreMainTarget();
   }
 
   private opaqueBgRgba(): [number, number, number, number] {
@@ -2978,12 +2979,25 @@ export class IsoScene {
     return [((bg >> 16) & 255) / 255, ((bg >> 8) & 255) / 255, (bg & 255) / 255, 1];
   }
 
-  private ensureRearTexture(): RenderTexture {
-    if (!this.rearRT) {
-      this.rearRT = RenderTexture.create({ width: 640, height: 220 });
-      this.rearSprite = new Sprite(this.rearRT);
-      this.rearSprite.eventMode = 'none';
-      this.rearLayer?.addChild(this.rearSprite);
+  private ensureRearTexture(sw: number, sh: number): RenderTexture {
+    const w = Math.max(2, Math.ceil(sw));
+    const h = Math.max(2, Math.ceil(sh));
+    if (!this.rearRT || this.rearRT.width !== w || this.rearRT.height !== h) {
+      this.rearRT?.destroy(true);
+      this.rearRT = RenderTexture.create({ width: w, height: h });
+      if (!this.rearSprite) {
+        this.rearSprite = new Sprite(this.rearRT);
+        this.rearSprite.eventMode = 'none';
+        this.rearLayer?.addChildAt(this.rearSprite, 0);
+      } else {
+        this.rearSprite.texture = this.rearRT;
+      }
+      if (!this.rearMask) {
+        this.rearMask = new Graphics();
+        this.rearMask.eventMode = 'none';
+        this.rearLayer?.addChild(this.rearMask);
+        if (this.rearLayer) this.rearLayer.mask = this.rearMask;
+      }
     }
     return this.rearRT;
   }
@@ -2992,24 +3006,13 @@ export class IsoScene {
     if (!this.jac || !this.app) return;
     const cw = this.app.screen.width || 1;
     const ch = this.app.screen.height || 1;
-    const region = this.jac.rearSource((x, y) => this.worldToScreen(x, y), cw, ch);
-    if (region.sw < 4 || region.sh < 4) return;
-    const rt = this.ensureRearTexture();
+    const rt = this.ensureRearTexture(cw, ch);
     const sprite = this.rearSprite;
     if (sprite) sprite.visible = false;
-    const sx = rt.width / Math.max(1, region.sw);
-    const sy = rt.height / Math.max(1, region.sh);
-    const crop = new Matrix();
-    crop.a = sx;
-    crop.d = sy;
-    crop.tx = -region.sx * sx;
-    crop.ty = -region.sy * sy;
-    crop.append(this.camera.worldTransform);
     try {
       this.app.renderer.render({
-        container: this.world,
+        container: this.camera,
         target: rt,
-        transform: crop,
         clear: true,
         clearColor: [0.063, 0.067, 0.078, 1],
       });
@@ -3022,8 +3025,9 @@ export class IsoScene {
   private layoutRearSprite(): void {
     const sprite = this.rearSprite;
     const layer = this.rearLayer;
+    const mask = this.rearMask;
     const canvas = this.canvasEl;
-    if (!sprite || !layer || !canvas) return;
+    if (!sprite || !layer || !canvas || !this.app) return;
     if (this.rearFade < 0.01) {
       layer.visible = false;
       return;
@@ -3048,10 +3052,25 @@ export class IsoScene {
     } else {
       left = (cr.width - w) / 2;
     }
-    sprite.position.set(left, top);
-    sprite.width = w;
-    sprite.height = h;
+    const cw = this.app.screen.width || 1;
+    const ch = this.app.screen.height || 1;
+    const region = this.jac?.rearSource((x, y) => this.worldToScreen(x, y), cw, ch) ?? {
+      sx: 0,
+      sy: 0,
+      sw: w,
+      sh: h,
+    };
+    const scaleX = w / Math.max(1, region.sw);
+    const scaleY = h / Math.max(1, region.sh);
+    sprite.position.set(left - region.sx * scaleX, top - region.sy * scaleY);
+    sprite.width = cw * scaleX;
+    sprite.height = ch * scaleY;
     sprite.alpha = this.rearFade;
+    if (mask) {
+      mask.clear();
+      mask.rect(left, top, w, h);
+      mask.fill({ color: 0xffffff });
+    }
   }
 
   private restoreMainTarget(): void {
