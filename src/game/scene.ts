@@ -4269,12 +4269,17 @@ export class IsoScene {
     const distDoor = Math.hypot(this.jac.cx - door.x, this.jac.cy - door.y);
     const idle = this.jac.drivePath.length === 0 && !this.jac.driveGoal;
     const along = this.jac.doorSideAlong(door.x, door.y);
-    const arrived = sit && distSit < 1.15 && this.jac.mph < 1.2;
-    const doorSideSit = idle && this.jac.mph < 1.2 && along >= 0 && distDoor <= 6.2;
+    const hereOk = this.jac.canParkHere();
+    const arrived = sit && distSit < 0.85 && this.jac.mph < 1.4;
+    const doorSideSit = idle && hereOk && this.jac.mph < 1.2 && along >= 0 && distDoor <= 8;
     if (arrived || doorSideSit) {
-      if (sit && distSit < 1.6) {
+      if (sit && distSit < 1.1) {
         this.jac.cx = sit.x;
         this.jac.cy = sit.y;
+      }
+      if (!this.jac.canParkHere() && !arrived) {
+        this.retryDriveEnterOrGetOut();
+        return;
       }
       this.jacGetOut({ thenEnter: true });
       return;
@@ -4293,7 +4298,7 @@ export class IsoScene {
     if (!entry || !this.jac?.driving) return;
     const along = this.jac.doorSideAlong(entry.door.x, entry.door.y);
     const dist = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
-    if (along >= 0 && dist <= 6.2) {
+    if (along >= 0 && dist <= 8 && this.jac.canParkHere()) {
       this.jacGetOut({ thenEnter: true });
       return;
     }

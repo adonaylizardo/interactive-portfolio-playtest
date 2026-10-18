@@ -77,10 +77,10 @@ const SUB_DT = 1 / 60;
 const MAX_FRAME_DT = 0.25;
 /** Stay on the current 4-way sprite until heading is 20° past the 45° line. */
 const DIR_HYSTERESIS = 20 / 90;
-const DIR_HOLD_S = 0.25;
+const DIR_HOLD_S = 0.32;
 const STUCK_REPLAN_S = 0.5;
-/** Parked sprite is 1.6× the 5×3 / 3×5 sit; overlap uses this, not the tile centre. */
-const SPRITE_FOOT_PAD = 1.32;
+/** One BFS on a door tap; replans may search further. */
+const TAP_BFS_BUDGET = 1;
 
 export type JacVisual = {
   obj: MapObject;
@@ -724,15 +724,20 @@ export class JacT9 {
     let pick: DoorSit | null = null;
     let path: { x: number; y: number }[] | null = null;
     let searches = 0;
+    const bfsBudget = this.stuckT >= STUCK_REPLAN_S * 0.4 ? 3 : TAP_BFS_BUDGET;
     for (const cand of order) {
       const cached = this.pathsFrom === origin ? this.pathToSit.get(k(cand.x, cand.y)) : undefined;
       let found = cached;
       if (!found) {
-        if (searches >= 3) continue;
+        found = this.axisDrivePath(sx, sy, cand.x, cand.y, (x, y) => this.driveBoxWalkable(x, y) || (x === sx && y === sy)) ?? undefined;
+      }
+      if (!found) {
+        if (searches >= bfsBudget) continue;
         searches += 1;
         found = this.driveBfsTo(cand.x, cand.y) ?? undefined;
       }
       if (!found) continue;
+      if (this.pathsFrom === origin) this.pathToSit.set(k(cand.x, cand.y), found);
       pick = cand;
       path = found;
       break;
@@ -767,49 +772,9 @@ export class JacT9 {
 
   private ensurePathsFromHere(): void {
     const origin = k(Math.round(this.cx), Math.round(this.cy));
-    if (this.pathsFrom === origin && this.pathToSit.size > 0) return;
+    if (this.pathsFrom === origin) return;
     this.pathsFrom = origin;
     this.pathToSit.clear();
-    const targets = new Set<string>();
-    for (const sits of this.doorSitCache.values()) {
-      for (const s of sits) targets.add(k(s.x, s.y));
-    }
-    if (targets.size === 0) return;
-    const sx = Math.round(this.cx);
-    const sy = Math.round(this.cy);
-    const pass = (x: number, y: number) => this.driveBoxWalkable(x, y) || (x === sx && y === sy);
-    type Node = { x: number; y: number; parent: Node | null };
-    const seen = new Set<string>([k(sx, sy)]);
-    const q: Node[] = [{ x: sx, y: sy, parent: null }];
-    const toPath = (node: Node) => {
-      const path: { x: number; y: number }[] = [];
-      let n: Node | null = node;
-      while (n) {
-        path.push({ x: n.x, y: n.y });
-        n = n.parent;
-      }
-      path.reverse();
-      if (path[0]?.x === sx && path[0]?.y === sy) path.shift();
-      return path;
-    };
-    this.pathToSit.set(k(sx, sy), []);
-    targets.delete(k(sx, sy));
-    for (let i = 0; i < q.length && targets.size; i++) {
-      const cur = q[i];
-      for (const [dx, dy] of CARDINALS) {
-        const nx = cur.x + dx;
-        const ny = cur.y + dy;
-        const id = k(nx, ny);
-        if (seen.has(id) || !pass(nx, ny)) continue;
-        seen.add(id);
-        const node = { x: nx, y: ny, parent: cur };
-        q.push(node);
-        if (targets.has(id)) {
-          this.pathToSit.set(id, toPath(node));
-          targets.delete(id);
-        }
-      }
-    }
   }
 
   private sitsForDoor(doorX: number, doorY: number): DoorSit[] {
@@ -1242,6 +1207,7 @@ export class JacT9 {
       left -= step;
     }
     this.syncMeters(moved, frame);
+    if (this.atDriveGoal()) this.clearDriveArrival();
     if (this.toggles.hazards) this.hazardT += frame;
     else this.hazardT = 0;
     this.applySprite();
@@ -1586,17 +1552,9 @@ export class JacT9 {
     this.recoverPathFollow();
     const goal = this.driveGoal;
     const goalDist = goal ? Math.hypot(goal.x - this.cx, goal.y - this.cy) : Infinity;
-    if (goal) {
-      const fwd = DIR_VEC[this.dir];
-      const behind = (goal.x - this.cx) * fwd.x + (goal.y - this.cy) * fwd.y < -0.05;
-      if (
-        this.visualOnTile(goal.x, goal.y) ||
-        goalDist < PATH_ARRIVE + 0.78 ||
-        (goalDist < 1.55 && behind)
-      ) {
-        this.clearDriveArrival();
-        return { throttle: 0, steer: 0 };
-      }
+    if (goal && this.atDriveGoal()) {
+      this.clearDriveArrival();
+      return { throttle: 0, steer: 0 };
     }
     if (this.drivePath.length === 0) {
       if (goal) this.drivePath.push({ x: goal.x, y: goal.y });
@@ -1609,7 +1567,10 @@ export class JacT9 {
     }
     const look = this.pathLookAhead();
     if (!look) {
-      if (this.acceptNearGoal()) return { throttle: 0, steer: 0 };
+      if (this.atDriveGoal()) {
+        this.clearDriveArrival();
+        return { throttle: 0, steer: 0 };
+      }
       this.markStuck(dt);
       return { throttle: 0, steer: 0 };
     }
@@ -1617,7 +1578,6 @@ export class JacT9 {
     const first = this.drivePath[0] ?? look;
     const ax = first.x - this.cx;
     const ay = first.y - this.cy;
-    const boxOrigin = (c: number) => Math.round(c - (DRIVE_BOX - 1) / 2);
     const stepX: FacingDir = ax >= 0 ? 'se' : 'nw';
     const stepY: FacingDir = ay >= 0 ? 'sw' : 'ne';
     const clearStep = (dir: FacingDir) => {
@@ -1625,23 +1585,17 @@ export class JacT9 {
       return this.driveBoxWalkable(this.cx + v.x * 0.4, this.cy + v.y * 0.4);
     };
     const wantDir: FacingDir = (() => {
-      const splitX = boxOrigin(this.cx) !== boxOrigin(first.x);
-      const splitY = boxOrigin(this.cy) !== boxOrigin(first.y);
-      if (splitX && splitY) {
-        const xOk = clearStep(stepX);
-        const yOk = clearStep(stepY);
-        if (xOk !== yOk) return xOk ? stepX : stepY;
-        if (xOk) return Math.abs(ax) >= Math.abs(ay) ? stepX : stepY;
-        return Math.abs(ax) >= Math.abs(ay) ? stepY : stepX;
-      }
-      if (splitX) return stepX;
-      if (splitY) return stepY;
-      const offX = Math.abs(ax) > 0.12;
-      const offY = Math.abs(ay) > 0.12;
+      const offX = Math.abs(ax) > 0.18;
+      const offY = Math.abs(ay) > 0.18;
+      const xOk = offX && clearStep(stepX);
+      const yOk = offY && clearStep(stepY);
       if (offX && offY) {
-        const prefer = Math.abs(ax) <= Math.abs(ay) ? stepX : stepY;
-        const other = prefer === stepX ? stepY : stepX;
-        return clearStep(prefer) || !clearStep(other) ? prefer : other;
+        if (xOk !== yOk) return xOk ? stepX : stepY;
+        const closer = Math.abs(ax) <= Math.abs(ay) ? stepX : stepY;
+        const other = closer === stepX ? stepY : stepX;
+        if (clearStep(closer)) return closer;
+        if (clearStep(other)) return other;
+        return closer;
       }
       if (offX) return stepX;
       if (offY) return stepY;
@@ -1656,8 +1610,8 @@ export class JacT9 {
     this.followDir = wantDir;
     let throttle = goalSlow;
     if (this.dir !== wantDir) {
-      throttle = 0;
-      this.stuckT = 0;
+      throttle = goalDist < 2.2 ? 0.35 : 0;
+      if (goalDist > 2.8) this.stuckT = 0;
       if (this.gear === 'R') this.gear = 'D';
     }
     if (Math.hypot(ax, ay) < 0.05) this.markStuck(dt);
@@ -1686,7 +1640,8 @@ export class JacT9 {
           if (corner) break;
         }
       }
-      const arrive = this.followLoose || this.isGoalNode(t) ? 0.55 : 0.4;
+      const corner = next && dist > 0.15;
+      const arrive = corner ? 0.22 : this.followLoose || this.isGoalNode(t) ? 0.5 : 0.35;
       if (dist < arrive) {
         this.drivePath.shift();
         continue;
@@ -1776,14 +1731,16 @@ export class JacT9 {
     this.noProgressT = 0;
   }
 
-  private visualGoalMiss(): number {
-    if (!this.driveGoal) return Infinity;
-    const v = this.visualCenterTile();
-    return Math.hypot(v.x - this.driveGoal.x, v.y - this.driveGoal.y);
+  private atDriveGoal(): boolean {
+    if (!this.driveGoal) return false;
+    const d = Math.hypot(this.driveGoal.x - this.cx, this.driveGoal.y - this.cy);
+    if (d < PATH_ARRIVE) return true;
+    if (d < 0.85 && this.visualOnTile(this.driveGoal.x, this.driveGoal.y)) return true;
+    return false;
   }
 
   private acceptNearGoal(): boolean {
-    if (!this.driveGoal || this.visualGoalMiss() > 0.42) return false;
+    if (!this.atDriveGoal()) return false;
     this.clearDriveArrival();
     return true;
   }
@@ -1806,7 +1763,7 @@ export class JacT9 {
     const here = k(Math.round(this.cx), Math.round(this.cy));
     const sameCell = this.lastStuckCell === here;
     this.lastStuckCell = here;
-    if (!sameCell && this.replanN < (this.followLoose ? 16 : 8)) {
+    if (!sameCell && this.replanN < 2) {
       const path = this.findDrivePath(this.driveGoal.x, this.driveGoal.y);
       if (path && path.length > 0 && !this.pathStartsBlocked(path)) {
         this.drivePath = path;
@@ -2251,26 +2208,31 @@ export class JacT9 {
     return true;
   }
 
-  /** 1.6× sprite diamond around the sit — catches a cactus/tree that the 5×3 tile AABB misses. */
+  /**
+   * 5×3 / 3×5 plus the 1.6× sprite hang. The body is south-anchored, so the
+   * bed and the iso-north edges (min x / min y) cover extra prop cells.
+   */
   private spriteFootprintClear(cx: number, cy: number, dir: FacingDir): boolean {
     const size = parkSize(dir);
-    const along = DIR_VEC[dir];
-    const across = dir === 'se' || dir === 'nw' ? { x: 0, y: 1 } : { x: 1, y: 0 };
-    const halfL = (size.w / 2) * SPRITE_FOOT_PAD;
-    const halfW = (size.h / 2) * SPRITE_FOOT_PAD;
-    const x0 = Math.floor(cx - halfL - halfW) - 1;
-    const x1 = Math.ceil(cx + halfL + halfW) + 1;
-    const y0 = Math.floor(cy - halfL - halfW) - 1;
-    const y1 = Math.ceil(cy + halfL + halfW) + 1;
-    for (let y = y0; y <= y1; y++) {
-      for (let x = x0; x <= x1; x++) {
-        if (!PROP_CELLS.has(k(x, y))) continue;
-        const u = (x - cx) * along.x + (y - cy) * along.y;
-        const v = (x - cx) * across.x + (y - cy) * across.y;
-        if (Math.abs(u) <= halfL + 0.48 && Math.abs(v) <= halfW + 0.48) return false;
-      }
+    if (!this.footprintClear(cx, cy, size.w, size.h)) return false;
+    const o = {
+      x: Math.round(cx - (size.w - 1) / 2),
+      y: Math.round(cy - (size.h - 1) / 2),
+    };
+    const extra: [number, number][] = [
+      ...this.rect(o.x - 1, o.y, 1, size.h),
+      ...this.rect(o.x, o.y - 1, size.w, 1),
+      [o.x - 1, o.y - 1],
+    ];
+    for (const [x, y] of extra) {
+      if (PROP_CELLS.has(k(x, y))) return false;
     }
     return true;
+  }
+
+  /** Parked 5×3 / 3×5 + sprite pad at the current sit — used before get-out. */
+  canParkHere(): boolean {
+    return this.parkSitOk(this.cx, this.cy, this.dir);
   }
 
   private propBodyClear(cx: number, cy: number): boolean {

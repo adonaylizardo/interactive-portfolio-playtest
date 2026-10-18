@@ -93,11 +93,19 @@ const CASE_PREVIEW_ES: Record<CaseHouseId, { subtitle: string; headline: string;
 };
 
 /** Door-step card: CASE label, name, one-line role, headline teaser. */
+const CASE_CARD_TITLES_ES: Record<CaseHouseId, string> = {
+  volaris: 'Aerolínea',
+  bain: 'Bain',
+  mentoria: 'Mentoría',
+  finoa: 'Finoa',
+  pg: 'P&G',
+};
+
 export function casePreviewCopy(id: string, lang: 'en' | 'es' = 'en'): CasePreviewCopy | null {
   if (!isCaseHouse(id)) return null;
   const content = CASES[id];
   if (!content) return null;
-  const title = CASE_CARD_TITLES[id];
+  const title = lang === 'es' ? CASE_CARD_TITLES_ES[id] : CASE_CARD_TITLES[id];
   const es = lang === 'es' ? CASE_PREVIEW_ES[id] : null;
   const headline = es?.headline ?? content.headline;
   const shortHeadline = es?.shortHeadline ?? content.shortHeadline;

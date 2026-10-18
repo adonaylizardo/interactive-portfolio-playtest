@@ -113,7 +113,7 @@ async function readTapMetrics(page) {
   });
 }
 
-async function waitDoorDone(page, timeout = 22000) {
+async function waitDoorDone(page, timeout = 25000) {
   const t0 = Date.now();
   let last = null;
   while (Date.now() - t0 < timeout) {
@@ -130,7 +130,6 @@ async function waitDoorDone(page, timeout = 22000) {
       };
     });
     if (!last.driving) return { ...last, done: true, ms: Date.now() - t0 };
-    if (!last.goal && last.mph < 1.2) return { ...last, done: true, ms: Date.now() - t0 };
     await wait(50);
   }
   return { ...last, done: false, ms: Date.now() - t0 };
