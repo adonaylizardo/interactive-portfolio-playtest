@@ -18,6 +18,7 @@ import { BuildingPanel } from './ui/buildingPanel';
 import { ChromeUI, type DesktopLayout } from './ui/chrome';
 import { JacHud } from './ui/jacHud';
 import { Joystick } from './ui/joystick';
+import { personaEnabled } from './game/persona/personaSpec';
 import { NameLabels } from './ui/nameLabels';
 import { CenitalBuildingLabels } from './ui/cenitalBuildingLabels';
 import { hideToast, showToast } from './ui/toast';
@@ -130,7 +131,7 @@ async function main(): Promise<void> {
         labels.setHidden(false);
       }
       const personaWalk =
-        scene.getViewMode().mode === 'persona' && !scene.isInInterior() && import.meta.env.BASE_URL.includes('preview-persona');
+        personaEnabled() && scene.getViewMode().mode === 'persona' && !scene.isInInterior();
       joystick.setHidden(
         (!scene.jacSnapshot()?.driving && !personaWalk) ||
           !!scene.isInInterior() ||

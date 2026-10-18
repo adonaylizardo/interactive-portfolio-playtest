@@ -267,6 +267,7 @@ async function runViewport(tag, opts) {
       ))?.split('/').pop() ?? 'dev';
 
     const personaBtn = page.locator('.ui-view[data-view="persona"]');
+    await personaBtn.waitFor({ state: 'attached', timeout: 30000 }).catch(() => null);
     if ((await personaBtn.count()) === 0) errors.push(`${tag}: persona view button missing`);
     else {
       await tapView(page, cdp, touch, 'persona');
