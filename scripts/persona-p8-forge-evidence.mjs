@@ -35,7 +35,16 @@ async function measureWalk(page, yawDeg, key) {
   await page.evaluate(() => window.__playtestQa.flushPersonaView());
   await wait(100);
   const before = await page.evaluate(() => window.__playtestQa.getCharacterPos());
-  const markBefore = await page.evaluate(() => window.__playtestQa.personaClientChar());
+  const worldMark = await page.evaluate(() => {
+    const c = window.__playtestQa.getCharacterPos();
+    const cam = window.__playtestQa.personaCam();
+    const yaw = cam.yawRad;
+    return { tx: c.x + Math.sin(yaw) * 4, ty: c.y + Math.cos(yaw) * 4 };
+  });
+  const markBefore = await page.evaluate(
+    (m) => window.__playtestQa.personaWorldMarkClientPx(m.tx, m.ty),
+    worldMark,
+  );
   const expectedScreen = await page.evaluate(() => window.__playtestQa.personaScreenForwardDeg());
   const expectedTile = await page.evaluate((k) => {
     const h = window.__playtestQa.personaMoveHeading({ w: true });
@@ -49,20 +58,28 @@ async function measureWalk(page, yawDeg, key) {
   await page.evaluate(() => window.__playtestQa.flushPersonaView());
   await wait(100);
   const after = await page.evaluate(() => window.__playtestQa.getCharacterPos());
-  const markAfter = await page.evaluate(() => window.__playtestQa.personaClientChar());
+  const markAfter = await page.evaluate(
+    (m) => window.__playtestQa.personaWorldMarkClientPx(m.tx, m.ty),
+    worldMark,
+  );
   const tileMotionDeg =
     ((Math.atan2(after.y - before.y, after.x - before.x) * 180) / Math.PI + 360) % 360;
   const screenMotionDeg =
-    ((Math.atan2(markAfter.y - markBefore.y, markAfter.x - markBefore.x) * 180) / Math.PI +
-      360) %
-    360;
+    markBefore && markAfter
+      ? ((Math.atan2(markAfter.y - markBefore.y, markAfter.x - markBefore.x) * 180) / Math.PI +
+          360) %
+        360
+      : NaN;
   const tileDelta = angDelta(tileMotionDeg, expectedTile ?? NaN);
-  const screenDelta = angDelta(screenMotionDeg, expectedScreen);
+  const expectedScreenMotion =
+    key === 's' ? expectedScreen : (expectedScreen + 180) % 360;
+  const screenDelta = angDelta(screenMotionDeg, expectedScreenMotion);
   return {
     yawDeg,
     key,
     expectedTile,
     expectedScreen,
+    expectedScreenMotion,
     tileMotionDeg,
     screenMotionDeg,
     tileDeltaDeg: tileDelta,
@@ -110,6 +127,7 @@ async function personaSwitchProbe(page, vp) {
 async function uiOverlaps(page, vp) {
   await page.evaluate(() => {
     localStorage.setItem('portfolio-persona-controls-v1', '1');
+    window.__playtestQa.setLayout?.('map');
     window.__playtestQa.setViewMode('cenital');
   });
   await wait(300);
@@ -123,7 +141,7 @@ async function uiOverlaps(page, vp) {
     };
     return {
       cam: r('.persona-kit__cam'),
-      locate: r('.chrome__locate'),
+      locate: r('.chrome__locate') ?? r('[data-action="center"]'),
       sound: r('.chrome__tools-stack [data-action="sound"], .chrome__tools-phone [data-action="sound"]'),
       ring: r('.checklist__ring-btn'),
       lang: r('.persona-kit__lang'),
@@ -188,7 +206,19 @@ async function controlsModalProbe(page) {
   await page.evaluate(() => localStorage.removeItem('portfolio-persona-controls-v1'));
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__playtestQa?.setViewMode, null, { timeout: 90000 });
-  await wait(500);
+  await page.waitForFunction(
+    () => {
+      const o = document.querySelector('.persona-kit__overlay');
+      return o && !o.hidden;
+    },
+    null,
+    { timeout: 15000 },
+  );
+  await page.waitForFunction(
+    () => document.activeElement?.classList?.contains('persona-kit__primary'),
+    null,
+    { timeout: 5000 },
+  );
   const open = await page.evaluate(() => {
     const o = document.querySelector('.persona-kit__overlay');
     return Boolean(o && !o.hidden);

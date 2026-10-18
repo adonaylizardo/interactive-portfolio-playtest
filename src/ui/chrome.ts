@@ -246,7 +246,7 @@ export class ChromeUI {
       <div class="chrome__tools-phone">
         ${roundBtn('search', 'Buscar', '', 'search')}
         ${roundBtn('sound', 'Sonido', '', 'sound')}
-        ${roundBtn('locate', 'Center on Adonay', '', 'center')}
+        ${roundBtn('locate', 'Center on Adonay', 'chrome__locate', 'center')}
       </div>
       <div class="chrome__intro" data-intro>
         <button type="button" class="chrome__intro-close" data-action="intro-close" aria-label="Close" data-i18n-aria="jac.close">${iconSvg('close')}</button>

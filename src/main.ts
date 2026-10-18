@@ -383,6 +383,7 @@ async function main(): Promise<void> {
     personaMoveHeading: (opts: { w?: boolean; stickY?: number }) => scene.qaPersonaMoveHeading(opts),
     personaScreenForwardDeg: () => scene.qaPersonaScreenForwardDeg(),
     personaClientChar: () => scene.qaPersonaClientChar(),
+    personaWorldMarkClientPx: (tx: number, ty: number) => scene.qaPersonaWorldMarkClientPx(tx, ty),
     personaRenderProbe: () => scene.qaPersonaRenderProbe(),
     personaEnterOffer: () => scene.qaPersonaEnterOffer(),
     personaEnterFromUi: () => scene.personaEnterFromUi(),

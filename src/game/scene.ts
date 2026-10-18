@@ -6224,6 +6224,25 @@ export class IsoScene {
     return { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y };
   }
 
+  /** QA: client pixel of a fixed world tile projected in persona view (Forge screen-motion). */
+  qaPersonaWorldMarkClientPx(markTx: number, markTy: number): { x: number; y: number } | null {
+    if (!this.personaOn()) return null;
+    const rect = this.canvasEl?.getBoundingClientRect();
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const p = personaTileClientPx(
+      this.charTx,
+      this.charTy,
+      markTx,
+      markTy,
+      this.personaCamYaw,
+      sw,
+      sh,
+    );
+    if (!p) return null;
+    return { x: (rect?.left ?? 0) + p.x, y: (rect?.top ?? 0) + p.y };
+  }
+
   qaPersonaRenderProbe(): {
     viewMode: Camera;
     worldVisible: boolean;

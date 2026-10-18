@@ -103,12 +103,13 @@ export class PersonaKitUI {
   }
 
   private bind(): void {
-    this.overlay.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        this.closeOverlay(true);
-      }
-    });
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || this.overlay.hidden) return;
+      e.preventDefault();
+      this.closeOverlay(true);
+    };
+    this.overlay.addEventListener('keydown', onEsc);
+    window.addEventListener('keydown', onEsc);
     this.root.querySelectorAll('[data-persona-close]').forEach((el) => {
       el.addEventListener('click', () => this.closeOverlay(true));
     });
@@ -239,7 +240,9 @@ export class PersonaKitUI {
     this.overlay.hidden = false;
     this.overlay.removeAttribute('inert');
     const primary = this.root.querySelector('.persona-kit__primary') as HTMLButtonElement | null;
-    primary?.focus();
+    requestAnimationFrame(() => {
+      primary?.focus({ preventScroll: true });
+    });
   }
 
   closeOverlay(persist = false): void {
