@@ -357,6 +357,7 @@ async function main(): Promise<void> {
     personaEnterFromUi: () => scene.personaEnterFromUi(),
     setPersonaYawDeg: (deg: number) => scene.qaSetPersonaYawDeg(deg),
     personaStickSpeedMul: (y: number) => scene.qaPersonaStickSpeedMul(y),
+    personaProjectedT9Width: () => scene.qaPersonaProjectedT9Width(),
     personaScreenMetrics: () => scene.qaPersonaScreenMetrics(),
     flushPersonaView: () => scene.qaFlushPersonaView(),
     stickToTile: (dx: number, dy: number) => scene.qaStickToTile(dx, dy),

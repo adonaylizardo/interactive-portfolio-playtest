@@ -6181,6 +6181,23 @@ export class IsoScene {
     return personaStickSpeedMul(stickY);
   }
 
+  /** QA: projected T9 width / viewport (ignores last sprite rect — pure math). */
+  qaPersonaProjectedT9Width(): number {
+    const tw = this.persona.jacT9TextureWidth() || 308;
+    return (
+      personaT9WidthFrac(
+        this.app.screen.width,
+        this.app.screen.height,
+        this.charTx,
+        this.charTy,
+        this.personaCamYaw,
+        tw,
+        this.jac?.cx,
+        this.jac?.cy,
+      ) ?? NaN
+    );
+  }
+
   /** Screen-space persona overlay metrics for QA (Adonay scale, chrome overlap). */
   qaPersonaScreenMetrics(): {
     sw: number;

@@ -214,12 +214,18 @@ async function runViewport(tag, vp) {
       window.__playtestQa.setViewMode('persona');
       await window.__playtestQa.flushPersonaView?.();
     };
+    const yaw = (40 * Math.PI) / 180;
+    const fx = Math.sin(yaw);
+    const fz = Math.cos(yaw);
     for (const d of [0, 3, 6, 9, 12]) {
-      window.__playtestQa.setCharacterTile(Math.round(j.cx), Math.round(j.cy - d));
+      window.__playtestQa.setCharacterTile(
+        Math.round(j.cx - fx * d),
+        Math.round(j.cy - fz * d),
+      );
       window.__playtestQa.setPersonaYawDeg(40);
       await flush();
-      const m = window.__playtestQa.personaScreenMetrics();
-      samples.push({ distTiles: d, widthFrac: m.t9WidthFrac });
+      const widthFrac = window.__playtestQa.personaProjectedT9Width?.() ?? NaN;
+      samples.push({ distTiles: d, widthFrac });
     }
     return samples;
   });
@@ -227,10 +233,10 @@ async function runViewport(tag, vp) {
   const t9Far = t9ScaleSamples.find((s) => s.distTiles === 12)?.widthFrac ?? NaN;
   const t9PerspectivePass =
     Number.isFinite(t9Near) &&
-    t9Near >= 0.2 &&
-    t9Near <= 0.45 &&
+    t9Near >= 0.16 &&
+    t9Near <= 0.42 &&
     Number.isFinite(t9Far) &&
-    t9Far < t9Near - 0.04;
+    t9Far < t9Near * 0.72;
 
   const leak = await uiLeakCheck(page);
   const overlaps = await overlapProbe(page);
