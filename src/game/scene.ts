@@ -4453,9 +4453,8 @@ export class IsoScene {
       return;
     }
     const stalled = this.jac.mph < 1.2 && pathLeft === 0;
-    const nearSit = distSit <= 2.15;
     const nearDoor = along >= 0 && distDoor <= 5.5;
-    if (stalled && leftSpawn && (nearSit || nearDoor)) {
+    if (stalled && leftSpawn && nearDoor && distSit <= 2.8) {
       this.jac.sitWhy = `approach sitD=${distSit.toFixed(2)} doorD=${distDoor.toFixed(2)}`;
       this.jacGetOut({ thenEnter: true });
       return;

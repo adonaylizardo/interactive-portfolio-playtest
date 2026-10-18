@@ -81,7 +81,7 @@ const STUCK_REPLAN_S = 0.5;
 /** Door taps use the spawn cache. Replans may search further. */
 const TAP_BFS_BUDGET = 0;
 /** Arrival = inside this radius of the collision-validated sit cell. */
-const SIT_CELL_R = 1.45;
+const SIT_CELL_R = 0.55;
 
 export type JacVisual = {
   obj: MapObject;
@@ -214,9 +214,7 @@ function buildPropCells(): { all: Set<string>; hard: Set<string> } {
         if (HARD_PROP_NAMES.has(o.name)) hard.add(key);
         if (o.name === 'tree') {
           for (const [adx, ady] of CARDINALS) {
-            const pit = k(fx + dx + adx, fy + dy + ady);
-            all.add(pit);
-            hard.add(pit);
+            all.add(k(fx + dx + adx, fy + dy + ady));
           }
         }
       }

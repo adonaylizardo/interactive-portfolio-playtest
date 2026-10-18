@@ -246,7 +246,7 @@ async function measureGround(browser) {
     await spawnDrive(page);
     await page.evaluate(() => window.__playtestQa.setZoom?.(0.4));
     await armSampler(page);
-    await page.evaluate(() => window.__playtestQa.driveTo?.(18, 10));
+    await page.evaluate(() => window.__playtestQa.jacDriveTo?.(18, 10));
     const t0 = Date.now();
     let last = null;
     while (Date.now() - t0 < 12000) {
