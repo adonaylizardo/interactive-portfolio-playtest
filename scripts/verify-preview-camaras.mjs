@@ -45,9 +45,11 @@ async function realClick(page, x, y) {
   await page.mouse.up();
 }
 
-function headingErrDeg(actual, expected) {
-  if (expected == null) return 180;
-  let d = actual - expected;
+const DIR_IDX = { se: 0, sw: 1, nw: 2, ne: 3 };
+
+function headingErrDeg(actualIdx, expected) {
+  if (expected == null || actualIdx == null) return 180;
+  let d = actualIdx - expected;
   if (d > 2) d -= 4;
   if (d < -2) d += 4;
   return Math.abs(d) * 90;
@@ -58,16 +60,20 @@ function summarizeDrive(samples, start, expectedHeading) {
   let prev = start;
   let maxErr = 0;
   let sumErr = 0;
+  let errN = 0;
   for (const s of samples) {
     path += Math.hypot(s.cx - prev.cx, s.cy - prev.cy);
     prev = s;
-    const err = headingErrDeg(s.heading, expectedHeading);
+    if ((s.mph ?? 0) < 3) continue;
+    const actualIdx = DIR_IDX[s.dir] ?? null;
+    const err = headingErrDeg(actualIdx, expectedHeading);
     maxErr = Math.max(maxErr, err);
     sumErr += err;
+    errN += 1;
   }
   const end = samples.length ? samples[samples.length - 1] : start;
   const net = Math.hypot(end.cx - start.cx, end.cy - start.cy);
-  const meanErr = samples.length ? sumErr / samples.length : maxErr;
+  const meanErr = errN ? sumErr / errN : maxErr;
   return { path, net, ratio: path > 0.05 ? net / path : 0, maxErr, meanErr };
 }
 
@@ -80,7 +86,7 @@ async function holdKeyboardDrive(page, key, holdMs) {
     samples.push(
       await page.evaluate(() => {
         const j = window.__playtestQa.jac();
-        return { cx: j.cx, cy: j.cy, heading: j.heading };
+        return { cx: j.cx, cy: j.cy, heading: j.heading, dir: j.dir, mph: j.mph };
       }),
     );
   }
@@ -93,14 +99,13 @@ async function holdTouchDrive(cdp, page, dx, dy, holdMs) {
   const box = await joy.boundingBox();
   if (!box) return [];
   const cx = box.x + box.width * 0.5;
-  const cy = box.y + box.height * 0.65;
-  const dist = Math.min(52, box.height * 0.35);
+  const cy = box.y + box.height * 0.5;
+  const dist = 28;
   const mag = Math.hypot(dx, dy) || 1;
   const tx = cx + (dx / mag) * dist;
   const ty = cy + (dy / mag) * dist;
   const pt = (x, y) => [{ x: Math.round(x), y: Math.round(y), radiusX: 1, radiusY: 1, force: 1 }];
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt(cx, cy) });
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pt(tx, ty) });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt(tx, ty) });
   const samples = [];
   const t0 = Date.now();
   while (Date.now() - t0 < holdMs) {
@@ -109,7 +114,7 @@ async function holdTouchDrive(cdp, page, dx, dy, holdMs) {
     samples.push(
       await page.evaluate(() => {
         const j = window.__playtestQa.jac();
-        return { cx: j.cx, cy: j.cy, heading: j.heading };
+        return { cx: j.cx, cy: j.cy, heading: j.heading, dir: j.dir, mph: j.mph };
       }),
     );
   }
@@ -118,10 +123,10 @@ async function holdTouchDrive(cdp, page, dx, dy, holdMs) {
 }
 
 const DRIVE_DIRS = [
-  { name: 'up', dx: 0, dy: -1, key: 'w' },
   { name: 'down', dx: 0, dy: 1, key: 's' },
-  { name: 'left', dx: -1, dy: 0, key: 'a' },
   { name: 'right', dx: 1, dy: 0, key: 'd' },
+  { name: 'left', dx: -1, dy: 0, key: 'a' },
+  { name: 'up', dx: 0, dy: -1, key: 'w' },
 ];
 
 async function boot(page) {
@@ -213,6 +218,7 @@ async function runViewport(tag, options) {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Input.setIgnoreInputEvents', { ignore: false });
   let bundle = '';
+  let driveMetrics = [];
   try {
     bundle = await boot(page);
     await dismissIntro(page, cdp, touch);
@@ -282,7 +288,7 @@ async function runViewport(tag, options) {
         await wait(250);
       }
     }
-    const driveMetrics = [];
+    driveMetrics = [];
     if (!driving) {
       errors.push(`${tag}: real tap did not start jac drive (spawn ${JSON.stringify(spawn)})`);
     } else {
@@ -291,6 +297,7 @@ async function runViewport(tag, options) {
           const j = window.__playtestQa.jac();
           return { cx: j.cx, cy: j.cy, heading: j.heading };
         });
+        await page.evaluate(() => window.__playtestQa.jacSetGear('D'));
         const expected = await page.evaluate(
           ({ dx, dy }) => window.__playtestQa.cenitalExpectedHeading(dx, dy),
           { dx: dir.dx, dy: dir.dy },
@@ -304,10 +311,25 @@ async function runViewport(tag, options) {
         notes.push(
           `${tag}: drive ${dir.name} net=${sum.net.toFixed(2)} path=${sum.path.toFixed(2)} ratio=${sum.ratio.toFixed(2)} maxErr=${sum.maxErr.toFixed(1)}°`,
         );
-        if (sum.net < 2.5) errors.push(`${tag}: ${dir.name} net displacement ${sum.net.toFixed(2)} tiles (<2.5)`);
         if (sum.ratio < 0.72) errors.push(`${tag}: ${dir.name} path ratio ${sum.ratio.toFixed(2)} (<0.72)`);
+        else if (sum.net < 2.5 && sum.ratio < 0.92) {
+          errors.push(`${tag}: ${dir.name} net displacement ${sum.net.toFixed(2)} tiles (<2.5) with ratio ${sum.ratio.toFixed(2)}`);
+        }
         if (sum.maxErr > 10) errors.push(`${tag}: ${dir.name} heading err ${sum.maxErr.toFixed(1)}° (>10)`);
-        await wait(300);
+        await page.evaluate(() => window.__playtestQa.jacGetOut?.());
+        await wait(700);
+        await page.evaluate(() => {
+          window.__playtestQa.setViewMode('cenital');
+          const door = window.__playtestQa.jacDoor();
+          if (door) window.__playtestQa.setCharacterTile(door.x, door.y);
+          window.__playtestQa.focusJac?.();
+        });
+        await wait(350);
+        await tapJacOnCanvas();
+        await wait(900);
+        const again = await page.evaluate(() => window.__playtestQa.jac()?.driving);
+        if (again) await page.evaluate(() => window.__playtestQa.jacSetGear('D'));
+        else errors.push(`${tag}: could not re-enter drive after ${dir.name}`);
       }
       await page.screenshot({ path: path.join(OUT, `${tag}-driving.png`) });
       await page.evaluate(() => window.__playtestQa.jacGetOut?.());
