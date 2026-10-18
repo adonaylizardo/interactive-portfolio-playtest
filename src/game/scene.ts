@@ -3440,7 +3440,7 @@ export class IsoScene {
         dx = 0;
         dy = 0;
       }
-      if (dx !== 0 || dy !== 0) this.pendingDriveEnter = null;
+      if ((dx !== 0 || dy !== 0) && !this.pendingJacExit) this.pendingDriveEnter = null;
       this.startCameraFollow();
       if (dx !== 0 || dy !== 0 || stickHeld || this.jac.drivePath.length > 0) {
         if (dx !== 0 || dy !== 0) this.fireMoveCommand();
@@ -4272,28 +4272,41 @@ export class IsoScene {
   }
 
   private tryFinishDriveEnter(): void {
-    if (!this.pendingDriveEnter || !this.jac?.driving || this.jac.isExiting()) return;
+    if (!this.pendingDriveEnter || !this.jac?.driving) return;
+    if (this.jac.isExiting()) return;
     const door = this.pendingDriveEnter.door;
     const sit = this.jac.driveGoal;
     const distSit = sit ? Math.hypot(this.jac.cx - sit.x, this.jac.cy - sit.y) : Infinity;
     const distDoor = Math.hypot(this.jac.cx - door.x, this.jac.cy - door.y);
     const idle = this.jac.drivePath.length === 0 && !this.jac.driveGoal;
     const along = this.jac.doorSideAlong(door.x, door.y);
-    const arrived = !!sit && distSit < 1.25 && this.jac.mph < 2;
+    const arrived = this.jac.atParkSit();
     const from = this.pendingDriveFrom;
     const traveled = !from || Math.hypot(this.jac.cx - from.x, this.jac.cy - from.y) > 2.2;
+    const stalled = this.jac.drivePath.length === 0 && this.jac.mph < 3;
     const doorSideSit =
-      this.jac.mph < 2 &&
-      along >= 0 &&
-      (distDoor <= 5.5 || (traveled && distDoor <= 10));
+      stalled && along >= 0 && (distDoor <= 5.5 || (traveled && distDoor <= 10));
     if (arrived || doorSideSit) {
-      if (sit && distSit < 1.1) {
+      this.jac.sitWhy = arrived
+        ? `arrived sit=(${sit?.x},${sit?.y}) d=${distSit.toFixed(2)} mph=${this.jac.mph}`
+        : `door-side along=${along.toFixed(2)} doorD=${distDoor.toFixed(2)} sitD=${distSit.toFixed(2)} mph=${this.jac.mph}`;
+      if (sit && distSit <= 1.2) {
         this.jac.cx = sit.x;
         this.jac.cy = sit.y;
       }
       this.jacGetOut({ thenEnter: true });
       return;
     }
+    this.noteSitSkip({
+      sit,
+      distSit,
+      distDoor,
+      along,
+      mph: this.jac.mph,
+      idle,
+      traveled,
+      pathN: this.jac.drivePath.length,
+    });
     if (this.jac.mph < 0.8 && distSit > 2.5) {
       this.jac.unstickIfStopped();
     }
@@ -4302,13 +4315,45 @@ export class IsoScene {
     }
   }
 
+  private lastSitSkipKey = '';
+  private noteSitSkip(row: {
+    sit: { x: number; y: number } | null;
+    distSit: number;
+    distDoor: number;
+    along: number;
+    mph: number;
+    idle: boolean;
+    traveled: boolean;
+    pathN: number;
+  }): void {
+    const why = [
+      `sit=${row.sit ? `${row.sit.x},${row.sit.y}` : 'none'}`,
+      `sitD=${row.distSit.toFixed(2)}`,
+      `doorD=${row.distDoor.toFixed(2)}`,
+      `along=${row.along.toFixed(2)}`,
+      `mph=${row.mph}`,
+      `pathN=${row.pathN}`,
+      row.idle ? 'idle' : 'follow',
+      row.traveled ? 'moved' : 'spawn',
+      row.sit && row.distSit > 1.2 ? 'outside-sit-radius' : '',
+      row.along < 0 ? 'behind-door' : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    if (why === this.lastSitSkipKey) return;
+    this.lastSitSkipKey = why;
+    if (this.jac) this.jac.sitWhy = why;
+    console.info('[drive-sit] skip', why);
+  }
+
   /** Stay on the door-side sit. A mid-route stall re-plans instead of getting out behind a house. */
   private retryDriveEnterOrGetOut(): void {
     const entry = this.pendingDriveEnter;
     if (!entry || !this.jac?.driving) return;
     const along = this.jac.doorSideAlong(entry.door.x, entry.door.y);
     const dist = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
-    if (along >= 0 && dist <= 10 && this.jac.canParkHere()) {
+    if (along >= 0 && dist <= 10 && (this.jac.canParkHere() || this.jac.atParkSit())) {
+      this.jac.sitWhy = `retry get-out along=${along.toFixed(2)} doorD=${dist.toFixed(2)}`;
       this.jacGetOut({ thenEnter: true });
       return;
     }
