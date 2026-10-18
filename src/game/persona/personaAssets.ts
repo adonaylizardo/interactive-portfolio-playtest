@@ -22,13 +22,9 @@ async function loadOne(key: string, url: string): Promise<Texture> {
   if (hit) return hit;
   const tex = await Assets.load<Texture>({ alias: key, src: url, data: { crossOrigin: 'anonymous' } });
   cache.set(key, tex);
-  try {
-    const res = await fetch(url, { method: 'HEAD' });
-    const cl = res.headers.get('content-length');
-    if (cl) loadedBytes += Number(cl);
-  } catch {
-    loadedBytes += 120_000;
-  }
+  const w = tex.width ?? 256;
+  const h = tex.height ?? 256;
+  loadedBytes += Math.max(32_000, w * h);
   return tex;
 }
 

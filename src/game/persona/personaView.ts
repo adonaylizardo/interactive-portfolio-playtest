@@ -143,6 +143,7 @@ export class PersonaView {
   readonly layer = new Container();
   private sky: TilingSprite | null = null;
   private avila: TilingSprite | null = null;
+  private groundFill = new Graphics();
   private ground = new Graphics();
   private facades: FacadeSlot[] = [];
   private adonay = new Sprite();
@@ -175,7 +176,9 @@ export class PersonaView {
     this.layer.eventMode = 'none';
     this.layer.interactiveChildren = false;
     this.layer.sortableChildren = true;
-    this.layer.addChild(this.ground);
+    this.groundFill.zIndex = -4000;
+    this.ground.zIndex = -800;
+    this.layer.addChild(this.groundFill, this.ground);
     this.adonay.zIndex = 800;
     this.pantone.zIndex = 750;
     this.jacCapo.zIndex = 900;
@@ -271,7 +274,7 @@ export class PersonaView {
       sp.roundPixels = true;
       if (tex.source?.style) tex.source.style.scaleMode = 'nearest';
       sp.tint = NIGHT_TINT;
-      sp.zIndex = -Math.round(anchor.z * 10);
+      sp.zIndex = 120;
       this.layer.addChild(sp);
       this.facades.push({ sprite: sp, building: o.name ?? '', x: anchor.x, z: anchor.z });
     }
@@ -301,9 +304,10 @@ export class PersonaView {
     const key = `${Math.round(cam.x * 2) / 2}:${Math.round(cam.z * 4) / 4}:${yawKey}:${sw}x${sh}`;
     if (key === this.lastGroundKey) return;
     this.lastGroundKey = key;
+    this.groundFill.clear();
     this.ground.clear();
     const horY = HORIZON_Y_1X * (sh / PERSONA_REF.h);
-    this.ground.rect(0, horY, sw, sh - horY).fill({ color: 0x1a1c20, alpha: 1 });
+    this.groundFill.rect(0, horY, sw, sh - horY).fill({ color: 0x1a1c20, alpha: 1 });
     const zFar = 58;
     const SW0 = -3.2;
     const CURB0 = 1.6;
@@ -327,7 +331,14 @@ export class PersonaView {
     this.fillGroundRect(cam, sw, sh, 4.25, 4.35, 2, ZX0 - 3, 0x34383e, 0.7);
     this.fillGroundRect(cam, sw, sh, STR1, FC1, 0, ZX0, brocal);
     this.fillGroundRect(cam, sw, sh, FC1, FS1, 0, ZX0, acera);
-    this.ground.zIndex = -500;
+  }
+
+  private depthSortZ(wx: number, wz: number, player: { x: number; z: number }, yawRad: number): number {
+    const behind = BEHIND_TP_M;
+    const camX = player.x - Math.sin(yawRad) * behind;
+    const camZ = player.z - Math.cos(yawRad) * behind;
+    const dist = Math.hypot(wx - camX, wz - camZ);
+    return Math.round(900 - dist * 18);
   }
 
   private syncBackdrops(sw: number, sh: number, yawQ: number): void {
@@ -374,7 +385,7 @@ export class PersonaView {
       f.sprite.x = p.x;
       f.sprite.y = p.y;
       f.sprite.scale.set(p.scale);
-      f.sprite.zIndex = -Math.round(f.z * 10);
+      f.sprite.zIndex = this.depthSortZ(f.x, f.z, player, yawRad);
     }
 
     if (input.jacDriving) {
@@ -413,6 +424,7 @@ export class PersonaView {
       this.adonay.scale.set(feetScale);
       this.adonay.roundPixels = true;
       this.adonay.tint = NIGHT_TINT;
+      this.adonay.zIndex = this.depthSortZ(player.x, player.z, player, yawRad);
     }
 
     let pAnim: PersonaAnim = 'idle';
@@ -449,6 +461,7 @@ export class PersonaView {
       const th = this.jacT9Ext.texture.height;
       const sc = billboardScale(t9p.scale, tw, jacAnchor.widthM) * T9_PROJECTION_CALIB;
       this.jacT9Ext.scale.set(sc);
+      this.jacT9Ext.zIndex = this.depthSortZ(jacAnchor.x, jacAnchor.z, player, yawRad);
       const w = tw * sc;
       const h = th * sc;
       this.lastJacScreen = {

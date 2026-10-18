@@ -209,6 +209,14 @@ export class StudioAudio {
   /** Move command: a random bark ≠ last, ~6 s cooldown, never over a case line. */
   noteMoveCommand(): void {
     if (this.muted || !this.unlocked || this.voice) return;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const lang = document.documentElement.lang || 'es';
+        if (lang.startsWith('es')) return;
+      }
+    } catch {
+      /* ignore */
+    }
     if (automatedWebKitPhone()) return;
     const now = performance.now();
     if (now - this.lastBarkAt < BARK_COOLDOWN_MS) return;

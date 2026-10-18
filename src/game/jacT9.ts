@@ -1538,6 +1538,24 @@ export class JacT9 {
     this.exitSit = null;
   }
 
+  /** Park exactly where the exit brake stopped — no relayout nudge. */
+  parkAtExitPose(): void {
+    if (this.exitSit) {
+      this.cx = this.exitSit.x;
+      this.cy = this.exitSit.y;
+    }
+    this.pendingExit = false;
+    this.exitHold = 0;
+    this.exitFrom = null;
+    this.exitSit = null;
+    this.vel = 0;
+    this.mode = 'parked';
+    this.applyParkedSolid(true);
+    this.layout();
+    this.applySprite();
+    this.hooks.onChange?.();
+  }
+
   visualCenterWorld(): { x: number; y: number } {
     return this.worldCenter();
   }

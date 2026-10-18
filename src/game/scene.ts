@@ -163,6 +163,7 @@ import {
   PERSPECTIVE_AIM_DOWN_FRAC,
   perspectiveYaw,
   screenDragToCameraDelta,
+  screenStickToDrive,
   screenStickToTile,
   zoomMinForView,
 } from './altView';
@@ -1423,8 +1424,30 @@ export class IsoScene {
     return this.personaPreviewOn();
   }
 
+  /** Unit forward on the tile grid from third-person camera yaw (not iso screen→tile). */
+  private personaTileForward(sign = 1): { x: number; y: number } {
+    const fx = Math.sin(this.personaCamYaw) * sign;
+    const fy = Math.cos(this.personaCamYaw) * sign;
+    const m = Math.hypot(fx, fy);
+    if (m < 1e-6) return { x: 0, y: 0 };
+    return { x: fx / m, y: fy / m };
+  }
+
   private remapPersonaStick(dx: number, dy: number): { x: number; y: number } {
     if (dx === 0 && dy === 0) return { x: 0, y: 0 };
+    if (this.personaOn() && this.jac?.driving) {
+      this.syncViewTransform();
+      return screenStickToDrive(dx, dy, this.viewRot, this.viewSx, this.viewSy);
+    }
+    if (this.personaOn()) {
+      const fwd = this.personaTileForward();
+      const strafe = { x: Math.cos(this.personaCamYaw), y: -Math.sin(this.personaCamYaw) };
+      const lx = dx * strafe.x + dy * fwd.x;
+      const ly = dx * strafe.y + dy * fwd.y;
+      const m = Math.hypot(lx, ly);
+      if (m < 1e-6) return { x: 0, y: 0 };
+      return { x: lx / m, y: ly / m };
+    }
     this.syncViewTransform();
     return screenStickToTile(dx, dy, this.viewRot, this.viewSx, this.viewSy);
   }
@@ -4098,11 +4121,10 @@ export class IsoScene {
       this.charState = sprint ? 'sprint' : 'walk';
       this.pendingNoahTalk = false;
       this.dropBenchWalk();
-      const mapped = screenStickToTile(0, fwd, this.viewRot, this.viewSx, this.viewSy);
-      const mag = Math.hypot(mapped.x, mapped.y);
-      if (mag < 1e-6) return;
-      const dx = mapped.x / mag;
-      const dy = mapped.y / mag;
+      const step = this.personaTileForward(fwd);
+      if (Math.hypot(step.x, step.y) < 1e-6) return;
+      const dx = step.x;
+      const dy = step.y;
       const tileBefore = this.roundedCharTile();
       let speedMul = 1;
       if (stickLive && Math.abs(stick.y) > PERSONA_STICK_DEAD) {
@@ -4155,11 +4177,8 @@ export class IsoScene {
     if (!building?.panelTitle || !building.door) return null;
     const inward = doorInwardStep(building);
     if (!inward) return null;
-    this.syncViewTransform();
-    const fwd = screenStickToTile(0, -1, this.viewRot, this.viewSx, this.viewSy);
-    const fm = Math.hypot(fwd.x, fwd.y);
-    if (fm < 1e-6) return null;
-    const dot = (fwd.x / fm) * inward.x + (fwd.y / fm) * inward.y;
+    const fwd = this.personaTileForward();
+    const dot = fwd.x * inward.x + fwd.y * inward.y;
     const minDot = building.name === 'catedral' ? 0.28 : 0.45;
     if (dot < minDot) return null;
     return building;
@@ -5067,12 +5086,10 @@ export class IsoScene {
       return;
     }
     this.pendingJacExit = false;
-    this.jac.cancelExit();
     if (this.pendingDriveEnter) {
       this.jac.faceClearOfDoor(this.pendingDriveEnter.door.x, this.pendingDriveEnter.door.y);
     }
-    this.jac.setMode('parked');
-    this.jac.relayoutParked();
+    this.jac.parkAtExitPose();
     const doorSpot = this.jac.driverExitStandTile();
     const spot = doorSpot ?? this.jac.driverDoorTile({ x: this.jac.cx, y: this.jac.cy }) ?? this.jac.exitTile();
     if (spot) {
@@ -6169,13 +6186,12 @@ export class IsoScene {
     if (!this.personaOn()) return null;
     this.syncViewTransform();
     let fwd = 0;
-    if (opts.w) fwd -= 1;
+    if (opts.w) fwd += 1;
     if (opts.stickY != null) fwd -= personaStickAxis(opts.stickY);
     if (Math.abs(fwd) < 1e-6) return null;
-    const m = screenStickToTile(0, fwd, this.viewRot, this.viewSx, this.viewSy);
-    const mag = Math.hypot(m.x, m.y);
-    if (mag < 1e-6) return null;
-    const deg = (Math.atan2(m.y / mag, m.x / mag) * 180) / Math.PI;
+    const step = this.personaTileForward(fwd);
+    if (Math.hypot(step.x, step.y) < 1e-6) return null;
+    const deg = (Math.atan2(step.y, step.x) * 180) / Math.PI;
     return ((deg % 360) + 360) % 360;
   }
 
