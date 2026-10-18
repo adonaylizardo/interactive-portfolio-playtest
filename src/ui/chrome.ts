@@ -267,6 +267,34 @@ export class ChromeUI {
           </div>
           <button type="button" class="ui-btn ui-btn--secondary" data-details data-i18n="chrome.details">Detalles</button>
         </div>
+        <div class="chrome__sheet-body" data-sheet-body hidden>
+          <section class="chrome__section" id="chrome-mobile-logros">
+            <div class="chrome__section-head">
+              <h2 data-i18n="chrome.achievements">Logros</h2>
+            </div>
+            <div class="chrome__logros">
+              <div class="chrome__logro">
+                <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
+                <p data-i18n="chrome.mentorshipStat">Mentoría: 30+ personas</p>
+              </div>
+              <div class="chrome__logro chrome__logro--empty">
+                <div class="chrome__logro-art">?</div>
+                <p data-i18n="chrome.comingSoon">Coming soon</p>
+              </div>
+              <div class="chrome__logro chrome__logro--empty">
+                <div class="chrome__logro-art">?</div>
+                <p data-i18n="chrome.comingSoon">Coming soon</p>
+              </div>
+            </div>
+          </section>
+          <section class="chrome__section" id="chrome-mobile-casos">
+            <h2 data-i18n="chrome.cases">Casos</h2>
+            <div class="chrome__cases">${caseRows}</div>
+          </section>
+          <div class="chrome__sheet-contact" id="chrome-mobile-contact">
+            <a class="ui-btn ui-btn--secondary" href="${CONTACT_HREF}">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></a>
+          </div>
+        </div>
       </div>
       <nav class="chrome__dock" aria-label="Dock" data-i18n-aria="chrome.dock">
         <button type="button" class="ui-round ui-round--lg ui-round--avatar" data-dock="intro" aria-label="Adonay">AL</button>
@@ -305,8 +333,9 @@ export class ChromeUI {
     this.root.querySelector('[data-action="show-panel"]')?.addEventListener('click', () => this.setLayout('split'));
     this.root.querySelector('[data-action="intro-close"]')?.addEventListener('click', () => this.setLayout('map'));
     this.root.querySelector('[data-details]')?.addEventListener('click', () => {
-      this.root.querySelector('.chrome__intro')?.classList.toggle('chrome__intro--expanded');
+      this.expandMobileSheet(true);
     });
+    this.bindMobileSheetGestures();
     this.root.querySelector('[data-action="home"]')?.addEventListener('click', () => {
       this.setLayout('split');
       this.scrollTo('#chrome-experiencia');
@@ -340,12 +369,14 @@ export class ChromeUI {
     this.root.querySelectorAll('[data-action="center"]').forEach((btn) => {
       btn.addEventListener('click', () => this.callbacks.onCenter());
     });
-    this.root.querySelector('[data-dock="intro"]')?.addEventListener('click', () => this.setLayout('split'));
+    this.root.querySelector('[data-dock="intro"]')?.addEventListener('click', () => {
+      this.openMobileSheetSection('intro');
+    });
     this.root.querySelector('.chrome__dock [data-action="cases"]')?.addEventListener('click', () => {
-      this.setLayout('split');
+      this.openMobileSheetSection('casos');
     });
     this.root.querySelector('.chrome__dock [data-action="achievements"]')?.addEventListener('click', () => {
-      this.setLayout('split');
+      this.openMobileSheetSection('logros');
     });
     this.root.querySelector('.chrome__dock [data-action="contact"]')?.addEventListener('click', () => {
       this.openContact();
@@ -381,7 +412,7 @@ export class ChromeUI {
     this.root.querySelectorAll('[data-action="download"]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
-        window.open(CV_HREF, '_blank', 'noopener,noreferrer');
+        this.downloadCv();
       });
     });
     this.syncSound();
@@ -474,17 +505,89 @@ export class ChromeUI {
   /** Stub until content-branch site search wires in here. */
   openSearch(): void {
     this.setLayout('split');
-    this.scrollTo('#chrome-casos');
+    if (this.mobile) {
+      this.expandMobileSheet(true);
+      this.scrollTo('#chrome-mobile-casos');
+    } else {
+      this.scrollTo('#chrome-casos');
+    }
+  }
+
+  expandMobileSheet(expanded: boolean): void {
+    const intro = this.root.querySelector('.chrome__intro') as HTMLElement | null;
+    const body = this.root.querySelector('[data-sheet-body]') as HTMLElement | null;
+    if (!intro) return;
+    intro.classList.toggle('chrome__intro--expanded', expanded);
+    if (body) body.hidden = !expanded;
+    this.sync();
+  }
+
+  openMobileSheetSection(target: 'casos' | 'logros' | 'intro' | 'contact'): void {
+    this.setLayout('split');
+    if (target === 'intro') {
+      this.expandMobileSheet(false);
+      return;
+    }
+    this.expandMobileSheet(true);
+    window.requestAnimationFrame(() => {
+      const sel =
+        target === 'logros'
+          ? '#chrome-mobile-logros'
+          : target === 'contact'
+            ? '#chrome-mobile-contact'
+            : '#chrome-mobile-casos';
+      this.scrollTo(sel);
+    });
+  }
+
+  private downloadCv(): void {
+    const a = document.createElement('a');
+    a.href = CV_HREF;
+    a.download = 'adonay-lizardo-cv.pdf';
+    a.rel = 'noopener';
+    document.body.append(a);
+    a.click();
+    a.remove();
+  }
+
+  private bindMobileSheetGestures(): void {
+    const intro = this.root.querySelector('.chrome__intro');
+    if (!intro) return;
+    let startY = 0;
+    intro.addEventListener(
+      'touchstart',
+      (e) => {
+        const te = e as TouchEvent;
+        startY = te.touches[0]?.clientY ?? 0;
+      },
+      { passive: true },
+    );
+    intro.addEventListener(
+      'touchend',
+      (e) => {
+        const te = e as TouchEvent;
+        const endY = te.changedTouches[0]?.clientY ?? startY;
+        if (startY - endY > 48) this.expandMobileSheet(true);
+      },
+      { passive: true },
+    );
+  }
+
+  private flashContactBlock(el: HTMLElement | null): void {
+    if (!el) return;
+    el.classList.add('chrome__contact--flash');
+    window.setTimeout(() => el.classList.remove('chrome__contact--flash'), 1400);
   }
 
   private openContact(): void {
-    this.setLayout('split');
-    const contactBlock =
-      (this.root.querySelector('.chrome__column #chrome-contact') as HTMLElement | null) ??
-      (this.root.querySelector('.chrome__intro .chrome__ctas') as HTMLElement | null);
-    contactBlock?.scrollIntoView({ block: 'start' });
-    contactBlock?.classList.add('chrome__contact--flash');
-    window.setTimeout(() => contactBlock?.classList.remove('chrome__contact--flash'), 1200);
+    if (this.mobile) {
+      this.openMobileSheetSection('contact');
+      this.flashContactBlock(this.root.querySelector('#chrome-mobile-contact'));
+    } else {
+      this.setLayout('split');
+      this.scrollTo('#chrome-contact');
+      this.flashContactBlock(this.root.querySelector('#chrome-contact'));
+    }
     studio.playLineForced('11-contact');
     this.callbacks.onLocate('contacto');
   }

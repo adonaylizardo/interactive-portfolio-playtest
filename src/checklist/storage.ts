@@ -41,8 +41,10 @@ export function isMobileOrCoarsePointer(): boolean {
   );
 }
 
-export function stepsForPlatform(_compact = isMobileOrCoarsePointer()): ChecklistStepId[] {
-  return ['walk-around', 'walk-keys', 'move-camera', 'zoom', 'enter-building'];
+export function stepsForPlatform(compact = isMobileOrCoarsePointer()): ChecklistStepId[] {
+  const steps: ChecklistStepId[] = ['walk-around', 'walk-keys', 'move-camera', 'zoom', 'enter-building'];
+  if (compact || isTouchPrimary()) return steps.filter((id) => id !== 'walk-keys');
+  return steps;
 }
 
 export function totalStepsForPlatform(compact = isMobileOrCoarsePointer()): number {

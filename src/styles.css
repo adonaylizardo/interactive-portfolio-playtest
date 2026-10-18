@@ -572,11 +572,11 @@ body[data-layout='panel'] .checklist {
 }
 
 @media (max-width: 767px) {
-  body[data-chrome='phone'] .checklist.checklist--mobile-closed {
-    top: auto;
-    bottom: max(12px, env(safe-area-inset-bottom));
+  body[data-chrome='phone'][data-layout='map'] .checklist.checklist--mobile-closed {
+    top: auto !important;
+    bottom: max(76px, calc(env(safe-area-inset-bottom) + 64px));
     left: max(12px, env(safe-area-inset-left));
-    right: auto;
+    right: auto !important;
     width: min(237px, calc(100vw - 120px));
     min-width: 0;
     max-width: min(237px, calc(100vw - 120px));
@@ -635,6 +635,43 @@ body[data-layout='panel'] .checklist {
     height: 44px;
     flex-shrink: 0;
     pointer-events: auto;
+  }
+
+  body[data-chrome='phone'][data-layout='split'] .checklist.checklist--mobile.checklist--mobile-closed {
+    top: max(56px, calc(env(safe-area-inset-top) + 44px)) !important;
+    bottom: auto !important;
+    left: max(12px, env(safe-area-inset-left)) !important;
+    right: auto !important;
+    width: 48px;
+    min-width: 48px;
+    max-width: 48px;
+    height: 48px;
+    max-height: 48px;
+    border-radius: 24px;
+    overflow: hidden;
+  }
+
+  body[data-chrome='phone'][data-layout='split'] .checklist.checklist--mobile-closed .checklist__header-text,
+  body[data-chrome='phone'][data-layout='split'] .checklist.checklist--mobile-closed .checklist__counter--label {
+    display: none !important;
+  }
+
+  body[data-chrome='phone'] .checklist--mobile:not(.checklist--mobile-closed) {
+    position: fixed;
+    top: auto;
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(76px, calc(env(safe-area-inset-bottom) + 64px));
+    width: auto;
+    max-width: none;
+    max-height: min(52vh, 380px);
+    transform: none;
+    z-index: 24;
+    border-radius: 16px;
+  }
+
+  body[data-chrome='phone'][data-layout='split'] .checklist--mobile:not(.checklist--mobile-closed) {
+    bottom: max(12px, env(safe-area-inset-bottom));
   }
 
   .checklist--mobile {
@@ -840,14 +877,28 @@ body[data-layout='panel'] .checklist {
 
 /* Phone landscape (e.g. 844×390): treat as compact. Checklist is a pill; lang stays off the panel. */
 @media (max-height: 500px) and (orientation: landscape) {
-  body[data-chrome='phone'] .checklist.checklist--mobile-closed {
+  body[data-chrome='phone'][data-layout='map'] .checklist.checklist--mobile-closed {
     top: auto;
-    bottom: max(12px, env(safe-area-inset-bottom));
+    bottom: max(76px, calc(env(safe-area-inset-bottom) + 64px));
     left: max(12px, env(safe-area-inset-left));
     right: auto;
     width: min(279px, calc(100vw - 160px));
     max-width: min(279px, calc(100vw - 160px));
     max-height: 52px;
+  }
+
+  body[data-chrome='phone'][data-layout='split'] .checklist.checklist--mobile-closed {
+    top: max(48px, calc(env(safe-area-inset-top) + 36px));
+    bottom: auto;
+  }
+
+  .chrome--sheet .chrome__intro,
+  .chrome--sheet .chrome__intro--expanded {
+    top: max(8px, env(safe-area-inset-top));
+    bottom: max(64px, calc(env(safe-area-inset-bottom) + 48px));
+    max-height: none;
+    border-radius: 12px;
+    border-bottom: 1px solid #2a2c31;
   }
 
   .checklist--mobile-closed .checklist__list,

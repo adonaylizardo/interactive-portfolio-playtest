@@ -629,11 +629,37 @@ body[data-interior='1'] .chrome__column {
   visibility: hidden;
 }
 
+#chrome-contact,
+#chrome-mobile-contact {
+  scroll-margin-top: 72px;
+}
+
 #chrome-contact.chrome__contact--flash,
+#chrome-mobile-contact.chrome__contact--flash,
 .chrome__intro .chrome__ctas.chrome__contact--flash {
   outline: 2px solid #5b8def;
   outline-offset: 4px;
   border-radius: 12px;
+}
+
+.chrome--sheet .chrome__intro--expanded {
+  max-height: min(calc(100dvh - 72px), 92vh);
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+.chrome--sheet .chrome__intro--expanded .chrome__sheet-body {
+  display: block;
+  margin-top: 4px;
+}
+
+.chrome__sheet-body .chrome__case-row,
+.chrome__sheet-body .chrome__logro {
+  pointer-events: auto;
+}
+
+.chrome__sheet-contact {
+  margin-top: 16px;
+  padding-bottom: 8px;
 }
 
 .chrome--split .chrome__subtitle {
@@ -907,8 +933,7 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
   display: none;
 }
 
-.chrome--dock .chrome__view-btns [data-view='rotate'],
-.chrome--dock .chrome__view-btns [data-view='map'] {
+.chrome--dock .chrome__view-btns [data-view='rotate'] {
   display: none;
 }
 

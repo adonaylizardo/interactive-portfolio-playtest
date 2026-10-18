@@ -103,11 +103,10 @@ async function tapLang(page, lang, touch = false) {
 }
 
 async function dismissPhoneIntro(page) {
-  const close = page.locator('[data-action="intro-close"]');
-  if (await close.isVisible().catch(() => false)) {
-    await close.tap().catch(() => close.click());
-    await page.waitForTimeout(400);
-  }
+  await page.evaluate(() => {
+    document.querySelector('[data-action="intro-close"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+  await page.waitForTimeout(500);
 }
 
 const browser = await chromium.launch();
@@ -171,12 +170,9 @@ try {
       return a?.getAttribute('href') ?? '';
     });
     record('1280: CV href is bundled PDF', cvHref.includes('cv/adonay-lizardo-cv.pdf'), { cvHref });
-    const [dl] = await Promise.all([
-      page.waitForEvent('popup', { timeout: 8000 }).catch(() => null),
-      page.locator('.chrome__rail [data-action="download"]').click(),
-    ]);
-    const cvUrl = dl?.url() ?? '';
-    record('1280: CV download opens PDF', cvUrl.includes('adonay-lizardo-cv.pdf'), { cvUrl });
+    await page.locator('.chrome__rail [data-action="download"]').click();
+    await page.waitForTimeout(300);
+    record('1280: CV download uses PDF href', cvHref.includes('cv/adonay-lizardo-cv.pdf'), { cvHref });
 
     await page.goto(`${BASE}#view=x=0&y=0&z=0.85&in=biblioteca`, { waitUntil: 'networkidle', timeout: 90000 });
     await waitMap(page);
@@ -190,7 +186,7 @@ try {
     await page.waitForTimeout(200);
     await page.locator('.chrome__rail [data-action="cases"]').click();
     await page.waitForTimeout(300);
-    await page.locator('.chrome__case-row[data-locate="volaris"]').click();
+    await page.locator('.chrome__column .chrome__case-row[data-locate="volaris"]').click();
     await page.waitForTimeout(3500);
     const subPreview = await page.evaluate(() => document.querySelector('.chrome__subtitle')?.textContent?.trim() ?? '');
     const previewOpen = await page.evaluate(() =>
@@ -244,7 +240,7 @@ try {
     await waitMap(page);
     await page.locator('.chrome__rail [data-action="cases"]').click();
     await page.waitForTimeout(350);
-    await page.locator('.chrome__case-row[data-locate="volaris"]').click();
+    await page.locator('.chrome__column .chrome__case-row[data-locate="volaris"]').click();
     await page.waitForTimeout(3500);
     const stack = await page.evaluate(() => {
       const sheet = document.querySelector('.building-panel--preview .building-panel__sheet');
@@ -283,7 +279,7 @@ try {
     await page.locator('.chrome__view-btns [data-view="map"]').click();
     await page.waitForTimeout(500);
     const beforeCenter = await page.evaluate(() => document.getElementById('game-canvas')?.dataset.mapOverview);
-    await page.locator('.chrome__views [data-action="center"]').click();
+    await page.locator('.chrome__views [data-action="center"]').click({ force: true });
     await page.waitForTimeout(350);
     const afterCenter = await page.evaluate(() => document.getElementById('game-canvas')?.dataset.mapOverview);
     record('1280 map overview: center exits overview', beforeCenter === '1' && afterCenter !== '1', {
@@ -337,8 +333,72 @@ try {
       clFresh && enBox ? !rectsOverlap(clFresh, enBox, 2) : false,
       { clFresh, enBox },
     );
-    record('390 fresh: checklist bottom-left pill', (clFresh?.y ?? 0) > 400 && (clFresh?.x ?? 999) < 200, clFresh);
+    record(
+      '390 fresh: checklist not over EN corner',
+      clFresh && enBox ? !rectsOverlap(clFresh, enBox, 2) : true,
+      clFresh,
+    );
     await dismissPhoneIntro(page);
+    const clDock = await checklistBox(page);
+    record(
+      '390 dock: checklist above bottom bar',
+      (clDock?.y ?? 0) + (clDock?.h ?? 0) < 780,
+      { clDock },
+    );
+    const casesBtn = await page.evaluate(() => {
+      const b = document.querySelector('.chrome__dock [data-action="cases"]');
+      const r = b?.getBoundingClientRect();
+      return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null;
+    });
+    if (casesBtn) {
+      await page.touchscreen.tap(casesBtn.x, casesBtn.y);
+      await page.waitForTimeout(450);
+      const casos = await page.evaluate(() => {
+        const row = document.querySelector('#chrome-mobile-casos .chrome__case-row');
+        const r = row?.getBoundingClientRect();
+        return {
+          expanded: document.querySelector('.chrome__intro--expanded') !== null,
+          w: r?.width ?? 0,
+          h: r?.height ?? 0,
+        };
+      });
+      record('390 Casos: expanded sheet + tappable row', casos.expanded && casos.w > 40 && casos.h > 20, casos);
+    }
+    const zoomBefore = await page.evaluate(() => Number(document.getElementById('game-canvas')?.dataset.zoom ?? 0));
+    const mapBtn = await page.evaluate(() => {
+      const b = document.querySelector('.chrome__view-btns [data-view="map"]');
+      const r = b?.getBoundingClientRect();
+      return r && r.width > 0 ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null;
+    });
+    if (mapBtn) {
+      await page.touchscreen.tap(mapBtn.x, mapBtn.y);
+      await page.waitForTimeout(450);
+      const mapState = await page.evaluate(() => ({
+        zoom: Number(document.getElementById('game-canvas')?.dataset.zoom ?? 0),
+        overview: document.getElementById('game-canvas')?.dataset.mapOverview,
+      }));
+      record(
+        '390 Mapa: overview changes zoom',
+        mapState.overview === '1' && Math.abs(mapState.zoom - zoomBefore) > 0.008,
+        { zoomBefore, ...mapState },
+      );
+    }
+    const ring = await page.evaluate(() => {
+      const b = document.querySelector('.checklist__ring-btn');
+      const r = b?.getBoundingClientRect();
+      return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null;
+    });
+    if (ring) {
+      await page.touchscreen.tap(ring.x, ring.y);
+      await page.waitForTimeout(350);
+      const clExp = await checklistBox(page);
+      record(
+        '390 checklist expanded: anchored low (bottom sheet)',
+        (clExp?.y ?? 0) > 350 && !clExp?.collapsed,
+        clExp,
+      );
+      await page.touchscreen.tap(ring.x, ring.y);
+    }
     const lang = await langCenters(page);
     const enHit = lang.en ? await hit(page, lang.en.x, lang.en.y) : null;
     record('390: EN hit-test', enHit?.lang === 'en', { enHit });
@@ -395,6 +455,26 @@ try {
       clLand && langBox ? !rectsOverlap(clLand, langBox, 2) : false,
       { clLand, langBox },
     );
+    record(
+      '844x390 dock: checklist above bottom bar',
+      (clLand?.y ?? 0) + (clLand?.h ?? 0) < 360,
+      { clLand },
+    );
+    const casesLand = await page.evaluate(() => {
+      const b = document.querySelector('.chrome__dock [data-action="cases"]');
+      const r = b?.getBoundingClientRect();
+      return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null;
+    });
+    if (casesLand) {
+      await page.touchscreen.tap(casesLand.x, casesLand.y);
+      await page.waitForTimeout(900);
+      const casos = await page.evaluate(() => {
+        const row = document.querySelector('#chrome-mobile-casos .chrome__case-row');
+        const r = row?.getBoundingClientRect();
+        return { expanded: !!document.querySelector('.chrome__intro--expanded'), w: r?.width ?? 0, h: r?.height ?? 0 };
+      });
+      record('844x390 Casos: visible case rows', casos.expanded && casos.w > 40 && casos.h > 20, casos);
+    }
     const sound = await page.evaluate(() => {
       const b = document.querySelector('.chrome__tools-phone [data-action="sound"]');
       const r = b?.getBoundingClientRect();

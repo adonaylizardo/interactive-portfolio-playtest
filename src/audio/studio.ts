@@ -3,7 +3,8 @@
  * Autoplay-safe: the graph starts on the first user gesture. Mute persists.
  */
 import { caseVoiceFile } from '../data/cases';
-import { VOICE_LINES } from '../data/voice-lines';
+import { VOICE_LINES, type VoiceLine } from '../data/voice-lines';
+import { getLang, onLangChange } from '../ui/i18n';
 
 const MUTE_KEY = 'studio-audio-muted';
 const VOICE_DIR = `${import.meta.env.BASE_URL}audio/voice/`;
@@ -70,6 +71,7 @@ export class StudioAudio {
   private introDeferred = false;
   private introKickTimer: ReturnType<typeof setTimeout> | null = null;
   private pending: string | null = null;
+  private voiceQueue: string[] = [];
   private bark: HTMLAudioElement | null = null;
   private barkLines: BarkLine[] = [];
   private barkReady = new Set<string>();
@@ -82,6 +84,30 @@ export class StudioAudio {
     window.addEventListener('pointerdown', unlock, { capture: true });
     window.addEventListener('keydown', unlock, { capture: true });
     window.addEventListener('touchend', unlock, { capture: true });
+    onLangChange(() => {
+      if (!this.activeLineId) return;
+      const line = VOICE_LINES[this.activeLineId];
+      if (line) {
+        this.subtitleText = this.lineSubtitle(line);
+        this.emit();
+      }
+    });
+  }
+
+  private lineSubtitle(line: VoiceLine): string {
+    if (getLang() === 'es' && line.script_text_es) return line.script_text_es;
+    return line.script_text;
+  }
+
+  private enqueueVoice(id: string): void {
+    if (this.voiceQueue.includes(id)) return;
+    this.voiceQueue.push(id);
+  }
+
+  private drainVoiceQueue(): void {
+    const next = this.voiceQueue.shift() ?? this.pending;
+    this.pending = null;
+    if (next) this.playLine(next, { force: true });
   }
 
   isMuted(): boolean {
@@ -178,6 +204,8 @@ export class StudioAudio {
     this.introDeferred = true;
     this.introLock = false;
     this.pending = null;
+    this.voiceQueue = [];
+    if (this.activeLineId === '01-intro') this.stopVoice();
     this.playLine(id, { force: true });
   }
 
@@ -282,7 +310,7 @@ export class StudioAudio {
   playCaseVoice(id: string | null | undefined): void {
     const file = caseVoiceFile(id);
     if (!file) return;
-    this.playLine(file);
+    this.playLineForced(file);
   }
 
   /** Move command: a random bark ≠ last, ~6 s cooldown, never over a case line. */
@@ -332,15 +360,20 @@ export class StudioAudio {
       this.introLock = false;
       return;
     }
-    if (this.introLock && id !== '01-intro' && !opts.force) {
-      this.pending = id;
+    if (this.voice && id !== '01-intro' && !opts.force) {
+      this.enqueueVoice(id);
       return;
     }
-    this.stopVoice();
+    if (this.introLock && id !== '01-intro' && !opts.force) {
+      this.enqueueVoice(id);
+      return;
+    }
+    if (this.voice && opts.force) this.stopVoice({ preserveQueue: true });
+    else this.stopVoice();
     this.stopBark();
     if (id !== '01-intro') this.played.add(id);
     this.activeLineId = id;
-    this.subtitleText = line.script_text;
+    this.subtitleText = this.lineSubtitle(line);
     this.emit();
     if (automatedWebKitPhone()) {
       window.setTimeout(() => this.finishVoice(true), 80);
@@ -357,7 +390,7 @@ export class StudioAudio {
       if (this.voice === el) this.finishVoice(true);
     });
     this.voice = el;
-    this.subtitleText = line.script_text;
+    this.subtitleText = this.lineSubtitle(line);
     this.duckAmbience(true);
     this.emit();
     void el.play().catch(() => {
@@ -373,9 +406,7 @@ export class StudioAudio {
     this.stopVoice({ preserveQueue: true });
     this.syncAmbience();
     this.emit();
-    const next = this.pending;
-    this.pending = null;
-    if (next) this.playLine(next);
+    this.drainVoiceQueue();
   }
 
   private stopVoice(opts: { preserveQueue?: boolean } = {}): void {

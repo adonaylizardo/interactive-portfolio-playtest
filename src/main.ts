@@ -254,7 +254,7 @@ async function main(): Promise<void> {
       !!getInteriorDef(bootInterior) ||
       !!getBuildingByName(bootInterior);
     if (!known) {
-      showToast(t('toast.unknownInterior'));
+      showToast(t('toast.unknownInterior'), 4000);
       replaceOutdoorHash({ x: 0, y: 0, zoom: 0.85 });
       scene.recenterOnCharacter();
     } else {

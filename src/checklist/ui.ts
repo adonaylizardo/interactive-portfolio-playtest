@@ -298,7 +298,7 @@ export class ChecklistUI {
     this.state.completed[step] = true;
     saveChecklist(this.state);
     this.render();
-    if (studio.hasIntroCompleted()) studio.playLine('07-achievement');
+    if (step === 'enter-building' && studio.hasIntroCompleted()) studio.playLine('07-achievement');
   }
 
   isSkippedOrDone(): boolean {

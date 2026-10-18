@@ -22,6 +22,7 @@ import {
   INICIO,
   MAP_HEIGHT,
   MAP_WIDTH,
+  getBuildingDoorTiles,
   objects,
   resolveBuildingEntryFromTile,
   resolveWalkTarget,
@@ -132,6 +133,7 @@ import {
   viewportMapCoverage,
   zoomMinForInteriorBounds,
   zoomMinForViewport,
+  zoomToFitWorldBounds,
   zoomAtScreenAnchor,
   smoothDampToZero,
 } from './cameraControl';
@@ -1385,7 +1387,10 @@ export class IsoScene {
     }
     this.savedCam = { x: this.cameraX, y: this.cameraY, zoom: this.zoom };
     this.mapOverview = true;
-    this.zoom = zoomMinForViewport(sw, sh);
+    const doorBounds = this.doorClusterWorldBounds();
+    this.cameraX = doorBounds.cx;
+    this.cameraY = doorBounds.cy;
+    this.zoom = zoomToFitWorldBounds(sw, sh, doorBounds, 24);
     const fitted = clampPanMapFullyInView(
       { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
       sw,
@@ -1395,6 +1400,41 @@ export class IsoScene {
     this.cameraY = fitted.cameraY;
     this.zoom = fitted.zoom;
     this.applyCamera(true);
+  }
+
+  private doorClusterWorldBounds(): {
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+    cx: number;
+    cy: number;
+  } {
+    const doors = getBuildingDoorTiles();
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const d of doors) {
+      const w = tileToWorld(d.door.x + 0.5, d.door.y + 0.5);
+      minX = Math.min(minX, w.x);
+      maxX = Math.max(maxX, w.x);
+      minY = Math.min(minY, w.y);
+      maxY = Math.max(maxY, w.y);
+    }
+    if (!Number.isFinite(minX)) {
+      const b = mapWorldBounds();
+      return { ...b, cx: (b.minX + b.maxX) / 2, cy: (b.minY + b.maxY) / 2 };
+    }
+    const pad = 48;
+    return {
+      minX: minX - pad,
+      maxX: maxX + pad,
+      minY: minY - pad,
+      maxY: maxY + pad,
+      cx: (minX + maxX) / 2,
+      cy: (minY + maxY) / 2,
+    };
   }
 
   requestWalk(

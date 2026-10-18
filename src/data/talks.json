@@ -1,58 +1,132 @@
 {
-  "items": [
+  "comingSoon": false,
+  "sections": [
     {
-      "id": "talk-example-1",
-      "example": true,
-      "titleKey": "talks.item1.title",
-      "metaKey": "talks.item1.meta"
+      "titleKey": "talks.section.innova360",
+      "items": [
+        {
+          "id": "innova360-2025",
+          "title": "Cómo hackear tu carrera cuando todo está en tu contra (literalmente)",
+          "url": "https://academiasinergia.substack.com/p/como-hackear-tu-carrera-cuando-todo",
+          "date": "2025-11-27",
+          "duration": "46:51",
+          "thumbnail": "https://i.ytimg.com/vi/FV-HJNBnEiM/hqdefault.jpg"
+        }
+      ]
     },
     {
-      "id": "talk-example-2",
-      "example": true,
-      "titleKey": "talks.item2.title",
-      "metaKey": "talks.item2.meta"
+      "items": [
+        {
+          "id": "yt-EBecBkHkRos",
+          "title": "Cómo crear negocios en tiempos de pandemia",
+          "url": "https://www.youtube.com/watch?v=EBecBkHkRos",
+          "date": "2020",
+          "duration": "1:16:38",
+          "thumbnail": "https://i.ytimg.com/vi/EBecBkHkRos/hqdefault.jpg"
+        },
+        {
+          "id": "yt-aCHPQatcjWQ",
+          "title": "Cómo liberar tu verdadero potencial",
+          "url": "https://www.youtube.com/watch?v=aCHPQatcjWQ",
+          "date": "2020",
+          "duration": "1:04:43",
+          "thumbnail": "https://i.ytimg.com/vi/aCHPQatcjWQ/hqdefault.jpg"
+        },
+        {
+          "id": "yt-gK6rYI__wag",
+          "title": "Creando un MVP",
+          "url": "https://www.youtube.com/watch?v=gK6rYI__wag",
+          "date": "2020",
+          "duration": "52:27",
+          "thumbnail": "https://i.ytimg.com/vi/gK6rYI__wag/hqdefault.jpg"
+        }
+      ]
     },
     {
-      "id": "talk-example-3",
-      "example": true,
-      "titleKey": "talks.item3.title",
-      "metaKey": "talks.item3.meta"
-    },
-    {
-      "id": "talk-example-4",
-      "example": true,
-      "titleKey": "talks.item4.title",
-      "metaKey": "talks.item4.meta"
-    },
-    {
-      "id": "talk-example-5",
-      "example": true,
-      "titleKey": "talks.item5.title",
-      "metaKey": "talks.item5.meta"
-    },
-    {
-      "id": "talk-example-6",
-      "example": true,
-      "titleKey": "talks.item6.title",
-      "metaKey": "talks.item6.meta"
-    },
-    {
-      "id": "talk-example-7",
-      "example": true,
-      "titleKey": "talks.item7.title",
-      "metaKey": "talks.item7.meta"
-    },
-    {
-      "id": "talk-example-8",
-      "example": true,
-      "titleKey": "talks.item8.title",
-      "metaKey": "talks.item8.meta"
-    },
-    {
-      "id": "talk-example-9",
-      "example": true,
-      "titleKey": "talks.item9.title",
-      "metaKey": "talks.item9.meta"
+      "id": "video-podcast",
+      "titleKey": "talks.section.sinergia",
+      "items": [
+        {
+          "id": "sinergia-como-hackear-tu-motivacion",
+          "title": "Cómo hackear tu motivación",
+          "url": "https://academiasinergia.substack.com/p/como-hackear-tu-motivacion",
+          "date": "2025-10-17",
+          "duration": "2:54",
+          "thumbnail": "https://substack-post-media.s3.amazonaws.com/public/images/d90cff4e-1ea9-40ad-a6f7-4199f95e55d3_1456x1048.png"
+        },
+        {
+          "id": "sinergia-la-solucion-para-que-dejes-de-sabotearte",
+          "title": "La solución para que dejes de sabotearte",
+          "url": "https://academiasinergia.substack.com/p/la-solucion-para-que-dejes-de-sabotearte",
+          "date": "2025-10-20",
+          "duration": "7:01",
+          "thumbnail": "https://substack-post-media.s3.amazonaws.com/public/images/59b84f08-2cc7-4b22-8a27-96a33e84bdaf_1456x1048.png"
+        },
+        {
+          "id": "sinergia-el-verdadero-problema-eres-tu",
+          "title": "El verdadero problema, eres tú",
+          "url": "https://academiasinergia.substack.com/p/el-verdadero-problema-eres-tu",
+          "date": "2025-10-26",
+          "duration": "1:08",
+          "thumbnail": "https://substack-post-media.s3.amazonaws.com/public/images/ecab6cb9-0fc8-400b-8e1d-299a8e478b34_1456x1048.png"
+        },
+        {
+          "id": "sinergia-como-empezar-tu-dia-adecuadamente",
+          "title": "Cómo empezar tu día adecuadamente (según la ciencia)",
+          "url": "https://academiasinergia.substack.com/p/como-empezar-tu-dia-adecuadamente",
+          "date": "2025-10-27",
+          "duration": "3:13",
+          "thumbnail": "https://substack-post-media.s3.amazonaws.com/public/images/bede9bac-b08e-40ef-b030-a137885be1e0_1456x1048.png"
+        },
+        {
+          "id": "sinergia-como-ser-mas-inteligente",
+          "title": "Cómo ser más inteligente",
+          "url": "https://academiasinergia.substack.com/p/como-ser-mas-inteligente",
+          "date": "2025-10-29",
+          "duration": "4:45",
+          "thumbnail": "https://substack-post-media.s3.amazonaws.com/public/images/4ecdd146-08ce-455d-aea6-aed47e62f8ec_1456x1048.png"
+        },
+        {
+          "id": "sinergia-la-comunicacion-intencional-en-los",
+          "title": "La Comunicación Intencional en los Negocios: ¿Feo Funcional, Bello Deslumbrante o Punto Medio Estratégico?",
+          "url": "https://academiasinergia.substack.com/p/la-comunicacion-intencional-en-los",
+          "date": "2025-11-03",
+          "duration": "16:38",
+          "thumbnail": "https://substack-post-media.s3.amazonaws.com/public/images/690dc754-559f-491a-b261-e25a2b272c46_1456x1048.png"
+        },
+        {
+          "id": "sinergia-la-brillantez-no-es-un-accidente",
+          "title": "La Brillantez no es un accidente, se forja",
+          "url": "https://academiasinergia.substack.com/p/la-brillantez-no-es-un-accidente",
+          "date": "2025-11-05",
+          "duration": "2:59",
+          "thumbnail": "https://substack-post-media.s3.amazonaws.com/public/images/f281d564-9934-4c47-be31-e1e3f7f6c5c0_1456x1048.png"
+        },
+        {
+          "id": "sinergia-tu-capacidad-de-disfrute-esta-en",
+          "title": "Tu capacidad de disfrute está en peligro de extinción",
+          "url": "https://academiasinergia.substack.com/p/tu-capacidad-de-disfrute-esta-en",
+          "date": "2025-11-24",
+          "duration": "4:48",
+          "thumbnail": "https://substack-post-media.s3.amazonaws.com/public/images/8b3d4c99-ad52-47a3-be01-cdbe78479366_1456x1048.png"
+        },
+        {
+          "id": "sinergia-eres-un-ladron-de-crecimiento-ajeno",
+          "title": "Eres un ladrón de crecimiento ajeno",
+          "url": "https://academiasinergia.substack.com/p/eres-un-ladron-de-crecimiento-ajeno",
+          "date": "2025-12-19",
+          "duration": "2:16",
+          "thumbnail": "https://substack-post-media.s3.amazonaws.com/public/images/1e5c8a21-b93f-461f-91b4-8679a3208bca_1456x1048.png"
+        },
+        {
+          "id": "sinergia-todos-le-creyeron-a-la-ia-todos-se",
+          "title": "Todos le creyeron a la IA. Todos se equivocaron.",
+          "url": "https://academiasinergia.substack.com/p/todos-le-creyeron-a-la-ia-todos-se",
+          "date": "2026-05-27",
+          "duration": "3:13",
+          "thumbnail": "https://substack-post-media.s3.amazonaws.com/public/images/1e115a73-03e1-48c2-a90c-2228facf2e8e_1456x1048.png"
+        }
+      ]
     }
   ]
 }

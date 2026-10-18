@@ -57,6 +57,10 @@ const DICT = {
     'experience.example': 'Example data',
 
     'talks.intro': 'One-line intro (placeholder).',
+    'talks.comingSoon': 'Coming soon',
+    'talks.section.innova360': 'Innova360',
+    'talks.section.sinergia': 'Academia Sinergia',
+    'talks.section.videoPodcast': 'Video podcast',
     'talks.playerPlaceholder':
       'Talk player placeholder — video or slides will load here from JSON later.',
     'talks.item1.title': 'Talk title (placeholder)',
@@ -238,6 +242,10 @@ const DICT = {
     'experience.example': 'Datos de ejemplo',
 
     'talks.intro': 'Intro de una línea (placeholder).',
+    'talks.comingSoon': 'Próximamente',
+    'talks.section.innova360': 'Innova360',
+    'talks.section.sinergia': 'Academia Sinergia',
+    'talks.section.videoPodcast': 'Video podcast',
     'talks.playerPlaceholder':
       'Placeholder del reproductor — el video o las diapositivas vendrán de un JSON más adelante.',
     'talks.item1.title': 'Talk title (placeholder)',

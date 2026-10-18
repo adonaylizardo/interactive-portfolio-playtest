@@ -3,6 +3,8 @@ import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
 import { CASES, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
 import {
   TALKS,
+  TALKS_COMING_SOON,
+  TALK_SECTIONS,
   WRITINGS,
   type TalkItem,
   type WritingItem,
@@ -11,6 +13,7 @@ import {
 import {
   isPlaceholderCopy,
   talkMeta,
+  talkSectionTitle,
   talkTitle,
   writingArticleUrl,
   writingItemHasCopy,
@@ -627,9 +630,7 @@ export class BuildingPanel {
 
   private syncExperienceIntro(): void {
     if (!this.experienceIntro) return;
-    const showTalksIntro = this.mode === 'talks';
-    this.experienceIntro.hidden = !showTalksIntro;
-    if (showTalksIntro) this.experienceIntro.textContent = t('talks.intro');
+    this.experienceIntro.hidden = true;
   }
 
   private refreshExperienceCopy(): void {
@@ -711,14 +712,29 @@ export class BuildingPanel {
 
   private renderTalksList(): void {
     if (!this.experienceList) return;
-    const count = this.isMobile() ? 7 : 9;
-    const items = TALKS.filter((item) => {
-      const title = talkTitle(item);
-      return title.length > 0 && !isPlaceholderCopy(title);
-    }).slice(0, count);
-    this.experienceList.replaceChildren(
-      ...items.map((item) => this.talkRow(item, () => this.openTalk(item))),
-    );
+    if (TALKS_COMING_SOON || TALKS.length === 0) {
+      const p = document.createElement('p');
+      p.className = 'experience__empty';
+      p.textContent = t('talks.comingSoon');
+      this.experienceList.replaceChildren(p);
+      return;
+    }
+    const nodes: HTMLElement[] = [];
+    for (const section of TALK_SECTIONS) {
+      const heading = talkSectionTitle(section);
+      if (heading) {
+        const h = document.createElement('h3');
+        h.className = 'experience__section-title';
+        h.textContent = heading;
+        nodes.push(h);
+      }
+      for (const item of section.items) {
+        const title = talkTitle(item);
+        if (!title.length || isPlaceholderCopy(title)) continue;
+        nodes.push(this.talkRow(item, () => this.openTalk(item)));
+      }
+    }
+    this.experienceList.replaceChildren(...nodes);
   }
 
   private talkRow(

@@ -10,7 +10,6 @@ export function isExperienceBuilding(id: string | null | undefined): id is Exper
 
 export type TalkItem = {
   id: string;
-  example?: boolean;
   title?: string;
   url?: string;
   date?: string;
@@ -18,6 +17,14 @@ export type TalkItem = {
   thumbnail?: string;
   titleKey?: string;
   metaKey?: string;
+  example?: boolean;
+};
+
+export type TalkSection = {
+  id?: string;
+  title?: string;
+  titleKey?: string;
+  items: TalkItem[];
 };
 
 export type WritingItem = {
@@ -44,6 +51,22 @@ type WritingsFile = {
   substackUrl?: string;
 };
 
-export const TALKS: TalkItem[] = (talksJson as { items?: TalkItem[] }).items ?? [];
+type TalksFile = {
+  sections?: TalkSection[];
+  items?: TalkItem[];
+  comingSoon?: boolean;
+};
+
+const talksFile = talksJson as TalksFile;
+
+export const TALK_SECTIONS: TalkSection[] = talksFile.sections?.length
+  ? talksFile.sections
+  : [{ items: talksFile.items ?? [] }];
+
+export const TALKS: TalkItem[] = TALK_SECTIONS.flatMap((s) => s.items);
+
+export const TALKS_COMING_SOON =
+  !!talksFile.comingSoon || (TALKS.length === 0 && !talksFile.sections?.length);
+
 export const WRITINGS: WritingSection[] = (writingsJson as WritingsFile).sections;
 export const WRITINGS_SUBSTACK_URL = (writingsJson as WritingsFile).substackUrl;
