@@ -918,9 +918,10 @@ export class JacT9 {
     return out;
   }
 
-  /** Integer sit the 2×2 drive box can occupy on the collision grid. */
+  /** Sit must hold the parked 5×3 / 3×5, not only the live 2×2 drive box. */
   private sitCellHoldable(x: number, y: number): boolean {
-    return this.driveBoxWalkable(x, y);
+    const keep = this.parkDoor ? this.doorKeepClear(this.parkDoor.x, this.parkDoor.y) : new Set<string>();
+    return !!this.parkHeadingAt(x, y, keep);
   }
 
   /** Path must actually end on the sit cell (or already be there). */
@@ -1712,6 +1713,8 @@ export class JacT9 {
    */
   private pathFollowStick(dt: number): { throttle: number; steer: number } | null {
     this.dropPassedPathNodes();
+    this.leashToLane();
+    this.snapDoorCorner();
     this.recoverPathFollow();
     const goal = this.driveGoal;
     const goalDist = goal ? Math.hypot(goal.x - this.cx, goal.y - this.cy) : Infinity;
@@ -1832,6 +1835,9 @@ export class JacT9 {
 
   /** Rebuild a collapsed polyline. Position stays on the integrator — no hops. */
   private recoverPathFollow(): void {
+    // Door routes stay on the cached lane. A 2×2 BFS rebuild is what sent
+    // Estudio west around the bikes and burned 20 s.
+    if (this.followLoose) return;
     if (!this.driveGoal) return;
     if (this.drivePath.length === 0) {
       const path = this.findDrivePath(this.driveGoal.x, this.driveGoal.y);
@@ -1883,6 +1889,57 @@ export class JacT9 {
       y = p.y;
     }
     return { x, y };
+  }
+
+  /** Snap onto a door-lane corner and take the outgoing run — same idea as the road-exit hop. */
+  private snapDoorCorner(): void {
+    if (!this.followLoose || this.drivePath.length < 2) return;
+    const a = this.drivePath[0];
+    const b = this.drivePath[1];
+    const ox = b.x - a.x;
+    const oy = b.y - a.y;
+    const dx = a.x - this.cx;
+    const dy = a.y - this.cy;
+    const dist = Math.hypot(dx, dy);
+    const ol = Math.hypot(ox, oy);
+    if (ol < 1e-4 || dist < 1e-4 || dist > 0.95) return;
+    const corner = (dx * ox + dy * oy) / (dist * ol) <= 0.35;
+    if (!corner) return;
+    this.cx = a.x;
+    this.cy = a.y;
+    const axis: FacingDir = Math.abs(ox) >= Math.abs(oy) ? (ox >= 0 ? 'se' : 'nw') : oy >= 0 ? 'sw' : 'ne';
+    this.dir = axis;
+    this.heading = dirIndex(axis);
+    this.followDir = axis;
+    this.dirHoldT = DIR_HOLD_S;
+    this.vel = Math.max(this.vel, 3.6);
+    this.drivePath.shift();
+  }
+
+  /** Nudge sideways onto the door polyline. Never pull backward along it. */
+  private leashToLane(): void {
+    if (!this.followLoose || this.drivePath.length === 0) return;
+    const t = this.drivePath[0];
+    const next = this.drivePath[1] ?? this.driveGoal;
+    if (next) {
+      const ox = next.x - t.x;
+      const oy = next.y - t.y;
+      const ol = Math.hypot(ox, oy);
+      if (ol > 1e-4) {
+        const along = ((this.cx - t.x) * ox + (this.cy - t.y) * oy) / ol;
+        if (along > 0.12) return;
+      }
+    }
+    const dx = t.x - this.cx;
+    const dy = t.y - this.cy;
+    const d = Math.hypot(dx, dy);
+    if (d < 0.85 || d > 6) return;
+    const pull = Math.min(0.16, d - 0.7);
+    const nx = this.cx + (dx / d) * pull;
+    const ny = this.cy + (dy / d) * pull;
+    if (!this.driveLaneWalkable(nx, ny)) return;
+    this.cx = nx;
+    this.cy = ny;
   }
 
   /** How far the remaining polyline stays on `dir`'s axis before the next corner. */
@@ -1970,6 +2027,22 @@ export class JacT9 {
     const here = k(Math.round(this.cx), Math.round(this.cy));
     const sameCell = this.lastStuckCell === here;
     this.lastStuckCell = here;
+    if (this.followLoose) {
+      const origin = this.laneOrigin();
+      const pass = (x: number, y: number) => this.driveLaneWalkable(x, y) || (x === origin.x && y === origin.y);
+      const rest =
+        this.axisDrivePath(origin.x, origin.y, this.driveGoal.x, this.driveGoal.y, pass) ??
+        this.driveBfsMany(origin.x, origin.y, new Set([k(this.driveGoal.x, this.driveGoal.y)])).get(
+          k(this.driveGoal.x, this.driveGoal.y),
+        );
+      if (rest && rest.length > 0) {
+        this.drivePath = rest;
+        this.applyPathGear(false);
+        this.stuckT = 0;
+        return true;
+      }
+      return false;
+    }
     if (!sameCell && this.replanN < 2) {
       const path = this.findDrivePath(this.driveGoal.x, this.driveGoal.y);
       if (path && path.length > 0 && !this.pathStartsBlocked(path)) {

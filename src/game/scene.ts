@@ -426,6 +426,8 @@ export class IsoScene {
   private tileByCell = new Map<string, { g: Sprite; tx: number; ty: number }>();
   private readonly tileHit = new Polygon(TILE_DIAMOND);
   private tilesBackfilled = false;
+  private skipTileCullFrames = 0;
+  private townBake: Sprite | null = null;
   private pointerGestureSerial = 0;
   private pixiTapGestureSerial = -1;
   private firstPointerDownAt = 0;
@@ -798,7 +800,7 @@ export class IsoScene {
     };
   }
 
-  private ensureTile(tx: number, ty: number): Sprite | null {
+  private ensureTile(tx: number, ty: number, attach = true): Sprite | null {
     const id = `${tx},${ty}`;
     const existing = this.tileByCell.get(id);
     if (existing) return existing.g;
@@ -813,26 +815,9 @@ export class IsoScene {
     const a = spriteAsset(key);
     g.position.set(foot.x - a.vfs.x, foot.y - a.vfs.y);
     g.hitArea = this.tileHit;
-    g.eventMode = 'static';
+    g.eventMode = 'none';
     g.cursor = cell.walkable ? 'pointer' : 'default';
-    g.on('pointertap', (e) => {
-      if (this.shouldBlockTap()) return;
-      this.pixiTapGestureSerial = this.pointerGestureSerial;
-      if (this.jac?.driving) {
-        const local = this.federatedToCanvas(e);
-        if (!local) return;
-        this.handleScreenTap(local.x, local.y, false);
-        return;
-      }
-      if (this.claimJacTap(e)) {
-        this.tapJac();
-        return;
-      }
-      if (!this.prepareMapTap(undefined, tx, ty)) return;
-      const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
-      this.requestWalk(tx, ty, sprint);
-    });
-    this.tilesLayer.addChild(g);
+    if (attach) this.tilesLayer.addChild(g);
     const entry = { g, tx, ty };
     this.tileByCell.set(id, entry);
     this.tileCullEntries.push(entry);
@@ -855,7 +840,7 @@ export class IsoScene {
 
   private ensureAllTiles(): void {
     for (let ty = 0; ty < MAP_HEIGHT; ty++) {
-      for (let tx = 0; tx < MAP_WIDTH; tx++) this.ensureTile(tx, ty);
+      for (let tx = 0; tx < MAP_WIDTH; tx++) this.ensureTile(tx, ty, false);
     }
     this.tilesBackfilled = true;
   }
@@ -904,7 +889,7 @@ export class IsoScene {
       const y0 = Math.max(0, b.door.y - 12);
       const y1 = Math.min(MAP_HEIGHT - 1, b.door.y + 12);
       for (let y = y0; y <= y1; y++) {
-        for (let x = x0; x <= x1; x++) this.ensureTile(x, y);
+        for (let x = x0; x <= x1; x++) this.ensureTile(x, y, false);
       }
     }
   }
@@ -928,12 +913,60 @@ export class IsoScene {
     for (const v of this.objectVisuals.values()) upload(v.sprite.texture);
   }
 
+  /** Flatten the 64×64 tile field once so a 0.28 door tap does not render ~2400 sprites. */
+  private bakeTownTiles(): void {
+    if (this.townBake || !this.app || this.tileCullEntries.length === 0) return;
+    for (const { g } of this.tileCullEntries) {
+      g.visible = true;
+      if (!g.parent) this.tilesLayer.addChild(g);
+    }
+    const b = mapWorldBounds();
+    const width = Math.max(1, b.maxX - b.minX);
+    const height = Math.max(1, b.maxY - b.minY);
+    const scale = Math.min(1, 2048 / width, 2048 / height);
+    const tw = Math.max(2, Math.ceil(width * scale));
+    const th = Math.max(2, Math.ceil(height * scale));
+    const px = this.tilesLayer.position.x;
+    const py = this.tilesLayer.position.y;
+    const sx = this.tilesLayer.scale.x;
+    const sy = this.tilesLayer.scale.y;
+    this.tilesLayer.position.set(-b.minX * scale, -b.minY * scale);
+    this.tilesLayer.scale.set(scale);
+    const rt = RenderTexture.create({ width: tw, height: th });
+    try {
+      this.app.renderer.render({ container: this.tilesLayer, target: rt, clear: true });
+    } catch {
+      /* bake skip */
+    }
+    this.tilesLayer.position.set(px, py);
+    this.tilesLayer.scale.set(sx, sy);
+    for (const { g } of this.tileCullEntries) {
+      g.visible = false;
+      if (g.parent) g.parent.removeChild(g);
+    }
+    const spr = new Sprite(rt);
+    spr.position.set(b.minX, b.minY);
+    spr.scale.set(1 / scale);
+    spr.eventMode = 'none';
+    spr.label = 'town-bake';
+    this.tilesLayer.addChild(spr);
+    this.townBake = spr;
+    try {
+      this.app.renderer.texture.initSource(rt.source);
+    } catch {
+      /* already on the GPU */
+    }
+  }
+
   /** Finish tile sprites + GPU upload so a door tap does not pay first-frame create/upload. */
   private flushTownWarm(): void {
     this.ensureAllTiles();
     this.prewarmDoorNeighborhoods();
     this.syncObjectSprites(true);
     this.uploadTownGpu();
+    this.bakeTownTiles();
+    this.lastTileCullKey = '';
+    this.cullVisibleTiles();
     this.app.render();
   }
 
@@ -945,12 +978,17 @@ export class IsoScene {
       this.frameBuildingDoorForQa(b.name);
       this.zoom = 0.28;
       this.applyCamera(false);
+      this.lastTileCullKey = '';
+      this.cullVisibleTiles();
+      this.uploadTownGpu();
       this.app.render();
     }
     this.cameraX = saved.x;
     this.cameraY = saved.y;
     this.zoom = saved.zoom;
     this.applyCamera(false);
+    this.lastTileCullKey = '';
+    this.cullVisibleTiles();
   }
 
   private queueTileBackfill(): void {
@@ -1910,6 +1948,7 @@ export class IsoScene {
     }
     this.qaLastDriveTap = { x: dest.x, y: dest.y };
     this.qaPointerDriveAccepts += 1;
+    this.skipTileCullFrames = 4;
     this.jac.setDrivePath(path, dest, { loose: true });
     this.fireMoveCommand();
     return true;
@@ -2257,7 +2296,7 @@ export class IsoScene {
       this.events.onChecklist('move-camera');
       this.panDragScreenPx = 0;
     }
-    this.syncObjectSprites();
+    if (this.skipTileCullFrames <= 0) this.syncObjectSprites();
     this.cullVisibleTiles();
   }
 
@@ -2273,29 +2312,55 @@ export class IsoScene {
     this.npcs?.cull({ minX, maxX, minY, maxY }, !!iso || this.interiorActive);
     this.fillActors?.cull({ minX, maxX, minY, maxY }, !!iso || this.interiorActive);
     const cullKey = `${minX | 0},${maxX | 0},${minY | 0},${maxY | 0},${iso ? 1 : 0},${this.interiorActive ? 1 : 0}`;
-    const skipTiles = this.tilesBackfilled && cullKey === this.lastTileCullKey;
-    this.lastTileCullKey = cullKey;
-    if (!skipTiles) {
-    for (const { g, tx, ty } of this.tileCullEntries) {
-      if (iso) {
-        g.visible = iso.has(`tile:${tx},${ty}`);
-        continue;
+    const skipWarm = this.tilesBackfilled && this.skipTileCullFrames > 0;
+    if (this.skipTileCullFrames > 0) this.skipTileCullFrames -= 1;
+    const useBake = !!this.townBake && this.zoom <= 0.45 && !iso && !this.interiorActive;
+    if (this.townBake) this.townBake.visible = useBake;
+    if (useBake && this.tilesLayer.children.length > 1) {
+      for (const { g } of this.tileCullEntries) {
+        g.visible = false;
+        if (g.parent) g.parent.removeChild(g);
       }
-      const foot = tileFootWorld(tx, ty);
-      g.visible =
-        foot.x >= minX - TILE_W &&
-        foot.x <= maxX + TILE_W &&
-        foot.y >= minY - TILE_H &&
-        foot.y <= maxY + TILE_H;
     }
+    const skipTiles =
+      useBake || skipWarm || (this.tilesBackfilled && cullKey === this.lastTileCullKey);
+    if (!skipTiles) this.lastTileCullKey = cullKey;
+    if (!skipTiles) {
+      for (const { g, tx, ty } of this.tileCullEntries) {
+        if (iso) {
+          const vis = iso.has(`tile:${tx},${ty}`);
+          g.visible = vis;
+          if (vis) {
+            if (!g.parent) this.tilesLayer.addChild(g);
+          } else if (g.parent) {
+            g.parent.removeChild(g);
+          }
+          continue;
+        }
+        const foot = tileFootWorld(tx, ty);
+        const vis =
+          foot.x >= minX - TILE_W &&
+          foot.x <= maxX + TILE_W &&
+          foot.y >= minY - TILE_H &&
+          foot.y <= maxY + TILE_H;
+        g.visible = vis;
+        if (vis) {
+          if (!g.parent) this.tilesLayer.addChild(g);
+        } else if (g.parent) {
+          g.parent.removeChild(g);
+        }
+      }
     }
-    for (const v of this.objectVisuals.values()) {
-      const g = this.objectGraphics.get(v.obj.id);
-      if (!g) continue;
-      const c = v.cull;
-      g.visible = iso
-        ? iso.has(v.obj.id)
-        : c.x1 >= minX && c.x0 <= maxX && c.y1 >= minY && c.y0 <= maxY;
+    if (!skipWarm) {
+      for (const v of this.objectVisuals.values()) {
+        const g = this.objectGraphics.get(v.obj.id);
+        if (!g) continue;
+        const c = v.cull;
+        const vis = iso
+          ? iso.has(v.obj.id)
+          : c.x1 >= minX && c.x0 <= maxX && c.y1 >= minY && c.y0 <= maxY;
+        g.visible = vis;
+      }
     }
   }
 
@@ -3233,7 +3298,7 @@ export class IsoScene {
     this.updateMovement();
     this.updateAvatars(Math.min(0.25, this.app.ticker.elapsedMS / 1000));
     this.updateCameraFollow();
-    if (!this.interiorActive) {
+    if (!this.interiorActive && this.skipTileCullFrames <= 0) {
       const dt = Math.min(0.25, this.app.ticker.elapsedMS / 1000);
       this.npcs.update(dt);
       this.fillActors?.update(dt);
@@ -3487,7 +3552,7 @@ export class IsoScene {
   private moveCommandArmed = true;
 
   private updateMovement(): void {
-    this.syncObjectSprites();
+    if (this.skipTileCullFrames <= 0) this.syncObjectSprites();
     if (this.doorCooldown > 0) {
       this.doorCooldown -= this.app.ticker.deltaMS;
     }
@@ -4383,7 +4448,7 @@ export class IsoScene {
       traveled,
       pathN: this.jac.drivePath.length,
     });
-    if (this.jac.mph < 0.8 && distSit > 2.5) {
+    if (this.jac.mph < 0.8 && distSit > 2.5 && pathLeft === 0) {
       this.jac.unstickIfStopped();
     }
     if (idle && this.jac.mph < 1.2) {
@@ -4537,6 +4602,15 @@ export class IsoScene {
 
   qaJacCanSit(cx: number, cy: number): boolean {
     return this.jac?.canDriveAt(cx, cy) ?? false;
+  }
+
+  qaTownWarmStats(): { tiles: number; objects: number; fills: number; bake: boolean } {
+    return {
+      tiles: this.tilesLayer.children.length,
+      objects: this.objectsLayer.children.length,
+      fills: this.fillActors?.snapshot().length ?? 0,
+      bake: !!this.townBake?.visible,
+    };
   }
 
   qaParkForDoor(doorX: number, doorY: number): {

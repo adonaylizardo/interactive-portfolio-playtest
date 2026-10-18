@@ -344,6 +344,7 @@ async function main(): Promise<void> {
     jacOverlapsProp: () => scene.qaJacOverlapsProp(),
     jacCanSit: (cx: number, cy: number) => scene.qaJacCanSit(cx, cy),
     parkForDoor: (x: number, y: number) => scene.qaParkForDoor(x, y),
+    townWarmStats: () => scene.qaTownWarmStats(),
     inputReady: () => scene.qaInputReady(),
     parkedFootprint: () => scene.qaParkedFootprint(),
     jacStick: (vec: { x: number; y: number } | null) => scene.qaJacStick(vec),
