@@ -737,7 +737,12 @@ export class JacT9 {
     const origin = k(originCell.x, originCell.y);
     const cacheKey = `${origin}>${doorX},${doorY}`;
     const cached = this.doorRouteCache.get(cacheKey);
-    if (cached && !this.skippedSits.has(k(cached.x, cached.y)) && this.sitCellHoldable(cached.x, cached.y)) {
+    if (
+      cached &&
+      !this.skippedSits.has(k(cached.x, cached.y)) &&
+      this.sitCellHoldable(cached.x, cached.y) &&
+      Math.hypot(cached.x - originCell.x, cached.y - originCell.y) > 3.2
+    ) {
       this.lastParkMs = performance.now() - t0;
       this.lastParkHeading = cached.heading;
       return { ...cached, path: cached.path.slice() };
@@ -766,7 +771,7 @@ export class JacT9 {
       (c) => !this.skippedSits.has(k(c.x, c.y)) && this.sitCellHoldable(c.x, c.y),
     );
     const doorSide = usable.filter(
-      (c) => c.along >= 0 && Math.hypot(c.x - sx, c.y - sy) > 2.4,
+      (c) => c.along >= 0 && Math.hypot(c.x - sx, c.y - sy) > 3.2,
     );
     const closeEnough = doorSide.filter((c) => Math.hypot(c.x - doorX, c.y - doorY) <= 8);
     const front = closeEnough.filter((c) => c.along >= 1 && c.doorD >= 3 && c.doorD <= 6);
