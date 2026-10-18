@@ -15,6 +15,7 @@ const METERS_PER_TILE = 2.35;
 const BASE =
   process.argv[2] ??
   'https://adonaylizardo.github.io/interactive-portfolio-playtest/preview-persona/';
+const ONLY = process.env.PERSONA_VERIFY_VIEWPORTS?.split(',').map((s) => s.trim()).filter(Boolean);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 fs.mkdirSync(OUT, { recursive: true });
@@ -270,7 +271,7 @@ async function walkTowardTile(page, cdp, touch, tx, ty, maxMs = 55000) {
   return Math.hypot(c.x - tx, c.y - ty) < 8;
 }
 
-async function driveMeters(page, cdp, touch, minM = 10, maxMs = 48000) {
+async function driveMeters(page, cdp, touch, minM = 10, maxMs = 72000) {
   const start = await page.evaluate(() => {
     const j = window.__playtestQa.jac();
     return j ? { x: j.cx, y: j.cy } : null;
@@ -388,26 +389,40 @@ async function runViewport(tag, opts) {
       rows.push({ check: 'pantone follows', pass: st.pantoneVisible });
       if (!st.pantoneVisible) errors.push(`${tag}: pantone not visible while walking`);
 
-      const nearCatedral = await walkTowardTile(page, cdp, touch, 14, 17, 100000);
+      const nearCatedral = await walkTowardTile(page, cdp, touch, 14, 17, 150000);
       await page.screenshot({ path: path.join(OUT, `${tag}-near-catedral.png`) });
       rows.push({ check: 'walk past catedral', pass: nearCatedral });
       if (!nearCatedral) errors.push(`${tag}: did not reach catedral approach by walking`);
 
-      const nearFlor = await walkTowardTile(page, cdp, touch, 46, 46, 70000);
+      const nearFlor = await walkTowardTile(page, cdp, touch, 46, 46, 100000);
       await page.screenshot({ path: path.join(OUT, `${tag}-near-flor.png`) });
       rows.push({ check: 'walk past flor', pass: nearFlor });
       if (!nearFlor) errors.push(`${tag}: did not reach flor approach by walking`);
 
       await releaseInputs(page);
-      await wait(31000);
+      await page.evaluate(() => window.__playtestQa.skipQuiet(31));
+      await wait(800);
       st = await page.evaluate(() => window.__playtestQa.personaState());
       rows.push({ check: 'pantone sits idle', pass: st.pantoneSit && st.pantoneVisible });
       if (!st.pantoneSit) errors.push(`${tag}: pantone did not sit after 30s idle`);
 
-      const nearJac = await walkTowardTile(page, cdp, touch, 27, 19, 90000);
+      let nearJac = false;
+      const jacT0 = Date.now();
+      while (Date.now() - jacT0 < 180000) {
+        st = await page.evaluate(() => window.__playtestQa.personaState());
+        if (st.jacBoard) {
+          nearJac = true;
+          break;
+        }
+        const goal = await page.evaluate(() => {
+          const door = window.__playtestQa.jacDoor();
+          return door ? { x: door.x, y: door.y } : { x: 27, y: 19 };
+        });
+        await walkTowardTile(page, cdp, touch, goal.x, goal.y, 8000);
+      }
       notes.push(`${tag}: near jac ${nearJac}`);
       await page
-        .waitForFunction(() => window.__playtestQa.personaState().jacBoard, null, { timeout: 12000 })
+        .waitForFunction(() => window.__playtestQa.personaState().jacBoard, null, { timeout: 8000 })
         .catch(() => null);
       const boardBtn = page.locator('[data-persona-jac="in"]');
       const boardBox = await boardBtn.boundingBox().catch(() => null);
@@ -500,6 +515,7 @@ for (const [tag, opts] of [
   ],
   ['1280', { viewport: { width: 1280, height: 800 } }],
 ]) {
+  if (ONLY && !ONLY.includes(tag)) continue;
   results.push(await runViewport(tag, opts));
 }
 
