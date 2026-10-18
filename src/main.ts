@@ -156,10 +156,10 @@ async function main(): Promise<void> {
         const snap = scene.jacSnapshot();
         const anchors = scene.jacHudAnchors();
         jacHud.update(snap, anchors, anchors.rear);
-        if (!personaActive) labels.setHidden(false);
+        if (!personaActive && !sheetOpen) labels.setHidden(false);
       } else {
         jacHud.park();
-        if (!personaActive) labels.setHidden(false);
+        if (!personaActive && !sheetOpen) labels.setHidden(false);
       }
       const ps = scene.qaPersonaState();
       personaJacBoard.sync({

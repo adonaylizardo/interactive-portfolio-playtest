@@ -474,6 +474,16 @@ body[data-interior='1'] .chrome__column {
   line-height: 24px;
 }
 
+.chrome__case-teaser {
+  font-size: 13px;
+  line-height: 18px;
+  color: #8a8f98;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .chrome__tab {
   display: none;
   position: absolute;

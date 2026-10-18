@@ -1707,14 +1707,17 @@ export class IsoScene {
     this.restoreBillboards();
     this.viewMode = mode;
     this.leaveMapOverview();
-    this.syncViewTransform();
+    if (mode === 'persona') {
+      this.syncPersonaCamFromFacing();
+    } else {
+      this.syncViewTransform();
+    }
     if (mode === 'persona') {
       this.personaIdleSec = 0;
       this.cenitalVanScreen.clear();
       this.cenitalVanScreen.visible = false;
       this.altViewLayer.clear();
       this.altJacLayer.clear();
-      this.syncPersonaCamFromFacing();
       if (!this.personaSpawnFramed) {
         this.personaSpawnFramed = true;
       }
@@ -1754,6 +1757,7 @@ export class IsoScene {
         if (this.qaPersonaPresentationReady()) break;
         await new Promise<void>((r) => setTimeout(r, 50));
       }
+      this.syncPersonaCamFromFacing();
       this.applyCamera(true);
       return;
     }
@@ -4221,16 +4225,42 @@ export class IsoScene {
   }
 
   private notePersonaChaseHeading(stepDx: number, stepDy: number): void {
-    if (!personaEnabled() || this.interiorActive) return;
+    if (!personaEnabled() || this.interiorActive || this.personaOn()) return;
     if (stepDx === 0 && stepDy === 0) return;
     this.personaChaseHeadingRad = Math.atan2(stepDx, stepDy);
-    if (this.personaOn()) this.personaCamYaw = this.personaChaseHeadingRad;
+  }
+
+  /** Cenital tap-walk: keep chase heading aligned with path velocity (not only tile snaps). */
+  private syncPersonaChaseHeadingFromPath(): void {
+    if (!personaEnabled() || this.interiorActive || this.personaOn() || this.path.length === 0) return;
+    const target = this.path[0];
+    const dx = target.x - this.charTx;
+    const dy = target.y - this.charTy;
+    if (Math.hypot(dx, dy) < 1e-4) return;
+    this.personaChaseHeadingRad = Math.atan2(dx, dy);
+  }
+
+  /** Smooth third-person yaw while auto-walking on a path (no tile-step snaps). */
+  private syncPersonaPathCameraYaw(): void {
+    if (!this.personaOn() || this.path.length === 0) return;
+    const target = this.path[0];
+    const dx = target.x - this.charTx;
+    const dy = target.y - this.charTy;
+    if (Math.hypot(dx, dy) < 1e-4) return;
+    const targetYaw = Math.atan2(dx, dy);
+    const dt = Math.min(0.1, this.app.ticker.deltaMS / 1000);
+    let diff = targetYaw - this.personaCamYaw;
+    while (diff > Math.PI) diff -= 2 * Math.PI;
+    while (diff < -Math.PI) diff += 2 * Math.PI;
+    const step = Math.min(Math.abs(diff), dt * 2.75) * Math.sign(diff);
+    this.personaCamYaw += step;
+    this.personaChaseHeadingRad = this.personaCamYaw;
+    this.syncViewTransform();
   }
 
   /** Third-person chase yaw from last movement heading (camera behind Adonay). */
   private syncPersonaCamFromFacing(): void {
     if (!personaEnabled()) return;
-    if (this.path.length > 0) return;
     if (this.personaChaseHeadingRad != null) {
       this.personaCamYaw = this.personaChaseHeadingRad;
     } else {
@@ -4441,6 +4471,8 @@ export class IsoScene {
       this.moveCommandArmed = true;
     }
 
+    this.syncPersonaChaseHeadingFromPath();
+
     if (this.path.length > 0) {
       // Distance left over at a path node carries on toward the next one (steady speed at any fps).
       let step = walkStepWorld(this.sprint || this.personaOn(), this.app.ticker.deltaMS);
@@ -4482,6 +4514,7 @@ export class IsoScene {
           if (this.pendingBench) this.arriveAtBench();
         }
       }
+      this.syncPersonaPathCameraYaw();
       this.syncCharacterGraphic();
     }
 

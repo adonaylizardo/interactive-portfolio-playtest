@@ -4,6 +4,7 @@ import { tileToWorld } from '../iso/math';
 import { isMobileLayout } from '../checklist/ui';
 import { iconSvg, type IconName } from './icons';
 import type { Camera } from '../tokens';
+import { casePreviewCopy, isCaseHouse } from '../data/cases';
 import { personaEnabled } from '../game/persona/personaSpec';
 import { getLang, onLangChange, setLang, t, type Lang } from './i18n';
 import { showToast } from './toast';
@@ -181,7 +182,7 @@ export class ChromeUI {
         <span class="chrome__case-thumb">${iconSvg('map')}${row.nda ? '<span class="chrome__nda">NDA</span>' : ''}</span>
         <span class="chrome__case-copy">
           <span class="chrome__case-title">${row.label}</span>
-          <span class="chrome__skeleton-stack"><span class="chrome__skeleton"></span><span class="chrome__skeleton chrome__skeleton--short"></span></span>
+          <span class="chrome__case-teaser" data-case-teaser="${row.id}"></span>
         </span>
       </button>`;
     }).join('');
@@ -540,6 +541,12 @@ export class ChromeUI {
     this.root.querySelectorAll('[data-action]').forEach((el) => {
       const key = ariaByAction[(el as HTMLElement).dataset.action ?? ''];
       if (key) el.setAttribute('aria-label', t(key));
+    });
+    this.root.querySelectorAll('[data-case-teaser]').forEach((el) => {
+      const id = (el as HTMLElement).dataset.caseTeaser;
+      if (!id || !isCaseHouse(id)) return;
+      const copy = casePreviewCopy(id, this.lang);
+      (el as HTMLElement).textContent = copy?.teaser ?? '';
     });
   }
 
