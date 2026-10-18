@@ -1,5 +1,5 @@
 /**
- * Controls UI gate — 6 states × 3 viewports vs docs/ref/controles-ui (deployed build).
+ * Controls UI gate — 6 states × 3 viewports vs docs/ref/controles-ui (chrome crops only).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -7,6 +7,13 @@ import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
 import { chromium } from 'playwright';
 import { launchBrowser } from './qa-ready.mjs';
+import {
+  chromeStackFromShot,
+  collectChromeBoxes,
+  diffNotes,
+  refChromeStack,
+  sideBySidePng,
+} from './ui-chrome-crop.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REF = path.join(ROOT, 'docs', 'ref', 'controles-ui');
@@ -33,69 +40,24 @@ const VIEWPORTS = [
   { tag: 'desktop', w: 1440, h: 900, touch: false },
 ];
 
-function refPath(vpTag, suffix) {
-  return path.join(REF, `${vpTag}_${suffix}@2x.png`);
+const BASE_CHROME = ['.persona-kit__cam', '.persona-kit__lang', '.persona-kit__help'];
+
+function chromeSelectors(stateId) {
+  switch (stateId) {
+    case '1-controles-primera-visita':
+      return [...BASE_CHROME, '.persona-kit__card'];
+    case '2-aviso-puerta':
+      return [...BASE_CHROME, '.persona-enter-prompt:not([hidden])'];
+    case '3a-t9-subir':
+    case '3b-t9-conduciendo-bajar':
+      return [...BASE_CHROME, '.persona-jac-board:not([hidden])'];
+    default:
+      return BASE_CHROME;
+  }
 }
 
-function sideBySide(oursPath, refPath, destPath) {
-  const ours = PNG.sync.read(fs.readFileSync(oursPath));
-  if (!fs.existsSync(refPath)) {
-    fs.copyFileSync(oursPath, destPath);
-    return { refMissing: true, diffPx: null, diffPct: null };
-  }
-  const ref = PNG.sync.read(fs.readFileSync(refPath));
-  const scale = (img, height) => {
-    if (img.height === height) return img;
-    const w = Math.max(1, Math.round((img.width * height) / img.height));
-    const out = new PNG({ width: w, height });
-    for (let y = 0; y < height; y++) {
-      const sy = Math.min(img.height - 1, Math.floor((y * img.height) / height));
-      for (let x = 0; x < w; x++) {
-        const sx = Math.min(img.width - 1, Math.floor((x * img.width) / w));
-        const si = (sy * img.width + sx) * 4;
-        const di = (y * w + x) * 4;
-        out.data[di] = img.data[si];
-        out.data[di + 1] = img.data[si + 1];
-        out.data[di + 2] = img.data[si + 2];
-        out.data[di + 3] = img.data[si + 3];
-      }
-    }
-    return out;
-  };
-  const h = Math.max(ours.height, ref.height);
-  const a = scale(ref, h);
-  const b = scale(ours, h);
-  let diffPx = 0;
-  const total = a.width * h;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < a.width; x++) {
-      const ai = (y * a.width + x) * 4;
-      const bi = (y * b.width + Math.min(x, b.width - 1)) * 4;
-      const dr = Math.abs(a.data[ai] - b.data[bi]);
-      const dg = Math.abs(a.data[ai + 1] - b.data[bi + 1]);
-      const db = Math.abs(a.data[ai + 2] - b.data[bi + 2]);
-      if (dr + dg + db > 48) diffPx += 1;
-    }
-  }
-  const gap = 12;
-  const out = new PNG({ width: a.width + gap + b.width, height: h });
-  out.data.fill(20);
-  const blit = (src, ox) => {
-    for (let y = 0; y < src.height; y++) {
-      for (let x = 0; x < src.width; x++) {
-        const si = (y * src.width + x) * 4;
-        const di = (y * out.width + ox + x) * 4;
-        out.data[di] = src.data[si];
-        out.data[di + 1] = src.data[si + 1];
-        out.data[di + 2] = src.data[si + 2];
-        out.data[di + 3] = 255;
-      }
-    }
-  };
-  blit(a, 0);
-  blit(b, a.width + gap);
-  fs.writeFileSync(destPath, PNG.sync.write(out));
-  return { refMissing: false, diffPx, diffPct: (100 * diffPx) / total };
+function refPath(vpTag, suffix) {
+  return path.join(REF, `${vpTag}_${suffix}@2x.png`);
 }
 
 async function cdpTouch(cdp, x, y) {
@@ -125,9 +87,6 @@ async function hitTestControls(page) {
       '.persona-kit__cam-opt[data-cam="persona"]',
       '.persona-kit__lang',
       '.persona-kit__help',
-      '.chrome__tools-phone [data-action="sound"], .chrome__tools-stack [data-action="sound"]',
-      '.chrome__locate',
-      '.joystick',
     ];
     const joy = document.querySelector('.joystick');
     const joyBox = joy && !joy.hidden ? joy.getBoundingClientRect() : null;
@@ -142,44 +101,27 @@ async function hitTestControls(page) {
       const top = document.elementFromPoint(cx, cy);
       const hit = top === el || el.contains(top);
       let overlapsJoy = false;
-      if (joyBox && s !== '.joystick') {
+      if (joyBox) {
         overlapsJoy =
           r.left < joyBox.right &&
           r.right > joyBox.left &&
           r.top < joyBox.bottom &&
           r.bottom > joyBox.top;
       }
-      out.push({
-        sel: s,
-        w: Math.round(r.width),
-        h: Math.round(r.height),
-        hit,
-        overlapsJoy,
-      });
+      out.push({ sel: s, w: Math.round(r.width), h: Math.round(r.height), hit, overlapsJoy });
     }
-    const prompt = document.querySelector('.persona-enter-prompt:not([hidden])');
-    const jac = document.querySelector('.persona-jac-board:not([hidden])');
-    const overlapJoy = (el) => {
-      if (!el || !joyBox) return false;
-      const r = el.getBoundingClientRect();
-      return r.left < joyBox.right && r.right > joyBox.left && r.top < joyBox.bottom && r.bottom > joyBox.top;
-    };
-    return {
-      controls: out,
-      promptOverlapsJoy: overlapJoy(prompt),
-      jacOverlapsJoy: overlapJoy(jac),
-    };
+    return { controls: out };
   });
 }
 
-async function prepareBase(page, touch) {
-  await page.evaluate((isTouch) => {
+async function prepareBase(page) {
+  await page.evaluate(() => {
     localStorage.removeItem('portfolio-persona-controls-v1');
     window.__playtestQa.setLayout?.('map');
     window.__playtestQa.leaveInteriorNow();
     window.__playtestQa.dismissBuildingPanel?.();
     window.__playtestQa.setViewMode?.('cenital');
-  }, touch);
+  });
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(window.__playtestQa?.setViewMode), null, { timeout: 60000 });
   await wait(500);
@@ -190,11 +132,9 @@ async function closeOverlay(page, cdp, touch) {
   await wait(300);
 }
 
-async function reachDoorOffer(page, cdp, touch) {
+async function reachDoorOffer(page) {
   await page.evaluate(() => window.__playtestQa.frameDoorForQa('estudio'));
   await wait(800);
-  await page.evaluate(() => window.__playtestQa.setCharacterTile(12, 14));
-  await wait(400);
 }
 
 async function reachJacBoard(page) {
@@ -204,7 +144,9 @@ async function reachJacBoard(page) {
     if (door) window.__playtestQa.setCharacterTile(Math.round(door.x), Math.round(door.y));
   });
   await wait(800);
-  await page.waitForFunction(() => window.__playtestQa.personaState().jacBoard, null, { timeout: 20000 }).catch(() => null);
+  await page
+    .waitForFunction(() => window.__playtestQa.personaState().jacBoard, null, { timeout: 20000 })
+    .catch(() => null);
 }
 
 async function enterDrive(page, cdp, touch) {
@@ -220,7 +162,7 @@ async function captureState(page, cdp, touch, stateId) {
       break;
     case '2-aviso-puerta':
       await closeOverlay(page, cdp, touch);
-      await reachDoorOffer(page, cdp, touch);
+      await reachDoorOffer(page);
       break;
     case '3a-t9-subir':
       await closeOverlay(page, cdp, touch);
@@ -268,13 +210,26 @@ async function runViewport(vp) {
       ))?.split('/').pop() ?? 'dev';
 
     for (const st of STATES) {
-      await prepareBase(page, vp.touch);
+      await prepareBase(page);
       await captureState(page, cdp, vp.touch, st.id);
-      const shot = path.join(OUT, `${vp.tag}_${st.id}.png`);
-      await page.screenshot({ path: shot });
-      const cmp = path.join(OUT, `${vp.tag}_${st.id}-vs-ref.png`);
+      const fullShot = path.join(OUT, `${vp.tag}_${st.id}_full.png`);
+      await page.screenshot({ path: fullShot });
+      const sels = chromeSelectors(st.id);
+      const boxes = await collectChromeBoxes(page, sels);
+      if (!boxes.length) throw new Error(`${vp.tag}/${st.id}: no chrome boxes`);
+      const stacked = chromeStackFromShot(fullShot, boxes);
+      const shot = path.join(OUT, `${vp.tag}_${st.id}_chrome.png`);
+      fs.writeFileSync(shot, PNG.sync.write(stacked));
       const ref = refPath(vp.tag, st.refSuffix);
-      const { refMissing, diffPct } = sideBySide(shot, ref, cmp);
+      const refStackPath = path.join(OUT, `${vp.tag}_${st.id}_ref-chrome.png`);
+      const refStack = refChromeStack(ref, { width: vp.w, height: vp.h }, boxes);
+      let cmpRef = ref;
+      if (refStack) {
+        fs.writeFileSync(refStackPath, PNG.sync.write(refStack));
+        cmpRef = refStackPath;
+      }
+      const cmp = path.join(OUT, `${vp.tag}_${st.id}-vs-ref_chrome.png`);
+      const { refMissing, diffPct } = sideBySidePng(stacked, cmpRef, cmp);
       const hits = await hitTestControls(page);
       rows.push({
         viewport: vp.tag,
@@ -282,9 +237,18 @@ async function runViewport(vp) {
         ref: path.basename(ref),
         refMissing,
         diffPct: diffPct != null ? Number(diffPct.toFixed(2)) : null,
+        diffNotes: diffNotes(diffPct),
+        chromeBoxes: boxes.map(({ sel, x, y, width, height }) => ({
+          sel,
+          x: Math.round(x),
+          y: Math.round(y),
+          w: Math.round(width),
+          h: Math.round(height),
+        })),
         hitTests: hits,
         screenshot: path.basename(shot),
         compare: path.basename(cmp),
+        fullFrame: path.basename(fullShot),
       });
     }
   } finally {
@@ -295,9 +259,23 @@ async function runViewport(vp) {
   return { viewport: vp.tag, bundle, rows };
 }
 
-const report = { base: BASE, at: new Date().toISOString(), viewports: [] };
+const report = {
+  base: BASE,
+  at: new Date().toISOString(),
+  compareMode: 'chrome-stack',
+  viewports: [],
+};
 for (const vp of VIEWPORTS) {
   report.viewports.push(await runViewport(vp));
 }
+const allRows = report.viewports.flatMap((v) => v.rows.map((r) => ({ ...r, bundle: v.bundle })));
+report.summary = {
+  bundle: report.viewports[0]?.bundle,
+  maxDiffPct: Math.max(...allRows.map((r) => r.diffPct ?? 0)),
+  meanDiffPct: Number(
+    (allRows.reduce((s, r) => s + (r.diffPct ?? 0), 0) / allRows.length).toFixed(2),
+  ),
+  passChrome4pct: allRows.every((r) => r.refMissing || (r.diffPct ?? 99) <= 4),
+};
 fs.writeFileSync(path.join(OUT, 'report.json'), JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));

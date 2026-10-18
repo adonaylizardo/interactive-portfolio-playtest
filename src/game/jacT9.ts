@@ -335,6 +335,8 @@ export class JacT9 {
   private pendingExit = false;
   private exitHold = 0;
   private exitSit: { x: number; y: number } | null = null;
+  /** Facing locked when the exit brake finishes — restored in parkAtExitPose. */
+  private exitFacing: { dir: FacingDir; heading: number } | null = null;
   private stuckT = 0;
   private unstickHold = 0;
   private driveHadSpeed = false;
@@ -1425,6 +1427,7 @@ export class JacT9 {
         if (this.pendingExit) {
           if (!this.exitSit) {
             this.exitSit = { x: this.cx, y: this.cy };
+            this.exitFacing = { dir: this.dir, heading: this.heading };
             this.exitHold = 0.12;
           } else {
             this.exitHold = Math.max(0, this.exitHold - dt);
@@ -1506,6 +1509,7 @@ export class JacT9 {
     this.pendingExit = true;
     this.exitHold = 0;
     this.exitSit = null;
+    this.exitFacing = null;
     this.exitFrom = { x: this.cx, y: this.cy };
     this.clearDrivePath();
     this.gearHeld = false;
@@ -1536,6 +1540,7 @@ export class JacT9 {
     this.pendingExit = false;
     this.exitHold = 0;
     this.exitSit = null;
+    this.exitFacing = null;
   }
 
   /** Park exactly where the exit brake stopped — no relayout nudge. */
@@ -1544,11 +1549,20 @@ export class JacT9 {
       this.cx = this.exitSit.x;
       this.cy = this.exitSit.y;
     }
+    if (this.exitFacing) {
+      this.dir = this.exitFacing.dir;
+      this.heading = this.exitFacing.heading;
+    }
     this.pendingExit = false;
     this.exitHold = 0;
     this.exitFrom = null;
     this.exitSit = null;
+    this.exitFacing = null;
     this.vel = 0;
+    this.engineOn = false;
+    this.gear = 'P';
+    this.rpm = 0;
+    this.mph = 0;
     this.mode = 'parked';
     this.applyParkedSolid(true);
     this.layout();

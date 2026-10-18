@@ -5110,9 +5110,6 @@ export class IsoScene {
       return;
     }
     this.pendingJacExit = false;
-    if (this.pendingDriveEnter) {
-      this.jac.faceClearOfDoor(this.pendingDriveEnter.door.x, this.pendingDriveEnter.door.y);
-    }
     this.jac.parkAtExitPose();
     const doorSpot = this.jac.driverExitStandTile();
     const spot = doorSpot ?? this.jac.driverDoorTile({ x: this.jac.cx, y: this.jac.cy }) ?? this.jac.exitTile();
