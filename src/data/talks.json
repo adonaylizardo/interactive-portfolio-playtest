@@ -2,6 +2,7 @@
   "comingSoon": false,
   "sections": [
     {
+      "titleKey": "talks.section.innova360",
       "items": [
         {
           "id": "innova360-2025",
@@ -17,7 +18,7 @@
       "items": [
         {
           "id": "yt-EBecBkHkRos",
-          "title": "Cómo construir negocios digitales en tiempos de pandemia",
+          "title": "Cómo crear negocios en tiempos de pandemia",
           "url": "https://www.youtube.com/watch?v=EBecBkHkRos",
           "date": "2020",
           "duration": "1:16:38",
@@ -43,7 +44,7 @@
     },
     {
       "id": "video-podcast",
-      "titleKey": "talks.section.videoPodcast",
+      "titleKey": "talks.section.sinergia",
       "items": [
         {
           "id": "sinergia-como-hackear-tu-motivacion",

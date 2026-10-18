@@ -133,7 +133,10 @@ async function main(): Promise<void> {
 
   const joystick = new Joystick(uiRoot);
   const labels = new NameLabels(uiRoot, { onJacInfo: () => scene.jacOpenInfo() });
-  const mapLabels = new BuildingMapLabels(uiRoot);
+  const mapLabels = new BuildingMapLabels(uiRoot, (id) => {
+    if (isReadingHash()) return;
+    scene?.walkToBuildingForQa(id);
+  });
   const jacHud = new JacHud(uiRoot, {
     onInfo: () => scene.jacOpenInfo(),
     onGetIn: () => scene.jacGetIn(),
@@ -153,6 +156,7 @@ async function main(): Promise<void> {
       joystick.setHidden(open || panel.isPreviewExpanded());
       if (panel.isPreviewExpanded()) checklist.setCollapsed(true);
       scene?.applyCameraFromUi();
+      scene?.schedulePresentationRefresh(3);
     },
     () => scene.leaveInteriorNow(),
   );

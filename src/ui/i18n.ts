@@ -88,6 +88,8 @@ const DICT = {
     'talks.upNext': 'More talks',
     'talks.comingSoon': 'Coming soon',
     'talks.section.videoPodcast': 'Video podcast',
+    'talks.section.innova360': 'Innova360',
+    'talks.section.sinergia': 'Academia Sinergia',
     'talks.openVideo': 'Open video in new tab',
 
     'read.title': 'Read',
@@ -267,6 +269,8 @@ const DICT = {
     'talks.upNext': 'Más charlas',
     'talks.comingSoon': 'Próximamente',
     'talks.section.videoPodcast': 'Video podcast',
+    'talks.section.innova360': 'Innova360',
+    'talks.section.sinergia': 'Academia Sinergia',
     'talks.openVideo': 'Abrir video en una pestaña nueva',
 
     'read.title': 'Leer',

@@ -164,6 +164,7 @@ export class BuildingPanel {
   /** Press on Salir: leave only on lift, and only if the finger stayed within ~10 px. */
   private exitPress: { x: number; y: number; drift: number } | null = null;
   private exitFromPointer = false;
+  private visibilitySyncQueued = false;
 
   constructor(
     container: HTMLElement,
@@ -252,6 +253,12 @@ export class BuildingPanel {
     `;
     container.appendChild(this.el);
     this.sheet = this.el.querySelector('.building-panel__sheet')!;
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => {
+        if (this.isOpen() && this.isMobile() && this.isInteriorMode()) this.queueVisibilitySync();
+      });
+      ro.observe(this.sheet);
+    }
     this.titleEl = this.el.querySelector('.building-panel__title')!;
     this.workedWithEl = this.el.querySelector('.worked-with')!;
     this.caseEl = this.el.querySelector('.case')!;
@@ -426,12 +433,25 @@ export class BuildingPanel {
     return window.matchMedia('(max-width: 767px)').matches;
   }
 
+  private queueVisibilitySync(): void {
+    if (this.visibilitySyncQueued) return;
+    this.visibilitySyncQueued = true;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        this.visibilitySyncQueued = false;
+        this.sheet.scrollTop = 0;
+        this.syncScrolled();
+        this.onVisibilityChange();
+      });
+    });
+  }
+
   private setPeek(peek: boolean): void {
     this.peekOnly = peek;
     this.dragStartY = 0;
     this.ignoreDragUntil = performance.now() + 400;
     this.syncPeekClass();
-    this.onVisibilityChange();
+    this.queueVisibilitySync();
   }
 
   private syncPeekClass(): void {
@@ -540,7 +560,7 @@ export class BuildingPanel {
       }
       this.renderWritingsList();
     }
-    this.onVisibilityChange();
+    this.queueVisibilitySync();
     studio.playClick();
   }
 

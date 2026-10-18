@@ -892,9 +892,17 @@ body[data-layout='panel'] .checklist {
     border-radius: 16px 16px 0 0;
     transform: none;
     overflow-y: auto;
+    padding-top: 0;
+    scroll-padding-top: 0;
   }
 
-  .building-panel--experience:not(.building-panel--peek) .exp-header {
+  .building-panel--writings.building-panel--open:not(.building-panel--peek) .building-panel__sheet {
+    padding-top: 0;
+    scroll-padding-top: 0;
+  }
+
+  .building-panel--experience:not(.building-panel--peek) .exp-header,
+  .building-panel--writings:not(.building-panel--peek) .exp-header {
     position: sticky;
     top: 0;
     z-index: 3;
@@ -1269,20 +1277,23 @@ body[data-layout='panel'] .checklist {
 .building-map-labels {
   position: fixed;
   inset: 0;
-  z-index: 12;
+  z-index: 24;
   pointer-events: none;
   overflow: hidden;
 }
 
 .building-map-label {
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   position: absolute;
-  top: 0;
-  left: 0;
-  padding: 4px 10px;
-  border-radius: 999px;
   border: 1px solid #3a3d44;
   background: rgb(11 12 14 / 88%);
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: inherit;
+  font: inherit;
+  top: 0;
+  left: 0;
   box-shadow: 0 2px 8px rgb(0 0 0 / 35%);
   white-space: nowrap;
   will-change: transform;

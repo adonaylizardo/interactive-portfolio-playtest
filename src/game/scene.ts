@@ -584,6 +584,7 @@ export class IsoScene {
     this.app.ticker.add(() => this.composeRearPass(), undefined, UPDATE_PRIORITY.NORMAL);
     this.app.ticker.add(() => this.events.onFrame?.(), undefined, UPDATE_PRIORITY.UTILITY);
     window.addEventListener('resize', () => this.onWindowViewportChange());
+    window.addEventListener('orientationchange', () => this.onWindowViewportChange());
     window.visualViewport?.addEventListener('resize', () => this.onWindowViewportChange());
     const lockViewport = () => {
       if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
@@ -2514,6 +2515,11 @@ export class IsoScene {
       this.pendingViewportApply = true;
       return;
     }
+    if (this.interiorActive) {
+      this.onViewportLayoutChange();
+      return;
+    }
+    this.syncRendererToLayout();
     this.applyCamera(false);
   }
 
@@ -2521,6 +2527,11 @@ export class IsoScene {
     if (!this.pendingViewportApply) return;
     this.pendingViewportApply = false;
     if (this.pointers.size > 0 || this.pinchGestureActive || this.gestureActive) return;
+    if (this.interiorActive) {
+      this.onViewportLayoutChange();
+      return;
+    }
+    this.syncRendererToLayout();
     this.applyCamera(false);
   }
 
@@ -3333,12 +3344,64 @@ export class IsoScene {
   /** CanvasSource textures can keep a sub-rect frame after RT passes — reset to full surface. */
   private resetCanvasTextureFrame(): void {
     if (!this.app || !this.canvasEl) return;
-    const tex = getCanvasTexture(this.canvasEl);
+    const tex = getCanvasTexture(this.canvasEl, { transparent: false });
+    const src = tex.source as { transparent?: boolean; pixelWidth?: number; pixelHeight?: number };
+    if (src) src.transparent = false;
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
     tex.frame.x = 0;
     tex.frame.y = 0;
-    tex.frame.width = this.app.screen.width;
-    tex.frame.height = this.app.screen.height;
+    tex.frame.width = sw;
+    tex.frame.height = sh;
     tex.updateUvs();
+    const orig = tex.orig;
+    orig.x = 0;
+    orig.y = 0;
+    orig.width = sw;
+    orig.height = sh;
+  }
+
+  private presentationRefreshPending = false;
+  private presentationBurst = 0;
+
+  /** After sheet peek/expand or rotation, Vulkan can present a sub-rect with alpha 0 above the sheet. */
+  schedulePresentationRefresh(burstFrames = 3): void {
+    this.presentationBurst = Math.max(this.presentationBurst, burstFrames);
+    if (this.presentationRefreshPending) return;
+    this.presentationRefreshPending = true;
+    const tick = (): void => {
+      this.refreshCanvasPresentation(true);
+      this.presentationBurst -= 1;
+      if (this.presentationBurst > 0) {
+        requestAnimationFrame(tick);
+      } else {
+        this.presentationRefreshPending = false;
+      }
+    };
+    requestAnimationFrame(() => requestAnimationFrame(tick));
+  }
+
+  refreshCanvasPresentation(clear = true): void {
+    if (!this.app || !this.canvasEl || this.readingPaused) return;
+    this.syncRendererToLayout();
+    this.restoreMainTarget(clear);
+    if (this.interiorActive) this.fitInteriorCamera();
+    this.applyCamera(false);
+    const rgba = this.opaqueBgRgba();
+    try {
+      this.app.renderer.render({
+        container: this.app.stage,
+        clear: true,
+        clearColor: rgba,
+      });
+    } catch {
+      this.app.render();
+    }
+    this.resetCanvasTextureFrame();
+  }
+
+  onViewportLayoutChange(): void {
+    this.schedulePresentationRefresh(4);
   }
 
   /** Resize GL backing store, then bind the full canvas before camera insets change. */
@@ -3998,24 +4061,17 @@ export class IsoScene {
   /** Refit camera when the interior sheet peek height changes. */
   applyCameraFromUi(): void {
     if (this.interiorActive) {
-      this.syncRendererToLayout();
-      this.fitInteriorCamera();
-      this.applyCamera(false);
-      this.restoreMainTarget(false);
-      this.app?.render();
+      this.refreshCanvasPresentation(true);
+      this.schedulePresentationRefresh(2);
       return;
     }
     this.applyCamera(false);
+    this.schedulePresentationRefresh(1);
   }
 
   /** Resume presenting the main canvas (reading pause / rear-cam can leave the ticker on a dead target). */
   ensurePresentation(): void {
-    if (!this.app) return;
-    if (this.readingPaused) return;
-    this.restoreMainTarget();
-    if (this.interiorActive) this.fitInteriorCamera();
-    this.applyCamera(false);
-    this.app.render();
+    this.refreshCanvasPresentation(true);
   }
 
   private readingPaused = false;
@@ -5107,11 +5163,21 @@ export class IsoScene {
       const cy = tl.y + asset.bbox.y0 * sc - 16;
       const s = this.worldToScreen(cx, cy);
       const onScreen = s.x > -60 && s.y > -60 && s.x < sw + 60 && s.y < sh + 60;
+      const phone = sw <= 767;
+      let clientX = (rect?.left ?? 0) + s.x;
+      let clientY = (rect?.top ?? 0) + s.y;
+      let visible = onScreen;
+      if (phone && rect && !onScreen) {
+        const halfW = 56;
+        visible = true;
+        clientX = Math.min(Math.max(clientX, rect.left + halfW + 8), rect.right - halfW - 8);
+        clientY = Math.min(Math.max(clientY, rect.top + 76), rect.bottom - 100);
+      }
       out.push({
         id,
-        x: (rect?.left ?? 0) + s.x,
-        y: (rect?.top ?? 0) + s.y,
-        visible: onScreen,
+        x: clientX,
+        y: clientY,
+        visible,
       });
     }
     return out;
