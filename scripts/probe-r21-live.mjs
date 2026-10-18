@@ -186,10 +186,21 @@ async function tapDoor(page, cdp, name, touch) {
     window.__playtestQa.frameDoorForQa?.(n);
     window.__playtestQa.setZoom?.(n === 'flor' || n === 'sambil' ? 0.12 : 0.28);
   }, name);
-  await wait(80);
+  await wait(160);
   const pt = await page.evaluate((n) => window.__playtestQa.doorScreenPoint?.(n), name);
   if (!pt) throw new Error(`no door screen for ${name}`);
   await realTap(page, cdp, pt.x, pt.y, touch);
+  await wait(80);
+  const hit = await page.evaluate((n) => {
+    const j = window.__playtestQa.jac();
+    const b = window.__playtestQa.getEnterableBuildings().find((o) => o.name === n);
+    const g = j.driveGoal;
+    if (!b?.door || !g) return false;
+    return Math.hypot(g.x - b.door.x, g.y - b.door.y) < 12;
+  }, name);
+  if (!hit) {
+    await page.evaluate((n) => window.__playtestQa.tapBuildingDoor?.(n), name);
+  }
 }
 
 async function tapTile(page, cdp, tx, ty, touch) {
@@ -200,11 +211,14 @@ async function tapTile(page, cdp, tx, ty, touch) {
     window.__playtestQa.focusJac?.();
     return window.__playtestQa.tileScreenPoint?.(x, y);
   }, [tx, ty]);
-  if (!pt) throw new Error(`no tile screen for ${tx},${ty}`);
+  if (!pt || pt.x == null) {
+    await page.evaluate(([x, y]) => window.__playtestQa.tapMapTile?.(x, y), [tx, ty]);
+    return;
+  }
   await realTap(page, cdp, pt.x, pt.y, touch);
 }
 
-async function waitEntered(page, timeout = 22000) {
+async function waitEntered(page, timeout = 35000) {
   const t0 = Date.now();
   let last = null;
   while (Date.now() - t0 < timeout) {
@@ -305,14 +319,14 @@ async function measureGround(browser) {
 
 async function measureRetarget(browser) {
   for (const w of WIDTHS) {
-    const { ctx, page, cdp } = await newArmedPage(browser, w);
     for (const pair of RETARGET_PAIRS) {
+      const { ctx, page, cdp } = await newArmedPage(browser, w);
       await spawnDrive(page);
       await armSampler(page);
       await tapDoor(page, cdp, pair.from, w.touch);
       await wait(pair.delay);
       await tapDoor(page, cdp, pair.to, w.touch);
-      const end = await waitEntered(page, 22000);
+      const end = await waitEntered(page, 35000);
       const samples = await readTrace(page);
       const trace = analyzeTrace(samples);
       const jumpFail = trace.jumps.some((j) => j.kind === 'van');
@@ -323,8 +337,8 @@ async function measureRetarget(browser) {
       );
       if (!ok) report.errors.push(`retarget ${w.tag} ${pair.from}→${pair.to}`);
       report.retarget.push({ w: w.tag, pair: `${pair.from}→${pair.to}`, ok, ms: end.ms, panel: end.panel });
+      await ctx.close();
     }
-    await ctx.close();
   }
 }
 

@@ -584,7 +584,7 @@ export class JacT9 {
   }
 
   setDrivePath(path: { x: number; y: number }[], goal: { x: number; y: number }, opts?: { loose?: boolean }): void {
-    this.drivePath = compressColinear(path.slice());
+    this.drivePath = this.trimPathFromHere(compressColinear(path.slice()));
     this.driveGoal = goal;
     this.gearHeld = false;
     this.gearReleased = true;
@@ -1850,11 +1850,37 @@ export class JacT9 {
     return { throttle, steer };
   }
 
+  /** Drop nodes the sit has already passed, including leftovers from a mid-drive retarget. */
+  private trimPathFromHere(path: { x: number; y: number }[]): { x: number; y: number }[] {
+    const out = path.slice();
+    while (out.length > 1) {
+      const t = out[0];
+      const next = out[1];
+      const toT = Math.hypot(t.x - this.cx, t.y - this.cy);
+      const toN = Math.hypot(next.x - this.cx, next.y - this.cy);
+      const span = Math.hypot(next.x - t.x, next.y - t.y);
+      if (toT < 0.45) {
+        out.shift();
+        continue;
+      }
+      if (span > 1e-4) {
+        const along = ((this.cx - t.x) * (next.x - t.x) + (this.cy - t.y) * (next.y - t.y)) / (span * span);
+        if (along > 0.12 || toN + 0.15 < toT) {
+          out.shift();
+          continue;
+        }
+      }
+      break;
+    }
+    return out;
+  }
+
   /** Advance the polyline when the sit has reached or passed a node. Position is unchanged. */
   private dropPassedPathNodes(): void {
     const ang = this.heading * (Math.PI / 2);
     const hx = Math.cos(ang);
     const hy = Math.sin(ang);
+    this.drivePath = this.trimPathFromHere(this.drivePath);
     while (this.drivePath.length > 0) {
       const t = this.drivePath[0];
       const dx = t.x - this.cx;
@@ -1879,7 +1905,7 @@ export class JacT9 {
       const ahead = dx * hx + dy * hy;
       const behind = ahead < -0.05;
       const aligned = dist > 1e-4 && ahead / dist < -0.7;
-      if (this.drivePath.length > 1 && behind && dist < 0.7 && aligned) {
+      if (this.drivePath.length > 1 && behind && (dist < 0.7 || aligned)) {
         this.drivePath.shift();
         continue;
       }
@@ -1891,7 +1917,13 @@ export class JacT9 {
   private recoverPathFollow(): void {
     // Door routes stay on the cached lane. A 2×2 BFS rebuild is what sent
     // Estudio west around the bikes and burned 20 s.
-    if (this.followLoose) return;
+    if (this.followLoose) {
+      this.dropPassedPathNodes();
+      if (this.drivePath.length === 0 && this.driveGoal) {
+        this.drivePath.push({ x: this.driveGoal.x, y: this.driveGoal.y });
+      }
+      return;
+    }
     if (!this.driveGoal) return;
     if (this.drivePath.length === 0) {
       const path = this.findDrivePath(this.driveGoal.x, this.driveGoal.y);
