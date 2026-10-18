@@ -1,7 +1,7 @@
 {
   "ok": true,
   "bundle": "index-D_hK-yhe.js",
-  "base": "http://127.0.0.1:4173/interactive-portfolio-playtest/preview-camaras/",
+  "base": "https://adonaylizardo.github.io/interactive-portfolio-playtest/preview-camaras/",
   "results": [
     {
       "tag": "390",
@@ -14,15 +14,15 @@
         "390: drive down net=14.00 path=14.00 ratio=1.00 maxErr=0.0°",
         "390: drive right net=17.00 path=17.00 ratio=1.00 maxErr=0.0°",
         "390: drive left net=22.00 path=22.00 ratio=1.00 maxErr=0.0°",
-        "390: drive up net=21.93 path=21.93 ratio=1.00 maxErr=0.0°"
+        "390: drive up net=21.99 path=21.99 ratio=1.00 maxErr=0.0°"
       ],
       "bundle": "index-D_hK-yhe.js",
       "driveMetrics": [
         {
           "dir": "down",
           "expected": 0,
-          "path": 13.999993028888824,
-          "net": 13.999993028888824,
+          "path": 13.999997573333275,
+          "net": 13.999997573333275,
           "ratio": 1,
           "maxErr": 0,
           "meanErr": 0
@@ -30,26 +30,26 @@
         {
           "dir": "right",
           "expected": 3,
-          "path": 16.999985168888816,
-          "net": 16.999985168888816,
-          "ratio": 1,
+          "path": 16.99940633333332,
+          "net": 16.999406333333315,
+          "ratio": 0.9999999999999998,
           "maxErr": 0,
           "meanErr": 0
         },
         {
           "dir": "left",
           "expected": 1,
-          "path": 22.003488744520254,
-          "net": 21.997964971959163,
-          "ratio": 0.9997489592389086,
+          "path": 21.998371113854986,
+          "net": 21.9982994513764,
+          "ratio": 0.9999967423734142,
           "maxErr": 0,
           "meanErr": 0
         },
         {
           "dir": "up",
           "expected": 2,
-          "path": 21.933905533333263,
-          "net": 21.933905533333263,
+          "path": 21.993541553333213,
+          "net": 21.993541553333213,
           "ratio": 1,
           "maxErr": 0,
           "meanErr": 0
@@ -74,8 +74,8 @@
         {
           "dir": "down",
           "expected": 0,
-          "path": 13.999011877777711,
-          "net": 13.999011877777711,
+          "path": 13.999695364444399,
+          "net": 13.999695364444399,
           "ratio": 1,
           "maxErr": 0,
           "meanErr": 0
@@ -83,26 +83,26 @@
         {
           "dir": "right",
           "expected": 3,
-          "path": 16.997907584444462,
-          "net": 16.997907584444466,
-          "ratio": 1.0000000000000002,
+          "path": 16.998116008888836,
+          "net": 16.998116008888836,
+          "ratio": 1,
           "maxErr": 0,
           "meanErr": 0
         },
         {
           "dir": "left",
           "expected": 1,
-          "path": 22.001433140802714,
-          "net": 21.99761327539495,
-          "ratio": 0.9998263810642098,
+          "path": 22.00068203579375,
+          "net": 21.997143488959722,
+          "ratio": 0.9998391619483309,
           "maxErr": 0,
           "meanErr": 0
         },
         {
           "dir": "up",
           "expected": 2,
-          "path": 21.926236659999866,
-          "net": 21.926236659999866,
+          "path": 21.933600017777685,
+          "net": 21.933600017777685,
           "ratio": 1,
           "maxErr": 0,
           "meanErr": 0
@@ -141,8 +141,8 @@
     {
       "viewport": "390",
       "direction": "up",
-      "netTiles": 21.93,
-      "pathTiles": 21.93,
+      "netTiles": 21.99,
+      "pathTiles": 21.99,
       "netOverPath": 1,
       "maxHeadingErrDeg": 0,
       "meanHeadingErrDeg": 0
