@@ -18,6 +18,7 @@ import { BuildingPanel } from './ui/buildingPanel';
 import { ChromeUI, type DesktopLayout } from './ui/chrome';
 import { JacHud } from './ui/jacHud';
 import { PersonaJacBoard } from './ui/personaJacBoard';
+import { PersonaEnterPrompt } from './ui/personaEnterPrompt';
 import { Joystick } from './ui/joystick';
 import { personaEnabled } from './game/persona/personaSpec';
 import { NameLabels } from './ui/nameLabels';
@@ -55,6 +56,9 @@ async function main(): Promise<void> {
   const personaJacBoard = new PersonaJacBoard(uiRoot, {
     onGetIn: () => scene.jacGetIn(),
     onGetOut: () => scene.jacGetOut(),
+  });
+  const personaEnterPrompt = new PersonaEnterPrompt(uiRoot, {
+    onEnter: () => scene.personaEnterFromUi(),
   });
   const jacHud = new JacHud(uiRoot, {
     onInfo: () => scene.jacOpenInfo(),
@@ -149,6 +153,7 @@ async function main(): Promise<void> {
         showIn: ps.active && ps.jacBoard && !driving,
         showOut: ps.active && driving,
       });
+      personaEnterPrompt.sync(ps.active && ps.enterOffer && !driving);
       document.body.dataset.view = scene.getViewMode().mode;
       const personaWalk =
         personaEnabled() && scene.getViewMode().mode === 'persona' && !scene.isInInterior();
@@ -212,7 +217,7 @@ async function main(): Promise<void> {
     (e) => {
       const t = e.target as HTMLElement | null;
       if (!t) return;
-      if (t.closest('.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock, .persona-jac-board')) return;
+      if (t.closest('.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock, .persona-jac-board, .persona-enter-prompt')) return;
       if (t === canvas || t.closest('#app, .joystick, #game-canvas, #ui-root')) {
         if (joystick.isActive() || scene?.jacSnapshot()?.driving) e.preventDefault();
       }
@@ -223,7 +228,7 @@ async function main(): Promise<void> {
     'touchmove',
     (e) => {
       const t = e.target as HTMLElement | null;
-      if (t?.closest('.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock, .persona-jac-board')) return;
+      if (t?.closest('.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock, .persona-jac-board, .persona-enter-prompt')) return;
       if (joystick.isActive() || scene?.jacSnapshot()?.driving) e.preventDefault();
     },
     { passive: false, capture: true },
@@ -339,6 +344,10 @@ async function main(): Promise<void> {
     overviewCoverage: () => scene.qaOverviewCoverage(),
     personaState: () => scene.qaPersonaState(),
     personaCam: () => scene.qaPersonaCam(),
+    personaMoveHeading: (opts: { w?: boolean; stickY?: number }) => scene.qaPersonaMoveHeading(opts),
+    personaEnterOffer: () => scene.qaPersonaEnterOffer(),
+    personaEnterFromUi: () => scene.personaEnterFromUi(),
+    setPersonaYawDeg: (deg: number) => scene.qaSetPersonaYawDeg(deg),
     stickToTile: (dx: number, dy: number) => scene.qaStickToTile(dx, dy),
     cameraViews: () => scene.qaCameraViews(),
     cenitalExpectedHeading: (dx: number, dy: number) => scene.qaCenitalExpectedHeading(dx, dy),

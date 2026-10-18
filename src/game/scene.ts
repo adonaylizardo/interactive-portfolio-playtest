@@ -17,6 +17,7 @@ import {
   fill,
   getBuildingAt,
   getBuildingAtDoor,
+  getBuildingAtDoorOrAdjacent,
   getBuildingByName,
   getSceneryAt,
   INICIO,
@@ -167,7 +168,7 @@ import {
 } from './altView';
 import { billboardHeightM, PerspectiveView } from './perspectiveView';
 import { PersonaView } from './persona/personaView';
-import { personaEnabled } from './persona/personaSpec';
+import { CAL_M, CAL_TILE, personaEnabled } from './persona/personaSpec';
 import {
   loadPlayerSheets,
   loadRestSheets,
@@ -283,8 +284,16 @@ const CHAR_BODY_CENTRE_RISE = 48;
 const FOLLOW_SMOOTH_S = 0.35;
 /** Persona mode: A/D and stick X rotate this yaw (rad/s), not strafe. */
 const PERSONA_TURN_RATE = 2.65;
-/** Slightly faster on-foot steps so POI walks stay under the 30s acceptance budget. */
-const PERSONA_WALK_MUL = 1.78;
+/** ~1.7 m/s on foot vs map keyboard walk (~4.5 tiles/s). */
+const PERSONA_WALK_MUL = 0.17;
+const PERSONA_STICK_DEAD = 0.15;
+const PERSONA_FRAME_C_T9 = { x: 2.0, z: 8.2 };
+
+function personaStickAxis(raw: number): number {
+  const a = Math.abs(raw);
+  if (a < PERSONA_STICK_DEAD) return 0;
+  return Math.sign(raw) * Math.min(1, (a - PERSONA_STICK_DEAD) / (1 - PERSONA_STICK_DEAD));
+}
 const FOLLOW_DRIVE_SMOOTH_S = 0.12;
 /** A per-frame character move longer than this (3 tiles) is a teleport, not walking. */
 const FOLLOW_TELEPORT_WORLD = 3 * Math.hypot(TILE_W / 2, TILE_H / 2);
@@ -1625,7 +1634,7 @@ export class IsoScene {
     this.syncViewTransform();
     if (mode === 'persona') {
       this.personaIdleSec = 0;
-      this.personaCamYaw = perspectiveYaw(this.followFacing(), this.yaw) * (Math.PI / 2);
+      this.framePersonaSpawnView();
       void this.persona.ensureLoaded(Math.min(window.devicePixelRatio || 1, 2));
     }
     this.centerOnCharacter(false);
@@ -1699,8 +1708,9 @@ export class IsoScene {
     }
     const walkTx = tx;
     const walkTy = ty;
-    const entry =
-      opts?.buildingEntry ?? resolveBuildingEntryFromTile(walkTx, walkTy, this.roundedCharTile());
+    const entry = this.personaOn()
+      ? null
+      : opts?.buildingEntry ?? resolveBuildingEntryFromTile(walkTx, walkTy, this.roundedCharTile());
     this.pendingBuildingEntry = entry;
     const walkable = !!cells[walkTy]?.[walkTx]?.walkable;
     const target = walkable ? { x: walkTx, y: walkTy } : resolveWalkTarget(walkTx, walkTy);
@@ -3374,7 +3384,8 @@ export class IsoScene {
         else if (this.seatedBench && !this.interiorActive) {
           this.standThen(null);
           e.preventDefault();
-        } else if (this.enterNearbyDoorFromKeyboard()) e.preventDefault();
+        } else if (this.tryPersonaEnterBuilding()) e.preventDefault();
+        else if (this.enterNearbyDoorFromKeyboard()) e.preventDefault();
         else if (this.playerNearNoah() && !this.noah.busy()) {
           this.startNoahTalk();
           e.preventDefault();
@@ -3984,6 +3995,8 @@ export class IsoScene {
   /** Tank-style third person: turn camera on A/D, move forward/back only on W/S. */
   private updatePersonaLocomotion(stick: { x: number; y: number }, stickLive: boolean): void {
     const dt = Math.min(0.1, this.app.ticker.deltaMS / 1000);
+    const stickX = stickLive ? personaStickAxis(stick.x) : 0;
+    const stickY = stickLive ? personaStickAxis(stick.y) : 0;
     let turn = 0;
     let fwd = 0;
     if (this.keys.has('a') || this.keys.has('arrowleft')) turn -= 1;
@@ -3991,8 +4004,8 @@ export class IsoScene {
     if (this.keys.has('w') || this.keys.has('arrowup')) fwd -= 1;
     if (this.keys.has('s') || this.keys.has('arrowdown')) fwd += 1;
     if (stickLive) {
-      turn += stick.x;
-      fwd -= stick.y;
+      turn += stickX;
+      fwd += stickY;
     }
     if (Math.abs(turn) > 0.02) {
       this.personaCamYaw += turn * PERSONA_TURN_RATE * dt;
@@ -4001,7 +4014,8 @@ export class IsoScene {
     if (fwd !== 0) {
       this.noteAvatarInput();
       this.fireMoveCommand();
-      const sprint = this.shiftHeld;
+      const mostlyTurn = stickLive && Math.abs(stickX) > Math.abs(stickY);
+      const sprint = this.shiftHeld && !mostlyTurn;
       this.sprint = sprint;
       this.charState = sprint ? 'sprint' : 'walk';
       this.pendingNoahTalk = false;
@@ -4012,7 +4026,11 @@ export class IsoScene {
       const dx = mapped.x / mag;
       const dy = mapped.y / mag;
       const tileBefore = this.roundedCharTile();
-      const next = this.personaKeyboardStep(this.charTx, this.charTy, dx, dy, sprint);
+      let speedMul = 1;
+      if (stickLive && Math.abs(stickY) > 0) {
+        speedMul = Math.abs(stickY);
+      }
+      const next = this.personaKeyboardStep(this.charTx, this.charTy, dx, dy, sprint, speedMul);
       this.charTx = next.x;
       this.charTy = next.y;
       const tileAfter = this.roundedCharTile();
@@ -4027,12 +4045,60 @@ export class IsoScene {
     }
   }
 
+  private framePersonaSpawnView(): void {
+    if (!personaEnabled()) return;
+    this.charTx = CAL_TILE.x;
+    this.charTy = CAL_TILE.y;
+    const dx = PERSONA_FRAME_C_T9.x - CAL_M.x;
+    const dz = PERSONA_FRAME_C_T9.z - CAL_M.z;
+    this.personaCamYaw = Math.atan2(dx, dz);
+    this.path = [];
+    this.pendingBuildingEntry = null;
+    this.charState = 'idle';
+    this.syncViewTransform();
+    this.syncCharacterGraphic();
+  }
+
+  private personaEnterOffer(): MapObject | null {
+    if (!this.personaOn() || this.interiorActive || this.jac?.driving || this.doorCooldown > 0) return null;
+    if (this.path.length > 0) return null;
+    const t = this.roundedCharTile();
+    let building = getBuildingAtDoor(t.x, t.y);
+    if (!building?.panelTitle || !building.door) {
+      building = getBuildingAtDoorOrAdjacent(t.x, t.y);
+    }
+    if (!building?.panelTitle || !building.door) return null;
+    const doorDist = Math.max(Math.abs(building.door.x - t.x), Math.abs(building.door.y - t.y));
+    if (doorDist > 1) return null;
+    const inward = doorInwardStep(building);
+    if (!inward) return null;
+    this.syncViewTransform();
+    const fwd = screenStickToTile(0, -1, this.viewRot, this.viewSx, this.viewSy);
+    const fm = Math.hypot(fwd.x, fwd.y);
+    if (fm < 1e-6) return null;
+    const dot = (fwd.x / fm) * inward.x + (fwd.y / fm) * inward.y;
+    if (dot < 0.45) return null;
+    return building;
+  }
+
+  private tryPersonaEnterBuilding(): boolean {
+    const building = this.personaEnterOffer();
+    if (!building) return false;
+    this.enterBuildingFromDoor(building);
+    return true;
+  }
+
+  personaEnterFromUi(): void {
+    this.tryPersonaEnterBuilding();
+  }
+
   private personaKeyboardStep(
     x: number,
     y: number,
     dx: number,
     dy: number,
     sprint: boolean,
+    speedMul = 1,
   ): { x: number; y: number } {
     const walkable = (tx: number, ty: number) => !!cells[ty]?.[tx]?.walkable;
     const tx = Math.round(x);
@@ -4043,7 +4109,8 @@ export class IsoScene {
       if (sx && walkable(tx + sx, ty)) return { x: tx + sx, y: ty };
       if (sy && walkable(tx, ty + sy)) return { x: tx, y: ty + sy };
     }
-    const world = walkStepWorld(sprint, this.app.ticker.deltaMS) * PERSONA_WALK_MUL;
+    const world =
+      walkStepWorld(sprint, this.app.ticker.deltaMS) * PERSONA_WALK_MUL * Math.max(0, speedMul);
     const k = world / tileMoveWorld(dx, dy);
     const next = slideStep(x, y, dx * k, dy * k, walkable);
     if (dx !== 0 && dy !== 0 && (next.x === x) !== (next.y === y)) {
@@ -4102,8 +4169,10 @@ export class IsoScene {
       return;
     }
     if (this.personaOn() && !this.interiorActive && !this.jac?.driving) {
-      const pathAuto = this.path.length > 0 && !stickLive && this.keys.size === 0;
-      if (!pathAuto) this.updatePersonaLocomotion(stick, stickLive);
+      const personaStickLive =
+        Math.abs(personaStickAxis(stick.x)) > 0 || Math.abs(personaStickAxis(stick.y)) > 0;
+      const pathAuto = this.path.length > 0 && !personaStickLive && this.keys.size === 0;
+      if (!pathAuto) this.updatePersonaLocomotion(stick, personaStickLive);
     } else if (stickLive) {
       this.noteAvatarInput();
       this.startCameraFollow();
@@ -4349,6 +4418,7 @@ export class IsoScene {
 
   /** Enter / Space: on a door's access tile enters; next to one walks onto it and enters. */
   private enterNearbyDoorFromKeyboard(): boolean {
+    if (this.personaOn()) return false;
     if (this.interiorActive || this.jac?.driving || this.doorCooldown > 0) return false;
     const t = this.roundedCharTile();
     const onDoor = getBuildingAtDoor(t.x, t.y);
@@ -5968,6 +6038,7 @@ export class IsoScene {
     pantoneSit: boolean;
     jacCabin: boolean;
     jacBoard: boolean;
+    enterOffer: boolean;
     assets: ReturnType<PersonaView['assetReport']>;
   } {
     return {
@@ -5976,8 +6047,34 @@ export class IsoScene {
       pantoneSit: this.persona.lastPantoneAnim === 'sit',
       jacCabin: this.persona.lastJacCabin,
       jacBoard: this.personaJacBoardVisible(),
+      enterOffer: !!this.personaEnterOffer(),
       assets: this.persona.assetReport(),
     };
+  }
+
+  /** QA: forward move heading in tile space (degrees 0–360) for W and/or stick Y (-1 = up). */
+  qaPersonaMoveHeading(opts: { w?: boolean; stickY?: number }): number | null {
+    if (!this.personaOn()) return null;
+    this.syncViewTransform();
+    let fwd = 0;
+    if (opts.w) fwd -= 1;
+    if (opts.stickY != null) fwd += personaStickAxis(opts.stickY);
+    if (Math.abs(fwd) < 1e-6) return null;
+    const m = screenStickToTile(0, fwd, this.viewRot, this.viewSx, this.viewSy);
+    const mag = Math.hypot(m.x, m.y);
+    if (mag < 1e-6) return null;
+    const deg = (Math.atan2(m.y / mag, m.x / mag) * 180) / Math.PI;
+    return ((deg % 360) + 360) % 360;
+  }
+
+  qaPersonaEnterOffer(): { show: boolean; name: string } {
+    const b = this.personaEnterOffer();
+    return { show: !!b, name: b?.name ?? '' };
+  }
+
+  qaSetPersonaYawDeg(deg: number): void {
+    this.personaCamYaw = (deg * Math.PI) / 180;
+    this.syncViewTransform();
   }
 
   /** QA: opaque-top client point vs the HTML pill's bottom (gap should stay ~NAME_PILL_GAP_PX). */

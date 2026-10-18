@@ -2799,6 +2799,34 @@ body.jac-info[data-chrome='phone'] .chrome__dock {
   }
 }
 
+.persona-enter-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: calc(132px + env(safe-area-inset-bottom, 0px));
+  z-index: 129;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+.persona-enter-prompt__btn {
+  min-width: 220px;
+  min-height: 44px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 12px;
+  background: #f2a93b;
+  color: #0b0c0e;
+  font: 600 15px/1.2 Inter, system-ui, sans-serif;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+@media (max-width: 767px) {
+  body[data-layout='split'] .persona-enter-prompt {
+    bottom: calc(168px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 body[data-view='persona'] .name-labels,
 body[data-view='persona'] .name-label {
   display: none !important;

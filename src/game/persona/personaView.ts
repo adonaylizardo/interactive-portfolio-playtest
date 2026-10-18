@@ -248,10 +248,14 @@ export class PersonaView {
       this.sky.y = 0;
     }
     if (this.avila) {
-      this.avila.width = sw * 2;
-      this.avila.height = sh * 0.18;
-      this.avila.tilePosition.x = parallax * (sw / PERSONA_REF.w);
-      this.avila.y = HORIZON_Y_1X * (sh / PERSONA_REF.h) - this.avila.height * 0.85;
+      const portrait = sh > sw;
+      this.avila.visible = !portrait;
+      if (!portrait) {
+        this.avila.width = sw * 2;
+        this.avila.height = sh * 0.18;
+        this.avila.tilePosition.x = parallax * (sw / PERSONA_REF.w);
+        this.avila.y = HORIZON_Y_1X * (sh / PERSONA_REF.h) - this.avila.height * 0.85;
+      }
     }
   }
 

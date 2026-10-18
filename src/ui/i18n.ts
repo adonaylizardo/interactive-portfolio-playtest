@@ -45,6 +45,7 @@ const DICT = {
 
     'persona.jacBoardIn': 'Get in the T9',
     'persona.jacBoardOut': 'Get out',
+    'persona.enter': 'Enter',
 
     'canvas.label': 'Isometric playtest world',
 
@@ -131,6 +132,7 @@ const DICT = {
 
     'persona.jacBoardIn': 'Subir a la T9',
     'persona.jacBoardOut': 'Bajar',
+    'persona.enter': 'Entrar',
 
     'canvas.label': 'Mundo isométrico de prueba',
 
