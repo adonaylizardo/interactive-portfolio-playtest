@@ -1426,8 +1426,8 @@ export class IsoScene {
 
   /** Unit forward on the tile grid from third-person camera yaw (not iso screen→tile). */
   private personaTileForward(sign = 1): { x: number; y: number } {
-    const fx = Math.sin(this.personaCamYaw) * sign;
-    const fy = Math.cos(this.personaCamYaw) * sign;
+    const fx = Math.cos(this.personaCamYaw) * sign;
+    const fy = Math.sin(this.personaCamYaw) * sign;
     const m = Math.hypot(fx, fy);
     if (m < 1e-6) return { x: 0, y: 0 };
     return { x: fx / m, y: fy / m };
