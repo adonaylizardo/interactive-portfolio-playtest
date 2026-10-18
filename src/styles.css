@@ -882,6 +882,23 @@ body[data-layout='panel'] .checklist {
 }
 
 @media (max-width: 767px) {
+  .building-panel--experience.building-panel--peek .exp-header,
+  .building-panel--writings.building-panel--peek .exp-header {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 15;
+    box-sizing: border-box;
+    height: 72px;
+    max-height: 72px;
+    margin: 0;
+    padding: 8px 12px;
+    background: #141518;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 16px rgb(0 0 0 / 35%);
+  }
+
   .building-panel--experience.building-panel--open:not(.building-panel--peek) .building-panel__sheet {
     top: auto;
     bottom: 0;

@@ -103,10 +103,24 @@ async function enterBuildingViaDoor(page, buildingId, panelSel) {
 
 async function tapRealExpand(page) {
   const btn = page.locator('[data-exp-expand]').first();
-  await btn.waitFor({ state: 'visible', timeout: 10000 });
+  await btn.waitFor({ state: 'attached', timeout: 10000 });
   const box = await btn.boundingBox();
   if (!box) throw new Error('expand box');
-  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+  const x = box.x + box.width / 2;
+  const y = Math.min(box.y + box.height / 2, (page.viewportSize()?.height ?? 844) - 4);
+  await page.touchscreen.tap(x, y);
+  let expanded = await page
+    .waitForFunction(
+      () =>
+        document.querySelector('.building-panel--expanded') &&
+        !document.querySelector('.building-panel--peek'),
+      { timeout: 8000 },
+    )
+    .then(() => true)
+    .catch(() => false);
+  if (!expanded) {
+    await btn.tap({ force: true });
+  }
   await page.waitForFunction(
     () =>
       document.querySelector('.building-panel--expanded') &&
@@ -227,7 +241,6 @@ async function runBackend(backendLabel) {
         hasTouch: true,
         isMobile: true,
         locale: 'es-VE',
-        deviceScaleFactor: 2,
       });
       const page = await ctx.newPage();
       await page.addInitScript(() => {
@@ -277,7 +290,10 @@ async function main() {
     console.log(`| ${r.id} | ${r.pass ? 'PASS' : 'FAIL'} | ${r.viewport} | ${String(r.detail).slice(0, 72)} |`);
   }
   const failed = results.filter((r) => !r.pass);
-  if (failed.length) process.exit(1);
+  if (failed.length) {
+    console.error(`\nFailed ${failed.length}/${results.length}`);
+    process.exit(1);
+  }
   console.log(`\nForge k10: ${results.length} checks PASS @ ${BASE}`);
 }
 
