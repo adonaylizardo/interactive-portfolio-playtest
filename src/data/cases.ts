@@ -102,9 +102,26 @@ const CASE_CARD_TITLES_ES: Record<CaseHouseId, string> = {
 };
 
 export function casePreviewCopy(id: string, lang: 'en' | 'es' = 'en'): CasePreviewCopy | null {
-  if (!isCaseHouse(id)) return null;
-  const content = CASES[id];
+  const content = CASES[id as keyof typeof CASES];
   if (!content) return null;
+  if (!isCaseHouse(id)) {
+    const title =
+      content.headline?.replace(/\s—.*$/, '') ??
+      id.charAt(0).toUpperCase() + id.slice(1);
+    const headings =
+      lang === 'es'
+        ? ['Problema', 'Lo que hice', 'Resultado']
+        : ['Problem', 'What I did', 'Result'];
+    return {
+      title,
+      subtitle: content.subtitle ?? '',
+      teaser: endSentence(content.shortHeadline ?? content.headline),
+      teaserFull: content.headline,
+      kicker: lang === 'es' ? `CASO · ${title.toUpperCase()}` : `CASE · ${title.toUpperCase()}`,
+      placeholder: `${title.toUpperCase()} · IMAGE PLACEHOLDER`,
+      pillMeta: headings.join(' · '),
+    };
+  }
   const title = lang === 'es' ? CASE_CARD_TITLES_ES[id] ?? content.headline : CASE_CARD_TITLES[id] ?? content.headline;
   const es = lang === 'es' ? CASE_PREVIEW_ES[id] : null;
   const landmarkIds = new Set(['sambil', 'catedral', 'flor']);
@@ -126,7 +143,7 @@ export function casePreviewCopy(id: string, lang: 'en' | 'es' = 'en'): CasePrevi
     subtitle: es?.subtitle ?? landmarkEs?.subtitle ?? content.subtitle,
     teaser: endSentence(shortHeadline ?? headline),
     teaserFull: headline,
-    kicker: `CASE · ${title.toUpperCase()}`,
+    kicker: lang === 'es' ? `CASO · ${title.toUpperCase()}` : `CASE · ${title.toUpperCase()}`,
     placeholder: `${title.toUpperCase()} · IMAGE PLACEHOLDER`,
     pillMeta:
       lang === 'es'

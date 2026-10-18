@@ -373,7 +373,13 @@ export class ChromeUI {
       studio.playLine('11-contact');
       this.callbacks.onLocate('contacto');
     });
-    this.root.querySelector('.chrome__dock [data-action="map"]')?.addEventListener('click', () => this.setLayout('map'));
+    this.root.querySelector('.chrome__dock [data-action="map"]')?.addEventListener('click', () => {
+      if (this.getView().mode === 'cenital') {
+        this.callbacks.onMapOverview();
+        return;
+      }
+      this.setLayout('map');
+    });
     this.root.querySelector('.chrome__rail [data-action="cases"]')?.addEventListener('click', () => {
       this.setLayout('split');
       this.scrollTo('#chrome-casos');
@@ -408,15 +414,19 @@ export class ChromeUI {
     if (!sub) return;
     const v = this.getView();
     const text = studio.subtitle();
-    const blocksLabels =
-      v.overview ||
-      (v.mode === 'cenital' &&
-        (this.mobile ||
-          this.shortLandscape() ||
-          text.startsWith('Hey, welcome')));
-    if (blocksLabels && text) {
+    if (v.mode === 'cenital' && text.startsWith('Hey, welcome')) {
+      sub.classList.remove('chrome__subtitle--compact');
       sub.textContent = '';
       sub.style.visibility = 'hidden';
+      return;
+    }
+    const blocksLabels =
+      v.overview ||
+      (v.mode === 'cenital' && (this.mobile || this.shortLandscape()));
+    sub.classList.toggle('chrome__subtitle--compact', !!(blocksLabels && text));
+    if (blocksLabels && text) {
+      sub.style.visibility = 'visible';
+      sub.textContent = text;
       return;
     }
     sub.style.visibility = text ? 'visible' : 'hidden';
@@ -537,6 +547,7 @@ export class ChromeUI {
       if (key !== 'rotate' && key !== 'map') btn.classList.toggle('is-active', key === v.mode);
       if (key === 'map') btn.classList.toggle('is-active', v.overview);
     });
+    this.syncSubtitle();
     this.root.classList.toggle('chrome--alt-view', v.mode !== 'isometrica');
     this.root.classList.toggle('chrome--overview', v.overview);
     const hint = this.root.querySelector('.chrome__sound') as HTMLElement | null;

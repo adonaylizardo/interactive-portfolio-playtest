@@ -427,6 +427,10 @@ export class IsoScene {
   private panDragScreenPx = 0;
   /** Farthest the single pointer of this gesture has strayed from where it went down, in screen px. */
   private tapDriftPx = 0;
+  /** Door glyph hit captured at pointerdown (driving cenital) for drift-tolerant enter. */
+  private driveGlyphPickSerial = -1;
+  private driveGlyphPickEntry: { panelTitle: string; door: { x: number; y: number } } | null =
+    null;
   private zoomChanged = false;
   private lastChecklistZoom = 0;
   private canvasEl: HTMLCanvasElement | null = null;
@@ -1665,6 +1669,34 @@ export class IsoScene {
         }
       }
     }
+    if (bestFill < 0.08) {
+      const b = mapWorldBounds();
+      this.overviewFitTrial = b;
+      this.yaw = savedYaw;
+      this.syncViewTransform();
+      const wx = (b.minX + b.maxX) / 2;
+      const wy = (b.minY + b.maxY) / 2;
+      const aim = this.freeRectCenter();
+      const { freeW, freeH } = this.overviewFitMargins();
+      const zFloor = zoomMinForView(this.viewRot, this.viewSx, this.viewSy, freeW, freeH);
+      let lo = zFloor * 0.96;
+      let hi = Math.max(this.zoom, zFloor * 2.2);
+      for (let i = 0; i < 52; i++) {
+        const mid = (lo + hi) / 2;
+        this.zoom = mid;
+        this.placeWorldAtScreen(wx, wy, aim.x, aim.y);
+        this.applyCamera(false);
+        if (this.mapFullyInFreeRect()) lo = mid;
+        else hi = mid;
+      }
+      this.zoom = lo;
+      this.placeWorldAtScreen(wx, wy, aim.x, aim.y);
+      bestFill = Math.min(this.overviewFillFraction().covW, this.overviewFillFraction().covH);
+      bestYaw = savedYaw;
+      bestZoom = this.zoom;
+      bestCam = { x: this.cameraX, y: this.cameraY };
+      bestBounds = b;
+    }
     this.overviewFitTrial = null;
     this.overviewLockedBounds = bestBounds;
     this.yaw = bestYaw;
@@ -1863,10 +1895,8 @@ export class IsoScene {
 
   /** Door pick in world space (stable at min zoom ~0.04–0.15); closest opening wins. */
   private pickBuildingDoorAtScreen(sx: number, sy: number): MapObject | undefined {
-    if (this.cenitalOn() && !this.mapOverview) {
-      const driving = !!this.jac?.driving;
-      const mph = this.jac?.mph ?? 0;
-      const slop = driving ? 12 + Math.min(22, mph * 1.6) : 24;
+    if (this.cenitalOn() && !this.mapOverview && !this.jac?.driving) {
+      const slop = 24;
       const buildings = objects.filter((o) => o.type === 'building' && o.door && o.panelTitle);
       let best: { obj: MapObject; dist: number } | null = null;
       for (const obj of buildings) {
@@ -1964,30 +1994,19 @@ export class IsoScene {
     return undefined;
   }
 
-  /** Cenital door glyph while driving — tight circle; road taps beside a facade do not enter. */
+  /** Cenital driving: enter only when the tap hits the door glyph (screen px, zoom-independent). */
   private pickDrivingCenitalDoorAtScreen(sx: number, sy: number): MapObject | undefined {
     if (!this.cenitalOn() || this.mapOverview) return undefined;
-    const mph = this.jac?.mph ?? 0;
-    const slop = 5 + Math.min(6, mph * 0.45);
-    const { x: wx, y: wy } = this.screenToWorld(sx, sy);
-    const tile = worldToTile(wx, wy);
-    const onWalkable = !!(tile && cells[tile.y]?.[tile.x]?.walkable);
+    const slop = 8;
     let best: { obj: MapObject; dist: number } | null = null;
     for (const obj of objects.filter((o) => o.type === 'building' && o.door && o.panelTitle)) {
       const m = cenitalDoorMarker(obj);
       if (!m) continue;
       const s = this.worldToScreen(m.x, m.y);
+      const hitX = Math.abs(sx - s.x) <= m.hw + slop;
+      const hitY = Math.abs(sy - s.y) <= m.hh + slop;
+      if (!hitX || !hitY) continue;
       const dist = Math.hypot(sx - s.x, sy - s.y);
-      const hitR = Math.max(m.hw, m.hh) + slop;
-      if (dist > hitR) continue;
-      if (onWalkable) {
-        const tight = Math.max(m.hw, m.hh) + 4;
-        if (dist > tight) continue;
-        if (tile && obj.door) {
-          const manhattan = Math.abs(tile.x - obj.door.x) + Math.abs(tile.y - obj.door.y);
-          if (manhattan > 2 && !doorHit(obj, wx, wy)) continue;
-        }
-      }
       if (!best || dist < best.dist) best = { obj, dist };
     }
     return best?.obj;
@@ -2077,6 +2096,15 @@ export class IsoScene {
       if (this.jac.isExiting()) return;
       if (performance.now() < this.suppressDriveTapUntil) return;
       if (this.pickJacAtScreen(sx, sy)) return;
+      if (
+        this.driveGlyphPickSerial === this.pointerGestureSerial &&
+        this.driveGlyphPickEntry &&
+        this.tapDriftPx < 56
+      ) {
+        this.requestDriveToEnter(this.driveGlyphPickEntry);
+        this.driveGlyphPickEntry = null;
+        return;
+      }
       const buildingHit = this.pickDrivingBuildingEnterAtScreen(sx, sy);
       if (buildingHit?.door && buildingHit.panelTitle) {
         this.requestDriveToEnter({ panelTitle: buildingHit.panelTitle, door: buildingHit.door });
@@ -2499,7 +2527,8 @@ export class IsoScene {
       this.syncViewTransform();
       const zFloor = this.zoomMinForCurrentView(sw, sh);
       if (this.mapOverview) {
-        this.zoom = Math.min(1.5, Math.max(zFloor, this.zoom));
+        if (this.zoom < zFloor * 0.96) this.zoom = zFloor * 0.96;
+        this.zoom = Math.min(1.5, this.zoom);
       } else if (this.perspectiveOn()) {
         this.zoom = Math.min(1.5, Math.max(0.35, this.zoom));
       } else if (this.identityView()) {
@@ -3661,6 +3690,17 @@ export class IsoScene {
         this.lastPanPos = { x: e.clientX, y: e.clientY };
         this.tapStart = { x: e.clientX, y: e.clientY, t: performance.now() };
         this.tapDownStamp = e.timeStamp;
+        if (this.jac?.driving && !this.jac.isExiting()) {
+          const rect = canvas.getBoundingClientRect();
+          const sx = e.clientX - rect.left;
+          const sy = e.clientY - rect.top;
+          this.driveGlyphPickSerial = this.pointerGestureSerial;
+          const glyph = this.pickDrivingCenitalDoorAtScreen(sx, sy);
+          this.driveGlyphPickEntry =
+            glyph?.door && glyph.panelTitle
+              ? { panelTitle: glyph.panelTitle, door: glyph.door }
+              : null;
+        }
       }
       if (this.pointers.size >= 2) {
         this.secondFingerArrived = true;
@@ -5953,8 +5993,15 @@ export class IsoScene {
       const h = o.h ?? 1;
       const p = tileToWorld(fx + (w - 1) / 2, fy + (h - 1) / 2);
       const s = this.worldToScreen(p.x, p.y);
-      const cx = (rect?.left ?? 0) + s.x;
-      const cy = (rect?.top ?? 0) + s.y;
+      let cx = (rect?.left ?? 0) + s.x;
+      let cy = (rect?.top ?? 0) + s.y;
+      const views = document.querySelector('.chrome__views') as HTMLElement | null;
+      if (views && !views.hidden) {
+        const vr = views.getBoundingClientRect();
+        if (vr.width > 8 && cx >= vr.left - 48 && cx <= vr.right + 80 && cy <= vr.bottom + 36) {
+          cy = Math.max(cy, vr.bottom + 22);
+        }
+      }
       const labelName =
         this.mapOverview && overviewShort[id] ? overviewShort[id] : (o.panelTitle ?? id);
       out.push({

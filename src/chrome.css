@@ -608,6 +608,25 @@ body[data-interior='1'] .chrome__column {
   visibility: hidden;
 }
 
+.chrome__subtitle.chrome__subtitle--compact {
+  top: max(12px, env(safe-area-inset-top, 0px));
+  bottom: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, calc(100vw - 32px));
+  padding: 6px 10px;
+  font-size: 13px;
+  line-height: 1.25;
+  border-radius: 999px;
+  background: rgba(11, 12, 14, 0.82);
+  z-index: 24;
+}
+
+.chrome--alt-view .chrome__lang-opt {
+  text-shadow: 0 0 6px rgba(11, 12, 14, 0.85);
+  background: rgba(11, 12, 14, 0.55);
+}
+
 .chrome--split .chrome__subtitle {
   left: calc(496px + (100% - 496px - 264px) / 2);
   width: min(520px, calc(100% - 496px - 280px));
