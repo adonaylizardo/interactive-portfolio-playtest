@@ -352,6 +352,7 @@ export class JacT9 {
   private goalBest = Infinity;
   private noProgressT = 0;
   private zeroMphT = 0;
+  private zeroMphAt = { x: 0, y: 0 };
   bumpT = 0;
   private bumpArmed = true;
   private exitFrom: { x: number; y: number } | null = null;
@@ -2056,6 +2057,16 @@ export class JacT9 {
     if (this.followLoose) {
       this.dropPassedPathNodes();
       if (this.drivePath.length === 0 && this.driveGoal) {
+        const d = Math.hypot(this.cx - this.driveGoal.x, this.cy - this.driveGoal.y);
+        if (d > 2.4) {
+          const path =
+            this.findDrivePath(this.driveGoal.x, this.driveGoal.y, { loose: true }) ??
+            this.findDrivePath(this.driveGoal.x, this.driveGoal.y, { loose: false });
+          if (path && path.length > 1 && !this.pathStartsBlocked(path)) {
+            this.drivePath = this.trimPathFromHere(compressColinear(path));
+            return;
+          }
+        }
         this.drivePath.push({ x: this.driveGoal.x, y: this.driveGoal.y });
       }
       return;
@@ -2246,32 +2257,41 @@ export class JacT9 {
 
   /**
    * Door-follows skip `noteGoalProgress`, so a 0 mph sit with a far goal
-   * used to last 25–30 s. After two seconds: skip this sit, replan, then a
-   * fallback BFS if the axis path is still blocked.
+   * used to last 25–30 s. Speedometer 0 with no tile progress for 2 s:
+   * drop the leftover polyline, replan, then a fallback BFS.
+   * Integrator vel flickers ~0.03–0.12 while mph stays 0 — ignore that.
    */
   private watchdogZeroMph(dt: number): void {
     if (!this.driving || !this.driveGoal || this.stuckGaveUp || this.pendingExit) {
       this.zeroMphT = 0;
+      this.zeroMphAt = { x: this.cx, y: this.cy };
       return;
     }
-    if (this.atParkSit() || this.mph > 0 || Math.abs(this.vel) > 0.08) {
+    if (this.atParkSit()) {
       this.zeroMphT = 0;
+      this.zeroMphAt = { x: this.cx, y: this.cy };
+      return;
+    }
+    const moved = Math.hypot(this.cx - this.zeroMphAt.x, this.cy - this.zeroMphAt.y);
+    if (this.mph >= 1 || moved > 0.35) {
+      this.zeroMphT = 0;
+      this.zeroMphAt = { x: this.cx, y: this.cy };
       return;
     }
     this.zeroMphT += dt;
     if (this.zeroMphT < ZERO_MPH_REPLAN_S) return;
     this.zeroMphT = 0;
+    this.zeroMphAt = { x: this.cx, y: this.cy };
     this.stuckT = Math.max(this.stuckT, STUCK_REPLAN_S);
-    if (this.parkDoor) {
-      if (this.tryNextSit()) return;
-    }
+    this.drivePath = [];
+    if (this.parkDoor && this.tryNextSit()) return;
     if (this.tryReplan()) return;
     const dest = this.driveGoal;
     if (!dest) return;
     const path =
       this.findDrivePath(dest.x, dest.y, { loose: true }) ??
       this.findDrivePath(dest.x, dest.y, { loose: false });
-    if (path && path.length > 0 && !this.pathStartsBlocked(path)) {
+    if (path && path.length > 1 && !this.pathStartsBlocked(path)) {
       this.drivePath = this.trimPathFromHere(compressColinear(path));
       this.applyPathGear(false);
       this.stuckT = 0;

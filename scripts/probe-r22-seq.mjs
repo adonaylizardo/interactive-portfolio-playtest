@@ -170,8 +170,8 @@ async function tapSalir(page, cdp, touch) {
   for (let i = 0; i < 4; i++) {
     const visible = await btn.isVisible().catch(() => false);
     if (visible) {
-      if (touch) await btn.tap({ timeout: 2000 }).catch(() => {});
-      else await btn.click({ timeout: 2000 }).catch(() => {});
+      if (touch) await btn.tap({ timeout: 2000, force: true }).catch(() => {});
+      else await btn.click({ timeout: 2000, force: true }).catch(() => {});
     } else {
       const box = await page.evaluate(() => {
         const el = document.querySelector('.building-panel [data-exit], [data-exit]');
