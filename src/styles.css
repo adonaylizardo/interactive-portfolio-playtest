@@ -1275,6 +1275,12 @@ body[data-layout='panel'] .checklist {
 
 .building-panel--preview.building-panel--open .building-panel__sheet {
   pointer-events: auto;
+  /* Sliding the card moves × / Salir under the finger. Snap it in. */
+  transition: none;
+}
+
+.building-panel--preview .building-panel__sheet {
+  transition: none;
 }
 
 .building-panel--preview .building-panel__backdrop {
