@@ -701,8 +701,10 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
   }
 
   body[data-layout='map'] .checklist--mobile-closed {
-    top: max(12px, calc(env(safe-area-inset-top) + 12px));
-    right: max(12px, env(safe-area-inset-right));
+    top: auto;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: max(12px, env(safe-area-inset-left));
+    right: auto;
   }
 
   .chrome--mobile .chrome__dock {

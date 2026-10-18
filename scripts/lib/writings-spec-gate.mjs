@@ -219,7 +219,18 @@ export async function runWritingsSpecGate(page, frameKey) {
         if (el.name === 'cuerpo' && el.selector.includes('body-wrap')) {
           const br = dom.getBoundingClientRect();
           dr = { left: br.left, top: br.top, width: br.width, height: dom.clientHeight };
-        } else if ((el.name === 'meta' || el.selector.includes('kicker')) && el.typography) {
+        } else if (el.name === 'meta' && el.typography) {
+          const br = dom.getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNodeContents(dom);
+          const tr = range.getBoundingClientRect();
+          dr = {
+            left: br.left,
+            top: br.top,
+            width: tr.width > 1 ? tr.width : br.width,
+            height: br.height,
+          };
+        } else if (el.selector.includes('kicker') && el.typography) {
           const range = document.createRange();
           range.selectNodeContents(dom);
           dr = range.getBoundingClientRect();
@@ -322,6 +333,8 @@ export function writeSpecGateMarkdown(results, outPath) {
   let md = '# Writings spec gate (Figma metadata vs DOM)\n\n';
   md +=
     'Strict: ±2px on x/y/w/h; exact font-size, line-height, weight, and family from `scripts/data/writings-spec-typography.json`.\n\n';
+  md +=
+    '**Scope (automated):** writings desktop-list, phone-list, phone-reading only — first list section + first rows, desktop reader not included, phone-map/desktop-map not included. Pixel diff for those frames remains separate (≤12% info cap).\n\n';
   for (const res of results) {
     md += `## ${res.frameKey}\n\n`;
     md += `**Overall:** ${res.pass ? 'PASS' : 'FAIL'}${res.error ? ` (${res.error})` : ''}\n\n`;

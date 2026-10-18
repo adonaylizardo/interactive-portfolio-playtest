@@ -955,6 +955,7 @@ export class BuildingPanel {
     this.el.classList.add('building-panel--open');
     this.syncPeekClass();
     this.onVisibilityChange();
+    studio.clearSubtitle();
     studio.playClick();
     studio.playCaseVoice(interiorId);
   }
@@ -1006,6 +1007,7 @@ export class BuildingPanel {
     this.el.classList.add('building-panel--open');
     this.syncPeekClass();
     this.onVisibilityChange();
+    studio.clearSubtitle();
     studio.playClick();
     studio.playCaseVoice(interiorId);
   }

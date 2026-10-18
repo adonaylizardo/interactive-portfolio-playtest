@@ -17,7 +17,7 @@ html {
 }
 
 button {
-  font: inherit;
+  font-family: inherit;
 }
 
 html,
@@ -241,10 +241,6 @@ body.is-canvas-dragging * {
   display: none;
 }
 
-#ui-root:has(> .building-panel--experience) .chrome__subtitle {
-  display: none !important;
-}
-
 @media (max-width: 767px) {
   #ui-root:has(> .building-panel--preview) .chrome__dock {
     display: none;
@@ -317,11 +313,13 @@ body[data-layout='panel'] .checklist {
 }
 
 .checklist--collapsed {
-  right: auto;
-  left: max(16px, env(safe-area-inset-left));
   width: fit-content;
   max-width: min(360px, calc(100vw - 200px));
   padding: 0;
+}
+
+.checklist__ring-hit {
+  display: none;
 }
 
 .checklist__header {
@@ -768,17 +766,15 @@ body[data-layout='panel'] .checklist {
     max-width: min(260px, calc(100vw - 160px));
   }
 
-  .checklist--mobile-closed,
-  .checklist--collapsed {
-    width: 48px;
-    height: 48px;
-    overflow: hidden;
-  }
-
-  .chrome__lang {
-    left: max(16px, env(safe-area-inset-left));
+  body[data-layout='map'] .checklist--mobile-closed {
+    top: auto;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: max(12px, env(safe-area-inset-left));
     right: auto;
-    top: 12px;
+    width: fit-content;
+    max-width: min(279px, calc(100vw - 120px));
+    height: auto;
+    overflow: visible;
   }
 
   .building-panel__sheet {
@@ -795,6 +791,12 @@ body[data-layout='panel'] .checklist {
 }
 
 @media (min-width: 768px) {
+  .checklist--collapsed {
+    right: max(16px, env(safe-area-inset-right));
+    left: auto;
+    max-width: min(360px, calc(100vw - 96px));
+  }
+
   .checklist__counter--label {
     font-size: 14px;
   }
@@ -1541,6 +1543,7 @@ body[data-layout='panel'] .checklist {
     padding: 0 16px 24px;
     padding-top: 0 !important;
     border-radius: 16px 16px 0 0;
+    border: none;
     border-top: 1px solid var(--ui-line);
     box-shadow: 0 -8px 32px rgb(0 0 0 / 45%);
     overflow: hidden !important;
