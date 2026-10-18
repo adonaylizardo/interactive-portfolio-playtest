@@ -4568,7 +4568,6 @@ export class IsoScene {
     if (why === this.lastSitSkipKey) return;
     this.lastSitSkipKey = why;
     if (this.jac) this.jac.sitWhy = why;
-    console.info('[drive-sit] skip', why);
   }
 
   /** Stay on the door-side sit. A mid-route stall re-plans instead of getting out behind a house. */

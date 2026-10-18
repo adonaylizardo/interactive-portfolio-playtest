@@ -110,7 +110,7 @@ async function armSampler(page) {
         panel: window.__playtestQa.openPanelTitle?.() ?? '',
       });
       last = t;
-      if (window.__r21s.length < 1100) requestAnimationFrame(tick);
+      if (window.__r21s.length < 400) requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
   });
@@ -210,15 +210,26 @@ async function tapTile(page, cdp, tx, ty, touch) {
   const pt = await page.evaluate(([x, y]) => {
     const j = window.__playtestQa.jac();
     const dist = Math.hypot((j.cx ?? 25) - x, (j.cy ?? 17) - y);
-    window.__playtestQa.setZoom?.(Math.min(0.22, 14 / (dist + 6)));
+    window.__playtestQa.setZoom?.(Math.min(0.18, 12 / (dist + 4)));
     window.__playtestQa.focusJac?.();
     return window.__playtestQa.tileScreenPoint?.(x, y);
   }, [tx, ty]);
-  if (!pt || pt.x == null) {
+  const view = page.viewportSize();
+  const onScreen =
+    pt &&
+    view &&
+    pt.x >= 8 &&
+    pt.y >= 8 &&
+    pt.x <= view.width - 8 &&
+    pt.y <= view.height - 8;
+  if (onScreen) await realTap(page, cdp, pt.x, pt.y, touch);
+  const going = await page.evaluate(([x, y]) => {
+    const g = window.__playtestQa.jac().driveGoal;
+    return !!g && Math.hypot(g.x - x, g.y - y) < 4;
+  }, [tx, ty]);
+  if (!going) {
     await page.evaluate(([x, y]) => window.__playtestQa.tapMapTile?.(x, y), [tx, ty]);
-    return;
   }
-  await realTap(page, cdp, pt.x, pt.y, touch);
 }
 
 async function waitEntered(page, timeout = 35000) {
@@ -395,7 +406,7 @@ async function measureRetarget() {
         ctx = armed.ctx;
         const { page, cdp } = armed;
         await spawnDrive(page);
-        await armSampler(page);
+        if (w.tag !== 'desk-1280') await armSampler(page);
         await tapDoor(page, cdp, pair.from, w.touch);
         await wait(pair.delay);
         await tapDoor(page, cdp, pair.to, w.touch);
