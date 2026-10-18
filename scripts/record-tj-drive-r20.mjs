@@ -141,13 +141,14 @@ async function waitDoorDone(page, timeout = 30000) {
   return { ...last, done: false, ms: Date.now() - t0 };
 }
 
-async function driveDoor(page, name, touch, { tap = false } = {}) {
+async function driveDoor(page, name, touch, { tap = false, cpu } = {}) {
   await spawnDrive(page);
   await page.evaluate((n) => {
     window.__playtestQa.frameDoorForQa?.(n);
     window.__playtestQa.setZoom?.(n === 'flor' || n === 'sambil' ? 0.12 : 0.28);
   }, name);
   await wait(60);
+  if (cpu) await cpu.send('Emulation.setCPUThrottlingRate', { rate: 4 });
   await armTapMetrics(page);
   if (tap) {
     const pt = await page.evaluate((n) => window.__playtestQa.doorScreenPoint(n), name);
@@ -157,6 +158,7 @@ async function driveDoor(page, name, touch, { tap = false } = {}) {
     await page.evaluate((n) => window.__playtestQa.driveEnter?.(n), name);
   }
   const metrics = await readTapMetrics(page);
+  if (cpu) await cpu.send('Emulation.setCPUThrottlingRate', { rate: 1 });
   const end = await waitDoorDone(page);
   const parked = await page.evaluate(() => {
     const j = window.__playtestQa.jac();
@@ -177,14 +179,14 @@ async function driveDoor(page, name, touch, { tap = false } = {}) {
   return { ...end, ...metrics, overlap: overlap || parked.overlap, parked };
 }
 
-async function measureDoors(page, tag, touch) {
+async function measureDoors(page, tag, touch, cpu) {
   const list = await names(page);
   const rows = [];
   for (const name of list) {
     const attempts = [];
     let ok = false;
     for (let i = 0; i < 3 && !ok; i++) {
-      const row = await driveDoor(page, name, touch, { tap: i === 0 });
+      const row = await driveDoor(page, name, touch, { tap: i === 0, cpu });
       attempts.push(row);
       ok = row.done;
       notes.push(
@@ -283,9 +285,9 @@ async function runViewport(browser, tag, size, touch, { doors = true, shots = fa
     deviceScaleFactor: 1,
   });
   const page = await ctx.newPage();
-  await throttleCpu(page, 4);
+  const cpu = await throttleCpu(page, 1);
   await boot(page);
-  if (doors) await measureDoors(page, tag, touch);
+  if (doors) await measureDoors(page, tag, touch, cpu);
   if (tag === 'phone-390') {
     await measureStick(page);
     await measureCaseEs(page);
