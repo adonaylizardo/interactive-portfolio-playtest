@@ -1223,6 +1223,14 @@ body[data-layout='panel'] .checklist {
   margin: 22px 0 8px;
   line-height: 1.3;
   color: #edeef0;
+  font-family:
+    Geist,
+    Inter,
+    system-ui,
+    'Noto Color Emoji',
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    sans-serif;
 }
 
 .about__h1 {

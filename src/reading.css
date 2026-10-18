@@ -6,7 +6,14 @@
   flex-direction: column;
   background: #0b0c0e;
   color: #edeef0;
-  font-family: Geist, Inter, system-ui, sans-serif;
+  font-family:
+    Geist,
+    Inter,
+    system-ui,
+    'Noto Color Emoji',
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    sans-serif;
 }
 
 .reading-view[hidden] {
@@ -34,10 +41,20 @@
 
 .reading-view__back-pill {
   min-height: 44px;
+  min-width: 44px;
   border-radius: 999px;
   padding: 10px 16px;
   font-size: 15px;
   font-weight: 500;
+}
+
+.reading-view__back-pill--list svg {
+  transform: scaleX(-1);
+  margin-right: 2px;
+}
+
+.reading-view__inline-back.reading-view__back-pill--list svg {
+  transform: scaleX(-1);
 }
 
 .reading-view__lang {
@@ -195,6 +212,14 @@
   font-size: 22px;
   font-weight: 600;
   line-height: 1.3;
+  font-family:
+    Geist,
+    Inter,
+    system-ui,
+    'Noto Color Emoji',
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    sans-serif;
 }
 
 .reading-about__lede {
@@ -211,6 +236,14 @@
   font-weight: 600;
   line-height: 1.35;
   scroll-margin-top: 16px;
+  font-family:
+    Geist,
+    Inter,
+    system-ui,
+    'Noto Color Emoji',
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    sans-serif;
 }
 
 .reading-about__contact {

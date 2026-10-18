@@ -69,13 +69,12 @@ export function canNavigateReadingBack(): boolean {
 let skipNextReadingPopstateDepth = false;
 
 export function goBackToReadingList(onFallback: () => void): void {
-  if (canNavigateReadingBack()) {
-    skipNextReadingPopstateDepth = true;
-    window.history.back();
-    return;
+  skipNextReadingPopstateDepth = true;
+  const next = readingHash();
+  if (location.hash !== next) {
+    history.replaceState({ reading: true, rDepth: 1 }, '', next);
   }
-  navigateReading({ kind: 'list' }, 'replace');
-  setReadingDepth(0);
+  setReadingDepth(1);
   onFallback();
 }
 

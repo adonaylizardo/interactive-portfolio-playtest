@@ -129,8 +129,8 @@ export class ReadingView {
         <button type="button" class="reading-view__back-pill ui-btn ui-btn--secondary" data-back>
           <span data-i18n="read.backToMap">Volver al mapa</span>
         </button>
-        <button type="button" class="reading-view__back-pill ui-btn ui-btn--secondary" data-back-list hidden>
-          <span data-i18n="read.backToList">Volver a la lista</span>
+        <button type="button" class="reading-view__back-pill reading-view__back-pill--list ui-btn ui-btn--secondary" data-back-list hidden>
+          ${iconSvg('chevron')} <span data-i18n="read.backToList">Volver a la lista</span>
         </button>
         <h1 class="reading-view__site-title" data-i18n="read.title">Leer</h1>
         <button type="button" class="reading-view__lang ui-round" data-reading-lang aria-label="Language">ES</button>
@@ -324,7 +324,8 @@ export class ReadingView {
     const backList = document.createElement('button');
     backList.type = 'button';
     backList.className = 'reading-view__inline-back ui-btn ui-btn--secondary';
-    backList.innerHTML = `<span>${t('read.backToList')}</span>`;
+    backList.innerHTML = `${iconSvg('chevron')} <span>${t('read.backToList')}</span>`;
+    backList.classList.add('reading-view__back-pill--list');
     backList.addEventListener('click', () => {
       goBackToReadingList(() => {
         this.route = { kind: 'list' };
