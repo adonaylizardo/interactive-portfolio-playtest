@@ -1,6 +1,7 @@
-# r22 sequential real-tap (local `index-D9SjIfna.js`)
+# r22 sequential real-tap (`index-D9SjIfna.js`)
 
-base: http://127.0.0.1:4302/interactive-portfolio-playtest/preview/
+live: https://adonaylizardo.github.io/interactive-portfolio-playtest/preview/
+local: http://127.0.0.1:4302/interactive-portfolio-playtest/preview/
 probed: 2026-10-18T11:32–11:49Z, one session per width, real taps only (no driveEnter).
 
 HIGH 1 Estudio→Volaris leftover stall is gone: the van no longer sits at (30.5, 39.0).
