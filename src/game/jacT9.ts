@@ -113,6 +113,7 @@ export type JacSnapshot = {
   pathN: number;
   lastParkMs: number;
   sitWhy: string;
+  maxTilesPerS: number;
   visualTx: number;
   visualTy: number;
   bump: number;
@@ -576,23 +577,8 @@ export class JacT9 {
   }
 
   setDrivePath(path: { x: number; y: number }[], goal: { x: number; y: number }, opts?: { loose?: boolean }): void {
-    this.drivePath = path;
+    this.drivePath = path.slice();
     this.driveGoal = goal;
-    if (opts?.loose && path.length > 0) {
-      const start = path[0];
-      if (Math.hypot(this.cx - start.x, this.cy - start.y) <= 2.6) {
-        this.cx = start.x;
-        this.cy = start.y;
-        const nxt = path[1] ?? goal;
-        const dx = nxt.x - start.x;
-        const dy = nxt.y - start.y;
-        const dir: FacingDir =
-          Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'se' : 'nw') : dy >= 0 ? 'sw' : 'ne';
-        this.dir = dir;
-        this.heading = dirIndex(dir);
-        if (path.length > 1) this.drivePath = path.slice(1);
-      }
-    }
     this.gearHeld = false;
     this.gearReleased = true;
     this.replanN = 0;
@@ -737,8 +723,14 @@ export class JacT9 {
     const origin = k(originCell.x, originCell.y);
     const cacheKey = `${origin}>${doorX},${doorY}`;
     const cached = this.doorRouteCache.get(cacheKey);
+    const cacheStart = cached?.path[0] ?? cached;
+    const cacheNear =
+      !!cached &&
+      !!cacheStart &&
+      Math.hypot(this.cx - cacheStart.x, this.cy - cacheStart.y) <= 2.8;
     if (
       cached &&
+      cacheNear &&
       !this.skippedSits.has(k(cached.x, cached.y)) &&
       this.sitCellHoldable(cached.x, cached.y) &&
       Math.hypot(cached.x - originCell.x, cached.y - originCell.y) > 3.2
@@ -1127,7 +1119,9 @@ export class JacT9 {
     return (
       this.driveBoxWalkable(cx, cy) &&
       this.footprintClear(cx, cy, size.w, size.h) &&
-      this.spriteFootprintClear(cx, cy, dir)
+      this.spriteFootprintClear(cx, cy, dir) &&
+      this.visualSpriteClear(cx, cy, dir) &&
+      !this.sitOverlapsBuilding(cx, cy, dir)
     );
   }
 
@@ -1500,8 +1494,9 @@ export class JacT9 {
         }
       }
       if (next.x !== this.cx || next.y !== this.cy) {
-        this.cx = next.x;
-        this.cy = next.y;
+        const clamped = this.clampSit(next.x, next.y);
+        this.cx = clamped.x;
+        this.cy = clamped.y;
         this.occupy(this.driveCells());
         this.layout();
       }
@@ -1629,8 +1624,7 @@ export class JacT9 {
     this.clearDrivePath();
     this.gearHeld = false;
     this.qaSteer = null;
-    this.brakeTowardZero(1 / 20, EXIT_BRAKE_TILES_S2);
-    if (Math.abs(this.vel) <= 2.4) this.vel = 0;
+    this.vel = 0;
     this.mph = 0;
   }
 
@@ -1777,8 +1771,9 @@ export class JacT9 {
         runDir = dir;
       }
     }
-    // Stay on a long polyline run — a side street must not steal the heading.
-    if (runLen >= 1.6) wantDir = runDir;
+    // Door lanes keep a long run. Ground taps follow the next node so they
+    // do not flip heading 9–25 times hunting a leftover axis.
+    if (this.followLoose && runLen >= 1.6) wantDir = runDir;
     const want = dirIndex(wantDir);
     let err = want - this.heading;
     if (err > 2) err -= 4;
@@ -1896,7 +1891,7 @@ export class JacT9 {
     return { x, y };
   }
 
-  /** Snap onto a door-lane corner and take the outgoing run — same idea as the road-exit hop. */
+  /** Face the outgoing door-lane run. Position stays on the integrator. */
   private snapDoorCorner(): void {
     if (!this.followLoose || this.drivePath.length < 2) return;
     const a = this.drivePath[0];
@@ -1907,18 +1902,11 @@ export class JacT9 {
     const dy = a.y - this.cy;
     const dist = Math.hypot(dx, dy);
     const ol = Math.hypot(ox, oy);
-    if (ol < 1e-4 || dist < 1e-4 || dist > 0.95) return;
+    if (ol < 1e-4 || dist < 1e-4 || dist > 0.55) return;
     const corner = (dx * ox + dy * oy) / (dist * ol) <= 0.35;
     if (!corner) return;
-    this.cx = a.x;
-    this.cy = a.y;
     const axis: FacingDir = Math.abs(ox) >= Math.abs(oy) ? (ox >= 0 ? 'se' : 'nw') : oy >= 0 ? 'sw' : 'ne';
-    this.dir = axis;
-    this.heading = dirIndex(axis);
     this.followDir = axis;
-    this.dirHoldT = DIR_HOLD_S;
-    this.vel = Math.max(this.vel, 3.6);
-    this.drivePath.shift();
   }
 
   /** Nudge sideways onto the door polyline. Never pull backward along it. */
@@ -1995,18 +1983,16 @@ export class JacT9 {
     return this.atParkSit();
   }
 
-  /** Stop on the sit but keep the goal so the scene can get out. */
+  /** Stop on the sit. Door follows keep the goal so the scene can get out. */
   private holdAtGoal(): boolean {
     if (!this.atDriveGoal()) return false;
     this.drivePath = [];
     this.vel = 0;
+    this.mph = 0;
     this.reversing = false;
     this.stuckT = 0;
     this.followDir = null;
-    if (this.lastParkHeading) {
-      this.dir = this.lastParkHeading;
-      this.heading = dirIndex(this.lastParkHeading);
-    }
+    if (!this.followLoose) this.driveGoal = null;
     return true;
   }
 
@@ -2208,6 +2194,7 @@ export class JacT9 {
       pathN: this.drivePath.length,
       lastParkMs: this.lastParkMs,
       sitWhy: this.sitWhy,
+      maxTilesPerS: DRIVE_TILES_PER_S,
       visualTx: this.visualCenterTile().x,
       visualTy: this.visualCenterTile().y,
       bump: this.bumpT,
@@ -2344,9 +2331,24 @@ export class JacT9 {
   }
 
   /** Current pose with an explicit facing — used to reject a turn that would clip. */
+  /** Stick / keys: the parked hull must stay on the map and out of buildings. */
+  private stickHullClear(cx: number, cy: number, dir: FacingDir): boolean {
+    for (const [x, y] of this.parkCellsAt(cx, cy, dir)) {
+      if (x < 0 || y < 0 || x >= MAP_WIDTH || y >= MAP_HEIGHT) return false;
+      if (HARD_PROP_CELLS.has(k(x, y))) return false;
+      const c = cells[y]?.[x];
+      if (!c) return false;
+      if (c.groundId.includes('borde') || c.groundId.includes('building/footprint')) return false;
+      const b = getBuildingAt(x, y);
+      if (b && b.id !== JAC_ID && b.name !== 'muro' && b.name !== 'obelisco') return false;
+    }
+    return true;
+  }
+
   private sitWith(cx: number, cy: number, dir: FacingDir): boolean {
     if (this.driving && !this.pendingExit) {
-      return this.followLoose ? this.driveLaneWalkable(cx, cy) : this.driveBoxWalkable(cx, cy);
+      if (this.followLoose) return this.driveLaneWalkable(cx, cy);
+      return this.driveBoxWalkable(cx, cy) && this.stickHullClear(cx, cy, dir);
     }
     const size = parkSize(dir);
     return (
@@ -2402,9 +2404,13 @@ export class JacT9 {
   private overlapCells(): [number, number][] {
     const out: [number, number][] = [];
     const seen = new Set<string>();
-    for (const [x, y] of this.solidCells()) {
+    for (const [x, y] of this.parkCellsAt(this.cx, this.cy, this.dir)) {
       const key = k(x, y);
-      if (seen.has(key) || !PROP_CELLS.has(key)) continue;
+      if (seen.has(key)) continue;
+      const b = getBuildingAt(x, y);
+      const building = !!b && b.id !== JAC_ID && b.name !== 'muro' && b.name !== 'obelisco';
+      const ground = cells[y]?.[x]?.groundId ?? '';
+      if (!PROP_CELLS.has(key) && !building && !ground.includes('building/footprint')) continue;
       seen.add(key);
       out.push([x, y]);
     }
@@ -2441,48 +2447,18 @@ export class JacT9 {
     };
   }
 
-  private nearestClearSit(): { x: number; y: number; dir: FacingDir } | null {
-    const dirs: FacingDir[] = [this.dir, ...DIRS.filter((d) => d !== this.dir)];
-    for (let r = 0; r <= 6; r += 0.25) {
-      const steps = r === 0 ? 1 : 16;
-      for (let i = 0; i < steps; i++) {
-        const a = (Math.PI * 2 * i) / Math.max(1, steps);
-        const sit = this.clampSit(this.cx + Math.cos(a) * r, this.cy + Math.sin(a) * r);
-        for (const dir of dirs) {
-          if (this.sitWith(sit.x, sit.y, dir)) return { x: sit.x, y: sit.y, dir };
-        }
-      }
-    }
-    return null;
-  }
-
-  /** If the van is inside a prop, push out along the MTV so it can never stay wedged. */
+  /** Nudge at most a fraction of a tile. Never hop to another sit or flip heading. */
   resolveOverlap(): boolean {
     if (!this.overlapsProp()) return true;
-    for (let i = 0; i < 12; i++) {
-      const hit = this.overlapCells();
-      if (hit.length === 0) break;
-      const mtv = this.mtvFor(hit);
+    const hit = this.overlapCells();
+    if (hit.length === 0) return true;
+    const mtv = this.mtvFor(hit);
+    const pull = Math.hypot(mtv.x, mtv.y);
+    if (pull > 1e-4 && pull <= 0.28) {
       const cand = this.clampSit(this.cx + mtv.x, this.cy + mtv.y);
       if (this.sitWith(cand.x, cand.y, this.dir)) {
         this.cx = cand.x;
         this.cy = cand.y;
-        continue;
-      }
-      const found = this.nearestClearSit();
-      if (!found) break;
-      this.cx = found.x;
-      this.cy = found.y;
-      this.dir = found.dir;
-      this.heading = dirIndex(found.dir);
-    }
-    if (this.overlapsProp()) {
-      const found = this.nearestClearSit();
-      if (found) {
-        this.cx = found.x;
-        this.cy = found.y;
-        this.dir = found.dir;
-        this.heading = dirIndex(found.dir);
       }
     }
     this.occupy(this.driving ? this.driveCells() : this.usableParkCells());
@@ -2518,12 +2494,12 @@ export class JacT9 {
     };
     for (const [x, y] of this.rect(o.x, o.y, w, h)) {
       if (x < 0 || y < 0 || x >= MAP_WIDTH || y >= MAP_HEIGHT) return false;
-      if (this.claimed.has(k(x, y))) continue;
       if (PROP_CELLS.has(k(x, y))) return false;
+      const b = getBuildingAt(x, y);
+      if (b && b.id !== JAC_ID && b.name !== 'muro' && b.name !== 'obelisco') return false;
       const c = cells[y]?.[x];
-      if (!c || c.walkable) continue;
-      if (c.groundId.includes('borde') || c.groundId.includes('building/footprint')) continue;
-      return false;
+      if (!c) return false;
+      if (c.groundId.includes('borde') || c.groundId.includes('building/footprint')) return false;
     }
     return true;
   }
@@ -2612,13 +2588,17 @@ export class JacT9 {
     return true;
   }
 
-  /** QA: true when the current solid / parked sprite footprint covers a prop cell. */
+  /** QA: parked 5×3 / 3×5 plus the drawn sprite vs every prop and building. */
   overlapsProp(): boolean {
-    const blocked = this.followLoose ? HARD_PROP_CELLS : PROP_CELLS;
-    for (const [x, y] of this.solidCells()) {
-      if (blocked.has(k(x, y))) return true;
+    const hull = this.parkCellsAt(this.cx, this.cy, this.dir);
+    for (const [x, y] of hull) {
+      if (PROP_CELLS.has(k(x, y))) return true;
+      const b = getBuildingAt(x, y);
+      if (b && b.id !== JAC_ID && b.name !== 'muro' && b.name !== 'obelisco') return true;
+      const c = cells[y]?.[x];
+      if (c?.groundId.includes('building/footprint') || c?.groundId.includes('borde')) return true;
     }
-    if (!this.driving && !this.visualSpriteClear(this.cx, this.cy, this.dir)) return true;
+    if (!this.visualSpriteClear(this.cx, this.cy, this.dir)) return true;
     return false;
   }
 

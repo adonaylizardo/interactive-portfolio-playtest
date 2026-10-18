@@ -48,6 +48,11 @@ const DICT = {
     'panel.exit': 'Exit',
     'panel.close': 'Close',
     'panel.readCase': 'Read case',
+    'case.kicker': 'CASE',
+    'case.placeholder': 'IMAGE PLACEHOLDER',
+    'case.problem': 'Problem',
+    'case.whatIDid': 'What I did',
+    'case.result': 'Result',
 
     'chrome.cases': 'Cases',
     'chrome.achievements': 'Achievements',
@@ -130,6 +135,11 @@ const DICT = {
     'panel.exit': 'Salir',
     'panel.close': 'Cerrar',
     'panel.readCase': 'Leer caso',
+    'case.kicker': 'CASO',
+    'case.placeholder': 'ESPACIO PARA IMAGEN',
+    'case.problem': 'Problema',
+    'case.whatIDid': 'Lo que hice',
+    'case.result': 'Resultado',
 
     'chrome.cases': 'Casos',
     'chrome.achievements': 'Logros',

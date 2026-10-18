@@ -5,6 +5,11 @@ export type CameraView = {
   y: number;
   zoom: number;
   interiorId?: string | null;
+  jacX?: number;
+  jacY?: number;
+  jacDir?: string;
+  charX?: number;
+  charY?: number;
 };
 
 export type HistoryNavigationState = {
@@ -40,6 +45,15 @@ export function buildHash(view: CameraView): string {
   params.set('y', view.y.toFixed(1));
   params.set('z', view.zoom.toFixed(3));
   if (view.interiorId) params.set('in', publicInteriorId(view.interiorId));
+  if (view.jacX != null && view.jacY != null) {
+    params.set('jx', view.jacX.toFixed(2));
+    params.set('jy', view.jacY.toFixed(2));
+    if (view.jacDir) params.set('jd', view.jacDir);
+  }
+  if (view.charX != null && view.charY != null) {
+    params.set('px', view.charX.toFixed(2));
+    params.set('py', view.charY.toFixed(2));
+  }
   return `#${HASH_PREFIX}${params.toString()}`;
 }
 
@@ -54,11 +68,20 @@ export function parseCameraFromHash(): CameraView | null {
     if (!interiorId) return null;
     return { x: 0, y: 0, zoom: 0.85, interiorId };
   }
+  const jacX = num('jx');
+  const jacY = num('jy');
+  const charX = num('px');
+  const charY = num('py');
   return {
     x,
     y,
     zoom,
     interiorId: interiorId || null,
+    jacX: Number.isFinite(jacX) ? jacX : undefined,
+    jacY: Number.isFinite(jacY) ? jacY : undefined,
+    jacDir: params.get('jd') || undefined,
+    charX: Number.isFinite(charX) ? charX : undefined,
+    charY: Number.isFinite(charY) ? charY : undefined,
   };
 }
 

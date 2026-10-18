@@ -63,6 +63,18 @@ function appendMarkdown(el: HTMLElement, text: string): void {
   if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
 }
 
+function localizeCaseHeading(heading: string): string {
+  const key =
+    heading === 'Problem'
+      ? 'case.problem'
+      : heading === 'What I did' || heading === 'What I Did'
+        ? 'case.whatIDid'
+        : heading === 'Result'
+          ? 'case.result'
+          : null;
+  return key ? t(key) : heading;
+}
+
 function caseBlockNode(block: CaseBlock): HTMLElement {
   if (block.kind === 'closing') {
     const p = document.createElement('p');
@@ -77,7 +89,7 @@ function caseBlockNode(block: CaseBlock): HTMLElement {
   if (block.heading) {
     const h = document.createElement('h3');
     h.className = 'case__heading';
-    h.textContent = block.heading;
+    h.textContent = localizeCaseHeading(block.heading);
     section.appendChild(h);
   }
   for (const text of block.paragraphs) {
@@ -470,20 +482,28 @@ export class BuildingPanel {
     if (this.previewSubtitle) this.previewSubtitle.textContent = subtitle;
     if (this.previewTeaser) this.previewTeaser.textContent = teaser;
     const meta = this.el.querySelector('.case-preview__read-meta');
-    if (meta) meta.textContent = preview?.pillMeta ?? 'Problem · What I did · Result';
+    if (meta) {
+      meta.textContent = `${t('case.problem')} · ${t('case.whatIDid')} · ${t('case.result')}`;
+    }
     if (this.readBarTitle) {
       this.readBarTitle.textContent = this.isMobile() || !subtitle
         ? (title ?? interiorId)
         : `${title}: ${subtitle.charAt(0).toLowerCase()}${subtitle.slice(1)}`;
     }
-    if (this.readKicker) this.readKicker.textContent = preview?.kicker ?? 'CASE';
+    const kickerEl = this.el.querySelector('.case-preview__kicker');
+    if (kickerEl) kickerEl.textContent = t('case.kicker');
+    if (this.readKicker) {
+      this.readKicker.textContent = `${t('case.kicker')} · ${(title ?? interiorId).toUpperCase()}`;
+    }
     if (this.readHeadline) {
       this.readHeadline.textContent = this.isMobile()
         ? (preview?.teaser ?? title ?? interiorId).replace(/[.]$/, '')
         : (preview?.teaserFull ?? preview?.teaser ?? title ?? interiorId);
     }
     if (this.readLede) this.readLede.textContent = subtitle;
-    if (this.readHeroLabel) this.readHeroLabel.textContent = preview?.placeholder ?? 'IMAGE PLACEHOLDER';
+    if (this.readHeroLabel) {
+      this.readHeroLabel.textContent = `${(title ?? interiorId).toUpperCase()} · ${t('case.placeholder')}`;
+    }
     return title;
   }
 
@@ -681,5 +701,6 @@ export class BuildingPanel {
     const read = this.el.querySelector('.case-preview__read-label');
     if (read) read.textContent = t('panel.readCase');
     if (this.mode === 'preview' && this.interiorId) this.fillPreviewCopy(this.interiorId);
+    if (this.interiorId && !this.caseEl.hidden) this.renderCase();
   }
 }
