@@ -1937,8 +1937,8 @@ export class IsoScene {
     this.pendingDriveEnterAt = performance.now();
     this.pendingDriveFrom = { x: this.jac.cx, y: this.jac.cy };
     const dest = path.length > 0 ? path[path.length - 1] : sit;
-    const spawn = this.jac.spawn?.center;
-    const leftSpawn = !spawn || Math.hypot(this.jac.cx - spawn.x, this.jac.cy - spawn.y) > 2.4;
+    const spawn = this.jac.spawn?.center ?? { x: 25.5, y: 17 };
+    const leftSpawn = Math.hypot(this.jac.cx - spawn.x, this.jac.cy - spawn.y) > 2.4;
     const atSit = path.length === 0 || (Math.hypot(this.jac.cx - dest.x, this.jac.cy - dest.y) < 1.2 && this.jac.mph < 1);
     if (atSit && atDoor && leftSpawn) {
       this.jacGetOut({ thenEnter: true });
@@ -4426,17 +4426,23 @@ export class IsoScene {
     const from = this.pendingDriveFrom;
     const traveled = !from || Math.hypot(this.jac.cx - from.x, this.jac.cy - from.y) > 2.2;
     const spawn = this.jac.spawn?.center;
-    const leftSpawn = !spawn || Math.hypot(this.jac.cx - spawn.x, this.jac.cy - spawn.y) > 2.4;
+    const lot = spawn ?? { x: 25.5, y: 17 };
+    const leftSpawn = Math.hypot(this.jac.cx - lot.x, this.jac.cy - lot.y) > 2.4;
     const pathLeft = this.jac.drivePath.length;
-    const nearPathEnd = traveled && leftSpawn && along >= 0 && pathLeft <= 5 && distSit <= 2.85;
-    const stalled = pathLeft === 0 && this.jac.mph < 3 && leftSpawn;
+    const slow = this.jac.mph < 4;
+    const nearSit = distSit <= 1.45;
     const doorSideSit =
-      (stalled || nearPathEnd) && along >= 0 && (distDoor <= 5.5 || (traveled && distDoor <= 10) || nearPathEnd);
+      traveled &&
+      leftSpawn &&
+      slow &&
+      along >= 0 &&
+      distSit <= 1.8 &&
+      (distDoor <= 5.5 || pathLeft === 0);
     if (arrived && !leftSpawn) {
       this.retryDriveEnterOrGetOut();
       return;
     }
-    if ((arrived || doorSideSit) && leftSpawn) {
+    if ((arrived || nearSit || doorSideSit) && leftSpawn) {
       this.jac.sitWhy = arrived
         ? `arrived sit=(${sit?.x},${sit?.y}) d=${distSit.toFixed(2)} mph=${this.jac.mph}`
         : `door-side along=${along.toFixed(2)} doorD=${distDoor.toFixed(2)} sitD=${distSit.toFixed(2)} mph=${this.jac.mph}`;
@@ -4503,14 +4509,15 @@ export class IsoScene {
     const along = this.jac.doorSideAlong(entry.door.x, entry.door.y);
     const dist = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
     const spawn = this.jac.spawn?.center;
-    const leftSpawn = !spawn || Math.hypot(this.jac.cx - spawn.x, this.jac.cy - spawn.y) > 2.4;
+    const lot = spawn ?? { x: 25.5, y: 17 };
+    const leftSpawn = Math.hypot(this.jac.cx - lot.x, this.jac.cy - lot.y) > 2.4;
     const sitNow = this.jac.driveGoal;
     const distSit = sitNow ? Math.hypot(this.jac.cx - sitNow.x, this.jac.cy - sitNow.y) : Infinity;
     if (
       leftSpawn &&
       along >= 0 &&
-      dist <= 10 &&
-      (this.jac.canParkHere() || this.jac.atParkSit() || distSit <= 1.8)
+      distSit <= 1.8 &&
+      (this.jac.canParkHere() || this.jac.atParkSit() || dist <= 5.5)
     ) {
       this.jac.sitWhy = `retry get-out along=${along.toFixed(2)} doorD=${dist.toFixed(2)}`;
       this.jacGetOut({ thenEnter: true });
