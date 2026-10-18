@@ -96,6 +96,13 @@ if (process.env.DEPLOY_GATE_PASSED === '1') {
 
 run('node scripts/copy-persona-art.mjs');
 
+if (target === 'preview-persona') {
+  writeFileSync(
+    path.join(dist, 'deploy-rev.txt'),
+    `${new Date().toISOString()} cursor/persona-camaras @ ${execSync('git rev-parse --short HEAD', { cwd: root, encoding: 'utf8' }).trim()}\n`,
+  );
+}
+
 if (!existsSync(path.join(dist, 'index.html'))) {
   console.error('dist/index.html missing after build');
   process.exit(1);

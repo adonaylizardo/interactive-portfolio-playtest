@@ -86,7 +86,7 @@ async function speedTable(page) {
       deflection: def,
       tilesIn2s: Number(tiles.toFixed(2)),
       tilesPerS: Number(tilesPerS.toFixed(2)),
-      pass: def <= PERSONA_STICK_DEAD ? tiles < 0.02 : def >= 0.17 ? tilesIn2s >= 0.08 && tilesPerS <= 2.2 : tilesPerS <= 2.2,
+      pass: def <= PERSONA_STICK_DEAD ? tiles < 0.02 : def >= 0.17 ? tiles >= 0.08 && tilesPerS <= 2.2 : tilesPerS <= 2.2,
     });
   }
   return rows;
