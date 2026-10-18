@@ -17,6 +17,7 @@ import {
   PERSONA_REF,
   PX_PER_M,
   jacPersonaAnchorMeters,
+  METERS_PER_TILE,
   piezaById,
   tileToPersonaMeters,
   WHEEL_POS_1X,
@@ -150,7 +151,8 @@ function projectTp(
   const cos = Math.cos(cam.yaw);
   const depth = dx * sin + dz * cos;
   const lateral = dx * cos - dz * sin;
-  if (depth < 0.4) return null;
+  const minDepthM = 0.6 * METERS_PER_TILE;
+  if (depth < minDepthM) return null;
   return {
     x: sw / 2 + (lateral * f) / depth,
     y: horY - ((wy - EYE_TP_M) * f) / depth,
@@ -237,6 +239,37 @@ export class PersonaView {
 
   qaSkyVisible(): boolean {
     return !!this.sky?.visible;
+  }
+
+  /** Forge QA: largest projected facade on screen (near-plane guard). */
+  qaFacadeScreenProbe(
+    charTx: number,
+    charTy: number,
+    yawRad: number,
+    sw: number,
+    sh: number,
+  ): { maxScale: number; maxScreenWFrac: number; oversized: boolean } {
+    const player = tileToPersonaMeters(charTx, charTy);
+    const cam = personaCam(player.x, player.z, yawRad);
+    let maxScale = 0;
+    let maxScreenWFrac = 0;
+    const maxScaleCap = 6;
+    const maxScreenW = sw * 0.95;
+    for (const f of this.facades) {
+      if (Math.abs(f.z - player.z) > 52) continue;
+      const p = projectTp(f.x, 0, f.z, cam, sw, sh);
+      const texW = f.sprite.texture.width;
+      const screenW = texW * (p?.scale ?? 0);
+      if (!p || p.scale < 0.07 || p.scale > maxScaleCap || screenW > maxScreenW) continue;
+      maxScale = Math.max(maxScale, p.scale);
+      maxScreenWFrac = Math.max(maxScreenWFrac, screenW / sw);
+    }
+    const visibleOversized = maxScale > maxScaleCap || maxScreenWFrac > maxScreenW / sw;
+    return {
+      maxScale,
+      maxScreenWFrac,
+      oversized: visibleOversized,
+    };
   }
 
   async ensureLoaded(dpr: number): Promise<void> {
@@ -419,7 +452,11 @@ export class PersonaView {
         continue;
       }
       const p = projectTp(f.x, 0, f.z, cam, sw, sh);
-      if (!p || p.scale < 0.07) {
+      const texW = f.sprite.texture.width;
+      const screenW = texW * (p?.scale ?? 0);
+      const maxScale = 6;
+      const maxScreenW = sw * 0.95;
+      if (!p || p.scale < 0.07 || p.scale > maxScale || screenW > maxScreenW) {
         f.sprite.visible = false;
         continue;
       }

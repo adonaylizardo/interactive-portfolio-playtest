@@ -63,7 +63,10 @@ export function parseCameraFromHash(): CameraView | null {
 }
 
 export function parseInteriorFromHash(): string | null {
-  return interiorIdFromPublic(hashParams().get('in'));
+  const raw = hashParams().get('in');
+  if (!raw) return null;
+  if (!/^[\w-]+$/i.test(raw)) return null;
+  return interiorIdFromPublic(raw);
 }
 
 let writeTimer: ReturnType<typeof setTimeout> | null = null;

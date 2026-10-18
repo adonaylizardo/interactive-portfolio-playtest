@@ -170,15 +170,19 @@ body.is-canvas-dragging * {
   pointer-events: auto;
 }
 
-#ui-root > .persona-kit,
+#ui-root > .persona-kit {
+  pointer-events: none;
+}
+
+#ui-root > .persona-kit .persona-kit__overlay:not([hidden]),
 #ui-root > .persona-kit .persona-kit__card,
-#ui-root > .persona-kit .persona-kit__cam-load,
+#ui-root > .persona-kit .persona-kit__cam-load:not([hidden]),
 #ui-root > .persona-kit .persona-kit__cam-load-pill,
 #ui-root > .persona-kit .persona-kit__cam,
 #ui-root > .persona-kit .persona-kit__help,
 #ui-root > .persona-kit .persona-kit__lang,
-#ui-root > .persona-enter-prompt,
-#ui-root > .persona-jac-board {
+#ui-root > .persona-enter-prompt:not([hidden]),
+#ui-root > .persona-jac-board:not([hidden]) .persona-jac-board__btn {
   pointer-events: auto;
 }
 
@@ -3225,6 +3229,26 @@ body.persona-kit .persona-kit__help {
     top: auto;
     bottom: calc(88px + env(safe-area-inset-bottom, 0px));
     right: max(16px, env(safe-area-inset-right, 0px));
+  }
+
+  body.persona-kit:has(.checklist:not(.checklist--collapsed):not(.checklist--mobile-closed)) .persona-kit__lang {
+    top: auto;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    right: calc(16px + 44px + 8px);
+  }
+
+  body.persona-kit:has(.checklist:not(.checklist--collapsed):not(.checklist--mobile-closed)) .persona-kit__help {
+    top: auto;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    right: max(16px, env(safe-area-inset-right, 0px));
+  }
+
+  body.persona-kit:has(.checklist:not(.checklist--collapsed):not(.checklist--mobile-closed))
+    .chrome__tools-stack
+    [data-action='sound'] {
+    top: auto;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    right: calc(16px + 44px + 52px);
   }
 }
 

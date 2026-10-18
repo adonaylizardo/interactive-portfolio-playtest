@@ -120,7 +120,9 @@ async function personaSwitchProbe(page, vp) {
     probe.personaLayerVisible &&
     !probe.cenitalVanVisible &&
     !probe.altLayerVisible &&
-    probe.adonayVisible;
+    probe.adonayVisible &&
+    probe.presentationReady &&
+    !probe.facade?.oversized;
   return { ...probe, colors, ok, screenshot: path.basename(shot) };
 }
 

@@ -197,6 +197,7 @@ async function main(): Promise<void> {
     },
     onUnreachable: () => showToast(t('toast.unreachable')),
     onGetOutToEnter: () => showToast(t('toast.getOutToEnter')),
+    onUnknownRoute: () => showToast(t('toast.unknownRoute')),
     buildingPanel: {
       isOpen: () => panel.isOpen(),
       openTitle: () => panel.openTitle(),

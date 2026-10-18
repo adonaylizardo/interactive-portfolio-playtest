@@ -21,7 +21,6 @@ export class PersonaKitUI {
   private langBtn: HTMLButtonElement;
   private callbacks: PersonaKitCallbacks;
   private switching = false;
-  private showLoadRaf = 0;
 
   constructor(container: HTMLElement, callbacks: PersonaKitCallbacks) {
     if (!personaEnabled()) {
@@ -173,17 +172,11 @@ export class PersonaKitUI {
     if (this.callbacks.getViewMode() === mode) return;
     this.switching = true;
     this.lockCamWidths();
-    let shown = false;
-    this.showLoadRaf = requestAnimationFrame(() => {
-      if (!this.switching) return;
-      this.showCamLoading(mode);
-      shown = true;
-    });
+    this.showCamLoading(mode);
     try {
       await this.callbacks.switchView(mode);
     } finally {
-      cancelAnimationFrame(this.showLoadRaf);
-      if (shown) this.hideCamLoading();
+      this.hideCamLoading();
       this.switching = false;
       this.syncCameraSwitch();
     }

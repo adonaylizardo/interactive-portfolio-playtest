@@ -277,6 +277,7 @@ export type SceneEvents = {
   onInteriorIdChange?: (interiorId: string | null) => void;
   onUnreachable?: () => void;
   onGetOutToEnter?: () => void;
+  onUnknownRoute?: () => void;
   onMoveCommand?: () => void;
   onFrame?: () => void;
   stick?: () => { x: number; y: number };
@@ -696,8 +697,13 @@ export class IsoScene {
     });
 
     if (bootInterior) {
-      replaceOutdoorHash(this.outdoorCamBeforeInterior ?? { x: this.cameraX, y: this.cameraY, zoom: this.zoom });
-      this.enterInterior(bootInterior, { skipFade: true });
+      if (!getInteriorDef(bootInterior)) {
+        this.events.onUnknownRoute?.();
+        replaceOutdoorHash(this.outdoorCamBeforeInterior ?? { x: this.cameraX, y: this.cameraY, zoom: this.zoom });
+      } else {
+        replaceOutdoorHash(this.outdoorCamBeforeInterior ?? { x: this.cameraX, y: this.cameraY, zoom: this.zoom });
+        this.enterInterior(bootInterior, { skipFade: true });
+      }
     }
     setHashWriteSuppressed(false);
     this.applyCamera(true);
@@ -710,6 +716,11 @@ export class IsoScene {
   private applyHashNavigation(state: HistoryNavigationState | null): void {
     const v = parseCameraFromHash();
     const id = parseInteriorFromHash();
+    if (id && !this.interiorActive && !getInteriorDef(id)) {
+      this.events.onUnknownRoute?.();
+      replaceOutdoorHash(this.outdoorCamBeforeInterior ?? { x: this.cameraX, y: this.cameraY, zoom: this.zoom });
+      return;
+    }
     if (v && !this.interiorActive) {
       this.cameraX = v.x;
       this.cameraY = v.y;
@@ -1731,7 +1742,12 @@ export class IsoScene {
       this.altJacLayer.clear();
       this.applyCamera(true);
       await this.persona.ensureLoaded(dpr);
-      await this.qaFlushPersonaView();
+      const deadline = performance.now() + 6000;
+      while (performance.now() < deadline) {
+        await this.qaFlushPersonaView();
+        if (this.qaPersonaPresentationReady()) break;
+        await new Promise<void>((r) => setTimeout(r, 50));
+      }
       this.applyCamera(true);
       return;
     }
@@ -6252,7 +6268,18 @@ export class IsoScene {
     altLayerVisible: boolean;
     adonayVisible: boolean;
     skyVisible: boolean;
+    facade: { maxScale: number; maxScreenWFrac: number; oversized: boolean };
+    presentationReady: boolean;
   } {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const facade = this.persona.qaFacadeScreenProbe(
+      this.charTx,
+      this.charTy,
+      this.personaCamYaw,
+      sw,
+      sh,
+    );
     return {
       viewMode: this.viewMode,
       worldVisible: this.world.visible,
@@ -6262,7 +6289,18 @@ export class IsoScene {
       altLayerVisible: this.altViewLayer.visible,
       adonayVisible: this.persona.qaAdonayVisible(),
       skyVisible: this.persona.qaSkyVisible(),
+      facade,
+      presentationReady: this.qaPersonaPresentationReady(),
     };
+  }
+
+  qaPersonaPresentationReady(): boolean {
+    if (!this.personaOn() || this.jac?.driving) return true;
+    if (!this.persona.qaAdonayVisible() || !this.persona.qaSkyVisible()) return false;
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    return !this.persona.qaFacadeScreenProbe(this.charTx, this.charTy, this.personaCamYaw, sw, sh)
+      .oversized;
   }
 
   qaPersonaState(): {
