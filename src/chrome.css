@@ -751,8 +751,8 @@ body[data-layout='panel'] #game-canvas {
 
   .chrome--mobile.chrome--landscape-side .chrome__lang {
     top: 12px;
-    left: 72px;
-    right: auto;
+    right: 16px;
+    left: auto;
   }
 
   .chrome--mobile.chrome--landscape-side .chrome__sound {

@@ -792,10 +792,17 @@ body[data-layout='panel'] .checklist {
     pointer-events: none;
   }
 
-  .building-panel--interior-only.building-panel--open.building-panel--expanded
+  .building-panel--interior-only.building-panel--open.building-panel--expanded:not(
+      .building-panel--experience
+    )
     .building-panel__backdrop {
     opacity: 1;
     pointer-events: auto;
+  }
+
+  .building-panel--experience.building-panel--open .building-panel__backdrop {
+    opacity: 0;
+    pointer-events: none;
   }
 }
 
@@ -875,8 +882,7 @@ body[data-layout='panel'] .checklist {
 }
 
 @media (max-width: 767px) {
-  .building-panel--experience:not(.building-panel--writings).building-panel--open:not(.building-panel--peek)
-    .building-panel__sheet {
+  .building-panel--experience.building-panel--open:not(.building-panel--peek) .building-panel__sheet {
     top: auto;
     bottom: 0;
     left: 0;
@@ -884,19 +890,6 @@ body[data-layout='panel'] .checklist {
     width: auto;
     max-height: min(42vh, 340px);
     border-radius: 16px 16px 0 0;
-    transform: none;
-    overflow-y: auto;
-  }
-
-  .building-panel--experience.building-panel--writings.building-panel--open:not(.building-panel--peek)
-    .building-panel__sheet {
-    top: 0;
-    bottom: 0;
-    left: 64px;
-    right: auto;
-    width: min(360px, calc(100vw - 64px - 8px));
-    max-height: none;
-    border-radius: 0 16px 16px 0;
     transform: none;
     overflow-y: auto;
   }

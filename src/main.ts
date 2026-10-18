@@ -165,6 +165,10 @@ async function main(): Promise<void> {
     if (interiorId) {
       const b = getBuildingByName(interiorId);
       if (b?.panelTitle) {
+        if (reading.isActive() || isReadingHash()) {
+          reading.syncRoute(null);
+          scene.setReadingPaused(false);
+        }
         checklist.setBuildingPanelOpen(true);
         if (interiorId === 'teresa') {
           studio.clearSubtitle();

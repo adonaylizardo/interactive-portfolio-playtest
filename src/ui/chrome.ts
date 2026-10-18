@@ -642,46 +642,99 @@ export class ChromeUI {
   private placeLang(): void {
     const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
     if (!lang) return;
+    const pad = 8;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
     const shortLand = window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
-    lang.style.left = 'auto';
-    lang.style.right = '16px';
-    lang.style.top = shortLand ? '12px' : this.mobile ? '24px' : '20px';
+    const landscapeSide = this.root.classList.contains('chrome--landscape-side');
+
+    const blockers: DOMRect[] = [];
+    const pushBlocker = (el: Element | null) => {
+      if (!el || (el as HTMLElement).hidden) return;
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el as HTMLElement);
+      if (r.width > 8 && r.height > 8 && cs.display !== 'none' && cs.visibility !== 'hidden') {
+        blockers.push(r);
+      }
+    };
+    pushBlocker(this.root.querySelector('.chrome__tools-phone'));
+    pushBlocker(document.querySelector('.checklist'));
+    pushBlocker(this.root.querySelector('.chrome__rail'));
+    pushBlocker(this.root.querySelector('.chrome__column'));
+    pushBlocker(this.root.querySelector('.chrome__intro'));
+    pushBlocker(this.root.querySelector('.chrome__dock'));
+
+    const overlaps = (lr: DOMRect) =>
+      blockers.some((b) => {
+        const ox = Math.max(0, Math.min(lr.right, b.right) - Math.max(lr.left, b.left));
+        const oy = Math.max(0, Math.min(lr.bottom, b.bottom) - Math.max(lr.top, b.top));
+        return ox > pad && oy > pad;
+      });
+
+    const apply = (top: number, left: number | null, right: number | null) => {
+      lang.style.top = `${top}px`;
+      if (left != null) {
+        lang.style.left = `${left}px`;
+        lang.style.right = 'auto';
+      } else {
+        lang.style.left = 'auto';
+        lang.style.right = `${right ?? 16}px`;
+      }
+    };
+
+    const measureAt = (top: number, left: number | null, right: number | null): DOMRect => {
+      apply(top, left, right);
+      return lang.getBoundingClientRect();
+    };
+
+    const langH = 48;
+    const candidates: { top: number; left: number | null; right: number | null }[] = [];
 
     if (this.mobile) {
-      if (shortLand) {
-        lang.style.left = '72px';
-        lang.style.right = 'auto';
-        lang.style.top = '12px';
-        return;
+      if (shortLand && landscapeSide) {
+        candidates.push(
+          { top: 12, left: null, right: 16 },
+          { top: 68, left: null, right: 16 },
+          { top: 12, left: Math.max(72, Math.round(vw * 0.42) + 12), right: null },
+          { top: vh - langH - 12, left: null, right: 16 },
+        );
+      } else if (shortLand) {
+        candidates.push(
+          { top: 12, left: null, right: 16 },
+          { top: 68, left: null, right: 16 },
+          { top: 12, left: null, right: 80 },
+          { top: vh - langH - 12, left: null, right: 16 },
+        );
+      } else {
+        candidates.push(
+          { top: 24, left: null, right: 16 },
+          { top: 84, left: null, right: 16 },
+          { top: 24, left: 16, right: null },
+          { top: vh - langH - 16, left: null, right: 16 },
+        );
       }
-      lang.style.top = '24px';
-      lang.style.right = '16px';
-      lang.style.left = 'auto';
-      const tools = this.root.querySelector('.chrome__tools-phone') as HTMLElement | null;
-      const tr = tools?.getBoundingClientRect();
-      const langRect = lang.getBoundingClientRect();
-      const cl = document.querySelector('.checklist') as HTMLElement | null;
-      const ring = cl && !cl.hidden ? cl.getBoundingClientRect() : null;
-      if (tr && tr.width > 8 && langRect.width > 8 && langRect.left < tr.right + 8) {
-        const candidateTop = Math.round(tr.bottom + 8);
-        const langH = langRect.height > 8 ? langRect.height : 40;
-        if (ring && ring.width > 8 && candidateTop + langH > ring.top - 4) {
-          lang.style.top = `${Math.max(12, Math.round(ring.bottom + 8))}px`;
-        } else {
-          lang.style.top = `${candidateTop}px`;
-        }
+    } else {
+      const cl = document.querySelector('.checklist');
+      const ring = cl?.getBoundingClientRect();
+      if (ring && ring.width > 8) {
+        candidates.push({
+          top: Math.max(16, ring.top + (ring.height - 44) / 2),
+          left: null,
+          right: Math.max(16, vw - ring.left + pad),
+        });
       }
-      return;
+      candidates.push(
+        { top: 20, left: null, right: 16 },
+        { top: 72, left: null, right: 16 },
+        { top: 20, left: 16, right: null },
+      );
     }
 
-    const cl = document.querySelector('.checklist') as HTMLElement | null;
-    const ring = cl && !cl.hidden ? cl.getBoundingClientRect() : null;
-    if (ring && ring.width > 8) {
-      const top = Math.max(16, ring.top + (ring.height - 40) / 2);
-      const right = Math.max(16, window.innerWidth - ring.left + 8);
-      lang.style.top = `${top}px`;
-      lang.style.right = `${right}px`;
+    for (const c of candidates) {
+      const r = measureAt(c.top, c.left, c.right);
+      if (r.width > 8 && !overlaps(r)) return;
     }
+    apply(candidates[0]!.top, candidates[0]!.left, candidates[0]!.right);
   }
 
   private drawMinimap(): void {

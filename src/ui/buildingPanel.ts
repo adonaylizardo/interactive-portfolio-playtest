@@ -716,6 +716,9 @@ export class BuildingPanel {
     open.rel = 'noopener noreferrer';
     open.textContent = t('talks.openVideo');
     wrap.append(media, open);
+    requestAnimationFrame(() => {
+      open.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
     const h3 = document.createElement('h3');
     h3.className = 'talks-player__title';
     h3.textContent = title;
@@ -1094,12 +1097,9 @@ export class BuildingPanel {
     if (this.isMobile()) {
       const peek = this.el.classList.contains('building-panel--peek');
       if (this.isExperienceMode() && !peek) {
-        if (this.mode === 'talks') {
-          const cap = Math.min(window.innerHeight * 0.42, 340);
-          const bottom = Math.min(sheet.height, cap, window.innerHeight - 120);
-          return { left: 0, top: 0, right: 0, bottom: Math.ceil(Math.max(88, bottom) + 8) };
-        }
-        return { left: Math.ceil(sheet.right + 8), top: 0, right: 0, bottom: 0 };
+        const cap = Math.min(window.innerHeight * 0.42, 340);
+        const bottom = Math.min(sheet.height, cap, window.innerHeight - 120);
+        return { left: 0, top: 0, right: 0, bottom: Math.ceil(Math.max(88, bottom) + 8) };
       }
       const bottom = peek ? Math.min(88, sheet.height) : sheet.height;
       return { left: 0, top: 0, right: 0, bottom: Math.ceil(bottom + 8) };

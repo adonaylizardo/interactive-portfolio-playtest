@@ -3190,6 +3190,7 @@ export class IsoScene {
    * PiP sprite). Never readPixels / drawImage the game WebGL view.
    */
   private composeRearPass(): void {
+    if (!this.jac?.rearCam) this.restoreMainTarget();
     const want = this.jac?.rearCam ? 1 : 0;
     if (want === 0) {
       this.rearFade = 0;
@@ -3966,9 +3967,27 @@ export class IsoScene {
 
   /** Refit camera when the interior sheet peek height changes. */
   applyCameraFromUi(): void {
-    if (this.interiorActive) this.fitInteriorCamera();
+    if (this.interiorActive) {
+      this.fitInteriorCamera();
+      this.applyCamera(false);
+      this.restoreMainTarget();
+      this.app?.render();
+      return;
+    }
     this.applyCamera(false);
   }
+
+  /** Resume presenting the main canvas (reading pause / rear-cam can leave the ticker on a dead target). */
+  ensurePresentation(): void {
+    if (!this.app) return;
+    if (this.readingPaused) return;
+    this.restoreMainTarget();
+    if (this.interiorActive) this.fitInteriorCamera();
+    this.applyCamera(false);
+    this.app.render();
+  }
+
+  private readingPaused = false;
 
   getInteriorBuildingId(): string | null {
     return this.interiorActive ? this.interiorDef?.id ?? null : null;
@@ -4781,8 +4800,13 @@ export class IsoScene {
   /** Pause map simulation while the reading view is open (saves CPU on long-form pages). */
   setReadingPaused(paused: boolean): void {
     if (!this.app) return;
-    if (paused) this.app.ticker.stop();
-    else this.app.ticker.start();
+    this.readingPaused = paused;
+    if (paused) {
+      this.app.ticker.stop();
+      return;
+    }
+    this.app.ticker.start();
+    this.ensurePresentation();
   }
 
   /** For QA — place character on a walkable tile without opening doors. */
