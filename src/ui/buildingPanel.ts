@@ -3,7 +3,18 @@ import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
 import { CASES, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
 import { TALKS, WRITINGS, type TalkItem, type WritingSection } from '../data/experiences';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
-import { FIGMA_DOC, FIGMA_PAUSE, FIGMA_PLAY, figmaAsset } from './figmaAssets';
+import {
+  FIGMA_BACK_PHONE_READING,
+  FIGMA_CLOSE_PHONE_READING,
+  FIGMA_DOC,
+  FIGMA_DOC_2X,
+  FIGMA_DOC_PHONE,
+  FIGMA_DOC_RASTER,
+  FIGMA_PAUSE,
+  FIGMA_PLAY,
+  FIGMA_SUBSTACK_PHONE,
+  figmaAsset,
+} from './figmaAssets';
 import { iconSvg } from './icons';
 import { onLangChange, t, type I18nKey } from './i18n';
 
@@ -11,6 +22,7 @@ const FIGMA_BACK = figmaAsset('talks-desktop-list', '9f9c4.svg');
 const FIGMA_EXPAND = figmaAsset('talks-desktop-list', 'ce7c9.svg');
 const FIGMA_CLOSE = figmaAsset('talks-desktop-list', 'f1b3a.svg');
 const FIGMA_SUBSTACK = figmaAsset('writings-desktop-reading', 'c0026.svg');
+
 function aboutBlockNode(block: AboutBlock): HTMLElement {
   if (block.kind === 'heading') {
     const h = document.createElement(`h${block.level + 3}`);
@@ -602,6 +614,16 @@ export class BuildingPanel {
     this.expMobileChrome.classList.toggle('exp-mobile-chrome--grab-wide', talksList);
     this.expMobileChrome.classList.toggle('exp-mobile-chrome--grab-compact', !talksList);
     this.expMobileChrome.classList.toggle('exp-mobile-chrome--list-pad', talksList);
+    if (this.mode === 'writings' && this.experienceView === 'detail') {
+      const backIcon = this.expMobileChrome.querySelector(
+        '.exp-mobile-chrome__back .exp-mobile-chrome__icon',
+      ) as HTMLImageElement | null;
+      const closeIcon = this.expMobileChrome.querySelector(
+        '.exp-mobile-chrome__close .exp-mobile-chrome__icon',
+      ) as HTMLImageElement | null;
+      if (backIcon) backIcon.src = FIGMA_BACK_PHONE_READING;
+      if (closeIcon) closeIcon.src = FIGMA_CLOSE_PHONE_READING;
+    }
   }
 
   private setExperienceView(view: 'list' | 'detail'): void {
@@ -657,9 +679,10 @@ export class BuildingPanel {
     if (kind === 'writing') {
       const doc = document.createElement('img');
       doc.className = 'experience__doc-icon';
-      doc.src = FIGMA_DOC;
-      doc.width = compact ? 15 : 15;
-      doc.height = compact ? 15 : 15;
+      doc.src = FIGMA_DOC_RASTER;
+      if (!this.isMobile()) doc.srcset = `${FIGMA_DOC_2X} 2x`;
+      doc.width = 15;
+      doc.height = 15;
       doc.alt = '';
       thumb.append(doc);
     } else {
@@ -827,29 +850,30 @@ export class BuildingPanel {
     if (!this.experienceDetail) return;
     const wrap = document.createElement('article');
     wrap.className = 'writings-reader';
+    const docIcon = this.isMobile() ? FIGMA_DOC_PHONE : FIGMA_DOC;
+    const substackIcon = this.isMobile() ? FIGMA_SUBSTACK_PHONE : FIGMA_SUBSTACK;
     wrap.innerHTML = `
       <div class="writings-reader__hero" aria-hidden="true">
-        <img class="writings-reader__hero-icon" src="${FIGMA_DOC}" width="15" height="15" alt="" />
+        <img class="writings-reader__hero-icon" src="${docIcon}" width="15" height="15" alt="" />
       </div>
       <p class="writings-reader__kicker"></p>
       <h3 class="writings-reader__title"></h3>
       <p class="writings-reader__meta"></p>
-      <p class="writings-reader__p"></p>
-      <p class="writings-reader__p"></p>
-      <p class="writings-reader__p"></p>
       <a class="writings-reader__substack" href="#" rel="noopener noreferrer">
-        <img class="writings-reader__substack-icon" src="${FIGMA_SUBSTACK}" width="15" height="15" alt="" />
+        <img class="writings-reader__substack-icon" src="${substackIcon}" width="15" height="15" alt="" />
         <span class="writings-reader__substack-label"></span>
       </a>
     `;
     wrap.querySelector('.writings-reader__kicker')!.textContent = t('writings.reader.kicker');
     wrap.querySelector('.writings-reader__title')!.textContent = t(item.titleKey as I18nKey);
     wrap.querySelector('.writings-reader__meta')!.textContent = t(item.metaKey as I18nKey);
-    const paras = wrap.querySelectorAll('.writings-reader__p');
-    paras[0]!.textContent = t('writings.reader.p1');
-    paras[1]!.textContent = t('writings.reader.p2');
-    paras[2]!.textContent = t('writings.reader.p3');
     const sub = wrap.querySelector('.writings-reader__substack') as HTMLAnchorElement;
+    for (const key of ['writings.reader.p1', 'writings.reader.p2', 'writings.reader.p3'] as const) {
+      const p = document.createElement('p');
+      p.className = 'writings-reader__p';
+      p.textContent = t(key);
+      wrap.insertBefore(p, sub);
+    }
     sub.querySelector('.writings-reader__substack-label')!.textContent = t('writings.substackCta');
     sub.addEventListener('click', (e) => e.preventDefault());
     this.experienceDetail.replaceChildren(wrap);

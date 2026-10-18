@@ -33,3 +33,9 @@ export const FIGMA_PAUSE = figmaAsset('talks-desktop-player', 'd0608.svg');
 export const FIGMA_STAGE = figmaAsset('talks-desktop-player', '0f6fa.png');
 /** Pagina glifo on list/reader cover placeholders (15×15). */
 export const FIGMA_DOC = figmaAsset('writings-desktop-list', 'aef4f.svg');
+export const FIGMA_DOC_RASTER = `${BASE}/assets/writings-desktop-list/aef4f-15.png`;
+export const FIGMA_DOC_2X = `${BASE}/assets/writings-desktop-list/aef4f@2x.png`;
+export const FIGMA_DOC_PHONE = figmaAsset('writings-phone-list', 'aef4f.svg');
+export const FIGMA_SUBSTACK_PHONE = figmaAsset('writings-phone-reading', 'c0026.svg');
+export const FIGMA_BACK_PHONE_READING = figmaAsset('writings-phone-reading', '9f9c4.svg');
+export const FIGMA_CLOSE_PHONE_READING = figmaAsset('writings-phone-reading', 'f1b3a.svg');

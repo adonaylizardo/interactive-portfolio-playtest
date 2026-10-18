@@ -1765,13 +1765,27 @@ body[data-layout='panel'] .checklist {
     line-height: 28px;
   }
 
-  .building-panel--experience .writings-reader__body {
-    font-size: 14px;
-    line-height: 22px;
-  }
-
   .building-panel--experience .writings-reader {
     gap: 12px;
+  }
+
+  .building-panel--experience.building-panel--writings .writings-reader__kicker,
+  .building-panel--experience.building-panel--writings .writings-reader__meta {
+    white-space: nowrap;
+  }
+
+  .building-panel--experience.building-panel--writings .writings-reader__p {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 343px;
+    font-size: 15px;
+    line-height: 24px;
+    font-weight: 400;
+    letter-spacing: 0;
+    color: #edeef0;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+    text-wrap: pretty;
   }
 
   .building-panel--experience .experience__intro {
@@ -1827,6 +1841,7 @@ body[data-layout='panel'] .checklist {
     overflow: hidden;
     text-overflow: ellipsis;
   }
+
 }
 
 @media (min-width: 768px) {
@@ -2386,6 +2401,14 @@ body[data-layout='panel'] .checklist {
   flex-direction: column;
   gap: 12px;
   margin-bottom: 0;
+}
+
+.writings-reader__p-raster {
+  display: block;
+  width: 100%;
+  max-width: 343px;
+  height: auto;
+  margin: 0;
 }
 
 .writings-reader__p {
