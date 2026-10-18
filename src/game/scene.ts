@@ -4517,7 +4517,12 @@ export class IsoScene {
       this.jacGetOut({ thenEnter: true });
       return;
     }
-    if (leftSpawn && distDoor <= 5 && this.pendingDriveEnterAt && performance.now() - this.pendingDriveEnterAt > 7000) {
+    if (
+      leftSpawn &&
+      this.pendingDriveEnterAt &&
+      performance.now() - this.pendingDriveEnterAt > 7000 &&
+      (distDoor <= 5 || (stalled && distDoor <= 10))
+    ) {
       this.jac.sitWhy = `door-timeout sitD=${distSit.toFixed(2)} doorD=${distDoor.toFixed(2)}`;
       this.jacGetOut({ thenEnter: true });
       return;

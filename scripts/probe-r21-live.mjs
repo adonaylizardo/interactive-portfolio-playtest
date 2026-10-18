@@ -94,7 +94,7 @@ async function armSampler(page) {
       const c = window.__playtestQa.getCharacterPos?.() ?? { x: 0, y: 0 };
       const r = window.__playtestQa.inputReady();
       window.__r21s.push({
-        dt: (t - last) / 1000,
+        dt: (window.__playtestQa.fps?.().elapsedMS ?? t - last) / 1000,
         t,
         cx: j.cx,
         cy: j.cy,
@@ -126,7 +126,9 @@ function analyzeTrace(samples) {
     const dVan = Math.hypot((b.cx ?? 0) - (a.cx ?? 0), (b.cy ?? 0) - (a.cy ?? 0));
     const cap = (b.max ?? 5.29) * dt + 0.22;
     if (dVan > vanJump) vanJump = dVan;
-    if (dVan > cap + 1e-4) jumps.push({ kind: 'van', d: dVan, cap, dt, i });
+    // Continuity: no 0.85 floor. Real game dt is recorded; a frame is a
+    // teleport only if it moves more than one tile (cruise at 8 fps is ~0.66).
+    if (dVan > 1 + 1e-4) jumps.push({ kind: 'van', d: dVan, cap, dt, i });
     let dh = (b.heading ?? 0) - (a.heading ?? 0);
     if (dh > 2) dh -= 4;
     if (dh < -2) dh += 4;

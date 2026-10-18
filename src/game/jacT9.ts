@@ -2056,7 +2056,7 @@ export class JacT9 {
     }
     this.noProgressT += dt;
     if (this.noProgressT < 3.2) return;
-    if (d < 4) {
+    if (d < 4 || this.noProgressT >= 5) {
       this.holdAtGoal();
       this.driveGoal = null;
       return;
