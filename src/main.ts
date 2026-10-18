@@ -129,8 +129,10 @@ async function main(): Promise<void> {
         jacHud.park();
         labels.setHidden(false);
       }
+      const personaWalk =
+        scene.getViewMode().mode === 'persona' && !scene.isInInterior() && import.meta.env.BASE_URL.includes('preview-persona');
       joystick.setHidden(
-        !scene.jacSnapshot()?.driving ||
+        (!scene.jacSnapshot()?.driving && !personaWalk) ||
           !!scene.isInInterior() ||
           panel.isPreviewExpanded() ||
           scene.jacInfoOpen(),
@@ -312,6 +314,7 @@ async function main(): Promise<void> {
     rotateView: () => scene.rotateView(),
     toggleMapOverview: () => scene.toggleMapOverview(),
     overviewCoverage: () => scene.qaOverviewCoverage(),
+    personaState: () => scene.qaPersonaState(),
     cameraViews: () => scene.qaCameraViews(),
     cenitalExpectedHeading: (dx: number, dy: number) => scene.qaCenitalExpectedHeading(dx, dy),
     cenitalBuildingLabels: () => cenitalLabels.qa(),

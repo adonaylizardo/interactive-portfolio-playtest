@@ -65,7 +65,7 @@ export const kit = {
   // Cámaras del minimapa (Figma ui/minimapa vista=…).
   // isometrica = default 2:1 iso. cenital = true overhead (roofs + upright billboards).
   // perspectiva = low follow cam (Pixi 3D projector, textured boxes, camera-relative WASD).
-  cameras: ["isometrica", "cenital", "perspectiva"],
+  cameras: ["isometrica", "cenital", "perspectiva", "persona"],
 } as const;
 
 export type Camera = (typeof kit.cameras)[number];

@@ -1,0 +1,143 @@
+{
+ "piezas": {
+  "adonay-espalda__idle": {
+   "w": 384,
+   "h": 300,
+   "frames": 2,
+   "frame_w": 192,
+   "ancla": [
+    96,
+    296
+   ],
+   "densidad_px_m": 161.8,
+   "ambar_pct": 15.83
+  },
+  "adonay-espalda__walk": {
+   "w": 768,
+   "h": 300,
+   "frames": 4,
+   "frame_w": 192,
+   "ancla": [
+    96,
+    296
+   ],
+   "densidad_px_m": 161.8,
+   "ambar_pct": 15.51
+  },
+  "pantone-espalda__idle": {
+   "w": 176,
+   "h": 132,
+   "frames": 2,
+   "frame_w": 88,
+   "ancla": [
+    44,
+    128
+   ],
+   "densidad_px_m": 161.8,
+   "ambar_pct": 0.0
+  },
+  "pantone-espalda__walk": {
+   "w": 352,
+   "h": 132,
+   "frames": 4,
+   "frame_w": 88,
+   "ancla": [
+    44,
+    128
+   ],
+   "densidad_px_m": 161.8,
+   "ambar_pct": 0.0
+  },
+  "pantone-espalda__sit": {
+   "w": 88,
+   "h": 132,
+   "frames": 1,
+   "frame_w": 88,
+   "ancla": [
+    44,
+    128
+   ],
+   "densidad_px_m": 161.8,
+   "ambar_pct": 0.0
+  },
+  "pantone-espalda": {
+   "w": 88,
+   "h": 132,
+   "ancla": [
+    44,
+    128
+   ],
+   "ambar_pct": 0.0
+  },
+  "adonay-espalda": {
+   "w": 192,
+   "h": 300,
+   "ancla": [
+    96,
+    296
+   ],
+   "ambar_pct": 15.83
+  },
+  "jac-t9-ext__34-frontal-3p__apagado": {
+   "w": 308,
+   "h": 221,
+   "bbox_en_frame": [
+    774,
+    328,
+    1082,
+    549
+   ],
+   "ancla": [
+    89,
+    236
+   ],
+   "ancla_def": "esquina delantera-pasajero a nivel de suelo",
+   "pose": {
+    "nariz_z_m": 8.2,
+    "costado_x_m": 2.0,
+    "cam_alto_m": 2.8,
+    "horizonte_y": 252
+   },
+   "ambar_pct": 0.0
+  }
+ },
+ "frame-c-a-pie-junto-t9": 0.36,
+ "camara": {
+  "modo": "tercera persona over-the-shoulder",
+  "alto_m": 2.8,
+  "detras_m": 5.649,
+  "fov_h": 70,
+  "f": 914,
+  "horizonte_y": 252,
+  "adonay": {
+   "x_m": -0.15,
+   "pies_y": 705.0,
+   "cabeza_y": 417.0,
+   "alto_px": 288.0
+  },
+  "pantone": {
+   "dx_m": -0.8,
+   "dz_m": 0.35,
+   "x_m": -0.95,
+   "z_m": 5.999,
+   "escala_pixi": 0.9417,
+   "pies_pantalla_1x": [
+    495.3,
+    678.6
+   ],
+   "offset_pies_vs_adonay_1x": [
+    -120.5,
+    -26.4
+   ],
+   "alto_orejas_m": 0.754,
+   "alto_px": 114.9
+  },
+  "t9": {
+   "techo_y_nariz": 359.0,
+   "suelo_y_nariz": 564.1,
+   "ancho_frente_px": 218.5,
+   "alto_px_frente": 205.1,
+   "ratio_altura_t9_vs_adonay": 1.034
+  }
+ }
+}

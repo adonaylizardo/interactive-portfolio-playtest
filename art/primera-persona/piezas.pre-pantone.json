@@ -1,0 +1,1700 @@
+{
+ "paquete": "primera-persona · propuesta v2",
+ "estado": "BORRADOR",
+ "fecha": "2026-10-17",
+ "version": 2,
+ "anterior": "piezas.v1.json",
+ "viewport_ref_1x": [
+  1280,
+  720
+ ],
+ "horizonte_y": 360,
+ "focal_px_1x": 914,
+ "fov_h_grados": 70,
+ "densidad": "16 px/m @1x en el plano de la pieza",
+ "giros": "solo 90°",
+ "exportacion": "lienzo ×4 → @1x con BOX (alfa premultiplicado, sin halos oscuros) → @2x = @1x ×2 NEAREST",
+ "camaras": {
+  "tercera-persona": {
+   "alto_m": 2.8,
+   "detras_m": 5.649,
+   "horizonte_y": 252,
+   "nota": "frame C; jugador visible de espaldas"
+  },
+  "a-pie": {
+   "ojo_m": 1.78,
+   "x_m": 7.2,
+   "nota": "acera derecha"
+  },
+  "jac-t9": {
+   "ojo_m": 1.45,
+   "x_m": 2.23,
+   "nota": "carril derecho, puesto izquierdo"
+  }
+ },
+ "proyeccion": "x = 640 + (x − cam.x)·f/z ; y = 360 − (y − ojo)·f/z",
+ "capas": {
+  "0": "cielo (TilingSprite)",
+  "1": "Ávila (TilingSprite)",
+  "2": "suelo (Graphics proyectado cada frame, franjas cada 3 m)",
+  "3": "fachadas (Sprite, zIndex=−z, scale=f/(z·16))",
+  "4": "props billboard (zIndex=−z)",
+  "5": "capó (overlay)",
+  "6": "cabina (overlay 1280×720)",
+  "7": "volante (rota)",
+  "8": "jugador de espaldas (solo cámara 3ª persona, fijo abajo-centro)"
+ },
+ "frames": {
+  "a": {
+   "png1x": "frames/frame-a-a-pie@1x.png",
+   "png2x": "frames/frame-a-a-pie@2x.png",
+   "ambar_pct": 0.23,
+   "nota": "re-renderizado: cambiaron piezas compartidas (Ávila, árbol, banco)"
+  },
+  "b": {
+   "png1x": "frames/frame-b-jac-t9@1x.png",
+   "png2x": "frames/frame-b-jac-t9@2x.png",
+   "ambar_pct": 0.22,
+   "nota": "escena + capó + cabina luces-on + volante"
+  },
+  "c": {
+   "png1x": "frames/frame-c-a-pie-junto-t9@1x.png",
+   "png2x": "frames/frame-c-a-pie-junto-t9@2x.png",
+   "ambar_pct": 0.36,
+   "modo_camara": "TERCERA PERSONA over-the-shoulder",
+   "camara": {
+    "modo": "tercera persona over-the-shoulder",
+    "alto_m": 2.8,
+    "detras_m": 5.649,
+    "fov_h": 70,
+    "f": 914,
+    "horizonte_y": 252,
+    "adonay": {
+     "x_m": -0.15,
+     "pies_y": 705.0,
+     "cabeza_y": 417.0,
+     "alto_px": 288.0
+    },
+    "t9": {
+     "techo_y_nariz": 359.0,
+     "suelo_y_nariz": 564.1,
+     "ancho_frente_px": 218.5,
+     "alto_px_frente": 205.1,
+     "ratio_altura_t9_vs_adonay": 1.034
+    }
+   },
+   "proyeccion": "x = 640 + (x − cam.x)·f/z ; y = 252 − (y − 2,80)·f/z  (f = 914, eje óptico desplazado: cámara nivelada, horizonte en y = 252)",
+   "nota": "Adonay de espaldas fijo abajo-centro (pies en y=705); T9 v3 re-proyectada en 3/4 frontal, estacionada en el canal de estacionamiento a su derecha-delante; apagada",
+   "colocacion": {
+    "adonay": {
+     "x": -0.15,
+     "z": 5.649
+    },
+    "t9": {
+     "nariz_z": 8.2,
+     "costado_x": 2.0
+    },
+    "acera_x": [
+     -3.2,
+     1.6
+    ],
+    "brocal_x": [
+     1.6,
+     1.77
+    ],
+    "calle_x": [
+     1.77,
+     11.3
+    ],
+    "calle_transversal_z": [
+     38,
+     46
+    ],
+    "fachadas": [
+     {
+      "id": "casa-volaris",
+      "x": -19,
+      "z": 50
+     },
+     {
+      "id": "estudio-6x6",
+      "x": -4,
+      "z": 50
+     },
+     {
+      "id": "casa-bain",
+      "x": 10.5,
+      "z": 50
+     },
+     {
+      "id": "casa-mentoria",
+      "x": 24,
+      "z": 50
+     },
+     {
+      "id": "casa-pg",
+      "x": -12,
+      "z": 36
+     },
+     {
+      "id": "casa-finoa",
+      "x": 21.5,
+      "z": 30
+     }
+    ],
+    "faroles": [
+     {
+      "x": 1.3,
+      "z": 30
+     },
+     {
+      "x": 1.3,
+      "z": 15.5
+     },
+     {
+      "x": 11.8,
+      "z": 24
+     }
+    ],
+    "arboles": [
+     {
+      "x": -5.2,
+      "z": 31
+     },
+     {
+      "x": -6.4,
+      "z": 21
+     },
+     {
+      "x": -5.6,
+      "z": 14.5
+     },
+     {
+      "x": 17.5,
+      "z": 17
+     }
+    ],
+    "bancos": [
+     {
+      "x": -4.3,
+      "z": 16
+     }
+    ]
+   }
+  }
+ },
+ "colocacion_en_frames": {
+  "fachadas": [
+   {
+    "id": "biblioteca-ingenieria",
+    "x": -21,
+    "z": 62
+   },
+   {
+    "id": "teresa-carreno",
+    "x": 14,
+    "z": 128
+   },
+   {
+    "id": "catedral-de-barquisimeto",
+    "x": 76,
+    "z": 150
+   }
+  ],
+  "arboles": [
+   {
+    "x": 40,
+    "z": 100
+   },
+   {
+    "x": -40,
+    "z": 52
+   },
+   {
+    "x": 25,
+    "z": 56
+   }
+  ],
+  "bancos": [
+   {
+    "x": 10.6,
+    "z": 13
+   },
+   {
+    "x": -10.6,
+    "z": 17
+   }
+  ],
+  "faroles": [
+   {
+    "x": -9.6,
+    "z": 40
+   },
+   {
+    "x": -9.6,
+    "z": 22
+   },
+   {
+    "x": 10,
+    "z": 38
+   },
+   {
+    "x": 10,
+    "z": 22
+   },
+   {
+    "x": -12,
+    "z": 46.5
+   },
+   {
+    "x": 12,
+    "z": 46.5
+   }
+  ]
+ },
+ "regla_ambar": "r>90, r−b>55, g>b, r≥g sobre píxeles con alfa>20 · tope 5 % por imagen",
+ "piezas": [
+  {
+   "id": "cielo-noche",
+   "capa": 0,
+   "tipo": "tile horizontal",
+   "pixi": "TilingSprite",
+   "archivos": {
+    "png1x": "piezas/cielo-noche__tile@1x.png",
+    "png2x": "piezas/cielo-noche__tile@2x.png"
+   },
+   "tamano_1x": [
+    2048,
+    400
+   ],
+   "tamano_2x": [
+    4096,
+    800
+   ],
+   "metros": null,
+   "ancla": {
+    "px_1x": [
+     0,
+     360
+    ],
+    "regla": "fila 360 = horizonte"
+   },
+   "zindex": "fondo, -1e9",
+   "notas": "sin cambios respecto a v1; envuelve en x; 2048 px = 360° de giro",
+   "ambar_pct": 0.0,
+   "parallax": {
+    "x": "tilePosition.x = −yaw·2048/360°",
+    "y": 0
+   }
+  },
+  {
+   "id": "cerros-avila",
+   "capa": 1,
+   "tipo": "tile horizontal sin costura",
+   "pixi": "TilingSprite",
+   "archivos": {
+    "png1x": "piezas/cerros-avila__tile@1x.png",
+    "png2x": "piezas/cerros-avila__tile@2x.png"
+   },
+   "tamano_1x": [
+    2048,
+    128
+   ],
+   "tamano_2x": [
+    4096,
+    256
+   ],
+   "metros": {
+    "nota": "lejano; no se escala con z"
+   },
+   "ancla": {
+    "px_1x": [
+     0,
+     126
+    ],
+    "regla": "fila 126 del tile = horizonte (y=360); sprite.y = 362−128 = 234"
+   },
+   "zindex": "fondo, -1e8",
+   "notas": "NUEVO. Silueta del Ávila (cresta lejana + colinas cercanas), torre del Humboldt con 2 luces frías, luces de barrio frías. Periodo 2048 px; mismo parallax que el cielo pero ×1,0 (ambos en el infinito).",
+   "ambar_pct": 0.0,
+   "parallax": {
+    "x": "igual que el cielo",
+    "y": 0
+   },
+   "humboldt_x_px": 1777
+  },
+  {
+   "id": "suelo-avenida__fase-a",
+   "capa": 2,
+   "tipo": "franja de suelo (sección transversal)",
+   "pixi": "Graphics (proyectado cada frame)",
+   "archivos": {
+    "png1x": "piezas/suelo-avenida__fase-a@1x.png",
+    "png2x": "piezas/suelo-avenida__fase-a@2x.png"
+   },
+   "tamano_1x": [
+    512,
+    8
+   ],
+   "tamano_2x": [
+    1024,
+    16
+   ],
+   "metros": {
+    "ancho": 32,
+    "fondo": 3
+   },
+   "ancla": {
+    "px_1x": [
+     256,
+     0
+    ],
+    "regla": "x=256 = eje de la avenida; 16 px/m; cubre −16…+16 m"
+   },
+   "zindex": "suelo, bajo todo",
+   "notas": "sin cambios; alternar fase-a/fase-b cada 3 m de z; cada fila se dibuja como trapecio proyectado con los colores leídos de la franja",
+   "ambar_pct": 0.0
+  },
+  {
+   "id": "suelo-avenida__fase-b",
+   "capa": 2,
+   "tipo": "franja de suelo (sección transversal)",
+   "pixi": "Graphics (proyectado cada frame)",
+   "archivos": {
+    "png1x": "piezas/suelo-avenida__fase-b@1x.png",
+    "png2x": "piezas/suelo-avenida__fase-b@2x.png"
+   },
+   "tamano_1x": [
+    512,
+    8
+   ],
+   "tamano_2x": [
+    1024,
+    16
+   ],
+   "metros": {
+    "ancho": 32,
+    "fondo": 3
+   },
+   "ancla": {
+    "px_1x": [
+     256,
+     0
+    ],
+    "regla": "x=256 = eje de la avenida; 16 px/m; cubre −16…+16 m"
+   },
+   "zindex": "suelo, bajo todo",
+   "notas": "sin cambios; alternar fase-a/fase-b cada 3 m de z; cada fila se dibuja como trapecio proyectado con los colores leídos de la franja",
+   "ambar_pct": 0.0
+  },
+  {
+   "id": "suelo-cruce__cebra",
+   "capa": 2,
+   "tipo": "franja de suelo (sección transversal)",
+   "pixi": "Graphics (proyectado cada frame)",
+   "archivos": {
+    "png1x": "piezas/suelo-cruce__cebra@1x.png",
+    "png2x": "piezas/suelo-cruce__cebra@2x.png"
+   },
+   "tamano_1x": [
+    512,
+    8
+   ],
+   "tamano_2x": [
+    1024,
+    16
+   ],
+   "metros": {
+    "ancho": 32,
+    "fondo": 0.5
+   },
+   "ancla": {
+    "px_1x": [
+     256,
+     0
+    ],
+    "regla": "x=256 = eje; 16 px/m"
+   },
+   "zindex": "suelo",
+   "notas": "NUEVO. paso peatonal: barras de 0,45 m cada 0,9 m sobre el asfalto (resto = sección de la avenida)",
+   "ambar_pct": 0.0
+  },
+  {
+   "id": "suelo-cruce__pare",
+   "capa": 2,
+   "tipo": "franja de suelo (sección transversal)",
+   "pixi": "Graphics (proyectado cada frame)",
+   "archivos": {
+    "png1x": "piezas/suelo-cruce__pare@1x.png",
+    "png2x": "piezas/suelo-cruce__pare@2x.png"
+   },
+   "tamano_1x": [
+    512,
+    8
+   ],
+   "tamano_2x": [
+    1024,
+    16
+   ],
+   "metros": {
+    "ancho": 32,
+    "fondo": 0.5
+   },
+   "ancla": {
+    "px_1x": [
+     256,
+     0
+    ],
+    "regla": "x=256 = eje; 16 px/m"
+   },
+   "zindex": "suelo",
+   "notas": "NUEVO. línea de pare del carril derecho (0,1…4,6 m), una fila de 0,4 m antes de la cebra",
+   "ambar_pct": 0.0
+  },
+  {
+   "id": "suelo-cruce__calle",
+   "capa": 2,
+   "tipo": "franja de suelo (sección transversal)",
+   "pixi": "Graphics (proyectado cada frame)",
+   "archivos": {
+    "png1x": "piezas/suelo-cruce__calle@1x.png",
+    "png2x": "piezas/suelo-cruce__calle@2x.png"
+   },
+   "tamano_1x": [
+    512,
+    8
+   ],
+   "tamano_2x": [
+    1024,
+    16
+   ],
+   "metros": {
+    "ancho": 32,
+    "fondo": 0.5
+   },
+   "ancla": {
+    "px_1x": [
+     256,
+     0
+    ],
+    "regla": "x=256 = eje; 16 px/m"
+   },
+   "zindex": "suelo",
+   "notas": "NUEVO. calle transversal: asfalto a todo el ancho",
+   "ambar_pct": 0.0
+  },
+  {
+   "id": "suelo-cruce__calle-eje",
+   "capa": 2,
+   "tipo": "franja de suelo (sección transversal)",
+   "pixi": "Graphics (proyectado cada frame)",
+   "archivos": {
+    "png1x": "piezas/suelo-cruce__calle-eje@1x.png",
+    "png2x": "piezas/suelo-cruce__calle-eje@2x.png"
+   },
+   "tamano_1x": [
+    512,
+    8
+   ],
+   "tamano_2x": [
+    1024,
+    16
+   ],
+   "metros": {
+    "ancho": 32,
+    "fondo": 0.5
+   },
+   "ancla": {
+    "px_1x": [
+     256,
+     0
+    ],
+    "regla": "x=256 = eje; 16 px/m"
+   },
+   "zindex": "suelo",
+   "notas": "NUEVO. eje discontinuo de la transversal (raya 4 m / hueco 5 m en x, a mitad de la calle)",
+   "ambar_pct": 0.0
+  },
+  {
+   "id": "suelo-acera-frente",
+   "capa": 2,
+   "tipo": "franja de suelo (sección transversal)",
+   "pixi": "Graphics (proyectado cada frame)",
+   "archivos": {
+    "png1x": "piezas/suelo-acera-frente@1x.png",
+    "png2x": "piezas/suelo-acera-frente@2x.png"
+   },
+   "tamano_1x": [
+    512,
+    8
+   ],
+   "tamano_2x": [
+    1024,
+    16
+   ],
+   "metros": {
+    "ancho": 32,
+    "fondo": 0.5
+   },
+   "ancla": {
+    "px_1x": [
+     256,
+     0
+    ],
+    "regla": "x=256 = eje; 16 px/m"
+   },
+   "zindex": "suelo",
+   "notas": "NUEVO. acera de enfrente (juntas cada 2 m en x)",
+   "ambar_pct": 0.0
+  },
+  {
+   "id": "suelo-plaza__fase-a",
+   "capa": 2,
+   "tipo": "franja de suelo (sección transversal)",
+   "pixi": "Graphics (proyectado cada frame)",
+   "archivos": {
+    "png1x": "piezas/suelo-plaza__fase-a@1x.png",
+    "png2x": "piezas/suelo-plaza__fase-a@2x.png"
+   },
+   "tamano_1x": [
+    512,
+    8
+   ],
+   "tamano_2x": [
+    1024,
+    16
+   ],
+   "metros": {
+    "ancho": 32,
+    "fondo": 3
+   },
+   "ancla": {
+    "px_1x": [
+     256,
+     0
+    ],
+    "regla": "x=256 = eje; 16 px/m"
+   },
+   "zindex": "suelo",
+   "notas": "NUEVO. plaza: losas de 2×2 m, fila con junta transversal",
+   "ambar_pct": 0.0
+  },
+  {
+   "id": "suelo-plaza__fase-b",
+   "capa": 2,
+   "tipo": "franja de suelo (sección transversal)",
+   "pixi": "Graphics (proyectado cada frame)",
+   "archivos": {
+    "png1x": "piezas/suelo-plaza__fase-b@1x.png",
+    "png2x": "piezas/suelo-plaza__fase-b@2x.png"
+   },
+   "tamano_1x": [
+    512,
+    8
+   ],
+   "tamano_2x": [
+    1024,
+    16
+   ],
+   "metros": {
+    "ancho": 32,
+    "fondo": 3
+   },
+   "ancla": {
+    "px_1x": [
+     256,
+     0
+    ],
+    "regla": "x=256 = eje; 16 px/m"
+   },
+   "zindex": "suelo",
+   "notas": "NUEVO. plaza: losas de 2×2 m, fila sin junta (solo juntas en x)",
+   "ambar_pct": 0.0
+  },
+  {
+   "id": "suelo-cruce__planta",
+   "capa": 2,
+   "tipo": "planta cenital de referencia",
+   "pixi": "referencia / textura opcional",
+   "archivos": {
+    "png1x": "piezas/suelo-cruce__planta@1x.png",
+    "png2x": "piezas/suelo-cruce__planta@2x.png"
+   },
+   "tamano_1x": [
+    512,
+    512
+   ],
+   "tamano_2x": [
+    1024,
+    1024
+   ],
+   "metros": {
+    "ancho": 32,
+    "fondo": 32
+   },
+   "ancla": {
+    "px_1x": [
+     256,
+     256
+    ],
+    "regla": "centro del cruce; 16 px/m; +z hacia arriba de la imagen"
+   },
+   "zindex": "suelo",
+   "notas": "NUEVO. Cruce de 4 brazos en planta a 16 px/m. En runtime NO se usa como textura en perspectiva: suelo-cruce__spec.json da los polígonos en metros para proyectarlos con Graphics (igual que la avenida). Sirve de verdad visual y para el minimapa.",
+   "ambar_pct": 0.0,
+   "spec": "piezas/suelo-cruce__spec.json"
+  },
+  {
+   "id": "suelo-plaza__planta",
+   "capa": 2,
+   "tipo": "planta cenital sin costura",
+   "pixi": "referencia / textura opcional",
+   "archivos": {
+    "png1x": "piezas/suelo-plaza__planta@1x.png",
+    "png2x": "piezas/suelo-plaza__planta@2x.png"
+   },
+   "tamano_1x": [
+    256,
+    256
+   ],
+   "tamano_2x": [
+    512,
+    512
+   ],
+   "metros": {
+    "ancho": 16,
+    "fondo": 16
+   },
+   "ancla": {
+    "px_1x": [
+     0,
+     0
+    ],
+    "regla": "tile 16×16 m, envuelve en x y z"
+   },
+   "zindex": "suelo",
+   "notas": "NUEVO. Losas de 2×2 m. En perspectiva usar las franjas suelo-plaza__fase-a/b (fase-a en la junta cada 2 m).",
+   "ambar_pct": 0.0
+  },
+  {
+   "id": "fachada-teresa-carreno",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/fachada-teresa-carreno__luz-encendida@1x.png",
+    "png2x": "piezas/fachada-teresa-carreno__luz-encendida@2x.png"
+   },
+   "tamano_1x": [
+    1040,
+    614
+   ],
+   "tamano_2x": [
+    2080,
+    1228
+   ],
+   "metros": {
+    "ancho": 65,
+    "alto": 38.2
+   },
+   "ancla": {
+    "px_1x": [
+     608,
+     613
+    ],
+    "regla": "centro-abajo (pie de la fachada; x = u=0 del edificio); anchor = (ancla.x/w, ancla.y/h)"
+   },
+   "zindex": "−z",
+   "notas": "re-exportada v2 (BOX→@1x, NEAREST→@2x)",
+   "ambar_pct": {
+    "luz-encendida": 2.87,
+    "luz-apagada": 0.0
+   },
+   "variantes": {
+    "luz-encendida": {
+     "png1x": "piezas/fachada-teresa-carreno__luz-encendida@1x.png",
+     "png2x": "piezas/fachada-teresa-carreno__luz-encendida@2x.png"
+    },
+    "luz-apagada": {
+     "png1x": "piezas/fachada-teresa-carreno__luz-apagada@1x.png",
+     "png2x": "piezas/fachada-teresa-carreno__luz-apagada@2x.png"
+    }
+   },
+   "escala": "scale = f/(z·16) = 57,125/z"
+  },
+  {
+   "id": "fachada-biblioteca-ingenieria",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/fachada-biblioteca-ingenieria__luz-encendida@1x.png",
+    "png2x": "piezas/fachada-biblioteca-ingenieria__luz-encendida@2x.png"
+   },
+   "tamano_1x": [
+    468,
+    185
+   ],
+   "tamano_2x": [
+    936,
+    370
+   ],
+   "metros": {
+    "ancho": 29.2,
+    "alto": 11.4
+   },
+   "ancla": {
+    "px_1x": [
+     234,
+     184
+    ],
+    "regla": "centro-abajo (pie de la fachada; x = u=0 del edificio); anchor = (ancla.x/w, ancla.y/h)"
+   },
+   "zindex": "−z",
+   "notas": "re-exportada v2 (BOX→@1x, NEAREST→@2x)",
+   "ambar_pct": {
+    "luz-encendida": 1.78,
+    "luz-apagada": 0.0
+   },
+   "variantes": {
+    "luz-encendida": {
+     "png1x": "piezas/fachada-biblioteca-ingenieria__luz-encendida@1x.png",
+     "png2x": "piezas/fachada-biblioteca-ingenieria__luz-encendida@2x.png"
+    },
+    "luz-apagada": {
+     "png1x": "piezas/fachada-biblioteca-ingenieria__luz-apagada@1x.png",
+     "png2x": "piezas/fachada-biblioteca-ingenieria__luz-apagada@2x.png"
+    }
+   },
+   "escala": "scale = f/(z·16) = 57,125/z"
+  },
+  {
+   "id": "fachada-catedral-de-barquisimeto",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/fachada-catedral-de-barquisimeto__luz-encendida@1x.png",
+    "png2x": "piezas/fachada-catedral-de-barquisimeto__luz-encendida@2x.png"
+   },
+   "tamano_1x": [
+    736,
+    588
+   ],
+   "tamano_2x": [
+    1472,
+    1176
+   ],
+   "metros": {
+    "ancho": 46,
+    "alto": 36.6
+   },
+   "ancla": {
+    "px_1x": [
+     368,
+     587
+    ],
+    "regla": "centro-abajo (pie de la fachada; x = u=0 del edificio); anchor = (ancla.x/w, ancla.y/h)"
+   },
+   "zindex": "−z",
+   "notas": "REDIBUJADA desde fotos reales (v3, ver fuente_ref); mismo lienzo, ancla y metros que v2",
+   "ambar_pct": {
+    "luz-encendida": 2.08,
+    "luz-apagada": 0.0
+   },
+   "variantes": {
+    "luz-encendida": {
+     "png1x": "piezas/fachada-catedral-de-barquisimeto__luz-encendida@1x.png",
+     "png2x": "piezas/fachada-catedral-de-barquisimeto__luz-encendida@2x.png"
+    },
+    "luz-apagada": {
+     "png1x": "piezas/fachada-catedral-de-barquisimeto__luz-apagada@1x.png",
+     "png2x": "piezas/fachada-catedral-de-barquisimeto__luz-apagada@2x.png"
+    }
+   },
+   "escala": "scale = f/(z·16) = 57,125/z",
+   "fuente_ref": [
+    {
+     "url": "https://commons.wikimedia.org/wiki/File:Catedral_Metropolitana_de_Barquisimeto.jpg",
+     "autor": "Jesús David Ríos (Flickr)",
+     "licencia": "CC BY-SA 2.0",
+     "archivo": "refs/catedral-frente_jesus-david-rios.jpg",
+     "uso": "alzado principal"
+    },
+    {
+     "url": "https://commons.wikimedia.org/wiki/File:Catedral_de_Barquisimeto.jpg",
+     "autor": "reindertot",
+     "licencia": "CC BY 2.0",
+     "archivo": "refs/catedral-alas_reindertot.jpg",
+     "uso": "puntas de las alas"
+    },
+    {
+     "url": "https://commons.wikimedia.org/wiki/File:Vista_de_la_Catedral_de_Barquisimeto_y_su_campanario.jpg",
+     "autor": "LoganPaelias",
+     "licencia": "CC BY-SA 4.0",
+     "archivo": "refs/catedral-campanario_loganpaelias.jpg",
+     "uso": "campanario exento (no incluido)"
+    }
+   ]
+  },
+  {
+   "id": "fachada-flor-de-venezuela",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/fachada-flor-de-venezuela__luz-encendida@1x.png",
+    "png2x": "piezas/fachada-flor-de-venezuela__luz-encendida@2x.png"
+   },
+   "tamano_1x": [
+    679,
+    329
+   ],
+   "tamano_2x": [
+    1358,
+    658
+   ],
+   "metros": {
+    "ancho": 42.4,
+    "alto": 20.4
+   },
+   "ancla": {
+    "px_1x": [
+     339,
+     328
+    ],
+    "regla": "centro-abajo (pie de la fachada; x = u=0 del edificio); anchor = (ancla.x/w, ancla.y/h)"
+   },
+   "zindex": "−z",
+   "notas": "REDIBUJADA desde fotos reales (v3, ver fuente_ref); mismo lienzo, ancla y metros que v2",
+   "ambar_pct": {
+    "luz-encendida": 3.0,
+    "luz-apagada": 0.0
+   },
+   "variantes": {
+    "luz-encendida": {
+     "png1x": "piezas/fachada-flor-de-venezuela__luz-encendida@1x.png",
+     "png2x": "piezas/fachada-flor-de-venezuela__luz-encendida@2x.png"
+    },
+    "luz-apagada": {
+     "png1x": "piezas/fachada-flor-de-venezuela__luz-apagada@1x.png",
+     "png2x": "piezas/fachada-flor-de-venezuela__luz-apagada@2x.png"
+    }
+   },
+   "escala": "scale = f/(z·16) = 57,125/z",
+   "iso_referencia": "exteriores/flor-de-venezuela/flor-de-venezuela__estado-default_zoom-cerca@1x.png",
+   "fuente_ref": [
+    {
+     "url": "https://commons.wikimedia.org/wiki/File:Flor_de_Venezuela_(Barquisimeto),_vista_frontal.jpg",
+     "autor": "Miguel Ahiezer Salcedo",
+     "licencia": "CC BY-SA 3.0",
+     "archivo": "refs/flor-frontal_miguel-ahiezer-salcedo.jpg",
+     "uso": "alzado principal"
+    },
+    {
+     "url": "https://commons.wikimedia.org/wiki/File:Flor_de_venezuela_barquisimeto_lara_3.jpg",
+     "autor": "beachpow",
+     "licencia": "CC BY-SA 4.0",
+     "archivo": "refs/flor-noche_beachpow.jpg",
+     "uso": "abanico de pétalos de frente, de noche"
+    }
+   ]
+  },
+  {
+   "id": "fachada-sambil-barquisimeto",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/fachada-sambil-barquisimeto__luz-encendida@1x.png",
+    "png2x": "piezas/fachada-sambil-barquisimeto__luz-encendida@2x.png"
+   },
+   "tamano_1x": [
+    1351,
+    559
+   ],
+   "tamano_2x": [
+    2702,
+    1118
+   ],
+   "metros": {
+    "ancho": 84.4,
+    "alto": 34.8
+   },
+   "ancla": {
+    "px_1x": [
+     675,
+     558
+    ],
+    "regla": "centro-abajo (pie de la fachada; x = u=0 del edificio); anchor = (ancla.x/w, ancla.y/h)"
+   },
+   "zindex": "−z",
+   "notas": "NUEVO. Basada en el iso exteriores/sambil-barquisimeto/sambil-barquisimeto__estado-default_zoom-cerca@1x.png",
+   "ambar_pct": {
+    "luz-encendida": 0.52,
+    "luz-apagada": 0.0
+   },
+   "variantes": {
+    "luz-encendida": {
+     "png1x": "piezas/fachada-sambil-barquisimeto__luz-encendida@1x.png",
+     "png2x": "piezas/fachada-sambil-barquisimeto__luz-encendida@2x.png"
+    },
+    "luz-apagada": {
+     "png1x": "piezas/fachada-sambil-barquisimeto__luz-apagada@1x.png",
+     "png2x": "piezas/fachada-sambil-barquisimeto__luz-apagada@2x.png"
+    }
+   },
+   "escala": "scale = f/(z·16) = 57,125/z",
+   "iso_referencia": "exteriores/sambil-barquisimeto/sambil-barquisimeto__estado-default_zoom-cerca@1x.png"
+  },
+  {
+   "id": "fachada-estudio-6x6",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/fachada-estudio-6x6__luz-encendida@1x.png",
+    "png2x": "piezas/fachada-estudio-6x6__luz-encendida@2x.png"
+   },
+   "tamano_1x": [
+    298,
+    97
+   ],
+   "tamano_2x": [
+    596,
+    194
+   ],
+   "metros": {
+    "ancho": 18.6,
+    "alto": 5.9
+   },
+   "ancla": {
+    "px_1x": [
+     149,
+     96
+    ],
+    "regla": "centro-abajo (pie de la fachada; x = u=0 del edificio); anchor = (ancla.x/w, ancla.y/h)"
+   },
+   "zindex": "−z",
+   "notas": "NUEVO. Basada en el iso exteriores/estudio-6x6/estudio-6x6__estado-exterior_zoom-cerca@1x.png",
+   "ambar_pct": {
+    "luz-encendida": 1.18,
+    "luz-apagada": 0.0
+   },
+   "variantes": {
+    "luz-encendida": {
+     "png1x": "piezas/fachada-estudio-6x6__luz-encendida@1x.png",
+     "png2x": "piezas/fachada-estudio-6x6__luz-encendida@2x.png"
+    },
+    "luz-apagada": {
+     "png1x": "piezas/fachada-estudio-6x6__luz-apagada@1x.png",
+     "png2x": "piezas/fachada-estudio-6x6__luz-apagada@2x.png"
+    }
+   },
+   "escala": "scale = f/(z·16) = 57,125/z",
+   "iso_referencia": "exteriores/estudio-6x6/estudio-6x6__estado-exterior_zoom-cerca@1x.png"
+  },
+  {
+   "id": "fachada-casa-volaris",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/fachada-casa-volaris__luz-encendida@1x.png",
+    "png2x": "piezas/fachada-casa-volaris__luz-encendida@2x.png"
+   },
+   "tamano_1x": [
+    205,
+    194
+   ],
+   "tamano_2x": [
+    410,
+    388
+   ],
+   "metros": {
+    "ancho": 12.8,
+    "alto": 12.0
+   },
+   "ancla": {
+    "px_1x": [
+     102,
+     193
+    ],
+    "regla": "centro-abajo (pie de la fachada; x = u=0 del edificio); anchor = (ancla.x/w, ancla.y/h)"
+   },
+   "zindex": "−z",
+   "notas": "NUEVO. Basada en el iso exteriores/casas-caso/volaris/casa-volaris__caso-volaris_estado-exterior_zoom-cerca@1x.png",
+   "ambar_pct": {
+    "luz-encendida": 1.75,
+    "luz-apagada": 0.0
+   },
+   "variantes": {
+    "luz-encendida": {
+     "png1x": "piezas/fachada-casa-volaris__luz-encendida@1x.png",
+     "png2x": "piezas/fachada-casa-volaris__luz-encendida@2x.png"
+    },
+    "luz-apagada": {
+     "png1x": "piezas/fachada-casa-volaris__luz-apagada@1x.png",
+     "png2x": "piezas/fachada-casa-volaris__luz-apagada@2x.png"
+    }
+   },
+   "escala": "scale = f/(z·16) = 57,125/z",
+   "iso_referencia": "exteriores/casas-caso/volaris/casa-volaris__caso-volaris_estado-exterior_zoom-cerca@1x.png"
+  },
+  {
+   "id": "fachada-casa-bain",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/fachada-casa-bain__luz-encendida@1x.png",
+    "png2x": "piezas/fachada-casa-bain__luz-encendida@2x.png"
+   },
+   "tamano_1x": [
+    202,
+    201
+   ],
+   "tamano_2x": [
+    404,
+    402
+   ],
+   "metros": {
+    "ancho": 12.6,
+    "alto": 12.4
+   },
+   "ancla": {
+    "px_1x": [
+     101,
+     200
+    ],
+    "regla": "centro-abajo (pie de la fachada; x = u=0 del edificio); anchor = (ancla.x/w, ancla.y/h)"
+   },
+   "zindex": "−z",
+   "notas": "NUEVO. Basada en el iso exteriores/casas-caso/bain/casa-bain__caso-bain_estado-exterior_zoom-cerca@1x.png",
+   "ambar_pct": {
+    "luz-encendida": 1.13,
+    "luz-apagada": 0.0
+   },
+   "variantes": {
+    "luz-encendida": {
+     "png1x": "piezas/fachada-casa-bain__luz-encendida@1x.png",
+     "png2x": "piezas/fachada-casa-bain__luz-encendida@2x.png"
+    },
+    "luz-apagada": {
+     "png1x": "piezas/fachada-casa-bain__luz-apagada@1x.png",
+     "png2x": "piezas/fachada-casa-bain__luz-apagada@2x.png"
+    }
+   },
+   "escala": "scale = f/(z·16) = 57,125/z",
+   "iso_referencia": "exteriores/casas-caso/bain/casa-bain__caso-bain_estado-exterior_zoom-cerca@1x.png"
+  },
+  {
+   "id": "fachada-casa-mentoria",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/fachada-casa-mentoria__luz-encendida@1x.png",
+    "png2x": "piezas/fachada-casa-mentoria__luz-encendida@2x.png"
+   },
+   "tamano_1x": [
+    218,
+    108
+   ],
+   "tamano_2x": [
+    436,
+    216
+   ],
+   "metros": {
+    "ancho": 13.6,
+    "alto": 6.6
+   },
+   "ancla": {
+    "px_1x": [
+     109,
+     107
+    ],
+    "regla": "centro-abajo (pie de la fachada; x = u=0 del edificio); anchor = (ancla.x/w, ancla.y/h)"
+   },
+   "zindex": "−z",
+   "notas": "NUEVO. Basada en el iso exteriores/casas-caso/mentoria/casa-mentoria__caso-mentoria_estado-exterior_zoom-cerca@1x.png",
+   "ambar_pct": {
+    "luz-encendida": 1.66,
+    "luz-apagada": 0.0
+   },
+   "variantes": {
+    "luz-encendida": {
+     "png1x": "piezas/fachada-casa-mentoria__luz-encendida@1x.png",
+     "png2x": "piezas/fachada-casa-mentoria__luz-encendida@2x.png"
+    },
+    "luz-apagada": {
+     "png1x": "piezas/fachada-casa-mentoria__luz-apagada@1x.png",
+     "png2x": "piezas/fachada-casa-mentoria__luz-apagada@2x.png"
+    }
+   },
+   "escala": "scale = f/(z·16) = 57,125/z",
+   "iso_referencia": "exteriores/casas-caso/mentoria/casa-mentoria__caso-mentoria_estado-exterior_zoom-cerca@1x.png"
+  },
+  {
+   "id": "fachada-casa-finoa",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/fachada-casa-finoa__luz-encendida@1x.png",
+    "png2x": "piezas/fachada-casa-finoa__luz-encendida@2x.png"
+   },
+   "tamano_1x": [
+    202,
+    143
+   ],
+   "tamano_2x": [
+    404,
+    286
+   ],
+   "metros": {
+    "ancho": 12.6,
+    "alto": 8.8
+   },
+   "ancla": {
+    "px_1x": [
+     101,
+     142
+    ],
+    "regla": "centro-abajo (pie de la fachada; x = u=0 del edificio); anchor = (ancla.x/w, ancla.y/h)"
+   },
+   "zindex": "−z",
+   "notas": "NUEVO. Basada en el iso exteriores/casas-caso/finoa/casa-finoa__caso-finoa_estado-exterior_zoom-cerca@1x.png",
+   "ambar_pct": {
+    "luz-encendida": 0.88,
+    "luz-apagada": 0.0
+   },
+   "variantes": {
+    "luz-encendida": {
+     "png1x": "piezas/fachada-casa-finoa__luz-encendida@1x.png",
+     "png2x": "piezas/fachada-casa-finoa__luz-encendida@2x.png"
+    },
+    "luz-apagada": {
+     "png1x": "piezas/fachada-casa-finoa__luz-apagada@1x.png",
+     "png2x": "piezas/fachada-casa-finoa__luz-apagada@2x.png"
+    }
+   },
+   "escala": "scale = f/(z·16) = 57,125/z",
+   "iso_referencia": "exteriores/casas-caso/finoa/casa-finoa__caso-finoa_estado-exterior_zoom-cerca@1x.png"
+  },
+  {
+   "id": "fachada-casa-pg",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/fachada-casa-pg__luz-encendida@1x.png",
+    "png2x": "piezas/fachada-casa-pg__luz-encendida@2x.png"
+   },
+   "tamano_1x": [
+    202,
+    159
+   ],
+   "tamano_2x": [
+    404,
+    318
+   ],
+   "metros": {
+    "ancho": 12.6,
+    "alto": 9.8
+   },
+   "ancla": {
+    "px_1x": [
+     101,
+     158
+    ],
+    "regla": "centro-abajo (pie de la fachada; x = u=0 del edificio); anchor = (ancla.x/w, ancla.y/h)"
+   },
+   "zindex": "−z",
+   "notas": "NUEVO. Basada en el iso exteriores/casas-caso/pg/casa-pg__caso-pg_estado-exterior_zoom-cerca@1x.png",
+   "ambar_pct": {
+    "luz-encendida": 2.52,
+    "luz-apagada": 0.0
+   },
+   "variantes": {
+    "luz-encendida": {
+     "png1x": "piezas/fachada-casa-pg__luz-encendida@1x.png",
+     "png2x": "piezas/fachada-casa-pg__luz-encendida@2x.png"
+    },
+    "luz-apagada": {
+     "png1x": "piezas/fachada-casa-pg__luz-apagada@1x.png",
+     "png2x": "piezas/fachada-casa-pg__luz-apagada@2x.png"
+    }
+   },
+   "escala": "scale = f/(z·16) = 57,125/z",
+   "iso_referencia": "exteriores/casas-caso/pg/casa-pg__caso-pg_estado-exterior_zoom-cerca@1x.png"
+  },
+  {
+   "id": "fachada-flor-de-venezuela-profundidad",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/fachada-flor-de-venezuela-profundidad__luz-encendida@1x.png",
+    "png2x": "piezas/fachada-flor-de-venezuela-profundidad__luz-encendida@2x.png"
+   },
+   "tamano_1x": [
+    679,
+    329
+   ],
+   "tamano_2x": [
+    1358,
+    658
+   ],
+   "metros": {
+    "ancho": 42.4,
+    "alto": 20.4
+   },
+   "ancla": {
+    "px_1x": [
+     339,
+     328
+    ],
+    "regla": "centro-abajo (pie de la fachada; x = u=0 del edificio); anchor = (ancla.x/w, ancla.y/h)"
+   },
+   "zindex": "−z",
+   "notas": "REDIBUJADA desde fotos reales (v3, ver fuente_ref); mismo lienzo, ancla y metros que v2",
+   "ambar_pct": {
+    "luz-encendida": 2.82,
+    "luz-apagada": 0.0
+   },
+   "variantes": {
+    "luz-encendida": {
+     "png1x": "piezas/fachada-flor-de-venezuela-profundidad__luz-encendida@1x.png",
+     "png2x": "piezas/fachada-flor-de-venezuela-profundidad__luz-encendida@2x.png"
+    },
+    "luz-apagada": {
+     "png1x": "piezas/fachada-flor-de-venezuela-profundidad__luz-apagada@1x.png",
+     "png2x": "piezas/fachada-flor-de-venezuela-profundidad__luz-apagada@2x.png"
+    }
+   },
+   "escala": "scale = f/(z·16) = 57,125/z",
+   "iso_referencia": "exteriores/flor-de-venezuela/flor-de-venezuela__estado-default_zoom-cerca@1x.png",
+   "fuente_ref": [
+    {
+     "url": "https://commons.wikimedia.org/wiki/File:Flor_de_Venezuela_(Barquisimeto),_vista_frontal.jpg",
+     "autor": "Miguel Ahiezer Salcedo",
+     "licencia": "CC BY-SA 3.0",
+     "archivo": "refs/flor-frontal_miguel-ahiezer-salcedo.jpg",
+     "uso": "alzado principal"
+    },
+    {
+     "url": "https://commons.wikimedia.org/wiki/File:Flor_de_venezuela_barquisimeto_lara_3.jpg",
+     "autor": "beachpow",
+     "licencia": "CC BY-SA 4.0",
+     "archivo": "refs/flor-noche_beachpow.jpg",
+     "uso": "abanico de pétalos de frente, de noche"
+    }
+   ]
+  },
+  {
+   "id": "farol-frente",
+   "capa": 4,
+   "tipo": "billboard",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/farol-frente__estado-encendido@1x.png",
+    "png2x": "piezas/farol-frente__estado-encendido@2x.png"
+   },
+   "tamano_1x": [
+    24,
+    76
+   ],
+   "tamano_2x": [
+    48,
+    152
+   ],
+   "metros": {
+    "ancho": 1.5,
+    "alto": 4.6
+   },
+   "ancla": {
+    "px_1x": [
+     6,
+     75
+    ],
+    "regla": "pie del poste"
+   },
+   "zindex": "−z",
+   "notas": "re-exportado v2; el halo se dibuja aparte (3 anillos duros, alfa bajo) como en v1",
+   "ambar_pct": 2.68
+  },
+  {
+   "id": "arbol-cuji-frente",
+   "capa": 4,
+   "tipo": "billboard (Estilo C)",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/arbol-cuji-frente@1x.png",
+    "png2x": "piezas/arbol-cuji-frente@2x.png"
+   },
+   "tamano_1x": [
+    125,
+    108
+   ],
+   "tamano_2x": [
+    250,
+    216
+   ],
+   "metros": {
+    "ancho": 7.8,
+    "alto": 6.6
+   },
+   "ancla": {
+    "px_1x": [
+     62,
+     107
+    ],
+    "regla": "pie del tronco"
+   },
+   "zindex": "−z",
+   "notas": "NUEVO. Cují en Estilo C (racimos G1/G2/G3, tronco texturado, contorno propLine 1 px). Sustituye al árbol de marcador de v1 en ambos frames.",
+   "ambar_pct": 0.0
+  },
+  {
+   "id": "banco-frente",
+   "capa": 4,
+   "tipo": "billboard",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/banco-frente@1x.png",
+    "png2x": "piezas/banco-frente@2x.png"
+   },
+   "tamano_1x": [
+    32,
+    18
+   ],
+   "tamano_2x": [
+    64,
+    36
+   ],
+   "metros": {
+    "ancho": 2.0,
+    "alto": 1.0
+   },
+   "ancla": {
+    "px_1x": [
+     16,
+     17
+    ],
+    "regla": "centro de las patas"
+   },
+   "zindex": "−z",
+   "notas": "NUEVO. Banco de listones de madera (wood) con patas grafito; sustituye al banco de marcador de v1.",
+   "ambar_pct": 0.0
+  },
+  {
+   "id": "jac-t9-capo",
+   "capa": 5,
+   "tipo": "overlay fijo a la cámara",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/jac-t9-capo@1x.png",
+    "png2x": "piezas/jac-t9-capo@2x.png"
+   },
+   "tamano_1x": [
+    1280,
+    720
+   ],
+   "tamano_2x": [
+    2560,
+    1440
+   ],
+   "metros": null,
+   "ancla": {
+    "px_1x": [
+     0,
+     0
+    ],
+    "regla": "(0,0) del viewport"
+   },
+   "zindex": "5 (sobre el mundo)",
+   "notas": "re-exportado con el pipeline v2; sin cambios de dibujo",
+   "ambar_pct": 0.0
+  },
+  {
+   "id": "jac-t9-cabina__luces-on",
+   "capa": 6,
+   "tipo": "overlay fijo a la cámara",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/jac-t9-cabina__luces-on@1x.png",
+    "png2x": "piezas/jac-t9-cabina__luces-on@2x.png"
+   },
+   "tamano_1x": [
+    1280,
+    720
+   ],
+   "tamano_2x": [
+    2560,
+    1440
+   ],
+   "metros": null,
+   "ancla": {
+    "px_1x": [
+     0,
+     0
+    ],
+    "regla": "(0,0) del viewport"
+   },
+   "zindex": "6",
+   "notas": "REEMPLAZA a la cabina v1. pantallas encendidas: cuadro (2 arcos con marcas blancas y rojas, pantalla central con carro y \"319\"), pantalla vertical con mosaicos; 3 testigos ámbar. NO incluye el volante (pieza aparte, capa 7). Incluye techo con franja de techo solar, parasoles, pilares A, espejo lateral, plumillas, tablero con rejilla, banda de cuero con costura, rejilla izquierda cromada, palancas, cuadro con capota, pantalla vertical con bisel cromado + botonera (botón rojo de emergencia), rejilla vertical alta, retrovisor con barra del platón y cabecera del copiloto.",
+   "ambar_pct": 0.0
+  },
+  {
+   "id": "jac-t9-cabina__luces-off",
+   "capa": 6,
+   "tipo": "overlay fijo a la cámara",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/jac-t9-cabina__luces-off@1x.png",
+    "png2x": "piezas/jac-t9-cabina__luces-off@2x.png"
+   },
+   "tamano_1x": [
+    1280,
+    720
+   ],
+   "tamano_2x": [
+    2560,
+    1440
+   ],
+   "metros": null,
+   "ancla": {
+    "px_1x": [
+     0,
+     0
+    ],
+    "regla": "(0,0) del viewport"
+   },
+   "zindex": "6",
+   "notas": "NUEVO. pantallas negras con reflejo frío tenue; botonera y rejillas visibles; 0 ámbar. NO incluye el volante (pieza aparte, capa 7). Incluye techo con franja de techo solar, parasoles, pilares A, espejo lateral, plumillas, tablero con rejilla, banda de cuero con costura, rejilla izquierda cromada, palancas, cuadro con capota, pantalla vertical con bisel cromado + botonera (botón rojo de emergencia), rejilla vertical alta, retrovisor con barra del platón y cabecera del copiloto.",
+   "ambar_pct": 0.0
+  },
+  {
+   "id": "jac-t9-volante",
+   "capa": 7,
+   "tipo": "sprite fijo a la cámara (rota)",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/jac-t9-volante@1x.png",
+    "png2x": "piezas/jac-t9-volante@2x.png"
+   },
+   "tamano_1x": [
+    464,
+    426
+   ],
+   "tamano_2x": [
+    928,
+    852
+   ],
+   "metros": {
+    "diametro_aprox": 0.38
+   },
+   "ancla": {
+    "px_1x": [
+     232,
+     232
+    ],
+    "regla": "centro del cubo; anchor = (232/464, 232/426) = (0,5, 0,5446)"
+   },
+   "zindex": "7 (sobre la cabina)",
+   "notas": "NUEVO. Colocar en (640,610) @1x. Rotación al doblar: hasta ±90° y volver. Aro negro grueso con fondo achatado, inserto en U plateado, placas plateadas con botones, marca de 12 h, insignia JAC ovalada cromada. En el frame B el fondo plano y la U inferior quedan fuera de pantalla (y>720); al rotar entran en cuadro.",
+   "ambar_pct": 0.0,
+   "pos_pantalla_1x": [
+    640,
+    610
+   ]
+  },
+  {
+   "id": "jac-t9-ext__34-frontal-3p",
+   "capa": 4,
+   "tipo": "billboard cercano (vehículo estacionado), específico de pose",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/jac-t9-ext__34-frontal-3p__apagado@1x.png",
+    "png2x": "piezas/jac-t9-ext__34-frontal-3p__apagado@2x.png"
+   },
+   "tamano_1x": [
+    308,
+    221
+   ],
+   "tamano_2x": [
+    616,
+    442
+   ],
+   "metros": {
+    "largo": 5.33,
+    "ancho": 1.96,
+    "alto": 1.84
+   },
+   "ancla": {
+    "px_1x": [
+     89,
+     236
+    ],
+    "regla": "esquina delantera-pasajero a nivel de suelo (puede caer fuera del recorte: el parachoques no toca el suelo)"
+   },
+   "pos_en_frame_c_1x": {
+    "bbox": [
+     774,
+     328,
+     1082,
+     549
+    ]
+   },
+   "pose": {
+    "nariz_z_m": 8.2,
+    "costado_x_m": 2.0,
+    "cam_alto_m": 2.8,
+    "horizonte_y": 252
+   },
+   "zindex": "−z con z = 8,2 m (nariz)",
+   "escala": "1:1 solo en la pose del frame C (nariz a 8,2 m, costado pasajero en x = 2,0 m, cámara 2,8 m). Para otras distancias a lo largo del mismo eje: scale ≈ 8,2/z (aprox.; la perspectiva interna no cambia)",
+   "ambar_pct": {
+    "apagado": 0.0
+   },
+   "tinte_noche_pixi": "0xCCD1E6 (multiplicativo; el frame C lo aplica)",
+   "notas": "NUEVO v3 (reemplaza jac-t9-ext lado/trasera/frente v1, RECHAZADAS → piezas/_obsoleto-t9ext-v1/). NO está redibujada: son los píxeles del render v3 aprobado (/workspace/jac3/se.jpg) re-proyectados cara por cara (lado pasajero, frente, capó, parabrisas, techo, lona) con homografías exactas a la cámara de 3ª persona. Vidrios: el magenta del fondo que se veía a través se neutralizó a vidrio oscuro. Sin variante de luces todavía."
+  },
+  {
+   "id": "adonay-espalda",
+   "capa": 8,
+   "tipo": "jugador (3ª persona) · fijo en pantalla abajo-centro",
+   "pixi": "Sprite",
+   "archivos": {
+    "png1x": "piezas/adonay-espalda@1x.png",
+    "png2x": "piezas/adonay-espalda@2x.png"
+   },
+   "tamano_1x": [
+    192,
+    300
+   ],
+   "tamano_2x": [
+    384,
+    600
+   ],
+   "frames": 1,
+   "frame_1x": [
+    192,
+    300
+   ],
+   "metros": {
+    "alto": 1.78
+   },
+   "ancla": {
+    "px_1x": [
+     96,
+     296
+    ],
+    "anchor": [
+     0.5,
+     0.9867
+    ],
+    "regla": "pies, centro (por frame)"
+   },
+   "densidad_px_m": 161.8,
+   "pos_pantalla_1x": [
+    616,
+    705.0
+   ],
+   "zindex": "sobre todo el mundo (capa 8)",
+   "ambar_pct": 15.83,
+   "notas": "NUEVO. Adonay de ESPALDAS, pixel-art a resolución de arte 96×150 (1 px de arte = 2 px @1x), paleta exacta de forge-paquete/personaje/adonay (pelo rizado oscuro, sobrecamisa arena con tablón trasero y mangas remangadas, pulsera roja, culotte negro ancho, Converse mostaza de suela blanca). Frame suelto de idle. El ámbar medido (~16 %) es ropa (arena/mostaza del sprite aprobado), no luz: con el tinte nocturno 0xCCD1E6 del frame deja de contar (frame C = 0.36 %)."
+  },
+  {
+   "id": "adonay-espalda__idle",
+   "capa": 8,
+   "tipo": "jugador (3ª persona) · fijo en pantalla abajo-centro",
+   "pixi": "AnimatedSprite",
+   "archivos": {
+    "png1x": "piezas/adonay-espalda__idle@1x.png",
+    "png2x": "piezas/adonay-espalda__idle@2x.png"
+   },
+   "tamano_1x": [
+    384,
+    300
+   ],
+   "tamano_2x": [
+    768,
+    600
+   ],
+   "frames": 2,
+   "frame_1x": [
+    192,
+    300
+   ],
+   "metros": {
+    "alto": 1.78
+   },
+   "ancla": {
+    "px_1x": [
+     96,
+     296
+    ],
+    "anchor": [
+     0.5,
+     0.9867
+    ],
+    "regla": "pies, centro (por frame)"
+   },
+   "densidad_px_m": 161.8,
+   "pos_pantalla_1x": [
+    616,
+    705.0
+   ],
+   "zindex": "sobre todo el mundo (capa 8)",
+   "ambar_pct": 15.83,
+   "notas": "NUEVO. Adonay de ESPALDAS, pixel-art a resolución de arte 96×150 (1 px de arte = 2 px @1x), paleta exacta de forge-paquete/personaje/adonay (pelo rizado oscuro, sobrecamisa arena con tablón trasero y mangas remangadas, pulsera roja, culotte negro ancho, Converse mostaza de suela blanca). Idle: 2 frames (respiración, 1 px). El ámbar medido (~16 %) es ropa (arena/mostaza del sprite aprobado), no luz: con el tinte nocturno 0xCCD1E6 del frame deja de contar (frame C = 0.36 %)."
+  },
+  {
+   "id": "adonay-espalda__walk",
+   "capa": 8,
+   "tipo": "jugador (3ª persona) · fijo en pantalla abajo-centro",
+   "pixi": "AnimatedSprite",
+   "archivos": {
+    "png1x": "piezas/adonay-espalda__walk@1x.png",
+    "png2x": "piezas/adonay-espalda__walk@2x.png"
+   },
+   "tamano_1x": [
+    768,
+    300
+   ],
+   "tamano_2x": [
+    1536,
+    600
+   ],
+   "frames": 4,
+   "frame_1x": [
+    192,
+    300
+   ],
+   "metros": {
+    "alto": 1.78
+   },
+   "ancla": {
+    "px_1x": [
+     96,
+     296
+    ],
+    "anchor": [
+     0.5,
+     0.9867
+    ],
+    "regla": "pies, centro (por frame)"
+   },
+   "densidad_px_m": 161.8,
+   "pos_pantalla_1x": [
+    616,
+    705.0
+   ],
+   "zindex": "sobre todo el mundo (capa 8)",
+   "ambar_pct": 15.51,
+   "notas": "NUEVO. Adonay de ESPALDAS, pixel-art a resolución de arte 96×150 (1 px de arte = 2 px @1x), paleta exacta de forge-paquete/personaje/adonay (pelo rizado oscuro, sobrecamisa arena con tablón trasero y mangas remangadas, pulsera roja, culotte negro ancho, Converse mostaza de suela blanca). Walk: 4 frames (talón izq. arriba · paso · talón der. arriba · paso), braceo y rebote de 2 px; ~8 fps. El ámbar medido (~16 %) es ropa (arena/mostaza del sprite aprobado), no luz: con el tinte nocturno 0xCCD1E6 del frame deja de contar (frame C = 0.36 %)."
+  }
+ ]
+}

@@ -166,6 +166,8 @@ import {
   zoomMinForView,
 } from './altView';
 import { billboardHeightM, PerspectiveView } from './perspectiveView';
+import { PersonaView } from './persona/personaView';
+import { personaEnabled } from './persona/personaSpec';
 import {
   loadPlayerSheets,
   loadRestSheets,
@@ -311,6 +313,9 @@ export class IsoScene {
   private altPaintKey = '';
   private billboardLayer = new Container();
   private perspective = new PerspectiveView();
+  private persona = new PersonaView();
+  private personaIdleSec = 0;
+  private personaTimeSec = 0;
   private billboarded = new Set<Container>();
   private lastFollowYaw = 0;
   private readonly headScratch = new Point();
@@ -513,6 +518,8 @@ export class IsoScene {
     this.app.stage.addChild(this.cenitalVanScreen);
     this.app.stage.addChild(this.rearLayer);
     this.app.stage.addChild(this.perspective.layer);
+    this.app.stage.addChild(this.persona.layer);
+    this.persona.layer.visible = false;
     this.app.stage.addChild(this.billboardLayer);
     this.billboardLayer.sortableChildren = true;
     this.billboardLayer.eventMode = 'passive';
@@ -1354,6 +1361,26 @@ export class IsoScene {
     return !this.interiorActive && this.viewMode === 'perspectiva';
   }
 
+  private personaOn(): boolean {
+    return personaEnabled() && !this.interiorActive && this.viewMode === 'persona';
+  }
+
+  private remapPersonaStick(dx: number, dy: number): { x: number; y: number } {
+    if (dx === 0 && dy === 0) return { x: 0, y: 0 };
+    const q = this.cameraYawQuarter();
+    const rad = (-q * Math.PI) / 2;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    let lx = dx * cos - dy * sin;
+    let ly = dx * sin + dy * cos;
+    const mag = Math.hypot(lx, ly);
+    if (mag > 1) {
+      lx /= mag;
+      ly /= mag;
+    }
+    return { x: lx, y: -ly };
+  }
+
   /** Screen coords (canvas pixels) ↔ world coords with world scaled under a fixed camera pivot. */
   private screenToWorld(sx: number, sy: number): { x: number; y: number } {
     if (this.perspectiveOn() && this.perspective.cam) {
@@ -1401,7 +1428,10 @@ export class IsoScene {
 
   /** Effective yaw quarter applied to the camera (perspectiva adds facing so we sit behind Adonay). */
   private cameraYawQuarter(): number {
-    if (this.viewMode === 'perspectiva' && !this.interiorActive) {
+    if (
+      (this.viewMode === 'perspectiva' || this.viewMode === 'persona') &&
+      !this.interiorActive
+    ) {
       return perspectiveYaw(this.followFacing(), this.yaw);
     }
     return ((this.yaw % 4) + 4) % 4;
@@ -1568,10 +1598,15 @@ export class IsoScene {
 
   setViewMode(mode: Camera): void {
     if (this.interiorActive) return;
+    if (mode === 'persona' && !personaEnabled()) return;
     this.restoreBillboards();
     this.viewMode = mode;
     this.leaveMapOverview();
     this.syncViewTransform();
+    if (mode === 'persona') {
+      this.personaIdleSec = 0;
+      void this.persona.ensureLoaded(Math.min(window.devicePixelRatio || 1, 2));
+    }
     this.centerOnCharacter(false);
     this.applyCamera(true);
     this.applyBillboards();
@@ -2337,14 +2372,18 @@ export class IsoScene {
     }
     this.syncViewTransform();
     this.camera.position.set(sw / 2, sh / 2);
-    if (this.perspectiveOn()) {
+    if (this.perspectiveOn() || this.personaOn()) {
       this.camera.scale.set(1, 1);
       this.camera.rotation = 0;
       this.world.visible = false;
+      this.persona.layer.visible = this.personaOn();
+      this.perspective.layer.visible = this.perspectiveOn();
     } else {
       this.camera.scale.set(this.viewSx, this.viewSy);
       this.camera.rotation = this.viewRot;
       this.world.visible = true;
+      this.persona.layer.visible = false;
+      this.perspective.layer.visible = false;
     }
     this.world.position.set(this.cameraX * this.zoom, this.cameraY * this.zoom);
     this.world.scale.set(this.zoom);
@@ -2403,7 +2442,8 @@ export class IsoScene {
       this.canvasEl.dataset.viewRot = String(this.viewRot);
       this.canvasEl.dataset.mapOverview = this.mapOverview ? '1' : '0';
       this.canvasEl.dataset.altView =
-        !this.interiorActive && (this.viewMode === 'cenital' || this.viewMode === 'perspectiva')
+        !this.interiorActive &&
+        (this.viewMode === 'cenital' || this.viewMode === 'perspectiva' || this.viewMode === 'persona')
           ? this.viewMode
           : 'off';
       this.canvasEl.dataset.layout = document.body.dataset.layout ?? '';
@@ -2445,7 +2485,36 @@ export class IsoScene {
     this.syncObjectSprites();
     this.syncAltView();
     this.syncPerspective();
+    this.syncPersona();
     this.cullVisibleTiles();
+  }
+
+  private syncPersona(): void {
+    const on = this.personaOn();
+    if (!on) return;
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const dt = Math.min(0.25, this.app.ticker.elapsedMS / 1000);
+    this.personaTimeSec += dt;
+    const walking = this.path.length > 0 || this.keys.size > 0;
+    if (walking) this.personaIdleSec = 0;
+    else this.personaIdleSec += dt;
+    this.avatar.setVisible(false);
+    void this.persona.sync({
+      sw,
+      sh,
+      dpr: Math.min(window.devicePixelRatio || 1, 2),
+      charTx: this.charTx,
+      charTy: this.charTy,
+      facing: this.followFacing(),
+      yawQuarter: this.cameraYawQuarter(),
+      walking,
+      idleSec: this.personaIdleSec,
+      jacDriving: !!this.jac?.driving,
+      jacLightsOn: !!this.jac?.snapshot().lightsOn,
+      steer: this.jac?.snapshot().steering ?? 0,
+      timeSec: this.personaTimeSec,
+    });
   }
 
   private syncPerspective(): void {
@@ -2577,6 +2646,7 @@ export class IsoScene {
   }
 
   private remapWalkStick(dx: number, dy: number): { x: number; y: number } {
+    if (this.personaOn() && (dx !== 0 || dy !== 0)) return this.remapPersonaStick(dx, dy);
     if (!this.altViewOn() || (dx === 0 && dy === 0)) return { x: dx, y: dy };
     this.syncViewTransform();
     return screenStickToTile(dx, dy, this.viewRot, this.viewSx, this.viewSy);
@@ -3586,7 +3656,9 @@ export class IsoScene {
       this.fillActors?.update(dt);
     }
     this.syncPerspective();
+    this.syncPersona();
     this.applyBillboards();
+    if (!this.personaOn()) this.avatar.setVisible(!this.interiorActive);
     this.events.onFrame?.();
   }
 
@@ -3791,7 +3863,7 @@ export class IsoScene {
     if (this.canvasEl) {
       this.canvasEl.dataset.follow = f.suspended ? 'suspended' : f.engaged ? 'engaged' : 'idle';
     }
-    if (jumped || f.suspended || this.mapOverview) return;
+    if (jumped || f.suspended || this.mapOverview || this.personaOn()) return;
     const moved = Math.hypot(stepX, stepY) > 1e-4;
     const walking = this.interiorActive ? this.interiorPath.length > 0 : this.path.length > 0;
     if (moved || walking || driving) f.engaged = true;
@@ -3886,7 +3958,7 @@ export class IsoScene {
         dx = 0;
         dy = 0;
       } else {
-        const mapped = this.remapDriveStick(dx, dy);
+        const mapped = this.personaOn() ? this.remapPersonaStick(dx, dy) : this.remapDriveStick(dx, dy);
         dx = mapped.x;
         dy = mapped.y;
       }
@@ -5724,6 +5796,22 @@ export class IsoScene {
     this.applyCamera(false);
     const cov = this.overviewFillFraction();
     return { covW: cov.covW, covH: cov.covH, overview: this.mapOverview };
+  }
+
+  qaPersonaState(): {
+    active: boolean;
+    pantoneVisible: boolean;
+    pantoneSit: boolean;
+    jacCabin: boolean;
+    assets: ReturnType<PersonaView['assetReport']>;
+  } {
+    return {
+      active: this.personaOn(),
+      pantoneVisible: this.persona.lastPantoneVisible,
+      pantoneSit: this.persona.lastPantoneAnim === 'sit',
+      jacCabin: this.persona.lastJacCabin,
+      assets: this.persona.assetReport(),
+    };
   }
 
   /** QA: opaque-top client point vs the HTML pill's bottom (gap should stay ~NAME_PILL_GAP_PX). */

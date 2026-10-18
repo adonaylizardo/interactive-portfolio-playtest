@@ -21,10 +21,13 @@ const pushDir = path.join(root, '.gh-pages-push');
 const LIVE_BASE = '/interactive-portfolio-playtest/';
 const PREVIEW_BASE = '/interactive-portfolio-playtest/preview/';
 const PREVIEW_CAMARAS_BASE = '/interactive-portfolio-playtest/preview-camaras/';
+const PREVIEW_PERSONA_BASE = '/interactive-portfolio-playtest/preview-persona/';
 const LIVE_URL = 'https://adonaylizardo.github.io/interactive-portfolio-playtest/';
 const PREVIEW_URL = 'https://adonaylizardo.github.io/interactive-portfolio-playtest/preview/';
 const PREVIEW_CAMARAS_URL =
   'https://adonaylizardo.github.io/interactive-portfolio-playtest/preview-camaras/';
+const PREVIEW_PERSONA_URL =
+  'https://adonaylizardo.github.io/interactive-portfolio-playtest/preview-persona/';
 
 const argv = process.argv.slice(2);
 const target = (() => {
@@ -37,6 +40,13 @@ const target = (() => {
     argv.includes('preview-camaras')
   ) {
     return 'preview-camaras';
+  }
+  if (
+    process.env.DEPLOY_TARGET === 'preview-persona' ||
+    argv.includes('--preview-persona') ||
+    argv.includes('preview-persona')
+  ) {
+    return 'preview-persona';
   }
   return 'preview';
 })();
@@ -52,21 +62,39 @@ if (target === 'live' && process.env.DEPLOY_LIVE_APPROVED !== '1') {
 }
 
 const base =
-  target === 'live' ? LIVE_BASE : target === 'preview-camaras' ? PREVIEW_CAMARAS_BASE : PREVIEW_BASE;
+  target === 'live'
+    ? LIVE_BASE
+    : target === 'preview-camaras'
+      ? PREVIEW_CAMARAS_BASE
+      : target === 'preview-persona'
+        ? PREVIEW_PERSONA_BASE
+        : PREVIEW_BASE;
 const url =
-  target === 'live' ? LIVE_URL : target === 'preview-camaras' ? PREVIEW_CAMARAS_URL : PREVIEW_URL;
+  target === 'live'
+    ? LIVE_URL
+    : target === 'preview-camaras'
+      ? PREVIEW_CAMARAS_URL
+      : target === 'preview-persona'
+        ? PREVIEW_PERSONA_URL
+        : PREVIEW_URL;
 
 function run(cmd, cwd = root) {
   execSync(cmd, { cwd, stdio: 'inherit' });
 }
+
+if (target === 'preview-persona') run('node scripts/copy-persona-art.mjs');
 
 if (process.env.DEPLOY_GATE_PASSED === '1') {
   run('npx tsc --pretty false');
   run(`npx vite build --base ${base}`);
 } else {
   run('npm run qa:gate');
-  if (target === 'preview' || target === 'preview-camaras') run(`npx vite build --base ${base}`);
+  if (target === 'preview' || target === 'preview-camaras' || target === 'preview-persona') {
+    run(`npx vite build --base ${base}`);
+  }
 }
+
+run('node scripts/copy-persona-art.mjs');
 
 if (!existsSync(path.join(dist, 'index.html'))) {
   console.error('dist/index.html missing after build');
@@ -90,8 +118,14 @@ try {
     mkdirSync(dest, { recursive: true });
     cpSync(dist, dest, { recursive: true });
     writeFileSync(path.join(pushDir, '.nojekyll'), '');
+  } else if (target === 'preview-persona') {
+    const dest = path.join(pushDir, 'preview-persona');
+    rmSync(dest, { recursive: true, force: true });
+    mkdirSync(dest, { recursive: true });
+    cpSync(dist, dest, { recursive: true });
+    writeFileSync(path.join(pushDir, '.nojekyll'), '');
   } else {
-    const keep = new Set(['.git', 'preview', 'preview-camaras']);
+    const keep = new Set(['.git', 'preview', 'preview-camaras', 'preview-persona']);
     for (const name of readdirSync(pushDir)) {
       if (keep.has(name)) continue;
       rmSync(path.join(pushDir, name), { recursive: true, force: true });
@@ -110,7 +144,9 @@ try {
         ? 'Deploy candidate to /preview/ (live root unchanged)'
         : target === 'preview-camaras'
           ? 'Deploy top-down camera candidate to /preview-camaras/'
-          : 'Promote approved candidate to live gh-pages root';
+          : target === 'preview-persona'
+            ? 'Deploy primera-persona camera candidate to /preview-persona/'
+            : 'Promote approved candidate to live gh-pages root';
     run('git -c user.email=agent@cursor.com -c user.name="Cursor Agent" commit -m "' + msg + '"', pushDir);
     run('git push origin HEAD:gh-pages', pushDir);
   }
