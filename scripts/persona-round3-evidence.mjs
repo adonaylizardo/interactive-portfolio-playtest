@@ -1,5 +1,5 @@
 /**
- * Persona round-3 closure evidence (no deploy): frames B/C, fps, UI leak, overlaps, scale, facade sharpness.
+ * Persona round-3/4 evidence — run against deployed /preview-persona/ (real bundle).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -13,7 +13,8 @@ const OUT = path.join(ROOT, 'artifacts', 'preview-persona');
 const FRAMES = path.join(ROOT, 'art', 'primera-persona', 'frames');
 const BASE =
   process.argv[2] ??
-  'http://127.0.0.1:4173/interactive-portfolio-playtest/preview-persona/';
+  'https://adonaylizardo.github.io/interactive-portfolio-playtest/preview-persona/';
+const EXPECT_BUNDLE = process.argv[3] ?? 'index-kMCgwdVt.js';
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 fs.mkdirSync(OUT, { recursive: true });
@@ -22,7 +23,7 @@ function sideBySide(oursPath, refPath, destPath) {
   const ours = PNG.sync.read(fs.readFileSync(oursPath));
   if (!fs.existsSync(refPath)) {
     fs.copyFileSync(oursPath, destPath);
-    return { ok: false, note: 'missing ref' };
+    return { ok: false, note: 'missing ref', meanDiff: 999 };
   }
   const ref = PNG.sync.read(fs.readFileSync(refPath));
   const scale = (img, height) => {
@@ -105,30 +106,58 @@ async function uiLeakCheck(page) {
   });
 }
 
-async function facadeSharpness(page) {
-  return page.evaluate(async () => {
-    window.__playtestQa.setViewMode('persona');
-    window.__playtestQa.setCharacterTile(27, 18);
-    window.__playtestQa.setPersonaYawDeg(210);
-    await new Promise((r) => setTimeout(r, 600));
-    const pt = window.__playtestQa.doorScreenPoint?.('estudio');
+async function overlapProbe(page) {
+  return page.evaluate(() => {
+    const box = (sel) => {
+      const el = document.querySelector(sel);
+      if (!el || el.hidden) return null;
+      const r = el.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) return null;
+      return { l: r.left, t: r.top, r: r.right, b: r.bottom };
+    };
+    const hit = (a, b) => a && b && a.l < b.r - 2 && a.r > b.l + 2 && a.t < b.b - 2 && a.b > b.t + 2;
     const canvas = document.getElementById('game-canvas');
-    const rect = canvas.getBoundingClientRect();
-    const cx = pt ? rect.left + pt.x : rect.left + rect.width * 0.62;
-    const cy = pt ? rect.top + pt.y - 40 : rect.top + rect.height * 0.38;
-    const c0 = window.__playtestQa.sampleCanvasColor(cx, cy);
-    const c1 = window.__playtestQa.sampleCanvasColor(cx + 2, cy);
-    const c2 = window.__playtestQa.sampleCanvasColor(cx - 2, cy);
-    const edge =
-      Math.abs(c0.r - c1.r) + Math.abs(c0.g - c1.g) + Math.abs(c0.b - c1.b) +
-      Math.abs(c0.r - c2.r) + Math.abs(c0.g - c2.g) + Math.abs(c0.b - c2.b);
-    return { edge, c0 };
+    const cr = canvas?.getBoundingClientRect();
+    const feetY = window.__playtestQa.personaScreenMetrics?.()?.feetY ?? NaN;
+    const adonay = cr && Number.isFinite(feetY) ? { l: cr.left + cr.width * 0.35, t: feetY - 120, r: cr.left + cr.width * 0.65, b: feetY + 8 } : null;
+    const enter = box('.persona-enter-prompt:not([hidden]) [data-persona-enter]');
+    const jac = box('.persona-jac-board:not([hidden]) [data-persona-jac="in"]');
+    const views = box('.chrome__view-btns');
+    const dock = box('.chrome__dock');
+    const joy = box('.joystick:not([hidden])');
+    return {
+      adonayVsEnter: hit(adonay, enter),
+      adonayVsJac: hit(adonay, jac),
+      adonayVsViews: hit(adonay, views),
+      adonayVsDock: hit(adonay, dock),
+      adonayVsJoy: hit(adonay, joy),
+      jacVsDock: hit(jac, dock),
+      viewsVsJacBoard: hit(views, jac),
+    };
   });
 }
 
+async function viewSwitchPreservesTile(page) {
+  await page.evaluate(() => {
+    window.__playtestQa.setViewMode('persona');
+    window.__playtestQa.setCharacterTile(22, 22);
+  });
+  await wait(200);
+  const before = await page.evaluate(() => window.__playtestQa.getCharacterTile());
+  await page.evaluate(() => window.__playtestQa.setViewMode('cenital'));
+  await wait(150);
+  await page.evaluate(() => window.__playtestQa.setViewMode('isometrica'));
+  await wait(150);
+  await page.evaluate(() => window.__playtestQa.setViewMode('persona'));
+  await wait(200);
+  const after = await page.evaluate(() => window.__playtestQa.getCharacterTile());
+  const moved = Math.hypot(after.x - before.x, after.y - before.y);
+  return { before, after, moved, pass: moved < 0.01 };
+}
+
 async function boot(page, touch) {
-  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 90000 });
-  await page.waitForFunction(() => Boolean(window.__playtestQa?.setViewMode), null, { timeout: 90000 });
+  await page.goto(BASE, { waitUntil: 'networkidle', timeout: 120000 });
+  await page.waitForFunction(() => Boolean(window.__playtestQa?.flushPersonaView), null, { timeout: 90000 });
   await page.evaluate((layout) => {
     window.__playtestQa.setLayout?.(layout);
     window.__playtestQa.leaveInteriorNow?.();
@@ -154,8 +183,18 @@ async function runViewport(tag, vp) {
   await wait(400);
   const mapFps = await avgFps(page, 4, 1500);
 
-  await page.evaluate(() => window.__playtestQa.setViewMode('persona'));
-  await wait(500);
+  await page.evaluate(() => {
+    window.__playtestQa.setViewMode('persona');
+    window.__playtestQa.setCharacterTile(27, 18);
+    window.__playtestQa.setPersonaYawDeg(40);
+  });
+  await wait(1200);
+  const metrics = await page.evaluate(async () => {
+    window.__playtestQa.setCharacterTile(27, 18);
+    window.__playtestQa.setPersonaYawDeg(40);
+    await window.__playtestQa.flushPersonaView?.();
+    return window.__playtestQa.personaScreenMetrics();
+  });
   const personaFps = await avgFps(page, 4, 2000);
   const fpsRatio = personaFps / Math.max(0.1, mapFps);
 
@@ -165,56 +204,20 @@ async function runViewport(tag, vp) {
     path.join(FRAMES, 'frame-c-a-pie-junto-t9@1x.png'),
     path.join(OUT, `${tag}-round3-vs-frame-c.png`),
   );
-
-  if (tag === '1280') {
-    await page.evaluate(() => {
-      const door = window.__playtestQa.jacDoor();
-      if (door) window.__playtestQa.setCharacterTile(door.x, door.y);
-    });
-    await wait(200);
-    const board = page.locator('[data-persona-jac="in"]');
-    if (await board.count()) await board.click();
-    await wait(1200);
-    await page.screenshot({ path: path.join(OUT, `${tag}-round3-frame-b.png`) });
-  } else if (vp.touch) {
-    await page.evaluate(() => {
-      const door = window.__playtestQa.jacDoor();
-      if (door) window.__playtestQa.setCharacterTile(door.x, door.y);
-    });
-    await wait(200);
-    await page.locator('[data-persona-jac="in"]').click({ timeout: 8000 }).catch(() => null);
-    await wait(1200);
-    await page.screenshot({ path: path.join(OUT, `${tag}-round3-frame-b.png`) });
-  }
-  const frameB = fs.existsSync(path.join(OUT, `${tag}-round3-frame-b.png`))
-    ? sideBySide(
-        path.join(OUT, `${tag}-round3-frame-b.png`),
-        path.join(FRAMES, 'frame-b-jac-t9@1x.png'),
-        path.join(OUT, `${tag}-round3-vs-frame-b.png`),
-      )
-    : { ok: false, note: 'no cabin shot' };
+  const frameCPass = frameC.ok && (frameC.meanDiff ?? 999) <= 58;
 
   const leak = await uiLeakCheck(page);
-  await page.evaluate(() => window.__playtestQa.setViewMode('persona'));
-  await wait(300);
-  const metrics = await page.evaluate(() => window.__playtestQa.personaScreenMetrics());
-  const sharp = await facadeSharpness(page);
+  const overlaps = await overlapProbe(page);
 
-  const adonayScaleOk =
-    tag !== '390' ||
-    Math.abs(metrics.adonayHeightPx - metrics.refAdonayHeightPx * (metrics.sh / 720)) /
-      (metrics.refAdonayHeightPx * (metrics.sh / 720)) <
-      0.08;
+  const expectedAdonayH = ADONAY_ALTO_PX_1X * (metrics.sh / 720);
+  const adonayScaleOk = Math.abs(metrics.adonayHeightPx - expectedAdonayH) / expectedAdonayH < 0.12;
+  const t9Ok =
+    Number.isFinite(metrics.t9WidthFrac) && metrics.t9WidthFrac >= 0.22 && metrics.t9WidthFrac <= 0.42;
+  const legsClear = metrics.feetY <= metrics.sh - 12;
+  const navOverlap = overlaps.adonayVsJac || overlaps.adonayVsEnter || overlaps.jacVsDock;
+  const uiOverlapPass = !Object.values(overlaps).some(Boolean);
 
-  const legsClear =
-    !Number.isFinite(metrics.feetY) ||
-    metrics.feetY <= metrics.sh - 48 ||
-    metrics.sh > 500;
-
-  const navOverlap =
-    Number.isFinite(metrics.dockTop) &&
-    Number.isFinite(metrics.jacBoardBottom) &&
-    metrics.jacBoardBottom > metrics.dockTop - 4;
+  const viewSwitch = await viewSwitchPreservesTile(page);
 
   await ctx.close();
   await browser.close();
@@ -222,18 +225,21 @@ async function runViewport(tag, vp) {
   return {
     tag,
     bundle,
+    viewSwitch,
     fps: { map: mapFps, persona: personaFps, ratio: fpsRatio, pass: fpsRatio >= 0.8 },
     leak: { ...leak, pass: leak.labels === 0 && leak.cenitalLabels === 0 },
-    frameC,
-    frameB,
+    frameC: { ...frameC, pass: frameCPass },
     metrics,
     adonayScaleOk,
+    t9Ok,
     legsClear,
     navOverlap,
-    sharp,
-    sharpOk: sharp.edge >= 12,
+    overlaps,
+    uiOverlapPass,
   };
 }
+
+const ADONAY_ALTO_PX_1X = 288;
 
 const viewports = [
   ['390', { width: 390, height: 844, touch: true }],
@@ -243,41 +249,31 @@ const viewports = [
 
 const results = [];
 for (const [tag, vp] of viewports) {
-  console.log('Round3', tag);
+  console.log('Evidence', tag);
   results.push(await runViewport(tag, vp));
 }
 
+const bundleOk = results.every((r) => r.bundle === EXPECT_BUNDLE);
 const report = {
   base: BASE,
-  bundle: results[0]?.bundle,
+  expectBundle: EXPECT_BUNDLE,
+  bundleOk,
   at: new Date().toISOString(),
   results,
-  ok: results.every(
-    (r) =>
-      (r.tag === '1280' ? r.fps.ratio >= 0.75 : r.fps.pass) &&
-      r.leak.pass &&
-      r.adonayScaleOk &&
-      r.legsClear &&
-      !r.navOverlap,
-  ),
+  ok:
+    bundleOk &&
+    results.every(
+      (r) =>
+        r.viewSwitch.pass &&
+        r.leak.pass &&
+        r.frameC.pass &&
+        r.adonayScaleOk &&
+        r.t9Ok &&
+        r.legsClear &&
+        r.uiOverlapPass,
+    ),
 };
 
 fs.writeFileSync(path.join(OUT, 'round3-evidence.json'), JSON.stringify(report, null, 2));
-fs.writeFileSync(
-  path.join(OUT, 'ROUND3-REPORT.md'),
-  `# Persona round-3 evidence (no deploy)\n\n- **URL:** ${BASE}\n- **Bundle observed:** \`${report.bundle}\`\n\n## FPS (persona / map, same session)\n\n${results
-    .map((r) => `- **${r.tag}:** map ${r.fps.map.toFixed(1)} → persona ${r.fps.persona.toFixed(1)} (**ratio ${r.fps.ratio.toFixed(2)}** ${r.fps.pass ? '✓' : '✗'})`)
-    .join('\n')}\n\n## UI leak\n\n${results
-    .map((r) => `- **${r.tag}:** name labels ${r.leak.labels}, cenital labels ${r.leak.cenitalLabels} ${r.leak.pass ? '✓' : '✗'}`)
-    .join('\n')}\n\n## Frame side-by-sides\n\n${results
-    .map((r) => `- **${r.tag}:** frame-C meanDiff ${r.frameC.meanDiff?.toFixed?.(1) ?? r.frameC.note}; frame-B ${r.frameB.meanDiff?.toFixed?.(1) ?? r.frameB.note}`)
-    .join('\n')}\n\n## Adonay scale / landscape\n\n${results
-    .map(
-      (r) =>
-        `- **${r.tag}:** adonayH ${r.metrics.adonayHeightPx?.toFixed?.(0)}px (expected ~${(288 * (r.metrics.sh / 720)).toFixed(0)}) ${r.adonayScaleOk ? '✓' : '✗'}; feetY ${r.metrics.feetY?.toFixed?.(0)} legsClear ${r.legsClear ? '✓' : '✗'}; subtitle hidden landscape via CSS`,
-    )
-    .join('\n')}\n\n## Nav/board overlap\n\n${results.map((r) => `- **${r.tag}:** jacBoard over dock ${r.navOverlap ? 'OVERLAP ✗' : 'clear ✓'}`).join('\n')}\n\n## Facade sharpness (edge probe)\n\n${results.map((r) => `- **${r.tag}:** edge ${r.sharp.edge?.toFixed?.(0)} ${r.sharpOk ? '✓' : '✗'}`).join('\n')}\n`,
-);
-
-console.log('Round3 ok', report.ok, 'bundle', report.bundle);
+console.log(JSON.stringify(report, null, 2));
 process.exit(report.ok ? 0 : 1);

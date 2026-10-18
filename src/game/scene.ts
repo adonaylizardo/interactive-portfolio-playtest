@@ -167,7 +167,7 @@ import {
   zoomMinForView,
 } from './altView';
 import { billboardHeightM, PerspectiveView } from './perspectiveView';
-import { PersonaView } from './persona/personaView';
+import { PersonaView, personaT9WidthFrac } from './persona/personaView';
 import {
   ADONAY_ALTO_PX_1X,
   CAL_M,
@@ -292,8 +292,8 @@ const FOLLOW_SMOOTH_S = 0.35;
 /** Persona mode: A/D and stick X rotate this yaw (rad/s), not strafe. */
 const PERSONA_TURN_RATE = 2.65;
 /** ~1.7 m/s on foot vs map keyboard walk (~4.5 tiles/s). */
-const PERSONA_WALK_MUL = 0.37;
-const PERSONA_STICK_DEAD = 0.1;
+const PERSONA_WALK_MUL = 0.43;
+const PERSONA_STICK_DEAD = 0;
 const PERSONA_FRAME_C_T9 = { x: 2.0, z: 8.2 };
 
 function personaStickAxis(raw: number): number {
@@ -363,6 +363,8 @@ export class IsoScene {
   cameraY = 0;
   zoom = 0.85;
   private viewMode: Camera = 'isometrica';
+  /** Persona spawn framing runs once per session; later view switches keep tile + yaw. */
+  private personaSpawnFramed = false;
   private yaw = 0;
   private viewRot = 0;
   private viewSx = 1;
@@ -1649,7 +1651,10 @@ export class IsoScene {
     this.syncViewTransform();
     if (mode === 'persona') {
       this.personaIdleSec = 0;
-      this.framePersonaSpawnView();
+      if (!this.personaSpawnFramed) {
+        this.framePersonaSpawnView();
+        this.personaSpawnFramed = true;
+      }
       void this.persona.ensureLoaded(Math.min(window.devicePixelRatio || 1, 2));
     }
     this.centerOnCharacter(false);
@@ -2551,27 +2556,14 @@ export class IsoScene {
     this.cullVisibleTiles();
   }
 
-  private syncPersona(): void {
-    const on = this.personaOn();
-    if (!on) return;
+  private personaFrameInput(): import('./persona/personaView').PersonaFrameInput | null {
+    if (!this.personaOn()) return null;
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
-    const dt = Math.min(0.25, this.app.ticker.elapsedMS / 1000);
-    this.personaTimeSec += dt;
     const stickLive = Math.abs(this.events.stick?.().x ?? 0) > 0.02 || Math.abs(this.events.stick?.().y ?? 0) > 0.02;
     const walking =
       this.path.length > 0 || this.keys.size > 0 || stickLive || !!this.qaStick;
-    if (walking) this.personaIdleSec = 0;
-    else this.personaIdleSec += dt;
-    if (!walking && !this.jac?.driving) {
-      this.personaIdleSyncSkip += 1;
-      const skipDiv = sh < 430 ? 8 : sh < 500 ? 7 : 5;
-      if (this.personaIdleSyncSkip % skipDiv !== 0) return;
-    } else {
-      this.personaIdleSyncSkip = 0;
-    }
-    this.avatar.setVisible(false);
-    void this.persona.sync({
+    return {
       sw,
       sh,
       dpr: Math.min(window.devicePixelRatio || 1, 1.25),
@@ -2586,7 +2578,40 @@ export class IsoScene {
       jacLightsOn: !!this.jac?.snapshot().lightsOn,
       steer: this.jac?.snapshot().steering ?? 0,
       timeSec: this.personaTimeSec,
-    });
+    };
+  }
+
+  private syncPersona(): void {
+    const on = this.personaOn();
+    if (!on) return;
+    const sh = this.app.screen.height;
+    const dt = Math.min(0.25, this.app.ticker.elapsedMS / 1000);
+    this.personaTimeSec += dt;
+    const stickLive = Math.abs(this.events.stick?.().x ?? 0) > 0.02 || Math.abs(this.events.stick?.().y ?? 0) > 0.02;
+    const walking =
+      this.path.length > 0 || this.keys.size > 0 || stickLive || !!this.qaStick;
+    if (walking) this.personaIdleSec = 0;
+    else this.personaIdleSec += dt;
+    if (!walking && !this.jac?.driving) {
+      this.personaIdleSyncSkip += 1;
+      const skipDiv = sh < 430 ? 8 : sh < 500 ? 7 : 5;
+      if (this.personaIdleSyncSkip % skipDiv !== 0 && this.persona.lastJacScreen) return;
+    } else {
+      this.personaIdleSyncSkip = 0;
+    }
+    this.avatar.setVisible(false);
+    const input = this.personaFrameInput();
+    if (input) void this.persona.sync(input);
+  }
+
+  async qaFlushPersonaView(): Promise<void> {
+    if (!this.personaOn()) return;
+    this.personaIdleSyncSkip = 0;
+    this.avatar.setVisible(false);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    await this.persona.ensureLoaded(dpr);
+    const input = this.personaFrameInput();
+    if (input) await this.persona.sync(input);
   }
 
   private syncPerspective(): void {
@@ -4098,7 +4123,8 @@ export class IsoScene {
     }
     if (!building?.panelTitle || !building.door) return null;
     const doorDist = Math.max(Math.abs(building.door.x - t.x), Math.abs(building.door.y - t.y));
-    if (doorDist > 1) return null;
+    const maxDoor = building.name === 'catedral' ? 2 : 1;
+    if (doorDist > maxDoor) return null;
     const inward = doorInwardStep(building);
     if (!inward) return null;
     this.syncViewTransform();
@@ -4106,7 +4132,8 @@ export class IsoScene {
     const fm = Math.hypot(fwd.x, fwd.y);
     if (fm < 1e-6) return null;
     const dot = (fwd.x / fm) * inward.x + (fwd.y / fm) * inward.y;
-    if (dot < 0.45) return null;
+    const minDot = building.name === 'catedral' ? 0.28 : 0.45;
+    if (dot < minDot) return null;
     return building;
   }
 
@@ -4880,9 +4907,6 @@ export class IsoScene {
 
   private atJacDoor(maxDist: number): boolean {
     if (!this.jac) return false;
-    if (this.jac.approachTiles().some((s) => Math.hypot(this.charTx - s.x, this.charTy - s.y) < maxDist)) {
-      return true;
-    }
     const door = this.jac.driverDoorTile({ x: this.charTx, y: this.charTy });
     if (!door) return false;
     return Math.hypot(this.charTx - door.x, this.charTy - door.y) < maxDist;
@@ -4902,10 +4926,16 @@ export class IsoScene {
       return;
     }
     const door = this.jac?.driverDoorTile({ x: this.charTx, y: this.charTy });
-    if (door && Math.hypot(this.charTx - door.x, this.charTy - door.y) > 0.2) {
-      this.charTx = door.x;
-      this.charTy = door.y;
-      this.syncCharacterGraphic();
+    if (door) {
+      const d = Math.hypot(this.charTx - door.x, this.charTy - door.y);
+      if (d > 0.2 && d <= 0.55) {
+        this.charTx = door.x;
+        this.charTy = door.y;
+        this.syncCharacterGraphic();
+      } else if (d > 0.55) {
+        this.pendingJacEnter = false;
+        return;
+      }
     }
     this.seatInJac();
   }
@@ -6044,7 +6074,28 @@ export class IsoScene {
   }
 
   personaJacBoardVisible(): boolean {
-    return this.personaOn() && !!this.jac && !this.jac.driving && this.atJacDoor(3.2);
+    return (
+      this.personaOn() &&
+      !!this.jac &&
+      !this.jac.driving &&
+      this.atJacDoor(1.5) &&
+      this.personaJacInView()
+    );
+  }
+
+  personaJacInView(): boolean {
+    const m = this.persona.lastJacScreen;
+    if (!m?.visible) return false;
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const pad = 24;
+    return (
+      m.w >= sw * 0.08 &&
+      m.x + m.w > pad &&
+      m.x < sw - pad &&
+      m.y + m.h > pad &&
+      m.y < sh - pad
+    );
   }
 
   /** QA: screen stick → unit tile delta (persona / alt cameras). */
@@ -6125,11 +6176,15 @@ export class IsoScene {
     enterBtnTop: number;
     jacBoardTop: number;
     jacBoardBottom: number;
+    t9WidthFrac: number;
   } {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     const feetScale = sh / PERSONA_REF.h;
-    const feetY = Math.min(FEET_Y_1X * feetScale, sh - (sh <= 500 ? 64 : 8));
+    const portraitNarrow = sh > sw && sw < 420;
+    const feetY = portraitNarrow
+      ? Math.min(FEET_Y_1X * feetScale, sh * 0.78)
+      : Math.min(FEET_Y_1X * feetScale, sh - (sh <= 500 ? 72 : 8));
     const adonayHeightPx = ADONAY_ALTO_PX_1X * feetScale;
     const refAdonayHeightPx = ADONAY_ALTO_PX_1X;
     const rect = (sel: string) => {
@@ -6154,7 +6209,16 @@ export class IsoScene {
       chromeTitleBottom: rect('.chrome__title'),
       chromeSubtitleBottom: rect('.chrome__subtitle'),
       dockTop: top('.chrome__dock'),
-      enterBtnTop: top('[data-persona-enter]'),
+      enterBtnTop: top('.persona-enter-prompt:not([hidden]) [data-persona-enter]'),
+    t9WidthFrac: (() => {
+      const w = this.persona.lastJacScreen?.visible
+        ? this.persona.lastJacScreen.w / Math.max(1, sw)
+        : null;
+      if (w != null && Number.isFinite(w)) return w;
+      const tw = this.persona.jacT9TextureWidth() || 308;
+      const est = personaT9WidthFrac(sw, sh, this.charTx, this.charTy, this.personaCamYaw, tw);
+      return est ?? NaN;
+    })(),
       jacBoardTop: top('.persona-jac-board'),
       jacBoardBottom: rect('.persona-jac-board__btn[data-persona-jac="in"]'),
     };

@@ -16,6 +16,7 @@ import {
   JAC_T9_POSE,
   METERS_PER_TILE,
   PANTONE_SCALE,
+  T9_TARGET_VW,
   PERSONA_REF,
   PX_PER_M,
   piezaById,
@@ -69,6 +70,25 @@ function forwardFromYawRad(yawRad: number): { x: number; z: number } {
 /** Projected scale × (meters-wide × px/m) / texture width → Pixi sprite scale. */
 function billboardScale(projScale: number, texWidth: number, widthM: number): number {
   return projScale * ((widthM * PX_PER_M) / texWidth);
+}
+
+export function personaT9WidthFrac(
+  sw: number,
+  sh: number,
+  charTx: number,
+  charTy: number,
+  yawRad: number,
+  texWidth: number,
+): number | null {
+  const player = tileToPersonaMeters(charTx, charTy);
+  const fwd = forwardFromYawRad(yawRad);
+  const cam = { x: player.x - fwd.x * BEHIND_TP_M, z: player.z - fwd.z * BEHIND_TP_M };
+  const t9p = projectTp(JAC_T9_POSE.x, 0, JAC_T9_POSE.z, cam, sw, sh);
+  if (!t9p || !texWidth) return null;
+  let sc = billboardScale(t9p.scale, texWidth, JAC_T9_POSE.widthM);
+  const wPx = texWidth * sc;
+  sc *= (sw * T9_TARGET_VW) / Math.max(1, wPx);
+  return (texWidth * sc) / sw;
 }
 
 function projectTp(
@@ -133,6 +153,7 @@ export class PersonaView {
   lastPantoneVisible = false;
   lastPantoneAnim: PersonaAnim = 'idle';
   lastJacCabin = false;
+  lastJacScreen: { visible: boolean; x: number; y: number; w: number; h: number } | null = null;
 
   constructor() {
     this.layer.label = 'persona-view';
@@ -152,6 +173,10 @@ export class PersonaView {
 
   assetReport(): ReturnType<typeof personaAssetReport> {
     return personaAssetReport();
+  }
+
+  jacT9TextureWidth(): number {
+    return this.jacT9Ext.texture?.width ?? 0;
   }
 
   async ensureLoaded(dpr: number): Promise<void> {
@@ -187,9 +212,9 @@ export class PersonaView {
       { file: 'farol-frente__estado-encendido', id: 'farol-frente', x: 1.3, z: 30 },
       { file: 'farol-frente__estado-encendido', id: 'farol-frente', x: 1.3, z: 15.5 },
       { file: 'farol-frente__estado-encendido', id: 'farol-frente', x: 11.8, z: 24 },
-      { file: 'arbol-cuji-frente', id: 'arbol-cuji-frente', x: -5.2, z: 31 },
+      { file: 'arbol-cuji-frente', id: 'arbol-cuji-frente', x: 11.8, z: 24 },
       { file: 'arbol-cuji-frente', id: 'arbol-cuji-frente', x: 17.5, z: 17 },
-      { file: 'banco-frente', id: 'banco-frente', x: -4.3, z: 28.5 },
+      { file: 'banco-frente', id: 'banco-frente', x: -4.3, z: 12.5 },
     ];
     for (const pl of propPlacements) {
       const tex = await loadProp(pl.file, dpr);
@@ -229,22 +254,55 @@ export class PersonaView {
     }
   }
 
+  private fillGroundRect(
+    cam: { x: number; z: number },
+    sw: number,
+    sh: number,
+    x0: number,
+    x1: number,
+    z0: number,
+    z1: number,
+    color: number,
+    alpha = 1,
+  ): void {
+    const tl = projectTp(x0, 0, z0, cam, sw, sh);
+    const tr = projectTp(x1, 0, z0, cam, sw, sh);
+    const br = projectTp(x1, 0, z1, cam, sw, sh);
+    const bl = projectTp(x0, 0, z1, cam, sw, sh);
+    if (!tl || !tr || !br || !bl) return;
+    this.ground.poly([tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y]).fill({ color, alpha });
+  }
+
   private drawGround(cam: { x: number; z: number }, sw: number, sh: number): void {
-    const key = `${Math.round(cam.x * 2) / 2}:${Math.round(cam.z * 4) / 4}`;
+    const key = `${Math.round(cam.x * 2) / 2}:${Math.round(cam.z * 4) / 4}:${sw}x${sh}`;
     if (key === this.lastGroundKey) return;
     this.lastGroundKey = key;
     this.ground.clear();
-    const stripes = 16;
-    for (let i = 0; i < stripes; i++) {
-      const z0 = cam.z + i * 3;
-      const z1 = z0 + 3;
-      const p0 = projectTp(0, 0, z0, cam, sw, sh);
-      const p1 = projectTp(0, 0, z1, cam, sw, sh);
-      if (!p0 || !p1) continue;
-      const yTop = Math.min(p0.y, p1.y);
-      const col = i % 2 === 0 ? 0x2a2c32 : 0x32343a;
-      this.ground.rect(0, yTop, sw, Math.max(2, sh - yTop)).fill({ color: col, alpha: 0.95 });
+    const horY = HORIZON_Y_1X * (sh / PERSONA_REF.h);
+    this.ground.rect(0, horY, sw, sh - horY).fill({ color: 0x1a1c20, alpha: 1 });
+    const zFar = 52;
+    const SW0 = -3.2;
+    const CURB0 = 1.6;
+    const CURB1 = 1.77;
+    const STR1 = 11.3;
+    const FC1 = 11.47;
+    const FS1 = 15.5;
+    const ZX0 = 38;
+    const grass = 0x1e261c;
+    const acera = 0x24262b;
+    const brocal = 0xd8dbe0;
+    const asf = 0x16171b;
+    this.fillGroundRect(cam, sw, sh, -80, SW0, 0, zFar, grass);
+    this.fillGroundRect(cam, sw, sh, FS1, 80, 0, zFar, grass);
+    this.fillGroundRect(cam, sw, sh, SW0, CURB0, 0, ZX0, acera);
+    this.fillGroundRect(cam, sw, sh, CURB0, CURB1, 0, ZX0, brocal);
+    this.fillGroundRect(cam, sw, sh, CURB1, STR1, 0, ZX0, asf);
+    for (let z = 3; z < ZX0 - 4; z += 9) {
+      this.fillGroundRect(cam, sw, sh, 7.8, 7.85, z, z + 3.5, 0x787c84, 0.85);
     }
+    this.fillGroundRect(cam, sw, sh, 4.25, 4.35, 2, ZX0 - 3, 0x34383e, 0.7);
+    this.fillGroundRect(cam, sw, sh, STR1, FC1, 0, ZX0, brocal);
+    this.fillGroundRect(cam, sw, sh, FC1, FS1, 0, ZX0, acera);
     this.ground.zIndex = -500;
   }
 
@@ -315,7 +373,9 @@ export class PersonaView {
     const feetScale = portraitNarrow
       ? Math.min(refScale, (sw * 0.34) / ADONAY_ALTO_PX_1X)
       : refScale;
-    const feetY = Math.min(FEET_Y_1X * refScale, sh - (portraitNarrow ? 12 : sh <= 500 ? 64 : 8));
+    const feetY = portraitNarrow
+      ? Math.min(FEET_Y_1X * refScale, sh * 0.78)
+      : Math.min(FEET_Y_1X * refScale, sh - (sh <= 500 ? 72 : 8));
     const adonayAnim = input.walking ? 'walk' : 'idle';
     const strip = adonayAnim === 'walk' ? this.adonayStrip.walk : this.adonayStrip.idle;
     if (strip) {
@@ -357,9 +417,23 @@ export class PersonaView {
       this.jacT9Ext.x = t9p.x;
       this.jacT9Ext.y = t9p.y;
       const tw = this.jacT9Ext.texture.width;
-      this.jacT9Ext.scale.set(billboardScale(t9p.scale, tw, JAC_T9_POSE.widthM));
+      const th = this.jacT9Ext.texture.height;
+      let sc = billboardScale(t9p.scale, tw, JAC_T9_POSE.widthM);
+      const wPx = tw * sc;
+      sc *= (sw * T9_TARGET_VW) / Math.max(1, wPx);
+      this.jacT9Ext.scale.set(sc);
+      const w = tw * sc;
+      const h = th * sc;
+      this.lastJacScreen = {
+        visible: true,
+        x: this.jacT9Ext.x - w / 2,
+        y: this.jacT9Ext.y - h,
+        w,
+        h,
+      };
     } else {
       this.jacT9Ext.visible = false;
+      this.lastJacScreen = null;
     }
     for (const p of this.propSprites) {
       const pr = projectTp(p.x, 0, p.z, cam, sw, sh);

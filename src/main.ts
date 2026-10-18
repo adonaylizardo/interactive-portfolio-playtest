@@ -164,6 +164,7 @@ async function main(): Promise<void> {
       document.body.dataset.view = scene.getViewMode().mode;
       const personaWalk =
         personaEnabled() && scene.getViewMode().mode === 'persona' && !scene.isInInterior();
+      joystick.setPersonaWalk(personaWalk);
       joystick.setHidden(
         (!scene.jacSnapshot()?.driving && !personaWalk) ||
           !!scene.isInInterior() ||
@@ -357,6 +358,7 @@ async function main(): Promise<void> {
     setPersonaYawDeg: (deg: number) => scene.qaSetPersonaYawDeg(deg),
     personaStickSpeedMul: (y: number) => scene.qaPersonaStickSpeedMul(y),
     personaScreenMetrics: () => scene.qaPersonaScreenMetrics(),
+    flushPersonaView: () => scene.qaFlushPersonaView(),
     stickToTile: (dx: number, dy: number) => scene.qaStickToTile(dx, dy),
     cameraViews: () => scene.qaCameraViews(),
     cenitalExpectedHeading: (dx: number, dy: number) => scene.qaCenitalExpectedHeading(dx, dy),

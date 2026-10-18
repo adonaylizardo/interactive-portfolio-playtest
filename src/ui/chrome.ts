@@ -347,12 +347,17 @@ export class ChromeUI {
       });
     });
     this.root.querySelectorAll('[data-view]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        (btn as HTMLElement).blur();
-        const v = (btn as HTMLElement).dataset.view;
+      btn.addEventListener('click', (e) => {
+        const el = btn as HTMLElement;
+        el.blur();
+        const v = el.dataset.view;
         if (v === 'rotate') this.callbacks.onRotate();
         else if (v === 'map') this.callbacks.onMapOverview();
         else this.callbacks.onView(v as Camera);
+        requestAnimationFrame(() => {
+          if (document.activeElement === el) el.blur();
+        });
+        e.preventDefault();
       });
     });
     this.root.querySelectorAll('[data-action="center"]').forEach((btn) => {
