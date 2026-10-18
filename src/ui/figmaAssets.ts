@@ -23,6 +23,10 @@ export function figmaFramePng(frame: FigmaFrame): string {
   return `${BASE}/${frame}.png`;
 }
 
+/** Figma export of phone map checklist pill (237×52, EN 3/5). */
+export const CHECKLIST_PHONE_PILL = `${BASE}/assets/checklist-phone-pill.png`;
+export const CHECKLIST_PHONE_PILL_2X = `${BASE}/assets/checklist-phone-pill@2x.png`;
+
 /** Shared play glyph used on talk list thumbs. */
 export const FIGMA_PLAY = figmaAsset('talks-desktop-list', '6a8ac.svg');
 export const FIGMA_PAUSE = figmaAsset('talks-desktop-player', 'd0608.svg');

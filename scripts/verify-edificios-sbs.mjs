@@ -234,6 +234,7 @@ async function enterPhoneBuilding(page, name) {
 async function captureFlow(page, building, flowPrefix, steps) {
   const locale = FLOW_LOCALE[flowPrefix] ?? { map: 'es', panel: 'es' };
   await page.goto(BASE, { waitUntil: 'networkidle', timeout: 60000 });
+  await page.evaluate(() => document.fonts?.ready);
   await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, {
     timeout: 60000,
   });
@@ -271,6 +272,7 @@ async function captureFlow(page, building, flowPrefix, steps) {
   if (steps.expand) {
     // Map capture uses frameDoorForQa + low zoom; reload so the next real door tap is aligned.
     await page.goto(BASE, { waitUntil: 'networkidle', timeout: 60000 });
+    await page.evaluate(() => document.fonts?.ready);
     await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, {
       timeout: 60000,
     });

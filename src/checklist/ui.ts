@@ -1,5 +1,5 @@
 import { studio } from '../audio/studio';
-import { figmaAsset } from '../ui/figmaAssets';
+import { CHECKLIST_PHONE_PILL, CHECKLIST_PHONE_PILL_2X, figmaAsset } from '../ui/figmaAssets';
 import { onLangChange, t } from '../ui/i18n';
 import {
   countCompleted,
@@ -77,6 +77,7 @@ export class ChecklistUI {
   private headerTitle: HTMLElement;
   private ringBtn: HTMLButtonElement;
   private mapRingImg: HTMLImageElement;
+  private mapArcFg: SVGCircleElement;
   private touch = isTouchPrimary();
   private compactSteps = isMobileOrCoarsePointer();
   private mobile = isMobileLayout();
@@ -91,6 +92,16 @@ export class ChecklistUI {
     this.applyLayoutClasses();
 
     this.root.innerHTML = `
+      <img
+        class="checklist__pill-raster"
+        src="${CHECKLIST_PHONE_PILL}"
+        srcset="${CHECKLIST_PHONE_PILL_2X} 2x"
+        width="237"
+        height="52"
+        alt=""
+        aria-hidden="true"
+      />
+      <button type="button" class="checklist__ring-hit" aria-label=""></button>
       <header class="checklist__header">
         <div class="checklist__header-text">
           <span class="checklist__label"></span>
@@ -122,6 +133,27 @@ export class ChecklistUI {
               alt=""
               aria-hidden="true"
             />
+            <svg
+              class="checklist__map-arc"
+              viewBox="0 0 44 44"
+              width="44"
+              height="44"
+              aria-hidden="true"
+            >
+              <circle
+                class="checklist__map-arc-fg"
+                cx="22"
+                cy="22"
+                r="16.75"
+                fill="none"
+                stroke="#EDEEF0"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-dasharray="105.557"
+                stroke-dashoffset="105.557"
+                transform="rotate(-90 22 22)"
+              />
+            </svg>
             <img class="checklist__clipboard-figma" src="" width="15" height="15" alt="" aria-hidden="true" />
           </button>
         </div>
@@ -140,8 +172,14 @@ export class ChecklistUI {
     this.ringEl = this.root.querySelector('.checklist__ring-fg')!;
     this.headerTitle = this.root.querySelector('.checklist__active-title')!;
     this.ringBtn = this.root.querySelector('.checklist__ring-btn')!;
+    const ringHit = this.root.querySelector('.checklist__ring-hit') as HTMLButtonElement;
+    ringHit.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.ringBtn.click();
+    });
     this.mapRingImg = this.root.querySelector('.checklist__ring-figma') as HTMLImageElement;
-    this.mapRingImg.src = figmaAsset('talks-phone-map', 'anillo-3-5.svg');
+    this.mapRingImg.src = figmaAsset('talks-phone-map', '6af66.svg');
+    this.mapArcFg = this.root.querySelector('.checklist__map-arc-fg')!;
     const clipFigma = this.root.querySelector('.checklist__clipboard-figma') as HTMLImageElement;
     clipFigma.src = figmaAsset('talks-phone-map', '629bf.svg');
     this.ringBtn.addEventListener('click', (e) => {
@@ -260,6 +298,12 @@ export class ChecklistUI {
     this.root.classList.toggle('checklist--panel-open', this.mobile && this.panelOpen);
     this.root.classList.toggle('checklist--complete', done >= total);
     this.root.classList.toggle('checklist--skipped', this.state.skipped);
+    const mapClosed =
+      this.mobile &&
+      !this.state.mobileExpanded &&
+      document.body.dataset.layout === 'map';
+    const mapRaster = mapClosed && done === 3 && total === 5;
+    this.root.classList.toggle('checklist--map-raster', mapRaster);
   }
 
   complete(step: ChecklistStepId): void {
@@ -287,9 +331,11 @@ export class ChecklistUI {
     this.counterEl.textContent = counterText;
     this.counterInRing.textContent = counterText;
     const circumference = 69.12;
+    const mapArcCirc = 105.557;
     const progress = done / total;
     const offset = circumference * (1 - progress);
     this.ringEl.style.strokeDashoffset = String(offset);
+    this.mapArcFg.style.strokeDashoffset = String(mapArcCirc * (1 - progress));
 
     const dismissBtn = this.root.querySelector('.checklist__dismiss') as HTMLButtonElement;
     const skipBtn = this.root.querySelector('.checklist__skip') as HTMLButtonElement;
@@ -301,6 +347,8 @@ export class ChecklistUI {
     skipBtn.textContent = t('check.skip');
     dismissBtn.textContent = t('check.close');
     this.ringBtn.setAttribute('aria-label', t('check.toggle'));
+    const ringHit = this.root.querySelector('.checklist__ring-hit') as HTMLButtonElement;
+    ringHit.setAttribute('aria-label', t('check.toggle'));
 
     this.applyLayoutClasses();
 
