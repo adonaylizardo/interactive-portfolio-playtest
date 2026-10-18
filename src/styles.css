@@ -593,6 +593,16 @@ body[data-layout='panel'] .checklist {
 
 /* Phone landscape (e.g. 844×390): treat as compact. Checklist is a pill; lang stays off the panel. */
 @media (max-height: 500px) and (orientation: landscape) {
+  body[data-view='persona'] .chrome__subtitle {
+    display: none;
+  }
+
+  body[data-view='persona'] .chrome__title {
+    font-size: 13px;
+    line-height: 1.15;
+    max-width: min(42vw, 280px);
+  }
+
   .checklist:not(.checklist--mobile-closed) {
     max-height: min(70vh, 220px);
     max-width: min(260px, calc(100vw - 160px));
@@ -2789,7 +2799,7 @@ body.jac-info[data-chrome='phone'] .chrome__dock {
 
 @media (max-width: 767px) {
   body[data-layout='split'] .persona-jac-board {
-    bottom: calc(108px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(128px + env(safe-area-inset-bottom, 0px));
   }
 }
 

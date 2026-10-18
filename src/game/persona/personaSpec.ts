@@ -8,6 +8,7 @@ export const BEHIND_TP_M = piezas.camaras['tercera-persona'].detras_m as number;
 export const EYE_JAC_M = piezas.camaras['jac-t9'].ojo_m as number;
 export const PX_PER_M = 16;
 export const FEET_Y_1X = piezas.frames.c.camara.adonay.pies_y as number;
+export const ADONAY_ALTO_PX_1X = piezas.frames.c.camara.adonay.alto_px as number;
 export const PANTONE_DX_M = piezas.frames.c.camara.pantone.dx_m as number;
 export const PANTONE_DZ_M = piezas.frames.c.camara.pantone.dz_m as number;
 export const PANTONE_SCALE = piezas.frames.c.camara.pantone.escala_pixi as number;

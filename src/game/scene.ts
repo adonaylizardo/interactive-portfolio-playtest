@@ -168,7 +168,14 @@ import {
 } from './altView';
 import { billboardHeightM, PerspectiveView } from './perspectiveView';
 import { PersonaView } from './persona/personaView';
-import { CAL_M, CAL_TILE, personaEnabled } from './persona/personaSpec';
+import {
+  ADONAY_ALTO_PX_1X,
+  CAL_M,
+  CAL_TILE,
+  FEET_Y_1X,
+  PERSONA_REF,
+  personaEnabled,
+} from './persona/personaSpec';
 import {
   loadPlayerSheets,
   loadRestSheets,
@@ -285,7 +292,7 @@ const FOLLOW_SMOOTH_S = 0.35;
 /** Persona mode: A/D and stick X rotate this yaw (rad/s), not strafe. */
 const PERSONA_TURN_RATE = 2.65;
 /** ~1.7 m/s on foot vs map keyboard walk (~4.5 tiles/s). */
-const PERSONA_WALK_MUL = 0.17;
+const PERSONA_WALK_MUL = 0.22;
 const PERSONA_STICK_DEAD = 0.15;
 const PERSONA_FRAME_C_T9 = { x: 2.0, z: 8.2 };
 
@@ -293,6 +300,13 @@ function personaStickAxis(raw: number): number {
   const a = Math.abs(raw);
   if (a < PERSONA_STICK_DEAD) return 0;
   return Math.sign(raw) * Math.min(1, (a - PERSONA_STICK_DEAD) / (1 - PERSONA_STICK_DEAD));
+}
+
+/** Walk speed fraction from stick deflection (0–1); ramps from just above deadzone. */
+function personaStickSpeedMul(raw: number): number {
+  const a = Math.abs(raw);
+  if (a <= PERSONA_STICK_DEAD) return 0;
+  return Math.min(1, a);
 }
 const FOLLOW_DRIVE_SMOOTH_S = 0.12;
 /** A per-frame character move longer than this (3 tiles) is a teleport, not walking. */
@@ -4027,8 +4041,8 @@ export class IsoScene {
       const dy = mapped.y / mag;
       const tileBefore = this.roundedCharTile();
       let speedMul = 1;
-      if (stickLive && Math.abs(stickY) > 0) {
-        speedMul = Math.abs(stickY);
+      if (stickLive && Math.abs(stick.y) > PERSONA_STICK_DEAD) {
+        speedMul = personaStickSpeedMul(stick.y);
       }
       const next = this.personaKeyboardStep(this.charTx, this.charTy, dx, dy, sprint, speedMul);
       this.charTx = next.x;
@@ -6075,6 +6089,59 @@ export class IsoScene {
   qaSetPersonaYawDeg(deg: number): void {
     this.personaCamYaw = (deg * Math.PI) / 180;
     this.syncViewTransform();
+  }
+
+  qaPersonaStickSpeedMul(stickY: number): number {
+    return personaStickSpeedMul(stickY);
+  }
+
+  /** Screen-space persona overlay metrics for QA (Adonay scale, chrome overlap). */
+  qaPersonaScreenMetrics(): {
+    sw: number;
+    sh: number;
+    feetScale: number;
+    feetY: number;
+    adonayHeightPx: number;
+    refAdonayHeightPx: number;
+    chromeTitleBottom: number;
+    chromeSubtitleBottom: number;
+    dockTop: number;
+    enterBtnTop: number;
+    jacBoardTop: number;
+    jacBoardBottom: number;
+  } {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const feetScale = sh / PERSONA_REF.h;
+    const feetY = Math.min(FEET_Y_1X * feetScale, sh - (sh <= 500 ? 64 : 8));
+    const adonayHeightPx = ADONAY_ALTO_PX_1X * feetScale;
+    const refAdonayHeightPx = ADONAY_ALTO_PX_1X;
+    const rect = (sel: string) => {
+      const el = document.querySelector(sel) as HTMLElement | null;
+      if (!el || el.hidden) return NaN;
+      const r = el.getBoundingClientRect();
+      return r.height > 2 ? r.bottom : NaN;
+    };
+    const top = (sel: string) => {
+      const el = document.querySelector(sel) as HTMLElement | null;
+      if (!el || el.hidden) return NaN;
+      const r = el.getBoundingClientRect();
+      return r.height > 2 ? r.top : NaN;
+    };
+    return {
+      sw,
+      sh,
+      feetScale,
+      feetY,
+      adonayHeightPx,
+      refAdonayHeightPx,
+      chromeTitleBottom: rect('.chrome__title'),
+      chromeSubtitleBottom: rect('.chrome__subtitle'),
+      dockTop: top('.chrome__dock'),
+      enterBtnTop: top('[data-persona-enter]'),
+      jacBoardTop: top('.persona-jac-board'),
+      jacBoardBottom: rect('.persona-jac-board__btn[data-persona-jac="in"]'),
+    };
   }
 
   /** QA: opaque-top client point vs the HTML pill's bottom (gap should stay ~NAME_PILL_GAP_PX). */

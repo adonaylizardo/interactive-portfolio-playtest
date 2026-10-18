@@ -13,6 +13,7 @@ const BASE =
   process.argv[2] ??
   'https://adonaylizardo.github.io/interactive-portfolio-playtest/preview-persona/';
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const PERSONA_STICK_DEAD = 0.15;
 
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -71,21 +72,21 @@ async function speedTable(page) {
       rows.push({ deflection: def, tilesIn2s: 0, pass: true });
       continue;
     }
-    const start = await page.evaluate(() => window.__playtestQa.getCharacterTile());
+    const start = await page.evaluate(() => window.__playtestQa.getCharacterPos());
     await page.evaluate((sy) => {
       window.__playtestQa.clearInput?.();
       window.__playtestQa.jacStick({ x: 0, y: -sy });
     }, def);
     await wait(2000);
     await page.evaluate(() => window.__playtestQa.jacStick(null));
-    const end = await page.evaluate(() => window.__playtestQa.getCharacterTile());
+    const end = await page.evaluate(() => window.__playtestQa.getCharacterPos());
     const tiles = Math.hypot(end.x - start.x, end.y - start.y);
     const tilesPerS = tiles / 2;
     rows.push({
       deflection: def,
       tilesIn2s: Number(tiles.toFixed(2)),
       tilesPerS: Number(tilesPerS.toFixed(2)),
-      pass: def < 0.15 ? tiles < 0.05 : tilesPerS <= 2.2,
+      pass: def <= PERSONA_STICK_DEAD ? tiles < 0.02 : def >= 0.17 ? tilesIn2s >= 0.08 && tilesPerS <= 2.2 : tilesPerS <= 2.2,
     });
   }
   return rows;

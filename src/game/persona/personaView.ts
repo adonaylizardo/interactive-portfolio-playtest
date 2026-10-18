@@ -113,7 +113,6 @@ export class PersonaView {
   private jacT9Ext = new Sprite();
   private propSprites: { sprite: Sprite; x: number; z: number }[] = [];
   private lastGroundKey = '';
-  private facadeTick = 0;
   private booted = false;
   private adonayStrip: { idle: import('pixi.js').Texture | null; walk: import('pixi.js').Texture | null } = {
     idle: null,
@@ -212,6 +211,8 @@ export class PersonaView {
       const ancla = meta?.ancla?.px_1x ?? [tex.width / 2, tex.height - 1];
       const sp = new Sprite(tex);
       sp.anchor.set(ancla[0] / tex.width, ancla[1] / tex.height);
+      sp.roundPixels = true;
+      if (tex.source?.style) tex.source.style.scaleMode = 'nearest';
       sp.tint = NIGHT_TINT;
       sp.zIndex = -Math.round(anchor.z * 10);
       this.layer.addChild(sp);
@@ -270,14 +271,11 @@ export class PersonaView {
     this.syncBackdrops(sw, sh, yawRad / (Math.PI / 2));
     this.drawGround(cam, sw, sh);
 
-    this.facadeTick += 1;
-    const heavyFacades = input.walking || this.facadeTick % 2 === 0;
     for (const f of this.facades) {
       if (Math.abs(f.z - player.z) > 52) {
         f.sprite.visible = false;
         continue;
       }
-      if (!heavyFacades) continue;
       const p = projectTp(f.x, 0, f.z, cam, sw, sh);
       if (!p || p.scale < 0.07) {
         f.sprite.visible = false;
@@ -304,7 +302,8 @@ export class PersonaView {
     this.adonay.visible = true;
     this.pantone.visible = true;
 
-    const feetY = FEET_Y_1X * (sh / PERSONA_REF.h);
+    const feetScale = sh / PERSONA_REF.h;
+    const feetY = Math.min(FEET_Y_1X * feetScale, sh - (sh <= 500 ? 64 : 8));
     const adonayAnim = input.walking ? 'walk' : 'idle';
     const strip = adonayAnim === 'walk' ? this.adonayStrip.walk : this.adonayStrip.idle;
     if (strip) {
@@ -314,7 +313,8 @@ export class PersonaView {
       this.adonay.anchor.set(0.5, 1);
       this.adonay.x = sw / 2;
       this.adonay.y = feetY;
-      this.adonay.scale.set(sh / PERSONA_REF.h);
+      this.adonay.scale.set(feetScale);
+      this.adonay.roundPixels = true;
       this.adonay.tint = NIGHT_TINT;
     }
 
@@ -329,7 +329,6 @@ export class PersonaView {
       const fi =
         pAnim === 'sit' ? 0 : Math.floor(input.timeSec * (pAnim === 'walk' ? 9 : 3)) % Math.max(1, n);
       this.pantone.texture = textureFrame(pStrip, frameW, fi);
-      const feetScale = sh / PERSONA_REF.h;
       this.pantone.anchor.set(0.5, 1);
       this.pantone.x = sw / 2 - 120.5 * feetScale;
       this.pantone.y = feetY - 26.4 * feetScale;
