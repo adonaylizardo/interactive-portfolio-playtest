@@ -1,5 +1,6 @@
 import { studio } from '../audio/studio';
-import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
+import { ABOUT, ABOUT_PANELS } from '../data/about';
+import { aboutBlockNode } from './aboutRender';
 import { CASES, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
 import {
   TALKS,
@@ -37,49 +38,6 @@ const FIGMA_BACK = figmaAsset('talks-desktop-list', '9f9c4.svg');
 const FIGMA_EXPAND = figmaAsset('talks-desktop-list', 'ce7c9.svg');
 const FIGMA_CLOSE = figmaAsset('talks-desktop-list', 'f1b3a.svg');
 const FIGMA_SUBSTACK = figmaAsset('writings-desktop-reading', 'c0026.svg');
-
-function aboutBlockNode(block: AboutBlock): HTMLElement {
-  if (block.kind === 'heading') {
-    const h = document.createElement(`h${block.level + 3}`);
-    h.className = `about__h${block.level}`;
-    h.textContent = block.text;
-    return h;
-  }
-  if (block.kind === 'image') {
-    const picture = document.createElement('picture');
-    picture.className = 'about__photo';
-    const webp = document.createElement('source');
-    webp.type = 'image/webp';
-    webp.srcset = `${import.meta.env.BASE_URL}about/${block.name}.webp`;
-    const img = document.createElement('img');
-    img.src = `${import.meta.env.BASE_URL}about/${block.fallback}`;
-    img.width = block.width;
-    img.height = block.height;
-    img.alt = block.alt;
-    img.loading = 'lazy';
-    img.decoding = 'async';
-    picture.append(webp, img);
-    return picture;
-  }
-  const p = document.createElement('p');
-  p.className = 'about__text';
-  block.lines.forEach((line, i) => {
-    if (i > 0) p.appendChild(document.createElement('br'));
-    for (const part of line) {
-      if (!part.href) {
-        p.appendChild(document.createTextNode(part.text));
-        continue;
-      }
-      const a = document.createElement('a');
-      a.href = part.href;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      a.textContent = part.text;
-      p.appendChild(a);
-    }
-  });
-  return p;
-}
 
 /** `**bold**` in case copy becomes a <strong>; the rest is a text node. */
 function appendMarkdown(el: HTMLElement, text: string): void {

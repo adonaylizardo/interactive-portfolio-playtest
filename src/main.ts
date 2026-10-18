@@ -14,8 +14,11 @@ import { parseInteriorFromHash, replaceOutdoorHash } from './camera/hash';
 import { getInteriorDef, interiorBlockedTilesHaveProps } from './game/interior';
 import { IsoScene } from './game/scene';
 import { findPath } from './iso/pathfinding';
+import type { SearchResult } from './data/siteSearch';
+import { AboutMePanel } from './ui/aboutMePanel';
 import { BuildingPanel } from './ui/buildingPanel';
 import { ChromeUI, type DesktopLayout } from './ui/chrome';
+import { SearchPalette } from './ui/searchPalette';
 import { JacHud } from './ui/jacHud';
 import { Joystick } from './ui/joystick';
 import { BuildingMapLabels } from './ui/buildingMapLabels';
@@ -36,7 +39,47 @@ async function main(): Promise<void> {
   if (!isMobileLayout()) checklist.setCollapsed(true);
 
   let scene!: IsoScene;
-  const chrome = new ChromeUI(uiRoot, {
+  let chrome!: ChromeUI;
+  let panel!: BuildingPanel;
+  const aboutPanel = new AboutMePanel(uiRoot);
+  const searchPalette = new SearchPalette(uiRoot, { onSelect: (result) => routeSearchResult(result) });
+
+  function routeSearchResult(result: SearchResult): void {
+    switch (result.kind) {
+      case 'cases':
+      case 'landmarks':
+        chrome.setLayout('map');
+        scene?.walkToBuildingForQa(result.targetId);
+        break;
+      case 'articles': {
+        chrome.setLayout('split');
+        const b = getBuildingByName('biblioteca');
+        if (b?.panelTitle) panel.showWritings(b.panelTitle, 'biblioteca');
+        break;
+      }
+      case 'talks': {
+        chrome.setLayout('split');
+        const b = getBuildingByName('teresa');
+        if (b?.panelTitle) panel.showTalks(b.panelTitle, 'teresa');
+        break;
+      }
+      case 'achievements':
+        chrome.setLayout('split');
+        if (isMobileLayout()) chrome.openMobileSheetSection('logros');
+        else document.querySelector('#chrome-logros')?.scrollIntoView({ block: 'start' });
+        break;
+      case 'contact':
+        aboutPanel.open({ highlightContact: true });
+        break;
+      case 'about':
+        aboutPanel.open({
+          sectionId: result.targetId === 'about' ? undefined : result.targetId,
+        });
+        break;
+    }
+  }
+
+  chrome = new ChromeUI(uiRoot, {
     onLayoutChange: () => {
       if (!isMobileLayout()) checklist.setCollapsed(true);
       else checklist.collapseMobile();
@@ -48,6 +91,8 @@ async function main(): Promise<void> {
     onMapOverview: () => scene?.toggleMapOverview(),
     onCenter: () => scene?.recenterOnCharacter(),
     onLocate: (id) => scene?.walkToBuildingForQa(id),
+    onOpenAbout: (opts) => aboutPanel.open(opts),
+    onOpenSearch: () => searchPalette.open(),
   });
 
   const joystick = new Joystick(uiRoot);
@@ -64,7 +109,7 @@ async function main(): Promise<void> {
     onEngine: () => scene.jacSetEngine(),
   });
   const stageScreen = new InteriorStageScreen(document.body);
-  const panel = new BuildingPanel(
+  panel = new BuildingPanel(
     uiRoot,
     () => {
       const open = panel.isInteriorMode();

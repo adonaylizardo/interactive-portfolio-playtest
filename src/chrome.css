@@ -640,6 +640,7 @@ body[data-interior='1'] .chrome__column {
   outline: 2px solid #5b8def;
   outline-offset: 4px;
   border-radius: 12px;
+  background: rgba(91, 141, 239, 0.08);
 }
 
 .chrome--sheet .chrome__intro--expanded {

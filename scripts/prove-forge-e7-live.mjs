@@ -419,12 +419,17 @@ try {
         const sub = document.querySelector('.chrome__subtitle')?.textContent?.trim() ?? '';
         return {
           sub,
-          flash: !!document.querySelector('.chrome__contact--flash, #chrome-contact.chrome__contact--flash'),
+          aboutOpen: !!document.querySelector('.about-panel--open'),
+          flash: !!document.querySelector('.about-panel__contact--flash'),
           introSnippet: sub.toLowerCase().includes(snippet),
         };
       }, INTRO_SNIPPET);
       record('390 contact tap: not intro caption', !contactState.introSnippet, contactState);
-      record('390 contact tap: voice subtitle or flash', contactState.sub.length > 4 || contactState.flash, contactState);
+      record(
+        '390 contact tap: about panel + highlight',
+        contactState.aboutOpen && contactState.flash,
+        contactState,
+      );
     }
     await page.close();
     await ctx.close();

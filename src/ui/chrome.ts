@@ -2,9 +2,15 @@ import { studio } from '../audio/studio';
 import { getEnterableBuildings } from '../data/map';
 import { tileToWorld } from '../iso/math';
 import { isMobileLayout } from '../checklist/ui';
+import { CV_HREF } from '../data/contactLinks';
 import { iconSvg, type IconName } from './icons';
 import type { Camera } from '../tokens';
 import { getLang, onLangChange, setLang, t, type Lang } from './i18n';
+
+export type AboutPanelOpenOpts = {
+  highlightContact?: boolean;
+  sectionId?: string;
+};
 
 export type DesktopLayout = 'split' | 'map' | 'panel';
 export type Audience = 'recruiter' | 'mentoria' | 'cliente';
@@ -17,6 +23,8 @@ export type ChromeCallbacks = {
   onMapOverview: () => void;
   onCenter: () => void;
   onLocate: (buildingId: string) => void;
+  onOpenAbout: (opts?: AboutPanelOpenOpts) => void;
+  onOpenSearch: () => void;
 };
 
 const EXPERIENCE: { id: string; label: string; nda?: boolean }[] = [
@@ -34,9 +42,6 @@ const CASES_ROWS: { id: string; label: string; nda?: boolean }[] = [
   { id: 'finoa', label: 'Finoa' },
   { id: 'pg', label: 'P&G' },
 ];
-
-const CV_HREF = `${import.meta.env.BASE_URL}cv/adonay-lizardo-cv.pdf`;
-const CONTACT_HREF = 'mailto:hello@adonaylizardo.com';
 
 function roundBtn(icon: IconName, label: string, extra = '', action?: string): string {
   const act = action ? ` data-action="${action}"` : '';
@@ -193,7 +198,7 @@ export class ChromeUI {
           </div>
           <div class="chrome__ctas" id="chrome-contact">
             <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer" download>${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
-            <a class="ui-btn ui-btn--secondary" href="${CONTACT_HREF}">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></a>
+            <button type="button" class="ui-btn ui-btn--secondary" data-action="about-contact">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></button>
           </div>
           <div class="chrome__audience">
             <p class="chrome__label" data-i18n="chrome.who">¿Quién eres?</p>
@@ -255,7 +260,7 @@ export class ChromeUI {
         </div>
         <div class="chrome__ctas">
           <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer" download>${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
-          <a class="ui-btn ui-btn--secondary" href="${CONTACT_HREF}">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></a>
+          <button type="button" class="ui-btn ui-btn--secondary" data-action="about-contact">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></button>
         </div>
         <div class="chrome__card-row">
           <div class="chrome__card-id">
@@ -292,7 +297,7 @@ export class ChromeUI {
             <div class="chrome__cases">${caseRows}</div>
           </section>
           <div class="chrome__sheet-contact" id="chrome-mobile-contact">
-            <a class="ui-btn ui-btn--secondary" href="${CONTACT_HREF}">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></a>
+            <button type="button" class="ui-btn ui-btn--secondary" data-action="about-contact">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></button>
           </div>
         </div>
       </div>
@@ -337,8 +342,10 @@ export class ChromeUI {
     });
     this.bindMobileSheetGestures();
     this.root.querySelector('[data-action="home"]')?.addEventListener('click', () => {
-      this.setLayout('split');
-      this.scrollTo('#chrome-experiencia');
+      this.openAboutPanel();
+    });
+    this.root.querySelectorAll('[data-action="about-contact"]').forEach((btn) => {
+      btn.addEventListener('click', () => this.openAboutPanel({ highlightContact: true }));
     });
     this.root.querySelectorAll('[data-audience]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -370,7 +377,7 @@ export class ChromeUI {
       btn.addEventListener('click', () => this.callbacks.onCenter());
     });
     this.root.querySelector('[data-dock="intro"]')?.addEventListener('click', () => {
-      this.openMobileSheetSection('intro');
+      this.openAboutPanel();
     });
     this.root.querySelector('.chrome__dock [data-action="cases"]')?.addEventListener('click', () => {
       this.openMobileSheetSection('casos');
@@ -416,9 +423,6 @@ export class ChromeUI {
       });
     });
     this.syncSound();
-    this.root.querySelectorAll(`a[href="${CONTACT_HREF}"]`).forEach((a) => {
-      a.addEventListener('click', () => studio.playLine('11-contact'));
-    });
     this.syncSubtitle();
   }
 
@@ -502,15 +506,14 @@ export class ChromeUI {
     this.root.querySelector(sel)?.scrollIntoView({ block: 'start' });
   }
 
-  /** Stub until content-branch site search wires in here. */
   openSearch(): void {
-    this.setLayout('split');
-    if (this.mobile) {
-      this.expandMobileSheet(true);
-      this.scrollTo('#chrome-mobile-casos');
-    } else {
-      this.scrollTo('#chrome-casos');
-    }
+    studio.playClick();
+    this.callbacks.onOpenSearch();
+  }
+
+  openAboutPanel(opts?: AboutPanelOpenOpts): void {
+    studio.playClick();
+    this.callbacks.onOpenAbout(opts);
   }
 
   expandMobileSheet(expanded: boolean): void {
@@ -573,23 +576,9 @@ export class ChromeUI {
     );
   }
 
-  private flashContactBlock(el: HTMLElement | null): void {
-    if (!el) return;
-    el.classList.add('chrome__contact--flash');
-    window.setTimeout(() => el.classList.remove('chrome__contact--flash'), 1400);
-  }
-
   private openContact(): void {
-    if (this.mobile) {
-      this.openMobileSheetSection('contact');
-      this.flashContactBlock(this.root.querySelector('#chrome-mobile-contact'));
-    } else {
-      this.setLayout('split');
-      this.scrollTo('#chrome-contact');
-      this.flashContactBlock(this.root.querySelector('#chrome-contact'));
-    }
+    this.openAboutPanel({ highlightContact: true });
     studio.playLineForced('11-contact');
-    this.callbacks.onLocate('contacto');
   }
 
   private syncAudience(): void {

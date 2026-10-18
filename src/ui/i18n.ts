@@ -149,6 +149,16 @@ const DICT = {
     'writings.guest3.title': 'Article title (placeholder)',
     'writings.guest3.meta': 'Publicación · Fecha · X min',
 
+    'search.placeholder': 'Search',
+    'search.tryAnother': 'Try another word, or browse by type.',
+    'search.group.cases': 'Cases',
+    'search.group.articles': 'Articles',
+    'search.group.talks': 'Talks',
+    'search.group.achievements': 'Achievements',
+    'search.group.landmarks': 'Landmarks',
+    'search.group.contact': 'Contact',
+    'search.group.about': 'About',
+
     'chrome.cases': 'Cases',
     'chrome.achievements': 'Achievements',
     'chrome.contact': 'Contact',
@@ -333,6 +343,16 @@ const DICT = {
     'writings.guest2.meta': 'Publicación · Fecha · X min',
     'writings.guest3.title': 'Título del artículo (placeholder)',
     'writings.guest3.meta': 'Publicación · Fecha · X min',
+
+    'search.placeholder': 'Buscar',
+    'search.tryAnother': 'Prueba otra palabra o explora por tipo.',
+    'search.group.cases': 'Casos',
+    'search.group.articles': 'Artículos',
+    'search.group.talks': 'Charlas',
+    'search.group.achievements': 'Logros',
+    'search.group.landmarks': 'Landmarks',
+    'search.group.contact': 'Contacto',
+    'search.group.about': 'About',
 
     'chrome.cases': 'Casos',
     'chrome.achievements': 'Logros',
