@@ -78,6 +78,8 @@ const MAX_FRAME_DT = 0.25;
 const DIR_HYSTERESIS = 20 / 90;
 const DIR_HOLD_S = 0.32;
 const STUCK_REPLAN_S = 0.5;
+/** 0 mph with a live goal this long → skip sit, replan, then a fallback route. */
+const ZERO_MPH_REPLAN_S = 2;
 /** Door taps use the spawn cache. Replans may search further. */
 const TAP_BFS_BUDGET = 0;
 /** Arrival = inside this radius of the collision-validated sit cell. */
@@ -113,6 +115,7 @@ export type JacSnapshot = {
   pathN: number;
   lastParkMs: number;
   noProgressT: number;
+  zeroMphT: number;
   sitWhy: string;
   maxTilesPerS: number;
   visualTx: number;
@@ -348,6 +351,7 @@ export class JacT9 {
   private followDir: FacingDir | null = null;
   private goalBest = Infinity;
   private noProgressT = 0;
+  private zeroMphT = 0;
   bumpT = 0;
   private bumpArmed = true;
   private exitFrom: { x: number; y: number } | null = null;
@@ -457,9 +461,16 @@ export class JacT9 {
       this.bumpArmed = true;
       this.exitFrom = null;
       this.clearDrivePath();
+      this.doorRouteCache.clear();
+      this.pathToSit.clear();
+      this.pathsFrom = '';
+      this.zeroMphT = 0;
       this.applyParkedSolid(false);
       this.precomputeDoorSits();
-      this.precomputeDoorRoutes();
+      // Routes warmed from a foreign stoop (Estudio sit after Salir) poison
+      // the next door: the cache key is this cell, and door-follows skip the
+      // stall timer. Solve live from here instead.
+      if (!this.atForeignStoop()) this.precomputeDoorRoutes();
       this.schedulePathsFromHere();
     } else if (wasDrive) {
       this.engineOn = false;
@@ -582,6 +593,7 @@ export class JacT9 {
     this.parkDoor = null;
     this.skippedSits.clear();
     this.lastStuckCell = '';
+    this.zeroMphT = 0;
   }
 
   setDrivePath(
@@ -601,6 +613,7 @@ export class JacT9 {
     this.followDir = null;
     this.goalBest = Math.hypot(this.cx - goal.x, this.cy - goal.y);
     this.noProgressT = 0;
+    this.zeroMphT = 0;
     // loose = 1-cell follow, not "keep the last door". A ground tap after a
     // door follow used to hang forever with parkDoor still set.
     if (!opts?.door) {
@@ -757,6 +770,7 @@ export class JacT9 {
       cacheNear &&
       !this.skippedSits.has(k(cached.x, cached.y)) &&
       this.sitCellHoldable(cached.x, cached.y) &&
+      !this.leftoverSitForDoor(cached, doorX, doorY) &&
       Math.hypot(cached.x - originCell.x, cached.y - originCell.y) > 3.2
     ) {
       this.lastParkMs = performance.now() - t0;
@@ -784,7 +798,10 @@ export class JacT9 {
     const sx = originCell.x;
     const sy = originCell.y;
     const usable = this.sitsForDoor(doorX, doorY).filter(
-      (c) => !this.skippedSits.has(k(c.x, c.y)) && this.sitCellHoldable(c.x, c.y),
+      (c) =>
+        !this.skippedSits.has(k(c.x, c.y)) &&
+        this.sitCellHoldable(c.x, c.y) &&
+        !this.leftoverSitForDoor(c, doorX, doorY),
     );
     const doorSide = usable.filter(
       (c) => c.along >= 0 && Math.hypot(c.x - sx, c.y - sy) > 3.2,
@@ -855,6 +872,30 @@ export class JacT9 {
   /** A sit hypot-closer to another enterable door is that other stoop, not this one. */
   private sitCloserToOtherDoor(c: DoorSit, doorX: number, doorY: number): boolean {
     return this.cellCloserToOtherDoor(c.x, c.y, doorX, doorY);
+  }
+
+  /**
+   * Cached / leftover sit after exiting another door: we are already on it,
+   * but it is too far from the tapped door to be that door's stoop.
+   */
+  leftoverSitForDoor(sit: { x: number; y: number }, doorX: number, doorY: number): boolean {
+    return Math.hypot(this.cx - sit.x, this.cy - sit.y) < 1.6 && Math.hypot(sit.x - doorX, sit.y - doorY) > 6;
+  }
+
+  /** Parked on some door's stoop, not the spawn lot. */
+  atForeignStoop(): boolean {
+    const spawn = this.spawn?.center ?? { x: 25.5, y: 17 };
+    if (Math.hypot(this.cx - spawn.x, this.cy - spawn.y) < 3) return false;
+    for (const b of getEnterableBuildings()) {
+      if (!b.door) continue;
+      if (Math.hypot(this.cx - b.door.x, this.cy - b.door.y) <= 6) return true;
+    }
+    return false;
+  }
+
+  /** QA / scene: drop a leftover sit so the next `parkForDoor` searches again. */
+  rejectSit(x: number, y: number): void {
+    this.skippedSits.add(k(x, y));
   }
 
   private cellCloserToOtherDoor(x: number, y: number, doorX: number, doorY: number): boolean {
@@ -1496,6 +1537,7 @@ export class JacT9 {
       left -= step;
     }
     this.syncMeters(moved, frame);
+    this.watchdogZeroMph(frame);
     this.holdAtGoal();
     if (this.toggles.hazards) this.hazardT += frame;
     else this.hazardT = 0;
@@ -2202,6 +2244,40 @@ export class JacT9 {
     return false;
   }
 
+  /**
+   * Door-follows skip `noteGoalProgress`, so a 0 mph sit with a far goal
+   * used to last 25–30 s. After two seconds: skip this sit, replan, then a
+   * fallback BFS if the axis path is still blocked.
+   */
+  private watchdogZeroMph(dt: number): void {
+    if (!this.driving || !this.driveGoal || this.stuckGaveUp || this.pendingExit) {
+      this.zeroMphT = 0;
+      return;
+    }
+    if (this.atParkSit() || this.mph > 0 || Math.abs(this.vel) > 0.08) {
+      this.zeroMphT = 0;
+      return;
+    }
+    this.zeroMphT += dt;
+    if (this.zeroMphT < ZERO_MPH_REPLAN_S) return;
+    this.zeroMphT = 0;
+    this.stuckT = Math.max(this.stuckT, STUCK_REPLAN_S);
+    if (this.parkDoor) {
+      if (this.tryNextSit()) return;
+    }
+    if (this.tryReplan()) return;
+    const dest = this.driveGoal;
+    if (!dest) return;
+    const path =
+      this.findDrivePath(dest.x, dest.y, { loose: true }) ??
+      this.findDrivePath(dest.x, dest.y, { loose: false });
+    if (path && path.length > 0 && !this.pathStartsBlocked(path)) {
+      this.drivePath = this.trimPathFromHere(compressColinear(path));
+      this.applyPathGear(false);
+      this.stuckT = 0;
+    }
+  }
+
   /** Re-path from the current sit after a stall. Door-follow routes re-plan too. */
   private tryReplan(): boolean {
     if (!this.driveGoal) return this.tryNextSit();
@@ -2217,7 +2293,7 @@ export class JacT9 {
         this.driveBfsMany(origin.x, origin.y, new Set([k(this.driveGoal.x, this.driveGoal.y)])).get(
           k(this.driveGoal.x, this.driveGoal.y),
         );
-      if (rest && rest.length > 0) {
+      if (rest && rest.length > 0 && !this.pathStartsBlocked(rest)) {
         this.drivePath = compressColinear(rest);
         this.applyPathGear(false);
         this.stuckT = 0;
@@ -2407,6 +2483,7 @@ export class JacT9 {
       pathN: this.drivePath.length,
       lastParkMs: this.lastParkMs,
       noProgressT: this.noProgressT,
+      zeroMphT: this.zeroMphT,
       sitWhy: this.sitWhy,
       maxTilesPerS: DRIVE_TILES_PER_S,
       visualTx: this.visualCenterTile().x,
@@ -2778,9 +2855,8 @@ export class JacT9 {
     };
   }
 
-  /** Parked tap: the footprint only. Door tiles never belong to the van. */
+  /** Parked tap: the footprint, including a door tile the van is sitting on. */
   tapHitsTile(tx: number, ty: number): boolean {
-    if (getBuildingAtDoor(tx, ty)) return false;
     for (const [x, y] of this.parkCells()) {
       if (x === tx && y === ty) return true;
     }

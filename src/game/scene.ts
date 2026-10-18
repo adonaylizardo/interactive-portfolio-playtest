@@ -186,6 +186,10 @@ const ALPHA_TAP_PROPS = new Set(['tree', 'bench', 'lamp', 'fill']);
  * pan threshold is easy to cross with a physical trackpad click (touch already allows 14 px).
  */
 const NOAH_CLICK_SLOP_PX = 12;
+/** A map tap is still a tap only if the pointer stayed inside this slop. */
+const TAP_SLOP_PX = 10;
+/** And only if the press lasted less than this. A pan must never become a ground tap. */
+const TAP_MAX_MS = 300;
 
 /**
  * Keyboard step on a tile grid: move on both axes if the target tile is walkable, otherwise slide
@@ -1845,16 +1849,16 @@ export class IsoScene {
       this.jacClose();
       return;
     }
+    if (this.pickJacAtScreen(sx, sy)) {
+      this.tapJac();
+      return;
+    }
     const doorFirst = this.pickBuildingDoorAtScreen(sx, sy);
     if (doorFirst?.door && doorFirst.panelTitle) {
       if (!this.prepareMapTap(doorFirst)) return;
       this.requestWalk(doorFirst.door.x, doorFirst.door.y, sprint, {
         buildingEntry: { panelTitle: doorFirst.panelTitle, door: doorFirst.door },
       });
-      return;
-    }
-    if (this.pickJacAtScreen(sx, sy)) {
-      this.tapJac();
       return;
     }
     const sceneryTile = this.pickSceneryAtScreen(sx, sy);
@@ -1955,7 +1959,12 @@ export class IsoScene {
     this.pendingDriveEnter = entry;
     this.pendingDriveEnterAt = performance.now();
     this.pendingDriveFrom = { x: this.jac.cx, y: this.jac.cy };
-    const sit = this.jac.parkForDoor(entry.door.x, entry.door.y);
+    let sit = this.jac.parkForDoor(entry.door.x, entry.door.y);
+    if (sit && this.jac.leftoverSitForDoor(sit, entry.door.x, entry.door.y)) {
+      this.jac.rejectSit(sit.x, sit.y);
+      sit = this.jac.parkForDoor(entry.door.x, entry.door.y);
+      if (sit && this.jac.leftoverSitForDoor(sit, entry.door.x, entry.door.y)) sit = null;
+    }
     const alongNow = this.jac.doorSideAlong(entry.door.x, entry.door.y);
     const distDoorNow = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
     const atDoor = alongNow >= 0 && distDoorNow <= 6;
@@ -2849,10 +2858,10 @@ export class IsoScene {
     if (hadMulti || hadSecond || this.panMoved) return;
 
     const dist = Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y);
-    if (dist >= 10) return;
-    // Rooms have no long-press action, so any still press is a tap there. On the map, press length
-    // comes from input timestamps: handlers and timers run late on a busy main thread.
-    if (!this.interiorActive && e.timeStamp - this.tapDownStamp > 450) return;
+    if (dist >= TAP_SLOP_PX) return;
+    // Rooms have no long-press action, so any still press is a tap there. On the map, a tap is
+    // movement below TAP_SLOP_PX and a press shorter than TAP_MAX_MS.
+    if (!this.interiorActive && e.timeStamp - this.tapDownStamp > TAP_MAX_MS) return;
     const upStamp = e.timeStamp;
     const gestureSerial = this.pointerGestureSerial;
 
@@ -3113,6 +3122,12 @@ export class IsoScene {
     const onTouchPinchMove = (e: TouchEvent) => {
       if (!isGameTouchTarget(e.target)) return;
       if (e.touches.length >= 1) e.preventDefault();
+      if (driveTap && e.touches.length === 1) {
+        const t = e.touches[0];
+        if (Math.hypot(t.clientX - driveTap.x, t.clientY - driveTap.y) > TAP_SLOP_PX) {
+          driveTap = null;
+        }
+      }
       if (e.touches.length >= 2) {
         if (this.pointers.size >= 2) return;
         if (this.touchOnlyPinch && this.zoomSource === 'pointer') {
@@ -3193,8 +3208,8 @@ export class IsoScene {
           const dist = Math.hypot(t.clientX - driveTap.x, t.clientY - driveTap.y);
           driveTap = null;
           if (
-            dt < 450 &&
-            dist < 22 &&
+            dt < TAP_MAX_MS &&
+            dist < TAP_SLOP_PX &&
             !this.jac.isExiting() &&
             performance.now() >= this.suppressDriveTapUntil
           ) {
@@ -3246,13 +3261,18 @@ export class IsoScene {
     };
 
     const onPointerMove = (e: PointerEvent) => {
-      if (this.pointers.size < 2 && (this.events.stickActive?.() || this.jac?.driving)) {
-        if (this.tapStart) {
-          this.tapDriftPx = Math.max(
-            this.tapDriftPx,
-            Math.hypot(e.clientX - this.tapStart.x, e.clientY - this.tapStart.y),
-          );
+      if (this.tapStart) {
+        this.tapDriftPx = Math.max(
+          this.tapDriftPx,
+          Math.hypot(e.clientX - this.tapStart.x, e.clientY - this.tapStart.y),
+        );
+        if (this.tapDriftPx > TAP_SLOP_PX) {
+          this.panMoved = true;
+          this.clearDeferredTap();
+          driveTap = null;
         }
+      }
+      if (this.pointers.size < 2 && this.events.stickActive?.()) {
         return;
       }
       if (!this.pointers.has(e.pointerId)) return;
@@ -4256,21 +4276,17 @@ export class IsoScene {
     g.label = JAC_ID;
   }
 
-  /** Van sprite wins over ground, but a door tap always beats the parked van. */
+  /** Van sprite wins over the building it sits on, including that building's door. */
   private claimJacTap(e: { clientX?: number; clientY?: number; global?: { x: number; y: number }; nativeEvent?: unknown }): boolean {
     if (!this.jac || this.jac.driving) return false;
     const local = this.federatedToCanvas(e);
     if (!local) return false;
-    if (this.pickBuildingDoorAtScreen(local.x, local.y)) return false;
     return this.pickJacAtScreen(local.x, local.y);
   }
 
   private pickJacAtScreen(sx: number, sy: number): boolean {
     if (!this.jac || this.interiorActive) return false;
-    if (this.pickBuildingDoorAtScreen(sx, sy)) return false;
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
-    const doorTile = worldToTile(wx, wy);
-    if (doorTile && getBuildingAtDoor(doorTile.x, doorTile.y)) return false;
     const g = this.objectGraphics.get(this.jac.obj.id);
     if (g) {
       const lx = wx - g.x;
@@ -4284,7 +4300,8 @@ export class IsoScene {
     if (tile && this.jac.tapHitsTile(tile.x, tile.y)) return true;
     const c = this.jac.worldCenter();
     const s = this.worldToScreen(c.x, c.y);
-    return Math.hypot(sx - s.x, sy - s.y) < 32;
+    const r = this.zoom < 0.2 ? Math.max(48, 8 / this.zoom) : 32;
+    return Math.hypot(sx - s.x, sy - s.y) < r;
   }
 
   tapJac(): void {
