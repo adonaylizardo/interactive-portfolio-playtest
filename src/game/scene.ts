@@ -215,6 +215,7 @@ export type BuildingPanelBridge = {
   dismiss: () => void;
   isPreview?: () => boolean;
   dismissFromHistory?: () => void;
+  containsSheetPoint?: (clientX: number, clientY: number) => boolean;
   layoutInsets?: () => { left: number; top: number; right: number; bottom: number };
   consumeInteriorCanvasTap?: (clientX: number, clientY: number) => boolean;
   expandInteriorSheetForQa?: () => void;
@@ -1813,6 +1814,13 @@ export class IsoScene {
       return;
     }
     if (!this.interiorActive && this.events.buildingPanel?.isPreview?.()) {
+      const client = this.canvasLocalToClient(sx, sy);
+      // Software-GL can deliver the click to the canvas even when the peek
+      // card is on top. A hit on the sheet is a close, not "same building".
+      if (this.events.buildingPanel.containsSheetPoint?.(client.x, client.y)) {
+        this.events.buildingPanel.dismiss();
+        return;
+      }
       const doorHit = this.pickBuildingDoorAtScreen(sx, sy);
       const buildingHit = doorHit ?? this.pickBuildingAtScreen(sx, sy);
       if (!this.prepareMapTap(buildingHit)) return;

@@ -173,6 +173,15 @@ body.is-canvas-dragging * {
   pointer-events: auto;
 }
 
+#ui-root > .building-panel.building-panel--preview {
+  z-index: 40;
+}
+
+#ui-root > .building-panel.building-panel--preview .building-panel__sheet {
+  pointer-events: auto;
+  z-index: 41;
+}
+
 /* The room sheet / Salir own the chrome; the tutorial must not steal exit-mat taps.
    Case preview stays on the map and keeps the v2 extras (checklist, minimap, lang). */
 #ui-root:has(> .building-panel--open:not(.building-panel--preview)) > .checklist {

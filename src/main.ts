@@ -142,6 +142,7 @@ async function main(): Promise<void> {
       openTitle: () => panel.openTitle(),
       dismiss: () => panel.hide(),
       dismissFromHistory: () => panel.hide({ fromHistory: true }),
+      containsSheetPoint: (x, y) => panel.containsSheetPoint(x, y),
       isPreview: () => panel.isPreviewMode(),
       layoutInsets: () => panel.layoutInsets(),
       consumeInteriorCanvasTap: (x, y) => panel.consumeInteriorCanvasTap(x, y),

@@ -311,6 +311,10 @@ export class BuildingPanel {
       exitBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
+        if (this.mode === 'preview') {
+          this.closePreview();
+          return;
+        }
         if (this.exitFromPointer) return;
         this.salir();
       });

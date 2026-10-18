@@ -184,7 +184,13 @@ async function visibleClose(page) {
 
 async function tapClose(page, cdp, touch) {
   for (let i = 0; i < 4; i++) {
-    const box = await visibleClose(page);
+    const loc = page.locator('.case-preview__salir, .case-read__salir, .case-preview__x, .case-read__x, .building-panel__exit').first();
+    const vis = await loc.isVisible().catch(() => false);
+    if (vis) {
+      if (touch) await loc.tap({ timeout: 2000 }).catch(() => {});
+      else await loc.click({ timeout: 2000 }).catch(() => {});
+    }
+    const box = vis ? null : await visibleClose(page);
     if (box) await realTap(page, cdp, box.x, box.y, touch);
     const t0 = Date.now();
     while (Date.now() - t0 < 2200) {
