@@ -2002,7 +2002,11 @@ export class JacT9 {
       }
       if (span > 1e-4) {
         const along = ((this.cx - t.x) * (next.x - t.x) + (this.cy - t.y) * (next.y - t.y)) / (span * span);
-        if (along > 0.12 || toN + 0.15 < toT) {
+        const side =
+          Math.abs((this.cx - t.x) * (next.y - t.y) - (this.cy - t.y) * (next.x - t.x)) / span;
+        // Only drop when we are actually on this segment. A van at (30,41)
+        // is "along" (38,42)→(38,39) in y and used to lose the east corridor.
+        if ((along > 0.12 && side < 0.85) || (toN + 0.15 < toT && side < 1.2)) {
           out.shift();
           continue;
         }
