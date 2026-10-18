@@ -3611,21 +3611,18 @@ export class IsoScene {
     if (this.interiorActive || this.jac?.driving) return;
     if (this.path.length > 0) return;
     if (this.doorCooldown > 0) return;
-    const building = getBuildingAtDoor(tx, ty);
-    if (!building?.panelTitle || !building.door) return;
+    const pending = this.pendingBuildingEntry;
+    if (!pending) return;
+    const d = pending.door;
+    const building = getBuildingAtDoor(d.x, d.y);
+    if (!building?.panelTitle || building.panelTitle !== pending.panelTitle) return;
 
-    if (!this.pendingBuildingEntry) return;
-    const d = this.pendingBuildingEntry.door;
     const onPendingDoor = tx === d.x && ty === d.y;
-    const adjacentPending =
-      Math.abs(tx - d.x) + Math.abs(ty - d.y) <= 2 &&
-      getBuildingAtDoor(d.x, d.y)?.panelTitle === this.pendingBuildingEntry.panelTitle;
+    const adjacentPending = Math.abs(tx - d.x) + Math.abs(ty - d.y) <= 2;
     if (!onPendingDoor && !adjacentPending) return;
     if (!onPendingDoor) {
       this.charTx = d.x;
       this.charTy = d.y;
-      tx = d.x;
-      ty = d.y;
     }
     this.enterBuildingFromDoor(building);
   }
@@ -4756,30 +4753,30 @@ export class IsoScene {
   frameBuildingDoorForQa(name: string): void {
     const obj = objects.find((o) => o.type === 'building' && o.name === name);
     if (!obj?.door) return;
-    const d = obj.door;
-    const midTx = (this.charTx + d.x) / 2;
-    const midTy = (this.charTy + d.y) / 2;
-    const mid = tileToWorld(midTx, midTy);
-    const doorW = tileToWorld(d.x, d.y);
-    const inward = doorInwardStep(obj);
-    const standTx = inward ? d.x - inward.x : d.x;
-    const standTy = inward ? d.y - inward.y : d.y;
-    const charW = tileToWorld(standTx, standTy);
-    const spanX = Math.max(TILE_W * 3, Math.abs(doorW.x - charW.x) + TILE_W * 2);
-    const spanY = Math.max(TILE_H * 4, Math.abs(doorW.y - charW.y) + TILE_H * 4);
+    this.suspendCameraFollow();
+    const tap = doorTapPoint(obj);
+    if (!tap) return;
+    const charW = tileToWorld(this.charTx, this.charTy);
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     this.updateCameraFitMargins();
     const m = cameraFitMargins();
     const innerW = Math.max(1, sw - m.left - m.right);
     const innerH = Math.max(1, sh - m.top - m.bottom);
+    const minX = Math.min(tap.x, charW.x);
+    const maxX = Math.max(tap.x, charW.x);
+    const minY = Math.min(tap.y, charW.y);
+    const maxY = Math.max(tap.y, charW.y);
+    const spanX = Math.max(TILE_W * 2.5, maxX - minX + TILE_W * 3);
+    const spanY = Math.max(TILE_H * 3, maxY - minY + TILE_H * 4);
     const zoomX = innerW / spanX;
     const zoomY = innerH / spanY;
-    const fit = clampZoom(Math.min(zoomX, zoomY) * 0.88, sw, sh);
+    const fit = clampZoom(Math.min(zoomX, zoomY) * 0.9, sw, sh);
     this.zoom = Math.max(fit, 0.12);
     const aim = this.freeRectCenter();
-    this.placeWorldAtScreen(mid.x, mid.y - 40, aim.x, aim.y);
+    this.placeWorldAtScreen(tap.x, tap.y - 24, aim.x, aim.y);
     this.applyCamera(false);
+    this.app?.render();
   }
 
   /** Client coordinates for tapping the drawn door of a building (QA). */

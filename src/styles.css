@@ -190,10 +190,14 @@ body.is-canvas-dragging * {
   pointer-events: auto;
 }
 
+/* Full-screen label layer must stay inert so #ui-root > * does not swallow map taps. */
+#ui-root > .building-map-labels {
+  pointer-events: none;
+}
+
 #ui-root > .chrome,
 #ui-root > .building-panel,
 #ui-root > .name-labels,
-#ui-root > .building-map-labels,
 #ui-root > .joystick,
 #ui-root > .jac-hud {
   pointer-events: none;
