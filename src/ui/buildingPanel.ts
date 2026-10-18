@@ -131,6 +131,7 @@ export class BuildingPanel {
   private workedWithLogos: WorkedWithLogo[] = WORKED_WITH;
   private interiorId: string | null = null;
   private onVisibilityChange: () => void;
+  private onSheetTransitionEnd: () => void;
   private onSalir: () => void;
   private mode: 'hidden' | 'interior' | 'preview' | 'talks' | 'writings' = 'hidden';
   private experienceEl: HTMLElement | null = null;
@@ -170,9 +171,11 @@ export class BuildingPanel {
     container: HTMLElement,
     onVisibilityChange: () => void,
     onSalir: () => void,
+    onSheetTransitionEnd?: () => void,
   ) {
     this.onVisibilityChange = onVisibilityChange;
     this.onSalir = onSalir;
+    this.onSheetTransitionEnd = onSheetTransitionEnd ?? onVisibilityChange;
     this.el = document.createElement('div');
     this.el.className = 'building-panel building-panel--interior-only';
     this.el.hidden = true;
@@ -259,6 +262,14 @@ export class BuildingPanel {
       });
       ro.observe(this.sheet);
     }
+    this.sheet.addEventListener('transitionend', (ev) => {
+      if (ev.target !== this.sheet || ev.propertyName !== 'transform') return;
+      if (!this.isOpen() || !this.isMobile()) return;
+      if (!this.isInteriorMode() && !this.isPreviewMode()) return;
+      this.sheet.scrollTop = 0;
+      this.syncScrolled();
+      this.onSheetTransitionEnd();
+    });
     this.titleEl = this.el.querySelector('.building-panel__title')!;
     this.workedWithEl = this.el.querySelector('.worked-with')!;
     this.caseEl = this.el.querySelector('.case')!;
@@ -452,6 +463,9 @@ export class BuildingPanel {
     this.ignoreDragUntil = performance.now() + 400;
     this.syncPeekClass();
     this.queueVisibilitySync();
+    if (this.isMobile() && this.isOpen() && (this.isInteriorMode() || this.isPreviewMode())) {
+      window.setTimeout(() => this.onSheetTransitionEnd(), 280);
+    }
   }
 
   private syncPeekClass(): void {

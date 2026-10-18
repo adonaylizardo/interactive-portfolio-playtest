@@ -464,10 +464,15 @@ export class IsoScene {
       antialias: true,
       autoDensity: true,
       premultipliedAlpha: false,
-      resolution: Math.min(window.devicePixelRatio || 1, 2),
+      resolution: window.devicePixelRatio || 1,
       resizeTo: window,
       preference: 'webgl',
+      webgl: {
+        preserveDrawingBuffer: true,
+        premultipliedAlpha: false,
+      },
     });
+    canvas.style.backgroundColor = '#0b0c0e';
     this.rearLayer = new Container();
     this.rearLayer.eventMode = 'none';
     this.rearLayer.label = 'jac-rear';
@@ -3192,8 +3197,6 @@ export class IsoScene {
       const dt = Math.min(0.25, this.app.ticker.elapsedMS / 1000);
       this.npcs.update(dt);
       this.fillActors?.update(dt);
-    } else if (!this.readingPaused && this.app) {
-      this.resetCanvasTextureFrame();
     }
   }
 
@@ -3221,6 +3224,40 @@ export class IsoScene {
     if (drewRear) this.renderRearTexture();
     this.layoutRearSprite();
     if (drewRear) this.restoreMainTarget(true);
+  }
+
+  private ensureMainRenderSurface(clearColor: boolean): void {
+    if (!this.app || !this.canvasEl) return;
+    try {
+      const rtSys = this.app.renderer.renderTarget;
+      const stack = rtSys as unknown as { _renderTargetStack?: unknown[] };
+      while (stack._renderTargetStack && stack._renderTargetStack.length > 1) {
+        rtSys.pop();
+      }
+      const opaque = this.opaqueBgRgba();
+      rtSys.bind({ target: this.canvasEl, clear: clearColor, clearColor: opaque });
+    } catch {
+      /* bind on next pass */
+    }
+    const gl = (this.app.renderer as { gl?: WebGL2RenderingContext }).gl;
+    const pw = this.canvasEl.width;
+    const ph = this.canvasEl.height;
+    if (gl && pw > 0 && ph > 0) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.disable(gl.SCISSOR_TEST);
+      gl.viewport(0, 0, pw, ph);
+      if (clearColor) {
+        const bg = worldBackgroundColor();
+        gl.clearColor(
+          ((bg >> 16) & 255) / 255,
+          ((bg >> 8) & 255) / 255,
+          (bg & 255) / 255,
+          1,
+        );
+        gl.clear(gl.COLOR_BUFFER_BIT);
+      }
+    }
+    this.resetCanvasTextureFrame();
   }
 
   private opaqueBgRgba(): [number, number, number, number] {
@@ -3367,6 +3404,7 @@ export class IsoScene {
   /** After sheet peek/expand or rotation, Vulkan can present a sub-rect with alpha 0 above the sheet. */
   schedulePresentationRefresh(burstFrames = 3): void {
     this.presentationBurst = Math.max(this.presentationBurst, burstFrames);
+    this.refreshCanvasPresentation(true);
     if (this.presentationRefreshPending) return;
     this.presentationRefreshPending = true;
     const tick = (): void => {
@@ -3384,7 +3422,7 @@ export class IsoScene {
   refreshCanvasPresentation(clear = true): void {
     if (!this.app || !this.canvasEl || this.readingPaused) return;
     this.syncRendererToLayout();
-    this.restoreMainTarget(clear);
+    this.ensureMainRenderSurface(clear);
     if (this.interiorActive) this.fitInteriorCamera();
     this.applyCamera(false);
     const rgba = this.opaqueBgRgba();
@@ -3397,7 +3435,10 @@ export class IsoScene {
     } catch {
       this.app.render();
     }
+    this.ensureMainRenderSurface(false);
     this.resetCanvasTextureFrame();
+    const gl = (this.app.renderer as { gl?: WebGL2RenderingContext }).gl;
+    gl?.finish();
   }
 
   onViewportLayoutChange(): void {
@@ -5167,7 +5208,7 @@ export class IsoScene {
       let clientX = (rect?.left ?? 0) + s.x;
       let clientY = (rect?.top ?? 0) + s.y;
       let visible = onScreen;
-      if (phone && rect && !onScreen) {
+      if (phone && rect) {
         const halfW = 56;
         visible = true;
         clientX = Math.min(Math.max(clientX, rect.left + halfW + 8), rect.right - halfW - 8);
