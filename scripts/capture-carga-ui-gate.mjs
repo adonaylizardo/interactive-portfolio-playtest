@@ -22,17 +22,26 @@ const VIEWPORTS = [
 ];
 
 async function captureLoading(page, tag) {
+  await page.route('**/*', async (route) => {
+    await new Promise((r) => setTimeout(r, 12));
+    await route.continue();
+  });
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#boot.boot-flow', { timeout: 120000 });
   await page.waitForFunction(
     () => {
       const pct = parseInt(document.querySelector('.boot-flow__pct')?.textContent ?? '0', 10);
-      return pct >= 18 && pct < 92 && document.body.classList.contains('boot-loading');
+      return (
+        pct >= 18 &&
+        pct < 88 &&
+        document.body.classList.contains('boot-loading') &&
+        !document.getElementById('boot')?.classList.contains('boot-flow--welcome')
+      );
     },
     { timeout: 120000 },
   );
-  await page.waitForTimeout(200);
   await page.screenshot({ path: path.join(OUT, `${tag}-carga.png`), fullPage: false });
+  await page.unroute('**/*');
 }
 
 async function captureWelcome(page, tag) {
@@ -78,6 +87,7 @@ async function proveRouting(browser) {
   watch(p3);
   await p3.goto(`${BASE}#/leer`, { waitUntil: 'domcontentloaded' });
   await p3.waitForFunction(() => location.hash.includes('/leer'), { timeout: 180000 });
+  await p3.waitForFunction(() => !document.getElementById('boot'), { timeout: 30000 });
   const deepRead = await p3.evaluate(() => location.hash);
   const skipWelcome = await p3.evaluate(() => !document.getElementById('boot'));
   await ctx3.close();
