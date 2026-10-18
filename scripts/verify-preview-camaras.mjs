@@ -301,6 +301,9 @@ async function runViewport(tag, options) {
     notes.push(`${tag}: overview coverage ${JSON.stringify(overview)}`);
     const minCov = Math.min(overview?.covW ?? 0, overview?.covH ?? 0);
     notes.push(`${tag}: overview limiting dim ${(minCov * 100).toFixed(1)}% (goal ≥85%)`);
+    if ((tag === '390' || tag === '844x390') && minCov < 0.85) {
+      errors.push(`${tag}: overview fill ${(minCov * 100).toFixed(1)}% < 85%`);
+    }
     await page.screenshot({ path: path.join(OUT, `${tag}-overview.png`) });
     await page.evaluate(() => window.__playtestQa.toggleMapOverview?.());
     await wait(200);
@@ -481,6 +484,7 @@ async function runViewport(tag, options) {
 const results = [];
 for (const [tag, opts] of [
   ['390', { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' }],
+  ['844x390', { viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' }],
   ['1280', { viewport: { width: 1280, height: 800 } }],
 ]) {
   results.push(await runViewport(tag, opts));

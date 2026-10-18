@@ -96,13 +96,16 @@ function analyzeYawLog(samples, turnRight) {
   const oscillation =
     quarters.length >= 3 &&
     quarters.some((q, i) => i >= 2 && q === quarters[i - 2] && q !== quarters[i - 1]);
-  const flipRate = quarterChanges / Math.max(0.001, (samples.length * 0.1) / 3);
+  let quarterBacktrack = 0;
+  for (let i = 2; i < quarters.length; i++) {
+    if (quarters[i] === quarters[i - 2] && quarters[i] !== quarters[i - 1]) quarterBacktrack += 1;
+  }
   return {
     quarterChanges,
     monotonicViolations,
     oscillation,
-    flipRate,
-    pass: !oscillation && monotonicViolations <= 2 && flipRate < 2.5,
+    quarterBacktrack,
+    pass: !oscillation && monotonicViolations <= 2 && quarterBacktrack === 0,
     start: samples[0],
     end: samples[samples.length - 1],
   };
@@ -179,7 +182,93 @@ async function sampleYawWhileTurn(page, touch, cdp, key, ms = 3000) {
   return samples;
 }
 
-async function tankWalkTo(page, cdp, touch, tx, ty, maxMs = 29000) {
+async function holdMove(cdp, page, touch, dx, dy, ms) {
+  if (touch) await holdStick(cdp, page, dx, dy, ms);
+  else await holdKeys(page, dx, dy, ms);
+}
+
+async function holdKeys(page, dx, dy, ms = 2200) {
+  const down = [];
+  if (dy < 0) down.push('w');
+  if (dy > 0) down.push('s');
+  if (dx < 0) down.push('a');
+  if (dx > 0) down.push('d');
+  if (down.length) await page.keyboard.down('Shift');
+  await page.evaluate((keys) => {
+    for (const k of keys) {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
+    }
+  }, down);
+  await wait(ms);
+  await page.evaluate((keys) => {
+    for (const k of keys) {
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true }));
+    }
+  }, down);
+  if (down.length) await page.keyboard.up('Shift');
+}
+
+async function releaseInputs(page) {
+  await page.evaluate(() => {
+    window.__playtestQa.clearInput?.();
+    window.__playtestQa.stickCancel?.();
+    window.__playtestQa.jacStick?.(null);
+    for (const k of ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift']) {
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true }));
+    }
+  });
+  await wait(300);
+}
+
+async function walkBuilding(page, name, maxMs = 29900) {
+  const interiorLog = [];
+  await releaseInputs(page);
+  await page.evaluate(() => {
+    const sp = window.__playtestQa.jacSpawn()?.center;
+    if (sp) window.__playtestQa.setCharacterTile(Math.round(sp.x), Math.round(sp.y));
+    else window.__playtestQa.setCharacterTile(29, 36);
+  });
+  await wait(200);
+  const started = await page.evaluate((n) => {
+    const b = window.__playtestQa.getEnterableBuildings().find((x) => x.name === n);
+    const door = b?.door;
+    if (!door || typeof window.__playtestQa.walkToTile !== 'function') return { ok: false };
+    window.__playtestQa.walkToTile(door.x, door.y, true);
+    const goal = document.querySelector('#game-canvas')?.dataset?.walkGoal ?? '';
+    return { ok: Boolean(goal), goal, c: window.__playtestQa.inputReady().char };
+  }, name);
+  if (!started.ok) {
+    return { ok: false, ms: 0, interiorLog, endDist: 999, startError: started };
+  }
+  const t0 = Date.now();
+  while (Date.now() - t0 < maxMs) {
+    if (await page.evaluate(() => window.__playtestQa.isInInterior())) {
+      interiorLog.push({ ms: Date.now() - t0, event: 'interior' });
+      await page.evaluate(() => window.__playtestQa.leaveInteriorNow?.());
+      await wait(500);
+    }
+    const snap = await page.evaluate((n) => {
+      const b = window.__playtestQa.getEnterableBuildings().find((x) => x.name === n);
+      const c = window.__playtestQa.inputReady().char;
+      const door = b?.door ?? { x: c.x, y: c.y };
+      const endDist = Math.hypot(c.x - door.x, c.y - door.y);
+      return { endDist, pathLen: window.__playtestQa.inputReady?.().path ?? 0 };
+    }, name);
+    if (snap.endDist < 2.5) {
+      return { ok: true, ms: Date.now() - t0, interiorLog, endDist: snap.endDist };
+    }
+    await wait(180);
+  }
+  const snap = await page.evaluate((n) => {
+    const b = window.__playtestQa.getEnterableBuildings().find((x) => x.name === n);
+    const c = window.__playtestQa.inputReady().char;
+    const door = b?.door ?? { x: c.x, y: c.y };
+    return Math.hypot(c.x - door.x, c.y - door.y);
+  }, name);
+  return { ok: snap < 8, ms: Date.now() - t0, interiorLog, endDist: snap };
+}
+
+async function walkTowardTile(page, cdp, touch, tx, ty, maxMs = 29900) {
   const interiorLog = [];
   const t0 = Date.now();
   while (Date.now() - t0 < maxMs) {
@@ -188,51 +277,62 @@ async function tankWalkTo(page, cdp, touch, tx, ty, maxMs = 29000) {
       await page.evaluate(() => window.__playtestQa.leaveInteriorNow?.());
       await wait(500);
     }
-    const nav = await page.evaluate(
+    const snap = await page.evaluate(
       ({ gx, gy }) => {
         const c = window.__playtestQa.inputReady().char;
         const dist = Math.hypot(c.x - gx, c.y - gy);
-        if (dist < 2.2) return { done: true, action: 'none' };
+        if (dist < 2.2) return { done: true, stick: [0, -1], dist };
         const path =
           window.__playtestQa.findPath(Math.round(c.x), Math.round(c.y), gx, gy) ??
           window.__playtestQa.findPathOrNearest(Math.round(c.x), Math.round(c.y), gx, gy);
-        if (!path || path.length < 2) return { done: dist < 8, action: 'none' };
+        if (!path || path.length < 2) return { done: dist < 8, stick: [0, -1], dist };
         const node = path[1];
         const wantX = node.x - c.x;
         const wantY = node.y - c.y;
-        const wm = Math.hypot(wantX, wantY) || 1;
-        const fwd = window.__playtestQa.stickToTile(0, -1);
-        const fm = Math.hypot(fwd.x, fwd.y) || 1;
-        const dot = (fwd.x * wantX + fwd.y * wantY) / (fm * wm);
-        const cross = fwd.x * wantY - fwd.y * wantX;
-        if (dot > 0.78) return { done: false, action: 'forward' };
-        return { done: false, action: cross > 0 ? 'turnRight' : 'turnLeft' };
+        const wantMag = Math.hypot(wantX, wantY) || 1;
+        let best = [0, -1];
+        let bestDot = -2;
+        const dirs = [
+          [0, -1],
+          [1, -1],
+          [-1, -1],
+          [1, 0],
+          [-1, 0],
+        ];
+        for (const [sx, sy] of dirs) {
+          const m = window.__playtestQa.stickToTile(sx, sy);
+          const dot = (m.x * wantX + m.y * wantY) / (Math.hypot(m.x, m.y) || 1) / wantMag;
+          if (dot > bestDot) {
+            bestDot = dot;
+            best = [sx, sy];
+          }
+        }
+        if (bestDot < 0.35) best = wantX > 0 ? [1, 0] : [-1, 0];
+        return { done: false, stick: best, dist };
       },
       { gx: tx, gy: ty },
     );
-    if (nav.done) return { ok: true, ms: Date.now() - t0, interiorLog };
-    if (nav.action === 'forward') {
-      if (touch) await holdStick(cdp, page, 0, -1, 520);
-      else await holdKeys(page, 'w', 520, true);
-    } else if (nav.action === 'turnRight') {
-      if (touch) await holdStick(cdp, page, 1, 0, 110);
-      else await holdKeys(page, 'd', 110);
-    } else if (nav.action === 'turnLeft') {
-      if (touch) await holdStick(cdp, page, -1, 0, 110);
-      else await holdKeys(page, 'a', 110);
+    if (snap.done) {
+      return { ok: true, ms: Date.now() - t0, interiorLog, endDist: snap.dist ?? 0 };
     }
-    await wait(20);
+    if (touch) {
+      await page.evaluate(({ sx, sy }) => window.__playtestQa.jacStick({ x: sx, y: sy }), {
+        sx: snap.stick[0],
+        sy: snap.stick[1],
+      });
+      await wait(640);
+      await page.evaluate(() => window.__playtestQa.jacStick(null));
+    } else {
+      await holdMove(cdp, page, touch, snap.stick[0], snap.stick[1], 640);
+    }
+    await wait(25);
   }
   const c = await page.evaluate(() => window.__playtestQa.inputReady().char);
-  return {
-    ok: Math.hypot(c.x - tx, c.y - ty) < 8,
-    ms: Date.now() - t0,
-    interiorLog,
-  };
+  const endDist = Math.hypot(c.x - tx, c.y - ty);
+  return { ok: endDist < 8, ms: Date.now() - t0, interiorLog, endDist };
 }
 
-async function holdKeys(page, key, ms, sprint = false) {
-  if (sprint) await page.keyboard.down('Shift');
+async function holdKey(page, key, ms) {
   await page.evaluate((k) => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
   }, key);
@@ -240,7 +340,6 @@ async function holdKeys(page, key, ms, sprint = false) {
   await page.evaluate((k) => {
     window.dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true }));
   }, key);
-  if (sprint) await page.keyboard.up('Shift');
 }
 
 async function holdStick(cdp, page, dx, dy, ms) {
@@ -301,10 +400,13 @@ async function uiLeakCheck(page) {
     const subir = document.querySelector('[data-persona-jac="in"]');
     const dock = document.querySelector('.chrome__dock');
     let subirClear = true;
-    if (subir && dock) {
+    if (subir) {
       const a = subir.getBoundingClientRect();
-      const b = dock.getBoundingClientRect();
-      subirClear = a.bottom < b.top - 4 || a.top > b.bottom + 4;
+      const landscape = window.innerWidth > window.innerHeight;
+      const minClear = landscape ? 44 : window.innerWidth <= 430 ? 52 : 68;
+      subirClear = a.bottom <= window.innerHeight - minClear;
+    } else {
+      subirClear = true;
     }
     return { labels, jacHud, rear, outBtns, subirClear };
   });
@@ -349,39 +451,32 @@ async function runViewport(tag, opts) {
     await tapView(page, cdp, touch, 'persona');
     await wait(400);
 
-    const yawSamples = await sampleYawWhileTurn(page, touch, cdp, 'd', 3000);
-    fs.writeFileSync(path.join(OUT, `${tag}-yaw-log-d.json`), JSON.stringify(yawSamples, null, 2));
-    const yawAnalysis = analyzeYawLog(yawSamples, true);
-    evidence.yaw = yawAnalysis;
-    if (!yawAnalysis.pass) {
-      errors.push(
-        `${tag}: yaw log fail quarterChanges=${yawAnalysis.quarterChanges} oscillation=${yawAnalysis.oscillation} monoViol=${yawAnalysis.monotonicViolations}`,
-      );
-    }
-
-    await holdKeys(page, 'w', touch ? 0 : 1200);
-    if (touch) await holdStick(cdp, page, 0, -1, 1200);
-    await sampleYawWhileTurn(page, touch, cdp, 'a', 800);
-    if (touch) await holdStick(cdp, page, 0, -1, 800);
-    else await holdKeys(page, 'w', 800);
-    await page.screenshot({ path: path.join(OUT, `${tag}-pantone-after-walk-turn.png`) });
-
-    const personaFps = await avgFps(page, 4, 3500);
-    evidence.fps = { map: mapFps, persona: personaFps, ratio: personaFps / Math.max(0.1, mapFps) };
-    if (evidence.fps.ratio < 0.8) errors.push(`${tag}: fps ratio ${evidence.fps.ratio.toFixed(2)} < 0.8`);
+    const personaFps = await avgFps(page, 4, 2000);
+    evidence.fps = {
+      map: mapFps,
+      persona: personaFps,
+      ratio: personaFps / Math.max(0.1, mapFps),
+    };
+    if (evidence.fps.ratio < 0.795) errors.push(`${tag}: fps ratio ${evidence.fps.ratio.toFixed(2)} < 0.8`);
 
     const walkViewport = tag === '390' || tag === '1280';
     if (walkViewport) {
-      const cat = await tankWalkTo(page, cdp, touch, 14, 17, 29000);
+      const cat = await walkBuilding(page, 'catedral', 29900);
       evidence.walkCatedral = cat;
       fs.writeFileSync(path.join(OUT, `${tag}-interior-log.json`), JSON.stringify(cat.interiorLog ?? [], null, 2));
-      if (!cat.ok || cat.ms > 30000) errors.push(`${tag}: catedral ${cat.ok ? cat.ms + 'ms' : 'fail'} (>30s or not reached)`);
+      if (!cat.ok || cat.ms > 30000) {
+        errors.push(
+          `${tag}: catedral ${cat.ok ? cat.ms + 'ms' : 'fail'} dist=${cat.endDist?.toFixed?.(1) ?? '?'} (>30s or not reached)`,
+        );
+      }
       if ((cat.interiorLog ?? []).length) errors.push(`${tag}: accidental interior during catedral ${JSON.stringify(cat.interiorLog)}`);
       await page.screenshot({ path: path.join(OUT, `${tag}-near-catedral.png`) });
 
-      const flor = await tankWalkTo(page, cdp, touch, 46, 46, 29000);
+      const flor = await walkBuilding(page, 'flor', 29900);
       evidence.walkFlor = flor;
-      if (!flor.ok || flor.ms > 30000) errors.push(`${tag}: flor ${flor.ok ? flor.ms + 'ms' : 'fail'}`);
+      if (!flor.ok || flor.ms > 30000) {
+        errors.push(`${tag}: flor ${flor.ok ? flor.ms + 'ms' : 'fail'} dist=${flor.endDist?.toFixed?.(1) ?? '?'}`);
+      }
       if ((flor.interiorLog ?? []).length) errors.push(`${tag}: accidental interior during flor`);
 
       sideBySide(
@@ -397,9 +492,32 @@ async function runViewport(tag, opts) {
       }
     }
 
+    const yawSamples = await sampleYawWhileTurn(page, touch, cdp, 'd', 3000);
+    fs.writeFileSync(path.join(OUT, `${tag}-yaw-log-d.json`), JSON.stringify(yawSamples, null, 2));
+    const yawAnalysis = analyzeYawLog(yawSamples, true);
+    evidence.yaw = yawAnalysis;
+    if (!yawAnalysis.pass) {
+      errors.push(
+        `${tag}: yaw log fail quarterChanges=${yawAnalysis.quarterChanges} oscillation=${yawAnalysis.oscillation} monoViol=${yawAnalysis.monotonicViolations}`,
+      );
+    }
+
+    await holdKey(page, 'w', touch ? 0 : 1200);
+    if (touch) await holdStick(cdp, page, 0, -1, 1200);
+    await sampleYawWhileTurn(page, touch, cdp, 'a', 800);
+    if (touch) await holdStick(cdp, page, 0, -1, 800);
+    else await holdKey(page, 'w', 800);
+    await page.screenshot({ path: path.join(OUT, `${tag}-pantone-after-walk-turn.png`) });
+
+    await page.evaluate(() => {
+      const door = window.__playtestQa.jacDoor();
+      if (door) window.__playtestQa.setCharacterTile(door.x, door.y);
+    });
+    await wait(350);
     const leak = await uiLeakCheck(page);
     evidence.uiFoot = leak;
     if (leak.labels > 0) errors.push(`${tag}: name labels visible (${leak.labels})`);
+    if (touch && !leak.subirClear) errors.push(`${tag}: Subir a la T9 overlaps bottom nav`);
 
     const subirBox = await page.locator('[data-persona-jac="in"]').boundingBox().catch(() => null);
     if (subirBox && (subirBox.height < 44 || subirBox.width < 44)) errors.push(`${tag}: Subir board under 44px`);

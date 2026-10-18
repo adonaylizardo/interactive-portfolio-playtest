@@ -2760,7 +2760,7 @@ body.jac-info[data-chrome='phone'] .chrome__dock {
 .persona-jac-board {
   position: fixed;
   left: 50%;
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
   z-index: 130;
   transform: translateX(-50%);
   display: flex;
@@ -2789,7 +2789,13 @@ body.jac-info[data-chrome='phone'] .chrome__dock {
 
 @media (max-width: 767px) {
   body[data-layout='split'] .persona-jac-board {
-    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(108px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (max-height: 430px) {
+  body[data-view='persona'] .persona-jac-board {
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
   }
 }
 

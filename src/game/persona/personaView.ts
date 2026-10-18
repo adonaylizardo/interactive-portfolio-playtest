@@ -275,7 +275,7 @@ export class PersonaView {
       }
       if (!heavyFacades) continue;
       const p = projectTp(f.x, 0, f.z, cam, sw, sh);
-      if (!p) {
+      if (!p || p.scale < 0.07) {
         f.sprite.visible = false;
         continue;
       }

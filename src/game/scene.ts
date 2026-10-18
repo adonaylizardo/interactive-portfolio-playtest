@@ -284,7 +284,7 @@ const FOLLOW_SMOOTH_S = 0.35;
 /** Persona mode: A/D and stick X rotate this yaw (rad/s), not strafe. */
 const PERSONA_TURN_RATE = 2.65;
 /** Slightly faster on-foot steps so POI walks stay under the 30s acceptance budget. */
-const PERSONA_WALK_MUL = 1.18;
+const PERSONA_WALK_MUL = 1.78;
 const FOLLOW_DRIVE_SMOOTH_S = 0.12;
 /** A per-frame character move longer than this (3 tiles) is a teleport, not walking. */
 const FOLLOW_TELEPORT_WORLD = 3 * Math.hypot(TILE_W / 2, TILE_H / 2);
@@ -390,6 +390,7 @@ export class IsoScene {
   qaLastDriveTap: { x: number; y: number } | null = null;
   qaPointerDriveAccepts = 0;
   private qaStick: { x: number; y: number } | null = null;
+  private personaIdleSyncSkip = 0;
   /** GPU rear crop. Shown as a stage sprite — never readPixels / drawImage of the game GL view. */
   private rearRT: RenderTexture | null = null;
   private rearSprite: Sprite | null = null;
@@ -1559,9 +1560,13 @@ export class IsoScene {
     const wx = (b.minX + b.maxX) / 2;
     const wy = (b.minY + b.maxY) / 2;
     const zMin = this.zoomMinForCurrentView(sw, sh);
-    let zoom = zMin;
+    const phoneLandscape = sw > sh && sh < 500;
+    const phonePortrait = sh > sw && sw < 500;
+    let zoom = phonePortrait ? zMin * 1.35 : phoneLandscape ? zMin * 1.08 : zMin;
     let best = { zoom: zMin, cameraX: this.cameraX, cameraY: this.cameraY, score: 0 };
-    for (let i = 0; i < 56; i++) {
+    const maxIter = phonePortrait || phoneLandscape ? 80 : 56;
+    const zoomCeiling = phonePortrait ? zMin * 6.5 : phoneLandscape ? zMin * 4.8 : zMin * 3.2;
+    for (let i = 0; i < maxIter; i++) {
       this.zoom = clampZoom(zoom, sw, sh);
       this.placeWorldAtScreen(wx, wy, aim.x, aim.y);
       this.applyCamera(false);
@@ -1571,13 +1576,14 @@ export class IsoScene {
         continue;
       }
       const cov = this.overviewFillFraction();
-      const score = Math.min(cov.covW, cov.covH);
+      const score =
+        phonePortrait ? cov.covH : phoneLandscape ? Math.min(cov.covW, cov.covH) : Math.min(cov.covW, cov.covH);
       if (score >= best.score) {
         best = { zoom: this.zoom, cameraX: this.cameraX, cameraY: this.cameraY, score };
       }
       if (score >= 0.85) break;
-      if (this.zoom >= clampZoom(zMin * 3.2, sw, sh) - 1e-4) break;
-      zoom *= 1.022;
+      if (this.zoom >= clampZoom(zoomCeiling, sw, sh) - 1e-4) break;
+      zoom *= phonePortrait ? 1.045 : phoneLandscape ? 1.028 : 1.022;
     }
     if (best.score < 0.05) {
       this.zoom = zMin;
@@ -2527,15 +2533,23 @@ export class IsoScene {
     const sh = this.app.screen.height;
     const dt = Math.min(0.25, this.app.ticker.elapsedMS / 1000);
     this.personaTimeSec += dt;
+    const stickLive = Math.abs(this.events.stick?.().x ?? 0) > 0.02 || Math.abs(this.events.stick?.().y ?? 0) > 0.02;
     const walking =
-      this.path.length > 0 || this.keys.size > 0 || !!this.events.stickActive?.();
+      this.path.length > 0 || this.keys.size > 0 || stickLive || !!this.qaStick;
     if (walking) this.personaIdleSec = 0;
     else this.personaIdleSec += dt;
+    if (!walking && !this.jac?.driving) {
+      this.personaIdleSyncSkip += 1;
+      const skipDiv = sh < 430 ? 8 : sh < 500 ? 7 : 5;
+      if (this.personaIdleSyncSkip % skipDiv !== 0) return;
+    } else {
+      this.personaIdleSyncSkip = 0;
+    }
     this.avatar.setVisible(false);
     void this.persona.sync({
       sw,
       sh,
-      dpr: Math.min(window.devicePixelRatio || 1, 2),
+      dpr: Math.min(window.devicePixelRatio || 1, 1.25),
       charTx: this.charTx,
       charTy: this.charTy,
       facing: this.followFacing(),
@@ -3984,10 +3998,6 @@ export class IsoScene {
       this.personaCamYaw += turn * PERSONA_TURN_RATE * dt;
     }
     this.syncViewTransform();
-    if (this.path.length > 0) {
-      this.path = [];
-      this.drawPathPreview();
-    }
     if (fwd !== 0) {
       this.noteAvatarInput();
       this.fireMoveCommand();
@@ -4092,7 +4102,8 @@ export class IsoScene {
       return;
     }
     if (this.personaOn() && !this.interiorActive && !this.jac?.driving) {
-      this.updatePersonaLocomotion(stick, stickLive);
+      const pathAuto = this.path.length > 0 && !stickLive && this.keys.size === 0;
+      if (!pathAuto) this.updatePersonaLocomotion(stick, stickLive);
     } else if (stickLive) {
       this.noteAvatarInput();
       this.startCameraFollow();
@@ -4181,7 +4192,8 @@ export class IsoScene {
 
     if (this.path.length > 0) {
       // Distance left over at a path node carries on toward the next one (steady speed at any fps).
-      let step = walkStepWorld(this.sprint, this.app.ticker.deltaMS);
+      let step = walkStepWorld(this.sprint || this.personaOn(), this.app.ticker.deltaMS);
+      if (this.personaOn()) step *= PERSONA_WALK_MUL;
       while (this.path.length > 0 && step > 0) {
         const target = this.path[0];
         const dx = target.x - this.charTx;
@@ -5524,6 +5536,12 @@ export class IsoScene {
       buildingEntry: { panelTitle: obj.panelTitle, door: obj.door },
     });
     return true;
+  }
+
+  /** QA: path to tile without opening a building panel (persona walk timing). */
+  qaWalkToTile(tx: number, ty: number, sprint = true): void {
+    this.pendingBuildingEntry = null;
+    this.walkToTile(tx, ty, sprint);
   }
 
   getObjectIds(): string[] {

@@ -263,6 +263,7 @@ async function main(): Promise<void> {
     walk: (dx: number, dy: number, sprint = false) => scene.qaWalk(dx, dy, sprint),
     setCharacterTile: (x: number, y: number) => scene.setCharacterTileForQa(x, y),
     walkToBuilding: (name: string) => scene.walkToBuildingForQa(name),
+    walkToTile: (x: number, y: number, sprint?: boolean) => scene.qaWalkToTile(x, y, sprint),
     doorScreenPoint: (name: string) => scene.getDoorScreenClientPoint(name),
     frameDoorForQa: (name: string) => scene.frameBuildingDoorForQa(name),
     tapBuildingDoor: (name: string) => scene.tapBuildingDoor(name),
