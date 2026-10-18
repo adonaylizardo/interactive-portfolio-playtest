@@ -20,6 +20,12 @@ const FIGMA_EXPAND = figmaAsset('talks-desktop-list', 'ce7c9.svg');
 const FIGMA_CLOSE = figmaAsset('talks-desktop-list', 'f1b3a.svg');
 const FIGMA_SUBSTACK = figmaAsset('writings-desktop-reading', 'c0026.svg');
 
+function isWritingsPlaceholder(text: string): boolean {
+  return /placeholder|Título del artículo|Article title \(placeholder\)|Descripción de una línea|One-line description \(placeholder\)|Publicación · Fecha · X min|Publication · Date · X min|Texto del artículo \(placeholder\)/i.test(
+    text,
+  );
+}
+
 function aboutBlockNode(block: AboutBlock): HTMLElement {
   if (block.kind === 'heading') {
     const h = document.createElement(`h${block.level + 3}`);
@@ -738,11 +744,18 @@ export class BuildingPanel {
     copy.className = 'experience__copy';
     const title = document.createElement('span');
     title.className = 'experience__row-title';
-    title.textContent = t(item.titleKey as I18nKey);
+    const titleText = t(item.titleKey as I18nKey);
+    if (!isWritingsPlaceholder(titleText)) title.textContent = titleText;
+    else title.hidden = true;
     const meta = document.createElement('span');
     meta.className = 'experience__row-meta';
-    meta.textContent = t(item.metaKey as I18nKey);
-    copy.append(title, meta);
+    const metaText = t(item.metaKey as I18nKey);
+    if (!isWritingsPlaceholder(metaText)) {
+      meta.textContent = metaText;
+      copy.append(title, meta);
+    } else {
+      copy.append(title);
+    }
     btn.append(thumb, copy);
     btn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -901,7 +914,7 @@ export class BuildingPanel {
       h.textContent = t(section.titleKey as I18nKey);
       const badge = document.createElement('span');
       badge.className = 'experience__section-count';
-      badge.textContent = String(visibleItems.length);
+      badge.textContent = String(section.items.length);
       const seeAll = document.createElement('button');
       seeAll.type = 'button';
       seeAll.className = 'experience__see-all';
@@ -918,10 +931,15 @@ export class BuildingPanel {
       spacer.className = 'experience__section-spacer';
       spacer.setAttribute('aria-hidden', 'true');
       row.append(h, badge, spacer, seeAll);
-      const p = document.createElement('p');
-      p.className = 'experience__section-desc';
-      p.textContent = t(section.descKey as I18nKey);
-      head.append(row, p);
+      const descText = t(section.descKey as I18nKey);
+      if (!isWritingsPlaceholder(descText)) {
+        const p = document.createElement('p');
+        p.className = 'experience__section-desc';
+        p.textContent = descText;
+        head.append(row, p);
+      } else {
+        head.append(row);
+      }
       block.appendChild(head);
       for (const item of visibleItems) {
         block.appendChild(this.writingRow(item, section));
@@ -956,12 +974,20 @@ export class BuildingPanel {
       <p class="writings-reader__meta"></p>
     `;
     wrap.querySelector('.writings-reader__kicker')!.textContent = t('writings.reader.kicker');
-    wrap.querySelector('.writings-reader__title')!.textContent = t(item.titleKey as I18nKey);
-    wrap.querySelector('.writings-reader__meta')!.textContent = t(item.metaKey as I18nKey);
+    const readerTitle = t(item.titleKey as I18nKey);
+    const titleEl = wrap.querySelector('.writings-reader__title') as HTMLElement;
+    if (isWritingsPlaceholder(readerTitle)) titleEl.hidden = true;
+    else titleEl.textContent = readerTitle;
+    const readerMeta = t(item.metaKey as I18nKey);
+    const metaEl = wrap.querySelector('.writings-reader__meta') as HTMLElement;
+    if (isWritingsPlaceholder(readerMeta)) metaEl.hidden = true;
+    else metaEl.textContent = readerMeta;
     for (const key of ['writings.reader.p1', 'writings.reader.p2', 'writings.reader.p3'] as const) {
+      const body = t(key);
+      if (isWritingsPlaceholder(body)) continue;
       const p = document.createElement('p');
       p.className = 'writings-reader__p';
-      p.textContent = t(key);
+      p.textContent = body;
       wrap.appendChild(p);
     }
     if (articleUrl) {

@@ -59,6 +59,7 @@ export class StudioAudio {
   private lastFootFrame = -1;
   private lastFootAt = 0;
   private voice: HTMLAudioElement | null = null;
+  private activeLineId: string | null = null;
   private subtitleText = '';
   private readonly played = new Set<string>();
   private readonly listeners = new Set<() => void>();
@@ -94,6 +95,10 @@ export class StudioAudio {
     return !!this.voice;
   }
 
+  hasIntroCompleted(): boolean {
+    return this.played.has('01-intro');
+  }
+
   qaBarks(): { ready: string[]; lastId: string; cooldownMs: number } {
     return {
       ready: [...this.barkReady],
@@ -122,11 +127,18 @@ export class StudioAudio {
 
   private shouldDeferIntro(): boolean {
     if (typeof document === 'undefined') return false;
+    const layout = document.body.dataset.layout;
+    if (layout === 'split' || layout === 'panel') return true;
     const panel = document.querySelector('#ui-root > .building-panel.building-panel--open');
     if (!panel) return false;
-    if (panel.classList.contains('building-panel--preview')) return true;
-    if (panel.classList.contains('building-panel--experience')) return true;
     return true;
+  }
+
+  /** User-initiated chrome voice (Contact, etc.) while intro is playing. */
+  playLineForced(id: string): void {
+    this.introLock = false;
+    this.pending = null;
+    this.playLine(id, { force: true });
   }
 
   onChange(fn: () => void): () => void {
@@ -166,7 +178,7 @@ export class StudioAudio {
     // After the gesture frame: starting the graph mid-setZoom / interior swap
     // takes WebKit's renderer down.
     const phone = window.matchMedia('(pointer: coarse), (max-width: 767px)').matches;
-    window.setTimeout(() => this.startGraphAndIntro(), phone ? 900 : 80);
+    window.setTimeout(() => this.startGraphAndIntro(), phone ? 900 : 320);
   }
 
   private startGraphAndIntro(): void {
@@ -274,17 +286,24 @@ export class StudioAudio {
     });
   }
 
-  playLine(id: string): void {
+  playLine(id: string, opts: { force?: boolean } = {}): void {
     const line = VOICE_LINES[id];
-    if (!line || this.played.has(id) || this.muted) return;
+    if (!line || this.muted) return;
+    if (!opts.force && this.played.has(id)) return;
     if (!this.unlocked) return;
-    if (this.introLock && id !== '01-intro') {
+    if (id === '01-intro' && this.shouldDeferIntro()) {
+      this.introDeferred = true;
+      this.introLock = false;
+      return;
+    }
+    if (this.introLock && id !== '01-intro' && !opts.force) {
       this.pending = id;
       return;
     }
     this.stopVoice();
     this.stopBark();
-    this.played.add(id);
+    if (id !== '01-intro') this.played.add(id);
+    this.activeLineId = id;
     this.subtitleText = line.script_text;
     this.emit();
     if (automatedWebKitPhone()) {
@@ -311,6 +330,8 @@ export class StudioAudio {
   }
 
   private finishVoice(): void {
+    if (this.activeLineId === '01-intro') this.played.add('01-intro');
+    this.activeLineId = null;
     this.introLock = false;
     this.stopVoice({ preserveQueue: true });
     this.syncAmbience();
@@ -322,10 +343,15 @@ export class StudioAudio {
 
   private stopVoice(opts: { preserveQueue?: boolean } = {}): void {
     const hadVoice = !!this.voice;
+    const interruptedIntro = this.activeLineId === '01-intro';
     if (this.voice) {
       this.voice.pause();
       this.voice.src = '';
       this.voice = null;
+    }
+    if (interruptedIntro) {
+      this.introDeferred = true;
+      this.activeLineId = null;
     }
     this.subtitleText = '';
     if (hadVoice || this.introLock) {

@@ -26,6 +26,7 @@ const DICT = {
 
     'toast.unreachable': "Can't get there",
     'toast.getOutToEnter': 'Get out to enter',
+    'toast.unknownInterior': 'Room not found — back to the map.',
 
     'jac.hint': 'Use arrows or WASD',
     'jac.desc': 'JAC T9, the family pickup.',
@@ -202,6 +203,7 @@ const DICT = {
 
     'toast.unreachable': 'No se puede llegar',
     'toast.getOutToEnter': 'Bájate para entrar',
+    'toast.unknownInterior': 'No encontramos esa sala — volvimos al mapa.',
 
     'jac.hint': 'Usa flechas o WASD',
     'jac.desc': 'JAC T9, la camioneta de la familia.',

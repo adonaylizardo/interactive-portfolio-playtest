@@ -236,9 +236,14 @@ body.is-canvas-dragging * {
   z-index: 21;
 }
 
-#ui-root:has(> .building-panel--preview) .chrome__subtitle,
 #ui-root:has(> .building-panel--preview) .chrome__sound {
   display: none;
+}
+
+#ui-root:has(> .building-panel--preview) .chrome__subtitle:not(:empty) {
+  display: block;
+  visibility: visible;
+  z-index: 22;
 }
 
 @media (max-width: 767px) {
@@ -589,8 +594,9 @@ body[data-layout='panel'] .checklist {
   body[data-layout='map'] .checklist--mobile-closed {
     -webkit-font-smoothing: subpixel-antialiased;
     pointer-events: none;
-    top: max(56px, calc(env(safe-area-inset-top) + 56px));
-    left: max(122px, calc(env(safe-area-inset-left) + 122px));
+    top: auto;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: max(12px, env(safe-area-inset-left));
     right: auto;
     width: 237px;
     min-width: 237px;
@@ -829,7 +835,8 @@ body[data-layout='panel'] .checklist {
   }
 
   #ui-root:has(> .building-panel--preview) > .checklist,
-  #ui-root:has(> .building-panel--preview) .chrome__intro {
+  #ui-root:has(> .building-panel--preview) .chrome__intro,
+  #ui-root:has(> .building-panel--preview) .chrome__dock {
     display: none !important;
   }
 

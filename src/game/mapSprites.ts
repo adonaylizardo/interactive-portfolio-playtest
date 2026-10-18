@@ -88,6 +88,7 @@ export function objectSpriteKey(
   if (!base) return null;
   const zoom = lejos ? 'lejos' : 'cerca';
   if (o.type === 'building' && LUZ_BUILDINGS.has(o.name)) {
+    if (lejos && state !== 'default') return `${base}/${state}/cerca`;
     if (lejos) return `${base}/${state}/${zoom}`;
     if (state === 'default') {
       const luz = lightsOn ? 'encendida' : 'apagada';

@@ -356,7 +356,7 @@ export class ChromeUI {
       this.setLayout('split');
     });
     this.root.querySelector('.chrome__dock [data-action="contact"]')?.addEventListener('click', () => {
-      studio.playLine('11-contact');
+      studio.playLineForced('11-contact');
       this.callbacks.onLocate('contacto');
     });
     this.root.querySelector('.chrome__dock [data-action="map"]')?.addEventListener('click', () => this.setLayout('map'));
@@ -369,7 +369,7 @@ export class ChromeUI {
       this.scrollTo('#chrome-logros');
     });
     this.root.querySelector('.chrome__rail [data-action="contact"]')?.addEventListener('click', () => {
-      studio.playLine('11-contact');
+      studio.playLineForced('11-contact');
       this.callbacks.onLocate('contacto');
     });
     this.root.querySelector('[data-action="fullpage"]')?.addEventListener('click', () => {
@@ -380,6 +380,20 @@ export class ChromeUI {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         studio.toggleMute();
+      });
+    });
+    this.root.querySelectorAll('[data-action="search"]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (this.mobile) this.setLayout('split');
+        else this.setLayout('split');
+        this.scrollTo('#chrome-casos');
+      });
+    });
+    this.root.querySelectorAll('[data-action="download"]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.open(CV_HREF, '_blank', 'noopener,noreferrer');
       });
     });
     this.syncSound();
@@ -530,16 +544,10 @@ export class ChromeUI {
     const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
     if (!lang) return;
     const shortLand = window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
-    if (shortLand) {
-      if (this.mobile && document.body.dataset.layout === 'map') {
-        lang.style.top = '12px';
-        lang.style.right = '12px';
-        lang.style.left = 'auto';
-      } else {
-        lang.style.top = '12px';
-        lang.style.left = '16px';
-        lang.style.right = 'auto';
-      }
+    if (shortLand && this.mobile) {
+      lang.style.top = '12px';
+      lang.style.right = '12px';
+      lang.style.left = 'auto';
       return;
     }
     lang.style.left = '';

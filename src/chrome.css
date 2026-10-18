@@ -504,6 +504,11 @@ body[data-interior='1'] .chrome__column {
   display: none;
 }
 
+.chrome__skeleton-stack,
+.chrome__skeleton {
+  display: none !important;
+}
+
 .chrome__lang {
   position: absolute;
   top: 20px;

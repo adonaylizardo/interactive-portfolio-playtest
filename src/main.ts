@@ -10,7 +10,7 @@ import {
   MAP_TRAMOS,
   validateWalkGridFootprint,
 } from './data/map';
-import { parseInteriorFromHash } from './camera/hash';
+import { parseInteriorFromHash, replaceOutdoorHash } from './camera/hash';
 import { getInteriorDef, interiorBlockedTilesHaveProps } from './game/interior';
 import { IsoScene } from './game/scene';
 import { findPath } from './iso/pathfinding';
@@ -38,8 +38,9 @@ async function main(): Promise<void> {
   let scene!: IsoScene;
   const chrome = new ChromeUI(uiRoot, {
     onLayoutChange: () => {
-      const layout = chrome.getLayout();
-      checklist.setCollapsed(layout === 'map' || layout === 'panel');
+      if (!isMobileLayout()) checklist.setCollapsed(true);
+      else checklist.collapseMobile();
+      if (chrome.getLayout() === 'map' && !panel.isOpen()) studio.maybePlayDeferredIntro();
       scene?.applyCameraFromUi();
     },
     onView: (mode: Camera) => scene?.setViewMode(mode),
@@ -79,6 +80,10 @@ async function main(): Promise<void> {
       }
       joystick.setHidden(open || panel.isPreviewExpanded());
       if (panel.isPreviewExpanded()) checklist.setCollapsed(true);
+      if (panel.isPreviewMode() && panel.isOpen() && !isMobileLayout()) {
+        chrome.setLayout('map');
+        checklist.setCollapsed(true);
+      }
       if (!panel.isOpen() && !scene?.isInInterior()) {
         if (!isMobileLayout()) checklist.setCollapsed(true);
         scene?.resetMapDoorChainState();
@@ -129,7 +134,9 @@ async function main(): Promise<void> {
       checklist.complete('enter-building');
       if (isCaseHouse(buildingId)) {
         if (chrome.isMobileSheetOpen()) chrome.setLayout('map');
+        if (!isMobileLayout()) chrome.setLayout('map');
         panel.showPreview(buildingId);
+        scene.pushCasePreviewHash(buildingId);
         return;
       }
       scene.enterInterior(buildingId);
@@ -240,8 +247,20 @@ async function main(): Promise<void> {
 
   const bootInterior = parseInteriorFromHash();
   if (bootInterior) {
-    chrome.setLayout('map');
-    syncInteriorPanel(bootInterior);
+    const known =
+      isCaseHouse(bootInterior) ||
+      bootInterior === 'teresa' ||
+      bootInterior === 'biblioteca' ||
+      !!getInteriorDef(bootInterior) ||
+      !!getBuildingByName(bootInterior);
+    if (!known) {
+      showToast(t('toast.unknownInterior'));
+      replaceOutdoorHash({ x: 0, y: 0, zoom: 0.85 });
+      scene.recenterOnCharacter();
+    } else {
+      chrome.setLayout('map');
+      syncInteriorPanel(bootInterior);
+    }
   }
 
   (window as unknown as { __playtestQa?: Record<string, unknown> }).__playtestQa = {

@@ -1935,6 +1935,15 @@ export class IsoScene {
     this.centerOnCharacter(false);
   }
 
+  /** Case preview on the map (deep-linkable via #view=…&in=). */
+  pushCasePreviewHash(buildingId: string): void {
+    writeInteriorToHash(
+      buildingId,
+      { x: this.cameraX, y: this.cameraY, zoom: this.zoom },
+      'push',
+    );
+  }
+
   private freeRectCenter(): { x: number; y: number } {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
