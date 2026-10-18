@@ -1823,7 +1823,7 @@ export class IsoScene {
       this.jacGetOut({ thenEnter: true });
       return true;
     }
-    const path = sit.path.length > 0 ? sit.path : this.jac.findDrivePath(sit.x, sit.y);
+    const path = sit.path;
     if (!path) {
       if (!atDoor) return false;
       this.pendingDriveEnter = entry;
@@ -1907,6 +1907,7 @@ export class IsoScene {
   private drawPathPreview(): void {
     this.pathGfx.clear();
     if (this.events.buildingPanel?.isOpen()) return;
+    if (this.pendingDriveEnter) return;
     const drivePts =
       this.jac?.driving && (this.jac.drivePath.length > 0 || this.jac.driveGoal)
         ? [
@@ -3417,7 +3418,8 @@ export class IsoScene {
   private moveCommandArmed = true;
 
   private updateMovement(): void {
-    this.syncObjectSprites();
+    const quietTap = !!this.pendingDriveEnter && performance.now() - this.pendingDriveEnterAt < 80;
+    if (!quietTap) this.syncObjectSprites();
     if (this.doorCooldown > 0) {
       this.doorCooldown -= this.app.ticker.deltaMS;
     }
@@ -4206,9 +4208,12 @@ export class IsoScene {
     }
     this.pendingJacEnter = false;
     this.pendingJacPanel = false;
+    this.pendingJacExit = false;
+    this.suppressDriveTapUntil = 0;
     this.path = [];
     this.drawPathPreview();
     this.pendingBuildingEntry = null;
+    this.pendingDriveEnter = null;
     this.events.chrome?.onJacHud?.();
     this.jac.setMode('drive');
     this.avatar.setVisible(false);
@@ -4283,9 +4288,11 @@ export class IsoScene {
     const arrived = this.jac.atParkSit();
     const from = this.pendingDriveFrom;
     const traveled = !from || Math.hypot(this.jac.cx - from.x, this.jac.cy - from.y) > 2.2;
-    const stalled = this.jac.drivePath.length === 0 && this.jac.mph < 3;
+    const pathLeft = this.jac.drivePath.length;
+    const nearPathEnd = traveled && along >= 0 && pathLeft <= 2 && distSit <= 2.2 && distDoor <= 12;
+    const stalled = pathLeft === 0 && this.jac.mph < 3;
     const doorSideSit =
-      stalled && along >= 0 && (distDoor <= 5.5 || (traveled && distDoor <= 10));
+      (stalled || nearPathEnd) && along >= 0 && (distDoor <= 5.5 || (traveled && distDoor <= 10) || nearPathEnd);
     if (arrived || doorSideSit) {
       this.jac.sitWhy = arrived
         ? `arrived sit=(${sit?.x},${sit?.y}) d=${distSit.toFixed(2)} mph=${this.jac.mph}`
@@ -4362,7 +4369,7 @@ export class IsoScene {
       this.jacGetOut({ thenEnter: true });
       return;
     }
-    const path = sit.path.length > 0 ? sit.path : this.jac.findDrivePath(sit.x, sit.y);
+    const path = sit.path;
     if (!path || path.length === 0) {
       this.jacGetOut({ thenEnter: true });
       return;
