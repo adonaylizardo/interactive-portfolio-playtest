@@ -1285,7 +1285,10 @@ body[data-layout='panel'] .checklist {
 
 .building-panel--preview .building-panel__backdrop {
   opacity: 0;
-  pointer-events: none;
+  /* Peek card is pointer-events:none except the sheet; the invisible
+     backdrop must still take map taps so landscape can close without
+     hitting the house body (which used to keep the card open). */
+  pointer-events: auto;
 }
 
 .building-panel--preview.building-panel--expanded .building-panel__backdrop {

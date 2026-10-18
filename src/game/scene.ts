@@ -239,6 +239,8 @@ export type SceneEvents = {
   onInteriorIdChange?: (interiorId: string | null) => void;
   onUnreachable?: () => void;
   onGetOutToEnter?: () => void;
+  onWalkingToVan?: () => void;
+  onSeatedInJac?: () => void;
   onMoveCommand?: () => void;
   onFrame?: () => void;
   stick?: () => { x: number; y: number };
@@ -1772,6 +1774,10 @@ export class IsoScene {
   /**
    * When the building panel is open: dismiss it and continue the map action, unless the
    * tap is on the same building (keep panel). Returns false to abort the tap entirely.
+   *
+   * Case preview is a card on the map, not an interior: a map tap is backdrop-close.
+   * Same-building must not keep the card open (landscape taps land on the house body
+   * above the sheet) and must not walk straight back into that door on the close tap.
    */
   private prepareMapTap(building?: MapObject, tx?: number, ty?: number): boolean {
     const bridge = this.events.buildingPanel;
@@ -1779,12 +1785,21 @@ export class IsoScene {
     const openTitle = bridge.openTitle();
     const same = (o?: { panelTitle?: string; name?: string } | null) =>
       !!o && (o.panelTitle === openTitle || o.name === openTitle);
+    const preview = !!bridge.isPreview?.();
+    if (preview) {
+      bridge.dismiss();
+      if (same(building)) return false;
+      if (tx !== undefined && ty !== undefined) {
+        if (same(getBuildingAtDoor(tx, ty))) return false;
+        if (same(getBuildingAt(tx, ty))) return false;
+      }
+      return true;
+    }
     if (same(building)) return false;
     if (tx !== undefined && ty !== undefined) {
       if (same(getBuildingAtDoor(tx, ty))) return false;
       if (same(getBuildingAt(tx, ty))) return false;
     }
-    const preview = !!bridge.isPreview?.();
     bridge.dismiss();
     this.pendingBuildingEntry = null;
     this.clearWalkPreview();
@@ -1793,7 +1808,6 @@ export class IsoScene {
     if (getBuildingAtDoor(ctx, cty)) {
       this.doorCooldown = 200;
     }
-    if (preview) return true;
     this.suppressMapTapOnce = true;
     return false;
   }
@@ -1819,6 +1833,11 @@ export class IsoScene {
       // card is on top. A hit on the sheet is a close, not "same building".
       if (this.events.buildingPanel.containsSheetPoint?.(client.x, client.y)) {
         this.events.buildingPanel.dismiss();
+        return;
+      }
+      // Backdrop / map tap. Prefer the van so a north sit under the house still reboards.
+      if (this.pickJacAtScreen(sx, sy)) {
+        this.tapJac();
         return;
       }
       const doorHit = this.pickBuildingDoorAtScreen(sx, sy);
@@ -1966,7 +1985,14 @@ export class IsoScene {
 
   private vanWalkBlock(): Set<string> {
     if (!this.jac || this.jac.driving) return new Set();
-    return this.jac.parkedFootprintKeys();
+    const keys = this.jac.parkedFootprintKeys();
+    const sx = Math.round(this.charTx);
+    const sy = Math.round(this.charTy);
+    // A get-out that opens a case preview leaves the walker on the door. Some
+    // sits put that door inside the parked 5×3, which made every later walk
+    // fail (no passable neighbor) until reload. Never cage the tile they are on.
+    if (keys.has(`${sx},${sy}`)) return new Set();
+    return keys;
   }
 
   private requestDriveToEnter(entry: { panelTitle: string; door: { x: number; y: number } }): boolean {
@@ -4338,11 +4364,16 @@ export class IsoScene {
 
   tapJac(): void {
     if (!this.jac || this.interiorActive || this.jac.driving) return;
+    if (this.events.buildingPanel?.isPreview?.()) this.events.buildingPanel.dismiss();
     this.jacGetIn();
   }
 
   private atJacDoor(maxDist: number): boolean {
     if (!this.jac) return false;
+    if (this.jac.driving) return false;
+    const sx = Math.round(this.charTx);
+    const sy = Math.round(this.charTy);
+    if (this.jac.parkedFootprintKeys().has(`${sx},${sy}`)) return true;
     if (this.jac.approachTiles().some((s) => Math.hypot(this.charTx - s.x, this.charTy - s.y) < maxDist)) {
       return true;
     }
@@ -4434,7 +4465,12 @@ export class IsoScene {
     if (this.jac.mode === 'menu' || this.jac.mode === 'info') this.jac.closeToMap();
     this.events.chrome?.onJacHud?.();
     this.walkToTile(door.x, door.y, false);
-    if (this.path.length === 0) this.trySeatInJac();
+    if (this.atJacDoor(1.6)) {
+      this.trySeatInJac();
+      return;
+    }
+    if (this.path.length > 0) this.events.onWalkingToVan?.();
+    else this.trySeatInJac();
   }
 
   private seatInJac(): void {
@@ -4447,10 +4483,10 @@ export class IsoScene {
     this.pendingJacExit = false;
     this.pendingDriveEnter = null;
     this.suppressDriveTapUntil = 0;
-    this.path = [];
-    this.drawPathPreview();
+    this.clearWalkPreview();
     this.pendingBuildingEntry = null;
     this.events.chrome?.onJacHud?.();
+    this.events.onSeatedInJac?.();
     this.jac.setMode('drive');
     this.avatar.setVisible(false);
     this.startCameraFollow();
@@ -4660,27 +4696,56 @@ export class IsoScene {
     if (this.interiorActive || this.jac?.driving) return;
     const tx = Math.round(this.charTx);
     const ty = Math.round(this.charTy);
-    if (tileIsStandable(tx, ty)) return;
-    const spot = this.nearestStandable(tx, ty);
+    if (tileIsStandable(tx, ty) && !this.parkedVanOverlaps(tx, ty)) return;
+    const spot = this.nearestStandableOutsideVan(tx, ty);
     if (!spot) return;
     this.charTx = spot.x;
     this.charTy = spot.y;
     this.syncCharacterGraphic();
   }
 
-  private nearestStandable(fromX: number, fromY: number): { x: number; y: number } | null {
-    if (tileIsStandable(fromX, fromY)) return { x: fromX, y: fromY };
+  private parkedVanOverlaps(tx: number, ty: number): boolean {
+    if (!this.jac || this.jac.driving) return false;
+    return this.jac.parkedFootprintKeys().has(`${tx},${ty}`);
+  }
+
+  /**
+   * Preview close (and any other panel hide) must not leave a pending door walk
+   * or a walker standing inside the parked hull — that combination ate every
+   * later tap's pathfinder after a north-side Volaris sit.
+   */
+  onBuildingPanelClosed(): void {
+    if (this.interiorActive) return;
+    this.pendingBuildingEntry = null;
+    this.pendingWalkInAt = 0;
+    this.suppressMapTapOnce = false;
+    this.clearWalkPreview();
+    const t = this.roundedCharTile();
+    if (getBuildingAtDoor(t.x, t.y)) this.doorCooldown = 220;
+    this.rescueAvatarIfTrapped();
+  }
+
+  private nearestStandableOutsideVan(fromX: number, fromY: number): { x: number; y: number } | null {
+    if (this.parkedVanOverlaps(fromX, fromY)) {
+      const door = this.jac?.driverDoorTile({ x: fromX, y: fromY });
+      if (door && tileIsStandable(door.x, door.y) && !this.parkedVanOverlaps(door.x, door.y)) {
+        return door;
+      }
+    }
+    if (tileIsStandable(fromX, fromY) && !this.parkedVanOverlaps(fromX, fromY)) {
+      return { x: fromX, y: fromY };
+    }
     for (let d = 1; d <= 12; d++) {
       for (let dy = -d; dy <= d; dy++) {
         for (let dx = -d; dx <= d; dx++) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== d) continue;
           const x = fromX + dx;
           const y = fromY + dy;
-          if (tileIsStandable(x, y)) return { x, y };
+          if (tileIsStandable(x, y) && !this.parkedVanOverlaps(x, y)) return { x, y };
         }
       }
     }
-    return null;
+    return tileIsStandable(fromX, fromY) ? { x: fromX, y: fromY } : null;
   }
 
   private releaseFailedScript(): void {
@@ -4778,6 +4843,12 @@ export class IsoScene {
     standable: boolean;
     char: { x: number; y: number };
     moveArmed: boolean;
+    vanOverlap: boolean;
+    doorCooldown: number;
+    pendingJacEnter: boolean;
+    walkGoal: string;
+    panelOpen: boolean;
+    preview: boolean;
   } {
     const char = { x: Math.round(this.charTx), y: Math.round(this.charTy) };
     return {
@@ -4789,6 +4860,12 @@ export class IsoScene {
       standable: tileIsStandable(char.x, char.y),
       char,
       moveArmed: this.moveCommandArmed,
+      vanOverlap: this.parkedVanOverlaps(char.x, char.y),
+      doorCooldown: this.doorCooldown,
+      pendingJacEnter: this.pendingJacEnter,
+      walkGoal: this.canvasEl?.dataset.walkGoal ?? '',
+      panelOpen: !!this.events.buildingPanel?.isOpen(),
+      preview: !!this.events.buildingPanel?.isPreview?.(),
     };
   }
 

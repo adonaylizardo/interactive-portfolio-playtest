@@ -67,6 +67,7 @@ async function main(): Promise<void> {
       joystick.setHidden(open || panel.isPreviewExpanded());
       if (panel.isPreviewExpanded()) checklist.setCollapsed(true);
       scene?.applyCameraFromUi();
+      if (!panel.isOpen()) scene?.onBuildingPanelClosed();
     },
     () => scene.leaveInteriorNow(),
   );
@@ -137,6 +138,8 @@ async function main(): Promise<void> {
     },
     onUnreachable: () => showToast(t('toast.unreachable')),
     onGetOutToEnter: () => showToast(t('toast.getOutToEnter')),
+    onWalkingToVan: () => showToast(t('toast.walkingToVan'), 8000),
+    onSeatedInJac: () => hideToast(),
     buildingPanel: {
       isOpen: () => panel.isOpen(),
       openTitle: () => panel.openTitle(),
