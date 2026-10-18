@@ -173,6 +173,15 @@ body.is-canvas-dragging * {
   pointer-events: auto;
 }
 
+#ui-root > .building-panel.building-panel--preview {
+  z-index: 40;
+}
+
+#ui-root > .building-panel.building-panel--preview .building-panel__sheet {
+  pointer-events: auto;
+  z-index: 41;
+}
+
 /* The room sheet / Salir own the chrome; the tutorial must not steal exit-mat taps.
    Case preview stays on the map and keeps the v2 extras (checklist, minimap, lang). */
 #ui-root:has(> .building-panel--open:not(.building-panel--preview)) > .checklist {
@@ -1248,12 +1257,15 @@ body[data-layout='panel'] .checklist {
   -webkit-tap-highlight-color: transparent;
 }
 
-.building-panel--preview .building-panel__exit,
 .building-panel--preview .building-panel__close,
 .building-panel--preview .building-panel__drag,
 .building-panel--preview .building-panel__title,
 .building-panel--preview .worked-with,
 .building-panel--preview .about {
+  display: none;
+}
+
+.building-panel--preview .building-panel__exit {
   display: none;
 }
 
@@ -1263,6 +1275,12 @@ body[data-layout='panel'] .checklist {
 
 .building-panel--preview.building-panel--open .building-panel__sheet {
   pointer-events: auto;
+  /* Sliding the card moves × / Salir under the finger. Snap it in. */
+  transition: none;
+}
+
+.building-panel--preview .building-panel__sheet {
+  transition: none;
 }
 
 .building-panel--preview .building-panel__backdrop {
@@ -1349,6 +1367,24 @@ body[data-layout='panel'] .checklist {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.case-preview__salir,
+.case-read__salir {
+  flex-shrink: 0;
+  min-width: 52px;
+  height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #edeef0;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;

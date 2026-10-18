@@ -1,0 +1,1133 @@
+{
+  "base": "http://127.0.0.1:4303/interactive-portfolio-playtest/preview/",
+  "hash": "index-MZISo_Ua.js",
+  "startedAt": "2026-10-18T12:56:46.080Z",
+  "finishedAt": "2026-10-18T13:50:26.882Z",
+  "widths": {
+    "phone-390": {
+      "doors": [
+        {
+          "name": "estudio",
+          "ok": true,
+          "ms": 21164,
+          "cx": 26.691414036094866,
+          "cy": 33.59900547948278,
+          "stall": 0,
+          "why": "",
+          "panel": "Estudio",
+          "interior": true,
+          "preview": false
+        },
+        {
+          "name": "volaris",
+          "ok": true,
+          "ms": 10139,
+          "cx": 34.015229444525744,
+          "cy": 35.75942297721789,
+          "stall": 0,
+          "why": "",
+          "panel": "volaris",
+          "interior": false,
+          "preview": true
+        },
+        {
+          "name": "bain",
+          "ok": true,
+          "ms": 2375,
+          "cx": 36.82221159334757,
+          "cy": 29.12860187294744,
+          "stall": 0,
+          "why": "",
+          "panel": "bain",
+          "interior": false,
+          "preview": true
+        },
+        {
+          "name": "mentoria",
+          "ok": true,
+          "ms": 701,
+          "cx": 32.22119293195218,
+          "cy": 29.049658418910735,
+          "stall": 0,
+          "why": "",
+          "panel": "mentoria",
+          "interior": false,
+          "preview": true
+        },
+        {
+          "name": "finoa",
+          "ok": true,
+          "ms": 2500,
+          "cx": 27.083212548853503,
+          "cy": 24.19914406186098,
+          "stall": 0,
+          "why": "",
+          "panel": "finoa",
+          "interior": false,
+          "preview": true
+        },
+        {
+          "name": "pg",
+          "ok": true,
+          "ms": 1050,
+          "cx": 27.024026737056495,
+          "cy": 28.771902588383348,
+          "stall": 0,
+          "why": "",
+          "panel": "pg",
+          "interior": false,
+          "preview": true
+        },
+        {
+          "name": "sambil",
+          "ok": true,
+          "ms": 30197,
+          "cx": 45.807669905461566,
+          "cy": 20.84955513225228,
+          "stall": 0,
+          "why": "",
+          "panel": "Sambil",
+          "interior": true,
+          "preview": false
+        },
+        {
+          "name": "catedral",
+          "ok": true,
+          "ms": 15370,
+          "cx": 17.035108052998773,
+          "cy": 20.84955513225228,
+          "stall": 0,
+          "why": "",
+          "panel": "Catedral",
+          "interior": true,
+          "preview": false
+        },
+        {
+          "name": "flor",
+          "ok": true,
+          "ms": 11227,
+          "cx": 48.772966168575174,
+          "cy": 41.93435895793079,
+          "stall": 0,
+          "why": "",
+          "panel": "Flor de Venezuela",
+          "interior": true,
+          "preview": false
+        }
+      ],
+      "retarget": [
+        {
+          "pair": "sambil\u2192finoa",
+          "rep": 1,
+          "ok": true,
+          "ms": 5881,
+          "panel": "finoa",
+          "interior": false,
+          "cx": 27.147303785918247,
+          "cy": 23.247920602357514,
+          "why": ""
+        },
+        {
+          "pair": "sambil\u2192finoa",
+          "rep": 2,
+          "ok": true,
+          "ms": 249,
+          "panel": "finoa",
+          "interior": false,
+          "cx": 26.8872273535522,
+          "cy": 21.840168279015142,
+          "why": ""
+        },
+        {
+          "pair": "sambil\u2192finoa",
+          "rep": 3,
+          "ok": true,
+          "ms": 1,
+          "panel": "finoa",
+          "interior": false,
+          "cx": 27.633539651352756,
+          "cy": 21.926583475214954,
+          "why": ""
+        },
+        {
+          "pair": "sambil\u2192mentoria",
+          "rep": 1,
+          "ok": true,
+          "ms": 4973,
+          "panel": "mentoria",
+          "interior": false,
+          "cx": 29.79044377051457,
+          "cy": 28.845145027042552,
+          "why": ""
+        },
+        {
+          "pair": "sambil\u2192mentoria",
+          "rep": 2,
+          "ok": false,
+          "why": "to-tap-miss",
+          "mid": {
+            "driving": true,
+            "gear": "D",
+            "goal": {
+              "x": 46,
+              "y": 19,
+              "path": [
+                {
+                  "x": 31,
+                  "y": 29
+                },
+                {
+                  "x": 32,
+                  "y": 29
+                },
+                {
+                  "x": 33,
+                  "y": 29
+                },
+                {
+                  "x": 34,
+                  "y": 29
+                },
+                {
+                  "x": 35,
+                  "y": 29
+                },
+                {
+                  "x": 36,
+                  "y": 29
+                },
+                {
+                  "x": 37,
+                  "y": 29
+                },
+                {
+                  "x": 38,
+                  "y": 29
+                },
+                {
+                  "x": 39,
+                  "y": 29
+                },
+                {
+                  "x": 40,
+                  "y": 29
+                },
+                {
+                  "x": 41,
+                  "y": 29
+                },
+                {
+                  "x": 42,
+                  "y": 29
+                },
+                {
+                  "x": 43,
+                  "y": 29
+                },
+                {
+                  "x": 44,
+                  "y": 29
+                },
+                {
+                  "x": 45,
+                  "y": 29
+                },
+                {
+                  "x": 46,
+                  "y": 29
+                },
+                {
+                  "x": 46,
+                  "y": 28
+                },
+                {
+                  "x": 46,
+                  "y": 27
+                },
+                {
+                  "x": 46,
+                  "y": 26
+                },
+                {
+                  "x": 46,
+                  "y": 25
+                },
+                {
+                  "x": 46,
+                  "y": 24
+                },
+                {
+                  "x": 46,
+                  "y": 23
+                },
+                {
+                  "x": 46,
+                  "y": 22
+                },
+                {
+                  "x": 46,
+                  "y": 21
+                },
+                {
+                  "x": 46,
+                  "y": 20
+                },
+                {
+                  "x": 46,
+                  "y": 19
+                }
+              ],
+              "heading": "se"
+            },
+            "mph": 0,
+            "vel": 0.1800192581359242,
+            "cx": 31.014707825944292,
+            "cy": 28.891249925976535,
+            "zeroMphT": 0.033400000000023286,
+            "noProgressT": 0,
+            "sitWhy": "sit=46,19 sitD=17.96 doorD=20.54 along=12.89 mph=0 pathN=2 follow spawn outside-sit-radius",
+            "interior": false,
+            "panel": "",
+            "preview": false,
+            "zoom": 0.32,
+            "accepts": 35
+          }
+        },
+        {
+          "pair": "sambil\u2192mentoria",
+          "rep": 3,
+          "ok": false,
+          "why": "to-tap-miss",
+          "mid": {
+            "driving": true,
+            "gear": "D",
+            "goal": {
+              "x": 46,
+              "y": 19,
+              "path": [
+                {
+                  "x": 32,
+                  "y": 29
+                },
+                {
+                  "x": 33,
+                  "y": 29
+                },
+                {
+                  "x": 34,
+                  "y": 29
+                },
+                {
+                  "x": 35,
+                  "y": 29
+                },
+                {
+                  "x": 36,
+                  "y": 29
+                },
+                {
+                  "x": 37,
+                  "y": 29
+                },
+                {
+                  "x": 38,
+                  "y": 29
+                },
+                {
+                  "x": 39,
+                  "y": 29
+                },
+                {
+                  "x": 40,
+                  "y": 29
+                },
+                {
+                  "x": 41,
+                  "y": 29
+                },
+                {
+                  "x": 42,
+                  "y": 29
+                },
+                {
+                  "x": 43,
+                  "y": 29
+                },
+                {
+                  "x": 44,
+                  "y": 29
+                },
+                {
+                  "x": 45,
+                  "y": 29
+                },
+                {
+                  "x": 46,
+                  "y": 29
+                },
+                {
+                  "x": 46,
+                  "y": 28
+                },
+                {
+                  "x": 46,
+                  "y": 27
+                },
+                {
+                  "x": 46,
+                  "y": 26
+                },
+                {
+                  "x": 46,
+                  "y": 25
+                },
+                {
+                  "x": 46,
+                  "y": 24
+                },
+                {
+                  "x": 46,
+                  "y": 23
+                },
+                {
+                  "x": 46,
+                  "y": 22
+                },
+                {
+                  "x": 46,
+                  "y": 21
+                },
+                {
+                  "x": 46,
+                  "y": 20
+                },
+                {
+                  "x": 46,
+                  "y": 19
+                }
+              ],
+              "heading": "se"
+            },
+            "mph": 0,
+            "vel": 0.24029857538623067,
+            "cx": 31.9215857089604,
+            "cy": 28.891249925976535,
+            "zeroMphT": 0.23339999999999422,
+            "noProgressT": 0,
+            "sitWhy": "sit=46,19 sitD=17.21 doorD=19.84 along=12.89 mph=0 pathN=2 follow spawn outside-sit-radius",
+            "interior": false,
+            "panel": "",
+            "preview": false,
+            "zoom": 0.32,
+            "accepts": 37
+          }
+        },
+        {
+          "pair": "flor\u2192volaris",
+          "rep": 1,
+          "ok": true,
+          "ms": 3527,
+          "panel": "volaris",
+          "interior": false,
+          "cx": 37.59652918712895,
+          "cy": 36.09042220790134,
+          "why": ""
+        },
+        {
+          "pair": "flor\u2192volaris",
+          "rep": 2,
+          "ok": false,
+          "why": "reboard-failed"
+        },
+        {
+          "pair": "flor\u2192volaris",
+          "rep": 3,
+          "ok": false,
+          "why": "reboard-failed"
+        },
+        {
+          "pair": "estudio\u2192pg",
+          "rep": 1,
+          "ok": false,
+          "why": "reboard-failed"
+        },
+        {
+          "pair": "estudio\u2192pg",
+          "rep": 2,
+          "ok": false,
+          "why": "reboard-failed"
+        },
+        {
+          "pair": "estudio\u2192pg",
+          "rep": 3,
+          "ok": false,
+          "why": "reboard-failed"
+        }
+      ],
+      "ground": [],
+      "ok": false
+    },
+    "land-844": {
+      "doors": [
+        {
+          "name": "estudio",
+          "ok": true,
+          "ms": 6835,
+          "cx": 29.747616145072463,
+          "cy": 38.8166376233899,
+          "stall": 0,
+          "why": "",
+          "panel": "Estudio",
+          "interior": true,
+          "preview": false
+        },
+        {
+          "name": "volaris",
+          "ok": true,
+          "ms": 8921,
+          "cx": 37.800522166939565,
+          "cy": 40.853975017914586,
+          "stall": 0,
+          "why": "",
+          "panel": "volaris",
+          "interior": false,
+          "preview": true
+        },
+        {
+          "name": "bain",
+          "ok": true,
+          "ms": 16884,
+          "cx": 37.341446863343144,
+          "cy": 30.710350448086967,
+          "stall": 0,
+          "why": "",
+          "panel": "bain",
+          "interior": false,
+          "preview": true
+        },
+        {
+          "name": "mentoria",
+          "ok": true,
+          "ms": 2049,
+          "cx": 32.229935876828186,
+          "cy": 29.08083017714675,
+          "stall": 0,
+          "why": "",
+          "panel": "mentoria",
+          "interior": false,
+          "preview": true
+        },
+        {
+          "name": "finoa",
+          "ok": true,
+          "ms": 1375,
+          "cx": 27.124629897227294,
+          "cy": 23.28496646492849,
+          "stall": 0,
+          "why": "",
+          "panel": "finoa",
+          "interior": false,
+          "preview": true
+        },
+        {
+          "name": "pg",
+          "ok": true,
+          "ms": 1869,
+          "cx": 27.027243348562816,
+          "cy": 28.79213504789287,
+          "stall": 619,
+          "why": "",
+          "panel": "pg",
+          "interior": false,
+          "preview": true
+        },
+        {
+          "name": "sambil",
+          "ok": true,
+          "ms": 26792,
+          "cx": 45.85975392577492,
+          "cy": 20.662268518420497,
+          "stall": 0,
+          "why": "",
+          "panel": "Sambil",
+          "interior": true,
+          "preview": false
+        },
+        {
+          "name": "catedral",
+          "ok": true,
+          "ms": 9874,
+          "cx": 17.328086856101663,
+          "cy": 20.706143540593246,
+          "stall": 0,
+          "why": "",
+          "panel": "Catedral",
+          "interior": true,
+          "preview": false
+        },
+        {
+          "name": "flor",
+          "ok": true,
+          "ms": 47978,
+          "cx": 48.74249522050999,
+          "cy": 41.91295660487698,
+          "stall": 0,
+          "why": "",
+          "panel": "Flor de Venezuela",
+          "interior": true,
+          "preview": false
+        }
+      ],
+      "retarget": [
+        {
+          "pair": "sambil\u2192finoa",
+          "rep": 1,
+          "ok": false,
+          "ms": 7388,
+          "panel": "Estudio",
+          "interior": true,
+          "cx": 30.2211059795745,
+          "cy": 40.820931070090474,
+          "why": "hit=false driving=false"
+        },
+        {
+          "pair": "sambil\u2192finoa",
+          "rep": 2,
+          "ok": true,
+          "ms": 20719,
+          "panel": "finoa",
+          "interior": false,
+          "cx": 27.28686205391038,
+          "cy": 27.7261940962902,
+          "why": ""
+        },
+        {
+          "pair": "sambil\u2192finoa",
+          "rep": 3,
+          "ok": true,
+          "ms": 497,
+          "panel": "finoa",
+          "interior": false,
+          "cx": 27.117168419186324,
+          "cy": 24.195324743667538,
+          "why": ""
+        },
+        {
+          "pair": "sambil\u2192mentoria",
+          "rep": 1,
+          "ok": true,
+          "ms": 7287,
+          "panel": "mentoria",
+          "interior": false,
+          "cx": 27.86157107543415,
+          "cy": 28.6919781324736,
+          "why": ""
+        },
+        {
+          "pair": "sambil\u2192mentoria",
+          "rep": 2,
+          "ok": true,
+          "ms": 861,
+          "panel": "mentoria",
+          "interior": false,
+          "cx": 29.76714872511725,
+          "cy": 28.900365395339715,
+          "why": ""
+        },
+        {
+          "pair": "sambil\u2192mentoria",
+          "rep": 3,
+          "ok": false,
+          "why": "to-tap-miss",
+          "mid": {
+            "driving": true,
+            "gear": "D",
+            "goal": {
+              "x": 46,
+              "y": 19,
+              "path": [
+                {
+                  "x": 31,
+                  "y": 29
+                },
+                {
+                  "x": 32,
+                  "y": 29
+                },
+                {
+                  "x": 33,
+                  "y": 29
+                },
+                {
+                  "x": 34,
+                  "y": 29
+                },
+                {
+                  "x": 35,
+                  "y": 29
+                },
+                {
+                  "x": 36,
+                  "y": 29
+                },
+                {
+                  "x": 37,
+                  "y": 29
+                },
+                {
+                  "x": 38,
+                  "y": 29
+                },
+                {
+                  "x": 39,
+                  "y": 29
+                },
+                {
+                  "x": 40,
+                  "y": 29
+                },
+                {
+                  "x": 41,
+                  "y": 29
+                },
+                {
+                  "x": 42,
+                  "y": 29
+                },
+                {
+                  "x": 43,
+                  "y": 29
+                },
+                {
+                  "x": 44,
+                  "y": 29
+                },
+                {
+                  "x": 45,
+                  "y": 29
+                },
+                {
+                  "x": 46,
+                  "y": 29
+                },
+                {
+                  "x": 46,
+                  "y": 28
+                },
+                {
+                  "x": 46,
+                  "y": 27
+                },
+                {
+                  "x": 46,
+                  "y": 26
+                },
+                {
+                  "x": 46,
+                  "y": 25
+                },
+                {
+                  "x": 46,
+                  "y": 24
+                },
+                {
+                  "x": 46,
+                  "y": 23
+                },
+                {
+                  "x": 46,
+                  "y": 22
+                },
+                {
+                  "x": 46,
+                  "y": 21
+                },
+                {
+                  "x": 46,
+                  "y": 20
+                },
+                {
+                  "x": 46,
+                  "y": 19
+                }
+              ],
+              "heading": "se"
+            },
+            "mph": 0,
+            "vel": 0.2469314635575299,
+            "cx": 31.08800237814114,
+            "cy": 28.92967840511029,
+            "zeroMphT": 0.10010000000000582,
+            "noProgressT": 0,
+            "sitWhy": "sit=46,19 sitD=17.92 doorD=20.50 along=12.93 mph=0 pathN=2 follow spawn outside-sit-radius",
+            "interior": false,
+            "panel": "",
+            "preview": false,
+            "zoom": 0.32,
+            "accepts": 39
+          }
+        },
+        {
+          "pair": "flor\u2192volaris",
+          "rep": 1,
+          "ok": true,
+          "ms": 5446,
+          "panel": "volaris",
+          "interior": false,
+          "cx": 37.63445250432796,
+          "cy": 36.06306491289641,
+          "why": ""
+        },
+        {
+          "pair": "flor\u2192volaris",
+          "rep": 2,
+          "ok": false,
+          "why": "reboard-failed"
+        },
+        {
+          "pair": "flor\u2192volaris",
+          "rep": 3,
+          "ok": false,
+          "why": "reboard-failed"
+        },
+        {
+          "pair": "estudio\u2192pg",
+          "rep": 1,
+          "ok": false,
+          "why": "reboard-failed"
+        },
+        {
+          "pair": "estudio\u2192pg",
+          "rep": 2,
+          "ok": false,
+          "why": "reboard-failed"
+        },
+        {
+          "pair": "estudio\u2192pg",
+          "rep": 3,
+          "ok": false,
+          "why": "reboard-failed"
+        }
+      ],
+      "ground": [],
+      "ok": false
+    },
+    "desk-1280": {
+      "doors": [
+        {
+          "name": "estudio",
+          "ok": true,
+          "ms": 5649,
+          "cx": 29.842309224034647,
+          "cy": 38.82849048588021,
+          "stall": 0,
+          "why": "",
+          "panel": "Estudio",
+          "interior": true,
+          "preview": false
+        },
+        {
+          "name": "volaris",
+          "ok": true,
+          "ms": 3786,
+          "cx": 38.6637641041009,
+          "cy": 39.41417359702665,
+          "stall": 0,
+          "why": "",
+          "panel": "volaris",
+          "interior": false,
+          "preview": true
+        },
+        {
+          "name": "bain",
+          "ok": true,
+          "ms": 4469,
+          "cx": 37.697423339470674,
+          "cy": 28.366788952683898,
+          "stall": 0,
+          "why": "",
+          "panel": "bain",
+          "interior": false,
+          "preview": true
+        },
+        {
+          "name": "mentoria",
+          "ok": true,
+          "ms": 1741,
+          "cx": 33.26558826695257,
+          "cy": 28.32512228601723,
+          "stall": 0,
+          "why": "",
+          "panel": "mentoria",
+          "interior": false,
+          "preview": true
+        },
+        {
+          "name": "finoa",
+          "ok": true,
+          "ms": 1757,
+          "cx": 26.720134545679166,
+          "cy": 23.79031456859636,
+          "stall": 0,
+          "why": "",
+          "panel": "finoa",
+          "interior": false,
+          "preview": true
+        },
+        {
+          "name": "pg",
+          "ok": true,
+          "ms": 1385,
+          "cx": 26.287338360279655,
+          "cy": 29.483155089035005,
+          "stall": 0,
+          "why": "",
+          "panel": "pg",
+          "interior": false,
+          "preview": true
+        },
+        {
+          "name": "sambil",
+          "ok": true,
+          "ms": 6826,
+          "cx": 46.681958050963615,
+          "cy": 19.50810164995372,
+          "stall": 0,
+          "why": "",
+          "panel": "Sambil",
+          "interior": true,
+          "preview": false
+        },
+        {
+          "name": "catedral",
+          "ok": true,
+          "ms": 7195,
+          "cx": 17.524587751419812,
+          "cy": 19.787093075424007,
+          "stall": 0,
+          "why": "",
+          "panel": "Catedral",
+          "interior": true,
+          "preview": false
+        },
+        {
+          "name": "flor",
+          "ok": true,
+          "ms": 11840,
+          "cx": 48.79083889379547,
+          "cy": 42.57073530759604,
+          "stall": 0,
+          "why": "",
+          "panel": "Flor de Venezuela",
+          "interior": true,
+          "preview": false
+        }
+      ],
+      "retarget": [
+        {
+          "pair": "sambil\u2192finoa",
+          "rep": 1,
+          "ok": true,
+          "ms": 7647,
+          "panel": "finoa",
+          "interior": false,
+          "cx": 28.183363418660154,
+          "cy": 26.157610735975883,
+          "why": ""
+        },
+        {
+          "pair": "sambil\u2192finoa",
+          "rep": 2,
+          "ok": true,
+          "ms": 997,
+          "panel": "finoa",
+          "interior": false,
+          "cx": 26.72006888458278,
+          "cy": 23.79341644892866,
+          "why": ""
+        },
+        {
+          "pair": "sambil\u2192finoa",
+          "rep": 3,
+          "ok": true,
+          "ms": 1749,
+          "panel": "finoa",
+          "interior": false,
+          "cx": 26.36871673817141,
+          "cy": 22.559964435248784,
+          "why": ""
+        },
+        {
+          "pair": "sambil\u2192mentoria",
+          "rep": 1,
+          "ok": true,
+          "ms": 3538,
+          "panel": "mentoria",
+          "interior": false,
+          "cx": 31.25662246666667,
+          "cy": 29.457552347090484,
+          "why": ""
+        },
+        {
+          "pair": "sambil\u2192mentoria",
+          "rep": 2,
+          "ok": true,
+          "ms": 244,
+          "panel": "mentoria",
+          "interior": false,
+          "cx": 31.450569198712948,
+          "cy": 28.680438286409153,
+          "why": ""
+        },
+        {
+          "pair": "sambil\u2192mentoria",
+          "rep": 3,
+          "ok": true,
+          "ms": 1237,
+          "panel": "mentoria",
+          "interior": false,
+          "cx": 31.81216299485363,
+          "cy": 29.059733624348183,
+          "why": ""
+        },
+        {
+          "pair": "flor\u2192volaris",
+          "rep": 1,
+          "ok": true,
+          "ms": 4210,
+          "panel": "volaris",
+          "interior": false,
+          "cx": 37.714236946869406,
+          "cy": 36.81830152032587,
+          "why": ""
+        },
+        {
+          "pair": "flor\u2192volaris",
+          "rep": 2,
+          "ok": true,
+          "ms": 1542,
+          "panel": "volaris",
+          "interior": false,
+          "cx": 37.56518387626881,
+          "cy": 39.59562303340872,
+          "why": ""
+        },
+        {
+          "pair": "flor\u2192volaris",
+          "rep": 3,
+          "ok": true,
+          "ms": 1300,
+          "panel": "volaris",
+          "interior": false,
+          "cx": 38.7282621931323,
+          "cy": 39.95055988030549,
+          "why": ""
+        },
+        {
+          "pair": "estudio\u2192pg",
+          "rep": 1,
+          "ok": true,
+          "ms": 6977,
+          "panel": "pg",
+          "interior": false,
+          "cx": 27.138610290948396,
+          "cy": 31.195385492917005,
+          "why": ""
+        },
+        {
+          "pair": "estudio\u2192pg",
+          "rep": 2,
+          "ok": true,
+          "ms": 431,
+          "panel": "pg",
+          "interior": false,
+          "cx": 26.6750317526961,
+          "cy": 31.765415216166613,
+          "why": ""
+        },
+        {
+          "pair": "estudio\u2192pg",
+          "rep": 3,
+          "ok": true,
+          "ms": 3420,
+          "panel": "pg",
+          "interior": false,
+          "cx": 27.012500380357622,
+          "cy": 30.869544706530586,
+          "why": ""
+        }
+      ],
+      "ground": [
+        {
+          "gx": 46,
+          "gy": 20,
+          "ok": true,
+          "ms": 5514,
+          "dist": 0.34582787313627017,
+          "ratio": 0.9842581011781307,
+          "plannedRatio": 1.365245745493681,
+          "why": ""
+        },
+        {
+          "gx": 24,
+          "gy": 27,
+          "ok": true,
+          "ms": 10355,
+          "dist": 0.8407094458976078,
+          "ratio": 0.9663509399186012,
+          "plannedRatio": 1.2619238774114152,
+          "why": ""
+        },
+        {
+          "gx": 37,
+          "gy": 26,
+          "ok": true,
+          "ms": 3023,
+          "dist": 0.31131781971427624,
+          "ratio": 0.9751089827355669,
+          "plannedRatio": 1.0049834253167198,
+          "why": ""
+        },
+        {
+          "gx": 44,
+          "gy": 36,
+          "ok": true,
+          "ms": 2845,
+          "dist": 0.31531292169847547,
+          "ratio": 0.9755026956367238,
+          "plannedRatio": 1.402500937265067,
+          "why": ""
+        },
+        {
+          "gx": 18,
+          "gy": 36,
+          "ok": true,
+          "ms": 5426,
+          "dist": 0.3057171117726951,
+          "ratio": 0.9888996181252062,
+          "plannedRatio": 1.0017849715083256,
+          "why": ""
+        }
+      ],
+      "ok": true
+    }
+  },
+  "errors": [
+    "phone-390: retarget sambil\u2192mentoria #2 to tap miss",
+    "phone-390: retarget sambil\u2192mentoria #3 to tap miss",
+    "phone-390: retarget flor\u2192volaris #2 reboard failed",
+    "phone-390: retarget flor\u2192volaris #3 reboard failed",
+    "phone-390: retarget estudio\u2192pg #1 reboard failed",
+    "phone-390: retarget estudio\u2192pg #2 reboard failed",
+    "phone-390: retarget estudio\u2192pg #3 reboard failed",
+    "phone-390: ground reboard failed",
+    "land-844: retarget sambil\u2192finoa #1 miss",
+    "land-844: retarget sambil\u2192mentoria #3 to tap miss",
+    "land-844: retarget flor\u2192volaris #2 reboard failed",
+    "land-844: retarget flor\u2192volaris #3 reboard failed",
+    "land-844: retarget estudio\u2192pg #1 reboard failed",
+    "land-844: retarget estudio\u2192pg #2 reboard failed",
+    "land-844: retarget estudio\u2192pg #3 reboard failed",
+    "land-844: ground reboard failed"
+  ]
+}

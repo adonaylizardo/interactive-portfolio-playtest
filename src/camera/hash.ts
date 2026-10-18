@@ -15,6 +15,7 @@ export type CameraView = {
 export type HistoryNavigationState = {
   playtest?: boolean;
   interior?: string | null;
+  preview?: string | null;
   outdoorCam?: { x: number; y: number; zoom: number };
 };
 
@@ -103,10 +104,12 @@ function flushHash(view: CameraView, replace: boolean): void {
   if (view.interiorId !== undefined) lastInteriorId = view.interiorId;
   const next = buildHash({ ...view, interiorId: interiorId || null });
   if (location.hash === next) return;
+  const prev = history.state as HistoryNavigationState | null;
   const state: HistoryNavigationState = {
     playtest: true,
     interior: interiorId || null,
-    outdoorCam: (history.state as HistoryNavigationState | null)?.outdoorCam,
+    preview: prev?.preview ?? null,
+    outdoorCam: prev?.outdoorCam,
   };
   // Van / player / camera pose always replaceState. A push here is what made
   // Back after reload teleport to the spawn jx/jy entry.

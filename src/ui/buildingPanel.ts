@@ -146,6 +146,8 @@ export class BuildingPanel {
   /** Press on Salir: leave only on lift, and only if the finger stayed within ~10 px. */
   private exitPress: { x: number; y: number; drift: number } | null = null;
   private exitFromPointer = false;
+  /** Case preview pushed a history entry so Back dismisses the card. */
+  private previewHistoryOpen = false;
 
   constructor(
     container: HTMLElement,
@@ -172,6 +174,7 @@ export class BuildingPanel {
               <p class="case-preview__kicker">CASE</p>
               <h2 class="case-preview__title"></h2>
             </div>
+            <button type="button" class="case-preview__salir" data-exit></button>
             <button type="button" class="case-preview__x" data-close aria-label="">${iconSvg('close')}</button>
           </div>
           <p class="case-preview__subtitle"></p>
@@ -187,6 +190,7 @@ export class BuildingPanel {
         </div>
         <div class="case-read__bar" data-read-bar hidden>
           <p class="case-read__bar-title"></p>
+          <button type="button" class="case-read__salir" data-exit></button>
           <button type="button" class="case-read__x" data-close aria-label="">${iconSvg('close')}</button>
         </div>
         <div class="case-read" data-read-view hidden>
@@ -246,7 +250,7 @@ export class BuildingPanel {
       }
     });
 
-    const exitBtn = this.el.querySelector('[data-exit]') as HTMLButtonElement;
+    const exitBtns = [...this.el.querySelectorAll('[data-exit]')] as HTMLButtonElement[];
     // Leave on lift, not press: a sheet drag that starts on Salir must not exit.
     // Slop 10 px. Touchend/pointerup (not click) so iOS does not wait ~300 ms.
     const point = (e: Event): { x: number; y: number } | null => {
@@ -295,21 +299,31 @@ export class BuildingPanel {
       this.exitPress = null;
       this.exitFromPointer = true;
     };
-    exitBtn.addEventListener('touchstart', onExitDown, { passive: false });
-    exitBtn.addEventListener('touchmove', onExitMove, { passive: false });
-    exitBtn.addEventListener('touchend', onExitUp, { passive: false });
-    exitBtn.addEventListener('touchcancel', onExitCancel, { passive: false });
-    exitBtn.addEventListener('pointerdown', onExitDown);
-    exitBtn.addEventListener('pointermove', onExitMove);
-    exitBtn.addEventListener('pointerup', onExitUp);
-    exitBtn.addEventListener('pointercancel', onExitCancel);
-    exitBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (this.exitFromPointer) return;
-      this.salir();
-    });
+    for (const exitBtn of exitBtns) {
+      exitBtn.addEventListener('touchstart', onExitDown, { passive: false });
+      exitBtn.addEventListener('touchmove', onExitMove, { passive: false });
+      exitBtn.addEventListener('touchend', onExitUp, { passive: false });
+      exitBtn.addEventListener('touchcancel', onExitCancel, { passive: false });
+      exitBtn.addEventListener('pointerdown', onExitDown);
+      exitBtn.addEventListener('pointermove', onExitMove);
+      exitBtn.addEventListener('pointerup', onExitUp);
+      exitBtn.addEventListener('pointercancel', onExitCancel);
+      exitBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (this.mode === 'preview') {
+          this.closePreview();
+          return;
+        }
+        if (this.exitFromPointer) return;
+        this.salir();
+      });
+    }
     this.el.querySelector('[data-backdrop]')!.addEventListener('click', () => {
+      if (this.mode === 'preview') {
+        this.closePreview();
+        return;
+      }
       if (this.isMobile() && this.mode === 'interior') this.setPeek(true);
     });
     this.sheet.addEventListener('scroll', () => this.syncScrolled(), { passive: true });
@@ -376,12 +390,9 @@ export class BuildingPanel {
     this.titleEl.hidden = preview;
   }
 
+  /** × / Salir / Back / Escape all leave the case card in one tap. */
   private closePreview(): void {
     if (this.mode !== 'preview') return;
-    if (!this.peekOnly || this.el.classList.contains('building-panel--expanded')) {
-      this.setPeek(true);
-      return;
-    }
     this.hide();
   }
 
@@ -451,9 +462,22 @@ export class BuildingPanel {
     this.renderAbout();
     this.el.classList.add('building-panel--open');
     this.syncPeekClass();
+    this.pushPreviewHistory(interiorId);
     this.onVisibilityChange();
     studio.playClick();
     studio.playCaseVoice(interiorId);
+  }
+
+  private pushPreviewHistory(interiorId: string): void {
+    const prev =
+      (history.state as { playtest?: boolean; preview?: string | null; outdoorCam?: unknown } | null) ?? {};
+    const next = { playtest: true, preview: interiorId, outdoorCam: prev.outdoorCam, interior: null };
+    if (!this.previewHistoryOpen) {
+      history.pushState(next, '', location.hash);
+      this.previewHistoryOpen = true;
+    } else {
+      history.replaceState({ ...prev, ...next }, '', location.hash);
+    }
   }
 
   /** QA: overlay open while still on the map (dismiss consume test). */
@@ -568,7 +592,7 @@ export class BuildingPanel {
     this.renderWorkedWith();
   }
 
-  hide(opts?: { snap?: boolean; silent?: boolean }): void {
+  hide(opts?: { snap?: boolean; silent?: boolean; fromHistory?: boolean }): void {
     // Snap out of the hit tree on this frame (same as the mat). A transforming sheet still
     // intercepts iOS taps even with pointer-events:none, so Salir waited ~250 ms for map input.
     this.el.classList.add('building-panel--snap');
@@ -589,6 +613,15 @@ export class BuildingPanel {
     if (this.readEl) this.readEl.hidden = true;
     if (this.readBar) this.readBar.hidden = true;
     this.el.classList.remove('building-panel--snap');
+    if (this.previewHistoryOpen) {
+      this.previewHistoryOpen = false;
+      if (!opts?.fromHistory) {
+        const prev = (history.state as { preview?: string | null } | null) ?? {};
+        // Drop the preview flag in place. history.back() after a chain of
+        // interiors popped into an old room and blocked re-boarding.
+        history.replaceState({ ...prev, preview: null }, '', location.hash);
+      }
+    }
     if (!opts?.silent) this.onVisibilityChange();
     if (opts?.snap) requestAnimationFrame(() => this.releaseCaseDom());
   }
@@ -600,8 +633,12 @@ export class BuildingPanel {
     this.caseEl.querySelector('.case__version--short')?.replaceChildren();
   }
 
-  /** Same leave as the mat: `onSalir` → `leaveInteriorNow()`. */
+  /** Same leave as the mat: `onSalir` → `leaveInteriorNow()`. Preview: hide the card. */
   salir(): void {
+    if (this.mode === 'preview') {
+      this.hide();
+      return;
+    }
     if (this.leaveArmed) return;
     this.leaveArmed = true;
     this.onSalir();
@@ -696,8 +733,9 @@ export class BuildingPanel {
   }
 
   private applyI18n(): void {
-    const exit = this.el.querySelector('[data-exit]') as HTMLElement | null;
-    if (exit) exit.textContent = t('panel.exit');
+    this.el.querySelectorAll('[data-exit]').forEach((el) => {
+      el.textContent = t('panel.exit');
+    });
     this.el.querySelectorAll('[data-close]').forEach((el) => {
       el.setAttribute('aria-label', t('panel.close'));
     });

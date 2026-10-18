@@ -214,6 +214,8 @@ export type BuildingPanelBridge = {
   openTitle: () => string;
   dismiss: () => void;
   isPreview?: () => boolean;
+  dismissFromHistory?: () => void;
+  containsSheetPoint?: (clientX: number, clientY: number) => boolean;
   layoutInsets?: () => { left: number; top: number; right: number; bottom: number };
   consumeInteriorCanvasTap?: (clientX: number, clientY: number) => boolean;
   expandInteriorSheetForQa?: () => void;
@@ -614,7 +616,12 @@ export class IsoScene {
     });
 
     bindPopstate((ev) => {
-      this.applyHashNavigation((ev.state as HistoryNavigationState | null) ?? null);
+      const state = (ev.state as HistoryNavigationState | null) ?? null;
+      if (!state?.preview && this.events.buildingPanel?.isPreview?.()) {
+        if (this.events.buildingPanel.dismissFromHistory) this.events.buildingPanel.dismissFromHistory();
+        else this.events.buildingPanel.dismiss();
+      }
+      this.applyHashNavigation(state);
     });
 
     if (bootInterior) {
@@ -747,7 +754,7 @@ export class IsoScene {
     g.eventMode = 'static';
     g.zIndex = -1000;
     g.on('pointertap', (e) => {
-      if (this.shouldBlockTap()) return;
+      if (this.shouldBlockTap(this.pointerTapSlop(e))) return;
       this.pixiTapGestureSerial = this.pointerGestureSerial;
       const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
       if (this.interiorActive || this.jac?.driving) {
@@ -1096,7 +1103,7 @@ export class IsoScene {
         }
       });
       g.on('pointertap', (e) => {
-        if (this.shouldBlockTap()) return;
+        if (this.shouldBlockTap(this.pointerTapSlop(e))) return;
         e.stopPropagation();
         this.pixiTapGestureSerial = this.pointerGestureSerial;
         if (this.jac?.driving) {
@@ -1806,6 +1813,18 @@ export class IsoScene {
       this.clearWalkPreview();
       return;
     }
+    if (!this.interiorActive && this.events.buildingPanel?.isPreview?.()) {
+      const client = this.canvasLocalToClient(sx, sy);
+      // Software-GL can deliver the click to the canvas even when the peek
+      // card is on top. A hit on the sheet is a close, not "same building".
+      if (this.events.buildingPanel.containsSheetPoint?.(client.x, client.y)) {
+        this.events.buildingPanel.dismiss();
+        return;
+      }
+      const doorHit = this.pickBuildingDoorAtScreen(sx, sy);
+      const buildingHit = doorHit ?? this.pickBuildingAtScreen(sx, sy);
+      if (!this.prepareMapTap(buildingHit)) return;
+    }
     if (this.interiorActive) {
       const { x: iwx, y: iwy } = this.screenToWorld(sx, sy);
       if (
@@ -1825,13 +1844,13 @@ export class IsoScene {
     if (this.jac?.driving) {
       if (this.jac.isExiting()) return;
       if (performance.now() < this.suppressDriveTapUntil) return;
-      if (this.pickJacAtScreen(sx, sy)) return;
       const doorHit = this.pickBuildingDoorAtScreen(sx, sy);
       const buildingHit = doorHit ?? this.pickBuildingAtScreen(sx, sy);
       if (buildingHit?.door && buildingHit.panelTitle) {
         this.requestDriveToEnter({ panelTitle: buildingHit.panelTitle, door: buildingHit.door });
         return;
       }
+      if (this.pickJacAtScreen(sx, sy)) return;
       const { x: wx, y: wy } = this.screenToWorld(sx, sy);
       const raw = worldToTile(wx, wy);
       if (raw && !this.jac.driveTileOk(raw.x, raw.y)) {
@@ -2003,13 +2022,13 @@ export class IsoScene {
   private requestDriveToScreen(sx: number, sy: number): void {
     if (!this.jac?.driving || this.jac.isExiting()) return;
     if (performance.now() < this.suppressDriveTapUntil) return;
-    if (this.pickJacAtScreen(sx, sy)) return;
     const doorHit = this.pickBuildingDoorAtScreen(sx, sy);
     const buildingHit = doorHit ?? this.pickBuildingAtScreen(sx, sy) ?? this.pickNearbyDriveDoor(sx, sy);
     if (buildingHit?.door && buildingHit.panelTitle) {
       this.requestDriveToEnter({ panelTitle: buildingHit.panelTitle, door: buildingHit.door });
       return;
     }
+    if (this.pickJacAtScreen(sx, sy)) return;
     this.events.stickCancel?.();
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
     const tile = worldToTile(wx, wy);
@@ -2751,6 +2770,13 @@ export class IsoScene {
     }
   }
 
+  /** Mouse / trackpad clicks may drift this far and still count. Touch uses 0 here; deferred tap has its own slop. */
+  private pointerTapSlop(e: { pointerType?: string; nativeEvent?: unknown }): number {
+    const native = e.nativeEvent as { pointerType?: string } | undefined;
+    const type = e.pointerType ?? native?.pointerType;
+    return type === 'touch' ? 0 : TAP_SLOP_PX;
+  }
+
   /** `panSlopPx`: a press that strayed no farther than this still taps, even if it nudged the camera. */
   private shouldBlockTap(panSlopPx = 0): boolean {
     return (
@@ -2851,11 +2877,14 @@ export class IsoScene {
     if (!tapStart) return;
     this.clearDeferredTap();
     if (this.pixiTapGestureSerial === this.pointerGestureSerial) return;
-    if (e.pointerType !== 'touch' && !this.interiorActive) return;
+    // Mouse used to skip this path and rely on Pixi pointertap. After boarding the
+    // camera is still damping, so down and up land on different display objects and
+    // pointertap never fires. Fall through here when Pixi did not claim the gesture.
 
     const hadMulti = this.hadMultiPointerGesture;
     const hadSecond = this.secondFingerArrived;
-    if (hadMulti || hadSecond || this.panMoved) return;
+    if (hadMulti || hadSecond) return;
+    if (this.panMoved && this.tapDriftPx > TAP_SLOP_PX) return;
 
     const dist = Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y);
     if (dist >= TAP_SLOP_PX) return;
@@ -2882,7 +2911,10 @@ export class IsoScene {
     // Always async so a Pixi pointertap dispatched by this same pointerup can claim the tap first.
     // Rooms have no pinch: fire on the next turn so a tap on the mat leaves without the 120 ms
     // map wait (that wait plus the sheet close was the ~650 ms iPhone exit).
-    const waitMs = this.interiorActive ? 0 : Math.max(0, this.firstPointerDownAt + 120 - performance.now());
+    const waitMs =
+      this.interiorActive || e.pointerType !== 'touch'
+        ? 0
+        : Math.max(0, this.firstPointerDownAt + 120 - performance.now());
     this.deferredTapTimer = setTimeout(fire, waitMs);
   }
 
@@ -3093,7 +3125,7 @@ export class IsoScene {
         const rect = canvas.getBoundingClientRect();
         const sx = t.clientX - rect.left;
         const sy = t.clientY - rect.top;
-        if (this.pickJacAtScreen(sx, sy)) {
+        if (this.pickJacAtScreen(sx, sy) && !this.pickBuildingDoorAtScreen(sx, sy)) {
           driveTap = null;
         }
       } else if (e.touches.length >= 2) {
@@ -3293,7 +3325,7 @@ export class IsoScene {
       if (this.pointers.size === 1 && this.lastPanPos && !this.pinchGestureActive && this.tapStart) {
         const dx = e.clientX - this.lastPanPos.x;
         const dy = e.clientY - this.lastPanPos.y;
-        const panThreshold = e.pointerType === 'touch' ? 14 : 4;
+        const panThreshold = e.pointerType === 'touch' ? 14 : TAP_SLOP_PX;
         const totalFromTap = Math.hypot(
           e.clientX - this.tapStart.x,
           e.clientY - this.tapStart.y,
@@ -3541,10 +3573,10 @@ export class IsoScene {
   private updateCameraFollow(): void {
     const f = this.follow;
     const driving = !!this.jac?.driving && !this.interiorActive;
-    if (driving) {
-      f.suspended = false;
-      f.engaged = true;
-    }
+    const vanMoving =
+      driving &&
+      !!this.jac &&
+      (this.jac.mph >= 0.4 || this.jac.drivePath.length > 0 || this.pendingDriveEnter != null);
     const t = this.followTargetWorld();
     const scope = this.interiorActive ? `room:${this.interiorDef?.id ?? ''}` : 'map';
     const jumped =
@@ -3569,7 +3601,7 @@ export class IsoScene {
     if (jumped || f.suspended) return;
     const moved = Math.hypot(stepX, stepY) > 1e-4;
     const walking = this.interiorActive ? this.interiorPath.length > 0 : this.path.length > 0;
-    if (moved || walking || driving) f.engaged = true;
+    if (moved || walking || vanMoving) f.engaged = true;
     if (!f.engaged) return;
 
     const dt = Math.min(0.1, this.app.ticker.deltaMS / 1000);
@@ -3589,7 +3621,7 @@ export class IsoScene {
       f.vx = 0;
       f.vy = 0;
     } else {
-      const smooth = driving ? FOLLOW_DRIVE_SMOOTH_S : FOLLOW_SMOOTH_S;
+      const smooth = vanMoving ? FOLLOW_DRIVE_SMOOTH_S : FOLLOW_SMOOTH_S;
       const sx = smoothDampToZero(ox, f.vx, smooth, dt);
       const sy = smoothDampToZero(oy, f.vy, smooth, dt);
       ox = sx.offset;
@@ -3610,7 +3642,7 @@ export class IsoScene {
     if (heldY) f.vy = 0;
     const camMoved = Math.hypot(this.cameraX - camBeforeX, this.cameraY - camBeforeY);
     const residual = Math.hypot(heldX ? 0 : ox, heldY ? 0 : oy);
-    if (!driving && !moved && !walking && camMoved < 0.05 && residual < 0.5) {
+    if (!vanMoving && !moved && !walking && camMoved < 0.05 && residual < 0.5) {
       f.engaged = false;
       f.vx = 0;
       f.vy = 0;
@@ -3645,8 +3677,8 @@ export class IsoScene {
         dy = 0;
       }
       if ((dx !== 0 || dy !== 0) && !this.pendingJacExit) this.pendingDriveEnter = null;
-      this.startCameraFollow();
       if (dx !== 0 || dy !== 0 || stickHeld || this.jac.drivePath.length > 0) {
+        this.startCameraFollow();
         if (dx !== 0 || dy !== 0) this.fireMoveCommand();
       }
       this.jac.update(this.app.ticker.deltaMS / 1000, { dx, dy, autoShift: true });
@@ -5092,6 +5124,7 @@ export class IsoScene {
 
   /** QA: pan so the van (when driving) or the walker and target door are both on screen. */
   frameBuildingDoorForQa(name: string): void {
+    this.suspendCameraFollow();
     const obj = objects.find((o) => o.type === 'building' && o.name === name);
     if (!obj?.door) return;
     const d = obj.door;
@@ -5111,9 +5144,18 @@ export class IsoScene {
     const innerH = Math.max(1, sh - m.top - m.bottom);
     const zoomX = innerW / spanX;
     const zoomY = innerH / spanY;
-    this.zoom = clampZoom(Math.min(zoomX, zoomY) * 0.88, sw, sh);
+    // Below ~0.15 door picks become body hits and the van radius (8/zoom)
+    // covers the stoop. Landscape Catedral→Flor used to frame at 0.057.
+    const fitted = clampZoom(Math.min(zoomX, zoomY) * 0.88, sw, sh);
+    const minTap = 0.18;
     const aim = this.freeRectCenter();
-    this.placeWorldAtScreen(mid.x, mid.y - 40, aim.x, aim.y);
+    if (fitted < minTap) {
+      this.zoom = clampZoom(minTap, sw, sh);
+      this.placeWorldAtScreen(doorW.x, doorW.y - 40, aim.x, aim.y);
+    } else {
+      this.zoom = fitted;
+      this.placeWorldAtScreen(mid.x, mid.y - 40, aim.x, aim.y);
+    }
     this.applyCamera(false);
     this.flushTownWarm();
   }
