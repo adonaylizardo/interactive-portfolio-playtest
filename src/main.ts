@@ -51,6 +51,9 @@ async function main(): Promise<void> {
   const syncReadingFromHash = (): void => {
     const route = parseReadingRoute();
     if (route) {
+      if (isMobileLayout() && !reading.isActive()) {
+        chrome.rememberMobileSheetBeforeReading();
+      }
       setHashWriteSuppressed(true);
       reading.syncRoute(route);
       checklist.setCollapsed(true);

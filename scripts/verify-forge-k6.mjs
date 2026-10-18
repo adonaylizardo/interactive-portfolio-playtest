@@ -105,11 +105,11 @@ async function historyB7B8(page, tag) {
   await page.waitForTimeout(700);
   await page.locator('.reading-view [data-back]').click({ timeout: 8000 });
   await page.waitForTimeout(700);
-  const sheetAfter = await page.evaluate(
-    () => document.querySelector('.chrome--sheet .chrome__intro') && getComputedStyle(document.querySelector('.chrome__intro')).display !== 'none',
-  );
+  const sheetAfter = await page.evaluate(() => !!document.querySelector('.chrome.chrome--sheet'));
   record('B7-sheet-restore', sheetAfter, `before=${sheetBefore} after=${sheetAfter}`, tag);
 
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(400);
   await page.goto(`${BASE}#/leer`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(500);
   await page.locator('.reading-view__row').filter({ hasText: /Volaris|Bain/i }).first().click();
