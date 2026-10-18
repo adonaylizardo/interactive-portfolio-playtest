@@ -784,20 +784,28 @@ export class JacT9 {
     const sx = originCell.x;
     const sy = originCell.y;
     const usable = this.sitsForDoor(doorX, doorY).filter(
-      (c) =>
-        !this.skippedSits.has(k(c.x, c.y)) &&
-        this.sitCellHoldable(c.x, c.y) &&
-        !this.sitCloserToOtherDoor(c, doorX, doorY),
+      (c) => !this.skippedSits.has(k(c.x, c.y)) && this.sitCellHoldable(c.x, c.y),
     );
     const doorSide = usable.filter(
       (c) => c.along >= 0 && Math.hypot(c.x - sx, c.y - sy) > 3.2,
     );
     const closeEnough = doorSide.filter((c) => Math.hypot(c.x - doorX, c.y - doorY) <= 6);
     const front = closeEnough.filter((c) => c.along >= 1 && c.doorD >= 3 && c.doorD <= 6);
-    const pool = front.length ? front : closeEnough.length ? closeEnough : doorSide;
+    const ownFront = front.filter((c) => !this.sitCloserToOtherDoor(c, doorX, doorY));
+    const ownClose = closeEnough.filter((c) => !this.sitCloserToOtherDoor(c, doorX, doorY));
+    const pool = ownFront.length
+      ? ownFront
+      : ownClose.length
+        ? ownClose
+        : front.length
+          ? front
+          : closeEnough.length
+            ? closeEnough
+            : doorSide;
     if (pool.length === 0) return null;
     const prefer = (c: DoorSit) => (cells[c.y]?.[c.x]?.groundId?.includes('park') ? 0 : 1);
     const closeness = (c: DoorSit) => Math.abs(c.doorD - 3.5);
+    const otherStoop = (c: DoorSit) => (this.sitCloserToOtherDoor(c, doorX, doorY) ? 1 : 0);
     const doorHug = (c: DoorSit) => (this.parkTouchesDoor(c.x, c.y, c.heading, doorX, doorY) ? 1 : 0);
     const origin = k(sx, sy);
     const exit = this.nearestRoadExit(sx, sy);
@@ -809,7 +817,9 @@ export class JacT9 {
     for (const cand of pool) {
       const rest =
         this.axisDrivePath(start.x, start.y, cand.x, cand.y, pass) ??
-        fromStart.get(k(cand.x, cand.y));
+        fromStart.get(k(cand.x, cand.y)) ??
+        this.findDrivePath(cand.x, cand.y, { loose: true }) ??
+        this.findDrivePath(cand.x, cand.y, { loose: false });
       if (!rest && !(cand.x === start.x && cand.y === start.y)) continue;
       const hop = start.x === sx && start.y === sy ? [] : exit.path;
       const path = hop.concat(rest ?? []);
@@ -817,10 +827,11 @@ export class JacT9 {
       if (this.pathsFrom === origin) this.pathToSit.set(k(cand.x, cand.y), path);
       scored.push({ c: cand, path });
     }
-    // Closeness to *this* door first. Shortest-path used to steal Finoa's
+    // Own stoop first, then closeness. Shortest-path used to steal Finoa's
     // stoop at (25,24) for the P&G door at (24,31).
     scored.sort(
       (a, b) =>
+        otherStoop(a.c) - otherStoop(b.c) ||
         closeness(a.c) - closeness(b.c) ||
         b.c.along - a.c.along ||
         doorHug(a.c) - doorHug(b.c) ||
@@ -829,19 +840,77 @@ export class JacT9 {
         a.c.walkD - b.c.walkD,
     );
     const best = scored[0];
+    const lane = this.laneParkForDoor(doorX, doorY);
+    if (
+      lane &&
+      (!best ||
+        otherStoop(best.c) ||
+        Math.hypot(best.c.x - doorX, best.c.y - doorY) > Math.hypot(lane.x - doorX, lane.y - doorY) + 0.4)
+    ) {
+      return lane;
+    }
     return best ? { x: best.c.x, y: best.c.y, path: best.path, heading: best.c.heading } : null;
   }
 
   /** A sit hypot-closer to another enterable door is that other stoop, not this one. */
   private sitCloserToOtherDoor(c: DoorSit, doorX: number, doorY: number): boolean {
-    const own = Math.hypot(c.x - doorX, c.y - doorY);
+    return this.cellCloserToOtherDoor(c.x, c.y, doorX, doorY);
+  }
+
+  private cellCloserToOtherDoor(x: number, y: number, doorX: number, doorY: number): boolean {
+    const own = Math.hypot(x - doorX, y - doorY);
     for (const b of getEnterableBuildings()) {
       if (!b.door) continue;
       if (b.door.x === doorX && b.door.y === doorY) continue;
-      const d = Math.hypot(c.x - b.door.x, c.y - b.door.y);
+      const d = Math.hypot(x - b.door.x, y - b.door.y);
       if (d + 2.2 < own) return true;
     }
     return false;
+  }
+
+  /**
+   * 1-cell lane in front of this door. Tight streets (P&G) cannot hold a 5×3
+   * hull, so the 2×2 / lane sit is the one the get-out walk can finish.
+   */
+  private laneParkForDoor(
+    doorX: number,
+    doorY: number,
+  ): { x: number; y: number; path: { x: number; y: number }[]; heading: FacingDir } | null {
+    const building = getBuildingAtDoor(doorX, doorY);
+    const inward = building ? doorInwardStep(building) : null;
+    const out = inward ? { x: -inward.x, y: -inward.y } : { x: 0, y: 1 };
+    const origin = this.laneOrigin();
+    const pass = (x: number, y: number) =>
+      this.driveLaneWalkable(x, y) || (x === origin.x && y === origin.y);
+    const keep = this.doorKeepClear(doorX, doorY);
+    let best: {
+      x: number;
+      y: number;
+      path: { x: number; y: number }[];
+      heading: FacingDir;
+      score: number;
+    } | null = null;
+    for (let y = doorY - 6; y <= doorY + 6; y++) {
+      for (let x = doorX - 6; x <= doorX + 6; x++) {
+        if (!this.driveLaneWalkable(x, y) && !this.driveBoxWalkable(x, y)) continue;
+        const along = (x - doorX) * out.x + (y - doorY) * out.y;
+        if (along < 0) continue;
+        const d = Math.hypot(x - doorX, y - doorY);
+        if (d < 1.15 || d > 6) continue;
+        if (this.cellCloserToOtherDoor(x, y, doorX, doorY)) continue;
+        const rest =
+          this.axisDrivePath(origin.x, origin.y, x, y, pass) ??
+          this.findDrivePath(x, y, { loose: true }) ??
+          this.findDrivePath(x, y, { loose: false });
+        if (!rest && !(x === origin.x && y === origin.y)) continue;
+        const path = rest ?? [];
+        if (!this.pathReachesSit(path, x, y, origin.x, origin.y)) continue;
+        const heading = this.parkHeadingAt(x, y, keep) ?? this.dir;
+        const score = Math.abs(d - 3.2) - along * 0.15;
+        if (!best || score < best.score) best = { x, y, path, heading, score };
+      }
+    }
+    return best ? { x: best.x, y: best.y, path: best.path, heading: best.heading } : null;
   }
 
   private isStreetCell(x: number, y: number): boolean {
