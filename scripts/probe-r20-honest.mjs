@@ -142,7 +142,7 @@ async function snapshot(page) {
   });
 }
 
-async function waitDone(page, timeout = 28000) {
+async function waitDone(page, timeout = 40000) {
   const t0 = Date.now();
   let last = null;
   while (Date.now() - t0 < timeout) {

@@ -1122,7 +1122,16 @@ export class JacT9 {
 
   /** Parked 5×3 / 3×5 plus the 1.6× sprite — used to pick a sit, never the live 2×2 drive box. */
   private parkSitOk(cx: number, cy: number, dir: FacingDir): boolean {
-    return this.driveBoxWalkable(cx, cy) && !this.hullOverlapsWorld(cx, cy, dir);
+    if (!this.driveBoxWalkable(cx, cy) || this.hullOverlapsWorld(cx, cy, dir)) return false;
+    for (const [dx, dy] of [
+      [0.5, 0],
+      [-0.5, 0],
+      [0, 0.5],
+      [0, -0.5],
+    ] as const) {
+      if (this.hullOverlapsWorld(cx + dx, cy + dy, dir)) return false;
+    }
+    return true;
   }
 
   private sitOverlapsBuilding(cx: number, cy: number, dir: FacingDir): boolean {
@@ -2381,6 +2390,7 @@ export class JacT9 {
   private sitWith(cx: number, cy: number, dir: FacingDir): boolean {
     if (this.driving && !this.pendingExit) {
       if (this.followLoose) return this.driveLaneWalkable(cx, cy);
+      if (this.drivePath.length > 0 || this.driveGoal) return this.driveBoxWalkable(cx, cy);
       return this.driveBoxWalkable(cx, cy) && this.stickHullClear(cx, cy, dir);
     }
     const size = parkSize(dir);
