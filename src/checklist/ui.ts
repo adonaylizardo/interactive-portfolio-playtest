@@ -335,6 +335,10 @@ export class ChecklistUI {
     this.root.classList.toggle('checklist--panel-open', this.mobile && this.panelOpen);
     this.root.classList.toggle('checklist--complete', done >= total);
     this.root.classList.toggle('checklist--skipped', this.state.skipped);
+    document.body.classList.toggle(
+      'checklist-mobile-expanded',
+      this.mobile && !hidden && this.state.mobileExpanded === true,
+    );
     if (this.mobile && this.state.mobileExpanded) this.positionMobileExpanded();
   }
 

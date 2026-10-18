@@ -133,6 +133,13 @@ export class ChromeUI {
     this.callbacks.onLayoutChange();
   }
 
+  private isLandscapeSideSheet(): boolean {
+    return (
+      window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches &&
+      window.innerWidth >= 768
+    );
+  }
+
   layoutInsets(): { left: number; top: number; right: number; bottom: number } {
     if (this.interiorOpen) {
       return this.mobile ? { left: 0, top: 0, right: 0, bottom: 0 } : { left: 64, top: 0, right: 0, bottom: 0 };
@@ -140,6 +147,14 @@ export class ChromeUI {
     if (this.mobile) {
       if (this.mobileSheet) {
         const sheet = this.root.querySelector('.chrome__intro')?.getBoundingClientRect();
+        if (sheet && sheet.width > 8 && this.isLandscapeSideSheet()) {
+          return {
+            left: 0,
+            top: 12,
+            right: Math.ceil(window.innerWidth - sheet.left + 8),
+            bottom: 12,
+          };
+        }
         const bottom = sheet ? Math.ceil(window.innerHeight - sheet.top + 8) : 280;
         return { left: 0, top: 12, right: 0, bottom };
       }
@@ -634,6 +649,17 @@ export class ChromeUI {
       const intro = this.root.querySelector('.chrome__intro') as HTMLElement | null;
       const r = intro?.getBoundingClientRect();
       if (r && r.height > 8) {
+        if (this.isLandscapeSideSheet()) {
+          sub.style.left = `${Math.max(12, r.left / 2)}px`;
+          sub.style.width = `${Math.max(160, r.left - 24)}px`;
+          sub.style.transform = 'translateX(-50%)';
+          sub.style.bottom = '12px';
+          sub.style.top = 'auto';
+          return;
+        }
+        sub.style.left = '';
+        sub.style.width = '';
+        sub.style.transform = '';
         sub.style.bottom = `${Math.max(12, window.innerHeight - r.top + 8)}px`;
         sub.style.top = 'auto';
         return;
@@ -641,6 +667,9 @@ export class ChromeUI {
     }
     sub.style.bottom = '';
     sub.style.top = '';
+    sub.style.left = '';
+    sub.style.width = '';
+    sub.style.transform = '';
   }
 
   private placeLang(): void {
@@ -648,9 +677,15 @@ export class ChromeUI {
     if (!lang) return;
     const shortLand = window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
     if (shortLand && this.mobile) {
-      lang.style.top = '12px';
-      lang.style.right = '12px';
-      lang.style.left = 'auto';
+      if (this.mobileSheet && !this.interiorOpen) {
+        lang.style.top = '12px';
+        lang.style.left = '12px';
+        lang.style.right = 'auto';
+      } else {
+        lang.style.top = '12px';
+        lang.style.right = '12px';
+        lang.style.left = 'auto';
+      }
       return;
     }
     lang.style.left = '';

@@ -471,6 +471,10 @@ export class IsoScene {
       preference: 'webgl',
     });
 
+    this.screenFill = new Graphics();
+    this.screenFill.eventMode = 'none';
+    this.screenFill.label = 'screen-fill';
+    this.app.stage.addChild(this.screenFill);
     this.rearLayer = new Container();
     this.rearLayer.eventMode = 'none';
     this.rearLayer.label = 'jac-rear';
@@ -701,6 +705,7 @@ export class IsoScene {
   }
 
   private outskirts: TilingSprite | null = null;
+  private screenFill: Graphics | null = null;
 
   /**
    * Stretches the outskirts over exactly what the camera sees (a tall phone at the 0.04 zoom floor
@@ -709,6 +714,17 @@ export class IsoScene {
    * Hidden while the town covers the whole screen: a full-screen blended quad costs software-GL
    * phones ~4 ms a frame.
    */
+  private paintScreenFill(): void {
+    const g = this.screenFill;
+    if (!g || !this.app) return;
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const c = worldBackgroundColor();
+    g.clear();
+    g.rect(0, 0, sw, sh);
+    g.fill(c);
+  }
+
   private fitOutskirts(sw: number, sh: number): void {
     const g = this.outskirts;
     if (!g) return;
@@ -2099,6 +2115,7 @@ export class IsoScene {
   applyCamera(persistHash = true): void {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
+    this.paintScreenFill();
     this.updateCameraFitMargins();
     if (this.interiorActive && this.interiorDef) {
       const bounds = interiorWorldBounds(this.interiorDef, this.interiorBottomSheet);

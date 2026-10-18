@@ -467,10 +467,18 @@ body.search-palette-open .chrome__column {
   visibility: hidden;
 }
 
-body.about-panel-open .chrome__subtitle {
+body.about-panel-open[data-chrome='desktop'] .chrome__subtitle {
   left: calc(64px + 432px + (100% - 64px - 432px) / 2) !important;
   width: min(480px, calc(100% - 64px - 432px - 32px)) !important;
   transform: translateX(-50%);
+}
+
+body.about-panel-open[data-chrome='phone'] .chrome__subtitle:not(:empty) {
+  left: 50% !important;
+  width: min(340px, calc(100vw - 32px)) !important;
+  transform: translateX(-50%) !important;
+  top: auto !important;
+  bottom: max(168px, calc(100dvh - 52vh)) !important;
 }
 
 body.about-panel-open[data-chrome='desktop'] .playtest-toast {
