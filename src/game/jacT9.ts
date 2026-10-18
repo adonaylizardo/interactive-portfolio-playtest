@@ -1207,7 +1207,7 @@ export class JacT9 {
       left -= step;
     }
     this.syncMeters(moved, frame);
-    if (this.atDriveGoal()) this.clearDriveArrival();
+    this.holdAtGoal();
     if (this.toggles.hazards) this.hazardT += frame;
     else this.hazardT = 0;
     this.applySprite();
@@ -1552,10 +1552,7 @@ export class JacT9 {
     this.recoverPathFollow();
     const goal = this.driveGoal;
     const goalDist = goal ? Math.hypot(goal.x - this.cx, goal.y - this.cy) : Infinity;
-    if (goal && this.atDriveGoal()) {
-      this.clearDriveArrival();
-      return { throttle: 0, steer: 0 };
-    }
+    if (this.holdAtGoal()) return { throttle: 0, steer: 0 };
     if (this.drivePath.length === 0) {
       if (goal) this.drivePath.push({ x: goal.x, y: goal.y });
       else {
@@ -1567,10 +1564,7 @@ export class JacT9 {
     }
     const look = this.pathLookAhead();
     if (!look) {
-      if (this.atDriveGoal()) {
-        this.clearDriveArrival();
-        return { throttle: 0, steer: 0 };
-      }
+      if (this.holdAtGoal()) return { throttle: 0, steer: 0 };
       this.markStuck(dt);
       return { throttle: 0, steer: 0 };
     }
@@ -1723,7 +1717,7 @@ export class JacT9 {
     this.noProgressT += dt;
     if (this.noProgressT < 6) return;
     if (d < 1.4) {
-      this.clearDriveArrival();
+      this.holdAtGoal();
       return;
     }
     this.stuckT = Math.max(this.stuckT, STUCK_REPLAN_S);
@@ -1739,10 +1733,23 @@ export class JacT9 {
     return false;
   }
 
-  private acceptNearGoal(): boolean {
+  /** Stop on the sit but keep the goal so the scene can get out. */
+  private holdAtGoal(): boolean {
     if (!this.atDriveGoal()) return false;
-    this.clearDriveArrival();
+    this.drivePath = [];
+    this.vel = 0;
+    this.reversing = false;
+    this.stuckT = 0;
+    this.followDir = null;
+    if (this.lastParkHeading) {
+      this.dir = this.lastParkHeading;
+      this.heading = dirIndex(this.lastParkHeading);
+    }
     return true;
+  }
+
+  private acceptNearGoal(): boolean {
+    return this.holdAtGoal();
   }
 
   private clearDriveArrival(): boolean {
@@ -1811,9 +1818,7 @@ export class JacT9 {
       this.tryReplan();
       return;
     }
-    this.drivePath = [];
-    this.driveGoal = null;
-    this.stuckT = 0;
+    this.clearDriveArrival();
     this.stuckGaveUp = true;
     this.hooks.onStuck?.();
   }
@@ -2032,7 +2037,7 @@ export class JacT9 {
     return (
       this.driveBoxWalkable(cx, cy) &&
       this.footprintClear(cx, cy, size.w, size.h) &&
-      this.spriteFootprintClear(cx, cy, dir)
+      this.visualSpriteClear(cx, cy, dir)
     );
   }
 
@@ -2208,13 +2213,29 @@ export class JacT9 {
     return true;
   }
 
-  /**
-   * 5×3 / 3×5 plus the 1.6× sprite hang. The body is south-anchored, so the
-   * bed and the iso-north edges (min x / min y) cover extra prop cells.
-   */
+  /** 5×3 / 3×5 plus one extra bed row — sit finding uses this, not the iso-north hang. */
   private spriteFootprintClear(cx: number, cy: number, dir: FacingDir): boolean {
     const size = parkSize(dir);
     if (!this.footprintClear(cx, cy, size.w, size.h)) return false;
+    const o = {
+      x: Math.round(cx - (size.w - 1) / 2),
+      y: Math.round(cy - (size.h - 1) / 2),
+    };
+    const rear = DIR_VEC[dir];
+    const extra = rear.x !== 0 ? this.rect(o.x - rear.x, o.y, 1, size.h) : this.rect(o.x, o.y - rear.y, size.w, 1);
+    for (const [x, y] of extra) {
+      if (PROP_CELLS.has(k(x, y))) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Full drawn sprite: 5×3 / 3×5, bed row, and the iso-north L (south-anchored
+   * 1.6× hang). Used to measure overlap at the real parked pose.
+   */
+  private visualSpriteClear(cx: number, cy: number, dir: FacingDir): boolean {
+    if (!this.spriteFootprintClear(cx, cy, dir)) return false;
+    const size = parkSize(dir);
     const o = {
       x: Math.round(cx - (size.w - 1) / 2),
       y: Math.round(cy - (size.h - 1) / 2),
@@ -2230,8 +2251,9 @@ export class JacT9 {
     return true;
   }
 
-  /** Parked 5×3 / 3×5 + sprite pad at the current sit — used before get-out. */
+  /** Sit-finding pose: 2×2 drive box plus parked 5×3 / 3×5 and bed row. */
   canParkHere(): boolean {
+    if (this.lastParkHeading && this.parkSitOk(this.cx, this.cy, this.lastParkHeading)) return true;
     return this.parkSitOk(this.cx, this.cy, this.dir);
   }
 
@@ -2280,13 +2302,14 @@ export class JacT9 {
     for (const [x, y] of this.solidCells()) {
       if (PROP_CELLS.has(k(x, y))) return true;
     }
-    if (!this.driving && !this.spriteFootprintClear(this.cx, this.cy, this.dir)) return true;
+    if (!this.driving && !this.visualSpriteClear(this.cx, this.cy, this.dir)) return true;
     return false;
   }
 
   /** Reclaim the parked footprint, refresh the live hit box, and retarget the door. */
   relayoutParked(): void {
     this.applyParkedSolid(true);
+    this.resolveOverlap();
     this.layout();
     this.applySprite();
     this.hooks.onChange?.();

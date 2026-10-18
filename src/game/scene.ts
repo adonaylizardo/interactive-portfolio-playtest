@@ -4270,7 +4270,7 @@ export class IsoScene {
     const idle = this.jac.drivePath.length === 0 && !this.jac.driveGoal;
     const along = this.jac.doorSideAlong(door.x, door.y);
     const hereOk = this.jac.canParkHere();
-    const arrived = sit && distSit < 0.85 && this.jac.mph < 1.4;
+    const arrived = !!sit && distSit < 0.85 && this.jac.mph < 1.4;
     const doorSideSit = idle && hereOk && this.jac.mph < 1.2 && along >= 0 && distDoor <= 8;
     if (arrived || doorSideSit) {
       if (sit && distSit < 1.1) {
