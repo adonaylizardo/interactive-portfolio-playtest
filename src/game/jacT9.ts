@@ -741,7 +741,8 @@ export class JacT9 {
     );
     const doorSide = usable.filter((c) => c.along >= 0);
     const closeEnough = doorSide.filter((c) => Math.hypot(c.x - doorX, c.y - doorY) <= 8);
-    const pool = closeEnough.length ? closeEnough : doorSide.length ? doorSide : usable;
+    const front = closeEnough.filter((c) => c.along >= 1 && c.doorD >= 3 && c.doorD <= 5);
+    const pool = front.length ? front : closeEnough.length ? closeEnough : doorSide.length ? doorSide : usable;
     const prefer = (c: DoorSit) => (cells[c.y]?.[c.x]?.groundId?.includes('park') ? 0 : 1);
     const closeness = (c: DoorSit) => Math.abs(c.doorD - 3.5);
     const doorHug = (c: DoorSit) => (this.parkTouchesDoor(c.x, c.y, c.heading, doorX, doorY) ? 1 : 0);
@@ -755,39 +756,26 @@ export class JacT9 {
     const order = (ranked.length ? ranked : pool)
       .slice()
       .sort((a, b) => doorHug(a) - doorHug(b) || prefer(a) - prefer(b) || reach(a) - reach(b) || b.along - a.along);
-    const pass = (x: number, y: number) => this.driveBoxWalkable(x, y) || (x === sx && y === sy);
-    const take = (cand: DoorSit, found: { x: number; y: number }[]) => {
-      if (!this.pathReachesSit(found, cand.x, cand.y, sx, sy)) return null;
-      if (found.length === 0 && Math.hypot(cand.x - doorX, cand.y - doorY) > 6) return null;
-      if (this.pathsFrom === origin) this.pathToSit.set(k(cand.x, cand.y), found);
-      return { x: cand.x, y: cand.y, path: found, heading: cand.heading };
-    };
-    let best: { x: number; y: number; path: { x: number; y: number }[]; heading: FacingDir } | null = null;
-    let bestLen = Infinity;
-    const consider = (cand: DoorSit, found: { x: number; y: number }[]) => {
-      const hit = take(cand, found);
-      if (!hit) return;
-      if (hit.path.length < bestLen) {
-        best = hit;
-        bestLen = hit.path.length;
-      }
-    };
-    for (const cand of order) {
-      const cached = this.pathsFrom === origin ? this.pathToSit.get(k(cand.x, cand.y)) : undefined;
-      const found = cached ?? this.axisDrivePath(sx, sy, cand.x, cand.y, pass) ?? undefined;
-      if (found) consider(cand, found);
-    }
-    if (best && bestLen <= 36) return best;
     let searches = 0;
     for (const cand of order) {
-      if (searches >= bfsBudget) break;
-      if (this.pathsFrom === origin && this.pathToSit.has(k(cand.x, cand.y))) continue;
-      searches += 1;
-      const found = this.driveBfsTo(cand.x, cand.y);
+      const cached = this.pathsFrom === origin ? this.pathToSit.get(k(cand.x, cand.y)) : undefined;
+      let found = cached;
+      if (!found) {
+        found =
+          this.axisDrivePath(sx, sy, cand.x, cand.y, (x, y) => this.driveBoxWalkable(x, y) || (x === sx && y === sy)) ??
+          undefined;
+      }
+      if (!found) {
+        if (searches >= bfsBudget) continue;
+        searches += 1;
+        found = this.driveBfsTo(cand.x, cand.y) ?? undefined;
+      }
       if (!found) continue;
-      consider(cand, found);
+      if (!this.pathReachesSit(found, cand.x, cand.y, sx, sy)) continue;
+      if (this.pathsFrom === origin) this.pathToSit.set(k(cand.x, cand.y), found);
+      return { x: cand.x, y: cand.y, path: found, heading: cand.heading };
     }
-    return best;
+    return null;
   }
 
   /** Integer sit the 2×2 drive box can occupy on the collision grid. */
@@ -822,7 +810,7 @@ export class JacT9 {
       if (!b.door) continue;
       const key = `${origin}>${b.door.x},${b.door.y}`;
       if (this.doorRouteCache.has(key)) continue;
-      const found = this.solvePark(b.door.x, b.door.y, 12);
+      const found = this.solvePark(b.door.x, b.door.y, 8);
       if (found) this.doorRouteCache.set(key, found);
     }
   }
@@ -1675,7 +1663,7 @@ export class JacT9 {
     this.followDir = wantDir;
     let throttle = goalSlow;
     if (this.dir !== wantDir) {
-      throttle = this.followLoose ? 0.22 : goalDist < 2.2 ? 0.35 : 0;
+      throttle = goalDist < 2.2 ? 0.35 : 0;
       if (goalDist > 2.8) this.stuckT = 0;
       if (this.gear === 'R') this.gear = 'D';
     }
