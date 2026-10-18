@@ -228,15 +228,19 @@ export class ChromeUI {
             <div class="chrome__logros">
               <div class="chrome__logro">
                 <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
-                <p data-i18n="chrome.mentorshipStat">Mentoría: 30+ personas</p>
+                <p data-i18n="chrome.achievement1">Main Speaker at INNOVA360 (Simón Rodríguez University), 200+ in-person students (2025)</p>
               </div>
-              <div class="chrome__logro chrome__logro--empty">
-                <div class="chrome__logro-art">?</div>
-                <p data-i18n="chrome.comingSoon">Coming soon</p>
+              <div class="chrome__logro">
+                <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
+                <p data-i18n="chrome.achievement2">Proposed and lead Applaudo's Bain Designers Guild (2025)</p>
               </div>
-              <div class="chrome__logro chrome__logro--empty">
-                <div class="chrome__logro-art">?</div>
-                <p data-i18n="chrome.comingSoon">Coming soon</p>
+              <div class="chrome__logro">
+                <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
+                <p data-i18n="chrome.achievement3">AI Transformation Lead for Design at Applaudo, 5/7 phases complete (Q3 2026, in progress)</p>
+              </div>
+              <div class="chrome__logro">
+                <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
+                <p data-i18n="chrome.achievement4">ADPList 2023: 31 mentoring sessions, 930 minutes, 15 countries</p>
               </div>
             </div>
           </section>

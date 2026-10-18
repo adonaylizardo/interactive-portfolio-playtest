@@ -98,6 +98,40 @@
   text-decoration: none;
 }
 
+.reading-view__row--talk {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.reading-view__talk-thumb {
+  flex: 0 0 112px;
+  width: 112px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #2a2c31;
+}
+
+.reading-view__talk-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.reading-view__section-title {
+  margin: 20px 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #888;
+}
+
+.reading-view__section-title:first-child {
+  margin-top: 0;
+}
+
 .reading-view__row:focus-visible {
   outline: 2px solid #edeef0;
   outline-offset: 2px;

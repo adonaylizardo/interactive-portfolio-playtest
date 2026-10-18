@@ -407,12 +407,13 @@ body[data-interior='1'] .chrome__column {
 
 .chrome__logros {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .chrome__logro {
-  flex: 1;
-  min-width: 0;
+  flex: 1 1 calc(50% - 4px);
+  min-width: 120px;
 }
 
 .chrome__logro-art {

@@ -90,6 +90,33 @@ async function runViewport(page, label, _width, _height, touch) {
   }
   if (!afterReload.hasCase) errors.push(`${tag}: volaris case text missing after refresh`);
 
+  await page.goto(`${BASE}#/leer/talks`, { waitUntil: 'networkidle' });
+  await wait(400);
+  const talks = await qa(page, () => ({
+    rows: document.querySelectorAll('.reading-view__row--talk').length,
+    podcast: document.querySelector('.reading-view__section-title')?.textContent ?? '',
+    firstHref: document.querySelector('.reading-view__row--talk')?.getAttribute('href') ?? '',
+  }));
+  if (talks.rows < 14) errors.push(`${tag}: expected >=14 talk rows, got ${talks.rows}`);
+  if (!talks.firstHref.startsWith('http')) errors.push(`${tag}: talk link missing (${talks.firstHref})`);
+  await page.screenshot({ path: path.join(SHOTS, `${label}-03-talks.png`) });
+
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await wait(500);
+  await qa(page, () => window.__playtestQa?.setLayout?.('split'));
+  await wait(300);
+  const logros = await qa(page, () => ({
+    count: document.querySelectorAll('#chrome-logros .chrome__logro').length,
+    text: document.querySelector('#chrome-logros .chrome__logro p')?.textContent ?? '',
+  }));
+  if (logros.count !== 4) errors.push(`${tag}: expected 4 logros, got ${logros.count}`);
+  if (logros.text.includes('30+') || logros.text.includes('Coming soon') || logros.text.includes('Próximamente')) {
+    errors.push(`${tag}: stale logros copy (${logros.text.slice(0, 40)})`);
+  }
+  if (!touch) {
+    await page.screenshot({ path: path.join(SHOTS, `${label}-04-logros.png`) });
+  }
+
   await page.goto(`${BASE}#/leer/writings`, { waitUntil: 'networkidle' });
   await wait(400);
   const writingLink = page.locator('.reading-view__row--link').first();

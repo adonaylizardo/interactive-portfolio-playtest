@@ -6,11 +6,26 @@ import {
   isCaseHouse,
   type CaseBlock,
 } from '../data/cases';
-import { TALKS, TALKS_COMING_SOON, WRITINGS, WRITINGS_SUBSTACK_URL, type WritingItem } from '../data/experiences';
+import {
+  TALK_SECTIONS,
+  TALKS,
+  TALKS_COMING_SOON,
+  WRITINGS,
+  WRITINGS_SUBSTACK_URL,
+  type TalkItem,
+  type WritingItem,
+} from '../data/experiences';
 import { VOICE_LINES } from '../data/voice-lines';
 import { iconSvg } from './icons';
 import { onLangChange, setLang, t, type I18nKey } from './i18n';
-import { talkMeta, talkTitle, writingMeta, writingTitle } from './contentLabels';
+import {
+  talkMeta,
+  talkSectionTitle,
+  talkThumbnailUrl,
+  talkTitle,
+  writingMeta,
+  writingTitle,
+} from './contentLabels';
 import { navigateReading, type ReadingRoute } from './readingRoute';
 
 const LANDMARK_IDS = ['sambil', 'catedral', 'flor'] as const;
@@ -335,28 +350,52 @@ export class ReadingView {
     } else {
       const list = document.createElement('div');
       list.className = 'reading-view__stack';
-      for (const item of TALKS) {
-        list.appendChild(this.talkRow(item));
+      for (const section of TALK_SECTIONS) {
+        const heading = talkSectionTitle(section);
+        if (heading) {
+          const sh = document.createElement('h3');
+          sh.className = 'reading-view__section-title';
+          sh.textContent = heading;
+          list.appendChild(sh);
+        }
+        for (const item of section.items) {
+          list.appendChild(this.talkRow(item));
+        }
       }
       wrap.appendChild(list);
     }
     this.main.replaceChildren(wrap);
   }
 
-  private talkRow(item: (typeof TALKS)[number]): HTMLElement {
-    const row = document.createElement('div');
-    row.className = 'reading-view__row reading-view__row--static';
+  private talkRow(item: TalkItem): HTMLElement {
+    const row = document.createElement('a');
+    row.className = 'reading-view__row reading-view__row--link reading-view__row--talk';
+    row.href = item.url;
+    row.target = '_blank';
+    row.rel = 'noopener noreferrer';
+    const thumbSrc = talkThumbnailUrl(item);
+    if (thumbSrc) {
+      const thumb = document.createElement('img');
+      thumb.className = 'reading-view__talk-thumb';
+      thumb.src = thumbSrc;
+      thumb.alt = '';
+      thumb.loading = 'lazy';
+      row.appendChild(thumb);
+    }
+    const copy = document.createElement('span');
+    copy.className = 'reading-view__talk-copy';
     const title = document.createElement('span');
     title.className = 'reading-view__row-title';
     title.textContent = talkTitle(item);
-    row.appendChild(title);
+    copy.appendChild(title);
     const meta = talkMeta(item);
     if (meta) {
       const m = document.createElement('span');
       m.className = 'reading-view__row-summary';
       m.textContent = meta;
-      row.appendChild(m);
+      copy.appendChild(m);
     }
+    row.appendChild(copy);
     return row;
   }
 

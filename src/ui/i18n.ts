@@ -70,6 +70,8 @@ const DICT = {
     'talks.videoLabel': 'VIDEO · PLACEHOLDER',
     'talks.upNext': 'More talks',
     'talks.comingSoon': 'Coming soon',
+    'talks.section.videoPodcast': 'Video podcast',
+    'talks.openVideo': 'Open video in new tab',
 
     'read.title': 'Read',
     'read.listIntro': 'Portfolio content without the map — cases, studio, talks, writings, and landmarks.',
@@ -135,7 +137,12 @@ const DICT = {
     'chrome.client': 'Client',
     'chrome.experience': 'Experience',
     'chrome.seeAll': 'See all',
-    'chrome.mentorshipStat': 'Mentorship: 30+ people',
+    'chrome.achievement1':
+      'Main Speaker at INNOVA360 (Simón Rodríguez University), 200+ in-person students (2025)',
+    'chrome.achievement2': "Proposed and lead Applaudo's Bain Designers Guild (2025)",
+    'chrome.achievement3':
+      'AI Transformation Lead for Design at Applaudo, 5/7 phases complete (Q3 2026, in progress)',
+    'chrome.achievement4': 'ADPList 2023: 31 mentoring sessions, 930 minutes, 15 countries',
     'chrome.comingSoon': 'Coming soon',
     'chrome.details': 'Details',
     'chrome.showPanel': 'Show panel',
@@ -224,6 +231,8 @@ const DICT = {
     'talks.videoLabel': 'VIDEO · PLACEHOLDER',
     'talks.upNext': 'Más charlas',
     'talks.comingSoon': 'Próximamente',
+    'talks.section.videoPodcast': 'Video podcast',
+    'talks.openVideo': 'Abrir video en una pestaña nueva',
 
     'read.title': 'Leer',
     'read.listIntro': 'Contenido del portafolio sin el mapa — casos, estudio, talks, writings y landmarks.',
@@ -289,7 +298,12 @@ const DICT = {
     'chrome.client': 'Cliente',
     'chrome.experience': 'Experiencia',
     'chrome.seeAll': 'Ver todos',
-    'chrome.mentorshipStat': 'Mentoría: 30+ personas',
+    'chrome.achievement1':
+      'Conferencista principal en INNOVA360 (Universidad Simón Rodríguez), más de 200 estudiantes presenciales (2025)',
+    'chrome.achievement2': 'Propuse y lidero el Bain Designers Guild de Applaudo (2025)',
+    'chrome.achievement3':
+      'Líder de transformación con IA para Diseño en Applaudo, 5/7 fases completadas (Q3 2026, en curso)',
+    'chrome.achievement4': 'ADPList 2023: 31 sesiones de mentoría, 930 minutos, 15 países',
     'chrome.comingSoon': 'Próximamente',
     'chrome.details': 'Detalles',
     'chrome.showPanel': 'Mostrar panel',
