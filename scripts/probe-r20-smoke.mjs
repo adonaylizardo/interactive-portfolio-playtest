@@ -132,7 +132,7 @@ for (const name of names) {
   await page.evaluate((n) => window.__playtestQa.driveEnter?.(n), name);
   const t0 = Date.now();
   let last = null;
-  while (Date.now() - t0 < 40000) {
+  while (Date.now() - t0 < 50000) {
     last = await snap(page);
     const away = Math.hypot((last.cx ?? 0) - 25.5, (last.cy ?? 0) - 17) > 2.2;
     if ((last.interior || last.panel) && away && !last.driving) break;

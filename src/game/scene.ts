@@ -4452,7 +4452,7 @@ export class IsoScene {
       this.jacGetOut({ thenEnter: true });
       return;
     }
-    if (leftSpawn && slow && along >= 0 && distDoor <= 3.5) {
+    if (leftSpawn && slow && along >= 0 && distDoor <= 3.5 && distSit > 2.2) {
       this.jac.sitWhy = `door-side sitD=${distSit.toFixed(2)} doorD=${distDoor.toFixed(2)}`;
       this.jacGetOut({ thenEnter: true });
       return;
