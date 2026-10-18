@@ -615,8 +615,11 @@ export class BuildingPanel {
     this.el.classList.remove('building-panel--snap');
     if (this.previewHistoryOpen) {
       this.previewHistoryOpen = false;
-      if (!opts?.fromHistory && (history.state as { preview?: string | null } | null)?.preview) {
-        history.back();
+      if (!opts?.fromHistory) {
+        const prev = (history.state as { preview?: string | null } | null) ?? {};
+        // Drop the preview flag in place. history.back() after a chain of
+        // interiors popped into an old room and blocked re-boarding.
+        history.replaceState({ ...prev, preview: null }, '', location.hash);
       }
     }
     if (!opts?.silent) this.onVisibilityChange();
