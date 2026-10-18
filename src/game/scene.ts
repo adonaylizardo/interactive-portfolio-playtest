@@ -4207,6 +4207,9 @@ export class IsoScene {
     }
     this.pendingJacEnter = false;
     this.pendingJacPanel = false;
+    this.pendingJacExit = false;
+    this.pendingDriveEnter = null;
+    this.suppressDriveTapUntil = 0;
     this.path = [];
     this.drawPathPreview();
     this.pendingBuildingEntry = null;
@@ -4284,14 +4287,16 @@ export class IsoScene {
     const arrived = this.jac.atParkSit();
     const from = this.pendingDriveFrom;
     const traveled = !from || Math.hypot(this.jac.cx - from.x, this.jac.cy - from.y) > 2.2;
-    const stalled = this.jac.drivePath.length === 0 && this.jac.mph < 3;
+    const pathLeft = this.jac.drivePath.length;
+    const nearPathEnd = traveled && along >= 0 && pathLeft <= 5 && distSit <= 2.85;
+    const stalled = pathLeft === 0 && this.jac.mph < 3;
     const doorSideSit =
-      stalled && along >= 0 && (distDoor <= 5.5 || (traveled && distDoor <= 10));
+      (stalled || nearPathEnd) && along >= 0 && (distDoor <= 5.5 || (traveled && distDoor <= 10) || nearPathEnd);
     if (arrived || doorSideSit) {
       this.jac.sitWhy = arrived
         ? `arrived sit=(${sit?.x},${sit?.y}) d=${distSit.toFixed(2)} mph=${this.jac.mph}`
         : `door-side along=${along.toFixed(2)} doorD=${distDoor.toFixed(2)} sitD=${distSit.toFixed(2)} mph=${this.jac.mph}`;
-      if (sit && distSit <= 1.2) {
+      if (sit && distSit <= 2.7) {
         this.jac.cx = sit.x;
         this.jac.cy = sit.y;
       }

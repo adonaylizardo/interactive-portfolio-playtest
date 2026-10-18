@@ -81,7 +81,7 @@ const STUCK_REPLAN_S = 0.5;
 /** Door taps use the spawn cache. Replans may search further. */
 const TAP_BFS_BUDGET = 0;
 /** Arrival = inside this radius of the collision-validated sit cell. */
-const SIT_CELL_R = 1.2;
+const SIT_CELL_R = 1.45;
 
 export type JacVisual = {
   obj: MapObject;
