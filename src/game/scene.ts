@@ -158,7 +158,7 @@ import {
   hideIsoPropSprite,
   isBillboarded,
   paintAltView,
-  paintJacCenital,
+  paintJacCenitalScreen,
   PERSPECTIVE_AIM_DOWN_FRAC,
   perspectiveYaw,
   screenDragToCameraDelta,
@@ -307,6 +307,7 @@ export class IsoScene {
   interiorLayer = new Container();
   private altViewLayer = new Graphics();
   private altJacLayer = new Graphics();
+  private cenitalVanScreen = new Graphics();
   private altPaintKey = '';
   private billboardLayer = new Container();
   private perspective = new PerspectiveView();
@@ -452,6 +453,7 @@ export class IsoScene {
     null;
   private pendingDriveEnter: { panelTitle: string; door: { x: number; y: number } } | null = null;
   private pendingDriveEnterAt = 0;
+  private pathPreviewRaf = 0;
   private pendingWalkInAt = 0;
   private pendingJacEnter = false;
   private pendingJacPanel = false;
@@ -506,6 +508,9 @@ export class IsoScene {
     this.rearLayer.eventMode = 'none';
     this.rearLayer.label = 'jac-rear';
     this.app.stage.addChild(this.camera);
+    this.cenitalVanScreen.eventMode = 'none';
+    this.cenitalVanScreen.label = 'cenital-van-screen';
+    this.app.stage.addChild(this.cenitalVanScreen);
     this.app.stage.addChild(this.rearLayer);
     this.app.stage.addChild(this.perspective.layer);
     this.app.stage.addChild(this.billboardLayer);
@@ -1460,10 +1465,30 @@ export class IsoScene {
     const sh = this.app.screen.height;
     this.updateCameraFitMargins();
     this.syncViewTransform();
-    this.zoom = this.zoomMinForCurrentView(sw, sh) * 0.92;
     const b = mapWorldBounds();
     const aim = this.freeRectCenter();
-    this.placeWorldAtScreen((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, aim.x, aim.y);
+    const wx = (b.minX + b.maxX) / 2;
+    const wy = (b.minY + b.maxY) / 2;
+    let zoom = this.zoomMinForCurrentView(sw, sh);
+    for (let i = 0; i < 36; i++) {
+      this.zoom = zoom;
+      this.placeWorldAtScreen(wx, wy, aim.x, aim.y);
+      const fitted = clampPanMapFullyInView(
+        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+        sw,
+        sh,
+      );
+      this.cameraX = fitted.cameraX;
+      this.cameraY = fitted.cameraY;
+      this.zoom = fitted.zoom;
+      const cov = viewportMapCoverage(
+        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+        sw,
+        sh,
+      );
+      if (Math.min(cov.covW, cov.covH) >= 0.85) break;
+      zoom *= 0.93;
+    }
   }
 
   private leaveMapOverview(opts?: { restorePan?: boolean }): void {
@@ -1944,23 +1969,26 @@ export class IsoScene {
     this.pendingDriveEnter = entry;
     this.pendingDriveEnterAt = performance.now();
     const dest = path.length > 0 ? path[path.length - 1] : sit;
+    if (path.length > 0) {
+      this.qaLastDriveTap = { x: dest.x, y: dest.y };
+      this.qaPointerDriveAccepts += 1;
+      this.jac.setDrivePath(path, dest, { loose: true });
+      this.startCameraFollow();
+      this.drawPathPreview();
+      this.fireMoveCommand();
+      return true;
+    }
     const alongNow = this.jac.doorSideAlong(entry.door.x, entry.door.y);
     const distDoorNow = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
-    const atSit = path.length === 0 || (Math.hypot(this.jac.cx - dest.x, this.jac.cy - dest.y) < 1.2 && this.jac.mph < 1);
+    const atSit =
+      Math.hypot(this.jac.cx - dest.x, this.jac.cy - dest.y) < 0.85 &&
+      this.jac.mph < 0.6 &&
+      this.jac.drivePath.length === 0;
     if (atSit && alongNow >= 0 && distDoorNow <= 5.5) {
       this.jacGetOut({ thenEnter: true });
       return true;
     }
-    if (path.length === 0) {
-      this.jacGetOut({ thenEnter: true });
-      return true;
-    }
-    this.qaLastDriveTap = { x: dest.x, y: dest.y };
-    this.qaPointerDriveAccepts += 1;
-    this.jac.setDrivePath(path, dest, { loose: true });
-    this.startCameraFollow();
-    this.drawPathPreview();
-    this.fireMoveCommand();
+    this.jacGetOut({ thenEnter: true });
     return true;
   }
 
@@ -2002,10 +2030,17 @@ export class IsoScene {
     if (fromPointer) this.qaPointerDriveAccepts += 1;
     const dest = path.length > 0 ? path[path.length - 1] : { x: gx, y: gy };
     this.jac.setDrivePath(path.length > 0 ? path : [dest], dest);
-    this.startCameraFollow();
-    this.drawPathPreview();
+    this.schedulePathPreview();
     this.fireMoveCommand();
     return true;
+  }
+
+  private schedulePathPreview(): void {
+    if (this.pathPreviewRaf) return;
+    this.pathPreviewRaf = requestAnimationFrame(() => {
+      this.pathPreviewRaf = 0;
+      this.drawPathPreview();
+    });
   }
 
   private drawPathPreview(): void {
@@ -2388,6 +2423,7 @@ export class IsoScene {
     if (!cenital) {
       this.altViewLayer.clear();
       this.altJacLayer.clear();
+      this.cenitalVanScreen.clear();
       this.altPaintKey = '';
       return;
     }
@@ -2399,9 +2435,18 @@ export class IsoScene {
       paintAltView(this.altViewLayer, objects, 'cenital', yaw, hover);
     }
     this.altJacLayer.clear();
+    this.cenitalVanScreen.clear();
     if (this.jac) {
       const snap = this.jac.snapshot();
-      paintJacCenital(this.altJacLayer, snap.cx, snap.cy, snap.heading, snap.driving);
+      const h = snap.heading * (Math.PI / 2);
+      const c = tileToWorld(snap.cx, snap.cy);
+      const tip = tileToWorld(snap.cx + Math.cos(h) * 2, snap.cy + Math.sin(h) * 2);
+      const s0 = this.worldToScreen(c.x, c.y);
+      const s1 = this.worldToScreen(tip.x, tip.y);
+      const lenPx = Math.max(24, Math.hypot(s1.x - s0.x, s1.y - s0.y));
+      const widPx = lenPx * 0.48;
+      const ang = Math.atan2(s1.y - s0.y, s1.x - s0.x);
+      paintJacCenitalScreen(this.cenitalVanScreen, s0.x, s0.y, ang, lenPx, widPx);
     }
   }
 
@@ -3782,7 +3827,7 @@ export class IsoScene {
         dx = mapped.x;
         dy = mapped.y;
       }
-      if (dx !== 0 || dy !== 0) this.pendingDriveEnter = null;
+      if (Math.hypot(dx, dy) > 0.28) this.pendingDriveEnter = null;
       this.startCameraFollow();
       if (dx !== 0 || dy !== 0 || stickHeld || this.jac.drivePath.length > 0) {
         if (dx !== 0 || dy !== 0) this.fireMoveCommand();
@@ -4627,9 +4672,18 @@ export class IsoScene {
     const distDoor = Math.hypot(this.jac.cx - door.x, this.jac.cy - door.y);
     const idle = this.jac.drivePath.length === 0 && !this.jac.driveGoal;
     const along = this.jac.doorSideAlong(door.x, door.y);
-    const arrived = sit && distSit < 1.15 && this.jac.mph < 1.2;
-    const doorSideSit = idle && this.jac.mph < 1.2 && along >= 0 && distDoor <= 6.2;
+    const hereOk = this.jac.canParkHere();
+    const arrived = !!sit && distSit < 0.85 && this.jac.mph < 1.4;
+    const doorSideSit = idle && hereOk && this.jac.mph < 1.2 && along >= 0 && distDoor <= 8;
     if (arrived || doorSideSit) {
+      if (sit && distSit < 1.1) {
+        this.jac.cx = sit.x;
+        this.jac.cy = sit.y;
+      }
+      if (!this.jac.canParkHere() && !arrived) {
+        this.retryDriveEnterOrGetOut();
+        return;
+      }
       this.jacGetOut({ thenEnter: true });
       return;
     }
@@ -4647,7 +4701,7 @@ export class IsoScene {
     if (!entry || !this.jac?.driving) return;
     const along = this.jac.doorSideAlong(entry.door.x, entry.door.y);
     const dist = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
-    if (along >= 0 && dist <= 6.2) {
+    if (along >= 0 && dist <= 8 && this.jac.canParkHere()) {
       this.jacGetOut({ thenEnter: true });
       return;
     }
@@ -5141,6 +5195,14 @@ export class IsoScene {
     return true;
   }
 
+  /** QA: start a door-park from the current drive pose without a pointer hit-test. */
+  qaDriveEnter(name: string): boolean {
+    const obj = objects.find((o) => o.type === 'building' && o.name === name);
+    if (!obj?.door || !obj.panelTitle) return false;
+    this.suppressDriveTapUntil = 0;
+    return this.requestDriveToEnter({ panelTitle: obj.panelTitle, door: obj.door });
+  }
+
   /** QA: pan so the character and target door are both on screen before a real pointer tap. */
   frameBuildingDoorForQa(name: string): void {
     const obj = objects.find((o) => o.type === 'building' && o.name === name);
@@ -5579,17 +5641,19 @@ export class IsoScene {
 
   /** QA: expected van heading (0–3 quarters) for a screen stick in cenital drive. */
   qaCenitalExpectedHeading(screenDx: number, screenDy: number): number | null {
-    const mag = Math.hypot(screenDx, screenDy);
-    if (mag < 0.08 || !this.cenitalOn()) return null;
+    const inMag = Math.hypot(screenDx, screenDy);
+    if (inMag < 0.08 || !this.cenitalOn()) return null;
     this.syncViewTransform();
     const { x, y } = screenStickToTile(
-      screenDx / mag,
-      screenDy / mag,
+      screenDx / inMag,
+      screenDy / inMag,
       this.viewRot,
       this.viewSx,
       this.viewSy,
     );
-    return headingFromTileStick(x, y, this.jac?.dir ?? 'se');
+    const mag = Math.hypot(x, y);
+    if (mag < 1e-6) return null;
+    return headingFromTileStick(x / mag, y / mag, this.jac?.dir ?? 'se');
   }
 
   /** QA: opaque-top client point vs the HTML pill's bottom (gap should stay ~NAME_PILL_GAP_PX). */

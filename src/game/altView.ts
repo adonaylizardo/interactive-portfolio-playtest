@@ -144,10 +144,10 @@ function paintRoof(g: Graphics, o: MapObject, hover: boolean): void {
   }
   if (o.name === 'lamp') {
     const p = tileToWorld(fx, fy);
-    g.circle(p.x, p.y, 6);
-    g.fill({ color: 0xb8bcc4 });
-    g.circle(p.x, p.y, 2.5);
-    g.fill({ color: 0xe8eaee });
+    g.circle(p.x, p.y, 4);
+    g.fill({ color: 0x6a7078 });
+    g.circle(p.x, p.y, 1.5);
+    g.fill({ color: 0x9aa0a8, alpha: 0.85 });
     return;
   }
   if (o.name === 'bench') {
@@ -213,21 +213,21 @@ function paintRoof(g: Graphics, o: MapObject, hover: boolean): void {
   g.stroke({ width: 1, color: shade(roof, 0.78), alpha: 0.7 });
   if (o.doorFace === '+y') {
     const door = tileToWorld(fx + (w - 1) / 2, fy + h - 0.08);
-    const hw = Math.min(22, w * TILE_W * 0.22);
-    g.roundRect(door.x - hw, door.y - 5, hw * 2, 10, 2);
-    g.fill({ color: 0x1e2228, alpha: 0.95 });
-    g.roundRect(door.x - hw * 0.55, door.y - 3.5, hw * 1.1, 7, 1.5);
-    g.fill({ color: 0xc8d0dc });
-    g.rect(door.x + hw * 0.35, door.y - 1.5, 2.5, 3);
+    const hw = Math.min(26, w * TILE_W * 0.26);
+    g.roundRect(door.x - hw, door.y - 7, hw * 2, 14, 3);
+    g.fill({ color: 0x2a6e8c, alpha: 0.95 });
+    g.roundRect(door.x - hw * 0.55, door.y - 5, hw * 1.1, 10, 2);
+    g.fill({ color: 0x8ed4f0 });
+    g.rect(door.x + hw * 0.32, door.y - 2, 3, 4);
     g.fill({ color: 0xf0b030 });
   } else if (o.doorFace === '+x') {
     const door = tileToWorld(fx + w - 0.08, fy + (h - 1) / 2);
-    const hh = Math.min(22, h * TILE_H * 0.22);
-    g.roundRect(door.x - 5, door.y - hh, 10, hh * 2, 2);
-    g.fill({ color: 0x1e2228, alpha: 0.95 });
-    g.roundRect(door.x - 3.5, door.y - hh * 0.55, 7, hh * 1.1, 1.5);
-    g.fill({ color: 0xc8d0dc });
-    g.rect(door.x - 1.5, door.y + hh * 0.35, 3, 2.5);
+    const hh = Math.min(26, h * TILE_H * 0.26);
+    g.roundRect(door.x - 7, door.y - hh, 14, hh * 2, 3);
+    g.fill({ color: 0x2a6e8c, alpha: 0.95 });
+    g.roundRect(door.x - 5, door.y - hh * 0.55, 10, hh * 1.1, 2);
+    g.fill({ color: 0x8ed4f0 });
+    g.rect(door.x - 2, door.y + hh * 0.32, 4, 3);
     g.fill({ color: 0xf0b030 });
   }
 }
@@ -334,22 +334,19 @@ export function paintAltView(
   }
 }
 
-/** Top-down van body in world space (cenital only). Heading: 0=+x tile (SE). */
-export function paintJacCenital(
+/** Screen-space van (cenital): ~2×1 tiles on screen, points along travel. */
+export function paintJacCenitalScreen(
   g: Graphics,
-  cx: number,
-  cy: number,
-  heading: number,
-  _driving: boolean,
+  sx: number,
+  sy: number,
+  screenAng: number,
+  lenPx: number,
+  widPx: number,
 ): void {
-  const c = tileToWorld(cx, cy);
-  const len = TILE_W * 2;
-  const wid = TILE_H;
-  const ang = heading * (Math.PI / 2);
-  const cos = Math.cos(ang);
-  const sin = Math.sin(ang);
-  const hw = len / 2;
-  const hh = wid / 2;
+  const cos = Math.cos(screenAng);
+  const sin = Math.sin(screenAng);
+  const hw = lenPx / 2;
+  const hh = widPx / 2;
   const body = 0x4a7ab0;
   const cab = 0x5c90c8;
   const trim = 0x2e4a66;
@@ -358,22 +355,18 @@ export function paintJacCenital(
     { x: hw, y: -hh },
     { x: hw, y: hh },
     { x: -hw, y: hh },
-  ].map(({ x, y }) => ({ x: c.x + x * cos - y * sin, y: c.y + x * sin + y * cos }));
+  ].map(({ x, y }) => ({ x: sx + x * cos - y * sin, y: sy + x * sin + y * cos }));
   poly(g, corners, body);
-  const cabInset = 0.38;
   poly(
     g,
-    corners.map((p) => ({
-      x: c.x + (p.x - c.x) * cabInset + (-hh * 0.15) * sin,
-      y: c.y + (p.y - c.y) * cabInset + (hh * 0.15) * cos,
-    })),
+    corners.map((p) => ({ x: sx + (p.x - sx) * 0.62, y: sy + (p.y - sy) * 0.62 })),
     cab,
   );
   g.moveTo(corners[0].x, corners[0].y);
   g.lineTo(corners[1].x, corners[1].y);
-  g.stroke({ width: 2.5, color: trim, alpha: 0.85 });
-  const nose = { x: c.x + hw * cos, y: c.y + hw * sin };
-  g.circle(nose.x, nose.y, 5);
+  g.stroke({ width: 2.5, color: trim, alpha: 0.9 });
+  const nose = { x: sx + hw * cos, y: sy + hw * sin };
+  g.circle(nose.x, nose.y, Math.max(4, widPx * 0.12));
   g.fill({ color: 0xe8eef4 });
 }
 

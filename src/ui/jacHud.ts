@@ -2,6 +2,7 @@ import { getEnterableBuildings } from '../data/map';
 import { tileToWorld } from '../iso/math';
 import { isMobileLayout } from '../checklist/ui';
 import type { JacGear, JacLights, JacSnapshot, JacToggleId } from '../game/jacT9';
+import type { Camera } from '../tokens';
 import { getLang, onLangChange, t } from './i18n';
 
 export type JacHudCallbacks = {
@@ -13,6 +14,10 @@ export type JacHudCallbacks = {
   onGear: (gear: JacGear) => void;
   onToggle: (id: JacToggleId) => void;
   onEngine: () => void;
+  onView?: (mode: Camera) => void;
+  onRotate?: () => void;
+  onMapOverview?: () => void;
+  getView?: () => { mode: Camera; overview: boolean };
 };
 
 const TOGGLES: { id: JacToggleId; labelKey: 'jac.hazards'; icon: string }[] = [
@@ -198,6 +203,8 @@ export class JacHud {
       else if (act === 'gear') this.callbacks.onGear(t.dataset.val as JacGear);
       else if (act === 'toggle') this.callbacks.onToggle(t.dataset.val as JacToggleId);
       else if (act === 'dial') this.cycleLights();
+      else if (act === 'view') this.callbacks.onView?.(t.dataset.val as Camera);
+      else if (act === 'overview') this.callbacks.onMapOverview?.();
     };
     this.root.addEventListener('pointerup', (e) => {
       if ('button' in e && (e as PointerEvent).button !== 0) return;
@@ -262,6 +269,7 @@ export class JacHud {
     if (!phone && (snap.mode === 'info' || snap.mode === 'drive')) {
       const body = this.dockEl.querySelector('.jac-dock__body');
       if (body) body.innerHTML = this.dockBody(snap);
+      this.syncDockViews();
     }
     if (phone && snap.mode === 'drive') {
       const btn = this.barEl.querySelector('.jac-bar__btn');
@@ -303,6 +311,17 @@ export class JacHud {
       if ((el as HTMLElement).dataset.jac === 'in') (el as HTMLElement).hidden = inBtn;
       if ((el as HTMLElement).dataset.jac === 'out') (el as HTMLElement).hidden = !inBtn;
     });
+  }
+
+  private syncDockViews(): void {
+    const view = this.callbacks.getView?.();
+    if (!view) return;
+    this.dockEl.querySelectorAll('[data-jac="view"]').forEach((el) => {
+      const mode = (el as HTMLElement).dataset.val as Camera;
+      el.classList.toggle('is-on', !view.overview && mode === view.mode);
+    });
+    const ov = this.dockEl.querySelector('[data-jac="overview"]');
+    if (ov) ov.classList.toggle('is-on', view.overview);
   }
 
   private needleDeg(value: number, max: number, from: number, to: number): number {
@@ -463,10 +482,10 @@ export class JacHud {
         <div class="jac-dock__body"></div>
         <div class="jac-dock__right">
           <canvas class="jac-dock__mini" width="120" height="78" aria-hidden="true"></canvas>
-          <div class="jac-dock__views">
-            <span class="jac-dock__view" aria-hidden="true"></span>
-            <span class="jac-dock__view is-on" aria-hidden="true"></span>
-            <span class="jac-dock__view" aria-hidden="true"></span>
+          <div class="jac-dock__views" role="group">
+            <button type="button" class="jac-dock__view" data-jac="view" data-val="isometrica" aria-label="${t('chrome.isometric')}"></button>
+            <button type="button" class="jac-dock__view" data-jac="view" data-val="cenital" aria-label="${t('chrome.topdown')}"></button>
+            <button type="button" class="jac-dock__view" data-jac="overview" aria-label="${t('chrome.map')}"></button>
           </div>
         </div>
       </section>

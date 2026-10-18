@@ -47,9 +47,9 @@ async function realClick(page, x, y) {
 
 const DIR_IDX = { se: 0, sw: 1, nw: 2, ne: 3 };
 
-function headingErrDeg(actualIdx, expected) {
-  if (expected == null || actualIdx == null) return 180;
-  let d = actualIdx - expected;
+function headingErrDeg(actual, expected) {
+  if (expected == null || actual == null) return 180;
+  let d = actual - expected;
   if (d > 2) d -= 4;
   if (d < -2) d += 4;
   return Math.abs(d) * 90;
@@ -65,8 +65,7 @@ function summarizeDrive(samples, start, expectedHeading) {
     path += Math.hypot(s.cx - prev.cx, s.cy - prev.cy);
     prev = s;
     if ((s.mph ?? 0) < 3) continue;
-    const actualIdx = DIR_IDX[s.dir] ?? null;
-    const err = headingErrDeg(actualIdx, expectedHeading);
+    const err = headingErrDeg(s.heading, expectedHeading);
     maxErr = Math.max(maxErr, err);
     sumErr += err;
     errN += 1;
@@ -94,7 +93,7 @@ async function holdKeyboardDrive(page, key, holdMs) {
   return samples;
 }
 
-async function holdTouchDrive(cdp, page, dx, dy, holdMs) {
+async function holdTouchDrive(cdp, page, dx, dy, holdMs = 3500) {
   const joy = page.locator('.joystick');
   const box = await joy.boundingBox();
   if (!box) return [];
@@ -128,6 +127,16 @@ const DRIVE_DIRS = [
   { name: 'left', dx: -1, dy: 0, key: 'a' },
   { name: 'up', dx: 0, dy: -1, key: 'w' },
 ];
+
+/** Screen stick unit vector for angle deg from screen-up (clockwise). */
+function stickFromAngle(deg) {
+  const rad = (deg * Math.PI) / 180;
+  const dx = Math.sin(rad);
+  const dy = -Math.cos(rad);
+  return { dx, dy };
+}
+
+const OFF_AXIS_ANGLES = [0, -10, 10, -30, 30, 45, -45];
 
 async function boot(page) {
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });

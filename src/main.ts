@@ -59,6 +59,13 @@ async function main(): Promise<void> {
     onGear: (gear) => scene.jacSetGear(gear),
     onToggle: (id) => scene.jacSetToggle(id),
     onEngine: () => scene.jacSetEngine(),
+    onView: (mode) => scene.setViewMode(mode),
+    onRotate: () => scene.rotateView(),
+    onMapOverview: () => scene.toggleMapOverview(),
+    getView: () => {
+      const v = scene.getViewMode();
+      return { mode: v.mode, overview: v.overview };
+    },
   });
   const panel = new BuildingPanel(
     uiRoot,
@@ -235,6 +242,7 @@ async function main(): Promise<void> {
     doorScreenPoint: (name: string) => scene.getDoorScreenClientPoint(name),
     frameDoorForQa: (name: string) => scene.frameBuildingDoorForQa(name),
     tapBuildingDoor: (name: string) => scene.tapBuildingDoor(name),
+    driveEnter: (name: string) => scene.qaDriveEnter(name),
     setSuppressTap: (ms: number) => scene.setSuppressTapForQa(ms),
     tapMapTile: (tx: number, ty: number) => scene.tapMapTileForQa(tx, ty),
     tapScreen: (sx: number, sy: number) => scene.tapScreenForQa(sx, sy),

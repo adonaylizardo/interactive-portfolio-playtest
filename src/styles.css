@@ -2498,9 +2498,12 @@ body.jac-menu-open .checklist {
 .jac-dock__view {
   width: 28px;
   height: 28px;
+  padding: 0;
   border-radius: 8px;
   border: 1px solid #2a2c31;
   background: #1a1c20;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 .jac-dock__view.is-on {
@@ -2732,9 +2735,8 @@ body.jac-drive .chrome__locate {
 
 @media (min-width: 768px) {
   body.jac-drive .chrome__views {
-    visibility: visible;
-    z-index: 130;
-    pointer-events: auto;
+    visibility: hidden;
+    pointer-events: none;
   }
 }
 
