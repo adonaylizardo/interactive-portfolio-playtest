@@ -788,6 +788,10 @@ export class IsoScene {
     g.zIndex = -1000;
     g.on('pointertap', (e) => {
       if (this.shouldBlockTap()) return;
+      if (this.personaOn() && !this.jac?.driving) {
+        e.stopPropagation();
+        return;
+      }
       this.pixiTapGestureSerial = this.pointerGestureSerial;
       const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
       if (this.interiorActive || this.jac?.driving) {
@@ -873,6 +877,10 @@ export class IsoScene {
     g.cursor = cell.walkable ? 'pointer' : 'default';
     g.on('pointertap', (e) => {
       if (this.shouldBlockTap()) return;
+      if (this.personaOn() && !this.jac?.driving) {
+        e.stopPropagation();
+        return;
+      }
       this.pixiTapGestureSerial = this.pointerGestureSerial;
       if (this.jac?.driving) {
         const local = this.federatedToCanvas(e);
@@ -1039,6 +1047,10 @@ export class IsoScene {
       });
       g.on('pointertap', (e) => {
         if (this.shouldBlockTap()) return;
+        if (this.personaOn() && !this.jac?.driving) {
+          e.stopPropagation();
+          return;
+        }
         e.stopPropagation();
         this.pixiTapGestureSerial = this.pointerGestureSerial;
         if (this.jac?.driving) {
@@ -1367,18 +1379,8 @@ export class IsoScene {
 
   private remapPersonaStick(dx: number, dy: number): { x: number; y: number } {
     if (dx === 0 && dy === 0) return { x: 0, y: 0 };
-    const q = this.cameraYawQuarter();
-    const rad = (-q * Math.PI) / 2;
-    const cos = Math.cos(rad);
-    const sin = Math.sin(rad);
-    let lx = dx * cos - dy * sin;
-    let ly = dx * sin + dy * cos;
-    const mag = Math.hypot(lx, ly);
-    if (mag > 1) {
-      lx /= mag;
-      ly /= mag;
-    }
-    return { x: lx, y: -ly };
+    this.syncViewTransform();
+    return screenStickToTile(dx, dy, this.viewRot, this.viewSx, this.viewSy);
   }
 
   /** Screen coords (canvas pixels) ↔ world coords with world scaled under a fixed camera pivot. */
@@ -1892,6 +1894,16 @@ export class IsoScene {
     if (this.suppressMapTapOnce) {
       this.suppressMapTapOnce = false;
       return;
+    }
+    if (this.personaOn() && !this.interiorActive) {
+      if (this.jac?.driving) {
+        /* fall through to drive tap handling below */
+      } else if (this.jac && this.pickJacAtScreen(sx, sy)) {
+        this.tapJac();
+        return;
+      } else {
+        return;
+      }
     }
     if (!this.interiorActive && this.events.checklist?.isMobileExpanded()) {
       this.events.checklist.collapseMobile();
@@ -2496,7 +2508,8 @@ export class IsoScene {
     const sh = this.app.screen.height;
     const dt = Math.min(0.25, this.app.ticker.elapsedMS / 1000);
     this.personaTimeSec += dt;
-    const walking = this.path.length > 0 || this.keys.size > 0;
+    const walking =
+      this.path.length > 0 || this.keys.size > 0 || !!this.events.stickActive?.();
     if (walking) this.personaIdleSec = 0;
     else this.personaIdleSec += dt;
     this.avatar.setVisible(false);
@@ -5798,11 +5811,23 @@ export class IsoScene {
     return { covW: cov.covW, covH: cov.covH, overview: this.mapOverview };
   }
 
+  personaJacBoardVisible(): boolean {
+    return this.personaOn() && !!this.jac && !this.jac.driving && this.atJacDoor(2.2);
+  }
+
+  /** QA: screen stick → unit tile delta (persona / alt cameras). */
+  qaStickToTile(dx: number, dy: number): { x: number; y: number } {
+    if (this.personaOn()) return this.remapPersonaStick(dx, dy);
+    this.syncViewTransform();
+    return screenStickToTile(dx, dy, this.viewRot, this.viewSx, this.viewSy);
+  }
+
   qaPersonaState(): {
     active: boolean;
     pantoneVisible: boolean;
     pantoneSit: boolean;
     jacCabin: boolean;
+    jacBoard: boolean;
     assets: ReturnType<PersonaView['assetReport']>;
   } {
     return {
@@ -5810,6 +5835,7 @@ export class IsoScene {
       pantoneVisible: this.persona.lastPantoneVisible,
       pantoneSit: this.persona.lastPantoneAnim === 'sit',
       jacCabin: this.persona.lastJacCabin,
+      jacBoard: this.personaJacBoardVisible(),
       assets: this.persona.assetReport(),
     };
   }
@@ -5992,6 +6018,14 @@ export class IsoScene {
   qaSkipQuiet(seconds: number): void {
     this.avatar.qaSkipQuiet(seconds);
     this.interiorAvatar.qaSkipQuiet(seconds);
+    if (this.personaOn()) this.personaIdleSec += seconds;
+  }
+
+  qaClearInput(): void {
+    this.keys.clear();
+    this.shiftHeld = false;
+    this.path = [];
+    this.events.stickCancel?.();
   }
 
   /** QA: what Pixi's event boundary would deliver a mouse event at this client point to. */

@@ -11,6 +11,7 @@ import { launchBrowser } from './qa-ready.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'artifacts', 'preview-persona');
 const FRAMES = path.join(ROOT, 'art', 'primera-persona', 'frames');
+const METERS_PER_TILE = 2.35;
 const BASE =
   process.argv[2] ??
   'https://adonaylizardo.github.io/interactive-portfolio-playtest/preview-persona/';
@@ -71,6 +72,17 @@ async function cdpTouch(cdp, x, y) {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt });
   await wait(40);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+}
+
+async function releaseInputs(page) {
+  await page.evaluate(() => {
+    window.__playtestQa.clearInput?.();
+    for (const k of ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']) {
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true }));
+    }
+    window.__playtestQa.stickCancel?.();
+  });
+  await wait(400);
 }
 
 async function holdKeys(page, dx, dy, ms = 2200) {
@@ -208,58 +220,103 @@ async function holdMove(cdp, page, touch, dx, dy, ms) {
   else await holdKeys(page, dx, dy, ms);
 }
 
-async function tapGroundTile(page, cdp, touch, tx, ty) {
-  const pt = await page.evaluate(({ tx, ty }) => {
-    const x = (tx - ty) * 64;
-    const y = (tx + ty) * 32;
-    return window.__playtestQa.worldToClient(x, y);
-  }, { tx, ty });
-  if (touch) await cdpTouch(cdp, pt.x, pt.y);
-  else await page.mouse.click(pt.x, pt.y);
-}
-
-async function walkToTileTap(page, cdp, touch, tx, ty) {
-  for (let i = 0; i < 4; i++) {
-    await tapGroundTile(page, cdp, touch, tx, ty);
-    await wait(5500);
-    const c = await page.evaluate(() => window.__playtestQa.inputReady().char);
-    if (Math.hypot(c.x - tx, c.y - ty) < 8) return true;
-  }
-  const c = await page.evaluate(() => window.__playtestQa.inputReady().char);
-  return Math.hypot(c.x - tx, c.y - ty) < 8;
-}
-
-async function walkTowardTile(page, cdp, touch, tx, ty, maxMs = 32000) {
+async function walkTowardTile(page, cdp, touch, tx, ty, maxMs = 55000) {
   const t0 = Date.now();
-  let best = [0, -1];
-  let lastScan = 0;
   while (Date.now() - t0 < maxMs) {
-    const before = await page.evaluate(() => window.__playtestQa.inputReady().char);
-    const distBefore = Math.hypot(before.x - tx, before.y - ty);
-    if (distBefore < 2.2) return true;
-
-    if (Date.now() - lastScan > 2200) {
-      let pick = best;
-      let bestGain = -1;
-      for (const [sx, sy] of STICK_DIRS) {
-        await holdMove(cdp, page, touch, sx, sy, 320);
-        const after = await page.evaluate(() => window.__playtestQa.inputReady().char);
-        const gain = distBefore - Math.hypot(after.x - tx, after.y - ty);
-        if (gain > bestGain) {
-          bestGain = gain;
-          pick = [sx, sy];
+    const snap = await page.evaluate(
+      ({ gx, gy }) => {
+        const c = window.__playtestQa.inputReady().char;
+        const dist = Math.hypot(c.x - gx, c.y - gy);
+        if (dist < 2.2) return { done: true, stick: [0, -1] };
+        const path = window.__playtestQa.findPath(
+          Math.round(c.x),
+          Math.round(c.y),
+          gx,
+          gy,
+        );
+        if (!path || path.length < 2) return { done: dist < 8, stick: [0, -1] };
+        const node = path[1];
+        const wantX = node.x - c.x;
+        const wantY = node.y - c.y;
+        const wantMag = Math.hypot(wantX, wantY) || 1;
+        let best = [0, -1];
+        let bestDot = -2;
+        for (const [sx, sy] of [
+          [0, -1],
+          [1, -1],
+          [1, 0],
+          [1, 1],
+          [0, 1],
+          [-1, 1],
+          [-1, 0],
+          [-1, -1],
+        ]) {
+          const m = window.__playtestQa.stickToTile(sx, sy);
+          const dot = (m.x * wantX + m.y * wantY) / (Math.hypot(m.x, m.y) || 1) / wantMag;
+          if (dot > bestDot) {
+            bestDot = dot;
+            best = [sx, sy];
+          }
         }
-        if (Math.hypot(after.x - tx, after.y - ty) < 2.2) return true;
-      }
-      best = pick;
-      lastScan = Date.now();
-    } else {
-      await holdMove(cdp, page, touch, best[0], best[1], 1100);
-    }
-    await wait(40);
+        return { done: false, stick: best };
+      },
+      { gx: tx, gy: ty },
+    );
+    if (snap.done) return true;
+    await holdMove(cdp, page, touch, snap.stick[0], snap.stick[1], 750);
+    await wait(30);
   }
   const c = await page.evaluate(() => window.__playtestQa.inputReady().char);
   return Math.hypot(c.x - tx, c.y - ty) < 8;
+}
+
+async function driveMeters(page, cdp, touch, minM = 10, maxMs = 48000) {
+  const start = await page.evaluate(() => {
+    const j = window.__playtestQa.jac();
+    return j ? { x: j.cx, y: j.cy } : null;
+  });
+  if (!start) return 0;
+  const t0 = Date.now();
+  const driveDirs = [
+    [0, -1],
+    [1, 0],
+    [0, 1],
+    [-1, 0],
+    [1, -1],
+    [-1, -1],
+  ];
+  let dirIdx = 0;
+  while (Date.now() - t0 < maxMs) {
+    const meters = await page.evaluate(
+      ({ sx, sy, mpt }) => {
+        const j = window.__playtestQa.jac();
+        if (!j) return 0;
+        return Math.hypot(j.cx - sx, j.cy - sy) * mpt;
+      },
+      { sx: start.x, sy: start.y, mpt: METERS_PER_TILE },
+    );
+    if (meters >= minM) return meters;
+    const before = meters;
+    const [sx, sy] = driveDirs[dirIdx % driveDirs.length];
+    await holdMove(cdp, page, touch, sx, sy, 1800);
+    const after = await page.evaluate(
+      ({ sx0, sy0, mpt }) => {
+        const j = window.__playtestQa.jac();
+        if (!j) return 0;
+        return Math.hypot(j.cx - sx0, j.cy - sy0) * mpt;
+      },
+      { sx0: start.x, sy0: start.y, mpt: METERS_PER_TILE },
+    );
+    if (after <= before + 0.2) dirIdx += 1;
+  }
+  return await page.evaluate(
+    ({ sx, sy, mpt }) => {
+      const j = window.__playtestQa.jac();
+      if (!j) return 0;
+      return Math.hypot(j.cx - sx, j.cy - sy) * mpt;
+    },
+    { sx: start.x, sy: start.y, mpt: METERS_PER_TILE },
+  );
 }
 
 async function runViewport(tag, opts) {
@@ -331,66 +388,61 @@ async function runViewport(tag, opts) {
       rows.push({ check: 'pantone follows', pass: st.pantoneVisible });
       if (!st.pantoneVisible) errors.push(`${tag}: pantone not visible while walking`);
 
-      const nearCatedral = touch
-        ? await walkToTileTap(page, cdp, touch, 14, 17)
-        : await walkTowardTile(page, cdp, touch, 14, 17, 35000);
+      const nearCatedral = await walkTowardTile(page, cdp, touch, 14, 17, 100000);
       await page.screenshot({ path: path.join(OUT, `${tag}-near-catedral.png`) });
       rows.push({ check: 'walk past catedral', pass: nearCatedral });
       if (!nearCatedral) errors.push(`${tag}: did not reach catedral approach by walking`);
 
-      const nearFlor = touch
-        ? await walkToTileTap(page, cdp, touch, 46, 46)
-        : await walkTowardTile(page, cdp, touch, 46, 46, 35000);
+      const nearFlor = await walkTowardTile(page, cdp, touch, 46, 46, 70000);
       await page.screenshot({ path: path.join(OUT, `${tag}-near-flor.png`) });
       rows.push({ check: 'walk past flor', pass: nearFlor });
       if (!nearFlor) errors.push(`${tag}: did not reach flor approach by walking`);
 
+      await releaseInputs(page);
       await wait(31000);
       st = await page.evaluate(() => window.__playtestQa.personaState());
       rows.push({ check: 'pantone sits idle', pass: st.pantoneSit && st.pantoneVisible });
       if (!st.pantoneSit) errors.push(`${tag}: pantone did not sit after 30s idle`);
 
-      const nearJac = touch
-        ? await walkToTileTap(page, cdp, touch, 27, 19)
-        : await walkTowardTile(page, cdp, touch, 27, 19, 35000);
+      const nearJac = await walkTowardTile(page, cdp, touch, 27, 19, 90000);
       notes.push(`${tag}: near jac ${nearJac}`);
-      const jac = page.locator('#game-canvas');
-      const e = await page.evaluate(() => window.__playtestQa.jacEntities());
-      const rect = await jac.boundingBox();
-      if (rect && e?.sx) {
-        const cx = rect.x + e.sx;
-        const cy = rect.y + e.sy;
-        if (touch) await cdpTouch(cdp, cx, cy);
-        else await page.mouse.click(cx, cy);
-        await wait(800);
-      }
+      await page
+        .waitForFunction(() => window.__playtestQa.personaState().jacBoard, null, { timeout: 12000 })
+        .catch(() => null);
+      const boardBtn = page.locator('[data-persona-jac="in"]');
+      const boardBox = await boardBtn.boundingBox().catch(() => null);
+      const boardSizeOk = boardBox && boardBox.height >= 44 && boardBox.width >= 44;
+      rows.push({ check: 'jac board visible', pass: !!boardSizeOk && nearJac });
+      if (!boardSizeOk) errors.push(`${tag}: Subir a la T9 board missing or under 44px`);
+
+      const tappedIn = await tapSelector(page, cdp, touch, '[data-persona-jac="in"]');
+      await wait(1200);
       let driving = await page.evaluate(() => window.__playtestQa.jac()?.driving);
-      if (!driving) {
-        const tappedIn =
-          (await tapSelector(page, cdp, touch, '.jac-bar [data-jac="in"]')) ||
-          (await tapSelector(page, cdp, touch, '.jac-menu [data-jac="in"]')) ||
-          (await tapSelector(page, cdp, touch, '[data-jac="in"]'));
-        if (!tappedIn) await page.keyboard.press('Enter');
-        await wait(1200);
-        driving = await page.evaluate(() => window.__playtestQa.jac()?.driving);
-      }
-      rows.push({ check: 'jac drive enter', pass: !!driving });
-      if (!driving) errors.push(`${tag}: did not enter jac T9`);
+      rows.push({ check: 'jac drive enter', pass: !!driving && tappedIn });
+      if (!driving) errors.push(`${tag}: did not enter jac T9 via board`);
       st = await page.evaluate(() => window.__playtestQa.personaState());
       rows.push({ check: 'jac cabin', pass: st.jacCabin && st.active });
       if (!st.jacCabin) errors.push(`${tag}: jac cabin overlay not active`);
 
-      await holdMove(cdp, page, touch, 0, -1, 2000);
+      const droveM = driving ? await driveMeters(page, cdp, touch, 10, 22000) : 0;
+      rows.push({ check: 'jac drove 10m', pass: droveM >= 10 });
+      if (droveM < 10) errors.push(`${tag}: drove only ${droveM.toFixed(1)}m (need 10m)`);
+      notes.push(`${tag}: drove ${droveM.toFixed(1)}m`);
+
       await page.screenshot({ path: path.join(OUT, `${tag}-jac-cabin.png`) });
 
-      const tappedOut =
-        (await tapSelector(page, cdp, touch, '.jac-bar [data-jac="out"]')) ||
-        (await tapSelector(page, cdp, touch, '[data-jac="out"]'));
-      if (!tappedOut) await page.keyboard.press('Enter');
-      await wait(1000);
-      const stillDriving = await page.evaluate(() => window.__playtestQa.jac()?.driving);
-      rows.push({ check: 'jac get out', pass: !stillDriving });
-      if (stillDriving) errors.push(`${tag}: still driving after get out`);
+      let gotOut = false;
+      if (droveM >= 10) {
+        const tappedOut =
+          (await tapSelector(page, cdp, touch, '[data-persona-jac="out"]')) ||
+          (await tapSelector(page, cdp, touch, '.jac-bar [data-jac="out"]')) ||
+          (await tapSelector(page, cdp, touch, '[data-jac="out"]'));
+        if (!tappedOut) await page.keyboard.press('Enter');
+        await wait(1200);
+        gotOut = !(await page.evaluate(() => window.__playtestQa.jac()?.driving));
+      }
+      rows.push({ check: 'jac get out', pass: gotOut && droveM >= 10 });
+      if (!gotOut) errors.push(`${tag}: get out failed or no prior 10m drive`);
 
       await exitPersonaView(page, cdp, touch);
       st = await page.evaluate(() => window.__playtestQa.personaState());

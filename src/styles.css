@@ -2757,3 +2757,39 @@ body.jac-info[data-chrome='phone'] .chrome__dock {
   }
 }
 
+.persona-jac-board {
+  position: fixed;
+  left: 50%;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  z-index: 130;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.persona-jac-board__btn {
+  min-width: 220px;
+  min-height: 44px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 12px;
+  background: #f2a93b;
+  color: #0b0c0e;
+  font: 600 15px/1.2 Inter, system-ui, sans-serif;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.persona-jac-board__btn--out {
+  background: #edeef0;
+}
+
+@media (max-width: 767px) {
+  body[data-layout='split'] .persona-jac-board {
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+}
+

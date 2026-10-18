@@ -43,6 +43,9 @@ const DICT = {
     'jac.drive': 'Drive',
     'jac.hazards': 'Hazards',
 
+    'persona.jacBoardIn': 'Get in the T9',
+    'persona.jacBoardOut': 'Get out',
+
     'canvas.label': 'Isometric playtest world',
 
     'panel.exit': 'Exit',
@@ -124,6 +127,9 @@ const DICT = {
     'jac.on': 'Enc.',
     'jac.drive': 'Conducir',
     'jac.hazards': 'Balizas',
+
+    'persona.jacBoardIn': 'Subir a la T9',
+    'persona.jacBoardOut': 'Bajar',
 
     'canvas.label': 'Mundo isométrico de prueba',
 

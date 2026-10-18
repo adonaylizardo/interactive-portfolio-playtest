@@ -17,6 +17,7 @@ import { findPath } from './iso/pathfinding';
 import { BuildingPanel } from './ui/buildingPanel';
 import { ChromeUI, type DesktopLayout } from './ui/chrome';
 import { JacHud } from './ui/jacHud';
+import { PersonaJacBoard } from './ui/personaJacBoard';
 import { Joystick } from './ui/joystick';
 import { personaEnabled } from './game/persona/personaSpec';
 import { NameLabels } from './ui/nameLabels';
@@ -51,6 +52,10 @@ async function main(): Promise<void> {
   const joystick = new Joystick(uiRoot);
   const labels = new NameLabels(uiRoot, { onJacInfo: () => scene.jacOpenInfo() });
   const cenitalLabels = new CenitalBuildingLabels(uiRoot);
+  const personaJacBoard = new PersonaJacBoard(uiRoot, {
+    onGetIn: () => scene.jacGetIn(),
+    onGetOut: () => scene.jacGetOut(),
+  });
   const jacHud = new JacHud(uiRoot, {
     onInfo: () => scene.jacOpenInfo(),
     onGetIn: () => scene.jacGetIn(),
@@ -130,6 +135,12 @@ async function main(): Promise<void> {
         jacHud.park();
         labels.setHidden(false);
       }
+      const ps = scene.qaPersonaState();
+      const driving = !!scene.jacSnapshot()?.driving;
+      personaJacBoard.sync({
+        showIn: ps.active && ps.jacBoard && !driving,
+        showOut: ps.active && driving,
+      });
       const personaWalk =
         personaEnabled() && scene.getViewMode().mode === 'persona' && !scene.isInInterior();
       joystick.setHidden(
@@ -192,7 +203,7 @@ async function main(): Promise<void> {
     (e) => {
       const t = e.target as HTMLElement | null;
       if (!t) return;
-      if (t.closest('.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock')) return;
+      if (t.closest('.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock, .persona-jac-board')) return;
       if (t === canvas || t.closest('#app, .joystick, #game-canvas, #ui-root')) {
         if (joystick.isActive() || scene?.jacSnapshot()?.driving) e.preventDefault();
       }
@@ -203,7 +214,7 @@ async function main(): Promise<void> {
     'touchmove',
     (e) => {
       const t = e.target as HTMLElement | null;
-      if (t?.closest('.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock')) return;
+      if (t?.closest('.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock, .persona-jac-board')) return;
       if (joystick.isActive() || scene?.jacSnapshot()?.driving) e.preventDefault();
     },
     { passive: false, capture: true },
@@ -316,6 +327,7 @@ async function main(): Promise<void> {
     toggleMapOverview: () => scene.toggleMapOverview(),
     overviewCoverage: () => scene.qaOverviewCoverage(),
     personaState: () => scene.qaPersonaState(),
+    stickToTile: (dx: number, dy: number) => scene.qaStickToTile(dx, dy),
     cameraViews: () => scene.qaCameraViews(),
     cenitalExpectedHeading: (dx: number, dy: number) => scene.qaCenitalExpectedHeading(dx, dy),
     cenitalBuildingLabels: () => cenitalLabels.qa(),
@@ -338,6 +350,7 @@ async function main(): Promise<void> {
       return { present: true, visible, opacity: Number(style.opacity), hint: el.dataset.hint ?? '' };
     },
     stickCancel: () => joystick.cancel(),
+    clearInput: () => scene.qaClearInput(),
     joystick: () => joystick.qa(),
     nameLabels: () => labels.qa(),
     namePillHeads: () => scene.qaNamePillHeads(),
