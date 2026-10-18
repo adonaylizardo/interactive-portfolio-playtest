@@ -141,6 +141,7 @@ async function main(): Promise<void> {
       isOpen: () => panel.isOpen(),
       openTitle: () => panel.openTitle(),
       dismiss: () => panel.hide(),
+      dismissFromHistory: () => panel.hide({ fromHistory: true }),
       isPreview: () => panel.isPreviewMode(),
       layoutInsets: () => panel.layoutInsets(),
       consumeInteriorCanvasTap: (x, y) => panel.consumeInteriorCanvasTap(x, y),
