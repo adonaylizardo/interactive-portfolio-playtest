@@ -5101,6 +5101,14 @@ export class IsoScene {
     this.handleScreenTap(scr.x, scr.y, false);
   }
 
+  getMapTileScreenClientPoint(tx: number, ty: number): { x: number; y: number } | null {
+    if (!this.canvasEl) return null;
+    const c = tileToWorld(tx, ty);
+    const scr = this.worldToScreen(c.x, c.y);
+    const rect = this.canvasEl.getBoundingClientRect();
+    return { x: rect.left + scr.x, y: rect.top + scr.y };
+  }
+
   /** QA: client/screen coords (same routing as pointer release → handleScreenTap). */
   tapScreenForQa(clientX: number, clientY: number, sprint = false): void {
     const rect = this.canvasEl?.getBoundingClientRect();

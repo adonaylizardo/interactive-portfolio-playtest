@@ -229,6 +229,7 @@ async function main(): Promise<void> {
     driveEnter: (name: string) => scene.qaDriveEnter(name),
     setSuppressTap: (ms: number) => scene.setSuppressTapForQa(ms),
     tapMapTile: (tx: number, ty: number) => scene.tapMapTileForQa(tx, ty),
+    tileScreenPoint: (tx: number, ty: number) => scene.getMapTileScreenClientPoint(tx, ty),
     tapScreen: (sx: number, sy: number) => scene.tapScreenForQa(sx, sy),
     isInInterior: () => scene.isInInterior(),
     getInteriorId: () => scene.getInteriorBuildingId(),
