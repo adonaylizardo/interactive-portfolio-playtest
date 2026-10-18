@@ -179,7 +179,7 @@ export class AboutMePanel {
     if (!this.subtitleHome) return;
     const { el, parent, next } = this.subtitleHome;
     if (next && next.parentNode === parent) parent.insertBefore(el, next);
-    else parent.append(el);
+    else parent.appendChild(el);
     this.subtitleHome = null;
   }
 
