@@ -89,10 +89,10 @@ async function toast1280(page) {
   await page.waitForFunction(() => window.__playtestQa?.setViewMode);
   await wait(2000);
   await page.evaluate(() => {
-    location.hash = '#in=bogus-place';
+    location.hash = '#caso=evil';
     window.dispatchEvent(new HashChangeEvent('hashchange'));
   });
-  await wait(1800);
+  await wait(600);
   const toastShot = path.join(OUT, 'p11-1280-unknown-route-toast.png');
   await page.screenshot({ path: toastShot });
   const toastDom = await page.evaluate(() => {
