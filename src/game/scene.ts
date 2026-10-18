@@ -731,6 +731,7 @@ export class IsoScene {
     g.zIndex = -1000;
     g.on('pointertap', (e) => {
       if (this.shouldBlockTap()) return;
+      if (this.skipPixiMapTapForTouch()) return;
       this.pixiTapGestureSerial = this.pointerGestureSerial;
       const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
       if (this.interiorActive || this.jac?.driving) {
@@ -811,6 +812,7 @@ export class IsoScene {
     g.cursor = cell.walkable ? 'pointer' : 'default';
     g.on('pointertap', (e) => {
       if (this.shouldBlockTap()) return;
+      if (this.skipPixiMapTapForTouch()) return;
       this.pixiTapGestureSerial = this.pointerGestureSerial;
       if (this.jac?.driving) {
         const local = this.federatedToCanvas(e);
@@ -978,6 +980,7 @@ export class IsoScene {
       });
       g.on('pointertap', (e) => {
         if (this.shouldBlockTap()) return;
+        if (this.skipPixiMapTapForTouch()) return;
         e.stopPropagation();
         this.pixiTapGestureSerial = this.pointerGestureSerial;
         const local = this.federatedToCanvas(e);
@@ -1424,6 +1427,15 @@ export class IsoScene {
     if (this.canvasEl) this.canvasEl.dataset.walkGoal = '';
   }
 
+  /** After closing a map sheet (case preview, overlay): drop stale walk/entry so the next door tap targets correctly. */
+  resetMapDoorChainState(): void {
+    this.pendingBuildingEntry = null;
+    this.clearWalkPreview();
+    this.doorCooldown = 0;
+    this.suspendCameraFollow();
+    this.applyCameraFromUi();
+  }
+
   walkToTile(tx: number, ty: number, sprint: boolean, opts?: { keepView?: boolean }): void {
     if (this.seatedBench && !this.interiorActive) {
       this.standThen(() => this.walkToTile(tx, ty, sprint, opts));
@@ -1512,12 +1524,8 @@ export class IsoScene {
     }
   }
 
-  /** Door pick in world space (stable at min zoom ~0.04–0.15); closest opening wins. */
+  /** Door pick in world space; closest door opening wins (never building-body fallback). */
   private pickBuildingDoorAtScreen(sx: number, sy: number): MapObject | undefined {
-    if (this.zoom <= 0.15) {
-      const body = this.pickBuildingAtScreen(sx, sy);
-      if (body?.door && body.panelTitle) return body;
-    }
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
     const buildings = objects.filter((o) => o.type === 'building' && o.door && o.panelTitle);
     let best: { obj: MapObject; dist: number; depth: number } | null = null;
@@ -1616,6 +1624,8 @@ export class IsoScene {
     bridge.dismiss();
     this.pendingBuildingEntry = null;
     this.clearWalkPreview();
+    this.suspendCameraFollow();
+    this.applyCameraFromUi();
     const ctx = Math.round(this.charTx);
     const cty = Math.round(this.charTy);
     if (getBuildingAtDoor(ctx, cty)) {
@@ -1676,18 +1686,6 @@ export class IsoScene {
       this.requestDriveToScreen(sx, sy);
       return;
     }
-    if (this.jac && (this.jac.mode === 'menu' || this.jac.mode === 'info')) {
-      if (this.pickJacAtScreen(sx, sy)) {
-        this.tapJac();
-        return;
-      }
-      this.jacClose();
-      return;
-    }
-    if (this.pickJacAtScreen(sx, sy)) {
-      this.tapJac();
-      return;
-    }
     const doorFirst = this.pickBuildingDoorAtScreen(sx, sy);
     if (doorFirst?.door && doorFirst.panelTitle) {
       if (!this.prepareMapTap(doorFirst)) return;
@@ -1703,6 +1701,18 @@ export class IsoScene {
       this.requestWalk(doorFirst.door.x, doorFirst.door.y, sprint, {
         buildingEntry: { panelTitle: doorFirst.panelTitle, door: doorFirst.door },
       });
+      return;
+    }
+    if (this.jac && (this.jac.mode === 'menu' || this.jac.mode === 'info')) {
+      if (this.pickJacAtScreen(sx, sy)) {
+        this.tapJac();
+        return;
+      }
+      this.jacClose();
+      return;
+    }
+    if (this.pickJacAtScreen(sx, sy)) {
+      this.tapJac();
       return;
     }
     const sceneryTile = this.pickSceneryAtScreen(sx, sy);
@@ -1998,7 +2008,12 @@ export class IsoScene {
         // Layouts v2: the tutorial is a top-right overlay. Never treat it as a left
         // sidebar — that used to steal the map hole and shove the character off-screen.
         if (bottomAnchored && box.left < sw * 0.45) {
-          bottom = Math.max(bottom, Math.ceil(sh - box.top + pad));
+          // Top map pill (layout=map): reserve space above the map, not the whole column below it.
+          if (box.top < sh * 0.2) {
+            top = Math.max(top, Math.ceil(box.bottom + pad));
+          } else {
+            bottom = Math.max(bottom, Math.ceil(sh - box.top + pad));
+          }
         } else if (box.left < sw * 0.35 && box.top <= sh * 0.5) {
           left = Math.max(left, Math.ceil(box.right + pad));
         }
@@ -2525,6 +2540,11 @@ export class IsoScene {
     } else {
       this.pinchSession = null;
     }
+  }
+
+  /** Phone map taps resolve on pointerup via tryScheduleDeferredTap; Pixi would double-fire. */
+  private skipPixiMapTapForTouch(): boolean {
+    return isTouchPrimary() && !this.interiorActive;
   }
 
   /** `panSlopPx`: a press that strayed no farther than this still taps, even if it nudged the camera. */
@@ -3616,6 +3636,7 @@ export class IsoScene {
     this.pendingBuildingEntry = null;
     this.path = [];
     this.drawPathPreview();
+    if (this.canvasEl) this.canvasEl.dataset.walkGoal = '';
     this.doorCooldown = 120;
     this.mapReturnDoor = { x: building.door.x, y: building.door.y };
     this.charTx = building.door.x;
@@ -3922,9 +3943,17 @@ export class IsoScene {
     return this.interiorActive;
   }
 
-  /** Refit camera when the interior sheet peek height changes. */
+  /** Refit camera when chrome/panel insets change (preview dismiss, map dock, sheet peek). */
   applyCameraFromUi(): void {
-    if (this.interiorActive) this.fitInteriorCamera();
+    this.updateCameraFitMargins();
+    if (this.interiorActive && this.interiorDef) {
+      this.fitInteriorCamera();
+    } else if (!this.follow.engaged) {
+      this.centerOnCharacter(false);
+      this.panMoved = false;
+      this.hadMultiPointerGesture = false;
+      this.tapDriftPx = 0;
+    }
     this.applyCamera(false);
   }
 
@@ -4700,6 +4729,29 @@ export class IsoScene {
     return true;
   }
 
+  /** QA: one-finger touch release on the door (same deferred-tap path as phone play). */
+  tapDoorWithTouchEventsForQa(name: string): boolean {
+    const client = this.getDoorScreenClientPoint(name);
+    const canvas = this.canvasEl;
+    if (!client || !canvas) return false;
+    this.releaseMapTapGestureForQa();
+    const pid = 42;
+    const base = {
+      bubbles: true,
+      cancelable: true,
+      clientX: client.x,
+      clientY: client.y,
+      pointerId: pid,
+      pointerType: 'touch' as const,
+      isPrimary: true,
+      button: 0,
+      buttons: 0,
+    };
+    canvas.dispatchEvent(new PointerEvent('pointerdown', { ...base, buttons: 1 }));
+    canvas.dispatchEvent(new PointerEvent('pointerup', base));
+    return true;
+  }
+
   /** QA: pan so the character and target door are both on screen before a real pointer tap. */
   frameBuildingDoorForQa(name: string): void {
     const obj = objects.find((o) => o.type === 'building' && o.name === name);
@@ -4709,9 +4761,12 @@ export class IsoScene {
     const midTy = (this.charTy + d.y) / 2;
     const mid = tileToWorld(midTx, midTy);
     const doorW = tileToWorld(d.x, d.y);
-    const charW = tileToWorld(this.charTx, this.charTy);
-    const spanX = Math.abs(doorW.x - charW.x) + TILE_W * 2;
-    const spanY = Math.abs(doorW.y - charW.y) + TILE_H * 4;
+    const inward = doorInwardStep(obj);
+    const standTx = inward ? d.x - inward.x : d.x;
+    const standTy = inward ? d.y - inward.y : d.y;
+    const charW = tileToWorld(standTx, standTy);
+    const spanX = Math.max(TILE_W * 3, Math.abs(doorW.x - charW.x) + TILE_W * 2);
+    const spanY = Math.max(TILE_H * 4, Math.abs(doorW.y - charW.y) + TILE_H * 4);
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     this.updateCameraFitMargins();
@@ -4720,7 +4775,8 @@ export class IsoScene {
     const innerH = Math.max(1, sh - m.top - m.bottom);
     const zoomX = innerW / spanX;
     const zoomY = innerH / spanY;
-    this.zoom = clampZoom(Math.min(zoomX, zoomY) * 0.88, sw, sh);
+    const fit = clampZoom(Math.min(zoomX, zoomY) * 0.88, sw, sh);
+    this.zoom = Math.max(fit, 0.12);
     const aim = this.freeRectCenter();
     this.placeWorldAtScreen(mid.x, mid.y - 40, aim.x, aim.y);
     this.applyCamera(false);
@@ -4731,6 +4787,8 @@ export class IsoScene {
     const obj = objects.find((o) => o.type === 'building' && o.name === name);
     const tap = obj ? doorTapPoint(obj) : null;
     if (!tap || !this.canvasEl) return null;
+    this.updateCameraFitMargins();
+    this.app?.render();
     const screen = this.worldToScreen(tap.x, tap.y);
     const rect = this.canvasEl.getBoundingClientRect();
     return { x: rect.left + screen.x, y: rect.top + screen.y };
@@ -4754,6 +4812,17 @@ export class IsoScene {
   }
 
   /** Stand on the tile in front of the door, frame camera — for real pointer entry tests. */
+  /** Clear pan/suppress flags so the next real pointer tap is not eaten after a sheet dismiss. */
+  releaseMapTapGestureForQa(): void {
+    this.clearDeferredTap();
+    this.panMoved = false;
+    this.hadMultiPointerGesture = false;
+    this.secondFingerArrived = false;
+    this.tapDriftPx = 0;
+    this.suppressTapUntil = 0;
+    this.pixiTapGestureSerial = -1;
+  }
+
   prepareDoorEntryForQa(name: string): boolean {
     const obj = objects.find((o) => o.type === 'building' && o.name === name);
     if (!obj?.door || !obj.panelTitle) return false;
@@ -4771,7 +4840,11 @@ export class IsoScene {
       break;
     }
     if (!placed) return false;
+    this.suspendCameraFollow();
     this.frameBuildingDoorForQa(name);
+    this.updateCameraFitMargins();
+    this.app?.render();
+    this.releaseMapTapGestureForQa();
     return true;
   }
 

@@ -690,7 +690,11 @@ export class BuildingPanel {
   }
 
   private writingRow(item: TalkItem, section: WritingSection, compact = false): HTMLElement {
-    return this.talkRow(item, () => this.openWriting(section, item), { compact, kind: 'writing' });
+    const row = this.talkRow(item, () => this.openWriting(section, item), { compact, kind: 'writing' });
+    if (item.id === 'ux-example-2' || item.id === 'sin-example-2') {
+      row.querySelector('.experience__row-title')?.classList.add('experience__row-title--two-line');
+    }
+    return row;
   }
 
   private openTalk(item: TalkItem): void {
@@ -778,6 +782,8 @@ export class BuildingPanel {
       }
       firstSection = false;
       const limit = rowLimit[section.id] ?? 3;
+      const block = document.createElement('div');
+      block.className = 'experience__section';
       const head = document.createElement('div');
       head.className = 'experience__section-head';
       const row = document.createElement('div');
@@ -787,7 +793,7 @@ export class BuildingPanel {
       h.textContent = t(section.titleKey as I18nKey);
       const badge = document.createElement('span');
       badge.className = 'experience__section-count';
-      badge.textContent = String(Math.min(limit, section.items.length));
+      badge.textContent = '0';
       const seeAll = document.createElement('button');
       seeAll.type = 'button';
       seeAll.className = 'experience__see-all';
@@ -800,10 +806,11 @@ export class BuildingPanel {
       p.className = 'experience__section-desc';
       p.textContent = t(section.descKey as I18nKey);
       head.append(row, p);
-      frag.appendChild(head);
+      block.appendChild(head);
       for (const item of section.items.slice(0, limit)) {
-        frag.appendChild(this.writingRow(item, section));
+        block.appendChild(this.writingRow(item, section));
       }
+      frag.appendChild(block);
     }
     this.experienceList.replaceChildren(frag);
   }

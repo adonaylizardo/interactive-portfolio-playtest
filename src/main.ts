@@ -76,7 +76,11 @@ async function main(): Promise<void> {
       }
       joystick.setHidden(open || panel.isPreviewExpanded());
       if (panel.isPreviewExpanded()) checklist.setCollapsed(true);
-      scene?.applyCameraFromUi();
+      if (!panel.isOpen() && !scene?.isInInterior()) {
+        scene?.resetMapDoorChainState();
+      } else {
+        scene?.applyCameraFromUi();
+      }
     },
     () => scene.leaveInteriorNow(),
   );
@@ -256,7 +260,9 @@ async function main(): Promise<void> {
     doorScreenPoint: (name: string) => scene.getDoorScreenClientPoint(name),
     frameDoorForQa: (name: string) => scene.frameBuildingDoorForQa(name),
     prepareDoorEntryForQa: (name: string) => scene.prepareDoorEntryForQa(name),
+    releaseMapTapGestureForQa: () => scene.releaseMapTapGestureForQa(),
     tapBuildingDoor: (name: string) => scene.tapBuildingDoor(name),
+    tapDoorWithTouchEvents: (name: string) => scene.tapDoorWithTouchEventsForQa(name),
     setSuppressTap: (ms: number) => scene.setSuppressTapForQa(ms),
     tapMapTile: (tx: number, ty: number) => scene.tapMapTileForQa(tx, ty),
     tapScreen: (sx: number, sy: number) => scene.tapScreenForQa(sx, sy),

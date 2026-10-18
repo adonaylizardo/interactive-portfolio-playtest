@@ -76,10 +76,13 @@ export class ChecklistUI {
   private ringEl: SVGCircleElement;
   private headerTitle: HTMLElement;
   private ringBtn: HTMLButtonElement;
+  private mapRingImg: HTMLImageElement;
   private touch = isTouchPrimary();
   private compactSteps = isMobileOrCoarsePointer();
   private mobile = isMobileLayout();
   private panelOpen = false;
+  /** Steps explicitly cleared via setProgressForQa stay incomplete until QA updates them. */
+  private qaPinnedIncomplete = new Set<ChecklistStepId>();
 
   constructor(container: HTMLElement, callbacks: ChecklistCallbacks) {
     this.state = loadChecklist();
@@ -97,12 +100,28 @@ export class ChecklistUI {
           <span class="checklist__counter checklist__counter--label"></span>
           <button type="button" class="checklist__ring-btn" aria-label="">
             <svg class="checklist__ring" viewBox="0 0 28 28" width="28" height="28" aria-hidden="true">
-              <circle class="checklist__ring-bg" cx="14" cy="14" r="11" fill="none" stroke-width="2"/>
-              <circle class="checklist__ring-fg" cx="14" cy="14" r="11" fill="none" stroke-width="2.5"
-                stroke-dasharray="69.12" stroke-dashoffset="69.12" transform="rotate(-90 14 14)"/>
+              <circle class="checklist__ring-bg" cx="14" cy="14" r="11" fill="none" stroke-width="2" />
+              <circle
+                class="checklist__ring-fg"
+                cx="14"
+                cy="14"
+                r="11"
+                fill="none"
+                stroke-width="2.5"
+                stroke-dasharray="69.12"
+                stroke-dashoffset="69.12"
+                transform="rotate(-90 14 14)"
+              />
             </svg>
             <span class="checklist__counter checklist__counter--in-ring"></span>
-            <img class="checklist__ring-figma" src="" width="44" height="44" alt="" aria-hidden="true" />
+            <img
+              class="checklist__ring-figma"
+              src=""
+              width="44"
+              height="44"
+              alt=""
+              aria-hidden="true"
+            />
             <img class="checklist__clipboard-figma" src="" width="15" height="15" alt="" aria-hidden="true" />
           </button>
         </div>
@@ -121,9 +140,9 @@ export class ChecklistUI {
     this.ringEl = this.root.querySelector('.checklist__ring-fg')!;
     this.headerTitle = this.root.querySelector('.checklist__active-title')!;
     this.ringBtn = this.root.querySelector('.checklist__ring-btn')!;
-    const ringFigma = this.root.querySelector('.checklist__ring-figma') as HTMLImageElement;
+    this.mapRingImg = this.root.querySelector('.checklist__ring-figma') as HTMLImageElement;
+    this.mapRingImg.src = figmaAsset('talks-phone-map', 'anillo-3-5.svg');
     const clipFigma = this.root.querySelector('.checklist__clipboard-figma') as HTMLImageElement;
-    ringFigma.src = figmaAsset('talks-phone-map', '6af66.svg');
     clipFigma.src = figmaAsset('talks-phone-map', '629bf.svg');
     this.ringBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -213,8 +232,13 @@ export class ChecklistUI {
   setProgressForQa(completed: Partial<Record<ChecklistStepId, boolean>>): void {
     this.state = loadChecklist();
     for (const [id, done] of Object.entries(completed) as [ChecklistStepId, boolean][]) {
-      if (done) this.state.completed[id] = true;
-      else this.state.completed[id] = false;
+      if (done) {
+        this.state.completed[id] = true;
+        this.qaPinnedIncomplete.delete(id);
+      } else {
+        this.state.completed[id] = false;
+        this.qaPinnedIncomplete.add(id);
+      }
     }
     saveChecklist(this.state);
     this.render();
@@ -240,6 +264,7 @@ export class ChecklistUI {
 
   complete(step: ChecklistStepId): void {
     if (this.state.skipped || this.state.dismissed) return;
+    if (this.qaPinnedIncomplete.has(step)) return;
     if (this.state.completed[step]) return;
     this.state.completed[step] = true;
     saveChecklist(this.state);
@@ -303,6 +328,19 @@ export class ChecklistUI {
         <p class="checklist__item-detail">${detail}</p>
       `;
       this.listEl.appendChild(li);
+    }
+
+    const mapClosedPill =
+      this.mobile &&
+      !this.state.mobileExpanded &&
+      document.body.dataset.layout === 'map';
+
+    if (mapClosedPill && !allDone) {
+      let lastIncomplete: StepCopy | null = null;
+      for (const stepId of platformSteps) {
+        if (!this.state.completed[stepId]) lastIncomplete = copy[stepId];
+      }
+      if (lastIncomplete) activeStep = lastIncomplete;
     }
 
     if (allDone) {

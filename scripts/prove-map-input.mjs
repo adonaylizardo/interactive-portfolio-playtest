@@ -44,7 +44,14 @@ async function waitEntered(page, name, touch, timeoutMs = 12000) {
       }),
       name,
     );
-    if (CASE_HOUSES.has(name) && state.preview) return { ok: true, ms: Date.now() - t0, mode: 'preview' };
+    if (CASE_HOUSES.has(name) && state.preview) {
+      return {
+        ok: true,
+        ms: Date.now() - t0,
+        mode: 'preview',
+        entryKind: 'case-preview (live: case sheet via mouse/tap on door)',
+      };
+    }
     if (!CASE_HOUSES.has(name) && state.interior === name) return { ok: true, ms: Date.now() - t0, mode: 'interior' };
     if ((name === 'teresa' || name === 'biblioteca') && state.exp) {
       return { ok: true, ms: Date.now() - t0, mode: 'experience' };
@@ -114,6 +121,58 @@ try {
         String(enHit ?? '').includes('chrome__lang-opt'),
       langEn,
       langEs,
+    });
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true);
+    const chainNames = await page.evaluate(() =>
+      window.__playtestQa.getEnterableBuildings().map((b) => b.name).sort(),
+    );
+    let chainOk = true;
+    for (const name of chainNames) {
+      const prepared = await page.evaluate((n) => window.__playtestQa.prepareDoorEntryForQa(n), name);
+      if (!prepared) {
+        chainOk = false;
+        results.push({ test: `phone chained ${name}`, pass: false, reason: 'prepare failed', mode: 'chain' });
+        break;
+      }
+      await wait(350);
+      await page.evaluate(() => window.__playtestQa.releaseMapTapGestureForQa?.());
+      const door = await page.evaluate((n) => window.__playtestQa.doorScreenPoint(n), name);
+      await page.touchscreen.tap(door.x, door.y);
+      const entered = await waitEntered(page, name, true, 45000);
+      const entryKind = CASE_HOUSES.has(name)
+        ? 'case-preview (same as live: map case sheet, not 3D interior)'
+        : name === 'teresa' || name === 'biblioteca'
+          ? 'experience-sheet'
+          : 'interior';
+      results.push({
+        test: `phone chained ${name}`,
+        pass: entered.ok,
+        mode: entered.mode,
+        entryKind,
+        reason: entered.ok ? null : entered.mode,
+      });
+      if (!entered.ok) {
+        chainOk = false;
+        break;
+      }
+      if (CASE_HOUSES.has(name)) {
+        await page.evaluate(() => window.__playtestQa.dismissBuildingPanel());
+        await page.waitForFunction(() => !document.querySelector('.building-panel--open'));
+      } else if (name === 'teresa' || name === 'biblioteca') {
+        await page.evaluate(() => window.__playtestQa.exitInterior());
+        await page.waitForFunction(() => !window.__playtestQa?.getInteriorId?.());
+      } else {
+        await page.evaluate(() => window.__playtestQa.exitInterior());
+        await page.waitForFunction(() => !window.__playtestQa?.getInteriorId?.());
+      }
+      await page.evaluate(() => window.__playtestQa.releaseMapTapGestureForQa?.());
+      await wait(400);
+    }
+    results.push({
+      test: 'phone 11/11 chained session (no reload)',
+      pass: chainOk && chainNames.length === 11,
+      count: chainNames.length,
     });
     await ctx.close();
   }

@@ -38,13 +38,23 @@ async function waitEntered(page, name, timeoutMs = 45000) {
 }
 
 async function enterBuilding(page, name, touch) {
-  const ok = await page.evaluate((n) => window.__playtestQa.prepareDoorEntryForQa(n), name);
-  if (!ok) throw new Error(`prepareDoorEntryForQa(${name}) failed`);
-  await wait(450);
-  const pt = await page.evaluate((n) => window.__playtestQa.doorScreenPoint(n), name);
-  if (!pt) throw new Error(`doorScreenPoint(${name}) null`);
-  if (touch) await page.touchscreen.tap(pt.x, pt.y);
-  else await page.mouse.click(pt.x, pt.y);
+  if (touch) {
+    const ok = await page.evaluate((n) => window.__playtestQa.prepareDoorEntryForQa(n), name);
+    if (!ok) throw new Error(`prepareDoorEntryForQa(${name}) failed`);
+    await wait(350);
+    await page.evaluate(() => window.__playtestQa.releaseMapTapGestureForQa?.());
+    const pt = await page.evaluate((n) => window.__playtestQa.doorScreenPoint(n), name);
+    if (!pt) throw new Error(`doorScreenPoint(${name}) null`);
+    await page.touchscreen.tap(pt.x, pt.y);
+    await wait(300);
+  } else {
+    const ok = await page.evaluate((n) => window.__playtestQa.prepareDoorEntryForQa(n), name);
+    if (!ok) throw new Error(`prepareDoorEntryForQa(${name}) failed`);
+    await wait(450);
+    const pt = await page.evaluate((n) => window.__playtestQa.doorScreenPoint(n), name);
+    if (!pt) throw new Error(`doorScreenPoint(${name}) null`);
+    await page.mouse.click(pt.x, pt.y);
+  }
   if (!(await waitEntered(page, name))) {
     throw new Error(`enter timeout for ${name}`);
   }
@@ -78,6 +88,7 @@ async function leaveBuilding(page, name, touch) {
       null,
       { timeout: 15000 },
     );
+    await page.evaluate(() => window.__playtestQa.releaseMapTapGestureForQa?.());
   } else {
     if (touch && (name === 'teresa' || name === 'biblioteca')) {
       await expandExperienceSheet(page);
@@ -112,15 +123,6 @@ async function runSuite(page, tag, touch) {
     window.__playtestQa.getEnterableBuildings().map((b) => b.name).sort(),
   );
   for (const name of names) {
-    // Phone: fresh navigation per door — after a case preview the camera/viewport can leave
-    // doorScreenPoint misaligned for the next building (walk goal ≠ prepared door). Desktop
-    // chains in one session; phone matches prove-map-input (11/11 real taps).
-    if (touch) {
-      await page.goto(BASE, { waitUntil: 'networkidle', timeout: 60000 });
-      await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, {
-        timeout: 60000,
-      });
-    }
     await enterExit(page, name, touch);
   }
   return names;
@@ -156,6 +158,41 @@ try {
     } finally {
       await ctx.close();
     }
+  }
+
+  {
+    const ctx = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    const page = await ctx.newPage();
+    await page.goto(BASE, { waitUntil: 'networkidle', timeout: 60000 });
+    await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, {
+      timeout: 60000,
+    });
+    await page.evaluate(() => window.__playtestQa.setLayout('map'));
+    await wait(400);
+    try {
+      const ok = await page.evaluate(() => window.__playtestQa.prepareDoorEntryForQa('teresa'));
+      if (!ok) errors.push('phone-map-dock: prepare failed');
+      else {
+        await wait(350);
+        await page.evaluate(() => window.__playtestQa.releaseMapTapGestureForQa?.());
+        const pt = await page.evaluate(() => window.__playtestQa.doorScreenPoint('teresa'));
+        if (!pt) errors.push('phone-map-dock: doorScreenPoint null');
+        else await page.touchscreen.tap(pt.x, pt.y);
+      }
+      const dockFailed = errors.some((e) => e.startsWith('phone-map-dock'));
+      if (!dockFailed && !(await waitEntered(page, 'teresa'))) {
+        errors.push('phone-map-dock: enter timeout teresa');
+      } else if (!dockFailed) {
+        console.log('phone-map-dock: teresa enter ok (map layout, touch path)');
+      }
+    } catch (e) {
+      errors.push(`phone-map-dock: ${e}`);
+    }
+    await ctx.close();
   }
 
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });

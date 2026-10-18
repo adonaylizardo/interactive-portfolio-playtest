@@ -382,6 +382,11 @@ body[data-layout='panel'] .checklist {
   color: #edeef0;
 }
 
+.checklist__ring {
+  width: 28px;
+  height: 28px;
+}
+
 .checklist__ring-bg {
   stroke: #2a2c31;
 }
@@ -579,35 +584,34 @@ body[data-layout='panel'] .checklist {
     min-width: 237px;
     max-width: 237px;
     height: auto;
+    background: #141518;
     border-radius: 26px;
     border: 0;
     box-shadow:
-      0 1px 1px rgba(0, 0, 0, 0.45),
-      0 2px 4px rgba(0, 0, 0, 0.45);
+      0 2px 4px rgba(0, 0, 0, 0.45),
+      0 1px 1px rgba(0, 0, 0, 0.45);
     overflow: hidden;
   }
 
   body[data-layout='map'] .checklist--mobile-closed .checklist__header {
-    display: grid;
-    grid-template-columns: 1fr auto 44px;
-    grid-template-areas: 'text count ring';
+    display: flex;
+    align-items: center;
+    gap: 10px;
     margin: 0;
     padding: 0 8px 0 18px;
-    column-gap: 10px;
     min-height: 52px;
     height: 52px;
     border-bottom: 0;
-    align-items: center;
   }
 
   body[data-layout='map'] .checklist--mobile-closed .checklist__header-text {
-    grid-area: text;
+    flex: 1 1 0;
     display: flex;
     flex-direction: column;
     justify-content: center;
     gap: 0;
+    min-width: 0;
     padding: 0;
-    max-width: none;
   }
 
   body[data-layout='map'] .checklist--mobile-closed .checklist__progress-wrap {
@@ -616,28 +620,33 @@ body[data-layout='panel'] .checklist {
 
   body[data-layout='map'] .checklist--mobile-closed .checklist__counter--label {
     display: inline !important;
-    grid-area: count;
-    align-self: center;
     font-family: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
     font-size: 13px;
     font-weight: 500;
     line-height: 16px;
+    white-space: nowrap;
   }
 
   body[data-layout='map'] .checklist--mobile-closed .checklist__ring-btn {
-    grid-area: ring;
-    justify-self: end;
     width: 44px;
     height: 44px;
     flex-shrink: 0;
     position: relative;
     pointer-events: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
   }
 
   body[data-layout='map'] .checklist--mobile-closed .checklist__label {
     font-size: 13px;
     line-height: 16px;
     font-weight: 400;
+    color: #8a8f98;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -webkit-font-smoothing: antialiased;
   }
 
   body[data-layout='map'] .checklist--mobile-closed .checklist__active-title {
@@ -645,10 +654,19 @@ body[data-layout='panel'] .checklist {
     font-size: 13px;
     font-weight: 500;
     line-height: 16px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body[data-layout='map'] .checklist--mobile-closed .checklist__counter--label {
+    -webkit-font-smoothing: antialiased;
   }
 
   body[data-layout='map'] .checklist--mobile-closed .checklist__ring,
-  body[data-layout='map'] .checklist--mobile-closed .checklist__counter--in-ring {
+  body[data-layout='map'] .checklist--mobile-closed .checklist__counter--in-ring,
+  body[data-layout='map'] .checklist--mobile-closed .checklist__clipboard-figma {
     display: none !important;
   }
 
@@ -656,16 +674,7 @@ body[data-layout='panel'] .checklist {
     display: block;
     width: 44px;
     height: 44px;
-    pointer-events: none;
-  }
-
-  body[data-layout='map'] .checklist--mobile-closed .checklist__clipboard-figma {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    width: 15px;
-    height: 15px;
+    flex-shrink: 0;
     pointer-events: none;
   }
 
@@ -1431,6 +1440,10 @@ body[data-layout='panel'] .checklist {
     gap: 8px;
   }
 
+  .building-panel--experience.building-panel--writings .experience__list {
+    gap: 8px;
+  }
+
   .building-panel--experience.building-panel--writings .experience__row {
     height: 72px;
     box-sizing: border-box;
@@ -1488,6 +1501,11 @@ body[data-layout='panel'] .checklist {
     flex-direction: column;
     max-height: none;
     gap: 0;
+  }
+
+  .building-panel--experience.building-panel--exp-detail .building-panel__sheet,
+  .building-panel--experience.building-panel--writings.building-panel--exp-list .building-panel__sheet {
+    gap: 12px;
   }
 
   .building-panel--experience.building-panel--open:not(.building-panel--peek).building-panel--exp-list
@@ -1617,9 +1635,15 @@ body[data-layout='panel'] .checklist {
     height: 15px;
   }
 
-  .building-panel--experience.building-panel--exp-list .building-panel__body-wrap,
-  .building-panel--experience.building-panel--exp-detail .building-panel__body-wrap {
+  .building-panel--experience.building-panel--exp-list:not(.building-panel--writings)
+    .building-panel__body-wrap {
     padding-top: 12px;
+  }
+
+  .building-panel--experience.building-panel--exp-detail .building-panel__body-wrap,
+  .building-panel--experience.building-panel--writings.building-panel--exp-list
+    .building-panel__body-wrap {
+    padding-top: 0;
   }
 
   .building-panel--experience .building-panel__body-wrap {
@@ -1648,12 +1672,33 @@ body[data-layout='panel'] .checklist {
     gap: 12px;
   }
 
+  .building-panel--experience.building-panel--writings.building-panel--exp-detail .experience {
+    gap: 0;
+  }
+
+  .building-panel--experience.building-panel--writings .experience__list {
+    gap: 12px;
+  }
+
   .building-panel--experience .talks-player {
     gap: 12px;
   }
 
   .building-panel--experience .talks-player__title {
     font-weight: 600;
+    font-size: 18px;
+    line-height: 24px;
+  }
+
+  .building-panel--experience .writings-reader__title {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 28px;
+  }
+
+  .building-panel--experience .writings-reader__body {
+    font-size: 14px;
+    line-height: 22px;
   }
 
   .building-panel--experience .writings-reader {
@@ -1693,6 +1738,28 @@ body[data-layout='panel'] .checklist {
 
   .talks-player .experience__row--compact {
     padding: 8px 0;
+  }
+
+  .talks-player .experience__up-next-list .experience__row--compact:first-child .experience__row-title {
+    min-height: 40px;
+    max-height: 40px;
+  }
+
+  .building-panel--experience.building-panel--writings .experience__row-title--two-line {
+    min-height: 40px;
+    max-height: 40px;
+  }
+}
+
+@media (min-width: 768px) {
+  .talks-player .experience__up-next-list .experience__row--compact:first-child .experience__row-title {
+    min-height: 40px;
+    max-height: 40px;
+  }
+
+  .building-panel--experience.building-panel--writings .experience__row-title--two-line {
+    min-height: 40px;
+    max-height: 40px;
   }
 }
 
@@ -1848,7 +1915,23 @@ body[data-layout='panel'] .checklist {
   color: #0b0c0e;
 }
 
+@media (min-width: 768px) {
+  .building-panel--experience.building-panel--writings .experience__filter:not(.is-active) {
+    background: transparent;
+  }
+}
+
+.experience__section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
 .experience__section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   margin-top: 0;
 }
 
@@ -1891,6 +1974,7 @@ body[data-layout='panel'] .checklist {
   font-family: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
   font-weight: 500;
+  line-height: normal;
   text-align: center;
   color: #8a8f98;
 }
@@ -2166,6 +2250,12 @@ body[data-layout='panel'] .checklist {
   width: 100%;
 }
 
+@media (min-width: 768px) {
+  .building-panel--experience .writings-reader {
+    gap: 16px;
+  }
+}
+
 .writings-reader__hero {
   display: grid;
   place-items: center;
@@ -2223,6 +2313,8 @@ body[data-layout='panel'] .checklist {
   font-size: 15px;
   line-height: 24px;
   color: var(--ui-text);
+  font-weight: 400;
+  letter-spacing: 0;
 }
 
 .writings-reader__substack {
@@ -2244,8 +2336,8 @@ body[data-layout='panel'] .checklist {
   cursor: pointer;
   touch-action: manipulation;
   box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.45),
-    0 3px 6px rgba(0, 0, 0, 0.45);
+    0 3px 6px rgba(0, 0, 0, 0.45),
+    0 2px 4px rgba(0, 0, 0, 0.45);
 }
 
 .writings-reader__substack-icon {
