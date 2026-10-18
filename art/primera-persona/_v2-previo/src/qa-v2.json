@@ -1,0 +1,222 @@
+{
+ "cerros-avila__tile": {
+  "ambar_pct": 0.0,
+  "borde_px": 1839,
+  "halo_pct": 0.0
+ },
+ "jac-t9-capo": {
+  "ambar_pct": 0.0,
+  "borde_px": 2324,
+  "halo_pct": 0.0
+ },
+ "jac-t9-cabina__luces-on": {
+  "ambar_pct": 0.0,
+  "borde_px": 139415,
+  "halo_pct": 0.0
+ },
+ "jac-t9-cabina__luces-off": {
+  "ambar_pct": 0.0,
+  "borde_px": 138521,
+  "halo_pct": 0.0
+ },
+ "jac-t9-volante": {
+  "ambar_pct": 0.0,
+  "borde_px": 3604,
+  "halo_pct": 0.0
+ },
+ "fachada-teresa-carreno__luz-encendida": {
+  "ambar_pct": 2.87,
+  "borde_px": 5434,
+  "halo_pct": 0.0
+ },
+ "fachada-teresa-carreno__luz-apagada": {
+  "ambar_pct": 0.0,
+  "borde_px": 5434,
+  "halo_pct": 0.0
+ },
+ "fachada-biblioteca-ingenieria__luz-encendida": {
+  "ambar_pct": 1.78,
+  "borde_px": 1422,
+  "halo_pct": 0.0
+ },
+ "fachada-biblioteca-ingenieria__luz-apagada": {
+  "ambar_pct": 0.0,
+  "borde_px": 1422,
+  "halo_pct": 0.0
+ },
+ "fachada-catedral-de-barquisimeto__luz-encendida": {
+  "ambar_pct": 1.76,
+  "borde_px": 3349,
+  "halo_pct": 0.0
+ },
+ "fachada-catedral-de-barquisimeto__luz-apagada": {
+  "ambar_pct": 0.0,
+  "borde_px": 3349,
+  "halo_pct": 0.0
+ },
+ "fachada-flor-de-venezuela__luz-encendida": {
+  "ambar_pct": 3.9,
+  "borde_px": 2976,
+  "halo_pct": 0.0
+ },
+ "fachada-flor-de-venezuela__luz-apagada": {
+  "ambar_pct": 0.0,
+  "borde_px": 2420,
+  "halo_pct": 0.0
+ },
+ "fachada-sambil-barquisimeto__luz-encendida": {
+  "ambar_pct": 0.52,
+  "borde_px": 5669,
+  "halo_pct": 0.0
+ },
+ "fachada-sambil-barquisimeto__luz-apagada": {
+  "ambar_pct": 0.0,
+  "borde_px": 5669,
+  "halo_pct": 0.0
+ },
+ "fachada-estudio-6x6__luz-encendida": {
+  "ambar_pct": 1.18,
+  "borde_px": 759,
+  "halo_pct": 0.0
+ },
+ "fachada-estudio-6x6__luz-apagada": {
+  "ambar_pct": 0.0,
+  "borde_px": 759,
+  "halo_pct": 0.0
+ },
+ "fachada-casa-volaris__luz-encendida": {
+  "ambar_pct": 1.75,
+  "borde_px": 705,
+  "halo_pct": 0.0
+ },
+ "fachada-casa-volaris__luz-apagada": {
+  "ambar_pct": 0.0,
+  "borde_px": 705,
+  "halo_pct": 0.0
+ },
+ "fachada-casa-bain__luz-encendida": {
+  "ambar_pct": 1.13,
+  "borde_px": 655,
+  "halo_pct": 0.0
+ },
+ "fachada-casa-bain__luz-apagada": {
+  "ambar_pct": 0.0,
+  "borde_px": 655,
+  "halo_pct": 0.0
+ },
+ "fachada-casa-mentoria__luz-encendida": {
+  "ambar_pct": 1.66,
+  "borde_px": 384,
+  "halo_pct": 0.0
+ },
+ "fachada-casa-mentoria__luz-apagada": {
+  "ambar_pct": 0.0,
+  "borde_px": 384,
+  "halo_pct": 0.0
+ },
+ "fachada-casa-finoa__luz-encendida": {
+  "ambar_pct": 0.88,
+  "borde_px": 677,
+  "halo_pct": 0.0
+ },
+ "fachada-casa-finoa__luz-apagada": {
+  "ambar_pct": 0.0,
+  "borde_px": 677,
+  "halo_pct": 0.0
+ },
+ "fachada-casa-pg__luz-encendida": {
+  "ambar_pct": 2.52,
+  "borde_px": 760,
+  "halo_pct": 0.0
+ },
+ "fachada-casa-pg__luz-apagada": {
+  "ambar_pct": 0.0,
+  "borde_px": 760,
+  "halo_pct": 0.0
+ },
+ "arbol-cuji-frente": {
+  "ambar_pct": 0.0,
+  "borde_px": 1000,
+  "halo_pct": 0.0
+ },
+ "banco-frente": {
+  "ambar_pct": 0.0,
+  "borde_px": 180,
+  "halo_pct": 0.0
+ },
+ "farol-frente__estado-encendido": {
+  "ambar_pct": 2.68,
+  "borde_px": 175,
+  "halo_pct": 0.0
+ },
+ "suelo-cruce__cebra": {
+  "ambar_pct": 0.0,
+  "borde_px": 0,
+  "halo_pct": 0.0
+ },
+ "suelo-cruce__pare": {
+  "ambar_pct": 0.0,
+  "borde_px": 0,
+  "halo_pct": 0.0
+ },
+ "suelo-cruce__calle": {
+  "ambar_pct": 0.0,
+  "borde_px": 0,
+  "halo_pct": 0.0
+ },
+ "suelo-cruce__calle-eje": {
+  "ambar_pct": 0.0,
+  "borde_px": 0,
+  "halo_pct": 0.0
+ },
+ "suelo-acera-frente": {
+  "ambar_pct": 0.0,
+  "borde_px": 0,
+  "halo_pct": 0.0
+ },
+ "suelo-plaza__fase-a": {
+  "ambar_pct": 0.0,
+  "borde_px": 0,
+  "halo_pct": 0.0
+ },
+ "suelo-plaza__fase-b": {
+  "ambar_pct": 0.0,
+  "borde_px": 0,
+  "halo_pct": 0.0
+ },
+ "suelo-cruce__planta": {
+  "ambar_pct": 0.0,
+  "borde_px": 0,
+  "halo_pct": 0.0
+ },
+ "suelo-plaza__planta": {
+  "ambar_pct": 0.0,
+  "borde_px": 0,
+  "halo_pct": 0.0
+ },
+ "cielo-noche__tile": {
+  "ambar_pct": 0.0,
+  "borde_px": 0,
+  "halo_pct": 0.0
+ },
+ "suelo-avenida__fase-a": {
+  "ambar_pct": 0.0,
+  "borde_px": 0,
+  "halo_pct": 0.0
+ },
+ "suelo-avenida__fase-b": {
+  "ambar_pct": 0.0,
+  "borde_px": 0,
+  "halo_pct": 0.0
+ },
+ "frame-a-a-pie": {
+  "ambar_pct": 0.26,
+  "borde_px": 0,
+  "halo_pct": 0.0
+ },
+ "frame-b-jac-t9": {
+  "ambar_pct": 0.22,
+  "borde_px": 0,
+  "halo_pct": 0.0
+ }
+}
