@@ -164,6 +164,7 @@ async function main(): Promise<void> {
       });
       personaEnterPrompt.sync(
         kitActive &&
+          scene.getViewMode().mode === 'persona' &&
           ps.enterOffer &&
           !driving &&
           !panel.isPreviewMode() &&

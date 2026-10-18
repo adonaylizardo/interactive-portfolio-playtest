@@ -35,6 +35,7 @@ import {
   navigateBackFromInterior,
   parseCameraFromHash,
   parseInteriorFromHash,
+  isSupportedPlaytestHash,
   pushInteriorEntry,
   replaceOutdoorHash,
   setHashWriteSuppressed,
@@ -176,9 +177,6 @@ import {
 } from './persona/personaView';
 import {
   ADONAY_ALTO_PX_1X,
-  CAL_M,
-  CAL_TILE,
-  METERS_PER_TILE,
   FEET_Y_1X,
   PERSONA_REF,
   personaEnabled,
@@ -302,8 +300,6 @@ const PERSONA_TURN_RATE = 1.35;
 /** ~1.7 m/s on foot vs map keyboard walk (~4.5 tiles/s). */
 const PERSONA_WALK_MUL = 0.43;
 const PERSONA_STICK_DEAD = 0;
-const PERSONA_FRAME_C_T9 = { x: 2.0, z: 8.2 };
-
 function personaStickAxis(raw: number): number {
   const a = Math.abs(raw);
   if (a < PERSONA_STICK_DEAD) return 0;
@@ -689,6 +685,11 @@ export class IsoScene {
     window.addEventListener('scroll', lockViewport, { passive: true });
     window.addEventListener('hashchange', () => {
       if (this.historySyncInProgress) return;
+      if (!isSupportedPlaytestHash()) {
+        this.events.onUnknownRoute?.();
+        replaceOutdoorHash(this.outdoorCamBeforeInterior ?? { x: this.cameraX, y: this.cameraY, zoom: this.zoom });
+        return;
+      }
       this.applyHashNavigation(null);
     });
 
@@ -696,7 +697,10 @@ export class IsoScene {
       this.applyHashNavigation((ev.state as HistoryNavigationState | null) ?? null);
     });
 
-    if (bootInterior) {
+    if (!isSupportedPlaytestHash()) {
+      this.events.onUnknownRoute?.();
+      replaceOutdoorHash(this.outdoorCamBeforeInterior ?? { x: this.cameraX, y: this.cameraY, zoom: this.zoom });
+    } else if (bootInterior) {
       if (!getInteriorDef(bootInterior)) {
         this.events.onUnknownRoute?.();
         replaceOutdoorHash(this.outdoorCamBeforeInterior ?? { x: this.cameraX, y: this.cameraY, zoom: this.zoom });
@@ -1708,8 +1712,8 @@ export class IsoScene {
       this.cenitalVanScreen.visible = false;
       this.altViewLayer.clear();
       this.altJacLayer.clear();
+      this.syncPersonaCamFromFacing();
       if (!this.personaSpawnFramed) {
-        this.framePersonaSpawnView();
         this.personaSpawnFramed = true;
       }
       void this.persona.ensureLoaded(Math.min(window.devicePixelRatio || 1, 2));
@@ -2354,6 +2358,9 @@ export class IsoScene {
 
   recenterOnCharacter(): void {
     this.leaveMapOverview();
+    if (this.personaOn()) {
+      this.syncPersonaCamFromFacing();
+    }
     this.syncViewTransform();
     this.centerOnCharacter(false);
     this.applyCamera(true);
@@ -4207,28 +4214,20 @@ export class IsoScene {
     }
   }
 
-  private framePersonaSpawnView(): void {
+  /** Third-person chase yaw from Adonay's facing (or movement heading while walking). */
+  private syncPersonaCamFromFacing(): void {
     if (!personaEnabled()) return;
-    if (this.jac) {
-      const player = {
-        x: CAL_M.x + (this.charTx - CAL_TILE.x) * METERS_PER_TILE,
-        z: CAL_M.z + (this.charTy - CAL_TILE.y) * METERS_PER_TILE,
-      };
-      const van = {
-        x: CAL_M.x + (this.jac.cx - CAL_TILE.x) * METERS_PER_TILE,
-        z: CAL_M.z + (this.jac.cy - CAL_TILE.y) * METERS_PER_TILE,
-      };
-      this.personaCamYaw = Math.atan2(van.x - player.x, van.z - player.z);
-    } else {
-      const dx = PERSONA_FRAME_C_T9.x - CAL_M.x;
-      const dz = PERSONA_FRAME_C_T9.z - CAL_M.z;
-      this.personaCamYaw = Math.atan2(dx, dz);
-    }
-    this.path = [];
-    this.pendingBuildingEntry = null;
-    this.charState = 'idle';
+    if (this.path.length > 0) return;
+    const dir = this.followFacing();
+    const tileFwd: Record<FacingDir, { x: number; y: number }> = {
+      se: { x: 1, y: 1 },
+      sw: { x: -1, y: 1 },
+      ne: { x: 1, y: -1 },
+      nw: { x: -1, y: -1 },
+    };
+    const f = tileFwd[dir];
+    this.personaCamYaw = Math.atan2(f.x, f.y);
     this.syncViewTransform();
-    this.syncCharacterGraphic();
   }
 
   private personaEnterOffer(): MapObject | null {
@@ -4237,12 +4236,13 @@ export class IsoScene {
     const t = this.roundedCharTile();
     const building = getBuildingAtPersonaDoor(t.x, t.y);
     if (!building?.panelTitle || !building.door) return null;
-    const inward = doorInwardStep(building);
-    if (!inward) return null;
+    const door = building.door;
+    const toDoor = { x: door.x - t.x, y: door.y - t.y };
+    const tdLen = Math.hypot(toDoor.x, toDoor.y) || 1;
     const fwd = this.personaTileForward();
-    const dot = fwd.x * inward.x + fwd.y * inward.y;
-    const minDot = building.name === 'catedral' ? 0.28 : 0.45;
-    if (dot < minDot) return null;
+    const towardDoor = (fwd.x * toDoor.x + fwd.y * toDoor.y) / tdLen;
+    const minToward = building.name === 'catedral' ? 0.2 : 0.35;
+    if (towardDoor < minToward) return null;
     return building;
   }
 

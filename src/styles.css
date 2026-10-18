@@ -170,8 +170,9 @@ body.is-canvas-dragging * {
   pointer-events: auto;
 }
 
-#ui-root > .persona-kit {
-  pointer-events: none;
+#ui-root > .persona-kit,
+body.persona-kit #ui-root > .persona-kit {
+  pointer-events: none !important;
 }
 
 #ui-root > .persona-kit .persona-kit__overlay:not([hidden]),
@@ -611,6 +612,31 @@ body[data-layout='panel'] .checklist {
 }
 
 /* Phone landscape (e.g. 844×390): treat as compact. Checklist is a pill; lang stays off the panel. */
+@media (max-width: 767px) {
+  body.persona-kit .persona-kit__lang {
+    left: auto;
+    right: max(12px, env(safe-area-inset-right, 0px));
+    top: calc(12px + env(safe-area-inset-top, 0px));
+  }
+
+  body.persona-kit .persona-kit__help {
+    left: auto;
+    right: max(12px, env(safe-area-inset-right, 0px));
+    top: calc(60px + env(safe-area-inset-top, 0px));
+  }
+
+  body.persona-kit:has(.checklist:not(.checklist--collapsed):not(.checklist--mobile-closed))
+    .persona-kit__cam {
+    top: auto;
+    bottom: calc(132px + env(safe-area-inset-bottom, 0px));
+  }
+
+  body.persona-kit:has(.checklist:not(.checklist--collapsed):not(.checklist--mobile-closed))
+    .persona-enter-prompt {
+    bottom: calc(148px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 @media (max-height: 500px) and (orientation: landscape) {
   body[data-view='persona'] .chrome__subtitle {
     display: none;
@@ -2928,7 +2954,7 @@ body.persona-kit .persona-kit {
   position: fixed;
   inset: 0;
   z-index: 130;
-  pointer-events: none;
+  pointer-events: none !important;
 }
 
 body.persona-kit .persona-kit__overlay {
@@ -3248,7 +3274,15 @@ body.persona-kit .persona-kit__help {
     [data-action='sound'] {
     top: auto;
     bottom: calc(24px + env(safe-area-inset-bottom, 0px));
-    right: calc(16px + 44px + 52px);
+    right: calc(272px + env(safe-area-inset-right, 0px));
+  }
+
+  body.persona-kit:has(.checklist--collapsed:not(.checklist--mobile-closed)) .persona-kit__lang {
+    top: calc(72px + env(safe-area-inset-top, 0px));
+  }
+
+  body.persona-kit:has(.checklist--collapsed:not(.checklist--mobile-closed)) .persona-kit__help {
+    top: calc(124px + env(safe-area-inset-top, 0px));
   }
 }
 

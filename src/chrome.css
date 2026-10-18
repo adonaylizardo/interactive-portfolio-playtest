@@ -870,6 +870,17 @@ body[data-layout='panel'] #game-canvas {
 }
 
 @media (max-height: 500px) and (orientation: landscape) {
+  .chrome--dock .chrome__dock {
+    z-index: 28;
+    pointer-events: auto;
+  }
+
+  .chrome--sheet .chrome__intro {
+    display: flex;
+    max-height: min(78vh, 300px);
+    z-index: 26;
+  }
+
   .chrome__intro {
     pointer-events: none;
     max-height: min(36vh, 140px);

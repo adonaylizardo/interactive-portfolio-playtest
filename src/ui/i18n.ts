@@ -28,6 +28,9 @@ const DICT = {
     'toast.getOutToEnter': 'Get out to enter',
     'toast.unknownRoute': "We couldn't find that place",
 
+    'voice.01-intro': "Hey, welcome to my studio. I'm Adonay. Take a walk around.",
+    'voice.11-contact': "Like what you see? Let's talk.",
+
     'jac.hint': 'Use arrows or WASD',
     'jac.desc': 'JAC T9, the family pickup.',
     'jac.getIn': 'Get in',
@@ -135,6 +138,9 @@ const DICT = {
     'toast.unreachable': 'No se puede llegar',
     'toast.getOutToEnter': 'Bájate para entrar',
     'toast.unknownRoute': 'No encontramos ese lugar',
+
+    'voice.01-intro': 'Hola, bienvenido a mi estudio. Soy Adonay. Recorre el mapa.',
+    'voice.11-contact': '¿Te gusta lo que ves? Hablemos.',
 
     'jac.hint': 'Usa flechas o WASD',
     'jac.desc': 'JAC T9, la camioneta de la familia.',

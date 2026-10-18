@@ -80,7 +80,11 @@ export class ChromeUI {
     });
     const onLayout = () => {
       this.mobile = isMobileLayout();
-      if (this.shortLandscape()) this.mobileSheet = false;
+      if (this.shortLandscape() && !this.mobileSheet) {
+        /* dock-only default; keep sheet open when the user opened Casos/Logros */
+      } else if (!this.mobile) {
+        /* desktop */
+      }
       this.sync();
       this.callbacks.onLayoutChange();
     };
@@ -124,7 +128,6 @@ export class ChromeUI {
   setLayout(next: DesktopLayout): void {
     if (this.mobile) {
       this.mobileSheet = next !== 'map';
-      if (this.shortLandscape()) this.mobileSheet = false;
     } else {
       this.layout = next;
     }
@@ -366,9 +369,11 @@ export class ChromeUI {
     this.root.querySelector('[data-dock="intro"]')?.addEventListener('click', () => this.setLayout('split'));
     this.root.querySelector('.chrome__dock [data-action="cases"]')?.addEventListener('click', () => {
       this.setLayout('split');
+      if (this.shortLandscape()) this.scrollTo('#chrome-casos');
     });
     this.root.querySelector('.chrome__dock [data-action="achievements"]')?.addEventListener('click', () => {
       this.setLayout('split');
+      if (this.shortLandscape()) this.scrollTo('#chrome-logros');
     });
     this.root.querySelector('.chrome__dock [data-action="contact"]')?.addEventListener('click', () => {
       studio.playLine('11-contact');
@@ -407,7 +412,18 @@ export class ChromeUI {
   private syncSubtitle(): void {
     const sub = this.root.querySelector('.chrome__subtitle') as HTMLElement | null;
     if (!sub) return;
-    sub.textContent = studio.subtitle();
+    const text = studio.subtitle();
+    const hideIntroOnPersonaPhone =
+      this.mobile &&
+      document.body.classList.contains('persona-kit') &&
+      (text.startsWith('Hey, welcome') || text.startsWith('Hola, bienvenido'));
+    if (hideIntroOnPersonaPhone) {
+      sub.textContent = '';
+      sub.style.visibility = 'hidden';
+      return;
+    }
+    sub.style.visibility = text ? 'visible' : 'hidden';
+    sub.textContent = text;
   }
 
   /** 'No sound? Check silent mode' is a boot hint — fade out after ~4s, then stay gone. */

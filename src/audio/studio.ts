@@ -4,6 +4,7 @@
  */
 import { caseVoiceFile } from '../data/cases';
 import { VOICE_LINES } from '../data/voice-lines';
+import { t } from '../ui/i18n';
 
 const MUTE_KEY = 'studio-audio-muted';
 const VOICE_DIR = `${import.meta.env.BASE_URL}audio/voice/`;
@@ -247,6 +248,12 @@ export class StudioAudio {
     });
   }
 
+  private localizedScript(id: string, fallback: string): string {
+    const key = `voice.${id}` as Parameters<typeof t>[0];
+    const tr = t(key);
+    return tr === key ? fallback : tr;
+  }
+
   playLine(id: string): void {
     const line = VOICE_LINES[id];
     if (!line || this.played.has(id) || this.muted) return;
@@ -258,7 +265,7 @@ export class StudioAudio {
     this.stopVoice();
     this.stopBark();
     this.played.add(id);
-    this.subtitleText = line.script_text;
+    this.subtitleText = this.localizedScript(id, line.script_text);
     this.emit();
     if (automatedWebKitPhone()) {
       window.setTimeout(() => this.finishVoice(), 80);
@@ -275,7 +282,7 @@ export class StudioAudio {
       if (this.voice === el) this.finishVoice();
     });
     this.voice = el;
-    this.subtitleText = line.script_text;
+    this.subtitleText = this.localizedScript(id, line.script_text);
     this.duckAmbience(true);
     this.emit();
     void el.play().catch(() => {
