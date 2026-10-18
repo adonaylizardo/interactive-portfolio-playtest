@@ -2118,16 +2118,18 @@ export class IsoScene {
       if (this.jac.isExiting()) return;
       if (performance.now() < this.suppressDriveTapUntil) return;
       if (this.pickJacAtScreen(sx, sy)) return;
+      const dragEnter = this.tapDriftPx > 10 || this.panMoved;
       if (
+        !dragEnter &&
         this.driveGlyphPickSerial === this.pointerGestureSerial &&
         this.driveGlyphPickEntry &&
-        this.tapDriftPx < 20
+        this.tapDriftPx <= 10
       ) {
         this.requestDriveToEnter(this.driveGlyphPickEntry);
         this.driveGlyphPickEntry = null;
         return;
       }
-      const buildingHit = this.pickDrivingBuildingEnterAtScreen(sx, sy);
+      const buildingHit = dragEnter ? undefined : this.pickDrivingBuildingEnterAtScreen(sx, sy);
       if (buildingHit?.door && buildingHit.panelTitle) {
         this.requestDriveToEnter({ panelTitle: buildingHit.panelTitle, door: buildingHit.door });
         return;
@@ -3229,6 +3231,7 @@ export class IsoScene {
   private shouldBlockTap(panSlopPx = 0): boolean {
     return (
       this.interiorActive ||
+      (this.jac?.driving && this.tapDriftPx > 10) ||
       (this.panMoved && (panSlopPx === 0 || this.tapDriftPx > panSlopPx)) ||
       this.pinchGestureActive ||
       this.hadMultiPointerGesture ||
@@ -3746,7 +3749,8 @@ export class IsoScene {
             this.tapDriftPx,
             Math.hypot(e.clientX - this.tapStart.x, e.clientY - this.tapStart.y),
           );
-          if (this.jac?.driving && this.tapDriftPx > 20) {
+          if (this.jac?.driving && this.tapDriftPx > 10) {
+            this.panMoved = true;
             this.driveGlyphPickEntry = null;
           }
         }
