@@ -240,6 +240,7 @@ export type SceneEvents = {
   onUnreachable?: () => void;
   onGetOutToEnter?: () => void;
   onWalkingToVan?: () => void;
+  onSeatedInJac?: () => void;
   onMoveCommand?: () => void;
   onFrame?: () => void;
   stick?: () => { x: number; y: number };
@@ -4485,6 +4486,7 @@ export class IsoScene {
     this.clearWalkPreview();
     this.pendingBuildingEntry = null;
     this.events.chrome?.onJacHud?.();
+    this.events.onSeatedInJac?.();
     this.jac.setMode('drive');
     this.avatar.setVisible(false);
     this.startCameraFollow();

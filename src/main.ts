@@ -139,6 +139,7 @@ async function main(): Promise<void> {
     onUnreachable: () => showToast(t('toast.unreachable')),
     onGetOutToEnter: () => showToast(t('toast.getOutToEnter')),
     onWalkingToVan: () => showToast(t('toast.walkingToVan'), 8000),
+    onSeatedInJac: () => hideToast(),
     buildingPanel: {
       isOpen: () => panel.isOpen(),
       openTitle: () => panel.openTitle(),
