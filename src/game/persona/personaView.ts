@@ -13,8 +13,6 @@ import {
   FOCAL_PX_1X,
   HORIZON_Y_1X,
   METERS_PER_TILE,
-  PANTONE_DX_M,
-  PANTONE_DZ_M,
   PANTONE_SCALE,
   PERSONA_REF,
   PX_PER_M,
@@ -25,6 +23,7 @@ import {
   ensurePersonaBoot,
   loadFacade,
   loadJacCabin,
+  loadProp,
   loadStrip,
   personaAssetReport,
   textureFrame,
@@ -113,6 +112,9 @@ export class PersonaView {
   private jacCapo = new Sprite();
   private jacCabina = new Sprite();
   private jacWheel = new Sprite();
+  private jacT9Ext = new Sprite();
+  private propSprites: { sprite: Sprite; x: number; z: number }[] = [];
+  private lastGroundCamZ = NaN;
   private booted = false;
   private adonayStrip: { idle: import('pixi.js').Texture | null; walk: import('pixi.js').Texture | null } = {
     idle: null,
@@ -138,7 +140,8 @@ export class PersonaView {
     this.jacCapo.zIndex = 900;
     this.jacCabina.zIndex = 910;
     this.jacWheel.zIndex = 920;
-    this.layer.addChild(this.adonay, this.pantone, this.jacCapo, this.jacCabina, this.jacWheel);
+    this.jacT9Ext.zIndex = 600;
+    this.layer.addChild(this.adonay, this.pantone, this.jacT9Ext, this.jacCapo, this.jacCabina, this.jacWheel);
     this.jacCapo.visible = this.jacCabina.visible = this.jacWheel.visible = false;
   }
 
@@ -167,6 +170,32 @@ export class PersonaView {
       this.layer.addChildAt(this.avila, this.sky ? 1 : 0);
     }
     await this.refreshFacades(dpr);
+    const t9Tex = await loadProp('jac-t9-ext__34-frontal-3p__apagado', dpr);
+    if (t9Tex) {
+      this.jacT9Ext.texture = t9Tex;
+      this.jacT9Ext.anchor.set(0.5, 1);
+      this.jacT9Ext.visible = true;
+    }
+    const propPlacements: { file: string; id: string; x: number; z: number }[] = [
+      { file: 'farol-frente__estado-encendido', id: 'farol-frente', x: 1.3, z: 30 },
+      { file: 'farol-frente__estado-encendido', id: 'farol-frente', x: 1.3, z: 15.5 },
+      { file: 'farol-frente__estado-encendido', id: 'farol-frente', x: 11.8, z: 24 },
+      { file: 'arbol-cuji-frente', id: 'arbol-cuji-frente', x: -5.2, z: 31 },
+      { file: 'arbol-cuji-frente', id: 'arbol-cuji-frente', x: 17.5, z: 17 },
+      { file: 'banco-frente', id: 'banco-frente', x: -4.3, z: 28.5 },
+    ];
+    for (const pl of propPlacements) {
+      const tex = await loadProp(pl.file, dpr);
+      if (!tex) continue;
+      const meta = piezaById(pl.id);
+      const ancla = meta?.ancla?.px_1x ?? [tex.width / 2, tex.height - 1];
+      const sp = new Sprite(tex);
+      sp.anchor.set(ancla[0] / tex.width, ancla[1] / tex.height);
+      sp.tint = NIGHT_TINT;
+      sp.zIndex = 500;
+      this.layer.addChild(sp);
+      this.propSprites.push({ sprite: sp, x: pl.x, z: pl.z });
+    }
     this.booted = true;
   }
 
@@ -192,6 +221,9 @@ export class PersonaView {
   }
 
   private drawGround(cam: { x: number; z: number }, sw: number, sh: number): void {
+    const key = Math.round(cam.z * 4) / 4;
+    if (key === this.lastGroundCamZ) return;
+    this.lastGroundCamZ = key;
     this.ground.clear();
     const stripes = 24;
     for (let i = 0; i < stripes; i++) {
@@ -286,27 +318,36 @@ export class PersonaView {
       const fi =
         pAnim === 'sit' ? 0 : Math.floor(input.timeSec * (pAnim === 'walk' ? 9 : 3)) % Math.max(1, n);
       this.pantone.texture = textureFrame(pStrip, frameW, fi);
-      const fwdP = forwardFromYaw(input.yawQuarter);
-      const rightP = { x: -fwdP.z, z: fwdP.x };
-      const px = player.x + rightP.x * PANTONE_DX_M + fwdP.x * PANTONE_DZ_M;
-      const pz = player.z + rightP.z * PANTONE_DX_M + fwdP.z * PANTONE_DZ_M;
-      const pp = projectTp(px, 0, pz, cam, sw, sh);
       const feetScale = sh / PERSONA_REF.h;
-      if (pp) {
-        this.pantone.anchor.set(0.5, 1);
-        this.pantone.x = pp.x;
-        this.pantone.y = pp.y;
-        this.pantone.scale.set(pp.scale * PANTONE_SCALE);
-      } else {
-        this.pantone.anchor.set(0.5, 1);
-        this.pantone.x = sw / 2 - 120.5 * feetScale;
-        this.pantone.y = feetY - 26.4 * feetScale;
-        this.pantone.scale.set(feetScale * PANTONE_SCALE);
-      }
+      this.pantone.anchor.set(0.5, 1);
+      this.pantone.x = sw / 2 - 120.5 * feetScale;
+      this.pantone.y = feetY - 26.4 * feetScale;
+      this.pantone.scale.set(feetScale * PANTONE_SCALE);
       this.pantone.tint = NIGHT_TINT;
       this.pantone.visible = true;
       this.lastPantoneVisible = true;
       this.lastPantoneAnim = pAnim;
+    }
+
+    const t9p = projectTp(2.0, 0, 8.2, cam, sw, sh);
+    if (t9p && this.jacT9Ext.texture) {
+      this.jacT9Ext.visible = !input.jacDriving;
+      this.jacT9Ext.x = t9p.x;
+      this.jacT9Ext.y = t9p.y;
+      this.jacT9Ext.scale.set(t9p.scale);
+    } else {
+      this.jacT9Ext.visible = false;
+    }
+    for (const p of this.propSprites) {
+      const pr = projectTp(p.x, 0, p.z, cam, sw, sh);
+      if (!pr) {
+        p.sprite.visible = false;
+        continue;
+      }
+      p.sprite.visible = !input.jacDriving;
+      p.sprite.x = pr.x;
+      p.sprite.y = pr.y;
+      p.sprite.scale.set(pr.scale);
     }
   }
 

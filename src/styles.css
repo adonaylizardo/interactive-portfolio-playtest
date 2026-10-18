@@ -2789,7 +2789,21 @@ body.jac-info[data-chrome='phone'] .chrome__dock {
 
 @media (max-width: 767px) {
   body[data-layout='split'] .persona-jac-board {
-    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   }
+}
+
+body[data-view='persona'] .name-labels,
+body[data-view='persona'] .name-label {
+  display: none !important;
+}
+
+body[data-view='persona'].jac-drive .jac-hud {
+  display: none !important;
+}
+
+body[data-view='persona'] .chrome__view-btns {
+  z-index: 140;
+  pointer-events: auto;
 }
 

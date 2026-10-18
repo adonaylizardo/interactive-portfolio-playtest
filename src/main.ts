@@ -119,21 +119,29 @@ async function main(): Promise<void> {
     },
     onMoveCommand: () => studio.noteMoveCommand(),
     onFrame: () => {
-      labels.update(scene.nameLabelAnchors());
+      const personaActive =
+        personaEnabled() && scene.getViewMode().mode === 'persona' && !scene.isInInterior();
+      if (!personaActive) {
+        labels.update(scene.nameLabelAnchors());
+      } else {
+        labels.setHidden(true);
+      }
       if (scene.getViewMode().mode === 'cenital' && !scene.isInInterior()) {
         cenitalLabels.setHidden(false);
         cenitalLabels.update(scene.cenitalBuildingLabelAnchors());
       } else {
         cenitalLabels.setHidden(true);
       }
-      if (scene.jacHudActive()) {
+      if (personaActive && scene.jacSnapshot()?.driving) {
+        jacHud.park();
+      } else if (scene.jacHudActive()) {
         const snap = scene.jacSnapshot();
         const anchors = scene.jacHudAnchors();
         jacHud.update(snap, anchors, anchors.rear);
-        labels.setHidden(false);
+        if (!personaActive) labels.setHidden(false);
       } else {
         jacHud.park();
-        labels.setHidden(false);
+        if (!personaActive) labels.setHidden(false);
       }
       const ps = scene.qaPersonaState();
       const driving = !!scene.jacSnapshot()?.driving;
@@ -141,6 +149,7 @@ async function main(): Promise<void> {
         showIn: ps.active && ps.jacBoard && !driving,
         showOut: ps.active && driving,
       });
+      document.body.dataset.view = scene.getViewMode().mode;
       const personaWalk =
         personaEnabled() && scene.getViewMode().mode === 'persona' && !scene.isInInterior();
       joystick.setHidden(
@@ -328,6 +337,7 @@ async function main(): Promise<void> {
     toggleMapOverview: () => scene.toggleMapOverview(),
     overviewCoverage: () => scene.qaOverviewCoverage(),
     personaState: () => scene.qaPersonaState(),
+    personaCam: () => scene.qaPersonaCam(),
     stickToTile: (dx: number, dy: number) => scene.qaStickToTile(dx, dy),
     cameraViews: () => scene.qaCameraViews(),
     cenitalExpectedHeading: (dx: number, dy: number) => scene.qaCenitalExpectedHeading(dx, dy),
