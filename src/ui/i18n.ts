@@ -29,6 +29,7 @@ const DICT = {
     'toast.unknownRoute': "We couldn't find that place",
 
     'voice.01-intro': "Hey, welcome to my studio. I'm Adonay. Take a walk around.",
+    'voice.07-achievement': 'Nice, you found one.',
     'voice.11-contact': "Like what you see? Let's talk.",
 
     'jac.hint': 'Use arrows or WASD',
@@ -140,6 +141,7 @@ const DICT = {
     'toast.unknownRoute': 'No encontramos ese lugar',
 
     'voice.01-intro': 'Hola, bienvenido a mi estudio. Soy Adonay. Recorre el mapa.',
+    'voice.07-achievement': 'Bien, encontraste uno.',
     'voice.11-contact': '¿Te gusta lo que ves? Hablemos.',
 
     'jac.hint': 'Usa flechas o WASD',

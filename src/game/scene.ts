@@ -349,6 +349,8 @@ export class IsoScene {
   private personaTimeSec = 0;
   /** Third-person camera yaw (rad), independent of Adonay's tile facing. */
   private personaCamYaw = 0;
+  /** Last tile-step heading for chase camera (continuous, not FacingDir diagonals). */
+  private personaChaseHeadingRad: number | null = null;
   private billboarded = new Set<Container>();
   private lastFollowYaw = 0;
   private readonly headScratch = new Point();
@@ -3810,14 +3812,16 @@ export class IsoScene {
           document.body.classList.add('is-canvas-dragging');
           this.suspendCameraFollow();
           this.syncViewTransform();
-          const delta = this.identityView()
-            ? { dx: dx / this.zoom, dy: dy / this.zoom }
-            : screenDragToCameraDelta(dx, dy, this.viewRot, this.viewSx, this.viewSy, this.zoom);
-          this.cameraX += delta.dx;
-          this.cameraY += delta.dy;
+          if (!this.personaPreviewOn()) {
+            const delta = this.identityView()
+              ? { dx: dx / this.zoom, dy: dy / this.zoom }
+              : screenDragToCameraDelta(dx, dy, this.viewRot, this.viewSx, this.viewSy, this.zoom);
+            this.cameraX += delta.dx;
+            this.cameraY += delta.dy;
+            this.panDragScreenPx += Math.hypot(dx, dy);
+            this.applyCamera();
+          }
           this.lastPanPos = { x: e.clientX, y: e.clientY };
-          this.panDragScreenPx += Math.hypot(dx, dy);
-          this.applyCamera();
         }
       }
     };
@@ -4179,6 +4183,7 @@ export class IsoScene {
     }
     if (Math.abs(turn) > 0.02) {
       this.personaCamYaw += turn * PERSONA_TURN_RATE * dt;
+      this.personaChaseHeadingRad = this.personaCamYaw;
     }
     this.syncViewTransform();
     if (fwd !== 0) {
@@ -4204,6 +4209,7 @@ export class IsoScene {
       this.charTy = next.y;
       const tileAfter = this.roundedCharTile();
       if (tileBefore.x !== tileAfter.x || tileBefore.y !== tileAfter.y) {
+        this.notePersonaChaseHeading(tileAfter.x - tileBefore.x, tileAfter.y - tileBefore.y);
         this.doorPushArmed = null;
         this.events.onChecklist('walk-keys');
       }
@@ -4214,19 +4220,25 @@ export class IsoScene {
     }
   }
 
-  /** Third-person chase yaw from Adonay's facing (or movement heading while walking). */
+  private notePersonaChaseHeading(stepDx: number, stepDy: number): void {
+    if (!personaEnabled() || this.interiorActive) return;
+    if (stepDx === 0 && stepDy === 0) return;
+    this.personaChaseHeadingRad = Math.atan2(stepDx, stepDy);
+    if (this.personaOn()) this.personaCamYaw = this.personaChaseHeadingRad;
+  }
+
+  /** Third-person chase yaw from last movement heading (camera behind Adonay). */
   private syncPersonaCamFromFacing(): void {
     if (!personaEnabled()) return;
     if (this.path.length > 0) return;
-    const dir = this.followFacing();
-    const tileFwd: Record<FacingDir, { x: number; y: number }> = {
-      se: { x: 1, y: 1 },
-      sw: { x: -1, y: 1 },
-      ne: { x: 1, y: -1 },
-      nw: { x: -1, y: -1 },
-    };
-    const f = tileFwd[dir];
-    this.personaCamYaw = Math.atan2(f.x, f.y);
+    if (this.personaChaseHeadingRad != null) {
+      this.personaCamYaw = this.personaChaseHeadingRad;
+    } else {
+      const fwd = this.personaTileForward();
+      if (Math.hypot(fwd.x, fwd.y) > 1e-6) {
+        this.personaCamYaw = Math.atan2(fwd.x, fwd.y);
+      }
+    }
     this.syncViewTransform();
   }
 
@@ -4413,6 +4425,7 @@ export class IsoScene {
         const tileAfter = this.roundedCharTile();
         const stepped = tileBefore.x !== tileAfter.x || tileBefore.y !== tileAfter.y;
         if (stepped) {
+          this.notePersonaChaseHeading(tileAfter.x - tileBefore.x, tileAfter.y - tileBefore.y);
           this.doorPushArmed = null;
           this.events.onChecklist('walk-keys');
         }
@@ -4444,8 +4457,13 @@ export class IsoScene {
           break;
         }
         step -= dist;
+        const prevTile = this.roundedCharTile();
         this.charTx = target.x;
         this.charTy = target.y;
+        const nextTile = this.roundedCharTile();
+        if (prevTile.x !== nextTile.x || prevTile.y !== nextTile.y) {
+          this.notePersonaChaseHeading(nextTile.x - prevTile.x, nextTile.y - prevTile.y);
+        }
         this.path.shift();
         this.drawPathPreview();
         if (this.path.length === 0) {

@@ -215,7 +215,7 @@ body.persona-kit #ui-root > .persona-kit {
   }
 
   #ui-root:has(> .building-panel--preview) > .checklist,
-  #ui-root:has(> .building-panel--preview) .chrome__intro {
+  #ui-root:has(> .building-panel--preview) .chrome__sheet-stack {
     display: none;
   }
 }
@@ -497,7 +497,7 @@ body[data-layout='panel'] .checklist {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease, transform 0.2s ease;
-  z-index: 80;
+  z-index: 150;
 }
 
 .playtest-toast--visible {

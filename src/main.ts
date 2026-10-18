@@ -130,17 +130,21 @@ async function main(): Promise<void> {
     },
     onMoveCommand: () => studio.noteMoveCommand(),
     onFrame: () => {
+      const sheetOpen = chrome.isMobileSheetOpen();
       const personaActive =
         personaEnabled() && scene.getViewMode().mode === 'persona' && !scene.isInInterior();
-      if (!personaActive) {
+      if (sheetOpen) {
+        labels.setHidden(true);
+        cenitalLabels.setHidden(true);
+      } else if (!personaActive) {
         labels.update(scene.nameLabelAnchors());
       } else {
         labels.setHidden(true);
       }
-      if (scene.getViewMode().mode === 'cenital' && !scene.isInInterior()) {
+      if (!sheetOpen && scene.getViewMode().mode === 'cenital' && !scene.isInInterior()) {
         cenitalLabels.setHidden(false);
         cenitalLabels.update(scene.cenitalBuildingLabelAnchors());
-      } else {
+      } else if (!sheetOpen) {
         cenitalLabels.setHidden(true);
       }
       const kitActive = personaEnabled() && scene.personaKitActive();
@@ -163,7 +167,8 @@ async function main(): Promise<void> {
         showOut: kitActive && driving && (isMobileLayout() || personaActive),
       });
       personaEnterPrompt.sync(
-        kitActive &&
+        !sheetOpen &&
+          kitActive &&
           scene.getViewMode().mode === 'persona' &&
           ps.enterOffer &&
           !driving &&
@@ -175,7 +180,8 @@ async function main(): Promise<void> {
         personaEnabled() && scene.getViewMode().mode === 'persona' && !scene.isInInterior();
       joystick.setPersonaWalk(thirdPersonWalk && !driving);
       joystick.setHidden(
-        (!driving && !kitActive) ||
+        sheetOpen ||
+          (!driving && !kitActive) ||
           !!scene.isInInterior() ||
           panel.isPreviewExpanded() ||
           scene.jacInfoOpen(),
@@ -399,6 +405,7 @@ async function main(): Promise<void> {
     cenitalExpectedHeading: (dx: number, dy: number) => scene.qaCenitalExpectedHeading(dx, dy),
     cenitalBuildingLabels: () => cenitalLabels.qa(),
     isMobileSheetOpen: () => chrome.isMobileSheetOpen(),
+    mobileSheetPanel: () => chrome.getMobileSheetPanel(),
     audioMuted: () => studio.isMuted(),
     audioUnlocked: () => studio.isUnlocked(),
     setAudioMuted: (muted: boolean) => studio.setMuted(muted),

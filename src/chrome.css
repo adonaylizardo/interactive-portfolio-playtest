@@ -159,7 +159,7 @@
 .chrome__column,
 .chrome__tab,
 .chrome__tools-phone,
-.chrome__intro,
+.chrome__sheet-stack,
 .chrome__dock,
 .chrome__lang,
 .chrome__view-btns,
@@ -499,7 +499,7 @@ body[data-interior='1'] .chrome__column {
 }
 
 .chrome__tools-phone,
-.chrome__intro,
+.chrome__sheet-stack,
 .chrome__dock {
   display: none;
 }
@@ -681,11 +681,11 @@ body[data-layout='panel'] #game-canvas {
   left: auto;
 }
 
-.chrome--mobile .chrome__intro {
+.chrome--mobile .chrome__sheet-stack {
   display: none;
 }
 
-.chrome--sheet .chrome__intro {
+.chrome--sheet .chrome__sheet-stack {
   display: flex;
   flex-direction: column;
   position: absolute;
@@ -694,7 +694,7 @@ body[data-layout='panel'] #game-canvas {
   bottom: 0;
   width: auto;
   max-height: min(72vh, 620px);
-  overflow: auto;
+  overflow: hidden;
   padding: 16px 16px 12px;
   border: 1px solid #2a2c31;
   border-bottom: 0;
@@ -702,6 +702,27 @@ body[data-layout='panel'] #game-canvas {
   background: #141518;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
   z-index: 6;
+}
+
+.chrome__sheet-panel {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow: auto;
+  flex: 1;
+}
+
+.chrome__sheet-panel.is-active {
+  display: flex;
+}
+
+.chrome__sheet-heading {
+  margin: 0;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 500;
+  padding-right: 48px;
 }
 
 .chrome__intro-close {
@@ -785,6 +806,19 @@ body[data-layout='panel'] #game-canvas {
   z-index: 6;
 }
 
+.chrome--sheet .chrome__dock {
+  display: flex;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 16px;
+  height: 48px;
+  justify-content: center;
+  gap: 8px;
+  z-index: 30;
+  pointer-events: auto;
+}
+
 .chrome--mobile .chrome__sound {
   left: 50%;
   transform: translateX(-50%);
@@ -852,7 +886,7 @@ body[data-layout='panel'] #game-canvas {
   position: static;
 }
 
-.chrome--interior .chrome__intro,
+.chrome--interior .chrome__sheet-stack,
 .chrome--interior .chrome__dock,
 .chrome--interior .chrome__tools-phone,
 .chrome--interior .chrome__sound,
@@ -875,19 +909,19 @@ body[data-layout='panel'] #game-canvas {
     pointer-events: auto;
   }
 
-  .chrome--sheet .chrome__intro {
+  .chrome--sheet .chrome__sheet-stack {
     display: flex;
     max-height: min(78vh, 300px);
     z-index: 26;
   }
 
-  .chrome__intro {
+  .chrome__sheet-stack {
     pointer-events: none;
     max-height: min(36vh, 140px);
   }
 
-  .chrome__intro button,
-  .chrome__intro a {
+  .chrome__sheet-stack button,
+  .chrome__sheet-stack a {
     pointer-events: auto;
   }
 
