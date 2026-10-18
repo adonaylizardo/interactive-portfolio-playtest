@@ -1,1 +1,1 @@
-2026-10-18T17:43:41.224Z cursor/persona-camaras @ a771148
+2026-10-18T18:46:29.561Z cursor/persona-camaras @ 329a4b2
