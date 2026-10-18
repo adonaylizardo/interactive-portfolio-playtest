@@ -894,6 +894,16 @@ body[data-layout='panel'] .checklist {
     overflow-y: auto;
   }
 
+  .building-panel--experience:not(.building-panel--peek) .exp-header {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    margin-top: -4px;
+    padding-top: 4px;
+    background: #141518;
+    box-shadow: 0 6px 12px rgb(0 0 0 / 35%);
+  }
+
   .building-panel__sheet {
     left: 0;
     right: 0;

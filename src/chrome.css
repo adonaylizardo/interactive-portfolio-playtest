@@ -721,6 +721,10 @@ body[data-layout='panel'] #game-canvas {
   z-index: 16;
 }
 
+.chrome [data-action='search'] {
+  display: none !important;
+}
+
 #ui-root:has(> .chrome.chrome--mobile) > .checklist {
   top: 84px;
 }

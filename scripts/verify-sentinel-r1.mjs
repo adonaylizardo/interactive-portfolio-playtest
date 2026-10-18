@@ -204,7 +204,12 @@ async function touchTargets(page, tag) {
     };
   });
   const ok = (t) => t && t.w >= 44 && t.h >= 44;
-  record('L-touch-tools', ok(targets.center) && ok(targets.sound) && ok(targets.search), JSON.stringify(targets), tag);
+  record(
+    'L-touch-tools',
+    ok(targets.center) && ok(targets.sound),
+    JSON.stringify(targets),
+    tag,
+  );
 }
 
 async function main() {

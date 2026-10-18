@@ -30,13 +30,13 @@ async function openCharlasExpanded(page) {
   await page.evaluate(() => window.__playtestQa?.enterInterior?.('teresa'));
   await page.waitForSelector('.building-panel--experience.building-panel--open', { timeout: 20000 });
   await page.evaluate(() => window.__playtestQa?.expandInteriorSheetForQa?.());
-  await page.locator('[data-exp-expand]').click({ timeout: 5000 }).catch(() => {});
-  await page.waitForTimeout(500);
   await page.waitForFunction(
-    () => !document.querySelector('.building-panel--peek') && document.querySelector('.building-panel--expanded'),
+    () =>
+      document.querySelector('.building-panel--experience.building-panel--expanded') &&
+      !document.querySelector('.building-panel--peek'),
     { timeout: 8000 },
   );
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(600);
 }
 
 function pixelVariance(png) {

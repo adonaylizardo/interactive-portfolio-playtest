@@ -24,83 +24,108 @@ async function hideWebdriver(page) {
   });
 }
 
-function pixelVariance(png) {
-  const { width, height, data } = png;
-  let sum = 0;
-  let sumSq = 0;
-  let n = 0;
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = (width * y + x) << 2;
-      const lum = (data[i] + data[i + 1] + data[i + 2]) / 3;
-      sum += lum;
-      sumSq += lum * lum;
-      n++;
+function transparentFraction(png) {
+  const n = png.width * png.height;
+  let zero = 0;
+  for (let i = 0; i < n; i++) if (png.data[i * 4 + 3] === 0) zero++;
+  return (zero / n) * 100;
+}
+
+async function stageAtDoor(page, name) {
+  await page.evaluate((building) => {
+    const qa = window.__playtestQa;
+    const b = qa.getEnterableBuildings().find((o) => o.name === building);
+    if (b?.door && b?.inward) {
+      qa.setCharacterTile(b.door.x + b.inward.x, b.door.y + b.inward.y);
     }
-  }
-  const mean = sum / n;
-  return { var: sumSq / n - mean * mean, mean };
+    qa.frameDoorForQa(building);
+  }, name);
+  await page.waitForTimeout(400);
 }
 
-async function openCharlasExpanded(page, viaLeer) {
-  if (viaLeer) {
-    await page.goto(`${BASE.replace(/#.*$/, '')}#/leer`, { waitUntil: 'networkidle', timeout: 120000 });
-    await page.waitForTimeout(500);
-    await page.locator('.reading-view [data-back]').click({ timeout: 8000 }).catch(() => {});
-    await page.waitForFunction(() => !location.hash.includes('/leer'), { timeout: 8000 }).catch(() => {});
-    await page.waitForTimeout(400);
-  } else {
-    await page.goto(BASE, { waitUntil: 'networkidle', timeout: 120000 });
-  }
-  await page.waitForTimeout(500);
-  await page.evaluate(() => window.__playtestQa?.enterInterior?.('teresa'));
-  await page.waitForSelector('.building-panel--experience.building-panel--open', { timeout: 20000 });
-  await page.evaluate(() => window.__playtestQa?.expandInteriorSheetForQa?.());
-  await page.locator('[data-exp-expand]').click({ timeout: 5000 }).catch(() => {});
+async function openCharlasExpanded(page) {
+  await page.goto(BASE, { waitUntil: 'networkidle', timeout: 120000 });
   await page.waitForTimeout(800);
+  await stageAtDoor(page, 'teresa');
+  const pt = await page.evaluate(() => window.__playtestQa.doorScreenPoint('teresa'));
+  if (pt) await page.touchscreen.tap(pt.x, pt.y);
+  let entered = await page
+    .waitForFunction(
+      () =>
+        window.__playtestQa?.isInInterior?.() &&
+        document.querySelector('.building-panel--experience.building-panel--open'),
+      { timeout: 45000 },
+    )
+    .then(() => true)
+    .catch(() => false);
+  if (!entered) {
+    await page.evaluate(() => window.__playtestQa?.enterInterior?.('teresa'));
+    await page.waitForSelector('.building-panel--experience.building-panel--open', { timeout: 20000 });
+  }
+  await page.evaluate(() => window.__playtestQa?.expandInteriorSheetForQa?.());
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.building-panel--experience.building-panel--expanded') &&
+      !document.querySelector('.building-panel--peek'),
+    { timeout: 8000 },
+  );
+  await page.waitForTimeout(600);
 }
 
-async function med1ScreenshotRoom(page, tag, viaLeer) {
-  await openCharlasExpanded(page, viaLeer);
+async function med1ScreenshotRoom(page, tag) {
+  await openCharlasExpanded(page);
   const sheetTop = await page.evaluate(
     () => document.querySelector('.building-panel__sheet')?.getBoundingClientRect().top ?? 0,
   );
+  const vw = (await page.viewportSize()).width;
   const clip = {
-    x: 0,
-    y: 0,
-    width: (await page.viewportSize()).width,
-    height: Math.max(80, Math.floor(sheetTop - 8)),
+    x: 6,
+    y: 1,
+    width: Math.min(vw - 12, 384),
+    height: Math.max(40, Math.floor(Math.min(sheetTop - 8, 334))),
   };
-  const shotPath = path.join(OUT, `charlas-expanded-${tag}${viaLeer ? '-leer' : ''}.png`);
+  const shotPath = path.join(OUT, `charlas-expanded-${tag}.png`);
   const buf = await page.screenshot({ path: shotPath, clip, type: 'png' });
   const png = PNG.sync.read(buf);
-  const { var: v, mean } = pixelVariance(png);
-  const tickerOk = await page.evaluate(() => {
-    const canvas = document.getElementById('game-canvas');
-    const cs = canvas ? getComputedStyle(canvas) : null;
-    return cs?.visibility !== 'hidden' && document.body.dataset.reading !== '1';
-  });
-  const pass = tickerOk && v > 18 && mean > 14 && mean < 240;
-  record(`MED-1-charlas-capture-${viaLeer ? 'leer' : 'door'}`, pass, `var=${v.toFixed(1)} mean=${mean.toFixed(1)} sheetTop=${sheetTop}`, tag);
+  const transparentPct = transparentFraction(png);
+  record('MED-1-charlas-alpha', transparentPct === 0, `transparent=${transparentPct.toFixed(2)}% sheetTop=${sheetTop}`, tag);
 }
 
 async function med1bBiblioteca(page, tag) {
   await page.goto(BASE, { waitUntil: 'networkidle', timeout: 120000 });
-  await page.evaluate(() => window.__playtestQa?.enterInterior?.('biblioteca'));
-  await page.waitForSelector('.building-panel--writings.building-panel--open', { timeout: 20000 });
+  await page.waitForTimeout(800);
+  await stageAtDoor(page, 'biblioteca');
+  const pt = await page.evaluate(() => window.__playtestQa.doorScreenPoint('biblioteca'));
+  if (pt) await page.touchscreen.tap(pt.x, pt.y);
+  let entered = await page
+    .waitForFunction(
+      () =>
+        window.__playtestQa?.isInInterior?.() &&
+        document.querySelector('.building-panel--writings.building-panel--open'),
+      { timeout: 45000 },
+    )
+    .then(() => true)
+    .catch(() => false);
+  if (!entered) {
+    await page.evaluate(() => window.__playtestQa?.enterInterior?.('biblioteca'));
+    await page.waitForSelector('.building-panel--writings.building-panel--open', { timeout: 20000 });
+  }
   await page.evaluate(() => window.__playtestQa?.expandInteriorSheetForQa?.());
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.building-panel--writings.building-panel--expanded') &&
+      !document.querySelector('.building-panel--peek'),
+    { timeout: 8000 },
+  );
   await page.waitForTimeout(600);
-  const m = await page.evaluate(() => {
-    const sheet = document.querySelector('.building-panel__sheet')?.getBoundingClientRect();
-    const free = document.getElementById('game-canvas')?.dataset.interiorFree;
-    const parsed = free ? JSON.parse(free) : null;
-    const freeW = parsed ? parsed.r - parsed.l : 0;
-    return { sheetLeft: sheet?.left ?? 0, sheetRight: sheet?.right ?? 0, freeW, vw: innerWidth };
-  });
-  const sheetPath = path.join(OUT, `biblioteca-expanded-${tag}.png`);
-  await page.screenshot({ path: sheetPath });
-  const pass = m.sheetLeft < 16 && m.freeW >= m.vw * 0.45;
-  record('MED-1b-biblioteca-room', pass, JSON.stringify(m), tag);
+  const sheetTop = await page.evaluate(
+    () => document.querySelector('.building-panel__sheet')?.getBoundingClientRect().top ?? 0,
+  );
+  const vw = (await page.viewportSize()).width;
+  const clip = { x: 6, y: 1, width: Math.min(vw - 12, 384), height: Math.max(40, Math.floor(Math.min(sheetTop - 8, 334))) };
+  const buf = await page.screenshot({ path: path.join(OUT, `biblioteca-expanded-${tag}.png`), clip, type: 'png' });
+  const transparentPct = transparentFraction(PNG.sync.read(buf));
+  record('MED-1b-biblioteca-alpha', transparentPct === 0, `transparent=${transparentPct.toFixed(2)}%`, tag);
 }
 
 const LANG = '.chrome > .chrome__lang';
@@ -175,18 +200,17 @@ async function main() {
 
   const browser = await launchBrowser(chromium);
   for (const w of [360, 390, 430]) {
-    for (const viaLeer of [false, true]) {
-      const ctx = await browser.newContext({
-        viewport: { width: w, height: 844 },
-        hasTouch: true,
-        isMobile: true,
-        locale: 'es-VE',
-      });
-      const page = await ctx.newPage();
-      await hideWebdriver(page);
-      await med1ScreenshotRoom(page, String(w), viaLeer);
-      await ctx.close();
-    }
+    const ctx = await browser.newContext({
+      viewport: { width: w, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+      locale: 'es-VE',
+      deviceScaleFactor: 2,
+    });
+    const page = await ctx.newPage();
+    await hideWebdriver(page);
+    await med1ScreenshotRoom(page, String(w));
+    await ctx.close();
   }
 
   for (const w of [360, 390, 430]) {

@@ -10,6 +10,7 @@ import {
   Texture,
   TilingSprite,
   UPDATE_PRIORITY,
+  getCanvasTexture,
 } from 'pixi.js';
 import {
   cells,
@@ -462,12 +463,11 @@ export class IsoScene {
       backgroundAlpha: 1,
       antialias: true,
       autoDensity: true,
-      premultipliedAlpha: true,
+      premultipliedAlpha: false,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
       resizeTo: window,
       preference: 'webgl',
     });
-
     this.rearLayer = new Container();
     this.rearLayer.eventMode = 'none';
     this.rearLayer.label = 'jac-rear';
@@ -3181,6 +3181,8 @@ export class IsoScene {
       const dt = Math.min(0.25, this.app.ticker.elapsedMS / 1000);
       this.npcs.update(dt);
       this.fillActors?.update(dt);
+    } else if (!this.readingPaused && this.app) {
+      this.resetCanvasTextureFrame();
     }
   }
 
@@ -3190,7 +3192,6 @@ export class IsoScene {
    * PiP sprite). Never readPixels / drawImage the game WebGL view.
    */
   private composeRearPass(): void {
-    if (!this.jac?.rearCam) this.restoreMainTarget();
     const want = this.jac?.rearCam ? 1 : 0;
     if (want === 0) {
       this.rearFade = 0;
@@ -3208,7 +3209,7 @@ export class IsoScene {
     const drewRear = !!this.jac?.rearCam;
     if (drewRear) this.renderRearTexture();
     this.layoutRearSprite();
-    if (drewRear) this.restoreMainTarget();
+    if (drewRear) this.restoreMainTarget(true);
   }
 
   private opaqueBgRgba(): [number, number, number, number] {
@@ -3312,13 +3313,42 @@ export class IsoScene {
     }
   }
 
-  private restoreMainTarget(): void {
+  /** Re-bind the main canvas render target (full viewport). Clears only when asked. */
+  private restoreMainTarget(clear = false): void {
     if (!this.app || !this.canvasEl) return;
     try {
-      this.app.renderer.renderTarget.bind(this.canvasEl, true, this.opaqueBgRgba());
+      const rtSys = this.app.renderer.renderTarget;
+      const opaque = this.opaqueBgRgba();
+      const stack = rtSys as unknown as { _renderTargetStack?: unknown[] };
+      while (stack._renderTargetStack && stack._renderTargetStack.length > 1) {
+        rtSys.pop();
+      }
+      rtSys.bind({ target: this.canvasEl, clear, clearColor: opaque });
+      this.resetCanvasTextureFrame();
     } catch {
       /* next ticker present still targets the canvas */
     }
+  }
+
+  /** CanvasSource textures can keep a sub-rect frame after RT passes — reset to full surface. */
+  private resetCanvasTextureFrame(): void {
+    if (!this.app || !this.canvasEl) return;
+    const tex = getCanvasTexture(this.canvasEl);
+    tex.frame.x = 0;
+    tex.frame.y = 0;
+    tex.frame.width = this.app.screen.width;
+    tex.frame.height = this.app.screen.height;
+    tex.updateUvs();
+  }
+
+  /** Resize GL backing store, then bind the full canvas before camera insets change. */
+  private syncRendererToLayout(): void {
+    if (!this.app || !this.canvasEl) return;
+    const w = Math.max(1, this.canvasEl.clientWidth || window.innerWidth);
+    const h = Math.max(1, this.canvasEl.clientHeight || window.innerHeight);
+    this.app.renderer.resize(w, h);
+    this.resetCanvasTextureFrame();
+    this.restoreMainTarget(true);
   }
 
   private followTargetWorld(): { x: number; y: number } {
@@ -3968,9 +3998,10 @@ export class IsoScene {
   /** Refit camera when the interior sheet peek height changes. */
   applyCameraFromUi(): void {
     if (this.interiorActive) {
+      this.syncRendererToLayout();
       this.fitInteriorCamera();
       this.applyCamera(false);
-      this.restoreMainTarget();
+      this.restoreMainTarget(false);
       this.app?.render();
       return;
     }
@@ -4806,6 +4837,7 @@ export class IsoScene {
       return;
     }
     this.app.ticker.start();
+    this.syncRendererToLayout();
     this.ensurePresentation();
   }
 

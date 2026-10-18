@@ -376,6 +376,7 @@ async function main(): Promise<void> {
     interiorPixelProbes: () => scene.getInteriorPixelProbesClient(),
     tapInteriorTile: (tx: number, ty: number) => scene.tapInteriorTileForQa(tx, ty),
     expandInteriorSheet: () => panel.expandInteriorSheetForQa(),
+    expandInteriorSheetForQa: () => panel.expandInteriorSheetForQa(),
     leaveInteriorNow: () => scene.leaveInteriorNow(),
     collapseInteriorSheetToPeek: () => panel.collapseToPeekOnly(),
     reframeMobileDefault: () => scene.reframeMobileDefaultViewForQa(),
