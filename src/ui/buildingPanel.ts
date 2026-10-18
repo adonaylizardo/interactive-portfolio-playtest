@@ -542,6 +542,35 @@ export class BuildingPanel {
     this.renderWritingsList();
   }
 
+  /** Site search: open a specific writing in the reader. */
+  openWritingById(itemId: string): boolean {
+    for (const section of WRITINGS) {
+      const item = section.items.find((x) => x.id === itemId);
+      if (!item) continue;
+      this.openWriting(section, item);
+      return true;
+    }
+    return false;
+  }
+
+  openTalkById(talkId: string): boolean {
+    if (talkId === 'teresa-building') {
+      this.setExperienceView('list');
+      return true;
+    }
+    const item = TALKS.find((x) => x.id === talkId);
+    if (!item) return false;
+    this.activeTalkId = item.id;
+    this.renderTalkPlayer(item);
+    this.setExperienceView('detail');
+    if (this.isMobile()) this.setPeek(false);
+    return true;
+  }
+
+  expandExperienceSheet(): void {
+    if (this.isMobile() && this.isExperienceMode()) this.setPeek(false);
+  }
+
   private openExperience(mode: 'talks' | 'writings', title: string, interiorId: string | null): void {
     this.leaveArmed = false;
     this.exitPress = null;

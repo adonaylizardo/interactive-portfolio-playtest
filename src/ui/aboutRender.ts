@@ -56,14 +56,23 @@ export function aboutBlockNode(block: AboutBlock): HTMLElement {
   return p;
 }
 
-/** Intro = h1, h3, and any paragraphs before “Let’s dive in.” */
+function normApostrophes(s: string): string {
+  return s.replace(/[\u2018\u2019\u2032`´]/g, "'");
+}
+
+function isDiveInParagraph(block: AboutBlock): boolean {
+  if (block.kind !== 'paragraph') return false;
+  return block.lines.flat().some((p) => normApostrophes(p.text.trim()).toLowerCase().startsWith("let's dive in"));
+}
+
+/** Intro = h1, h3, and any paragraphs before “Let’s dive in.” (curly apostrophe in source). */
 export function splitAboutIntroBody(blocks: AboutBlock[]): { intro: AboutBlock[]; body: AboutBlock[] } {
   const intro: AboutBlock[] = [];
   const body: AboutBlock[] = [];
   let pastIntro = false;
   for (const block of blocks) {
     if (!pastIntro) {
-      if (block.kind === 'paragraph' && block.lines.flat().some((p) => p.text.trim().startsWith("Let's dive in"))) {
+      if (isDiveInParagraph(block)) {
         pastIntro = true;
         body.push(block);
         continue;

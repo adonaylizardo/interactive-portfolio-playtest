@@ -154,9 +154,63 @@ body[data-chrome='desktop'] .about-panel__sheet {
 .search-palette__field {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
+  gap: 8px;
+  padding: 10px 12px;
   border-bottom: 1px solid #2a2c31;
+}
+
+.search-palette__back {
+  display: none;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 22px;
+  background: transparent;
+  color: #edeef0;
+  cursor: pointer;
+  transform: rotate(180deg);
+}
+
+.search-palette--phone-full .search-palette__back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-palette__input-wrap {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.search-palette__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px 4px;
+}
+
+.search-palette__chip {
+  border: 1px solid #2a2c31;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: #141518;
+  color: #edeef0;
+  font: 500 13px/16px Inter, system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.search-palette__chip:hover {
+  background: rgba(237, 238, 240, 0.08);
+}
+
+.search-palette__idle {
+  margin: 12px 16px 20px;
+  color: #9aa0a6;
+  font: 400 14px/20px Inter, system-ui, sans-serif;
 }
 
 .search-palette__input {
@@ -193,9 +247,9 @@ body[data-chrome='desktop'] .about-panel__sheet {
 
 .search-palette__hit {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-start;
-  gap: 2px;
+  gap: 10px;
   width: 100%;
   padding: 10px 16px;
   border: 0;
@@ -204,6 +258,32 @@ body[data-chrome='desktop'] .about-panel__sheet {
   text-align: left;
   cursor: pointer;
   font: inherit;
+}
+
+.search-palette__hit-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #9aa0a6;
+}
+
+.search-palette__hit-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.search-palette__hit--active {
+  background: rgba(237, 238, 240, 0.08);
+}
+
+.search-palette__hit strong {
+  font-weight: 600;
+  color: #edeef0;
+}
+
+.search-palette__empty-title {
+  overflow-wrap: anywhere;
 }
 
 .search-palette__hit:hover,

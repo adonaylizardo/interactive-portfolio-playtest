@@ -1,10 +1,10 @@
-import { ABOUT } from './about';
+import { ABOUT, type AboutBlock } from './about';
 import { CASES, CASE_CARD_TITLES, CASE_HOUSE_IDS, type CaseHouseId } from './cases';
 import { TALKS, WRITINGS } from './experiences';
 import { aboutSectionId } from './aboutSectionId';
 import { talkTitle, writingTitle } from '../ui/contentLabels';
-import { t } from '../ui/i18n';
-import { CONTACT_EMAIL } from './contactLinks';
+import { t, getLang } from '../ui/i18n';
+import { CONTACT_EMAIL, CV_HREF } from './contactLinks';
 
 export type SearchResultKind =
   | 'cases'
@@ -19,9 +19,10 @@ export type SearchResult = {
   kind: SearchResultKind;
   title: string;
   snippet: string;
-  /** Case / landmark building id, talk id, writing id, or about section id. */
   targetId: string;
   score: number;
+  /** Lowercase haystack used for match highlighting. */
+  haystack: string;
 };
 
 export type SearchResultGroup = {
@@ -30,12 +31,26 @@ export type SearchResultGroup = {
   items: SearchResult[];
 };
 
+export type SearchTypeChip = {
+  kind: SearchResultKind;
+  label: string;
+};
+
 const LANDMARK_IDS = ['sambil', 'catedral', 'flor'] as const;
+
+const CASE_ALIASES: Record<CaseHouseId, string[]> = {
+  volaris: ['volaris', 'airline', 'aerolinea', 'aerolínea'],
+  bain: ['bain', 'consulting'],
+  mentoria: ['mentoria', 'mentoría', 'applaudo'],
+  finoa: ['finoa', 'crypto'],
+  pg: ['pg', 'p&g', 'procter', 'gamble'],
+};
 
 function norm(s: string): string {
   return s
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u2018\u2019]/g, "'")
     .toLowerCase();
 }
 
@@ -52,7 +67,7 @@ function matchScore(haystack: string, query: string): number {
 function caseText(id: CaseHouseId): string {
   const c = CASES[id];
   if (!c) return '';
-  const chunks: string[] = [c.headline, c.subtitle, c.shortHeadline ?? ''];
+  const chunks: string[] = [c.headline, c.subtitle, c.shortHeadline ?? '', ...CASE_ALIASES[id]];
   for (const block of [...c.full, ...c.short]) {
     if (block.kind === 'section') {
       if (block.heading) chunks.push(block.heading);
@@ -63,96 +78,129 @@ function caseText(id: CaseHouseId): string {
   return chunks.join(' ');
 }
 
+function aboutBlockPlain(block: AboutBlock): string {
+  if (block.kind === 'heading') return block.text;
+  if (block.kind === 'image') return '';
+  return block.lines.flat().map((p) => p.text).join(' ');
+}
+
+function excerpt(text: string, query: string, maxLen = 96): string {
+  const n = norm(text);
+  const q = norm(query);
+  const idx = q ? n.indexOf(q.split(/\s+/)[0] ?? q) : -1;
+  let slice = text;
+  if (idx >= 0) {
+    const start = Math.max(0, idx - 24);
+    slice = text.slice(start, start + maxLen);
+    if (start > 0) slice = `…${slice}`;
+  } else slice = text.slice(0, maxLen);
+  if (slice.length < text.length && !slice.endsWith('…')) slice += '…';
+  return slice.replace(/\s+/g, ' ').trim();
+}
+
+function pushRow(out: SearchResult[], row: Omit<SearchResult, 'score'> & { score?: number }): void {
+  out.push({ ...row, score: row.score ?? 0 });
+}
+
 function buildIndex(): SearchResult[] {
   const out: SearchResult[] = [];
 
   for (const id of CASE_HOUSE_IDS) {
     const title = CASE_CARD_TITLES[id];
     const text = caseText(id);
-    out.push({
+    pushRow(out, {
       kind: 'cases',
       title,
       snippet: CASES[id]?.subtitle ?? title,
       targetId: id,
-      score: 0,
-    });
-    out.push({
-      kind: 'cases',
-      title,
-      snippet: text.slice(0, 120),
-      targetId: id,
-      score: 0,
+      haystack: `${title} ${text}`,
     });
   }
 
   for (const section of WRITINGS) {
     for (const item of section.items) {
       const title = writingTitle(item);
-      out.push({
+      pushRow(out, {
         kind: 'articles',
         title,
         snippet: item.publication ?? 'adonaylizardo.com',
         targetId: item.id,
-        score: 0,
+        haystack: `${title} ${item.publication ?? ''} ${item.url ?? ''} artículo article diseño design`,
       });
     }
   }
 
   for (const talk of TALKS) {
-    out.push({
+    const title = talkTitle(talk);
+    pushRow(out, {
       kind: 'talks',
-      title: talkTitle(talk),
-      snippet: talk.url ?? 'Talk',
+      title,
+      snippet: talk.date ?? 'Talk',
       targetId: talk.id,
-      score: 0,
+      haystack: `${title} ${talk.url ?? ''} talk charla speaker teresa teatro`,
     });
   }
+  pushRow(out, {
+    kind: 'talks',
+    title: t('panel.talks'),
+    snippet: 'Teresa',
+    targetId: 'teresa-building',
+    haystack: 'talks charlas speaker teresa teatro podcast video',
+  });
 
-  out.push({
+  pushRow(out, {
     kind: 'achievements',
-    title: 'mentorship-stat',
-    snippet: 'achievements',
+    title: t('chrome.mentorshipStat'),
+    snippet: t('chrome.achievements'),
     targetId: 'mentorship',
-    score: 0,
+    haystack: `${t('chrome.mentorshipStat')} ${t('chrome.achievements')} logros achievements mentor`,
   });
 
   for (const id of LANDMARK_IDS) {
     const c = CASES[id];
-    out.push({
+    pushRow(out, {
       kind: 'landmarks',
       title: c?.headline ?? id,
-      snippet: c?.full[0]?.kind === 'section' ? c.full[0].paragraphs[0] ?? '' : '',
+      snippet: c?.full[0]?.kind === 'section' ? (c.full[0].paragraphs[0] ?? '') : '',
       targetId: id,
-      score: 0,
+      haystack: `${c?.headline ?? id} landmark map`,
     });
   }
 
-  out.push({
+  pushRow(out, {
     kind: 'contact',
-    title: 'contact',
+    title: t('chrome.contact'),
     snippet: CONTACT_EMAIL,
     targetId: 'contact',
-    score: 0,
+    haystack: `${t('chrome.contact')} ${CONTACT_EMAIL} email correo`,
   });
-  out.push({
+  pushRow(out, {
     kind: 'contact',
     title: 'Email',
     snippet: CONTACT_EMAIL,
     targetId: 'email',
-    score: 0,
+    haystack: `email ${CONTACT_EMAIL}`,
+  });
+  pushRow(out, {
+    kind: 'contact',
+    title: t('chrome.downloadCv'),
+    snippet: 'CV PDF',
+    targetId: 'cv',
+    haystack: `cv curriculum vitae download ${CV_HREF} ${t('chrome.downloadCv')}`,
   });
 
-  let sectionText = '';
   let sectionTitle = '';
-  let sectionId = '';
+  let sectionId = 'about';
+  let sectionParts: string[] = [];
   const flushAbout = () => {
-    if (!sectionTitle) return;
-    out.push({
+    if (!sectionParts.length && !sectionTitle) return;
+    const full = sectionParts.join(' ').replace(/\s+/g, ' ').trim();
+    pushRow(out, {
       kind: 'about',
-      title: sectionTitle,
-      snippet: sectionText.slice(0, 140),
-      targetId: sectionId || 'about',
-      score: 0,
+      title: sectionTitle || 'About me',
+      snippet: full.slice(0, 120),
+      targetId: sectionId,
+      haystack: `${sectionTitle} ${full}`,
     });
   };
 
@@ -161,39 +209,67 @@ function buildIndex(): SearchResult[] {
       flushAbout();
       sectionTitle = block.text;
       sectionId = block.level >= 2 ? aboutSectionId(block.text) : 'about';
-      sectionText = block.text;
+      sectionParts = [block.text];
       continue;
     }
-    if (block.kind === 'paragraph') {
-      const line = block.lines.flat().map((p) => p.text).join(' ');
-      sectionText += ` ${line}`;
-      if (!sectionTitle) sectionTitle = line.slice(0, 80);
-    }
+    const plain = aboutBlockPlain(block);
+    if (plain) sectionParts.push(plain);
   }
   flushAbout();
+
+  pushRow(out, {
+    kind: 'about',
+    title: 'About me',
+    snippet: 'Adonay Lizardo',
+    targetId: 'about',
+    haystack: ABOUT.map(aboutBlockPlain).join(' '),
+  });
 
   return out;
 }
 
-const INDEX = buildIndex();
+let indexCache: SearchResult[] | null = null;
+
+function getIndex(): SearchResult[] {
+  if (!indexCache) indexCache = buildIndex();
+  return indexCache;
+}
+
+/** Rebuild when language changes (achievement/contact labels). */
+export function resetSearchIndexForTests(): void {
+  indexCache = null;
+}
+
+export function searchTypeChips(): SearchTypeChip[] {
+  const kinds: SearchResultKind[] = [
+    'cases',
+    'articles',
+    'talks',
+    'achievements',
+    'landmarks',
+    'about',
+  ];
+  const labels: Record<SearchResultKind, Parameters<typeof t>[0]> = {
+    cases: 'search.group.cases',
+    articles: 'search.group.articles',
+    talks: 'search.group.talks',
+    achievements: 'search.group.achievements',
+    landmarks: 'search.group.landmarks',
+    contact: 'search.group.contact',
+    about: 'search.group.about',
+  };
+  return kinds.map((kind) => ({ kind, label: t(labels[kind]) }));
+}
 
 export function searchSite(query: string): SearchResultGroup[] {
   const q = query.trim();
   if (!q) return [];
+  void getLang();
 
-  const scored = INDEX.map((row) => {
-    let title = row.title;
-    let snippet = row.snippet;
-    if (row.kind === 'achievements' && row.targetId === 'mentorship') {
-      title = t('chrome.mentorshipStat');
-      snippet = t('chrome.achievements');
-    }
-    if (row.kind === 'contact' && row.targetId === 'contact') {
-      title = t('chrome.contact');
-    }
-    const blob = `${title} ${snippet}`;
-    const score = Math.max(matchScore(blob, q), matchScore(title, q));
-    return { ...row, title, snippet, score };
+  const scored = getIndex().map((row) => {
+    const score = matchScore(row.haystack, q);
+    const snippet = row.kind === 'about' ? excerpt(row.haystack.replace(row.title, '').trim() || row.haystack, q) : excerpt(row.snippet || row.haystack, q);
+    return { ...row, snippet, score };
   }).filter((r) => r.score > 0);
 
   scored.sort((a, b) => b.score - a.score);
@@ -201,7 +277,7 @@ export function searchSite(query: string): SearchResultGroup[] {
   const byKind = new Map<SearchResultKind, SearchResult[]>();
   const seen = new Set<string>();
   for (const row of scored) {
-    const key = `${row.kind}:${row.targetId}:${row.title}`;
+    const key = `${row.kind}:${row.targetId}`;
     if (seen.has(key)) continue;
     seen.add(key);
     const list = byKind.get(row.kind) ?? [];

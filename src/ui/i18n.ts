@@ -150,6 +150,7 @@ const DICT = {
     'writings.guest3.meta': 'Publicación · Fecha · X min',
 
     'search.placeholder': 'Search',
+    'search.back': 'Back',
     'search.tryAnother': 'Try another word, or browse by type.',
     'search.group.cases': 'Cases',
     'search.group.articles': 'Articles',
@@ -345,6 +346,7 @@ const DICT = {
     'writings.guest3.meta': 'Publicación · Fecha · X min',
 
     'search.placeholder': 'Buscar',
+    'search.back': 'Atrás',
     'search.tryAnother': 'Prueba otra palabra o explora por tipo.',
     'search.group.cases': 'Casos',
     'search.group.articles': 'Artículos',

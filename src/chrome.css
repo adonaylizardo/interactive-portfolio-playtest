@@ -750,6 +750,23 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
 }
 
 @media (max-height: 500px) and (orientation: landscape) {
+  .chrome--sheet .chrome__intro {
+    top: 12px;
+    bottom: auto;
+    left: 12px;
+    right: 12px;
+    max-height: min(280px, calc(100dvh - 24px));
+    overflow-y: auto;
+  }
+
+  .chrome--sheet .chrome__intro-close {
+    z-index: 10;
+  }
+
+  .chrome--sheet .chrome__lang {
+    z-index: 9;
+  }
+
   body[data-layout='map'] .chrome--mobile .chrome__lang {
     top: max(12px, env(safe-area-inset-top));
     right: max(12px, env(safe-area-inset-right));
@@ -926,8 +943,9 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
   display: block;
   width: auto;
   right: 16px;
-  bottom: 80px;
+  bottom: 148px;
   left: auto;
+  z-index: 5;
 }
 
 .chrome--dock .chrome__minimap-wrap {

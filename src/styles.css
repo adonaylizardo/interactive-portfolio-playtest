@@ -577,7 +577,8 @@ body[data-layout='panel'] .checklist {
     bottom: max(76px, calc(env(safe-area-inset-bottom) + 64px));
     left: max(12px, env(safe-area-inset-left));
     right: auto !important;
-    width: min(237px, calc(100vw - 120px));
+    z-index: 26;
+    width: min(220px, calc(100vw - 168px));
     min-width: 0;
     max-width: min(237px, calc(100vw - 120px));
     height: auto;

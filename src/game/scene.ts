@@ -2882,11 +2882,16 @@ export class IsoScene {
 
     const isTypingTarget = (t: EventTarget | null) =>
       t instanceof HTMLElement &&
-      (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(t.tagName));
+      (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName));
+    const uiCapturesKeyboard = () =>
+      document.body.classList.contains('search-palette-open') ||
+      document.body.classList.contains('about-panel-open');
     window.addEventListener('keydown', (e) => {
       this.noteAvatarInput();
       const k = e.key.toLowerCase();
+      const typing = isTypingTarget(e.target) || uiCapturesKeyboard();
       if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
+        if (typing) return;
         if (!e.repeat && !this.keys.has(k)) {
           this.startCameraFollow();
           this.armDoorPush();

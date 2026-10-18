@@ -388,7 +388,10 @@ export class ChromeUI {
     this.root.querySelector('.chrome__dock [data-action="contact"]')?.addEventListener('click', () => {
       this.openContact();
     });
-    this.root.querySelector('.chrome__dock [data-action="map"]')?.addEventListener('click', () => this.setLayout('map'));
+    this.root.querySelector('.chrome__dock [data-action="map"]')?.addEventListener('click', () => {
+      this.setLayout('map');
+      this.callbacks.onMapOverview();
+    });
     this.root.querySelector('.chrome__rail [data-action="cases"]')?.addEventListener('click', () => {
       this.setLayout('split');
       this.scrollTo('#chrome-casos');

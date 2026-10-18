@@ -52,24 +52,41 @@ async function main(): Promise<void> {
         scene?.walkToBuildingForQa(result.targetId);
         break;
       case 'articles': {
-        chrome.setLayout('split');
+        chrome.setInteriorOpen(false, { skipLayout: true });
+        chrome.setLayout('map');
         const b = getBuildingByName('biblioteca');
-        if (b?.panelTitle) panel.showWritings(b.panelTitle, 'biblioteca');
+        if (b?.panelTitle) {
+          panel.showWritings(b.panelTitle, 'biblioteca');
+          panel.openWritingById(result.targetId);
+          panel.expandExperienceSheet();
+        }
         break;
       }
       case 'talks': {
-        chrome.setLayout('split');
+        chrome.setInteriorOpen(false, { skipLayout: true });
+        chrome.setLayout('map');
         const b = getBuildingByName('teresa');
-        if (b?.panelTitle) panel.showTalks(b.panelTitle, 'teresa');
+        if (b?.panelTitle) {
+          panel.showTalks(b.panelTitle, 'teresa');
+          panel.openTalkById(result.targetId);
+          panel.expandExperienceSheet();
+        }
         break;
       }
+      case 'contact':
+        if (result.targetId === 'cv') {
+          const a = document.createElement('a');
+          a.href = `${import.meta.env.BASE_URL}cv/adonay-lizardo-cv.pdf`;
+          a.download = 'adonay-lizardo-cv.pdf';
+          a.click();
+          break;
+        }
+        aboutPanel.open({ highlightContact: true });
+        break;
       case 'achievements':
         chrome.setLayout('split');
         if (isMobileLayout()) chrome.openMobileSheetSection('logros');
         else document.querySelector('#chrome-logros')?.scrollIntoView({ block: 'start' });
-        break;
-      case 'contact':
-        aboutPanel.open({ highlightContact: true });
         break;
       case 'about':
         aboutPanel.open({
@@ -83,6 +100,9 @@ async function main(): Promise<void> {
     onLayoutChange: () => {
       if (!isMobileLayout()) checklist.setCollapsed(true);
       else checklist.collapseMobile();
+      labels.setHidden(
+        isMobileLayout() && (chrome.isMobileSheetOpen() || (panel.isOpen() && panel.isExperienceMode())),
+      );
       if (chrome.getLayout() === 'map' && !panel.isOpen()) studio.scheduleIntroWhenMapIdle(450);
       scene?.applyCameraFromUi();
     },
