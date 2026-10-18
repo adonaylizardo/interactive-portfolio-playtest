@@ -25,6 +25,24 @@ async function dismissIntro(page) {
   await page.waitForTimeout(400);
 }
 
+async function tapSelector(page, sel, touch) {
+  const pt = await page.evaluate((selector) => {
+    const el = document.querySelector(selector);
+    const r = el?.getBoundingClientRect();
+    if (!r || r.width < 2) return null;
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  }, sel);
+  if (!pt) return false;
+  if (touch) await page.touchscreen.tap(pt.x, pt.y);
+  else await page.mouse.click(pt.x, pt.y);
+  return true;
+}
+
+async function closeAbout(page) {
+  await page.evaluate(() => document.querySelector('[data-about-close]')?.click());
+  await page.waitForTimeout(350);
+}
+
 async function setEn(page) {
   const lang = await page.evaluate(() => {
     const en = document.querySelector('.chrome__lang-opt[data-lang="en"]');
@@ -59,7 +77,7 @@ try {
     await page.goto(BASE, { waitUntil: 'networkidle', timeout: 120000 });
     await waitMap(page);
     if (vp.touch) await dismissIntro(page);
-    if (vp.w === 1280) await setEn(page);
+    await setEn(page);
 
     if (!report.bundle) {
       report.bundle = await page.evaluate(() => ({
@@ -71,9 +89,7 @@ try {
     const avatarSel = vp.touch
       ? '.chrome__dock [data-dock="intro"]'
       : '.chrome__rail [data-action="home"]';
-    await page.locator(avatarSel).first().tap({ force: true }).catch(() =>
-      page.locator(avatarSel).first().click(),
-    );
+    await tapSelector(page, avatarSel, vp.touch);
     await page.waitForTimeout(600);
     const aboutOpen = await page.evaluate(
       () => document.querySelector('.about-panel--open') && document.querySelector('#about-panel-title')?.textContent,
@@ -81,15 +97,12 @@ try {
     report.checks.push({ id: `${vp.tag} avatar opens About`, pass: aboutOpen === 'About me', aboutOpen });
     await cropShot(page, `${vp.tag}-about`, { x: 0, y: 0, width: vp.w, height: vp.h });
 
-    await page.evaluate(() => document.querySelector('[data-about-close]')?.click());
-    await page.waitForTimeout(300);
+    await closeAbout(page);
 
     const contactSel = vp.touch
       ? '.chrome__dock [data-action="contact"]'
       : '.chrome__rail [data-action="contact"]';
-    await page.locator(contactSel).first().tap({ force: true }).catch(() =>
-      page.locator(contactSel).first().click(),
-    );
+    await tapSelector(page, contactSel, vp.touch);
     await page.waitForTimeout(800);
     const contactState = await page.evaluate(() => ({
       open: !!document.querySelector('.about-panel--open'),
@@ -103,14 +116,18 @@ try {
     });
     await cropShot(page, `${vp.tag}-contact`, { x: 0, y: 0, width: vp.w, height: vp.h });
 
-    await page.evaluate(() => document.querySelector('[data-about-close]')?.click());
-    await page.waitForTimeout(200);
+    await closeAbout(page);
 
-    const searchBtn = vp.touch
-      ? '.chrome__tools-phone [data-action="search"], .chrome__rail [data-action="search"]'
-      : '.chrome__rail [data-action="search"]';
-    await page.locator(searchBtn).first().click();
-    await page.waitForTimeout(400);
+    await page.evaluate(() => {
+      const buttons = [...document.querySelectorAll('[data-action="search"]')];
+      const visible = buttons.find((b) => {
+        const r = b.getBoundingClientRect();
+        return r.width > 2 && r.height > 2;
+      });
+      visible?.click();
+    });
+    await page.waitForTimeout(600);
+    await page.waitForSelector('.search-palette--open .search-palette__input', { timeout: 15000 });
     await page.locator('.search-palette__input').fill('design');
     await page.waitForTimeout(500);
     const designGroups = await page.evaluate(() =>
