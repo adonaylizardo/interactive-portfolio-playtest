@@ -73,6 +73,8 @@ export class StudioAudio {
   private lastBarkId = '';
   private lastBarkAt = 0;
   private barksLoaded = false;
+  private placeVoiceEl: HTMLAudioElement | null = null;
+  private placeVoiceKey: string | null = null;
 
   constructor() {
     const unlock = () => this.unlock();
@@ -211,6 +213,81 @@ export class StudioAudio {
     const file = caseVoiceFile(id);
     if (!file) return;
     this.playLine(file);
+  }
+
+  stopPlaceVoice(): void {
+    if (this.placeVoiceEl) {
+      this.placeVoiceEl.pause();
+      this.placeVoiceEl.src = '';
+      this.placeVoiceEl = null;
+    }
+    this.placeVoiceKey = null;
+    this.syncAmbience();
+    this.emit();
+  }
+
+  getPlaceVoiceProgress(): { current: number; duration: number; playing: boolean; voiceId: string | null } {
+    const el = this.placeVoiceEl;
+    if (!el) return { current: 0, duration: 0, playing: false, voiceId: null };
+    const duration = Number.isFinite(el.duration) ? el.duration : 0;
+    return {
+      current: el.currentTime,
+      duration,
+      playing: !el.paused && !el.ended,
+      voiceId: this.placeVoiceKey,
+    };
+  }
+
+  /** QA / automation: start place voice without gesture (headless may block HTMLAudio.play otherwise). */
+  qaPlayPlaceVoice(voiceId: string): boolean {
+    this.setMuted(false);
+    if (!this.unlocked) {
+      this.unlocked = true;
+      this.introLock = false;
+    }
+    return this.startPlaceVoice(voiceId, { qa: true });
+  }
+
+  /** Play / pause / switch landmark voice. Returns whether audio is playing after the call. */
+  togglePlaceVoice(voiceId: string): boolean {
+    if (this.muted) return false;
+    if (!this.unlocked) this.unlock();
+    if (this.placeVoiceKey === voiceId && this.placeVoiceEl) {
+      if (this.placeVoiceEl.paused) {
+        void this.placeVoiceEl.play().catch(() => this.stopPlaceVoice());
+        this.emit();
+        return true;
+      }
+      this.placeVoiceEl.pause();
+      this.emit();
+      return false;
+    }
+    return this.startPlaceVoice(voiceId, { qa: false });
+  }
+
+  private startPlaceVoice(voiceId: string, opts?: { qa?: boolean }): boolean {
+    this.stopVoice();
+    this.stopBark();
+    this.stopPlaceVoice();
+    const line = VOICE_LINES[voiceId];
+    if (!line) return false;
+    if (!opts?.qa && automatedWebKitPhone()) return false;
+    this.preferOgg ??= canPlayOgg();
+    const file = this.preferOgg ? line.files.ogg : line.files.mp3;
+    const el = new Audio(`${VOICE_DIR}${file}`);
+    el.preload = 'auto';
+    el.addEventListener('ended', () => {
+      if (this.placeVoiceEl === el) this.stopPlaceVoice();
+    });
+    el.addEventListener('error', () => {
+      if (this.placeVoiceEl === el) this.stopPlaceVoice();
+    });
+    this.placeVoiceEl = el;
+    this.placeVoiceKey = voiceId;
+    this.duckAmbience(true);
+    this.emit();
+    void el.play().catch(() => this.stopPlaceVoice());
+    return true;
   }
 
   /** Move command: a random bark ≠ last, ~6 s cooldown, never over a case line. */

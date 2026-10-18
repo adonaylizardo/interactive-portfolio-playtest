@@ -66,6 +66,7 @@ export class ChromeUI {
   private audience: Audience = 'recruiter';
   private lang: Lang = getLang();
   private interiorOpen = false;
+  private placeCardOpen = false;
   private mobile = isMobileLayout();
   private callbacks: ChromeCallbacks;
   private minimap: HTMLCanvasElement;
@@ -151,6 +152,13 @@ export class ChromeUI {
     if (detail) detail.hidden = false;
     intro?.classList.add('chrome__intro--expanded');
     if (scrollTarget) this.scrollTo(scrollTarget);
+  }
+
+  setPlaceCardOpen(open: boolean, opts?: { skipLayout?: boolean }): void {
+    this.placeCardOpen = open;
+    if (open) document.body.dataset.placeCard = '1';
+    else delete document.body.dataset.placeCard;
+    if (!opts?.skipLayout) this.callbacks.onLayoutChange();
   }
 
   setInteriorOpen(open: boolean, opts?: { skipLayout?: boolean }): void {
@@ -583,6 +591,7 @@ export class ChromeUI {
     this.root.dataset.layout = layout;
     this.root.classList.toggle('chrome--mobile', this.mobile);
     this.root.classList.toggle('chrome--interior', this.interiorOpen);
+    this.root.classList.toggle('chrome--place-card', this.placeCardOpen);
     this.root.classList.toggle(
       'chrome--landscape-side',
       landscapeSide,

@@ -205,6 +205,11 @@ function slideStep(
   return { x, y };
 }
 
+export type PlaceCardBridge = {
+  isOpen: () => boolean;
+  layoutInsets: () => { left: number; top: number; right: number; bottom: number };
+};
+
 export type BuildingPanelBridge = {
   isOpen: () => boolean;
   openTitle: () => string;
@@ -242,6 +247,7 @@ export type SceneEvents = {
   stickShown?: () => boolean;
   stickCancel?: () => void;
   buildingPanel?: BuildingPanelBridge;
+  placeCard?: PlaceCardBridge;
   checklist?: ChecklistBridge;
   chrome?: ChromeBridge;
 };
@@ -2034,6 +2040,16 @@ export class IsoScene {
       if (this.jac.rearCam) top = Math.max(top, phone ? 140 : 160);
     }
     const panelInsets = this.events.buildingPanel?.layoutInsets?.();
+    const placeInsets =
+      !this.interiorActive && this.events.placeCard?.isOpen?.()
+        ? this.events.placeCard.layoutInsets()
+        : null;
+    if (placeInsets) {
+      left = Math.max(left, placeInsets.left + pad);
+      right = Math.max(right, placeInsets.right + pad);
+      top = Math.max(top, placeInsets.top + pad);
+      bottom = Math.max(bottom, placeInsets.bottom + pad);
+    }
     const bottomSheet =
       !!panelInsets && this.interiorActive && panelInsets.bottom > 0 && panelInsets.right === 0;
     this.interiorBottomSheet = bottomSheet;

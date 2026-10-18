@@ -1,6 +1,7 @@
 import { studio } from './audio/studio';
 import { ChecklistUI } from './checklist/ui';
 import { isCaseHouse } from './data/cases';
+import { isPlaceCard } from './data/placeCards';
 import {
   doorInwardStep,
   getBuildingByName,
@@ -26,6 +27,7 @@ import { getInteriorDef, interiorBlockedTilesHaveProps } from './game/interior';
 import { IsoScene } from './game/scene';
 import { findPath } from './iso/pathfinding';
 import { BuildingPanel } from './ui/buildingPanel';
+import { PlaceCardPanel } from './ui/placeCardPanel';
 import { ChromeUI, type DesktopLayout } from './ui/chrome';
 import { JacHud } from './ui/jacHud';
 import { Joystick } from './ui/joystick';
@@ -156,6 +158,11 @@ async function main(): Promise<void> {
     onToggle: (id) => scene.jacSetToggle(id),
     onEngine: () => scene.jacSetEngine(),
   });
+  const placeCard = new PlaceCardPanel(uiRoot, () => {
+    chrome.setPlaceCardOpen(placeCard.isOpen());
+    scene?.applyCameraFromUi();
+  });
+
   const panel = new BuildingPanel(
     uiRoot,
     () => {
@@ -175,6 +182,7 @@ async function main(): Promise<void> {
   );
   joystick.onStickStart(() => {
     if (panel.isPreviewMode()) panel.hide();
+    if (placeCard.isOpen()) placeCard.hide();
     studio.noteMoveCommand();
   });
 
@@ -212,6 +220,11 @@ async function main(): Promise<void> {
     onChecklist: (step) => checklist.complete(step),
     onEnterBuilding: (buildingId) => {
       checklist.complete('enter-building');
+      if (isPlaceCard(buildingId)) {
+        if (chrome.isMobileSheetOpen()) chrome.setLayout('map');
+        placeCard.open(buildingId);
+        return;
+      }
       if (isCaseHouse(buildingId)) {
         if (chrome.isMobileSheetOpen()) chrome.setLayout('map');
         panel.showPreview(buildingId);
@@ -243,8 +256,10 @@ async function main(): Promise<void> {
         !scene.jacSnapshot()?.driving ||
           !!scene.isInInterior() ||
           panel.isPreviewExpanded() ||
+          placeCard.isOpen() ||
           scene.jacInfoOpen(),
       );
+      placeCard.tickUi();
     },
     stick: () => joystick.vector(),
     stickActive: () => joystick.isActive(),
@@ -270,6 +285,10 @@ async function main(): Promise<void> {
       layoutInsets: () => panel.layoutInsets(),
       consumeInteriorCanvasTap: (x, y) => panel.consumeInteriorCanvasTap(x, y),
       expandInteriorSheetForQa: () => panel.expandInteriorSheetForQa(),
+    },
+    placeCard: {
+      isOpen: () => placeCard.isOpen(),
+      layoutInsets: () => placeCard.layoutInsets(),
     },
     checklist: {
       isMobileExpanded: () => checklist.isMobileExpanded(),
@@ -390,6 +409,13 @@ async function main(): Promise<void> {
     enterInterior: (name: string) => scene.enterInterior(name),
     exitInterior: () => scene.exitInterior(),
     dismissBuildingPanel: () => panel.hide(),
+    openPlaceCard: (id: string) => {
+      if (isPlaceCard(id)) placeCard.open(id);
+    },
+    closePlaceCard: () => placeCard.hide(),
+    isPlaceCardOpen: () => placeCard.isOpen(),
+    placeVoiceProgress: () => studio.getPlaceVoiceProgress(),
+    qaPlayPlaceVoice: (voiceId: string) => studio.qaPlayPlaceVoice(voiceId),
     showPanelOverlayForQa: (title: string) => {
       checklist.setBuildingPanelOpen(true);
       panel.showOverlayForQa(title);
