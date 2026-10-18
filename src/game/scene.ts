@@ -1844,13 +1844,13 @@ export class IsoScene {
     if (this.jac?.driving) {
       if (this.jac.isExiting()) return;
       if (performance.now() < this.suppressDriveTapUntil) return;
-      if (this.pickJacAtScreen(sx, sy)) return;
       const doorHit = this.pickBuildingDoorAtScreen(sx, sy);
       const buildingHit = doorHit ?? this.pickBuildingAtScreen(sx, sy);
       if (buildingHit?.door && buildingHit.panelTitle) {
         this.requestDriveToEnter({ panelTitle: buildingHit.panelTitle, door: buildingHit.door });
         return;
       }
+      if (this.pickJacAtScreen(sx, sy)) return;
       const { x: wx, y: wy } = this.screenToWorld(sx, sy);
       const raw = worldToTile(wx, wy);
       if (raw && !this.jac.driveTileOk(raw.x, raw.y)) {
@@ -2022,13 +2022,13 @@ export class IsoScene {
   private requestDriveToScreen(sx: number, sy: number): void {
     if (!this.jac?.driving || this.jac.isExiting()) return;
     if (performance.now() < this.suppressDriveTapUntil) return;
-    if (this.pickJacAtScreen(sx, sy)) return;
     const doorHit = this.pickBuildingDoorAtScreen(sx, sy);
     const buildingHit = doorHit ?? this.pickBuildingAtScreen(sx, sy) ?? this.pickNearbyDriveDoor(sx, sy);
     if (buildingHit?.door && buildingHit.panelTitle) {
       this.requestDriveToEnter({ panelTitle: buildingHit.panelTitle, door: buildingHit.door });
       return;
     }
+    if (this.pickJacAtScreen(sx, sy)) return;
     this.events.stickCancel?.();
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
     const tile = worldToTile(wx, wy);
@@ -3125,7 +3125,7 @@ export class IsoScene {
         const rect = canvas.getBoundingClientRect();
         const sx = t.clientX - rect.left;
         const sy = t.clientY - rect.top;
-        if (this.pickJacAtScreen(sx, sy)) {
+        if (this.pickJacAtScreen(sx, sy) && !this.pickBuildingDoorAtScreen(sx, sy)) {
           driveTap = null;
         }
       } else if (e.touches.length >= 2) {

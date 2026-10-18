@@ -148,7 +148,7 @@ async function boardVan(page, cdp, touch) {
     await wait(160);
     const pt = await vanClient(page);
     const pick = pt ? await page.evaluate((p) => window.__playtestQa.pickAt(p.x, p.y), pt) : null;
-    if (pt && pick?.jac) await realTap(page, cdp, pt.x, pt.y, touch);
+    if (pt) await realTap(page, cdp, pt.x, pt.y, touch);
     for (let w = 0; w < 80; w++) {
       const now = await snap(page);
       if (now.driving) return { ok: true, ms: Date.now() - t0, tries: i + 1 };
