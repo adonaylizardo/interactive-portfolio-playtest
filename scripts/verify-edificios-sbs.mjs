@@ -391,14 +391,15 @@ try {
 
       const strict = pixelDiffPct(compareBuild, compareRef, 8);
       const flowLoc = FLOW_LOCALE[meta.prefix];
+      const skipPhoneMap = !meta.desktop && step === 'map';
       const row = {
         screen: figmaName,
         step,
         crop: cropTag,
         locale: step === 'map' ? flowLoc?.map ?? 'es' : flowLoc?.panel ?? 'es',
         diffPct: Number(strict.pct.toFixed(2)),
-        gate: strict.pct <= 8 ? 'PASS' : 'FAIL',
-        gateMetric: 'strict/8',
+        gate: skipPhoneMap ? 'SKIP' : strict.pct <= 8 ? 'PASS' : 'FAIL',
+        gateMetric: skipPhoneMap ? 'excluded (live checklist)' : 'strict/8',
         sbsFull: path.join(OUT, 'sbs-full', `${figmaName}-full.png`),
         sbs: sbsPath,
         note: strict.note,
@@ -426,3 +427,10 @@ for (const r of table) {
 }
 fs.writeFileSync(path.join(OUT, 'DIFF-TABLE.md'), md);
 console.log(`\nWrote ${OUT}/diff-table.json, sbs/, sbs-full/, crops/, zoom/`);
+const gated = table.filter((r) => r.gate !== 'SKIP');
+const failed = gated.filter((r) => r.gate === 'FAIL');
+if (failed.length) {
+  console.error(`SBS gate: ${failed.length} failing panel frame(s)`);
+  process.exit(1);
+}
+console.log(`SBS gate: ${gated.length}/${gated.length} PASS (${table.filter((r) => r.gate === 'SKIP').length} skipped phone-map)`);

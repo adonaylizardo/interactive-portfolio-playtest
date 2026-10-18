@@ -47,6 +47,7 @@ const DICT = {
 
     'panel.exit': 'Exit',
     'panel.close': 'Close',
+    'panel.expand': 'Expand panel',
     'panel.readCase': 'Read case',
     'panel.talks': 'Talks',
     'panel.writings': 'Writings',
@@ -222,6 +223,7 @@ const DICT = {
 
     'panel.exit': 'Salir',
     'panel.close': 'Cerrar',
+    'panel.expand': 'Expandir panel',
     'panel.readCase': 'Leer caso',
     'panel.talks': 'Talks',
     'panel.writings': 'Writings',

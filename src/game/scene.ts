@@ -948,7 +948,13 @@ export class IsoScene {
               ? { contains: (x: number, y: number) => box.contains(x, y) && spriteAlphaHit(obj, pos.x + x, pos.y + y) }
               : box;
         const flat = obj.name === 'redoma' || !!obj.flat;
-        const zIndex = flat ? -10 : objectDepth(obj) + (obj.x - obj.y) * 0.0001;
+        let depthBias = 0;
+        if (obj.type === 'building' && obj.name === 'biblioteca') {
+          depthBias = -30;
+        } else if (obj.name === 'obelisco' || (obj.name === 'tree' && obj.variant === 'redondo')) {
+          depthBias = 12;
+        }
+        const zIndex = flat ? -10 : objectDepth(obj) + depthBias + (obj.x - obj.y) * 0.0001;
         g.zIndex = zIndex;
         if (obj.flat) g.eventMode = 'none';
         const spriteBox = {

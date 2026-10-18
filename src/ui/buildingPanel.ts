@@ -778,6 +778,8 @@ export class BuildingPanel {
           <button type="button" class="talks-player__pause" aria-label="${t('talks.play')}">
             <img class="talks-player__pause-icon" src="${FIGMA_PLAY}" width="14" height="14" alt="" />
           </button>
+          <div class="talks-player__progress" aria-hidden="true"><span class="talks-player__progress-fill"></span></div>
+          <p class="talks-player__time" aria-hidden="true">0:00 / 0:00</p>
         </div>
         <h3 class="talks-player__title"></h3>
         <p class="talks-player__meta"></p>
@@ -1241,5 +1243,11 @@ export class BuildingPanel {
     if (read) read.textContent = t('panel.readCase');
     const back = this.el.querySelector('[data-exp-back]') as HTMLElement | null;
     if (back) back.setAttribute('aria-label', t('experience.back'));
+    const mobBack = this.el.querySelector('[data-exp-mobile-back]') as HTMLElement | null;
+    if (mobBack) mobBack.setAttribute('aria-label', t('experience.back'));
+    const mobClose = this.el.querySelector('[data-exp-mobile-close]') as HTMLElement | null;
+    if (mobClose) mobClose.setAttribute('aria-label', t('panel.close'));
+    const expand = this.el.querySelector('[data-exp-expand]') as HTMLElement | null;
+    if (expand) expand.setAttribute('aria-label', t('panel.expand'));
   }
 }

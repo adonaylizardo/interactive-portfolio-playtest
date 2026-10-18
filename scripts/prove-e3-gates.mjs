@@ -46,18 +46,15 @@ async function proveControls(page, viewport, label) {
   await page.setViewportSize(viewport);
   await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true);
-  if (viewport.width >= 768) {
-    await page.evaluate(() => window.__playtestQa.setLayout?.('map'));
-  } else {
-    await page.evaluate(() => window.__playtestQa.setLayout?.('map'));
-  }
+  await page.evaluate(() => window.__playtestQa.setLayout?.('map'));
   await wait(400);
   const tests = [];
   const langEn = await tapOwnCenter(page, '.chrome__lang [data-lang="en"]');
   tests.push({ test: `${label} EN`, pass: langEn.ok, ...langEn });
   const langEs = await tapOwnCenter(page, '.chrome__lang [data-lang="es"]');
   tests.push({ test: `${label} ES`, pass: langEs.ok, ...langEs });
-  if (viewport.width < 768) {
+  const mobileChrome = viewport.width < 768 || viewport.height < 500;
+  if (mobileChrome) {
     const search = await tapOwnCenter(page, '.chrome__tools-phone [data-action="search"]');
     const sound = await tapOwnCenter(page, '.chrome__tools-phone [data-action="sound"]');
     tests.push({ test: `${label} Search`, pass: search.ok, ...search });

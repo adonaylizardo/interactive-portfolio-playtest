@@ -1454,14 +1454,10 @@ body[data-layout='panel'] .checklist {
     gap: 7px;
   }
 
-  .building-panel--experience.building-panel--writings .experience__thumb--doc {
-    width: 63px;
-    height: 63px;
-  }
-
   .building-panel--experience.building-panel--writings .experience__row-title {
-    font-size: 13.25px;
-    line-height: 19px;
+    font-size: 12.5px;
+    line-height: 20.5px;
+    letter-spacing: -0.02em;
   }
 
   .building-panel--experience.building-panel--writings .experience__row {
@@ -1473,6 +1469,18 @@ body[data-layout='panel'] .checklist {
 
   .building-panel--experience.building-panel--writings .experience__list {
     gap: 8px;
+  }
+
+  .building-panel--experience .talks-player {
+    gap: 15px;
+  }
+
+  .building-panel--experience .talks-player__stage {
+    height: 220px;
+  }
+
+  .building-panel--experience .talks-player__title {
+    line-height: 23px;
   }
 
   .building-panel--experience.building-panel--writings
@@ -1711,6 +1719,12 @@ body[data-layout='panel'] .checklist {
 
   .building-panel--experience.building-panel--writings .experience__list {
     gap: 12px;
+  }
+
+  .building-panel--experience.building-panel--writings .experience__row-title {
+    font-size: 13px;
+    line-height: 20px;
+    letter-spacing: -0.02em;
   }
 
   .building-panel--experience .talks-player {
