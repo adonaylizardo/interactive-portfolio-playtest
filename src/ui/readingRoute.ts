@@ -4,7 +4,9 @@ export type ReadingRoute =
 
 const PREFIX = '/leer';
 const OUTDOOR_HASH_KEY = 'portfolio-playtest-outdoor-hash';
-const READING_DEPTH_KEY = 'portfolio-playtest-reading-depth';
+
+/** In-memory only — reset on every full document load. */
+let readingDepthInDoc = 0;
 
 function isMapViewHash(hash: string): boolean {
   const raw = hash.replace(/^#/, '');
@@ -19,13 +21,21 @@ function saveOutdoorHashIfNeeded(): void {
   }
 }
 
+export function resetReadingNavigationForLoad(): void {
+  readingDepthInDoc = 0;
+  try {
+    sessionStorage.removeItem('portfolio-playtest-reading-depth');
+  } catch {
+    /* ignore */
+  }
+}
+
 export function readingDepth(): number {
-  const n = Number(sessionStorage.getItem(READING_DEPTH_KEY) ?? '0');
-  return Number.isFinite(n) && n > 0 ? n : 0;
+  return readingDepthInDoc;
 }
 
 function setReadingDepth(n: number): void {
-  sessionStorage.setItem(READING_DEPTH_KEY, String(Math.max(0, n)));
+  readingDepthInDoc = Math.max(0, n);
 }
 
 export function noteReadingPopstate(): void {
@@ -95,7 +105,15 @@ export function leaveReadingHash(): void {
   if (!isReadingHash()) return;
   const saved = sessionStorage.getItem(OUTDOOR_HASH_KEY);
   const base = `${location.pathname}${location.search}`;
-  const next = saved && saved.startsWith('#') ? `${base}${saved}` : base;
-  history.replaceState({ reading: false, playtest: true }, '', next);
+  const target = saved && saved.startsWith('#') ? `${base}${saved}` : base;
+  const depth = readingDepth();
   setReadingDepth(0);
+
+  if (depth === 1 && saved) {
+    skipNextReadingPopstateDepth = true;
+    history.back();
+    return;
+  }
+
+  history.replaceState({ reading: false, playtest: true }, '', target);
 }

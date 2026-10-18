@@ -54,7 +54,7 @@ export const CASE_CARD_TITLES: Record<CaseHouseId, string> = {
 
 /** Map / reading card title (mentoria is localized). */
 export function caseCardTitle(id: CaseHouseId, lang: 'en' | 'es'): string {
-  if (id === 'mentoria') return lang === 'en' ? 'Mentoring' : 'Mentoría';
+  if (id === 'mentoria') return lang === 'en' ? 'Mentoring' : 'Mentoría en Applaudo';
   return CASE_CARD_TITLES[id];
 }
 

@@ -166,7 +166,7 @@ export class ChromeUI {
       <button type="button" class="chrome__case-row" data-locate="${row.id}">
         <span class="chrome__case-thumb">${iconSvg('map')}</span>
         <span class="chrome__case-copy">
-          <span class="chrome__case-title">${row.label}</span>
+          <span class="chrome__case-title"${row.id === 'mentoria' ? ' data-i18n="chrome.expRow.mentoria"' : ''}>${row.id === 'mentoria' ? 'Mentoring at Applaudo' : row.label}</span>
           <span class="chrome__case-subtitle" data-i18n="chrome.caseSub.${row.id}">${caseRowSummary(row.id)}</span>
         </span>
       </button>`;

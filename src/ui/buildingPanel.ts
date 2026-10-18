@@ -519,7 +519,10 @@ export class BuildingPanel {
     this.setExperienceView('list');
     if (mode === 'talks') this.renderTalksList();
     else {
-      this.renderWritingsFilters();
+      if (this.experienceFilters) {
+        this.experienceFilters.replaceChildren();
+        this.experienceFilters.hidden = true;
+      }
       this.renderWritingsList();
     }
     this.onVisibilityChange();
@@ -535,7 +538,6 @@ export class BuildingPanel {
     if (!this.isExperienceMode()) return;
     this.syncExperienceIntro();
     if (this.expHeaderTitle) this.expHeaderTitle.textContent = this.experiencePanelTitle;
-    if (this.mode === 'writings') this.renderWritingsFilters();
     if (this.experienceView === 'list') {
       if (this.mode === 'talks') this.renderTalksList();
       else this.renderWritingsList();
@@ -557,8 +559,7 @@ export class BuildingPanel {
     this.experienceView = view;
     this.experienceList.hidden = view !== 'list';
     this.experienceDetail.hidden = view !== 'detail';
-    const showFilters = this.mode === 'writings' && view === 'list';
-    this.experienceFilters.hidden = !showFilters;
+    this.experienceFilters.hidden = true;
     if (this.experienceIntro) {
       this.experienceIntro.hidden = this.mode !== 'talks' || view !== 'list';
     }

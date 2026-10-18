@@ -18,6 +18,7 @@ import {
   navigateReading,
   noteReadingPopstate,
   parseReadingRoute,
+  resetReadingNavigationForLoad,
 } from './ui/readingRoute';
 import { ReadingView } from './ui/readingView';
 import { getInteriorDef, interiorBlockedTilesHaveProps } from './game/interior';
@@ -35,6 +36,7 @@ import { getLang, onLangChange, setLang, t } from './ui/i18n';
 import type { Camera } from './tokens';
 
 async function main(): Promise<void> {
+  resetReadingNavigationForLoad();
   const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
   const uiRoot = document.getElementById('ui-root')!;
   const applyCanvasLabel = () => canvas.setAttribute('aria-label', t('canvas.label'));
