@@ -324,8 +324,7 @@ export class ReadingView {
     const backList = document.createElement('button');
     backList.type = 'button';
     backList.className = 'reading-view__inline-back ui-btn ui-btn--secondary';
-    backList.innerHTML = `${iconSvg('chevron')} <span>${t('read.backToList')}</span>`;
-    backList.classList.add('reading-view__back-pill--list');
+    backList.innerHTML = `<span>${t('read.backToList')}</span>`;
     backList.addEventListener('click', () => {
       goBackToReadingList(() => {
         this.route = { kind: 'list' };
