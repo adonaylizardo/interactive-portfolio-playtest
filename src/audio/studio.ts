@@ -65,6 +65,8 @@ export class StudioAudio {
   private preferOgg: boolean | null = null;
   /** First gesture owns the intro; other lines wait until it has finished. */
   private introLock = false;
+  /** Intro was skipped because a panel was open on unlock; play when back on map. */
+  private introDeferred = false;
   private pending: string | null = null;
   private bark: HTMLAudioElement | null = null;
   private barkLines: BarkLine[] = [];
@@ -110,6 +112,23 @@ export class StudioAudio {
     this.emit();
   }
 
+  /** Map-only: play intro if unlock happened while a panel was open. */
+  maybePlayDeferredIntro(): void {
+    if (!this.unlocked || this.muted || this.played.has('01-intro') || !this.introDeferred) return;
+    if (this.shouldDeferIntro()) return;
+    this.introDeferred = false;
+    this.playLine('01-intro');
+  }
+
+  private shouldDeferIntro(): boolean {
+    if (typeof document === 'undefined') return false;
+    const panel = document.querySelector('#ui-root > .building-panel.building-panel--open');
+    if (!panel) return false;
+    if (panel.classList.contains('building-panel--preview')) return true;
+    if (panel.classList.contains('building-panel--experience')) return true;
+    return true;
+  }
+
   onChange(fn: () => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -152,6 +171,11 @@ export class StudioAudio {
 
   private startGraphAndIntro(): void {
     if (automatedWebKitPhone()) {
+      if (this.shouldDeferIntro()) {
+        this.introDeferred = true;
+        this.introLock = false;
+        return;
+      }
       this.playLine('01-intro');
       if (this.muted || !this.played.has('01-intro')) this.introLock = false;
       return;
@@ -171,6 +195,11 @@ export class StudioAudio {
       }
     } catch {
       /* autoplay / context limits: mute state still flips */
+    }
+    if (this.shouldDeferIntro()) {
+      this.introDeferred = true;
+      this.introLock = false;
+      return;
     }
     this.playLine('01-intro');
     if (this.muted || !this.played.has('01-intro')) this.introLock = false;
@@ -283,7 +312,7 @@ export class StudioAudio {
 
   private finishVoice(): void {
     this.introLock = false;
-    this.stopVoice();
+    this.stopVoice({ preserveQueue: true });
     this.syncAmbience();
     this.emit();
     const next = this.pending;
@@ -291,13 +320,19 @@ export class StudioAudio {
     if (next) this.playLine(next);
   }
 
-  private stopVoice(): void {
+  private stopVoice(opts: { preserveQueue?: boolean } = {}): void {
+    const hadVoice = !!this.voice;
     if (this.voice) {
       this.voice.pause();
       this.voice.src = '';
       this.voice = null;
     }
     this.subtitleText = '';
+    if (hadVoice || this.introLock) {
+      this.introLock = false;
+      if (!opts.preserveQueue) this.pending = null;
+    }
+    this.duckAmbience(false);
   }
 
   private startAmbience(): void {

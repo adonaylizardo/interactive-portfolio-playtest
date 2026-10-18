@@ -1,0 +1,713 @@
+[
+  {
+    "frameKey": "writings-desktop-list",
+    "rows": [
+      {
+        "nodeId": "199:2651",
+        "name": "ui/panel-encabezado",
+        "selector": ".exp-header",
+        "figmaBox": "0,0,431×65",
+        "domBox": "0.0,0.0,431.0×65.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2668",
+        "name": "cuerpo",
+        "selector": ".building-panel__body-wrap",
+        "figmaBox": "0,65,431×835",
+        "domBox": "0.0,65.0,431.0×835.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2669",
+        "name": "filtros",
+        "selector": ".experience__filters",
+        "figmaBox": "24,85,383×32",
+        "domBox": "24.0,85.0,383.0×32.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2670",
+        "name": "chip · All",
+        "selector": ".experience__filter[data-writings-filter=\"all\"]",
+        "figmaBox": "24,85,44×32",
+        "domBox": "24.0,85.0,45.0×32.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2672",
+        "name": "chip · UXSC",
+        "selector": ".experience__filter[data-writings-filter=\"uxsc\"]",
+        "figmaBox": "76,85,67×32",
+        "domBox": "77.0,85.0,67.0×32.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2678",
+        "name": "seccion · UX Sidekick Chronicles",
+        "selector": ".experience__list > .experience__section:nth-child(1)",
+        "figmaBox": "24,125,383×282",
+        "domBox": "24.0,125.0,383.0×282.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2679",
+        "name": "encabezado-seccion",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__section-row",
+        "figmaBox": "24,125,383×32",
+        "domBox": "24.0,125.0,383.0×32.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2680",
+        "name": "nombre",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__section-title",
+        "figmaBox": "24,129,180×24",
+        "domBox": "24.0,129.0,179.0×24.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2681",
+        "name": "conteo",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__section-count",
+        "figmaBox": "212,132,23×18",
+        "domBox": "211.0,132.0,23.0×18.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2684",
+        "name": "ver-todo",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__see-all",
+        "figmaBox": "354,125,53×32",
+        "domBox": "355.0,125.0,52.0×32.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2686",
+        "name": "descripcion",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__section-desc",
+        "figmaBox": "24,161,383×18",
+        "domBox": "24.0,161.0,383.0×18.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2687",
+        "name": "fila-articulo 0",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(1)",
+        "figmaBox": "24,183,383×72",
+        "domBox": "24.0,183.0,383.0×72.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2688",
+        "name": "portada (placeholder)",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(1) .experience__thumb--doc",
+        "figmaBox": "24,187,64×64",
+        "domBox": "24.0,187.0,64.0×64.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2691",
+        "name": "texto",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(1) .experience__copy",
+        "figmaBox": "100,199,307×40",
+        "domBox": "100.0,199.0,307.0×40.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2692",
+        "name": "titulo",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(1) .experience__row-title",
+        "figmaBox": "100,199,307×20",
+        "domBox": "100.0,199.0,307.0×20.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2693",
+        "name": "meta",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(1) .experience__row-meta",
+        "figmaBox": "100,223,151×16",
+        "domBox": "100.0,223.0,151.0×16.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2694",
+        "name": "fila-articulo 1",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(2)",
+        "figmaBox": "24,259,383×72",
+        "domBox": "24.0,259.0,383.0×72.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2695",
+        "name": "portada (placeholder)",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(2) .experience__thumb--doc",
+        "figmaBox": "24,263,64×64",
+        "domBox": "24.0,263.0,64.0×64.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2699",
+        "name": "titulo",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(2) .experience__row-title",
+        "figmaBox": "100,265,307×40",
+        "domBox": "100.0,265.0,307.0×40.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2700",
+        "name": "meta",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(2) .experience__row-meta",
+        "figmaBox": "100,309,151×16",
+        "domBox": "100.0,309.0,151.0×16.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "crop-anchor",
+        "name": "panel sheet vs Figma crop origin",
+        "selector": ".building-panel--writings.building-panel--exp-list .building-panel__sheet",
+        "figmaBox": "64,0,—",
+        "domBox": "64.0,0.0,—",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": "absolute viewport position"
+      }
+    ],
+    "pass": true
+  },
+  {
+    "frameKey": "writings-phone-list",
+    "rows": [
+      {
+        "nodeId": "199:2000",
+        "name": "agarre",
+        "selector": ".exp-mobile-chrome__grab",
+        "figmaBox": "16,1,343×16",
+        "domBox": "16.0,1.0,343.0×16.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2001",
+        "name": "barra",
+        "selector": ".exp-mobile-chrome__bar",
+        "figmaBox": "167.5,11,40×4",
+        "domBox": "167.5,11.0,40.0×4.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2002",
+        "name": "encabezado",
+        "selector": ".exp-mobile-chrome__row",
+        "figmaBox": "16,29,343×44",
+        "domBox": "16.0,29.0,343.0×44.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2003",
+        "name": "titulo",
+        "selector": ".exp-mobile-chrome__title",
+        "figmaBox": "16,39,295×24",
+        "domBox": "16.0,39.0,295.0×24.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2004",
+        "name": "cerrar",
+        "selector": "[data-exp-mobile-close]",
+        "figmaBox": "315,29,44×44",
+        "domBox": "315.0,29.0,44.0×44.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2007",
+        "name": "filtros",
+        "selector": ".experience__filters",
+        "figmaBox": "16,85,343×44",
+        "domBox": "16.0,85.0,343.0×44.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2008",
+        "name": "chip · All",
+        "selector": ".experience__filter[data-writings-filter=\"all\"]",
+        "figmaBox": "16,85,44×44",
+        "domBox": "16.0,85.0,45.0×44.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2010",
+        "name": "chip · UXSC",
+        "selector": ".experience__filter[data-writings-filter=\"uxsc\"]",
+        "figmaBox": "68,85,67×44",
+        "domBox": "69.0,85.0,67.0×44.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2012",
+        "name": "chip · Sinergia",
+        "selector": ".experience__filter[data-writings-filter=\"sinergia\"]",
+        "figmaBox": "143,85,81×44",
+        "domBox": "144.0,85.0,80.0×44.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2014",
+        "name": "chip · Guest",
+        "selector": ".experience__filter[data-writings-filter=\"guest\"]",
+        "figmaBox": "232,85,67×44",
+        "domBox": "232.0,85.0,67.0×44.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2016",
+        "name": "seccion · UX Sidekick Chronicles",
+        "selector": ".experience__list > .experience__section:nth-child(1)",
+        "figmaBox": "16,141,343×318",
+        "domBox": "16.0,141.0,343.0×318.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2017",
+        "name": "encabezado-seccion",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__section-row",
+        "figmaBox": "16,141,343×44",
+        "domBox": "16.0,141.0,343.0×44.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2018",
+        "name": "nombre",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__section-title",
+        "figmaBox": "16,151,180×24",
+        "domBox": "16.0,151.0,179.0×24.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2019",
+        "name": "conteo",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__section-count",
+        "figmaBox": "204,154,23×18",
+        "domBox": "203.0,154.0,23.0×18.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2022",
+        "name": "ver-todo",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__see-all",
+        "figmaBox": "306,141,53×44",
+        "domBox": "307.0,141.0,52.0×44.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2024",
+        "name": "descripcion",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__section-desc",
+        "figmaBox": "16,189,343×18",
+        "domBox": "16.0,189.0,343.0×18.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2025",
+        "name": "fila-articulo 0",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(1)",
+        "figmaBox": "16,211,343×80",
+        "domBox": "16.0,211.0,343.0×80.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2026",
+        "name": "portada (placeholder)",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(1) .experience__thumb--doc",
+        "figmaBox": "16,219,64×64",
+        "domBox": "16.0,219.0,64.0×64.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2030",
+        "name": "titulo",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(1) .experience__row-title",
+        "figmaBox": "92,231,267×20",
+        "domBox": "92.0,231.0,267.0×20.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2031",
+        "name": "meta",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(1) .experience__row-meta",
+        "figmaBox": "92,255,151×16",
+        "domBox": "92.0,255.0,151.0×16.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2032",
+        "name": "fila-articulo 1",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(2)",
+        "figmaBox": "16,295,343×80",
+        "domBox": "16.0,295.0,343.0×80.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2033",
+        "name": "portada (placeholder)",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(2) .experience__thumb--doc",
+        "figmaBox": "16,303,64×64",
+        "domBox": "16.0,303.0,64.0×64.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2037",
+        "name": "titulo",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(2) .experience__row-title",
+        "figmaBox": "92,305,267×40",
+        "domBox": "92.0,305.0,267.0×40.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2038",
+        "name": "meta",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(2) .experience__row-meta",
+        "figmaBox": "92,349,151×16",
+        "domBox": "92.0,349.0,151.0×16.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2039",
+        "name": "fila-articulo 2",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(3)",
+        "figmaBox": "16,379,343×80",
+        "domBox": "16.0,379.0,343.0×80.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2040",
+        "name": "portada (placeholder)",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(3) .experience__thumb--doc",
+        "figmaBox": "16,387,64×64",
+        "domBox": "16.0,387.0,64.0×64.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2044",
+        "name": "titulo",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(3) .experience__row-title",
+        "figmaBox": "92,399,267×20",
+        "domBox": "92.0,399.0,267.0×20.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2045",
+        "name": "meta",
+        "selector": ".experience__list > .experience__section:nth-child(1) .experience__row:nth-of-type(3) .experience__row-meta",
+        "figmaBox": "92,423,151×16",
+        "domBox": "92.0,423.0,151.0×16.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      }
+    ],
+    "pass": true
+  },
+  {
+    "frameKey": "writings-phone-reading",
+    "rows": [
+      {
+        "nodeId": "199:2207",
+        "name": "agarre",
+        "selector": ".exp-mobile-chrome__grab",
+        "figmaBox": "16,1,343×16",
+        "domBox": "16.0,1.0,343.0×16.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2208",
+        "name": "barra",
+        "selector": ".exp-mobile-chrome__bar",
+        "figmaBox": "167.5,11,40×4",
+        "domBox": "167.5,11.0,40.0×4.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2209",
+        "name": "encabezado",
+        "selector": ".exp-mobile-chrome__row",
+        "figmaBox": "16,29,343×44",
+        "domBox": "16.0,29.0,343.0×44.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2210",
+        "name": "atras",
+        "selector": "[data-exp-mobile-back]",
+        "figmaBox": "16,29,44×44",
+        "domBox": "16.0,29.0,44.0×44.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2213",
+        "name": "titulo",
+        "selector": ".exp-mobile-chrome__title",
+        "figmaBox": "64,39,247×24",
+        "domBox": "64.0,39.0,247.0×24.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2214",
+        "name": "cerrar",
+        "selector": "[data-exp-mobile-close]",
+        "figmaBox": "315,29,44×44",
+        "domBox": "315.0,29.0,44.0×44.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2217",
+        "name": "portada (placeholder)",
+        "selector": ".writings-reader__hero",
+        "figmaBox": "16,85,343×193",
+        "domBox": "16.0,85.0,343.0×193.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": "n/a",
+        "note": ""
+      },
+      {
+        "nodeId": "199:2220",
+        "name": "etiqueta",
+        "selector": ".writings-reader__kicker",
+        "figmaBox": "16,290,154×14",
+        "domBox": "16.0,290.0,154.0×14.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2221",
+        "name": "titulo",
+        "selector": ".writings-reader__title",
+        "figmaBox": "16,316,343×28",
+        "domBox": "16.0,316.0,343.0×28.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2222",
+        "name": "meta",
+        "selector": ".writings-reader__meta",
+        "figmaBox": "16,356,164×16",
+        "domBox": "16.0,356.0,166.0×16.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2223",
+        "name": "cuerpo",
+        "selector": ".writings-reader__p",
+        "figmaBox": "16,384,343×72",
+        "domBox": "16.0,384.0,343.0×72.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2224",
+        "name": "cuerpo",
+        "selector": ".writings-reader__p",
+        "figmaBox": "16,468,343×72",
+        "domBox": "16.0,468.0,343.0×72.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2225",
+        "name": "cuerpo",
+        "selector": ".writings-reader__p",
+        "figmaBox": "16,552,343×72",
+        "domBox": "16.0,552.0,343.0×72.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      },
+      {
+        "nodeId": "199:2226",
+        "name": "ui/boton",
+        "selector": ".writings-reader__substack",
+        "figmaBox": "16,636,165×44",
+        "domBox": "16.0,636.0,164.0×44.0",
+        "gate": "PASS",
+        "boxOk": true,
+        "typeOk": true,
+        "note": ""
+      }
+    ],
+    "pass": true
+  }
+]
