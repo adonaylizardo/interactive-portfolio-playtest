@@ -28,7 +28,8 @@ export type IconName =
   | 'chevron'
   | 'arrowNe'
   | 'play'
-  | 'pause';
+  | 'pause'
+  | 'link';
 
 const PATHS: Record<IconName, string> = {
   briefcase: `<rect ${STROKE} x="1.5" y="5" width="12" height="8.5" rx="1.5"/><path ${STROKE} d="M5 5V3.5A1.5 1.5 0 0 1 6.5 2h2A1.5 1.5 0 0 1 10 3.5V5M1.5 8.5h12"/>`,
@@ -53,4 +54,5 @@ const PATHS: Record<IconName, string> = {
   arrowNe: `<path ${STROKE} d="M4 11 11 4M6.5 4H11v4.5"/>`,
   play: `<path ${STROKE} d="M4.5 3.5 11 7.5 4.5 11.5z"/>`,
   pause: `<path ${STROKE} d="M4.5 3.5h2.5v8H4.5zM8 3.5h2.5v8H8z"/>`,
+  link: `<path ${STROKE} d="M6 8.5a2.5 2.5 0 0 0 3.5 0l2-2a2.5 2.5 0 0 0-3.5-3.5l-1 1M9 6.5a2.5 2.5 0 0 0-3.5 0l-2 2a2.5 2.5 0 0 0 3.5 3.5l1-1"/>`,
 };

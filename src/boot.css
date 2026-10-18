@@ -13,8 +13,16 @@ body.boot-welcome #ui-root .checklist {
   position: fixed;
   inset: 0;
   z-index: 45;
-  pointer-events: auto;
+  pointer-events: none;
   color: #edeef0;
+  background: transparent;
+}
+
+.boot-flow__loading,
+.boot-flow__welcome,
+.boot-flow__lang,
+.boot-flow__btn {
+  pointer-events: auto;
 }
 
 .boot-flow--done {
@@ -35,6 +43,15 @@ body.boot-welcome #ui-root .checklist {
 
 body.boot-loading #game-canvas {
   visibility: visible;
+}
+
+body.boot-loading::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+  background: rgb(0 0 0 / 40%);
+  pointer-events: none;
 }
 
 .boot-flow__loading--out {
@@ -137,23 +154,31 @@ body.boot-loading #game-canvas {
 
 .boot-flow__sheet {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 12px 20px max(24px, env(safe-area-inset-bottom));
+  left: 16px;
+  right: 16px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  padding: 20px 20px 24px;
   background: #141518;
   border: 1px solid #2a2c31;
-  border-bottom: none;
-  border-radius: 20px 20px 0 0;
+  border-radius: 20px;
   box-shadow: 0 -8px 32px rgb(0 0 0 / 45%);
 }
 
+body.boot-welcome #game-canvas {
+  visibility: visible;
+}
+
+body.boot-welcome::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+  background: rgb(0 0 0 / 45%);
+  pointer-events: none;
+}
+
 .boot-flow__handle {
-  width: 40px;
-  height: 4px;
-  margin: 0 auto 16px;
-  border-radius: 2px;
-  background: #3a3d44;
+  display: none;
 }
 
 .boot-flow__headline {
@@ -207,18 +232,23 @@ body.boot-loading #game-canvas {
   }
 
   .boot-flow__sheet {
-    left: 50%;
+    left: max(16px, env(safe-area-inset-left));
     right: auto;
-    bottom: 32px;
-    transform: translateX(-50%);
-    width: min(520px, calc(100% - 48px));
+    bottom: auto;
+    top: 50%;
+    transform: translateY(-50%);
+    width: min(420px, calc(100% - 32px));
     border-radius: 20px;
-    border-bottom: 1px solid #2a2c31;
     padding: 24px 28px 28px;
   }
 
-  .boot-flow__handle {
-    display: none;
+  .boot-flow__actions {
+    justify-content: flex-start;
+  }
+
+  .boot-flow__btn {
+    flex: 0 1 auto;
+    min-width: 140px;
   }
 }
 

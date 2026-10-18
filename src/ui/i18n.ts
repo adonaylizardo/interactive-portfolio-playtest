@@ -393,12 +393,12 @@ const DICT = {
     'chrome.dock': 'Barra',
     'chrome.audience': 'Audiencia',
 
-    'state.webgl.title': "The map can't run in this browser",
-    'state.loadFailed.title': "Couldn't load the map",
-    'state.loadFailed.sub': 'Check your connection and try again.',
-    'state.tryAgain': 'Try again',
+    'state.webgl.title': 'El mapa no puede ejecutarse en este navegador',
+    'state.loadFailed.title': 'No se pudo cargar el mapa',
+    'state.loadFailed.sub': 'Comprueba tu conexión e inténtalo de nuevo.',
+    'state.tryAgain': 'Reintentar',
     'state.readInstead': 'Solo leer',
-    'state.offline': "You're offline. Some places may not load.",
+    'state.offline': 'Estás sin conexión. Es posible que algunos lugares no carguen.',
 
     'boot.error': 'Error al cargar:',
     'boot.loading': 'Cargando el mapa',

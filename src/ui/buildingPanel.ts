@@ -1119,6 +1119,17 @@ export class BuildingPanel {
     return this.isOpen() ? this.openKey : '';
   }
 
+  /** Mobile interior / experience sheet fully expanded (not peek). */
+  isInteriorSheetExpanded(): boolean {
+    if (!this.isOpen() || !this.isMobile() || this.peekOnly) return false;
+    return (
+      this.mode === 'interior' ||
+      this.mode === 'talks' ||
+      this.mode === 'writings' ||
+      this.mode === 'preview'
+    );
+  }
+
   /** Peek / sheet inset for interior camera fit. */
   layoutInsets(): { left: number; top: number; right: number; bottom: number } {
     if (

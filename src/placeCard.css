@@ -176,9 +176,23 @@
     left: 0;
     right: 0;
     bottom: 0;
+    height: min(51vh, 414px);
+    max-height: min(51vh, 414px);
     border-radius: 20px 20px 0 0;
     border-bottom: none;
     padding-bottom: max(12px, env(safe-area-inset-bottom));
+    overflow: hidden;
+  }
+
+  .place-card__hero {
+    flex: 0 1 auto;
+    min-height: 72px;
+    max-height: 120px;
+    margin-bottom: 12px;
+  }
+
+  .place-card__hero-img {
+    max-height: 120px;
   }
 }
 

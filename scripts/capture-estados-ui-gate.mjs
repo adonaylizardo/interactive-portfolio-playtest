@@ -93,11 +93,10 @@ async function main() {
   });
 
   await captureState(browser, 'carga-fallida', async (page) => {
-    await dismissWelcome(page);
-    await page.evaluate(() =>
-      (window.__showFatalState ?? window.__playtestQa?.showFatalState)?.('load-failed'),
-    );
-    await page.waitForSelector('#fatal-state');
+    await page.route('**/preview-contenido/sprites/**', (route) => route.abort());
+    await page.route('**/sprites/**', (route) => route.abort());
+    await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#fatal-state', { timeout: 45000 });
   });
 
   await captureState(browser, 'sin-conexion', async (page) => {

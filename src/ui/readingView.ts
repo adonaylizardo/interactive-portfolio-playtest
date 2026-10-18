@@ -126,20 +126,14 @@ export class ReadingView {
     this.root.hidden = true;
     this.root.innerHTML = `
       <header class="reading-view__header">
-        <button type="button" class="reading-view__back ui-btn ui-btn--secondary" data-back>
-          ${iconSvg('chevron')} <span data-i18n="read.backToMap">Volver al mapa</span>
+        <button type="button" class="reading-view__back-pill ui-btn ui-btn--secondary" data-back>
+          <span data-i18n="read.backToMap">Volver al mapa</span>
         </button>
-        <button type="button" class="reading-view__back ui-btn ui-btn--secondary" data-back-list hidden>
-          ${iconSvg('chevron')} <span data-i18n="read.backToList">Volver a la lista</span>
-        </button>
-        <button type="button" class="reading-view__back ui-btn ui-btn--secondary" data-back-map hidden>
-          ${iconSvg('chevron')} <span data-i18n="read.backToMap">Volver al mapa</span>
+        <button type="button" class="reading-view__back-pill ui-btn ui-btn--secondary" data-back-list hidden>
+          <span data-i18n="read.backToList">Volver a la lista</span>
         </button>
         <h1 class="reading-view__site-title" data-i18n="read.title">Leer</h1>
-        <div class="reading-view__lang chrome__lang" role="group" aria-label="Language" data-i18n-aria="chrome.language">
-          <button type="button" class="chrome__lang-opt" data-lang="en">EN</button>
-          <button type="button" class="chrome__lang-opt is-active" data-lang="es">ES</button>
-        </div>
+        <button type="button" class="reading-view__lang ui-round" data-reading-lang aria-label="Language">ES</button>
       </header>
       <div class="reading-view__scroll" tabindex="-1"></div>
     `;
@@ -168,12 +162,8 @@ export class ReadingView {
         this.scroll.scrollTop = 0;
       });
     });
-    this.root.querySelector('[data-back-map]')?.addEventListener('click', () => this.onExitMap());
-    this.root.querySelectorAll('[data-lang]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const lang = (btn as HTMLElement).dataset.lang;
-        if (lang === 'en' || lang === 'es') setLang(lang);
-      });
+    this.root.querySelector('[data-reading-lang]')?.addEventListener('click', () => {
+      setLang(getLang() === 'es' ? 'en' : 'es');
     });
   }
 
@@ -229,11 +219,11 @@ export class ReadingView {
     });
     const backMap = this.root.querySelector('[data-back]') as HTMLElement;
     const backList = this.root.querySelector('[data-back-list]') as HTMLElement;
-    const backMapDetail = this.root.querySelector('[data-back-map]') as HTMLElement;
     const onDetail = this.route.kind === 'detail';
     backMap.hidden = onDetail;
     backList.hidden = !onDetail;
-    backMapDetail.hidden = true;
+    const langBtn = this.root.querySelector('[data-reading-lang]') as HTMLButtonElement | null;
+    if (langBtn) langBtn.textContent = getLang() === 'es' ? 'ES' : 'EN';
   }
 
   private render(): void {
@@ -295,6 +285,7 @@ export class ReadingView {
       this.route = { kind: 'detail', slug };
       this.applyI18n();
       this.render();
+      this.syncDocumentTitle();
       this.scroll.scrollTop = 0;
     });
     return btn;
@@ -333,7 +324,7 @@ export class ReadingView {
     const backList = document.createElement('button');
     backList.type = 'button';
     backList.className = 'reading-view__inline-back ui-btn ui-btn--secondary';
-    backList.innerHTML = `${iconSvg('chevron')} <span>${t('read.backToList')}</span>`;
+    backList.innerHTML = `<span>${t('read.backToList')}</span>`;
     backList.addEventListener('click', () => {
       goBackToReadingList(() => {
         this.route = { kind: 'list' };
@@ -355,6 +346,7 @@ export class ReadingView {
     wrap.appendChild(pageTitle);
 
     let contactInserted = false;
+    let introLedeDone = false;
     for (const block of aboutForLang(getLang())) {
       if (block.kind === 'heading') {
         const tag = block.level === 1 ? 'h3' : block.level === 2 ? 'h4' : 'h5';
@@ -362,7 +354,12 @@ export class ReadingView {
         hx.textContent = block.text;
         if (block.level >= 2) {
           hx.id = block.id;
-          hx.className = 'reading-about__section-title';
+          if (block.level === 3 && !introLedeDone) {
+            introLedeDone = true;
+            hx.className = 'reading-about__lede';
+          } else {
+            hx.className = 'reading-about__section-title';
+          }
         } else {
           hx.className = 'reading-about__headline';
         }
@@ -392,6 +389,8 @@ export class ReadingView {
         wrap.appendChild(p);
       } else if (block.kind === 'image') {
         const picture = document.createElement('picture');
+        const frame = document.createElement('div');
+        frame.className = 'about__photo-frame';
         picture.className = 'about__photo';
         const webp = document.createElement('source');
         webp.type = 'image/webp';
@@ -403,7 +402,8 @@ export class ReadingView {
         img.alt = block.alt;
         img.loading = 'lazy';
         picture.append(webp, img);
-        wrap.appendChild(picture);
+        frame.appendChild(picture);
+        wrap.appendChild(frame);
       }
     }
     this.main.replaceChildren(wrap);

@@ -71,6 +71,7 @@
   font-weight: 600;
   line-height: 1.25;
   max-width: 320px;
+  white-space: nowrap;
 }
 
 .fatal-state__lede {
@@ -89,11 +90,14 @@
   width: 100%;
   max-width: 320px;
   margin-top: 12px;
+  align-items: center;
 }
 
 .fatal-state__btn {
   min-height: 44px;
-  width: 100%;
+  width: auto;
+  min-width: 140px;
+  max-width: 100%;
   border-radius: 999px;
   font-family: Geist, Inter, system-ui, sans-serif;
   font-size: 15px;
@@ -118,18 +122,35 @@
 .playtest-toast--offline {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  max-width: min(360px, calc(100vw - 32px));
-  white-space: normal;
+  gap: 10px;
+  padding: 10px 16px 10px 12px;
+  width: min(330px, calc(100vw - 32px));
+  max-width: min(330px, calc(100vw - 32px));
+  white-space: nowrap;
   text-align: left;
   line-height: 1.35;
+  border-radius: 999px;
 }
 
 .playtest-toast__icon {
   flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 12%);
+  padding: 5px;
+  box-sizing: border-box;
+  background-color: rgb(255 255 255 / 12%);
+  background-image: none;
+  mask: none;
+  -webkit-mask: none;
+  position: relative;
+}
+
+.playtest-toast__icon::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
   background: currentColor;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Cpath d='M5 12.55a11 11 0 0 1 14.08 0'/%3E%3Cpath d='M1.42 9a16 16 0 0 1 21.16 0'/%3E%3Cpath d='M8.53 16.11a6 6 0 0 1 6.95 0'/%3E%3Cline x1='12' y1='20' x2='12.01' y2='20'/%3E%3Cline x1='2' y1='2' x2='22' y2='22'/%3E%3C/svg%3E")
     center / contain no-repeat;
@@ -140,6 +161,17 @@
 
 @media (max-width: 767px) {
   body[data-offline='1'] .playtest-toast--offline.playtest-toast--visible {
-    bottom: max(172px, calc(env(safe-area-inset-bottom) + 156px));
+    bottom: max(188px, calc(env(safe-area-inset-bottom) + 172px));
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .fatal-state__monogram,
+  .fatal-state__name {
+    display: none;
+  }
+
+  .fatal-state__title {
+    font-size: 20px;
   }
 }

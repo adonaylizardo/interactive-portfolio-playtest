@@ -27,7 +27,7 @@ export function createAboutContactBlock(): HTMLElement {
   const links = document.createElement('div');
   links.className = 'reading-about__contact-links';
 
-  const row = (label: string, href: string, external = true) => {
+  const row = (label: string, href: string, icon: 'mail' | 'link', external = true) => {
     const a = document.createElement('a');
     a.className = 'reading-about__contact-row';
     a.href = href;
@@ -35,14 +35,14 @@ export function createAboutContactBlock(): HTMLElement {
       a.target = '_blank';
       a.rel = 'noopener noreferrer';
     }
-    a.innerHTML = `<span class="reading-about__contact-label">${label}</span>${iconSvg('arrowNe', 14)}`;
+    a.innerHTML = `<span class="reading-about__contact-row-icon" aria-hidden="true">${iconSvg(icon, 18)}</span><span class="reading-about__contact-label">${label}</span>${iconSvg('arrowNe', 14)}`;
     return a;
   };
 
   links.append(
-    row(t('read.about.email'), CONTACT_MAILTO, false),
-    row(t('read.about.linkedin'), LINKEDIN_HREF),
-    row(t('read.about.medium'), MEDIUM_HREF),
+    row(t('read.about.email'), CONTACT_MAILTO, 'mail', false),
+    row(t('read.about.linkedin'), LINKEDIN_HREF, 'link'),
+    row(t('read.about.medium'), MEDIUM_HREF, 'link'),
   );
 
   section.append(actions, links);

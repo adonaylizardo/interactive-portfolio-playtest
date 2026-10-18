@@ -210,6 +210,10 @@ export async function loadMapSprites(
   }
   if (keys) {
     await loadKeys(keys, onKeyDone);
+    const missing = keys.filter((k) => !spritesLoaded(k));
+    if (missing.length) {
+      throw new Error(`boot sprites failed to load (${missing.length}): ${missing.slice(0, 4).join(', ')}`);
+    }
     return;
   }
   const stateFrames = new Set([...buildingStateKeys('hover'), ...buildingStateKeys('resaltado')]);

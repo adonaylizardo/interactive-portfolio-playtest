@@ -41,6 +41,7 @@ import {
   markWelcomeDone,
   shouldSkipWelcomeFlow,
 } from './ui/bootFlow';
+import { armBootAssetGuard, disarmBootAssetGuard } from './ui/bootAssetGuard';
 import { showFatalState, setOnFatalReadInstead } from './ui/fatalState';
 import { startOfflineMonitor, isOfflineBannerVisible } from './ui/offlineBanner';
 import { canUseWebGL } from './ui/webglCheck';
@@ -171,6 +172,16 @@ async function main(): Promise<void> {
     scene?.applyCameraFromUi();
   });
 
+  const bootReading = parseReadingRoute();
+  if (bootReading) setHashWriteSuppressed(true);
+
+  if (!canUseWebGL()) {
+    bootFlow.dismiss();
+    showFatalState('webgl');
+    startOfflineMonitor();
+    return;
+  }
+
   const panel = new BuildingPanel(
     uiRoot,
     () => {
@@ -180,12 +191,12 @@ async function main(): Promise<void> {
       joystick.setHidden(open || panel.isPreviewExpanded());
       if (panel.isPreviewExpanded()) checklist.setCollapsed(true);
       scene?.applyCameraFromUi();
-      scene?.schedulePresentationRefresh(3);
+      scene?.schedulePresentationRefresh(420);
     },
     () => scene.leaveInteriorNow(),
     () => {
       scene?.refreshCanvasPresentation(true);
-      scene?.schedulePresentationRefresh(8);
+      scene?.schedulePresentationRefresh(420);
     },
   );
   joystick.onStickStart(() => {
@@ -296,6 +307,7 @@ async function main(): Promise<void> {
       layoutInsets: () => panel.layoutInsets(),
       consumeInteriorCanvasTap: (x, y) => panel.consumeInteriorCanvasTap(x, y),
       expandInteriorSheetForQa: () => panel.expandInteriorSheetForQa(),
+      isInteriorSheetExpanded: () => panel.isInteriorSheetExpanded(),
     },
     placeCard: {
       isOpen: () => placeCard.isOpen(),
@@ -315,10 +327,6 @@ async function main(): Promise<void> {
     onLoadProgress: (pct) => bootFlow.setProgress(pct),
   });
 
-  chrome.bindScene({
-    getCharTile: () => scene.getCharacterTile(),
-    getView: () => scene.getViewMode(),
-  });
   const lockViewport = () => {
     if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
   };
@@ -346,21 +354,22 @@ async function main(): Promise<void> {
     },
     { passive: false, capture: true },
   );
-  const bootReading = parseReadingRoute();
-  if (bootReading) setHashWriteSuppressed(true);
-
-  if (!canUseWebGL()) {
-    showFatalState('webgl');
-    return;
-  }
+  armBootAssetGuard(() => showFatalState('load-failed'));
 
   try {
     await scene.init(canvas);
   } catch (err) {
     console.error(err);
+    disarmBootAssetGuard();
     showFatalState('load-failed');
     return;
   }
+  disarmBootAssetGuard();
+
+  chrome.bindScene({
+    getCharTile: () => scene.getCharacterTile(),
+    getView: () => scene.getViewMode(),
+  });
 
   startOfflineMonitor();
 

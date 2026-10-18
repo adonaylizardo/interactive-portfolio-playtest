@@ -218,6 +218,7 @@ export type BuildingPanelBridge = {
   layoutInsets?: () => { left: number; top: number; right: number; bottom: number };
   consumeInteriorCanvasTap?: (clientX: number, clientY: number) => boolean;
   expandInteriorSheetForQa?: () => void;
+  isInteriorSheetExpanded?: () => boolean;
 };
 
 export type ChecklistBridge = {
@@ -465,7 +466,9 @@ export class IsoScene {
     this.canvasEl = canvas;
     this.app = new Application();
     const reportLoad = (pct: number): void => {
-      this.events.onLoadProgress?.(Math.max(0, Math.min(100, Math.round(pct))));
+      const rounded = Math.max(0, Math.min(100, Math.round(pct)));
+      this.events.onLoadProgress?.(rounded);
+      if (rounded >= 20 && rounded < 100) this.refreshCanvasPresentation(true);
     };
     reportLoad(2);
 
@@ -593,6 +596,7 @@ export class IsoScene {
       this.reducedMotion,
     );
     this.syncCharacterGraphic();
+    this.refreshCanvasPresentation(true);
 
     if (bootInterior) {
       this.outdoorCamBeforeInterior = {
@@ -930,7 +934,12 @@ export class IsoScene {
     }, 2500);
     void loadSpriteProbes();
     if (this.npcs.isEnabled()) this.loadNpcs();
-    const fillLoad = this.fillActors.load(hi).then(() => this.cullVisibleTiles());
+    const fillLoad = this.fillActors.load(hi).then(
+      () => this.cullVisibleTiles(),
+      (err) => {
+        console.warn('[fill] load failed', err);
+      },
+    );
     void Promise.allSettled([fillLoad, this.buildNoah()]).then(prefetchRestSheets);
   }
 
@@ -3233,6 +3242,12 @@ export class IsoScene {
       this.npcs.update(dt);
       this.fillActors?.update(dt);
     }
+    if (this.presentationHoldFrames > 0) {
+      this.presentationHoldFrames -= 1;
+      this.refreshCanvasPresentation(true);
+    } else if (this.interiorActive && this.events.buildingPanel?.isInteriorSheetExpanded?.()) {
+      this.refreshCanvasPresentation(false);
+    }
   }
 
   /**
@@ -3435,10 +3450,14 @@ export class IsoScene {
 
   private presentationRefreshPending = false;
   private presentationBurst = 0;
+  /** Vulkan / SwiftShader can leave alpha-0 bands above interior sheets until the full canvas is repainted. */
+  private presentationHoldFrames = 0;
 
   /** After sheet peek/expand or rotation, Vulkan can present a sub-rect with alpha 0 above the sheet. */
   schedulePresentationRefresh(burstFrames = 3): void {
     this.presentationBurst = Math.max(this.presentationBurst, burstFrames);
+    const hold = this.interiorActive ? Math.max(burstFrames, 420) : burstFrames;
+    this.presentationHoldFrames = Math.max(this.presentationHoldFrames, hold);
     this.refreshCanvasPresentation(true);
     if (this.presentationRefreshPending) return;
     this.presentationRefreshPending = true;
@@ -5444,7 +5463,12 @@ export class IsoScene {
   }
 
   private loadNpcs(): void {
-    void this.npcs.load().then(() => this.cullVisibleTiles());
+    void this.npcs.load().then(
+      () => this.cullVisibleTiles(),
+      (err) => {
+        console.warn('[npcs] load failed', err);
+      },
+    );
   }
 
   qaNpcTown(): ReturnType<NpcCrowd['town']> {
