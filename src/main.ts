@@ -267,6 +267,7 @@ async function main(): Promise<void> {
   });
   if (personaEnabled()) {
     scene.setViewMode('cenital');
+    if (isMobileLayout()) chrome.setLayout('map');
     personaKit.onBoot();
   }
   chrome.beginSoundHint();

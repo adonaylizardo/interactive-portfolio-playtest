@@ -2907,6 +2907,14 @@ body.persona-kit .ui-view[data-view='persona'] {
   display: none !important;
 }
 
+body.persona-kit .chrome__locate,
+body.persona-kit .chrome__tools-stack .ui-round,
+body.persona-kit .chrome__tools-phone .ui-round {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+}
+
 body.persona-kit .persona-kit {
   position: fixed;
   inset: 0;

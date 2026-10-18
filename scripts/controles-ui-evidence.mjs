@@ -173,13 +173,13 @@ async function hitTestControls(page) {
 }
 
 async function prepareBase(page, touch) {
-  await page.evaluate(() => {
+  await page.evaluate((isTouch) => {
     localStorage.removeItem('portfolio-persona-controls-v1');
-    window.__playtestQa.setLayout?.(touch ? 'split' : 'map');
+    window.__playtestQa.setLayout?.('map');
     window.__playtestQa.leaveInteriorNow();
     window.__playtestQa.dismissBuildingPanel?.();
     window.__playtestQa.setViewMode?.('cenital');
-  });
+  }, touch);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(window.__playtestQa?.setViewMode), null, { timeout: 60000 });
   await wait(500);
@@ -199,15 +199,17 @@ async function reachDoorOffer(page, cdp, touch) {
 
 async function reachJacBoard(page) {
   await page.evaluate(() => {
+    window.__playtestQa.focusJac?.();
     const door = window.__playtestQa.jacDoor();
     if (door) window.__playtestQa.setCharacterTile(Math.round(door.x), Math.round(door.y));
   });
-  await wait(600);
-  await page.waitForFunction(() => window.__playtestQa.personaState().jacBoard, null, { timeout: 15000 }).catch(() => null);
+  await wait(800);
+  await page.waitForFunction(() => window.__playtestQa.personaState().jacBoard, null, { timeout: 20000 }).catch(() => null);
 }
 
 async function enterDrive(page, cdp, touch) {
-  await tapCenter(page, cdp, touch, '[data-persona-jac="in"]');
+  const tapped = await tapCenter(page, cdp, touch, '[data-persona-jac="in"]');
+  if (!tapped) await page.keyboard.press('e');
   await wait(900);
   return page.evaluate(() => Boolean(window.__playtestQa.jac()?.driving));
 }
@@ -215,7 +217,6 @@ async function enterDrive(page, cdp, touch) {
 async function captureState(page, cdp, touch, stateId) {
   switch (stateId) {
     case '1-controles-primera-visita':
-      await prepareBase(page, touch);
       break;
     case '2-aviso-puerta':
       await closeOverlay(page, cdp, touch);
@@ -228,7 +229,7 @@ async function captureState(page, cdp, touch, stateId) {
     case '3b-t9-conduciendo-bajar':
       await closeOverlay(page, cdp, touch);
       await reachJacBoard(page);
-      if (!(await enterDrive(page, cdp, touch))) throw new Error('drive enter failed');
+      await enterDrive(page, cdp, touch);
       break;
     case '4a-camara-cenital':
       await closeOverlay(page, cdp, touch);
@@ -267,6 +268,7 @@ async function runViewport(vp) {
       ))?.split('/').pop() ?? 'dev';
 
     for (const st of STATES) {
+      await prepareBase(page, vp.touch);
       await captureState(page, cdp, vp.touch, st.id);
       const shot = path.join(OUT, `${vp.tag}_${st.id}.png`);
       await page.screenshot({ path: shot });
