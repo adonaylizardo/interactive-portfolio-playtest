@@ -26,6 +26,7 @@ const DICT = {
 
     'toast.unreachable': "Can't get there",
     'toast.getOutToEnter': 'Get out to enter',
+    'toast.walkingToVan': 'Walking to the T9…',
 
     'jac.hint': 'Use arrows or WASD',
     'jac.desc': 'JAC T9, the family pickup.',
@@ -113,6 +114,7 @@ const DICT = {
 
     'toast.unreachable': 'No se puede llegar',
     'toast.getOutToEnter': 'Bájate para entrar',
+    'toast.walkingToVan': 'Caminando a la T9…',
 
     'jac.hint': 'Usa flechas o WASD',
     'jac.desc': 'JAC T9, la camioneta de la familia.',
