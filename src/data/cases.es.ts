@@ -10,7 +10,7 @@ const VOLARIS_RULE =
   'Diseño y código nunca se sincronizan directo. Ambos pasan primero por el contrato sellado.';
 const VOLARIS_CLOSING = 'La meta no era evitar errores. Era evitar que alguien tuviera que adivinar.';
 
-/** Faithful ES (tú, neutral Venezuelan). Numbers match `cases.ts` EN source. */
+/** Verbatim from origin/cursor/contenido-4b28 — do not invent copy here. */
 export const CASES_ES: Record<string, CaseContent> = {
   volaris: {
     headline: 'Un contrato que ingeniería no podía malinterpretar',

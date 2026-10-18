@@ -583,7 +583,11 @@ export class JacT9 {
     this.lastStuckCell = '';
   }
 
-  setDrivePath(path: { x: number; y: number }[], goal: { x: number; y: number }, opts?: { loose?: boolean }): void {
+  setDrivePath(
+    path: { x: number; y: number }[],
+    goal: { x: number; y: number },
+    opts?: { loose?: boolean; door?: boolean },
+  ): void {
     this.drivePath = this.trimPathFromHere(compressColinear(path.slice()));
     this.driveGoal = goal;
     this.gearHeld = false;
@@ -596,7 +600,9 @@ export class JacT9 {
     this.followDir = null;
     this.goalBest = Math.hypot(this.cx - goal.x, this.cy - goal.y);
     this.noProgressT = 0;
-    if (!opts?.loose) {
+    // loose = 1-cell follow, not "keep the last door". A ground tap after a
+    // door follow used to hang forever with parkDoor still set.
+    if (!opts?.door) {
       this.parkDoor = null;
       this.lastParkHeading = null;
     }

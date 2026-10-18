@@ -2,7 +2,7 @@
 import { chromium } from 'playwright';
 import { launchBrowser } from './qa-ready.mjs';
 
-const BASE = 'https://adonaylizardo.github.io/interactive-portfolio-playtest/preview/?r21=DBE2EkI6';
+const BASE = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4294/interactive-portfolio-playtest/preview/';
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const browser = await launchBrowser(chromium, { headless: true });

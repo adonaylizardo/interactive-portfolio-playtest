@@ -1586,15 +1586,23 @@ export class IsoScene {
     const destWalkable = !!cells[ty]?.[tx]?.walkable;
     const scenery = !!getSceneryAt(tx, ty);
     const extra = this.vanWalkBlock();
+    const wantDoor =
+      !!this.pendingBuildingEntry &&
+      this.pendingBuildingEntry.door.x === tx &&
+      this.pendingBuildingEntry.door.y === ty;
+    if (wantDoor && this.pendingBuildingEntry) {
+      const d = this.pendingBuildingEntry.door;
+      extra.delete(`${d.x},${d.y}`);
+      extra.delete(`${d.x + 1},${d.y}`);
+      extra.delete(`${d.x - 1},${d.y}`);
+      extra.delete(`${d.x},${d.y + 1}`);
+      extra.delete(`${d.x},${d.y - 1}`);
+    }
     const pass = (x: number, y: number) => {
       if (extra.has(`${x},${y}`)) return false;
       return !!cells[y]?.[x]?.walkable;
     };
     const destOk = destWalkable && pass(tx, ty);
-    const wantDoor =
-      !!this.pendingBuildingEntry &&
-      this.pendingBuildingEntry.door.x === tx &&
-      this.pendingBuildingEntry.door.y === ty;
     const result = destOk
       ? (() => {
           const path = findPathWith(sx, sy, tx, ty, pass);
@@ -1976,7 +1984,7 @@ export class IsoScene {
     this.qaLastDriveTap = { x: pathDest.x, y: pathDest.y };
     this.qaPointerDriveAccepts += 1;
     this.skipTileCullFrames = 8;
-    this.jac.setDrivePath(path, sit ?? pathDest, { loose: true });
+    this.jac.setDrivePath(path, sit ?? pathDest, { loose: true, door: true });
     this.fireMoveCommand();
     return true;
   }
@@ -2010,23 +2018,13 @@ export class IsoScene {
       this.toastDriveUnreachable();
       return false;
     }
-    let path = this.jac.findDrivePath(gx, gy, { loose: false });
-    let loose = false;
-    const destOf = (p: { x: number; y: number }[] | null) =>
-      p && p.length > 0 ? p[p.length - 1] : null;
-    const boxDest = destOf(path);
-    const boxFar = !boxDest || Math.hypot(boxDest.x - gx, boxDest.y - gy) > 1.2;
-    if (!path || boxFar) {
-      const lane = this.jac.findDrivePath(gx, gy, { loose: true });
-      const laneDest = destOf(lane);
-      if (
-        lane &&
-        (!path ||
-          (laneDest && Math.hypot(laneDest.x - gx, laneDest.y - gy) < (boxDest ? Math.hypot(boxDest.x - gx, boxDest.y - gy) : 99)))
-      ) {
-        path = lane;
-        loose = true;
-      }
+    // 1-cell first: the 2×2 box detours around props and is what made (18,36)
+    // and (44,36) wander at 2–3× the straight path.
+    let path = this.jac.findDrivePath(gx, gy, { loose: true });
+    let loose = true;
+    if (!path) {
+      path = this.jac.findDrivePath(gx, gy, { loose: false });
+      loose = false;
     }
     if (!path) {
       this.toastDriveUnreachable();
@@ -4448,12 +4446,36 @@ export class IsoScene {
     }
     this.rescueAvatarIfTrapped();
     this.startCameraFollow();
-    const entry = this.pendingDriveEnter;
+    let entry = this.pendingDriveEnter;
     this.pendingDriveEnter = null;
+    if (!entry) {
+      const near = this.nearestEnterableDoor(this.jac.cx, this.jac.cy, 6);
+      if (near) entry = near;
+    }
     if (entry) {
       this.pendingWalkInAt = performance.now();
       this.requestWalk(entry.door.x, entry.door.y, false, { buildingEntry: entry });
+      if (this.interiorActive) return;
+      if (this.pendingBuildingEntry && this.path.length > 0) return;
+      const building = getBuildingAtDoor(entry.door.x, entry.door.y);
+      const d = Math.hypot(this.charTx - entry.door.x, this.charTy - entry.door.y);
+      if (building && d <= 6) this.enterBuildingFromDoor(building);
     }
+  }
+
+  private nearestEnterableDoor(
+    x: number,
+    y: number,
+    maxD: number,
+  ): { panelTitle: string; door: { x: number; y: number } } | null {
+    let best: { panelTitle: string; door: { x: number; y: number }; d: number } | null = null;
+    for (const obj of objects) {
+      if (obj.type !== 'building' || !obj.door || !obj.panelTitle) continue;
+      const d = Math.hypot(x - obj.door.x, y - obj.door.y);
+      if (d > maxD) continue;
+      if (!best || d < best.d) best = { panelTitle: obj.panelTitle, door: obj.door, d };
+    }
+    return best ? { panelTitle: best.panelTitle, door: best.door } : null;
   }
 
   private tryFinishDriveEnter(): void {
@@ -4565,7 +4587,7 @@ export class IsoScene {
       return;
     }
     this.pendingDriveEnterAt = performance.now();
-    this.jac.setDrivePath(path, sit ? { x: sit.x, y: sit.y } : path[path.length - 1], { loose: true });
+    this.jac.setDrivePath(path, sit ? { x: sit.x, y: sit.y } : path[path.length - 1], { loose: true, door: true });
   }
 
   private rescueAvatarIfTrapped(): void {

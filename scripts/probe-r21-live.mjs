@@ -196,7 +196,7 @@ async function tapDoor(page, cdp, name, touch) {
     const b = window.__playtestQa.getEnterableBuildings().find((o) => o.name === n);
     const g = j.driveGoal;
     if (!b?.door || !g) return false;
-    return Math.hypot(g.x - b.door.x, g.y - b.door.y) < 12;
+    return Math.hypot(g.x - b.door.x, g.y - b.door.y) < 8;
   }, name);
   if (!hit) {
     await page.evaluate((n) => window.__playtestQa.tapBuildingDoor?.(n), name);
@@ -378,9 +378,7 @@ async function montage(browser) {
 const browser = await launchBrowser(chromium, { headless: true });
 try {
   await measureRetarget(browser);
-  await measureGround(browser);
-  await measureDoors(browser);
-  await montage(browser);
+  if (!process.env.R21_ONLY) { await measureGround(browser); await measureDoors(browser); await montage(browser); }
 } finally {
   await browser.close();
 }
