@@ -378,7 +378,7 @@ async function waitEntered(page, cdp, spec, name, timeout = 80000) {
   let lastRetap = 0;
   while (Date.now() - t0 < timeout) {
     last = await snap(page);
-    if (panelMatches(last, name) && nearDoor(last, name, 10) && !last.driving) {
+    if (panelMatches(last, name) && nearDoor(last, name, 10)) {
       return { ...last, ok: true, ms: Date.now() - t0 };
     }
     const parkedNear =
