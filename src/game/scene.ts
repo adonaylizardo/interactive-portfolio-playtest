@@ -851,7 +851,9 @@ export class IsoScene {
     if (existing) return existing.g;
     const key = tileSpriteKey(cells, tx, ty);
     if (!spritesLoaded(key)) {
-      void loadKeys([key]).then(() => this.ensureTile(tx, ty));
+      void loadKeys([key])
+        .then(() => this.ensureTile(tx, ty))
+        .catch((err) => console.warn('[sprites] tile load failed', err));
       return null;
     }
     const cell = cells[ty][tx];
@@ -913,26 +915,40 @@ export class IsoScene {
     }
   }
 
+  private deferSpriteLoad(keys: string[] | (() => Promise<void>), then?: () => void): void {
+    const run = typeof keys === 'function' ? keys : () => loadKeys(keys);
+    void run().then(
+      () => then?.(),
+      (err) => console.warn('[sprites] deferred load failed', err),
+    );
+  }
+
   /** After first paint: rest of the town, @2x swap, then interiors/hover stay on demand. */
   private hydrateMap(): void {
     const hi = this.app.renderer.resolution;
     void (async () => {
-      await upgradeLoadedSprites(hi);
-      await upgradePlayerSheets(hi);
-      this.refreshTileTextures();
-      this.syncObjectSprites(true);
-      await loadKeys(remainingMapKeys(loadedSpriteKeys()));
-      this.ensureVisibleTiles();
-      this.syncObjectSprites(true);
-      this.queueTileBackfill();
+      try {
+        await upgradeLoadedSprites(hi);
+        await upgradePlayerSheets(hi);
+        this.refreshTileTextures();
+        this.syncObjectSprites(true);
+        await loadKeys(remainingMapKeys(loadedSpriteKeys()));
+        this.ensureVisibleTiles();
+        this.syncObjectSprites(true);
+        this.queueTileBackfill();
+      } catch (err) {
+        console.warn('[hydrate] map expansion failed', err);
+      }
     })();
     window.setTimeout(() => {
-      void loadKeys(allSpriteKeys().filter((k) => k.endsWith('/lejos'))).then(() => this.syncObjectSprites(true));
+      this.deferSpriteLoad(allSpriteKeys().filter((k) => k.endsWith('/lejos')), () =>
+        this.syncObjectSprites(true),
+      );
     }, 800);
     window.setTimeout(() => {
-      void loadBuildingStateSprites().then(() => this.syncObjectSprites(true));
+      this.deferSpriteLoad(() => loadBuildingStateSprites(), () => this.syncObjectSprites(true));
     }, 2500);
-    void loadSpriteProbes();
+    void loadSpriteProbes().catch((err) => console.warn('[sprites] probes failed', err));
     if (this.npcs.isEnabled()) this.loadNpcs();
     const fillLoad = this.fillActors.load(hi).then(
       () => this.cullVisibleTiles(),
@@ -1020,7 +1036,11 @@ export class IsoScene {
           occluder: objectOccluder(obj),
           zIndex,
         });
-        if (!ready) void loadKeys([key]).then(() => this.syncObjectSprites(true));
+        if (!ready) {
+          void loadKeys([key])
+            .then(() => this.syncObjectSprites(true))
+            .catch((err) => console.warn('[sprites] object load failed', err));
+        }
       }
       g.on('pointerover', () => {
         if (matchMedia('(hover: hover)').matches) {
@@ -1112,7 +1132,9 @@ export class IsoScene {
       }
       if (!key) continue;
       if (!spritesLoaded(key)) {
-        void loadKeys([key]).then(() => this.syncObjectSprites(true));
+        void loadKeys([key])
+          .then(() => this.syncObjectSprites(true))
+          .catch((err) => console.warn('[sprites] interior load failed', err));
         continue;
       }
       v.state = state;

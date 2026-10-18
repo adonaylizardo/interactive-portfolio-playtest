@@ -373,6 +373,19 @@ async function main(): Promise<void> {
 
   startOfflineMonitor();
 
+  window.addEventListener('unhandledrejection', (ev) => {
+    const msg =
+      ev.reason instanceof Error
+        ? ev.reason.message
+        : typeof ev.reason === 'string'
+          ? ev.reason
+          : String(ev.reason ?? '');
+    if (/(\[Loader\.load\]|Failed to fetch|sprite load failed|deferred load failed)/i.test(msg)) {
+      ev.preventDefault();
+      console.warn(ev.reason);
+    }
+  });
+
   let enteredViaWelcomeRead = false;
   if (skipWelcome) {
     await bootFlow.finishLoading(true);
