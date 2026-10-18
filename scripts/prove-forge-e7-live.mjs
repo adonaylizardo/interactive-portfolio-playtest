@@ -127,6 +127,19 @@ try {
     out.bundle = await bundleHash(page);
     await waitMap(page);
 
+    await page.locator('.chrome__rail [data-action="contact"]').click();
+    await page.waitForTimeout(1600);
+    const contactFirst = await page.evaluate((snippet) => {
+      const sub = document.querySelector('.chrome__subtitle')?.textContent?.trim() ?? '';
+      return {
+        sub: sub.slice(0, 120),
+        introSnippet: sub.toLowerCase().includes(snippet),
+        flash: !!document.querySelector('#chrome-contact.chrome__contact--flash'),
+      };
+    }, INTRO_SNIPPET);
+    record('1280 first click contact: not intro', !contactFirst.introSnippet, contactFirst);
+    record('1280 first click contact: visible feedback', contactFirst.sub.length > 4 || contactFirst.flash, contactFirst);
+
     const lang = await langCenters(page);
     for (const action of ['home', 'cases', 'achievements']) {
       await page.locator(`.chrome__rail [data-action="${action}"]`).click();
@@ -153,12 +166,17 @@ try {
       searchLabel,
     });
 
+    const cvHref = await page.evaluate(() => {
+      const a = document.querySelector('.chrome__column a[download]');
+      return a?.getAttribute('href') ?? '';
+    });
+    record('1280: CV href is bundled PDF', cvHref.includes('cv/adonay-lizardo-cv.pdf'), { cvHref });
     const [dl] = await Promise.all([
       page.waitForEvent('popup', { timeout: 8000 }).catch(() => null),
       page.locator('.chrome__rail [data-action="download"]').click(),
     ]);
     const cvUrl = dl?.url() ?? '';
-    record('1280: CV opens PDF path', cvUrl.includes('adonay-lizardo-cv.pdf'), { cvUrl });
+    record('1280: CV download opens PDF', cvUrl.includes('adonay-lizardo-cv.pdf'), { cvUrl });
 
     await page.goto(`${BASE}#view=x=0&y=0&z=0.85&in=biblioteca`, { waitUntil: 'networkidle', timeout: 90000 });
     await waitMap(page);
@@ -258,12 +276,14 @@ try {
     });
     record('1280 split+preview: caption not over read case', !captionDuringPreview.overlap, captionDuringPreview);
 
-    await page.locator('.case-preview__x[data-close]').click({ timeout: 8000 }).catch(() => {});
-    await page.waitForTimeout(400);
+    await page.goto(BASE, { waitUntil: 'networkidle', timeout: 90000 });
+    await waitMap(page);
+    await page.locator('.chrome__column [data-action="hide-panel"]').click({ timeout: 8000 }).catch(() => {});
+    await page.waitForTimeout(300);
     await page.locator('.chrome__view-btns [data-view="map"]').click();
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(500);
     const beforeCenter = await page.evaluate(() => document.getElementById('game-canvas')?.dataset.mapOverview);
-    await page.locator('.chrome__locate [data-action="center"]').click();
+    await page.locator('.chrome__views [data-action="center"]').click();
     await page.waitForTimeout(350);
     const afterCenter = await page.evaluate(() => document.getElementById('game-canvas')?.dataset.mapOverview);
     record('1280 map overview: center exits overview', beforeCenter === '1' && afterCenter !== '1', {
@@ -326,6 +346,7 @@ try {
 
     await page.goto(BASE, { waitUntil: 'networkidle', timeout: 90000 });
     await waitMap(page);
+    await dismissPhoneIntro(page);
     const contactPt = await page.evaluate(() => {
       const b = document.querySelector('.chrome__dock [data-action="contact"]');
       const r = b?.getBoundingClientRect();
@@ -333,8 +354,7 @@ try {
     });
     if (contactPt) {
       await page.touchscreen.tap(contactPt.x, contactPt.y);
-      await page.waitForTimeout(200);
-      await page.waitForTimeout(1200);
+      await page.waitForTimeout(2200);
       const contactState = await page.evaluate((snippet) => {
         const sub = document.querySelector('.chrome__subtitle')?.textContent?.trim() ?? '';
         return {
@@ -343,8 +363,8 @@ try {
           introSnippet: sub.toLowerCase().includes(snippet),
         };
       }, INTRO_SNIPPET);
-      record('390 first gesture contact: not intro caption', !contactState.introSnippet, contactState);
-      record('390 first gesture contact: contact line or flash', contactState.sub.length > 4 || contactState.flash, contactState);
+      record('390 contact tap: not intro caption', !contactState.introSnippet, contactState);
+      record('390 contact tap: voice subtitle or flash', contactState.sub.length > 4 || contactState.flash, contactState);
     }
     await page.close();
     await ctx.close();
