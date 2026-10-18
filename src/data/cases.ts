@@ -1,8 +1,11 @@
+import { CASES_ES } from './cases.es';
+
 /**
  * Panel copy, keyed by building id. English text is verbatim from
  * `content/cases/{id}-panel.md` (Desktop/full on desktop, Mobile/short in the phone sheet).
- * The airline case never names the client — ignore that file's Español section. Landmark rooms
- * keep the place name as the title and a short placeholder. Internal draft sections are not stored here.
+ * ES bodies are the existing translations from `cursor/contenido-4b28` (`src/data/cases.es.ts`)
+ * — copied as-is, not rewritten here. The airline case never names the client in EN.
+ * Landmark rooms keep the place name as the title and a short placeholder.
  */
 export type CaseBlock =
   | { kind: 'section'; heading?: string; paragraphs: string[]; bullets?: string[] }
@@ -396,3 +399,11 @@ export const CASES: Record<string, CaseContent> = {
   catedral: landmarkPlaceholder('Catedral', '09-cathedral'),
   flor: landmarkPlaceholder('Flor de Venezuela', '08-flor-de-venezuela'),
 };
+
+/** ES panel bodies from `cursor/contenido-4b28`. Falls back to EN when a slot has no ES file. */
+export function caseForLang(id: string, lang: 'en' | 'es'): CaseContent | undefined {
+  const en = CASES[id];
+  if (!en) return undefined;
+  if (lang === 'es') return CASES_ES[id] ?? en;
+  return en;
+}

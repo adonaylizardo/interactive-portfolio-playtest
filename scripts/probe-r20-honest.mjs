@@ -94,8 +94,8 @@ function analyzeTrace(samples) {
     const b = samples[i];
     const dt = Math.max(b.dt || 0, 1 / 120);
     const dVan = Math.hypot((b.cx ?? 0) - (a.cx ?? 0), (b.cy ?? 0) - (a.cy ?? 0));
-    // Headless desktop frames are 60–110 ms; 0.66–0.75 is cruise, not a hop.
-    const cap = Math.max((b.max ?? 5) * dt + 0.22, 0.85);
+    // Real dt only — r21 forbids the 0.85 floor that hid desktop cruise frames.
+    const cap = (b.max ?? 5) * dt + 0.22;
     if (dVan > vanJump) vanJump = dVan;
     if (dVan > cap + 1e-4) jumps.push({ kind: 'van', d: dVan, cap, i });
     let dh = (b.heading ?? 0) - (a.heading ?? 0);
@@ -239,61 +239,144 @@ async function measureViewport(browser, tag, size, touch) {
   await ctx.close();
 }
 
-async function measureGround(browser) {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
-  const page = await ctx.newPage();
-  await boot(page);
-  for (let i = 0; i < 5; i++) {
-    await spawnDrive(page);
-    await page.evaluate(() => window.__playtestQa.setZoom?.(0.4));
-    await armSampler(page);
-    await page.evaluate(() => window.__playtestQa.jacDriveTo?.(18, 10));
-    const t0 = Date.now();
-    let last = null;
-    while (Date.now() - t0 < 12000) {
-      last = await snapshot(page);
-      const d = Math.hypot((last.cx ?? 0) - 18, (last.cy ?? 0) - 10);
-      if (!last.goal && d <= 1.45 && last.mph < 2) {
-        last = { ...last, ok: true, ms: Date.now() - t0, dist: d };
-        break;
-      }
-      await wait(50);
+function headingFlips(samples) {
+  let changes = 0;
+  let flips180 = 0;
+  let prev = null;
+  for (const s of samples) {
+    const h = s.heading;
+    if (h == null || !s.driving) continue;
+    if (prev == null) {
+      prev = h;
+      continue;
     }
-    if (!last?.ok) last = { ...last, ok: false, ms: Date.now() - t0, dist: Math.hypot((last?.cx ?? 0) - 18, (last?.cy ?? 0) - 10) };
-    const samples = await readTrace(page);
-    const trace = analyzeTrace(samples);
-    const jumpFail = trace.jumps.some((j) => j.kind === 'van');
-    log(`ground#${i + 1} ${last.ok && !jumpFail ? 'OK' : 'FAIL'} ${last.ms}ms d=${last.dist?.toFixed?.(2)} goal=${JSON.stringify(last.goal)} vanΔ=${trace.vanJump.toFixed(2)}`);
-    if (!last.ok || jumpFail) report.errors.push(`ground#${i + 1} failed`);
-    report.ground.push({ ok: last.ok && !jumpFail, ms: last.ms, dist: last.dist, vanJump: trace.vanJump });
+    let dh = h - prev;
+    if (dh > 2) dh -= 4;
+    if (dh < -2) dh += 4;
+    if (Math.abs(dh) > 0.35) {
+      changes += 1;
+      if (Math.abs(dh) > 1.7) flips180 += 1;
+      prev = h;
+    }
   }
-  await ctx.close();
+  return { changes, flips180 };
+}
+
+function pathRatio(samples, gx, gy) {
+  if (samples.length < 2) return { travel: 0, straight: 0, ratio: 0 };
+  let travel = 0;
+  const a0 = samples[0];
+  for (let i = 1; i < samples.length; i++) {
+    travel += Math.hypot((samples[i].cx ?? 0) - (samples[i - 1].cx ?? 0), (samples[i].cy ?? 0) - (samples[i - 1].cy ?? 0));
+  }
+  const straight = Math.hypot(gx - (a0.cx ?? 0), gy - (a0.cy ?? 0));
+  return { travel, straight, ratio: straight > 0.2 ? travel / straight : 0 };
+}
+
+const GROUND_GOALS = [
+  [46, 20],
+  [24, 27],
+  [37, 26],
+  [44, 36],
+  [18, 36],
+];
+const RETARGET_PAIRS = [
+  { from: 'sambil', to: 'finoa', delay: 800, want: /finoa/i },
+  { from: 'sambil', to: 'mentoria', delay: 800, want: /mentor/i },
+  { from: 'flor', to: 'volaris', delay: 1500, want: /volaris|airline/i },
+  { from: 'estudio', to: 'pg', delay: 800, want: /p&g|pg/i },
+];
+const WIDTHS = [
+  { tag: 'phone-390', size: { width: 390, height: 844 }, touch: true },
+  { tag: 'land-844', size: { width: 844, height: 390 }, touch: true },
+  { tag: 'desk-1280', size: { width: 1280, height: 800 }, touch: false },
+];
+
+async function measureGround(browser) {
+  for (const w of WIDTHS) {
+    const ctx = await browser.newContext({ viewport: w.size, hasTouch: w.touch, isMobile: w.touch });
+    const page = await ctx.newPage();
+    await boot(page);
+    for (const [gx, gy] of GROUND_GOALS) {
+      await spawnDrive(page);
+      await page.evaluate(() => window.__playtestQa.setZoom?.(0.4));
+      await armSampler(page);
+      await page.evaluate(([x, y]) => window.__playtestQa.jacDriveTo?.(x, y), [gx, gy]);
+      const t0 = Date.now();
+      let last = null;
+      while (Date.now() - t0 < 20000) {
+        last = await snapshot(page);
+        const d = Math.hypot((last.cx ?? 0) - gx, (last.cy ?? 0) - gy);
+        if (!last.goal && d <= 1.45 && last.mph < 2) {
+          last = { ...last, ok: true, ms: Date.now() - t0, dist: d };
+          break;
+        }
+        await wait(50);
+      }
+      if (!last?.ok) {
+        last = {
+          ...last,
+          ok: false,
+          ms: Date.now() - t0,
+          dist: Math.hypot((last?.cx ?? 0) - gx, (last?.cy ?? 0) - gy),
+        };
+      }
+      const samples = await readTrace(page);
+      const trace = analyzeTrace(samples);
+      const flips = headingFlips(samples);
+      const ratio = pathRatio(samples, gx, gy);
+      const jumpFail = trace.jumps.some((j) => j.kind === 'van');
+      const wanderFail = ratio.ratio > 1.5 || flips.flips180 > 0;
+      const ok = last.ok && !jumpFail && !wanderFail;
+      log(
+        `ground ${w.tag} (${gx},${gy}) ${ok ? 'OK' : 'FAIL'} ${last.ms}ms d=${last.dist?.toFixed?.(2)} ratio=${ratio.ratio.toFixed(2)} flips180=${flips.flips180} vanΔ=${trace.vanJump.toFixed(2)}`,
+      );
+      if (!ok) report.errors.push(`ground ${w.tag} (${gx},${gy}) failed`);
+      report.ground.push({
+        w: w.tag,
+        gx,
+        gy,
+        ok,
+        ms: last.ms,
+        dist: last.dist,
+        ratio: ratio.ratio,
+        flips180: flips.flips180,
+        vanJump: trace.vanJump,
+      });
+    }
+    await ctx.close();
+  }
 }
 
 async function measureRetarget(browser) {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
-  const page = await ctx.newPage();
-  await boot(page);
-  for (let i = 0; i < 3; i++) {
-    await spawnDrive(page);
-    await page.evaluate(() => {
-      window.__playtestQa.frameDoorForQa?.('sambil');
-      window.__playtestQa.setZoom?.(0.12);
-    });
-    await armSampler(page);
-    await page.evaluate(() => window.__playtestQa.driveEnter?.('sambil'));
-    await wait(800);
-    await page.evaluate(() => window.__playtestQa.driveEnter?.('finoa'));
-    const end = await waitDone(page, 20000);
-    const samples = await readTrace(page);
-    const trace = analyzeTrace(samples);
-    const jumpFail = trace.jumps.some((j) => j.kind === 'van' || j.kind === 'char');
-    const finoa = /finoa/i.test(end.panel || '') || end.interior;
-    log(`retarget#${i + 1} ${end.ok && finoa && !jumpFail ? 'OK' : 'FAIL'} ${end.ms}ms panel=${end.panel} driving=${end.driving} vanΔ=${trace.vanJump.toFixed(2)}`);
-    if (!end.ok || !finoa || jumpFail) report.errors.push(`retarget#${i + 1} failed`);
-    report.retarget.push({ ok: end.ok && finoa && !jumpFail, ms: end.ms, panel: end.panel });
+  for (const w of WIDTHS) {
+    const ctx = await browser.newContext({ viewport: w.size, hasTouch: w.touch, isMobile: w.touch });
+    const page = await ctx.newPage();
+    await boot(page);
+    for (const pair of RETARGET_PAIRS) {
+      await spawnDrive(page);
+      await page.evaluate((n) => {
+        window.__playtestQa.frameDoorForQa?.(n);
+        window.__playtestQa.setZoom?.(0.12);
+      }, pair.from);
+      await armSampler(page);
+      await page.evaluate((n) => window.__playtestQa.driveEnter?.(n), pair.from);
+      await wait(pair.delay);
+      await page.evaluate((n) => window.__playtestQa.driveEnter?.(n), pair.to);
+      const end = await waitDone(page, 22000);
+      const samples = await readTrace(page);
+      const trace = analyzeTrace(samples);
+      const jumpFail = trace.jumps.some((j) => j.kind === 'van' || j.kind === 'char');
+      const hit = pair.want.test(end.panel || '') || pair.want.test(end.interior || '');
+      const ok = end.ok && hit && !jumpFail && !end.driving;
+      log(
+        `retarget ${w.tag} ${pair.from}→${pair.to} ${ok ? 'OK' : 'FAIL'} ${end.ms}ms panel=${end.panel} driving=${end.driving} @${end.cx?.toFixed?.(2)},${end.cy?.toFixed?.(2)} vanΔ=${trace.vanJump.toFixed(2)}`,
+      );
+      if (!ok) report.errors.push(`retarget ${w.tag} ${pair.from}→${pair.to} failed`);
+      report.retarget.push({ w: w.tag, pair: `${pair.from}→${pair.to}`, ok, ms: end.ms, panel: end.panel });
+    }
+    await ctx.close();
   }
-  await ctx.close();
 }
 
 async function shotDoor(browser, name, file) {

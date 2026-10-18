@@ -108,6 +108,8 @@ function flushHash(view: CameraView, replace: boolean): void {
     interior: interiorId || null,
     outdoorCam: (history.state as HistoryNavigationState | null)?.outdoorCam,
   };
+  // Van / player / camera pose always replaceState. A push here is what made
+  // Back after reload teleport to the spawn jx/jy entry.
   if (replace) {
     history.replaceState(state, '', next);
   } else {

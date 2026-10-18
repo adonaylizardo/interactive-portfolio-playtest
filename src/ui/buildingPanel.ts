@@ -1,6 +1,6 @@
 import { studio } from '../audio/studio';
 import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
-import { CASES, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
+import { caseForLang, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
 import { iconSvg } from './icons';
 import { getLang, onLangChange, t } from './i18n';
@@ -522,8 +522,10 @@ export class BuildingPanel {
 
   /** Fills the case article for the current interior; returns its headline, or null when there is no case. */
   private renderCase(): string | null {
-    const content = this.interiorId ? CASES[this.interiorId] : undefined;
+    const lang = getLang();
+    const content = this.interiorId ? caseForLang(this.interiorId, lang) : undefined;
     this.caseEl.hidden = !content;
+    this.caseEl.lang = lang;
     this.el.classList.toggle('building-panel--case', !!content);
     const full = this.caseEl.querySelector('.case__version--full')!;
     const short = this.caseEl.querySelector('.case__version--short')!;

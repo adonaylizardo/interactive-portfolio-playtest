@@ -627,11 +627,6 @@ export class IsoScene {
   private applyHashNavigation(state: HistoryNavigationState | null): void {
     const v = parseCameraFromHash();
     const id = parseInteriorFromHash();
-    if (v && !this.interiorActive) {
-      this.cameraX = v.x;
-      this.cameraY = v.y;
-      this.zoom = clampZoom(v.zoom);
-    }
     if (id && !this.interiorActive) {
       if (state?.outdoorCam && !this.outdoorCamBeforeInterior) {
         this.outdoorCamBeforeInterior = { ...state.outdoorCam };
@@ -648,6 +643,10 @@ export class IsoScene {
       this.cameraY = v.y;
       this.zoom = clampZoom(v.zoom);
       this.applyCamera(false);
+    } else if (!id && !this.interiorActive) {
+      // Outdoor Back: keep the live van/player. Position writes use replaceState
+      // so an old jx/jy entry cannot teleport after reload.
+      this.applyCamera(true);
     }
     this.rebaselineChecklistFromCamera();
   }
@@ -1924,46 +1923,44 @@ export class IsoScene {
   private requestDriveToEnter(entry: { panelTitle: string; door: { x: number; y: number } }): boolean {
     if (!this.jac?.driving || this.jac.isExiting()) return false;
     if (performance.now() < this.suppressDriveTapUntil) return false;
-    const sit = this.jac.parkForDoor(entry.door.x, entry.door.y);
-    const alongNow = this.jac.doorSideAlong(entry.door.x, entry.door.y);
-    const distDoorNow = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
-    const atDoor = alongNow >= 0 && distDoorNow <= 6;
-    if (!sit) {
-      if (!atDoor) return false;
-      this.pendingDriveEnter = entry;
-      this.jacGetOut({ thenEnter: true });
-      return true;
-    }
-    const path = sit.path.length > 0 ? sit.path : this.jac.findDrivePath(sit.x, sit.y);
-    if (!path) {
-      if (!atDoor) return false;
-      this.pendingDriveEnter = entry;
-      this.jacGetOut({ thenEnter: true });
-      return true;
-    }
+    // Swap the goal first. A failed replan must not keep the previous door.
     this.events.stickCancel?.();
     this.pendingBuildingEntry = null;
     this.pendingDriveEnter = entry;
     this.pendingDriveEnterAt = performance.now();
     this.pendingDriveFrom = { x: this.jac.cx, y: this.jac.cy };
-    const dest = path.length > 0 ? path[path.length - 1] : sit;
+    const sit = this.jac.parkForDoor(entry.door.x, entry.door.y);
+    const alongNow = this.jac.doorSideAlong(entry.door.x, entry.door.y);
+    const distDoorNow = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
+    const atDoor = alongNow >= 0 && distDoorNow <= 6;
+    const dest = sit ? { x: sit.x, y: sit.y } : { x: entry.door.x, y: entry.door.y };
+    let path =
+      sit && sit.path.length > 0
+        ? sit.path
+        : sit
+          ? this.jac.findDrivePath(sit.x, sit.y, { loose: true }) ??
+            this.jac.findDrivePath(sit.x, sit.y, { loose: false })
+          : null;
+    if (!path) {
+      path =
+        this.jac.findDrivePath(dest.x, dest.y, { loose: false }) ??
+        this.jac.findDrivePath(dest.x, dest.y, { loose: true });
+    }
     const spawn = this.jac.spawn?.center ?? { x: 25.5, y: 17 };
     const leftSpawn = Math.hypot(this.jac.cx - spawn.x, this.jac.cy - spawn.y) > 2.4;
-    const atSit =
-      this.jac.atParkSit({ x: dest.x, y: dest.y }) && this.jac.mph < 1;
-    if (atSit && atDoor && leftSpawn) {
+    const atSit = this.jac.atParkSit(dest) && this.jac.mph < 1.2;
+    if ((atSit || atDoor) && leftSpawn && (!path || path.length === 0 || atSit)) {
       this.jacGetOut({ thenEnter: true });
       return true;
     }
-    if (path.length === 0) {
-      if (!atSit || !leftSpawn) return false;
-      this.jacGetOut({ thenEnter: true });
+    if (!path || path.length === 0) {
       return true;
     }
-    this.qaLastDriveTap = { x: dest.x, y: dest.y };
+    const pathDest = path[path.length - 1];
+    this.qaLastDriveTap = { x: pathDest.x, y: pathDest.y };
     this.qaPointerDriveAccepts += 1;
     this.skipTileCullFrames = 8;
-    this.jac.setDrivePath(path, dest, { loose: true });
+    this.jac.setDrivePath(path, sit ?? pathDest, { loose: true });
     this.fireMoveCommand();
     return true;
   }
@@ -1997,7 +1994,24 @@ export class IsoScene {
       this.toastDriveUnreachable();
       return false;
     }
-    const path = this.jac.findDrivePath(gx, gy);
+    let path = this.jac.findDrivePath(gx, gy, { loose: false });
+    let loose = false;
+    const destOf = (p: { x: number; y: number }[] | null) =>
+      p && p.length > 0 ? p[p.length - 1] : null;
+    const boxDest = destOf(path);
+    const boxFar = !boxDest || Math.hypot(boxDest.x - gx, boxDest.y - gy) > 1.2;
+    if (!path || boxFar) {
+      const lane = this.jac.findDrivePath(gx, gy, { loose: true });
+      const laneDest = destOf(lane);
+      if (
+        lane &&
+        (!path ||
+          (laneDest && Math.hypot(laneDest.x - gx, laneDest.y - gy) < (boxDest ? Math.hypot(boxDest.x - gx, boxDest.y - gy) : 99)))
+      ) {
+        path = lane;
+        loose = true;
+      }
+    }
     if (!path) {
       this.toastDriveUnreachable();
       return false;
@@ -2005,7 +2019,7 @@ export class IsoScene {
     this.qaLastDriveTap = { x: gx, y: gy };
     if (fromPointer) this.qaPointerDriveAccepts += 1;
     const dest = path.length > 0 ? path[path.length - 1] : { x: gx, y: gy };
-    this.jac.setDrivePath(path.length > 0 ? path : [dest], dest);
+    this.jac.setDrivePath(path.length > 0 ? path : [dest], dest, loose ? { loose: true } : undefined);
     this.schedulePathPreview();
     this.fireMoveCommand();
     return true;
@@ -4443,21 +4457,21 @@ export class IsoScene {
     const leftSpawn = Math.hypot(this.jac.cx - lot.x, this.jac.cy - lot.y) > 2.4;
     const pathLeft = this.jac.drivePath.length;
     const slow = this.jac.mph < 2;
+    const stalled = this.jac.mph < 1.2 && pathLeft === 0;
     if (arrived && !leftSpawn) {
       this.retryDriveEnterOrGetOut();
       return;
     }
-    if (arrived && leftSpawn && slow && this.jac.parkFaceReady()) {
+    if (arrived && leftSpawn && slow && (this.jac.parkFaceReady() || this.jac.mph < 0.5)) {
       this.jac.sitWhy = `arrived sit=(${sit?.x},${sit?.y}) d=${distSit.toFixed(2)} mph=${this.jac.mph}`;
       this.jacGetOut({ thenEnter: true });
       return;
     }
-    if (leftSpawn && slow && along >= 0 && distDoor <= 3.5 && distSit > 2.2) {
+    if (leftSpawn && slow && along >= 0 && distDoor <= 4.2 && (distSit > 1.5 || stalled || this.jac.mph < 0.5)) {
       this.jac.sitWhy = `door-side sitD=${distSit.toFixed(2)} doorD=${distDoor.toFixed(2)}`;
       this.jacGetOut({ thenEnter: true });
       return;
     }
-    const stalled = this.jac.mph < 1.2 && pathLeft === 0;
     this.noteSitSkip({
       sit,
       distSit,
@@ -4520,11 +4534,22 @@ export class IsoScene {
       return;
     }
     const sit = this.jac.parkForDoor(entry.door.x, entry.door.y);
-    if (!sit) return;
-    const path = sit.path.length > 0 ? sit.path : this.jac.findDrivePath(sit.x, sit.y);
-    if (!path || path.length === 0) return;
+    const dest = sit ?? entry.door;
+    const path =
+      sit && sit.path.length > 0
+        ? sit.path
+        : this.jac.findDrivePath(dest.x, dest.y, { loose: true }) ??
+          this.jac.findDrivePath(dest.x, dest.y, { loose: false });
+    if (!path || path.length === 0) {
+      const distDoor = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
+      if (leftSpawn && this.jac.mph < 2 && distDoor <= 5) {
+        this.jac.sitWhy = `retry door-close d=${distDoor.toFixed(2)}`;
+        this.jacGetOut({ thenEnter: true });
+      }
+      return;
+    }
     this.pendingDriveEnterAt = performance.now();
-    this.jac.setDrivePath(path, { x: sit.x, y: sit.y }, { loose: true });
+    this.jac.setDrivePath(path, sit ? { x: sit.x, y: sit.y } : path[path.length - 1], { loose: true });
   }
 
   private rescueAvatarIfTrapped(): void {
