@@ -5090,18 +5090,19 @@ export class IsoScene {
     return this.requestDriveToEnter({ panelTitle: obj.panelTitle, door: obj.door });
   }
 
-  /** QA: pan so the character and target door are both on screen before a real pointer tap. */
+  /** QA: pan so the van (when driving) or the walker and target door are both on screen. */
   frameBuildingDoorForQa(name: string): void {
     const obj = objects.find((o) => o.type === 'building' && o.name === name);
     if (!obj?.door) return;
     const d = obj.door;
-    const midTx = (this.charTx + d.x) / 2;
-    const midTy = (this.charTy + d.y) / 2;
+    const from = this.jac?.driving ? { x: this.jac.cx, y: this.jac.cy } : { x: this.charTx, y: this.charTy };
+    const midTx = (from.x + d.x) / 2;
+    const midTy = (from.y + d.y) / 2;
     const mid = tileToWorld(midTx, midTy);
     const doorW = tileToWorld(d.x, d.y);
-    const charW = tileToWorld(this.charTx, this.charTy);
-    const spanX = Math.abs(doorW.x - charW.x) + TILE_W * 2;
-    const spanY = Math.abs(doorW.y - charW.y) + TILE_H * 4;
+    const fromW = tileToWorld(from.x, from.y);
+    const spanX = Math.abs(doorW.x - fromW.x) + TILE_W * 4;
+    const spanY = Math.abs(doorW.y - fromW.y) + TILE_H * 6;
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     this.updateCameraFitMargins();

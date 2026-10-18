@@ -138,7 +138,7 @@ async function vanClient(page) {
 
 async function boardVan(page, cdp, touch) {
   const t0 = Date.now();
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 10; i++) {
     const s = await snap(page);
     if (s.driving) return { ok: true, ms: Date.now() - t0, tries: i };
     if (s.interior) {
@@ -148,17 +148,21 @@ async function boardVan(page, cdp, touch) {
     await page.evaluate(() => {
       window.__playtestQa.dismissBuildingPanel?.();
       window.__playtestQa.focusJac?.();
+      window.__playtestQa.setZoom?.(0.45);
     });
-    await wait(120);
+    await wait(160);
     const pt = await vanClient(page);
-    if (pt) await realTap(page, cdp, pt.x, pt.y, touch);
-    for (let w = 0; w < 40; w++) {
+    const pick = pt
+      ? await page.evaluate((p) => window.__playtestQa.pickAt(p.x, p.y), pt)
+      : null;
+    if (pt && pick?.jac) await realTap(page, cdp, pt.x, pt.y, touch);
+    for (let w = 0; w < 80; w++) {
       const now = await snap(page);
       if (now.driving) return { ok: true, ms: Date.now() - t0, tries: i + 1 };
       await wait(80);
     }
   }
-  return { ok: false, ms: Date.now() - t0, tries: 8 };
+  return { ok: false, ms: Date.now() - t0, tries: 10 };
 }
 
 async function tapSalir(page, cdp, touch) {
@@ -183,25 +187,41 @@ function onScreen(pt, view) {
   return !!pt && !!view && pt.x >= 8 && pt.y >= 8 && pt.x <= view.width - 8 && pt.y <= view.height - 8;
 }
 
+function clampTap(pt, view) {
+  if (!pt || !view) return null;
+  return {
+    x: Math.min(view.width - 12, Math.max(12, pt.x)),
+    y: Math.min(view.height - 12, Math.max(12, pt.y)),
+  };
+}
+
 async function tapDoor(page, cdp, name, touch) {
-  await page.evaluate((n) => window.__playtestQa.frameDoorForQa?.(n), name);
-  await wait(200);
-  const pt = await page.evaluate((n) => window.__playtestQa.doorScreenPoint?.(n), name);
   const view = page.viewportSize();
-  if (!onScreen(pt, view)) return { tapped: false, accepted: false, pt };
+  let pt = null;
+  let pick = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await page.evaluate((n) => window.__playtestQa.frameDoorForQa?.(n), name);
+    await wait(220);
+    const raw = await page.evaluate((n) => window.__playtestQa.doorScreenPoint?.(n), name);
+    pt = clampTap(raw, view);
+    pick = pt ? await page.evaluate((p) => window.__playtestQa.pickAt(p.x, p.y), pt) : null;
+    if (pt && pick?.door === name && !pick.jac) break;
+    if (pt && pick?.door === name) break;
+  }
+  if (!pt) return { tapped: false, accepted: false, pt, pick };
   await realTap(page, cdp, pt.x, pt.y, touch);
-  await wait(120);
+  await wait(160);
   const hit = await page.evaluate((n) => {
     const j = window.__playtestQa.jac();
     const r = window.__playtestQa.inputReady();
     const buildings = window.__playtestQa.getEnterableBuildings();
     const b = buildings.find((o) => o.name === n);
     const g = j.driveGoal;
-    if (!b?.door) return { pending: !!r.pendingDrive, near: false };
+    if (!b?.door) return { pending: !!r.pendingDrive, near: false, driving: j.driving };
     const own = g ? Math.hypot(g.x - b.door.x, g.y - b.door.y) : Infinity;
-    return { pending: !!r.pendingDrive, near: own < 12, goal: g };
+    return { pending: !!r.pendingDrive, near: own < 12, goal: g, driving: j.driving };
   }, name);
-  return { tapped: true, accepted: !!(hit.pending || hit.near), pt, hit };
+  return { tapped: true, accepted: !!(hit.pending || hit.near), pt, pick, hit };
 }
 
 async function waitEntered(page, timeout = 40000) {
@@ -350,7 +370,12 @@ async function runWidth(spec) {
         `${tag}: pan drove van or set goal (${JSON.stringify({ moved: row.pan.vanMoved, goals: row.pan.goalSets })})`,
       );
     }
-    await page.evaluate(() => window.__playtestQa.focusJac?.());
+    await page.evaluate(() => {
+      window.__playtestQa.focusJac?.();
+      window.__playtestQa.setZoom?.(0.4);
+      window.__playtestQa.jacSetGear?.('D');
+    });
+    await wait(200);
 
     for (const name of DOORS) {
       const start = await snap(page);
