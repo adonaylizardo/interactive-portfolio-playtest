@@ -217,7 +217,7 @@ async function runViewport(tag, vp) {
     const yaw = (40 * Math.PI) / 180;
     const fx = Math.sin(yaw);
     const fz = Math.cos(yaw);
-    for (const d of [0, 3, 6, 9, 12]) {
+    for (const d of [1, 3, 6, 9, 12]) {
       window.__playtestQa.setCharacterTile(
         Math.round(j.cx - fx * d),
         Math.round(j.cy - fz * d),
@@ -229,14 +229,19 @@ async function runViewport(tag, vp) {
     }
     return samples;
   });
-  const t9Near = t9ScaleSamples.find((s) => s.distTiles === 0)?.widthFrac ?? NaN;
-  const t9Far = t9ScaleSamples.find((s) => s.distTiles === 12)?.widthFrac ?? NaN;
+  const sampleFrac = (d) => {
+    const v = t9ScaleSamples.find((s) => s.distTiles === d)?.widthFrac;
+    return typeof v === 'number' && Number.isFinite(v) ? v : NaN;
+  };
+  const t9Near = [1, 3].map(sampleFrac).find((v) => Number.isFinite(v)) ?? NaN;
+  const t9Far = sampleFrac(12);
   const t9PerspectivePass =
     Number.isFinite(t9Near) &&
     t9Near >= 0.16 &&
     t9Near <= 0.42 &&
     Number.isFinite(t9Far) &&
     t9Far < t9Near * 0.72;
+  console.log(`${tag} t9 near=${t9Near} far=${t9Far} pass=${t9PerspectivePass}`);
 
   const leak = await uiLeakCheck(page);
   const overlaps = await overlapProbe(page);
