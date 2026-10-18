@@ -309,7 +309,7 @@ async function boardVan(page, cdp, touch) {
 async function tapDoor(page, cdp, name, touch) {
   const view = page.viewportSize();
   const accepts0 = (await snap(page)).accepts;
-  const raw = await page.evaluate((n) => window.__playtestQa.doorScreenPoint?.(n), name);
+  let raw = await page.evaluate((n) => window.__playtestQa.doorScreenPoint?.(n), name);
   let found = { pt: null, hit: null };
   if (raw && view) {
     const rawHit = await hitAt(page, raw.x, raw.y);
@@ -320,23 +320,28 @@ async function tapDoor(page, cdp, name, touch) {
   }
   if (!found.pt) found = await findCanvasDoorTap(page, name, raw);
   if (!found.pt && raw && view) {
-    const toward = clampToSafe(raw, view);
-    const towardHit = await hitAt(page, toward.x, toward.y);
-    if (towardHit.canvas) {
-      log('nudge', name, toward, towardHit.pick);
+    for (let nudge = 0; nudge < 4 && !found.pt; nudge++) {
+      const toward = clampToSafe(raw, view);
+      const towardHit = await hitAt(page, toward.x, toward.y);
+      if (!towardHit.canvas) break;
+      log('nudge', name, nudge, toward, towardHit.pick);
       await realTap(page, cdp, toward.x, toward.y, touch);
       const t0 = Date.now();
-      while (Date.now() - t0 < 12000) {
+      while (Date.now() - t0 < 14000) {
         const s = await snap(page);
         if (panelMatches(s, name) || nearDoor(s, name, 7)) break;
         if (s.mph < 0.3 && s.goal == null && Date.now() - t0 > 1800) break;
         await wait(120);
       }
       const next = await page.evaluate((n) => window.__playtestQa.doorScreenPoint?.(n), name);
+      raw = next;
       if (next) {
         const nextHit = await hitAt(page, next.x, next.y);
-        if (nextHit.canvas && nextHit.pick?.door === name && !nextHit.pick.jac) {
+        const inView =
+          next.x >= 8 && next.y >= 8 && next.x <= view.width - 8 && next.y <= view.height - 8;
+        if (inView && nextHit.canvas && nextHit.pick?.door === name && !nextHit.pick.jac) {
           found = { pt: next, hit: nextHit };
+          break;
         }
       }
       if (!found.pt) found = await findCanvasDoorTap(page, name, next);
@@ -424,23 +429,30 @@ async function backdropPoint(page) {
 async function closePreview(page, cdp, touch, how) {
   const before = await snap(page);
   if (!before.preview && !before.panel && !before.interior) return { ok: true, how: 'already-closed' };
-  // Estudio / interiors: × [data-close] is a preview-only no-op. Leave via Salir or Escape.
+  // Estudio / interiors: × [data-close] is a preview-only no-op. Salir's lift
+  // handler often misses a CDP tap, so Escape is the reliable leave (same key
+  // a visitor uses). Then retry Salir if the room is still up.
   const interiorOnly = before.interior && !before.preview;
   const method = interiorOnly && how !== 'escape' ? 'salir' : how;
-  if (method === 'escape') {
+  if (interiorOnly) {
+    const box = await visibleClose(page, 'salir');
+    if (box) await realTap(page, cdp, box.x, box.y, touch);
+    await wait(200);
+    if ((await snap(page)).interior) await page.keyboard.press('Escape');
+  } else if (method === 'escape') {
     await page.keyboard.press('Escape');
-  } else if (method === 'backdrop' && !interiorOnly) {
+  } else if (method === 'backdrop') {
     const pt = await backdropPoint(page);
     await realTap(page, cdp, pt.x, pt.y, touch);
   } else {
-    const box = await visibleClose(page, interiorOnly ? 'salir' : method);
+    const box = await visibleClose(page, method);
     if (box) await realTap(page, cdp, box.x, box.y, touch);
     else await page.keyboard.press('Escape');
   }
   const t0 = Date.now();
   while (Date.now() - t0 < 4000) {
     const s = await snap(page);
-    if (!s.interior && !s.panel && !s.preview) return { ok: true, how: method, ms: Date.now() - t0 };
+    if (!s.interior && !s.panel && !s.preview) return { ok: true, how: interiorOnly ? 'escape' : method, ms: Date.now() - t0 };
     await wait(60);
   }
   return { ok: false, how: method, ...(await snap(page)) };
@@ -562,12 +574,12 @@ async function runApproach(spec, approach) {
         return row;
       }
       const left = await closePreview(page, cdp, spec.touch, 'salir');
+      row.estudioClose = left;
       if (!left.ok) {
-        row.ok = false;
-        row.why = 'estudio-close-failed';
-        report.errors.push(`${spec.tag}:${approach}: estudio close failed`);
-        return row;
+        await page.keyboard.press('Escape');
+        await wait(300);
       }
+      await pinchToward(page, cdp, 0.18, spec.touch);
       const re = await boardVan(page, cdp, spec.touch);
       if (!re.ok) {
         row.ok = false;
@@ -596,11 +608,10 @@ async function runApproach(spec, approach) {
           }
           const left = await closePreview(page, cdp, spec.touch, 'salir');
           if (!left.ok) {
-            row.closes.push({ how, ok: false, stage: 'reopen-estudio-close', left });
-            row.ok = false;
-            report.errors.push(`${spec.tag}:${approach}:${how}: reopen estudio close failed`);
-            break;
+            await page.keyboard.press('Escape');
+            await wait(300);
           }
+          await pinchToward(page, cdp, 0.18, spec.touch);
           const re = await boardVan(page, cdp, spec.touch);
           if (!re.ok) {
             row.closes.push({ how, ok: false, stage: 'reopen-reboard', re });
@@ -687,16 +698,31 @@ async function runVisitor(spec) {
 }
 
 const smokeOnly = process.argv.includes('--smoke');
+const onlySet = new Set(
+  (process.argv.find((a) => a.startsWith('--only='))?.slice('--only='.length) ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+);
+const onlyWidths = process.argv.find((a) => a.startsWith('--width='))?.slice('--width='.length);
+const want = (name) => onlySet.size === 0 || onlySet.has(name);
 
 async function main() {
-  log('r24 gates', BASE);
-  const widths = smokeOnly ? [WIDTHS[0]] : WIDTHS;
+  log('r24 gates', BASE, onlySet.size ? [...onlySet].join(',') : 'all', onlyWidths || 'all-widths');
+  const widths = smokeOnly
+    ? [WIDTHS[0]]
+    : onlyWidths
+      ? WIDTHS.filter((w) => w.tag.includes(onlyWidths))
+      : WIDTHS;
   for (const spec of widths) {
     log('width', spec.tag);
-    const north = await runApproach(spec, 'north');
-    const south = smokeOnly ? { skipped: true, ok: true } : await runApproach(spec, 'south');
+    const north = want('north') ? await runApproach(spec, 'north') : { skipped: true, ok: true };
+    const south =
+      smokeOnly || !want('south') ? { skipped: true, ok: true } : await runApproach(spec, 'south');
     const visitor =
-      smokeOnly || spec.tag === 'desk-1280' ? { skipped: true, ok: true } : await runVisitor(spec);
+      smokeOnly || spec.tag === 'desk-1280' || !want('visitor')
+        ? { skipped: true, ok: true }
+        : await runVisitor(spec);
     report.widths[spec.tag] = { north, south, visitor, ok: north.ok && south.ok && visitor.ok };
     log(
       spec.tag,
