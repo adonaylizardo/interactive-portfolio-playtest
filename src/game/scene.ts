@@ -1941,7 +1941,16 @@ export class IsoScene {
   }
 
   recenterOnCharacter(): void {
+    if (this.mapOverview) {
+      this.mapOverview = false;
+      if (this.savedCam) {
+        this.cameraX = this.savedCam.x;
+        this.cameraY = this.savedCam.y;
+        this.zoom = this.savedCam.zoom;
+      }
+    }
     this.centerOnCharacter(false);
+    this.applyCamera(true);
   }
 
   /** Case preview on the map (deep-linkable via #view=…&in=). */

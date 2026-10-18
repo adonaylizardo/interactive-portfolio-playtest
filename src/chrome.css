@@ -629,6 +629,13 @@ body[data-interior='1'] .chrome__column {
   visibility: hidden;
 }
 
+#chrome-contact.chrome__contact--flash,
+.chrome__intro .chrome__ctas.chrome__contact--flash {
+  outline: 2px solid #5b8def;
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+
 .chrome--split .chrome__subtitle {
   left: calc(496px + (100% - 496px - 264px) / 2);
   width: min(520px, calc(100% - 496px - 280px));
@@ -706,7 +713,7 @@ body[data-layout='panel'] #game-canvas {
 
 .chrome--mobile .chrome__lang {
   left: auto;
-  z-index: 20;
+  z-index: 25;
 }
 
 body[data-layout='map'] .chrome--mobile .chrome__lang {

@@ -80,6 +80,16 @@ async function checklistBox(page) {
   });
 }
 
+function rectsOverlap(a, b, pad = 0) {
+  if (!a || !b) return false;
+  return !(
+    a.x + a.w + pad <= b.x ||
+    b.x + b.w + pad <= a.x ||
+    a.y + a.h + pad <= b.y ||
+    b.y + b.h + pad <= a.y
+  );
+}
+
 async function tapLang(page, lang, touch = false) {
   const centers = await langCenters(page);
   const pt = centers[lang];
@@ -133,13 +143,22 @@ try {
 
     await page.locator('.chrome__rail [data-action="search"]').click();
     await page.waitForTimeout(300);
-    record('1280: search opens casos', (await page.evaluate(() => document.body.dataset.layout)) === 'split', {});
+    const searchLabel = await page.evaluate(() =>
+      document.querySelector('.chrome__rail [data-action="search"]')?.getAttribute('aria-label') ?? '',
+    );
+    record('1280: go-to-cases opens split', (await page.evaluate(() => document.body.dataset.layout)) === 'split', {
+      searchLabel,
+    });
+    record('1280: search label not Buscar/Search alone', !/^(Buscar|Search)$/i.test(searchLabel.trim()), {
+      searchLabel,
+    });
 
     const [dl] = await Promise.all([
       page.waitForEvent('popup', { timeout: 8000 }).catch(() => null),
       page.locator('.chrome__rail [data-action="download"]').click(),
     ]);
-    record('1280: download opens tab', !!dl, {});
+    const cvUrl = dl?.url() ?? '';
+    record('1280: CV opens PDF path', cvUrl.includes('adonay-lizardo-cv.pdf'), { cvUrl });
 
     await page.goto(`${BASE}#view=x=0&y=0&z=0.85&in=biblioteca`, { waitUntil: 'networkidle', timeout: 90000 });
     await waitMap(page);
@@ -224,8 +243,33 @@ try {
     record('1280 split+preview: sheet right of column', stack.sheetLeft >= 490, stack);
     record('1280 split+preview: casos row hit-test', stack.hitCaseRow, stack);
 
-    const subCase = await page.evaluate(() => document.querySelector('.chrome__subtitle')?.textContent?.trim() ?? '');
-    record('1280 split+preview: caption visible', subCase.length > 8, { subCase: subCase.slice(0, 80) });
+    const captionDuringPreview = await page.evaluate(() => {
+      const sub = document.querySelector('.chrome__subtitle');
+      const readBtn = document.querySelector('.case-preview__read, [data-i18n="panel.readCase"]')?.closest('a, button');
+      const sr = sub?.getBoundingClientRect();
+      const br = readBtn?.getBoundingClientRect();
+      const subVisible = sub && getComputedStyle(sub).display !== 'none' && (sub.textContent?.trim()?.length ?? 0) > 0;
+      const overlap =
+        subVisible &&
+        sr &&
+        br &&
+        !(sr.right <= br.left || br.right <= sr.left || sr.bottom <= br.top || br.bottom <= sr.top);
+      return { subVisible, overlap, subDisplay: sub ? getComputedStyle(sub).display : null };
+    });
+    record('1280 split+preview: caption not over read case', !captionDuringPreview.overlap, captionDuringPreview);
+
+    await page.locator('.case-preview__x[data-close]').click({ timeout: 8000 }).catch(() => {});
+    await page.waitForTimeout(400);
+    await page.locator('.chrome__view-btns [data-view="map"]').click();
+    await page.waitForTimeout(400);
+    const beforeCenter = await page.evaluate(() => document.getElementById('game-canvas')?.dataset.mapOverview);
+    await page.locator('.chrome__locate [data-action="center"]').click();
+    await page.waitForTimeout(350);
+    const afterCenter = await page.evaluate(() => document.getElementById('game-canvas')?.dataset.mapOverview);
+    record('1280 map overview: center exits overview', beforeCenter === '1' && afterCenter !== '1', {
+      beforeCenter,
+      afterCenter,
+    });
 
     await page.goto(`${BASE}#view=x=0&y=0&z=0.85&in=biblioteca`, { waitUntil: 'networkidle', timeout: 90000 });
     await waitMap(page);
@@ -263,12 +307,45 @@ try {
     const page = await ctx.newPage();
     await page.goto(BASE, { waitUntil: 'networkidle', timeout: 90000 });
     await waitMap(page);
+    const langFresh = await langCenters(page);
+    const clFresh = await checklistBox(page);
+    const enBox = langFresh.en
+      ? { x: langFresh.en.x - langFresh.en.w / 2, y: langFresh.en.y - langFresh.en.h / 2, w: langFresh.en.w, h: langFresh.en.h }
+      : null;
+    record(
+      '390 fresh: checklist clear of EN',
+      clFresh && enBox ? !rectsOverlap(clFresh, enBox, 2) : false,
+      { clFresh, enBox },
+    );
+    record('390 fresh: checklist bottom-left pill', (clFresh?.y ?? 0) > 400 && (clFresh?.x ?? 999) < 200, clFresh);
     await dismissPhoneIntro(page);
     const lang = await langCenters(page);
     const enHit = lang.en ? await hit(page, lang.en.x, lang.en.y) : null;
-    const cl = await checklistBox(page);
-    record('390: checklist not over EN', !enHit?.cls.includes('checklist'), { enHit, cl });
+    record('390: EN hit-test', enHit?.lang === 'en', { enHit });
     record('390: EN tap → en', (await tapLang(page, 'en', true)).ok, {});
+
+    await page.goto(BASE, { waitUntil: 'networkidle', timeout: 90000 });
+    await waitMap(page);
+    const contactPt = await page.evaluate(() => {
+      const b = document.querySelector('.chrome__dock [data-action="contact"]');
+      const r = b?.getBoundingClientRect();
+      return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null;
+    });
+    if (contactPt) {
+      await page.touchscreen.tap(contactPt.x, contactPt.y);
+      await page.waitForTimeout(200);
+      await page.waitForTimeout(1200);
+      const contactState = await page.evaluate((snippet) => {
+        const sub = document.querySelector('.chrome__subtitle')?.textContent?.trim() ?? '';
+        return {
+          sub,
+          flash: !!document.querySelector('.chrome__contact--flash, #chrome-contact.chrome__contact--flash'),
+          introSnippet: sub.toLowerCase().includes(snippet),
+        };
+      }, INTRO_SNIPPET);
+      record('390 first gesture contact: not intro caption', !contactState.introSnippet, contactState);
+      record('390 first gesture contact: contact line or flash', contactState.sub.length > 4 || contactState.flash, contactState);
+    }
     await page.close();
     await ctx.close();
   }
@@ -283,6 +360,21 @@ try {
     await page.goto(BASE, { waitUntil: 'networkidle', timeout: 90000 });
     await waitMap(page);
     await dismissPhoneIntro(page);
+    const clLand = await checklistBox(page);
+    const langLand = await langCenters(page);
+    const langBox = langLand.en
+      ? {
+          x: langLand.en.x - langLand.en.w / 2,
+          y: langLand.en.y - langLand.en.h / 2,
+          w: langLand.en.w,
+          h: langLand.en.h,
+        }
+      : null;
+    record(
+      '844x390: checklist clear of EN',
+      clLand && langBox ? !rectsOverlap(clLand, langBox, 2) : false,
+      { clLand, langBox },
+    );
     const sound = await page.evaluate(() => {
       const b = document.querySelector('.chrome__tools-phone [data-action="sound"]');
       const r = b?.getBoundingClientRect();

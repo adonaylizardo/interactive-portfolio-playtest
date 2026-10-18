@@ -121,6 +121,11 @@ export class StudioAudio {
   /** Map-only: play intro if unlock happened while a panel was open. */
   maybePlayDeferredIntro(): void {
     if (!this.unlocked || this.muted || this.played.has('01-intro')) return;
+    if (this.isVoicePlaying()) {
+      this.introDeferred = true;
+      this.scheduleIntroWhenMapIdle(450);
+      return;
+    }
     if (this.shouldDeferIntro()) {
       this.introDeferred = true;
       return;
@@ -169,6 +174,8 @@ export class StudioAudio {
 
   /** User-initiated chrome voice (Contact, etc.) while intro is playing. */
   playLineForced(id: string): void {
+    this.cancelIntroKick();
+    this.introDeferred = true;
     this.introLock = false;
     this.pending = null;
     this.playLine(id, { force: true });

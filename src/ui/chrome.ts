@@ -35,7 +35,7 @@ const CASES_ROWS: { id: string; label: string; nda?: boolean }[] = [
   { id: 'pg', label: 'P&G' },
 ];
 
-const CV_HREF = 'https://adonaylizardo.com';
+const CV_HREF = `${import.meta.env.BASE_URL}cv/adonay-lizardo-cv.pdf`;
 const CONTACT_HREF = 'mailto:hello@adonaylizardo.com';
 
 function roundBtn(icon: IconName, label: string, extra = '', action?: string): string {
@@ -191,8 +191,8 @@ export class ChromeUI {
             <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
             <p class="chrome__blurb" data-i18n="chrome.lede">Explore the map, open cases from the doors, and browse talks and writings inside the buildings.</p>
           </div>
-          <div class="chrome__ctas">
-            <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer">${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
+          <div class="chrome__ctas" id="chrome-contact">
+            <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer" download>${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
             <a class="ui-btn ui-btn--secondary" href="${CONTACT_HREF}">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></a>
           </div>
           <div class="chrome__audience">
@@ -254,7 +254,7 @@ export class ChromeUI {
           </div>
         </div>
         <div class="chrome__ctas">
-          <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer">${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
+          <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer" download>${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
           <a class="ui-btn ui-btn--secondary" href="${CONTACT_HREF}">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></a>
         </div>
         <div class="chrome__card-row">
@@ -290,7 +290,6 @@ export class ChromeUI {
           ${roundBtn('locate', 'Center on Adonay', 'chrome__locate', 'center')}
         </div>
         <div class="chrome__view-btns">
-          <button type="button" class="ui-view" data-view="rotate" aria-label="Rotate" data-i18n-aria="chrome.rotate">${iconSvg('rotate')}</button>
           <button type="button" class="ui-view is-active" data-view="isometrica" aria-label="Isometric" data-i18n-aria="chrome.isometric">${iconSvg('cube')}</button>
           <button type="button" class="ui-view" data-view="cenital" aria-label="Top-down" data-i18n-aria="chrome.topdown">${iconSvg('grid')}</button>
           <button type="button" class="ui-view" data-view="perspectiva" aria-label="Perspective" data-i18n-aria="chrome.perspective">${iconSvg('persp')}</button>
@@ -349,8 +348,7 @@ export class ChromeUI {
       this.setLayout('split');
     });
     this.root.querySelector('.chrome__dock [data-action="contact"]')?.addEventListener('click', () => {
-      studio.playLineForced('11-contact');
-      this.callbacks.onLocate('contacto');
+      this.openContact();
     });
     this.root.querySelector('.chrome__dock [data-action="map"]')?.addEventListener('click', () => this.setLayout('map'));
     this.root.querySelector('.chrome__rail [data-action="cases"]')?.addEventListener('click', () => {
@@ -362,8 +360,7 @@ export class ChromeUI {
       this.scrollTo('#chrome-logros');
     });
     this.root.querySelector('.chrome__rail [data-action="contact"]')?.addEventListener('click', () => {
-      studio.playLineForced('11-contact');
-      this.callbacks.onLocate('contacto');
+      this.openContact();
     });
     this.root.querySelector('[data-action="fullpage"]')?.addEventListener('click', () => {
       if (this.layout === 'panel') this.setLayout('split');
@@ -474,6 +471,18 @@ export class ChromeUI {
 
   private scrollTo(sel: string): void {
     this.root.querySelector(sel)?.scrollIntoView({ block: 'start' });
+  }
+
+  private openContact(): void {
+    this.setLayout('split');
+    const contactBlock =
+      (this.root.querySelector('.chrome__column #chrome-contact') as HTMLElement | null) ??
+      (this.root.querySelector('.chrome__intro .chrome__ctas') as HTMLElement | null);
+    contactBlock?.scrollIntoView({ block: 'start' });
+    contactBlock?.classList.add('chrome__contact--flash');
+    window.setTimeout(() => contactBlock?.classList.remove('chrome__contact--flash'), 1200);
+    studio.playLineForced('11-contact');
+    this.callbacks.onLocate('contacto');
   }
 
   private syncAudience(): void {
