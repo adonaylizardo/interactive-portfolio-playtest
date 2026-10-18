@@ -4058,11 +4058,11 @@ export class IsoScene {
     let fwd = 0;
     if (this.keys.has('a') || this.keys.has('arrowleft')) turn -= 1;
     if (this.keys.has('d') || this.keys.has('arrowright')) turn += 1;
-    if (this.keys.has('w') || this.keys.has('arrowup')) fwd -= 1;
-    if (this.keys.has('s') || this.keys.has('arrowdown')) fwd += 1;
+    if (this.keys.has('w') || this.keys.has('arrowup')) fwd += 1;
+    if (this.keys.has('s') || this.keys.has('arrowdown')) fwd -= 1;
     if (stickLive) {
       turn += stickX;
-      fwd += stickY;
+      fwd -= stickY;
     }
     if (Math.abs(turn) > 0.02) {
       this.personaCamYaw += turn * PERSONA_TURN_RATE * dt;
@@ -6153,7 +6153,7 @@ export class IsoScene {
     this.syncViewTransform();
     let fwd = 0;
     if (opts.w) fwd -= 1;
-    if (opts.stickY != null) fwd += personaStickAxis(opts.stickY);
+    if (opts.stickY != null) fwd -= personaStickAxis(opts.stickY);
     if (Math.abs(fwd) < 1e-6) return null;
     const m = screenStickToTile(0, fwd, this.viewRot, this.viewSx, this.viewSy);
     const mag = Math.hypot(m.x, m.y);
