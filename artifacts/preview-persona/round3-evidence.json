@@ -1,0 +1,161 @@
+{
+  "base": "http://127.0.0.1:4178/interactive-portfolio-playtest/preview-persona/",
+  "bundle": "index-BVTvOfSJ.js",
+  "at": "2026-10-18T12:14:09.937Z",
+  "results": [
+    {
+      "tag": "390",
+      "bundle": "index-BVTvOfSJ.js",
+      "fps": {
+        "map": 12.352263083604036,
+        "persona": 7.038491834463722,
+        "ratio": 0.5698139512431831,
+        "pass": false
+      },
+      "leak": {
+        "labels": 0,
+        "cenitalLabels": 0,
+        "checklistBig": false,
+        "pass": true
+      },
+      "frameC": {
+        "ok": true,
+        "meanDiff": 17.70687305059343
+      },
+      "frameB": {
+        "ok": true,
+        "meanDiff": 17.263830153522097
+      },
+      "metrics": {
+        "sw": 390,
+        "sh": 844,
+        "feetScale": 1.1722222222222223,
+        "feetY": 826.4166666666667,
+        "adonayHeightPx": 337.6,
+        "refAdonayHeightPx": 288,
+        "chromeTitleBottom": null,
+        "chromeSubtitleBottom": 712,
+        "dockTop": 780,
+        "enterBtnTop": null,
+        "jacBoardTop": 720,
+        "jacBoardBottom": null
+      },
+      "adonayScaleOk": true,
+      "legsClear": true,
+      "navOverlap": false,
+      "sharp": {
+        "edge": 0,
+        "c0": {
+          "r": 0,
+          "g": 0,
+          "b": 0,
+          "a": 0
+        }
+      },
+      "sharpOk": false
+    },
+    {
+      "tag": "844x390",
+      "bundle": "index-BVTvOfSJ.js",
+      "fps": {
+        "map": 15.393619138387661,
+        "persona": 8.431703799242257,
+        "ratio": 0.5477401852963734,
+        "pass": false
+      },
+      "leak": {
+        "labels": 0,
+        "cenitalLabels": 0,
+        "checklistBig": false,
+        "pass": true
+      },
+      "frameC": {
+        "ok": true,
+        "meanDiff": 17.939037905092594
+      },
+      "frameB": {
+        "ok": true,
+        "meanDiff": 19.753546730324075
+      },
+      "metrics": {
+        "sw": 844,
+        "sh": 390,
+        "feetScale": 0.5416666666666666,
+        "feetY": 326,
+        "adonayHeightPx": 156,
+        "refAdonayHeightPx": 288,
+        "chromeTitleBottom": null,
+        "chromeSubtitleBottom": null,
+        "dockTop": 326,
+        "enterBtnTop": null,
+        "jacBoardTop": 282,
+        "jacBoardBottom": null
+      },
+      "adonayScaleOk": true,
+      "legsClear": true,
+      "navOverlap": false,
+      "sharp": {
+        "edge": 0,
+        "c0": {
+          "r": 0,
+          "g": 0,
+          "b": 0,
+          "a": 0
+        }
+      },
+      "sharpOk": false
+    },
+    {
+      "tag": "1280",
+      "bundle": "index-BVTvOfSJ.js",
+      "fps": {
+        "map": 6.217921911640537,
+        "persona": 3.602394165372476,
+        "ratio": 0.5793566108684083,
+        "pass": false
+      },
+      "leak": {
+        "labels": 0,
+        "cenitalLabels": 0,
+        "checklistBig": false,
+        "pass": true
+      },
+      "frameC": {
+        "ok": true,
+        "meanDiff": 14.304077799479167
+      },
+      "frameB": {
+        "ok": true,
+        "meanDiff": 13.8523046875
+      },
+      "metrics": {
+        "sw": 1280,
+        "sh": 800,
+        "feetScale": 1.1111111111111112,
+        "feetY": 783.3333333333334,
+        "adonayHeightPx": 320,
+        "refAdonayHeightPx": 288,
+        "chromeTitleBottom": null,
+        "chromeSubtitleBottom": 772,
+        "dockTop": null,
+        "enterBtnTop": null,
+        "jacBoardTop": 676,
+        "jacBoardBottom": null
+      },
+      "adonayScaleOk": true,
+      "legsClear": true,
+      "navOverlap": false,
+      "sharp": {
+        "edge": 0,
+        "c0": {
+          "r": 18,
+          "g": 20,
+          "b": 23,
+          "a": 255
+        }
+      },
+      "sharpOk": false
+    }
+  ],
+  "ok": false
+}

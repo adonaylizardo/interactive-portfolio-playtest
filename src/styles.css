@@ -2770,7 +2770,7 @@ body.jac-info[data-chrome='phone'] .chrome__dock {
 .persona-jac-board {
   position: fixed;
   left: 50%;
-  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(80px + env(safe-area-inset-bottom, 0px));
   z-index: 130;
   transform: translateX(-50%);
   display: flex;
@@ -2799,20 +2799,20 @@ body.jac-info[data-chrome='phone'] .chrome__dock {
 
 @media (max-width: 767px) {
   body[data-layout='split'] .persona-jac-board {
-    bottom: calc(128px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(148px + env(safe-area-inset-bottom, 0px));
   }
 }
 
 @media (max-height: 430px) {
   body[data-view='persona'] .persona-jac-board {
-    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   }
 }
 
 .persona-enter-prompt {
   position: fixed;
   left: 50%;
-  bottom: calc(132px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   z-index: 129;
   transform: translateX(-50%);
   pointer-events: auto;
@@ -2832,8 +2832,19 @@ body.jac-info[data-chrome='phone'] .chrome__dock {
 }
 
 @media (max-width: 767px) {
-  body[data-layout='split'] .persona-enter-prompt {
-    bottom: calc(168px + env(safe-area-inset-bottom, 0px));
+  body[data-view='persona'] .persona-enter-prompt {
+    left: max(12px, env(safe-area-inset-left, 0px));
+    right: auto;
+    transform: none;
+    bottom: calc(200px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (max-height: 430px) {
+  body[data-view='persona'] .persona-enter-prompt {
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(52px + env(safe-area-inset-bottom, 0px));
   }
 }
 

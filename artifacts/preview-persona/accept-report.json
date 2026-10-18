@@ -1,149 +1,39 @@
 {
-  "ok": true,
-  "base": "http://127.0.0.1:8765/interactive-portfolio-playtest/preview-persona/",
-  "expectedBundle": "index-BMoeR2yr.js",
+  "ok": false,
+  "base": "http://127.0.0.1:4178/interactive-portfolio-playtest/preview-persona/",
+  "expectedBundle": "index-BVTvOfSJ.js",
   "results": [
     {
       "tag": "390",
-      "errors": [],
+      "errors": [
+        "390: fps ratio 0.53 < 0.8",
+        "390: flor fail dist=8.2"
+      ],
       "evidence": {
-        "bundle": "index-BMoeR2yr.js",
+        "bundle": "index-BVTvOfSJ.js",
         "fps": {
-          "map": 12.507363801629445,
-          "persona": 16.705577432997774,
-          "ratio": 1.3356593521986937
+          "map": 13.763494791783888,
+          "persona": 7.268682173748585,
+          "ratio": 0.5281131197933553
         },
         "walkCatedral": {
           "ok": true,
-          "ms": 2872,
+          "ms": 8823,
           "interiorLog": [],
-          "endDist": 0
+          "endDist": 2.23606797749979
         },
         "walkFlor": {
-          "ok": true,
-          "ms": 5015,
+          "ok": false,
+          "ms": 30047,
           "interiorLog": [],
-          "endDist": 0
+          "endDist": 8.246211251235321
         },
         "assets": {
           "textures": 23,
-          "bytesLoaded": 874441,
+          "bytesLoaded": 1078780,
           "keys": [
             "adonay-idle:1",
             "avila:1",
-            "cielo:1",
-            "adonay-espalda__idle:1",
-            "adonay-espalda__walk:1",
-            "pantone-espalda__idle:1",
-            "pantone-espalda__walk:1",
-            "pantone-espalda__sit:1",
-            "cielo-noche__tile:1",
-            "cerros-avila__tile:1",
-            "fachada-estudio-6x6__luz-encendida:1",
-            "fachada-casa-volaris__luz-encendida:1",
-            "fachada-casa-bain__luz-encendida:1",
-            "fachada-casa-mentoria__luz-encendida:1",
-            "fachada-casa-finoa__luz-encendida:1",
-            "fachada-casa-pg__luz-encendida:1",
-            "fachada-sambil-barquisimeto__luz-encendida:1",
-            "fachada-catedral-de-barquisimeto__luz-encendida:1",
-            "fachada-flor-de-venezuela-profundidad__luz-encendida:1",
-            "jac-t9-ext__34-frontal-3p__apagado:1",
-            "farol-frente__estado-encendido:1",
-            "arbol-cuji-frente:1",
-            "banco-frente:1"
-          ]
-        },
-        "yaw": {
-          "quarterChanges": 5,
-          "monotonicViolations": 0,
-          "oscillation": false,
-          "quarterBacktrack": 0,
-          "pass": true,
-          "start": {
-            "yawRad": 3.3183476535897856,
-            "yawQuarter": 2,
-            "yawDeg": 190.12731550783442
-          },
-          "end": {
-            "yawRad": 10.914307653589807,
-            "yawQuarter": 3,
-            "yawDeg": 625.3437648580284
-          }
-        },
-        "uiFoot": {
-          "labels": 0,
-          "jacHud": false,
-          "rear": false,
-          "outBtns": 0,
-          "subirClear": true
-        }
-      }
-    },
-    {
-      "tag": "844x390",
-      "errors": [],
-      "evidence": {
-        "bundle": "index-BMoeR2yr.js",
-        "fps": {
-          "map": 16.44851896526713,
-          "persona": 15.415377526136664,
-          "ratio": 0.9371893942967109
-        },
-        "yaw": {
-          "quarterChanges": 5,
-          "monotonicViolations": 0,
-          "oscillation": false,
-          "quarterBacktrack": 0,
-          "pass": true,
-          "start": {
-            "yawRad": 3.318347653589795,
-            "yawQuarter": 2,
-            "yawDeg": 190.12731550783496
-          },
-          "end": {
-            "yawRad": 11.091327653589795,
-            "yawQuarter": 3,
-            "yawDeg": 635.4862637474337
-          }
-        },
-        "uiFoot": {
-          "labels": 0,
-          "jacHud": false,
-          "rear": false,
-          "outBtns": 0,
-          "subirClear": true
-        }
-      }
-    },
-    {
-      "tag": "1280",
-      "errors": [],
-      "evidence": {
-        "bundle": "index-BMoeR2yr.js",
-        "fps": {
-          "map": 5.426218215632005,
-          "persona": 5.024566326795304,
-          "ratio": 0.9259794072270056
-        },
-        "walkCatedral": {
-          "ok": true,
-          "ms": 6044,
-          "interiorLog": [],
-          "endDist": 1
-        },
-        "walkFlor": {
-          "ok": true,
-          "ms": 12702,
-          "interiorLog": [],
-          "endDist": 1
-        },
-        "assets": {
-          "textures": 23,
-          "bytesLoaded": 1725879,
-          "keys": [
-            "avila:1",
-            "adonay-idle:1",
             "cielo:1",
             "adonay-espalda__idle:1",
             "adonay-espalda__walk:1",
@@ -174,14 +64,132 @@
           "quarterBacktrack": 0,
           "pass": true,
           "start": {
-            "yawRad": 3.4065926535897932,
-            "yawQuarter": 2,
-            "yawDeg": 195.18338157096684
+            "yawRad": 0.9653031558104505,
+            "yawQuarter": 1,
+            "yawDeg": 55.307796778598124
           },
           "end": {
-            "yawRad": 6.321592653589791,
+            "yawRad": 5.47030315581045,
+            "yawQuarter": 3,
+            "yawDeg": 313.425283485034
+          }
+        },
+        "uiFoot": {
+          "labels": 0,
+          "jacHud": false,
+          "rear": false,
+          "outBtns": 0,
+          "subirClear": true
+        }
+      }
+    },
+    {
+      "tag": "844x390",
+      "errors": [
+        "844x390: fps ratio 0.55 < 0.8"
+      ],
+      "evidence": {
+        "bundle": "index-BVTvOfSJ.js",
+        "fps": {
+          "map": 15.415995853542377,
+          "persona": 8.508469560026661,
+          "ratio": 0.5519247436792438
+        },
+        "yaw": {
+          "quarterChanges": 3,
+          "monotonicViolations": 0,
+          "oscillation": false,
+          "quarterBacktrack": 0,
+          "pass": true,
+          "start": {
+            "yawRad": 0.9653031558104505,
+            "yawQuarter": 1,
+            "yawDeg": 55.307796778598124
+          },
+          "end": {
+            "yawRad": 6.795303155810449,
             "yawQuarter": 0,
-            "yawDeg": 362.2005788516016
+            "yawDeg": 389.34219133986795
+          }
+        },
+        "uiFoot": {
+          "labels": 0,
+          "jacHud": false,
+          "rear": false,
+          "outBtns": 0,
+          "subirClear": true
+        }
+      }
+    },
+    {
+      "tag": "1280",
+      "errors": [
+        "1280: fps ratio 0.65 < 0.8",
+        "1280: flor fail dist=30.9"
+      ],
+      "evidence": {
+        "bundle": "index-BVTvOfSJ.js",
+        "fps": {
+          "map": 5.97279707256558,
+          "persona": 3.8572083266756256,
+          "ratio": 0.6457959779669501
+        },
+        "walkCatedral": {
+          "ok": true,
+          "ms": 26951,
+          "interiorLog": [],
+          "endDist": 2.23606797749979
+        },
+        "walkFlor": {
+          "ok": false,
+          "ms": 30875,
+          "interiorLog": [],
+          "endDist": 30.886890422961002
+        },
+        "assets": {
+          "textures": 23,
+          "bytesLoaded": 1248906,
+          "keys": [
+            "adonay-idle:1",
+            "avila:1",
+            "cielo:1",
+            "adonay-espalda__idle:1",
+            "adonay-espalda__walk:1",
+            "pantone-espalda__idle:1",
+            "pantone-espalda__walk:1",
+            "pantone-espalda__sit:1",
+            "cielo-noche__tile:1",
+            "cerros-avila__tile:1",
+            "fachada-estudio-6x6__luz-encendida:1",
+            "fachada-casa-volaris__luz-encendida:1",
+            "fachada-casa-bain__luz-encendida:1",
+            "fachada-casa-mentoria__luz-encendida:1",
+            "fachada-casa-finoa__luz-encendida:1",
+            "fachada-casa-pg__luz-encendida:1",
+            "fachada-sambil-barquisimeto__luz-encendida:1",
+            "fachada-catedral-de-barquisimeto__luz-encendida:1",
+            "fachada-flor-de-venezuela-profundidad__luz-encendida:1",
+            "jac-t9-ext__34-frontal-3p__apagado:1",
+            "farol-frente__estado-encendido:1",
+            "arbol-cuji-frente:1",
+            "banco-frente:1"
+          ]
+        },
+        "yaw": {
+          "quarterChanges": 1,
+          "monotonicViolations": 0,
+          "oscillation": false,
+          "quarterBacktrack": 0,
+          "pass": true,
+          "start": {
+            "yawRad": 0.9653031558104505,
+            "yawQuarter": 1,
+            "yawDeg": 55.307796778598124
+          },
+          "end": {
+            "yawRad": 2.555303155810451,
+            "yawQuarter": 2,
+            "yawDeg": 146.40808620439907
           }
         },
         "uiFoot": {
@@ -200,5 +208,5 @@
       }
     }
   ],
-  "at": "2026-10-18T08:02:02.526Z"
+  "at": "2026-10-18T12:18:17.505Z"
 }

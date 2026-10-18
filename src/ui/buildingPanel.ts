@@ -114,6 +114,7 @@ export class BuildingPanel {
   private interiorId: string | null = null;
   private onVisibilityChange: () => void;
   private onSalir: () => void;
+  private onCasePreviewClosed: () => void;
   private mode: 'hidden' | 'interior' | 'preview' = 'hidden';
   private previewEl: HTMLElement | null = null;
   private previewTitle: HTMLElement | null = null;
@@ -138,9 +139,11 @@ export class BuildingPanel {
     container: HTMLElement,
     onVisibilityChange: () => void,
     onSalir: () => void,
+    onCasePreviewClosed: () => void = () => {},
   ) {
     this.onVisibilityChange = onVisibilityChange;
     this.onSalir = onSalir;
+    this.onCasePreviewClosed = onCasePreviewClosed;
     this.el = document.createElement('div');
     this.el.className = 'building-panel building-panel--interior-only';
     this.el.hidden = true;
@@ -546,6 +549,7 @@ export class BuildingPanel {
   }
 
   hide(opts?: { snap?: boolean; silent?: boolean }): void {
+    const closingPreview = this.mode === 'preview';
     // Snap out of the hit tree on this frame (same as the mat). A transforming sheet still
     // intercepts iOS taps even with pointer-events:none, so Salir waited ~250 ms for map input.
     this.el.classList.add('building-panel--snap');
@@ -566,7 +570,10 @@ export class BuildingPanel {
     if (this.readEl) this.readEl.hidden = true;
     if (this.readBar) this.readBar.hidden = true;
     this.el.classList.remove('building-panel--snap');
-    if (!opts?.silent) this.onVisibilityChange();
+    if (!opts?.silent) {
+      if (closingPreview) this.onCasePreviewClosed();
+      this.onVisibilityChange();
+    }
     if (opts?.snap) requestAnimationFrame(() => this.releaseCaseDom());
   }
 

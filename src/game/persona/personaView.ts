@@ -3,6 +3,7 @@ import type { MapObject } from '../../data/world';
 import { objects } from '../../data/map';
 import type { FacingDir } from '../player';
 import {
+  ADONAY_ALTO_PX_1X,
   BEHIND_TP_M,
   CAL_M,
   CAL_TILE,
@@ -12,6 +13,7 @@ import {
   FEET_Y_1X,
   FOCAL_PX_1X,
   HORIZON_Y_1X,
+  JAC_T9_POSE,
   METERS_PER_TILE,
   PANTONE_SCALE,
   PERSONA_REF,
@@ -64,6 +66,11 @@ function forwardFromYawRad(yawRad: number): { x: number; z: number } {
   return { x: Math.sin(yawRad), z: Math.cos(yawRad) };
 }
 
+/** Projected scale × (meters-wide × px/m) / texture width → Pixi sprite scale. */
+function billboardScale(projScale: number, texWidth: number, widthM: number): number {
+  return projScale * ((widthM * PX_PER_M) / texWidth);
+}
+
 function projectTp(
   wx: number,
   wy: number,
@@ -111,7 +118,7 @@ export class PersonaView {
   private jacCabina = new Sprite();
   private jacWheel = new Sprite();
   private jacT9Ext = new Sprite();
-  private propSprites: { sprite: Sprite; x: number; z: number }[] = [];
+  private propSprites: { sprite: Sprite; x: number; z: number; piezaId: string }[] = [];
   private lastGroundKey = '';
   private booted = false;
   private adonayStrip: { idle: import('pixi.js').Texture | null; walk: import('pixi.js').Texture | null } = {
@@ -171,7 +178,9 @@ export class PersonaView {
     const t9Tex = await loadProp('jac-t9-ext__34-frontal-3p__apagado', dpr);
     if (t9Tex) {
       this.jacT9Ext.texture = t9Tex;
-      this.jacT9Ext.anchor.set(0.5, 1);
+      const t9Meta = piezaById('jac-t9-ext__34-frontal-3p');
+      const ancla = t9Meta?.ancla?.px_1x ?? [t9Tex.width / 2, t9Tex.height - 1];
+      this.jacT9Ext.anchor.set(ancla[0] / t9Tex.width, ancla[1] / t9Tex.height);
       this.jacT9Ext.visible = true;
     }
     const propPlacements: { file: string; id: string; x: number; z: number }[] = [
@@ -192,7 +201,7 @@ export class PersonaView {
       sp.tint = NIGHT_TINT;
       sp.zIndex = 500;
       this.layer.addChild(sp);
-      this.propSprites.push({ sprite: sp, x: pl.x, z: pl.z });
+      this.propSprites.push({ sprite: sp, x: pl.x, z: pl.z, piezaId: pl.id });
     }
     this.booted = true;
   }
@@ -233,9 +242,8 @@ export class PersonaView {
       const p1 = projectTp(0, 0, z1, cam, sw, sh);
       if (!p0 || !p1) continue;
       const yTop = Math.min(p0.y, p1.y);
-      const yBot = Math.max(p0.y, p1.y);
       const col = i % 2 === 0 ? 0x2a2c32 : 0x32343a;
-      this.ground.rect(0, yTop, sw, Math.max(2, yBot - yTop)).fill({ color: col, alpha: 0.95 });
+      this.ground.rect(0, yTop, sw, Math.max(2, sh - yTop)).fill({ color: col, alpha: 0.95 });
     }
     this.ground.zIndex = -500;
   }
@@ -302,8 +310,12 @@ export class PersonaView {
     this.adonay.visible = true;
     this.pantone.visible = true;
 
-    const feetScale = sh / PERSONA_REF.h;
-    const feetY = Math.min(FEET_Y_1X * feetScale, sh - (sh <= 500 ? 64 : 8));
+    const refScale = sh / PERSONA_REF.h;
+    const portraitNarrow = sh > sw && sw < 420;
+    const feetScale = portraitNarrow
+      ? Math.min(refScale, (sw * 0.34) / ADONAY_ALTO_PX_1X)
+      : refScale;
+    const feetY = Math.min(FEET_Y_1X * refScale, sh - (portraitNarrow ? 12 : sh <= 500 ? 64 : 8));
     const adonayAnim = input.walking ? 'walk' : 'idle';
     const strip = adonayAnim === 'walk' ? this.adonayStrip.walk : this.adonayStrip.idle;
     if (strip) {
@@ -330,7 +342,7 @@ export class PersonaView {
         pAnim === 'sit' ? 0 : Math.floor(input.timeSec * (pAnim === 'walk' ? 9 : 3)) % Math.max(1, n);
       this.pantone.texture = textureFrame(pStrip, frameW, fi);
       this.pantone.anchor.set(0.5, 1);
-      this.pantone.x = sw / 2 - 120.5 * feetScale;
+      this.pantone.x = Math.max(52 * feetScale, sw / 2 - 120.5 * feetScale);
       this.pantone.y = feetY - 26.4 * feetScale;
       this.pantone.scale.set(feetScale * PANTONE_SCALE);
       this.pantone.tint = NIGHT_TINT;
@@ -339,12 +351,13 @@ export class PersonaView {
       this.lastPantoneAnim = pAnim;
     }
 
-    const t9p = projectTp(2.0, 0, 8.2, cam, sw, sh);
+    const t9p = projectTp(JAC_T9_POSE.x, 0, JAC_T9_POSE.z, cam, sw, sh);
     if (t9p && this.jacT9Ext.texture) {
       this.jacT9Ext.visible = !input.jacDriving;
       this.jacT9Ext.x = t9p.x;
       this.jacT9Ext.y = t9p.y;
-      this.jacT9Ext.scale.set(t9p.scale);
+      const tw = this.jacT9Ext.texture.width;
+      this.jacT9Ext.scale.set(billboardScale(t9p.scale, tw, JAC_T9_POSE.widthM));
     } else {
       this.jacT9Ext.visible = false;
     }
@@ -357,7 +370,10 @@ export class PersonaView {
       p.sprite.visible = !input.jacDriving;
       p.sprite.x = pr.x;
       p.sprite.y = pr.y;
-      p.sprite.scale.set(pr.scale);
+      const meta = piezaById(p.piezaId);
+      const wM = meta?.metros?.ancho;
+      const tw = p.sprite.texture.width;
+      p.sprite.scale.set(wM && tw ? billboardScale(pr.scale, tw, wM) : pr.scale);
     }
   }
 

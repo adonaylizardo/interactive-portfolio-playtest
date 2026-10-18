@@ -292,8 +292,8 @@ const FOLLOW_SMOOTH_S = 0.35;
 /** Persona mode: A/D and stick X rotate this yaw (rad/s), not strafe. */
 const PERSONA_TURN_RATE = 2.65;
 /** ~1.7 m/s on foot vs map keyboard walk (~4.5 tiles/s). */
-const PERSONA_WALK_MUL = 0.22;
-const PERSONA_STICK_DEAD = 0.15;
+const PERSONA_WALK_MUL = 0.37;
+const PERSONA_STICK_DEAD = 0.1;
 const PERSONA_FRAME_C_T9 = { x: 2.0, z: 8.2 };
 
 function personaStickAxis(raw: number): number {
@@ -1642,6 +1642,7 @@ export class IsoScene {
   setViewMode(mode: Camera): void {
     if (this.interiorActive) return;
     if (mode === 'persona' && !personaEnabled()) return;
+    if (mode === this.viewMode && mode === 'persona') return;
     this.restoreBillboards();
     this.viewMode = mode;
     this.leaveMapOverview();
@@ -3393,7 +3394,21 @@ export class IsoScene {
       if (!e.repeat && !isTypingTarget(e.target) && (k === 'e' || k === '1' || k === '2')) {
         if (this.handleJacKey(k)) e.preventDefault();
       }
-      if ((e.key === 'Enter' || e.key === ' ') && !e.repeat && !isTypingTarget(e.target)) {
+      if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) {
+        const focused = e.target instanceof HTMLElement ? e.target : null;
+        if (
+          e.key === 'Enter' &&
+          focused?.matches('.ui-view[data-view]') &&
+          this.personaOn() &&
+          this.personaEnterOffer()
+        ) {
+          focused.blur();
+          if (this.tryPersonaEnterBuilding()) {
+            e.preventDefault();
+            return;
+          }
+        }
+        if (isTypingTarget(e.target)) return;
         if (e.key === 'Enter' && this.handleJacKey('enter')) e.preventDefault();
         else if (this.seatedBench && !this.interiorActive) {
           this.standThen(null);
@@ -4104,6 +4119,10 @@ export class IsoScene {
 
   personaEnterFromUi(): void {
     this.tryPersonaEnterBuilding();
+  }
+
+  bumpDoorCooldown(ms: number): void {
+    this.doorCooldown = Math.max(this.doorCooldown, ms);
   }
 
   private personaKeyboardStep(
@@ -5266,19 +5285,16 @@ export class IsoScene {
 
   private handleJacKey(k: string): boolean {
     if (!this.jac || this.interiorActive) return false;
-    if (k === 'e') {
+    if (k === 'e' || k === 'enter') {
       if (this.jac.driving) {
-        this.jacGetOut();
-        return true;
+        if (k === 'e') this.jacGetOut();
+        return k === 'e';
       }
-      if (this.atJacDoor(1.6) || this.jac.mode === 'menu' || this.jac.mode === 'info') {
+      if (this.personaOn() && this.personaJacBoardVisible()) {
         this.jacGetIn();
         return true;
       }
-      return false;
-    }
-    if (k === 'enter') {
-      if (this.jac.driving) return false;
+      if (this.personaOn() && this.tryPersonaEnterBuilding()) return true;
       if (this.atJacDoor(1.6) || this.jac.mode === 'menu' || this.jac.mode === 'info') {
         this.jacGetIn();
         return true;

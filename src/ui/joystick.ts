@@ -10,7 +10,7 @@ export type StickVector = { x: number; y: number };
 const PAD = 112;
 const KNOB = 44;
 const MAX_RADIUS = 28;
-const DEADZONE = 8;
+const DEADZONE = 4;
 
 function isCoarse(): boolean {
   return window.matchMedia('(pointer: coarse)').matches;

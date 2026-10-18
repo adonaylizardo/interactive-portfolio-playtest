@@ -88,6 +88,11 @@ async function main(): Promise<void> {
       scene?.applyCameraFromUi();
     },
     () => scene.leaveInteriorNow(),
+    () => {
+      if (personaEnabled() && scene.getViewMode().mode === 'persona') {
+        scene.bumpDoorCooldown(2800);
+      }
+    },
   );
   joystick.onStickStart(() => {
     if (panel.isPreviewMode()) panel.hide();
@@ -153,7 +158,9 @@ async function main(): Promise<void> {
         showIn: ps.active && ps.jacBoard && !driving,
         showOut: ps.active && driving,
       });
-      personaEnterPrompt.sync(ps.active && ps.enterOffer && !driving);
+      personaEnterPrompt.sync(
+        ps.active && ps.enterOffer && !driving && !panel.isPreviewMode() && !panel.isPreviewExpanded(),
+      );
       document.body.dataset.view = scene.getViewMode().mode;
       const personaWalk =
         personaEnabled() && scene.getViewMode().mode === 'persona' && !scene.isInInterior();

@@ -14,6 +14,9 @@ export const PANTONE_DZ_M = piezas.frames.c.camara.pantone.dz_m as number;
 export const PANTONE_SCALE = piezas.frames.c.camara.pantone.escala_pixi as number;
 export const WHEEL_POS_1X = [640, 610] as const;
 
+/** Frame-C parked T9 (passenger side x, nose z, physical width for billboard scale). */
+export const JAC_T9_POSE = { x: 2.0, z: 8.2, widthM: 1.96 } as const;
+
 /** Calibration: jac spawn tile ↔ frame-C player meters. */
 export const CAL_TILE = { x: 27, y: 18 };
 export const CAL_M = { x: -0.15, z: 5.649 };

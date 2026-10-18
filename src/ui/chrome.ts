@@ -348,6 +348,7 @@ export class ChromeUI {
     });
     this.root.querySelectorAll('[data-view]').forEach((btn) => {
       btn.addEventListener('click', () => {
+        (btn as HTMLElement).blur();
         const v = (btn as HTMLElement).dataset.view;
         if (v === 'rotate') this.callbacks.onRotate();
         else if (v === 'map') this.callbacks.onMapOverview();
