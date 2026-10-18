@@ -110,6 +110,14 @@ export function navigateReading(route: ReadingRoute, mode: 'push' | 'replace' = 
     history.replaceState({ reading: true, rDepth: depth }, '', next);
     return;
   }
+  if (route.kind === 'detail' && !isReadingHash()) {
+    saveOutdoorHashIfNeeded();
+    setReadingDepth(1);
+    history.pushState({ reading: true, rDepth: 1 }, '', readingHash());
+    setReadingDepth(2);
+    history.pushState({ reading: true, rDepth: 2 }, '', next);
+    return;
+  }
   let depth: number;
   if (!isReadingHash()) {
     saveOutdoorHashIfNeeded();

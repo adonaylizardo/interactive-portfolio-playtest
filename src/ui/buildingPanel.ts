@@ -1,5 +1,5 @@
 import { studio } from '../audio/studio';
-import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
+import { aboutForLang, ABOUT_PANELS, type AboutBlock } from '../data/about';
 import { caseForLang, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
 import {
   TALK_SECTIONS,
@@ -143,6 +143,7 @@ export class BuildingPanel {
   private experienceView: 'list' | 'detail' = 'list';
   private experiencePanelTitle = '';
   private writingsFilter: 'all' | 'uxsc' | 'sinergia' | 'guest' = 'all';
+  private writingsShowAll = false;
   private activeTalkId: string | null = null;
   private activeWriting: { sectionId: string; itemId: string } | null = null;
   private previewEl: HTMLElement | null = null;
@@ -266,7 +267,7 @@ export class BuildingPanel {
     this.readHeadline = this.el.querySelector('.case-read__headline');
     this.readLede = this.el.querySelector('.case-read__lede');
     this.readHeroLabel = this.el.querySelector('.case-read__hero-label');
-    this.aboutEl.append(...ABOUT.map(aboutBlockNode));
+    this.aboutEl.append(...aboutForLang(getLang()).map(aboutBlockNode));
     this.experienceEl = this.el.querySelector('[data-experience]');
     this.experienceIntro = this.el.querySelector('.experience__intro');
     this.experienceFilters = this.el.querySelector('[data-exp-filters]');
@@ -289,6 +290,9 @@ export class BuildingPanel {
     onLangChange(() => {
       this.applyI18n();
       this.refreshExperienceCopy();
+      if (this.interiorId && this.mode === 'interior' && ABOUT_PANELS.has(this.interiorId)) {
+        this.aboutEl.replaceChildren(...aboutForLang(getLang()).map(aboutBlockNode));
+      }
       if (this.interiorId && this.mode === 'interior') {
         this.setTitle(this.openKey, this.renderCase());
       }
@@ -491,6 +495,7 @@ export class BuildingPanel {
     this.mode = mode;
     this.interiorId = interiorId;
     this.writingsFilter = 'all';
+    this.writingsShowAll = false;
     this.activeTalkId = null;
     this.activeWriting = null;
     this.peekOnly = this.isMobile();
@@ -733,6 +738,12 @@ export class BuildingPanel {
       seeAll.type = 'button';
       seeAll.className = 'experience__see-all';
       seeAll.textContent = t('chrome.seeAll');
+      seeAll.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.writingsShowAll = true;
+        this.renderWritingsList();
+      });
       row.append(h, badge, seeAll);
       if (section.descKey) {
         const p = document.createElement('p');
@@ -743,7 +754,8 @@ export class BuildingPanel {
         head.append(row);
       }
       frag.appendChild(head);
-      for (const item of section.items.slice(0, 3)) {
+      const items = this.writingsShowAll ? section.items : section.items.slice(0, 3);
+      for (const item of items) {
         frag.appendChild(this.writingRow(item, section));
       }
     }
@@ -1059,6 +1071,9 @@ export class BuildingPanel {
     const sheet = this.sheet.getBoundingClientRect();
     if (this.isMobile()) {
       const peek = this.el.classList.contains('building-panel--peek');
+      if (this.isExperienceMode() && !peek) {
+        return { left: Math.ceil(Math.min(sheet.width, window.innerWidth * 0.58) + 8), top: 0, right: 0, bottom: 0 };
+      }
       const bottom = peek ? Math.min(88, sheet.height) : sheet.height;
       return { left: 0, top: 0, right: 0, bottom: Math.ceil(bottom + 8) };
     }

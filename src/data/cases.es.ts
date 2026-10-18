@@ -31,7 +31,7 @@ export const CASES_ES: Record<string, CaseContent> = {
         heading: 'Luego lo escalé',
         paragraphs: ['Con esa luz verde, armé una metodología para escalarlo al resto del equipo:'],
         bullets: [
-          'Skills para acelerar el proceso (antes, de 1 a 2 días a unas 2 horas, tanto en Android como en iOS)',
+          'Skills para acelerar el proceso',
           'Una lista de cursos para entrenamiento acelerado',
           'Shadowing y talleres con personas clave del proyecto',
           'Alineación con liderazgo y el cliente para una adopción adecuada',

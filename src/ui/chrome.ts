@@ -45,6 +45,14 @@ function caseRowSummary(id: CaseHouseId): string {
 
 const CV_HREF = `${import.meta.env.BASE_URL}cv/adonay-lizardo-cv.pdf`;
 const CONTACT_HREF = 'mailto:adolizardo@gmail.com';
+const MOBILE_SHEET_STORAGE_KEY = 'portfolio-playtest-mobile-sheet';
+
+function isLandscapePhone(): boolean {
+  return (
+    isMobileLayout() &&
+    window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches
+  );
+}
 
 function roundBtn(icon: IconName, label: string, extra = '', action?: string): string {
   const act = action ? ` data-action="${action}"` : '';
@@ -114,7 +122,35 @@ export class ChromeUI {
   }
 
   isMobileSheetOpen(): boolean {
-    return this.mobile && this.mobileSheet && !this.interiorOpen;
+    return this.mobile && this.mobileSheet && !this.interiorOpen && !isLandscapePhone();
+  }
+
+  rememberMobileSheetBeforeReading(): void {
+    try {
+      sessionStorage.setItem(MOBILE_SHEET_STORAGE_KEY, this.mobileSheet ? '1' : '0');
+    } catch {
+      /* private mode */
+    }
+  }
+
+  restoreMobileSheetAfterReading(): void {
+    try {
+      const v = sessionStorage.getItem(MOBILE_SHEET_STORAGE_KEY);
+      if (v === '0') this.mobileSheet = false;
+      else if (v === '1') this.mobileSheet = true;
+      sessionStorage.removeItem(MOBILE_SHEET_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+    this.sync();
+  }
+
+  expandIntroDetail(scrollTarget?: string): void {
+    const intro = this.root.querySelector('.chrome__intro') as HTMLElement | null;
+    const detail = this.root.querySelector('[data-intro-detail]') as HTMLElement | null;
+    if (detail) detail.hidden = false;
+    intro?.classList.add('chrome__intro--expanded');
+    if (scrollTarget) this.scrollTo(scrollTarget);
   }
 
   setInteriorOpen(open: boolean, opts?: { skipLayout?: boolean }): void {
@@ -141,6 +177,11 @@ export class ChromeUI {
       return this.mobile ? { left: 0, top: 0, right: 0, bottom: 0 } : { left: 64, top: 0, right: 0, bottom: 0 };
     }
     if (this.mobile) {
+      if (isLandscapePhone() && this.mobileSheet) {
+        const col = this.root.querySelector('.chrome__column')?.getBoundingClientRect();
+        const left = col && col.width > 8 ? Math.ceil(col.right + 8) : 320;
+        return { left, top: 16, right: 16, bottom: 24 };
+      }
       if (this.mobileSheet) {
         const sheet = this.root.querySelector('.chrome__intro')?.getBoundingClientRect();
         const bottom = sheet ? Math.ceil(window.innerHeight - sheet.top + 8) : 280;
@@ -223,19 +264,19 @@ export class ChromeUI {
             <div class="chrome__logros">
               <div class="chrome__logro">
                 <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
-                <p data-i18n="chrome.achievement1">Main Speaker at INNOVA360 (Simón Rodríguez University), 200+ in-person students (2025)</p>
+                <p data-i18n="chrome.achievement1">Main speaker at Innova360, 200+ students</p>
               </div>
               <div class="chrome__logro">
                 <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
-                <p data-i18n="chrome.achievement2">Proposed and led Applaudo's Bain Designers Guild (2025)</p>
+                <p data-i18n="chrome.achievement2">Propose and lead the Bain Designers Guild</p>
               </div>
               <div class="chrome__logro">
                 <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
-                <p data-i18n="chrome.achievement3">AI Transformation Lead for Design at Applaudo, 5/7 phases complete (Q3 2026, in progress)</p>
+                <p data-i18n="chrome.achievement3">AI Transformation Lead, 5/7 phases</p>
               </div>
               <div class="chrome__logro">
                 <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
-                <p data-i18n="chrome.achievement4">ADPList 2023: 31 mentoring sessions, 930 minutes, 15 countries</p>
+                <p data-i18n="chrome.achievement4">ADPList 2023: 31 sessions, 15 countries</p>
               </div>
             </div>
           </section>
@@ -278,6 +319,39 @@ export class ChromeUI {
             </span>
           </div>
           <button type="button" class="ui-btn ui-btn--secondary" data-details data-i18n="chrome.details">Detalles</button>
+        </div>
+        <div class="chrome__intro-detail" data-intro-detail hidden>
+          <section class="chrome__section" id="chrome-experiencia-mobile">
+            <h2 data-i18n="chrome.experience">Experiencia</h2>
+            <div class="chrome__exp">${expRows}</div>
+          </section>
+          <section class="chrome__section" id="chrome-logros-mobile">
+            <div class="chrome__section-head">
+              <h2 data-i18n="chrome.achievements">Logros</h2>
+            </div>
+            <div class="chrome__logros">
+              <div class="chrome__logro">
+                <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
+                <p data-i18n="chrome.achievement1">Speaker principal de Innova360, 200+ estudiantes</p>
+              </div>
+              <div class="chrome__logro">
+                <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
+                <p data-i18n="chrome.achievement2">Propuse y lidero el Bain Designers Guild</p>
+              </div>
+              <div class="chrome__logro">
+                <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
+                <p data-i18n="chrome.achievement3">AI Transformation Lead, 5/7 fases</p>
+              </div>
+              <div class="chrome__logro">
+                <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
+                <p data-i18n="chrome.achievement4">ADPList 2023: 31 sesiones, 15 países</p>
+              </div>
+            </div>
+          </section>
+          <section class="chrome__section" id="chrome-casos-mobile">
+            <h2 data-i18n="chrome.cases">Casos</h2>
+            <div class="chrome__cases">${caseRows}</div>
+          </section>
         </div>
       </div>
       <nav class="chrome__dock" aria-label="Dock" data-i18n-aria="chrome.dock">
@@ -324,7 +398,10 @@ export class ChromeUI {
     this.root.querySelector('[data-action="show-panel"]')?.addEventListener('click', () => this.setLayout('split'));
     this.root.querySelector('[data-action="intro-close"]')?.addEventListener('click', () => this.setLayout('map'));
     this.root.querySelector('[data-details]')?.addEventListener('click', () => {
-      this.root.querySelector('.chrome__intro')?.classList.toggle('chrome__intro--expanded');
+      const intro = this.root.querySelector('.chrome__intro');
+      const detail = this.root.querySelector('[data-intro-detail]') as HTMLElement | null;
+      const expanded = intro?.classList.toggle('chrome__intro--expanded');
+      if (detail) detail.hidden = !expanded;
     });
     this.root.querySelector('[data-action="home"]')?.addEventListener('click', () => {
       this.setLayout('split');
@@ -362,9 +439,11 @@ export class ChromeUI {
     this.root.querySelector('[data-dock="intro"]')?.addEventListener('click', () => this.setLayout('split'));
     this.root.querySelector('.chrome__dock [data-action="cases"]')?.addEventListener('click', () => {
       this.setLayout('split');
+      this.expandIntroDetail('#chrome-casos-mobile');
     });
     this.root.querySelector('.chrome__dock [data-action="achievements"]')?.addEventListener('click', () => {
       this.setLayout('split');
+      this.expandIntroDetail('#chrome-logros-mobile');
     });
     this.root.querySelector('.chrome__dock [data-action="contact"]')?.addEventListener('click', () => {
       studio.playLine('11-contact');
@@ -496,6 +575,7 @@ export class ChromeUI {
 
   sync(opts?: { deferColumn?: boolean }): void {
     this.mobile = isMobileLayout();
+    const landscapeSide = this.mobile && isLandscapePhone() && this.mobileSheet && !this.interiorOpen;
     const layout = this.mobile ? (this.mobileSheet ? 'split' : 'map') : this.layout;
     document.body.dataset.layout = layout;
     document.body.dataset.chrome = this.mobile ? 'phone' : 'desktop';
@@ -503,7 +583,14 @@ export class ChromeUI {
     this.root.dataset.layout = layout;
     this.root.classList.toggle('chrome--mobile', this.mobile);
     this.root.classList.toggle('chrome--interior', this.interiorOpen);
-    this.root.classList.toggle('chrome--sheet', this.mobile && this.mobileSheet && !this.interiorOpen);
+    this.root.classList.toggle(
+      'chrome--landscape-side',
+      landscapeSide,
+    );
+    this.root.classList.toggle(
+      'chrome--sheet',
+      this.mobile && this.mobileSheet && !this.interiorOpen && !landscapeSide,
+    );
     this.root.classList.toggle('chrome--dock', this.mobile && !this.mobileSheet && !this.interiorOpen);
     this.root.classList.toggle('chrome--map', !this.mobile && this.layout === 'map');
     this.root.classList.toggle('chrome--panel', !this.mobile && this.layout === 'panel');
@@ -514,9 +601,16 @@ export class ChromeUI {
     if (col) {
       // Inline display wins over `.chrome--split { display:block }`, so innerText
       // Hide the intro column while a case interior is open.
-      col.style.display = this.interiorOpen ? 'none' : '';
-      col.hidden = this.interiorOpen;
-      col.setAttribute('aria-hidden', this.interiorOpen ? 'true' : 'false');
+      const showCol = !this.interiorOpen && (!this.mobile || landscapeSide);
+      col.style.display = showCol ? '' : 'none';
+      col.hidden = !showCol;
+      col.setAttribute('aria-hidden', showCol ? 'false' : 'true');
+    }
+    const rail = this.root.querySelector('.chrome__rail') as HTMLElement | null;
+    if (rail && landscapeSide) {
+      rail.style.display = 'flex';
+    } else if (rail && this.mobile) {
+      rail.style.display = '';
     }
   }
 

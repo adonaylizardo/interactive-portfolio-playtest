@@ -1,4 +1,6 @@
-import source from './about.md?raw';
+import sourceEn from './about.md?raw';
+import sourceEs from './about.es.md?raw';
+import type { Lang } from '../ui/i18n';
 
 /**
  * "About me" section of the Estudio panel, rendered from about.md (the text of adonaylizardo.com/about,
@@ -66,7 +68,12 @@ export function parseAbout(md: string): AboutBlock[] {
   return blocks;
 }
 
-export const ABOUT: AboutBlock[] = parseAbout(source);
+export function aboutForLang(lang: Lang): AboutBlock[] {
+  return parseAbout(lang === 'es' ? sourceEs : sourceEn);
+}
+
+/** @deprecated use aboutForLang(getLang()) */
+export const ABOUT: AboutBlock[] = parseAbout(sourceEn);
 
 /** Interiors whose panel shows the section (Adonay's own studio). */
 export const ABOUT_PANELS = new Set(['estudio']);

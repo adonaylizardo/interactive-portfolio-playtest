@@ -97,6 +97,8 @@ const DICT = {
     'read.section.talks': 'Talks',
     'read.section.writings': 'Articles',
     'read.section.landmarks': 'Landmarks',
+    'read.section.achievements': 'Achievements',
+    'read.section.experience': 'Experience',
     'read.notFound': 'This section is not available.',
 
     'writings.intro': 'Articles and notes (placeholder).',
@@ -153,12 +155,10 @@ const DICT = {
     'chrome.client': 'Client',
     'chrome.experience': 'Experience',
     'chrome.seeAll': 'See all',
-    'chrome.achievement1':
-      'Main Speaker at INNOVA360 (Simón Rodríguez University), 200+ in-person students (2025)',
-    'chrome.achievement2': "Proposed and led Applaudo's Bain Designers Guild (2025)",
-    'chrome.achievement3':
-      'AI Transformation Lead for Design at Applaudo, 5/7 phases complete (Q3 2026, in progress)',
-    'chrome.achievement4': 'ADPList 2023: 31 mentoring sessions, 930 minutes, 15 countries',
+    'chrome.achievement1': 'Main speaker at Innova360, 200+ students',
+    'chrome.achievement2': 'Propose and lead the Bain Designers Guild',
+    'chrome.achievement3': 'AI Transformation Lead, 5/7 phases',
+    'chrome.achievement4': 'ADPList 2023: 31 sessions, 15 countries',
     'chrome.exp.volaris': 'Senior UX/UI Designer & Mentoring Program Lead · Applaudo · 2024–present',
     'chrome.exp.bain': 'Squad lead · Bain · 2024–present',
     'chrome.exp.mentoria': 'Mentoring lead · Applaudo · 2024–present',
@@ -273,6 +273,8 @@ const DICT = {
     'read.section.talks': 'Charlas',
     'read.section.writings': 'Artículos',
     'read.section.landmarks': 'Lugares',
+    'read.section.achievements': 'Logros',
+    'read.section.experience': 'Experiencia',
     'read.notFound': 'Esta sección no está disponible.',
 
     'writings.intro': 'Artículos y notas (placeholder).',
@@ -329,12 +331,10 @@ const DICT = {
     'chrome.client': 'Cliente',
     'chrome.experience': 'Experiencia',
     'chrome.seeAll': 'Ver todos',
-    'chrome.achievement1':
-      'Conferencista principal en INNOVA360 (Universidad Simón Rodríguez), más de 200 estudiantes presenciales (2025)',
-    'chrome.achievement2': 'Propuse y lideré el Bain Designers Guild de Applaudo (2025)',
-    'chrome.achievement3':
-      'Líder de transformación con IA para Diseño en Applaudo, 5/7 fases completadas (Q3 2026, en curso)',
-    'chrome.achievement4': 'ADPList 2023: 31 sesiones de mentoría, 930 minutos, 15 países',
+    'chrome.achievement1': 'Speaker principal de Innova360, 200+ estudiantes',
+    'chrome.achievement2': 'Propuse y lidero el Bain Designers Guild',
+    'chrome.achievement3': 'AI Transformation Lead, 5/7 fases',
+    'chrome.achievement4': 'ADPList 2023: 31 sesiones, 15 países',
     'chrome.exp.volaris':
       'Senior UX/UI Designer & Mentoring Program Lead · Applaudo · 2024–presente',
     'chrome.exp.bain': 'Squad lead · Bain · 2024–presente',

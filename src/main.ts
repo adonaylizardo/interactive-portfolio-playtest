@@ -100,6 +100,7 @@ async function main(): Promise<void> {
     leaveReadingHash();
     syncReadingFromHash();
     if (!isMobileLayout()) chrome.setLayout('split');
+    else chrome.restoreMobileSheetAfterReading();
   };
 
   const reading = new ReadingView(uiRoot, closeReading);
@@ -119,6 +120,7 @@ async function main(): Promise<void> {
       scene?.walkToBuildingForQa(id);
     },
     onReadingOpen: () => {
+      if (isMobileLayout()) chrome.rememberMobileSheetBeforeReading();
       navigateReading({ kind: 'list' });
       syncReadingFromHash();
     },
@@ -195,6 +197,7 @@ async function main(): Promise<void> {
     onMoveCommand: () => studio.noteMoveCommand(),
     onFrame: () => {
       labels.update(scene.nameLabelAnchors());
+      labels.setHidden(!!scene.isInInterior());
       mapLabels.setHidden(!!scene.isInInterior());
       mapLabels.update(
         scene.buildingMapLabelAnchors().map((a) => ({

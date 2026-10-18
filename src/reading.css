@@ -218,14 +218,29 @@ body[data-reading='1'] .building-panel {
 }
 
 @media (min-width: 768px) {
-  body[data-reading='1'] .reading-view {
-    left: 64px;
-  }
-
   body[data-reading='1'] .reading-view__main {
     padding-top: 28px;
     padding-bottom: 48px;
   }
+}
+
+.reading-view__scroll:focus {
+  outline: none;
+}
+
+.reading-view__scroll:focus-visible {
+  outline: 2px solid #edeef0;
+  outline-offset: -2px;
+}
+
+.reading-view__achievements {
+  margin: 0;
+  padding-left: 1.25rem;
+  line-height: 1.55;
+}
+
+.reading-view__achievements li {
+  margin-bottom: 12px;
 }
 
 .writings-reader__open {

@@ -1,4 +1,4 @@
-import { ABOUT } from '../data/about';
+import { aboutForLang } from '../data/about';
 import {
   caseCardTitle,
   CASE_HOUSE_IDS,
@@ -29,8 +29,17 @@ import { goBackToReadingList, navigateReading, type ReadingRoute } from './readi
 
 const LANDMARK_IDS = ['sambil', 'catedral', 'flor'] as const;
 
+const ACHIEVEMENT_KEYS: I18nKey[] = [
+  'chrome.achievement1',
+  'chrome.achievement2',
+  'chrome.achievement3',
+  'chrome.achievement4',
+];
+
 const LIST_ROWS: { slug: string; section: I18nKey; labelKey?: I18nKey; label?: string }[] = [
   { slug: 'estudio', section: 'read.section.about', labelKey: 'read.section.about' },
+  { slug: 'experiencia', section: 'read.section.experience', labelKey: 'read.section.experience' },
+  { slug: 'logros', section: 'read.section.achievements', labelKey: 'read.section.achievements' },
   ...CASE_HOUSE_IDS.map((id) => ({
     slug: id,
     section: 'read.section.cases' as I18nKey,
@@ -173,7 +182,6 @@ export class ReadingView {
     this.applyI18n();
     this.render();
     this.scroll.scrollTop = 0;
-    this.scroll.focus({ preventScroll: true });
   }
 
   private applyI18n(): void {
@@ -263,6 +271,14 @@ export class ReadingView {
       this.renderAbout();
       return;
     }
+    if (slug === 'logros') {
+      this.renderAchievements();
+      return;
+    }
+    if (slug === 'experiencia') {
+      this.renderExperience();
+      return;
+    }
     if (slug === 'talks') {
       this.renderTalks();
       return;
@@ -288,7 +304,7 @@ export class ReadingView {
     h.className = 'reading-view__detail-title';
     h.textContent = t('read.section.about');
     wrap.appendChild(h);
-    for (const block of ABOUT) {
+    for (const block of aboutForLang(getLang())) {
       if (block.kind === 'heading') {
         const hx = document.createElement(`h${Math.min(block.level + 2, 6)}`);
         hx.textContent = block.text;
@@ -331,6 +347,49 @@ export class ReadingView {
     this.main.replaceChildren(wrap);
   }
 
+  private renderAchievements(): void {
+    const wrap = document.createElement('article');
+    wrap.className = 'reading-view__article';
+    const h = document.createElement('h2');
+    h.className = 'reading-view__detail-title';
+    h.textContent = t('read.section.achievements');
+    wrap.appendChild(h);
+    const list = document.createElement('ul');
+    list.className = 'reading-view__achievements';
+    for (const key of ACHIEVEMENT_KEYS) {
+      const li = document.createElement('li');
+      li.textContent = t(key);
+      list.appendChild(li);
+    }
+    wrap.appendChild(list);
+    this.main.replaceChildren(wrap);
+  }
+
+  private renderExperience(): void {
+    const wrap = document.createElement('article');
+    wrap.className = 'reading-view__article';
+    const h = document.createElement('h2');
+    h.className = 'reading-view__detail-title';
+    h.textContent = t('read.section.experience');
+    wrap.appendChild(h);
+    const list = document.createElement('div');
+    list.className = 'reading-view__stack';
+    for (const id of CASE_HOUSE_IDS) {
+      const row = document.createElement('div');
+      row.className = 'reading-view__row reading-view__row--static';
+      const title = document.createElement('span');
+      title.className = 'reading-view__row-title';
+      title.textContent = caseCardTitle(id, getLang());
+      const meta = document.createElement('span');
+      meta.className = 'reading-view__row-summary';
+      meta.textContent = t(`chrome.exp.${id}` as I18nKey);
+      row.append(title, meta);
+      list.appendChild(row);
+    }
+    wrap.appendChild(list);
+    this.main.replaceChildren(wrap);
+  }
+
   private renderCase(id: string): void {
     const content = caseForLang(id, getLang());
     const wrap = document.createElement('article');
@@ -338,9 +397,10 @@ export class ReadingView {
     wrap.lang = getLang();
     const h = document.createElement('h2');
     h.className = 'reading-view__detail-title';
-    h.textContent = isCaseHouse(id) ? caseCardTitle(id, getLang()) : (content?.headline ?? id);
+    const headline = content?.headline ?? (isCaseHouse(id) ? caseCardTitle(id, getLang()) : id);
+    h.textContent = headline;
     wrap.appendChild(h);
-    if (content?.subtitle && content.subtitle !== content.headline) {
+    if (content?.subtitle && content.subtitle !== headline) {
       const sub = document.createElement('p');
       sub.className = 'reading-view__detail-sub';
       sub.textContent = content.subtitle;
