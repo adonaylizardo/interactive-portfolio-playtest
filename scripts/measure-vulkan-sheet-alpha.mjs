@@ -30,32 +30,34 @@ async function main() {
   await page.evaluate(() => window.__playtestQa?.expandInteriorSheet?.());
   await page.waitForSelector('.building-panel--expanded', { timeout: 15000 });
 
-  const measure = async (label) => {
-    await page.waitForTimeout(label === '+0.9s' ? 900 : label === '+2s' ? 2000 : 5000);
-    return page.evaluate(() => {
+  const sample = () =>
+    page.evaluate(() => {
       const sheet = document.querySelector('.building-panel__sheet');
-      const canvas = document.getElementById('game-canvas');
-      if (!sheet || !canvas) return { error: 'missing nodes' };
+      if (!sheet) return { error: 'missing sheet' };
       const top = sheet.getBoundingClientRect().top;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return { error: 'no 2d context (preserveDrawingBuffer?)' };
-      const w = canvas.width;
-      const h = canvas.height;
-      const scale = w / canvas.clientWidth;
-      const yPx = Math.max(0, Math.floor((top / 2) * scale));
-      const img = ctx.getImageData(0, 0, w, yPx);
-      let transparent = 0;
-      for (let i = 3; i < img.data.length; i += 4) {
-        if (img.data[i] === 0) transparent += 1;
+      const points = [];
+      for (let y = 32; y < top - 8; y += 28) {
+        for (let x = 32; x < 358; x += 36) {
+          points.push({ x, y });
+        }
       }
-      const total = img.data.length / 4;
-      return { top, alpha0Pct: total ? (transparent / total) * 100 : 0, pixels: total };
+      const colors = window.__playtestQa?.sampleCanvasColors?.(points) ?? [];
+      let alpha0 = 0;
+      let n = 0;
+      for (const c of colors) {
+        if (!c) continue;
+        n += 1;
+        if (c.a === 0) alpha0 += 1;
+      }
+      return { top, alpha0Pct: n ? (alpha0 / n) * 100 : 100, samples: n };
     });
-  };
 
-  const r1 = await measure('+0.9s');
-  const r2 = await measure('+2s');
-  const r3 = await measure('+5s');
+  await page.waitForTimeout(900);
+  const r1 = await sample();
+  await page.waitForTimeout(1100);
+  const r2 = await sample();
+  await page.waitForTimeout(3000);
+  const r3 = await sample();
   await browser.close();
   console.log(JSON.stringify({ r1, r2, r3 }, null, 2));
   const fail = [r1, r2, r3].some((r) => r.alpha0Pct > 50);
