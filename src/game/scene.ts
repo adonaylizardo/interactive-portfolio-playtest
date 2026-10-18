@@ -1669,6 +1669,22 @@ export class IsoScene {
     return best?.obj;
   }
 
+  /** Pinch-zoomed door taps miss the diamond; take the nearest door within 2.4 tiles. */
+  private pickNearbyDriveDoor(sx: number, sy: number): MapObject | undefined {
+    if (this.zoom > 0.2) return undefined;
+    const { x: wx, y: wy } = this.screenToWorld(sx, sy);
+    const tile = worldToTile(wx, wy);
+    if (!tile) return undefined;
+    let best: { obj: MapObject; d: number } | null = null;
+    for (const obj of objects) {
+      if (obj.type !== 'building' || !obj.door || !obj.panelTitle) continue;
+      const d = Math.hypot(tile.x - obj.door.x, tile.y - obj.door.y);
+      if (d > 2.4) continue;
+      if (!best || d < best.d) best = { obj, d };
+    }
+    return best?.obj;
+  }
+
   /**
    * Tile a map tap targets when it lands on scenery or a prop. Walkable ground under the tap wins,
    * even where a tall sprite is drawn over it. On a solid obelisco cell only the drawn monument
@@ -1970,7 +1986,7 @@ export class IsoScene {
     if (performance.now() < this.suppressDriveTapUntil) return;
     if (this.pickJacAtScreen(sx, sy)) return;
     const doorHit = this.pickBuildingDoorAtScreen(sx, sy);
-    const buildingHit = doorHit ?? this.pickBuildingAtScreen(sx, sy);
+    const buildingHit = doorHit ?? this.pickBuildingAtScreen(sx, sy) ?? this.pickNearbyDriveDoor(sx, sy);
     if (buildingHit?.door && buildingHit.panelTitle) {
       this.requestDriveToEnter({ panelTitle: buildingHit.panelTitle, door: buildingHit.door });
       return;
