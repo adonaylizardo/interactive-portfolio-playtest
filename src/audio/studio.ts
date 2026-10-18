@@ -139,7 +139,7 @@ export class StudioAudio {
   /** After returning to the map with no panel, try intro again (debounced). */
   scheduleIntroWhenMapIdle(delayMs = 500): void {
     if (this.played.has('01-intro') || this.muted || !this.unlocked) return;
-    this.introDeferred = true;
+    if (!this.introDeferred) this.introDeferred = true;
     this.cancelIntroKick();
     this.introKickTimer = window.setTimeout(() => {
       this.introKickTimer = null;
