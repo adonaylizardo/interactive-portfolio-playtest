@@ -4452,13 +4452,12 @@ export class IsoScene {
       this.jacGetOut({ thenEnter: true });
       return;
     }
-    const stalled = this.jac.mph < 1.2 && pathLeft === 0;
-    const nearDoor = along >= 0 && distDoor <= 5.5;
-    if (stalled && leftSpawn && nearDoor && distSit <= 2.8) {
-      this.jac.sitWhy = `approach sitD=${distSit.toFixed(2)} doorD=${distDoor.toFixed(2)}`;
+    if (leftSpawn && slow && along >= 0 && distDoor <= 3.5) {
+      this.jac.sitWhy = `door-side sitD=${distSit.toFixed(2)} doorD=${distDoor.toFixed(2)}`;
       this.jacGetOut({ thenEnter: true });
       return;
     }
+    const stalled = this.jac.mph < 1.2 && pathLeft === 0;
     this.noteSitSkip({
       sit,
       distSit,

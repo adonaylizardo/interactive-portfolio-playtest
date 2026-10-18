@@ -774,7 +774,7 @@ export class JacT9 {
     );
     const closeEnough = doorSide.filter((c) => Math.hypot(c.x - doorX, c.y - doorY) <= 8);
     const front = closeEnough.filter((c) => c.along >= 1 && c.doorD >= 3 && c.doorD <= 6);
-    const pool = front.length ? front : closeEnough.length ? closeEnough : doorSide.length ? doorSide : usable;
+    const pool = front.length ? front : closeEnough.length ? closeEnough : doorSide;
     if (pool.length === 0) return null;
     const prefer = (c: DoorSit) => (cells[c.y]?.[c.x]?.groundId?.includes('park') ? 0 : 1);
     const closeness = (c: DoorSit) => Math.abs(c.doorD - 3.5);
