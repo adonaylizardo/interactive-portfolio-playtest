@@ -22,26 +22,34 @@ const VIEWPORTS = [
 ];
 
 async function captureLoading(page, tag) {
-  await page.route('**/*', async (route) => {
+  const slowLoad = async (route) => {
     await new Promise((r) => setTimeout(r, 12));
-    await route.continue();
-  });
-  await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#boot.boot-flow', { timeout: 120000 });
-  await page.waitForFunction(
-    () => {
-      const pct = parseInt(document.querySelector('.boot-flow__pct')?.textContent ?? '0', 10);
-      return (
-        pct >= 18 &&
-        pct < 88 &&
-        document.body.classList.contains('boot-loading') &&
-        !document.getElementById('boot')?.classList.contains('boot-flow--welcome')
-      );
-    },
-    { timeout: 120000 },
-  );
-  await page.screenshot({ path: path.join(OUT, `${tag}-carga.png`), fullPage: false });
-  await page.unroute('**/*');
+    try {
+      await route.continue();
+    } catch {
+      /* parallel handler race */
+    }
+  };
+  await page.route('**/*', slowLoad);
+  try {
+    await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#boot.boot-flow', { timeout: 120000 });
+    await page.waitForFunction(
+      () => {
+        const pct = parseInt(document.querySelector('.boot-flow__pct')?.textContent ?? '0', 10);
+        return (
+          pct >= 18 &&
+          pct < 88 &&
+          document.body.classList.contains('boot-loading') &&
+          !document.getElementById('boot')?.classList.contains('boot-flow--welcome')
+        );
+      },
+      { timeout: 120000 },
+    );
+    await page.screenshot({ path: path.join(OUT, `${tag}-carga.png`), fullPage: false });
+  } finally {
+    await page.unroute('**/*', slowLoad);
+  }
 }
 
 async function captureWelcome(page, tag) {
@@ -112,8 +120,10 @@ async function main() {
     } catch {
       /* fresh context */
     }
+    const pageWelcome = await ctx.newPage();
+    pageWelcome.setDefaultTimeout(180000);
     await captureLoading(page, vp.id);
-    await captureWelcome(page, vp.id);
+    await captureWelcome(pageWelcome, vp.id);
     await ctx.close();
   }
 
