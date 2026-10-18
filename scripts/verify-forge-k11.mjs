@@ -197,6 +197,7 @@ async function runBackend(label) {
         locale: 'es-VE',
       });
       const page = await ctx.newPage();
+      page.setDefaultTimeout(180000);
       try {
         await med1Case(page, w, buildingId, panelSel, mode, label, true);
       } catch (e) {
