@@ -565,6 +565,10 @@ body[data-interior='1'] .chrome__column {
   display: none;
 }
 
+.chrome--alt-view .chrome__sound {
+  display: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .chrome__sound {
     transition: none;
@@ -863,4 +867,24 @@ body[data-layout='panel'] #game-canvas {
   visibility: visible;
   bottom: 24px;
   top: auto;
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .chrome__intro {
+    pointer-events: none;
+    max-height: min(36vh, 140px);
+  }
+
+  .chrome__intro button,
+  .chrome__intro a {
+    pointer-events: auto;
+  }
+
+  .chrome__lang,
+  .chrome--mobile .chrome__lang,
+  .chrome--split .chrome__lang {
+    left: auto !important;
+    right: 72px !important;
+    top: 12px !important;
+  }
 }

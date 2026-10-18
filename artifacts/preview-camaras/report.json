@@ -1,0 +1,187 @@
+{
+  "ok": true,
+  "bundle": "index-D_hK-yhe.js",
+  "base": "https://adonaylizardo.github.io/interactive-portfolio-playtest/preview-camaras/",
+  "results": [
+    {
+      "tag": "390",
+      "errors": [],
+      "notes": [
+        "390 bundle index-D_hK-yhe.js",
+        "390: enter sambil cenital {\"ok\":true,\"readyBefore\":false,\"readyAfter\":false,\"ms\":400}",
+        "390: enter estudio cenital {\"ok\":true,\"readyBefore\":false,\"readyAfter\":true,\"ms\":7600}",
+        "390: enter estudio iso {\"ok\":true,\"readyBefore\":false,\"readyAfter\":false,\"ms\":0}",
+        "390: drive down net=14.00 path=14.00 ratio=1.00 maxErr=0.0°",
+        "390: drive right net=17.00 path=17.00 ratio=1.00 maxErr=0.0°",
+        "390: drive left net=22.00 path=22.00 ratio=1.00 maxErr=0.0°",
+        "390: drive up net=21.99 path=21.99 ratio=1.00 maxErr=0.0°"
+      ],
+      "bundle": "index-D_hK-yhe.js",
+      "driveMetrics": [
+        {
+          "dir": "down",
+          "expected": 0,
+          "path": 13.999997573333275,
+          "net": 13.999997573333275,
+          "ratio": 1,
+          "maxErr": 0,
+          "meanErr": 0
+        },
+        {
+          "dir": "right",
+          "expected": 3,
+          "path": 16.99940633333332,
+          "net": 16.999406333333315,
+          "ratio": 0.9999999999999998,
+          "maxErr": 0,
+          "meanErr": 0
+        },
+        {
+          "dir": "left",
+          "expected": 1,
+          "path": 21.998371113854986,
+          "net": 21.9982994513764,
+          "ratio": 0.9999967423734142,
+          "maxErr": 0,
+          "meanErr": 0
+        },
+        {
+          "dir": "up",
+          "expected": 2,
+          "path": 21.993541553333213,
+          "net": 21.993541553333213,
+          "ratio": 1,
+          "maxErr": 0,
+          "meanErr": 0
+        }
+      ]
+    },
+    {
+      "tag": "1280",
+      "errors": [],
+      "notes": [
+        "1280 bundle index-D_hK-yhe.js",
+        "1280: enter sambil cenital {\"ok\":true,\"readyBefore\":false,\"readyAfter\":false,\"ms\":400}",
+        "1280: enter estudio cenital {\"ok\":true,\"readyBefore\":false,\"readyAfter\":true,\"ms\":8000}",
+        "1280: enter estudio iso {\"ok\":true,\"readyBefore\":false,\"readyAfter\":false,\"ms\":0}",
+        "1280: drive down net=14.00 path=14.00 ratio=1.00 maxErr=0.0°",
+        "1280: drive right net=17.00 path=17.00 ratio=1.00 maxErr=0.0°",
+        "1280: drive left net=22.00 path=22.00 ratio=1.00 maxErr=0.0°",
+        "1280: drive up net=21.93 path=21.93 ratio=1.00 maxErr=0.0°"
+      ],
+      "bundle": "index-D_hK-yhe.js",
+      "driveMetrics": [
+        {
+          "dir": "down",
+          "expected": 0,
+          "path": 13.999695364444399,
+          "net": 13.999695364444399,
+          "ratio": 1,
+          "maxErr": 0,
+          "meanErr": 0
+        },
+        {
+          "dir": "right",
+          "expected": 3,
+          "path": 16.998116008888836,
+          "net": 16.998116008888836,
+          "ratio": 1,
+          "maxErr": 0,
+          "meanErr": 0
+        },
+        {
+          "dir": "left",
+          "expected": 1,
+          "path": 22.00068203579375,
+          "net": 21.997143488959722,
+          "ratio": 0.9998391619483309,
+          "maxErr": 0,
+          "meanErr": 0
+        },
+        {
+          "dir": "up",
+          "expected": 2,
+          "path": 21.933600017777685,
+          "net": 21.933600017777685,
+          "ratio": 1,
+          "maxErr": 0,
+          "meanErr": 0
+        }
+      ]
+    }
+  ],
+  "driveTable": [
+    {
+      "viewport": "390",
+      "direction": "down",
+      "netTiles": 14,
+      "pathTiles": 14,
+      "netOverPath": 1,
+      "maxHeadingErrDeg": 0,
+      "meanHeadingErrDeg": 0
+    },
+    {
+      "viewport": "390",
+      "direction": "right",
+      "netTiles": 17,
+      "pathTiles": 17,
+      "netOverPath": 1,
+      "maxHeadingErrDeg": 0,
+      "meanHeadingErrDeg": 0
+    },
+    {
+      "viewport": "390",
+      "direction": "left",
+      "netTiles": 22,
+      "pathTiles": 22,
+      "netOverPath": 1,
+      "maxHeadingErrDeg": 0,
+      "meanHeadingErrDeg": 0
+    },
+    {
+      "viewport": "390",
+      "direction": "up",
+      "netTiles": 21.99,
+      "pathTiles": 21.99,
+      "netOverPath": 1,
+      "maxHeadingErrDeg": 0,
+      "meanHeadingErrDeg": 0
+    },
+    {
+      "viewport": "1280",
+      "direction": "down",
+      "netTiles": 14,
+      "pathTiles": 14,
+      "netOverPath": 1,
+      "maxHeadingErrDeg": 0,
+      "meanHeadingErrDeg": 0
+    },
+    {
+      "viewport": "1280",
+      "direction": "right",
+      "netTiles": 17,
+      "pathTiles": 17,
+      "netOverPath": 1,
+      "maxHeadingErrDeg": 0,
+      "meanHeadingErrDeg": 0
+    },
+    {
+      "viewport": "1280",
+      "direction": "left",
+      "netTiles": 22,
+      "pathTiles": 22,
+      "netOverPath": 1,
+      "maxHeadingErrDeg": 0,
+      "meanHeadingErrDeg": 0
+    },
+    {
+      "viewport": "1280",
+      "direction": "up",
+      "netTiles": 21.93,
+      "pathTiles": 21.93,
+      "netOverPath": 1,
+      "maxHeadingErrDeg": 0,
+      "meanHeadingErrDeg": 0
+    }
+  ]
+}

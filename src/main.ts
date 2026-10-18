@@ -19,6 +19,7 @@ import { ChromeUI, type DesktopLayout } from './ui/chrome';
 import { JacHud } from './ui/jacHud';
 import { Joystick } from './ui/joystick';
 import { NameLabels } from './ui/nameLabels';
+import { CenitalBuildingLabels } from './ui/cenitalBuildingLabels';
 import { hideToast, showToast } from './ui/toast';
 import { getLang, onLangChange, setLang, t } from './ui/i18n';
 import type { Camera } from './tokens';
@@ -48,6 +49,7 @@ async function main(): Promise<void> {
 
   const joystick = new Joystick(uiRoot);
   const labels = new NameLabels(uiRoot, { onJacInfo: () => scene.jacOpenInfo() });
+  const cenitalLabels = new CenitalBuildingLabels(uiRoot);
   const jacHud = new JacHud(uiRoot, {
     onInfo: () => scene.jacOpenInfo(),
     onGetIn: () => scene.jacGetIn(),
@@ -105,6 +107,12 @@ async function main(): Promise<void> {
     onMoveCommand: () => studio.noteMoveCommand(),
     onFrame: () => {
       labels.update(scene.nameLabelAnchors());
+      if (scene.getViewMode().mode === 'cenital' && !scene.isInInterior()) {
+        cenitalLabels.setHidden(false);
+        cenitalLabels.update(scene.cenitalBuildingLabelAnchors());
+      } else {
+        cenitalLabels.setHidden(true);
+      }
       if (scene.jacHudActive()) {
         const snap = scene.jacSnapshot();
         const anchors = scene.jacHudAnchors();
@@ -221,6 +229,7 @@ async function main(): Promise<void> {
     findPath,
     getCharacterTile: () => scene.getCharacterTile(),
     getCharacterPos: () => scene.getCharacterPosForQa(),
+    walk: (dx: number, dy: number, sprint = false) => scene.qaWalk(dx, dy, sprint),
     setCharacterTile: (x: number, y: number) => scene.setCharacterTileForQa(x, y),
     walkToBuilding: (name: string) => scene.walkToBuildingForQa(name),
     doorScreenPoint: (name: string) => scene.getDoorScreenClientPoint(name),
@@ -294,6 +303,9 @@ async function main(): Promise<void> {
     setViewMode: (m: Camera) => scene.setViewMode(m),
     rotateView: () => scene.rotateView(),
     toggleMapOverview: () => scene.toggleMapOverview(),
+    cameraViews: () => scene.qaCameraViews(),
+    cenitalExpectedHeading: (dx: number, dy: number) => scene.qaCenitalExpectedHeading(dx, dy),
+    cenitalBuildingLabels: () => cenitalLabels.qa(),
     isMobileSheetOpen: () => chrome.isMobileSheetOpen(),
     audioMuted: () => studio.isMuted(),
     audioUnlocked: () => studio.isUnlocked(),
@@ -330,7 +342,7 @@ async function main(): Promise<void> {
     tapJac: () => scene.tapJac(),
     jacInfo: () => scene.jacOpenInfo(),
     jacGetIn: () => scene.jacGetIn(),
-    jacGetOut: () => scene.jacGetOut(),
+    jacGetOut: (opts?: { thenEnter?: boolean }) => scene.jacGetOut(opts),
     jacDriveTo: (tx: number, ty: number) => scene.qaDriveTo(tx, ty),
     jacFindDrivePath: (tx: number, ty: number) => scene.qaFindDrivePath(tx, ty),
     lastDriveTap: () => scene.qaLastDriveTap,
@@ -346,7 +358,8 @@ async function main(): Promise<void> {
     inputReady: () => scene.qaInputReady(),
     parkedFootprint: () => scene.qaParkedFootprint(),
     jacStick: (vec: { x: number; y: number } | null) => scene.qaJacStick(vec),
-    jacDriveStep: (dt: number, dx: number, dy: number) => scene.qaJacDriveStep(dt, dx, dy),
+    jacDriveStep: (dt: number, dx: number, dy: number, opts?: { render?: boolean }) =>
+      scene.qaJacDriveStep(dt, dx, dy, opts),
     viewportLock: () => ({
       scrollX: window.scrollX,
       scrollY: window.scrollY,

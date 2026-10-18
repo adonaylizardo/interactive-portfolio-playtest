@@ -69,7 +69,7 @@ import {
   TILE_DIAMOND,
   type OccluderBox,
 } from './mapSprites';
-import { NAME_PILL_GAP_PX, spriteOpaqueTopWorld } from './spriteTop';
+import { NAME_PILL_GAP_PX, spriteOpaqueTopWorld, textureOpaqueTop } from './spriteTop';
 import {
   allSpriteKeys,
   hasSprite,
@@ -138,7 +138,34 @@ import { FillActors, type FillActorSnapshot } from './fillActors';
 import { NpcCrowd, type NpcSnapshot } from './npcs';
 import { buildTown, type Bench } from './npcRoutines';
 import { Noah, type NoahSnapshot } from './noah';
-import { JacT9, JAC_ID, tileIsStandable, type JacGear, type JacLights, type JacSnapshot, type JacToggleId } from './jacT9';
+import {
+  JacT9,
+  JAC_ID,
+  headingFromTileStick,
+  tileIsStandable,
+  type JacGear,
+  type JacLights,
+  type JacSnapshot,
+  type JacToggleId,
+} from './jacT9';
+import {
+  ALT_LABEL_GAP_PX,
+  applyScreenBillboard,
+  captureBillboardHome,
+  CENITAL_VIEW_SY,
+  CENITAL_VIEW_TILT,
+  clearBillboard,
+  hideIsoPropSprite,
+  isBillboarded,
+  paintAltView,
+  paintJacCenital,
+  PERSPECTIVE_AIM_DOWN_FRAC,
+  perspectiveYaw,
+  screenDragToCameraDelta,
+  screenStickToTile,
+  zoomMinForView,
+} from './altView';
+import { billboardHeightM, PerspectiveView } from './perspectiveView';
 import {
   loadPlayerSheets,
   loadRestSheets,
@@ -148,6 +175,7 @@ import {
   SPRINT_TILES_PER_S,
   TILE_STEP_WORLD,
   WALK_TILES_PER_S,
+  worldToTileFrac,
   type AvatarSnapshot,
   type FacingDir,
 } from './player';
@@ -277,6 +305,14 @@ export class IsoScene {
   characterLayer = new Container();
   highlightLayer = new Container();
   interiorLayer = new Container();
+  private altViewLayer = new Graphics();
+  private altJacLayer = new Graphics();
+  private altPaintKey = '';
+  private billboardLayer = new Container();
+  private perspective = new PerspectiveView();
+  private billboarded = new Set<Container>();
+  private lastFollowYaw = 0;
+  private readonly headScratch = new Point();
   private interiorTapRoutingBound = false;
 
   charTx = INICIO[0];
@@ -471,13 +507,24 @@ export class IsoScene {
     this.rearLayer.label = 'jac-rear';
     this.app.stage.addChild(this.camera);
     this.app.stage.addChild(this.rearLayer);
+    this.app.stage.addChild(this.perspective.layer);
+    this.app.stage.addChild(this.billboardLayer);
+    this.billboardLayer.sortableChildren = true;
+    this.billboardLayer.eventMode = 'passive';
+    this.billboardLayer.label = 'billboards';
     this.camera.addChild(this.world);
     this.world.addChild(this.tilesLayer);
     this.world.addChild(this.pathLayer);
+    this.world.addChild(this.altViewLayer);
+    this.world.addChild(this.altJacLayer);
     this.world.addChild(this.objectsLayer);
     this.world.addChild(this.highlightLayer);
     this.world.addChild(this.characterLayer);
     this.world.addChild(this.interiorLayer);
+    this.altViewLayer.eventMode = 'none';
+    this.altViewLayer.label = 'alt-view';
+    this.altJacLayer.eventMode = 'none';
+    this.altJacLayer.label = 'alt-jac';
     this.interiorLayer.visible = false;
     this.interiorLayer.sortableChildren = true;
     this.interiorFloorGfx.zIndex = 0;
@@ -995,7 +1042,9 @@ export class IsoScene {
         if (obj.type === 'building' && obj.panelTitle && !this.prepareMapTap(obj)) return;
         const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
         if (obj.type === 'building' && obj.door && obj.panelTitle) {
-          this.requestWalk(obj.door.x, obj.door.y, sprint, { walkOnly: true });
+          this.requestWalk(obj.door.x, obj.door.y, sprint, {
+            buildingEntry: { panelTitle: obj.panelTitle, door: obj.door },
+          });
           return;
         }
         this.pendingBuildingEntry = null;
@@ -1296,8 +1345,16 @@ export class IsoScene {
     studio.noteWalk(snap.adonay.mode === 'walk', snap.adonay.frame, this.sprint);
   }
 
+  private perspectiveOn(): boolean {
+    return !this.interiorActive && this.viewMode === 'perspectiva';
+  }
+
   /** Screen coords (canvas pixels) ↔ world coords with world scaled under a fixed camera pivot. */
   private screenToWorld(sx: number, sy: number): { x: number; y: number } {
+    if (this.perspectiveOn() && this.perspective.cam) {
+      const t = this.perspective.unproject(sx, sy);
+      if (t) return tileToWorld(t.tx, t.ty);
+    }
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     const z = this.zoom;
@@ -1314,6 +1371,11 @@ export class IsoScene {
   }
 
   private worldToScreen(wx: number, wy: number): { x: number; y: number } {
+    if (this.perspectiveOn() && this.perspective.cam) {
+      const t = worldToTileFrac(wx, wy);
+      const p = this.perspective.project(t.x, t.y, 0);
+      if (p) return { x: p.x, y: p.y };
+    }
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     const z = this.zoom;
@@ -1327,6 +1389,19 @@ export class IsoScene {
     };
   }
 
+  private followFacing(): FacingDir {
+    if (this.jac?.driving && !this.interiorActive) return this.jac.dir;
+    return this.avatar?.adonay.dir ?? 'se';
+  }
+
+  /** Effective yaw quarter applied to the camera (perspectiva adds facing so we sit behind Adonay). */
+  private cameraYawQuarter(): number {
+    if (this.viewMode === 'perspectiva' && !this.interiorActive) {
+      return perspectiveYaw(this.followFacing(), this.yaw);
+    }
+    return ((this.yaw % 4) + 4) % 4;
+  }
+
   private syncViewTransform(): void {
     if (this.interiorActive) {
       this.viewRot = 0;
@@ -1334,15 +1409,11 @@ export class IsoScene {
       this.viewSy = 1;
       return;
     }
-    const yaw = (this.yaw % 4) * (Math.PI / 2);
+    const yaw = this.cameraYawQuarter() * (Math.PI / 2);
     if (this.viewMode === 'cenital') {
-      this.viewRot = yaw + Math.PI / 4;
+      this.viewRot = yaw + CENITAL_VIEW_TILT;
       this.viewSx = 1;
-      this.viewSy = 2;
-    } else if (this.viewMode === 'perspectiva') {
-      this.viewRot = yaw;
-      this.viewSx = 1;
-      this.viewSy = 1.38;
+      this.viewSy = CENITAL_VIEW_SY;
     } else {
       this.viewRot = yaw;
       this.viewSx = 1;
@@ -1360,47 +1431,94 @@ export class IsoScene {
     };
   }
 
+  private altViewOn(): boolean {
+    return !this.interiorActive && this.viewMode === 'cenital';
+  }
+
+  private cenitalOn(): boolean {
+    return !this.interiorActive && this.viewMode === 'cenital';
+  }
+
+  private identityView(): boolean {
+    return Math.abs(this.viewRot) < 1e-4 && Math.abs(this.viewSx - 1) < 1e-4 && Math.abs(this.viewSy - 1) < 1e-4;
+  }
+
+  private zoomMinForCurrentView(sw: number, sh: number): number {
+    this.syncViewTransform();
+    const m = cameraFitMargins();
+    return zoomMinForView(
+      this.viewRot,
+      this.viewSx,
+      this.viewSy,
+      Math.max(1, sw - m.left - m.right),
+      Math.max(1, sh - m.top - m.bottom),
+    );
+  }
+
+  private frameMapOverview(): void {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    this.updateCameraFitMargins();
+    this.syncViewTransform();
+    this.zoom = this.zoomMinForCurrentView(sw, sh) * 0.92;
+    const b = mapWorldBounds();
+    const aim = this.freeRectCenter();
+    this.placeWorldAtScreen((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, aim.x, aim.y);
+  }
+
+  private leaveMapOverview(opts?: { restorePan?: boolean }): void {
+    if (!this.mapOverview) return;
+    this.mapOverview = false;
+    if (this.savedCam) {
+      this.zoom = this.savedCam.zoom;
+      if (opts?.restorePan) {
+        this.cameraX = this.savedCam.x;
+        this.cameraY = this.savedCam.y;
+      }
+    }
+  }
+
   setViewMode(mode: Camera): void {
     if (this.interiorActive) return;
+    this.restoreBillboards();
     this.viewMode = mode;
-    this.mapOverview = false;
+    this.leaveMapOverview();
+    this.syncViewTransform();
     this.centerOnCharacter(false);
     this.applyCamera(true);
+    this.applyBillboards();
   }
 
   rotateView(): void {
     if (this.interiorActive) return;
+    this.restoreBillboards();
     this.yaw = (this.yaw + 1) % 4;
+    this.syncViewTransform();
+    if (this.mapOverview) {
+      this.frameMapOverview();
+      this.applyCamera(true);
+      this.applyBillboards();
+      return;
+    }
     this.centerOnCharacter(false);
     this.applyCamera(true);
+    this.applyBillboards();
   }
 
   toggleMapOverview(): void {
     if (this.interiorActive) return;
-    const sw = this.app.screen.width;
-    const sh = this.app.screen.height;
+    this.restoreBillboards();
     if (this.mapOverview) {
-      this.mapOverview = false;
-      if (this.savedCam) {
-        this.cameraX = this.savedCam.x;
-        this.cameraY = this.savedCam.y;
-        this.zoom = this.savedCam.zoom;
-      }
+      this.leaveMapOverview({ restorePan: true });
       this.applyCamera(true);
+      this.applyBillboards();
       return;
     }
     this.savedCam = { x: this.cameraX, y: this.cameraY, zoom: this.zoom };
     this.mapOverview = true;
-    this.zoom = zoomMinForViewport(sw, sh);
-    const fitted = clampPanMapFullyInView(
-      { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
-      sw,
-      sh,
-    );
-    this.cameraX = fitted.cameraX;
-    this.cameraY = fitted.cameraY;
-    this.zoom = fitted.zoom;
+    this.frameMapOverview();
     this.applyCamera(true);
+    this.applyBillboards();
   }
 
   requestWalk(
@@ -1409,7 +1527,6 @@ export class IsoScene {
     sprint: boolean,
     opts?: {
       buildingEntry?: { panelTitle: string; door: { x: number; y: number } };
-      walkOnly?: boolean;
     },
   ): void {
     if (this.jac?.driving) {
@@ -1432,10 +1549,8 @@ export class IsoScene {
     }
     const walkTx = tx;
     const walkTy = ty;
-    const entry = opts?.walkOnly
-      ? null
-      : (opts?.buildingEntry ??
-        resolveBuildingEntryFromTile(walkTx, walkTy, this.roundedCharTile()));
+    const entry =
+      opts?.buildingEntry ?? resolveBuildingEntryFromTile(walkTx, walkTy, this.roundedCharTile());
     this.pendingBuildingEntry = entry;
     const walkable = !!cells[walkTy]?.[walkTx]?.walkable;
     const target = walkable ? { x: walkTx, y: walkTy } : resolveWalkTarget(walkTx, walkTy);
@@ -1708,16 +1823,16 @@ export class IsoScene {
       this.jacClose();
       return;
     }
-    if (this.pickJacAtScreen(sx, sy)) {
-      this.tapJac();
-      return;
-    }
     const doorFirst = this.pickBuildingDoorAtScreen(sx, sy);
     if (doorFirst?.door && doorFirst.panelTitle) {
       if (!this.prepareMapTap(doorFirst)) return;
       this.requestWalk(doorFirst.door.x, doorFirst.door.y, sprint, {
         buildingEntry: { panelTitle: doorFirst.panelTitle, door: doorFirst.door },
       });
+      return;
+    }
+    if (this.pickJacAtScreen(sx, sy)) {
+      this.tapJac();
       return;
     }
     const sceneryTile = this.pickSceneryAtScreen(sx, sy);
@@ -1729,7 +1844,9 @@ export class IsoScene {
     const building = this.pickBuildingAtScreen(sx, sy);
     if (building?.door && building.panelTitle) {
       if (!this.prepareMapTap(building)) return;
-      this.requestWalk(building.door.x, building.door.y, sprint, { walkOnly: true });
+      this.requestWalk(building.door.x, building.door.y, sprint, {
+        buildingEntry: { panelTitle: building.panelTitle, door: building.door },
+      });
       return;
     }
     const bench = this.pickBenchAtScreen(sx, sy);
@@ -1827,7 +1944,14 @@ export class IsoScene {
     this.pendingDriveEnter = entry;
     this.pendingDriveEnterAt = performance.now();
     const dest = path.length > 0 ? path[path.length - 1] : sit;
-    if (path.length === 0 || (Math.hypot(this.jac.cx - dest.x, this.jac.cy - dest.y) < 1.2 && this.jac.mph < 1)) {
+    const alongNow = this.jac.doorSideAlong(entry.door.x, entry.door.y);
+    const distDoorNow = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
+    const atSit = path.length === 0 || (Math.hypot(this.jac.cx - dest.x, this.jac.cy - dest.y) < 1.2 && this.jac.mph < 1);
+    if (atSit && alongNow >= 0 && distDoorNow <= 5.5) {
+      this.jacGetOut({ thenEnter: true });
+      return true;
+    }
+    if (path.length === 0) {
       this.jacGetOut({ thenEnter: true });
       return true;
     }
@@ -1927,7 +2051,10 @@ export class IsoScene {
   }
 
   recenterOnCharacter(): void {
+    this.leaveMapOverview();
+    this.syncViewTransform();
     this.centerOnCharacter(false);
+    this.applyCamera(true);
   }
 
   private freeRectCenter(): { x: number; y: number } {
@@ -1940,17 +2067,36 @@ export class IsoScene {
     };
   }
 
+  /** Where the follow target should sit on screen (perspectiva: lower third, over-the-shoulder). */
+  private followAimScreen(): { x: number; y: number } {
+    const aim = this.freeRectCenter();
+    if (this.viewMode === 'perspectiva' && !this.interiorActive && !this.mapOverview) {
+      const sh = this.app.screen.height;
+      return { x: aim.x, y: aim.y + sh * PERSPECTIVE_AIM_DOWN_FRAC };
+    }
+    return aim;
+  }
+
   private placeWorldAtScreen(wx: number, wy: number, sx: number, sy: number): void {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
-    this.cameraX = (sx - sw / 2) / this.zoom - wx;
-    this.cameraY = (sy - sh / 2) / this.zoom - wy;
+    const z = this.zoom || 1;
+    const dx = sx - sw / 2;
+    const dy = sy - sh / 2;
+    const cos = Math.cos(this.viewRot);
+    const sin = Math.sin(this.viewRot);
+    const lx = (dx * cos + dy * sin) / (this.viewSx || 1);
+    const ly = (-dx * sin + dy * cos) / (this.viewSy || 1);
+    this.cameraX = lx / z - wx;
+    this.cameraY = ly / z - wy;
   }
 
   private centerOnCharacter(animate: boolean): void {
     this.updateCameraFitMargins();
+    this.syncViewTransform();
+    this.lastFollowYaw = this.cameraYawQuarter();
     const t = this.followTargetWorld();
-    const aim = this.freeRectCenter();
+    const aim = this.followAimScreen();
     this.placeWorldAtScreen(t.x, t.y, aim.x, aim.y);
     if (!animate || this.reducedMotion) this.applyCamera();
   }
@@ -2054,21 +2200,33 @@ export class IsoScene {
         });
       }
     } else {
-      this.zoom = clampZoom(this.zoom, sw, sh);
-      const stabilize =
-        this.pinchGestureActive && this.zoomSource === 'pointer'
-          ? stabilizeCameraDuringPinch
-          : stabilizeCameraAfterGesture;
-      const hardened = stabilize(
-        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
-        sw,
-        sh,
-      );
-      this.cameraX = hardened.cameraX;
-      this.cameraY = hardened.cameraY;
-      this.zoom = hardened.zoom;
+      this.syncViewTransform();
+      const zFloor = this.zoomMinForCurrentView(sw, sh);
+      if (this.mapOverview) {
+        this.zoom = Math.min(1.5, Math.max(zFloor, this.zoom));
+      } else if (this.perspectiveOn()) {
+        this.zoom = Math.min(1.5, Math.max(0.35, this.zoom));
+      } else if (this.identityView()) {
+        this.zoom = clampZoom(this.zoom, sw, sh);
+        const stabilize =
+          this.pinchGestureActive && this.zoomSource === 'pointer'
+            ? stabilizeCameraDuringPinch
+            : stabilizeCameraAfterGesture;
+        const hardened = stabilize(
+          { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+          sw,
+          sh,
+        );
+        this.cameraX = hardened.cameraX;
+        this.cameraY = hardened.cameraY;
+        this.zoom = hardened.zoom;
+      } else {
+        this.zoom = Math.min(1.5, Math.max(zFloor, this.zoom));
+      }
       const zMin = zoomMinForViewport(sw, sh);
-      if (this.zoom <= zMin + 0.001) {
+      // Only the map-overview button may snap to a full-map fit. Doing it whenever
+      // zoom ≈ zMin undoes Center / Rotate and keeps overview framing after leaving it.
+      if (this.mapOverview && this.identityView() && this.zoom <= zMin + 0.001) {
         const fitted = clampPanMapFullyInView(
           { cameraX: this.cameraX, cameraY: this.cameraY, zoom: zMin },
           sw,
@@ -2081,8 +2239,15 @@ export class IsoScene {
     }
     this.syncViewTransform();
     this.camera.position.set(sw / 2, sh / 2);
-    this.camera.scale.set(this.viewSx, this.viewSy);
-    this.camera.rotation = this.viewRot;
+    if (this.perspectiveOn()) {
+      this.camera.scale.set(1, 1);
+      this.camera.rotation = 0;
+      this.world.visible = false;
+    } else {
+      this.camera.scale.set(this.viewSx, this.viewSy);
+      this.camera.rotation = this.viewRot;
+      this.world.visible = true;
+    }
     this.world.position.set(this.cameraX * this.zoom, this.cameraY * this.zoom);
     this.world.scale.set(this.zoom);
     this.fitOutskirts(sw, sh);
@@ -2135,9 +2300,14 @@ export class IsoScene {
       this.canvasEl.dataset.anchorWy = String(-this.cameraY);
       this.canvasEl.dataset.viewMode = this.viewMode;
       this.canvasEl.dataset.yaw = String(this.yaw);
+      this.canvasEl.dataset.cameraYaw = String(this.cameraYawQuarter());
       this.canvasEl.dataset.viewSy = String(this.viewSy);
       this.canvasEl.dataset.viewRot = String(this.viewRot);
       this.canvasEl.dataset.mapOverview = this.mapOverview ? '1' : '0';
+      this.canvasEl.dataset.altView =
+        !this.interiorActive && (this.viewMode === 'cenital' || this.viewMode === 'perspectiva')
+          ? this.viewMode
+          : 'off';
       this.canvasEl.dataset.layout = document.body.dataset.layout ?? '';
       const charScreen = this.followTargetScreen();
       this.canvasEl.dataset.charScreen = JSON.stringify({
@@ -2175,7 +2345,157 @@ export class IsoScene {
       this.panDragScreenPx = 0;
     }
     this.syncObjectSprites();
+    this.syncAltView();
+    this.syncPerspective();
     this.cullVisibleTiles();
+  }
+
+  private syncPerspective(): void {
+    const on = this.perspectiveOn();
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const follow =
+      this.jac?.driving && !this.interiorActive
+        ? worldToTileFrac(this.jac.worldCenter().x, this.jac.worldCenter().y)
+        : { x: this.charTx, y: this.charTy };
+    this.perspective.sync({
+      active: on,
+      tx: follow.x,
+      ty: follow.y,
+      dir: this.followFacing(),
+      userYaw: this.yaw,
+      zoom: this.zoom,
+      overview: this.mapOverview,
+      sw,
+      sh,
+      cells,
+      objects,
+      hoverId: this.hoveredObject?.id ?? null,
+    });
+  }
+
+  private syncAltView(): void {
+    const cenital = this.cenitalOn();
+    this.altViewLayer.visible = cenital;
+    this.altJacLayer.visible = cenital;
+    for (const v of this.objectVisuals.values()) {
+      if (v.obj.id === JAC_ID) {
+        v.sprite.visible = !cenital;
+        continue;
+      }
+      v.sprite.visible = !(cenital && hideIsoPropSprite(v.obj));
+    }
+    if (!cenital) {
+      this.altViewLayer.clear();
+      this.altJacLayer.clear();
+      this.altPaintKey = '';
+      return;
+    }
+    const yaw = this.cameraYawQuarter();
+    const hover = this.hoveredObject?.id ?? null;
+    const key = `cenital:${yaw}:${hover ?? ''}`;
+    if (key !== this.altPaintKey) {
+      this.altPaintKey = key;
+      paintAltView(this.altViewLayer, objects, 'cenital', yaw, hover);
+    }
+    this.altJacLayer.clear();
+    if (this.jac) {
+      const snap = this.jac.snapshot();
+      paintJacCenital(this.altJacLayer, snap.cx, snap.cy, snap.heading, snap.driving);
+    }
+  }
+
+  private collectBillboards(): Container[] {
+    const out: Container[] = [];
+    if (this.interiorActive) return out;
+    if (this.avatar) out.push(...this.avatar.spritesForBillboard());
+    if (this.noah) out.push(...this.noah.spritesForBillboard());
+    if (this.npcs) out.push(...this.npcs.spritesForBillboard());
+    if (this.fillActors) out.push(...this.fillActors.spritesForBillboard());
+    if (this.jac && !this.cenitalOn()) out.push(...this.jac.spritesForBillboard());
+    return out;
+  }
+
+  private restoreBillboards(): void {
+    for (const s of this.billboarded) clearBillboard(s);
+    this.billboarded.clear();
+  }
+
+  private applyBillboards(): void {
+    this.billboardLayer.visible = this.altViewOn();
+    if (!this.altViewOn()) return;
+    this.syncViewTransform();
+    if (this.perspectiveOn()) this.syncPerspective();
+    for (const s of this.collectBillboards()) {
+      if (!s.visible) continue;
+      const home = captureBillboardHome(s);
+      if (this.perspectiveOn()) {
+        const t = worldToTileFrac(home.x, home.y);
+        const p = this.perspective.project(t.x, t.y, 0);
+        if (!p) continue;
+        const signX = home.sx < 0 ? -1 : 1;
+        let sc: number;
+        if (s instanceof Sprite && s.texture) {
+          const texH = Math.max(8, s.texture.height);
+          sc = Math.max(0.2, (p.scale * billboardHeightM(s.label ?? '')) / texH);
+        } else {
+          sc = Math.abs(home.sy) * Math.max(0.5, p.scale * 0.014);
+        }
+        applyScreenBillboard(
+          s,
+          this.billboardLayer,
+          p.x,
+          p.y,
+          signX * sc,
+          sc,
+          Math.round(40_000 - p.z * 40),
+        );
+      } else {
+        const screen = this.worldToScreen(home.x, home.y);
+        const signX = home.sx < 0 ? -1 : 1;
+        const signY = home.sy < 0 ? -1 : 1;
+        applyScreenBillboard(
+          s,
+          this.billboardLayer,
+          screen.x,
+          screen.y,
+          signX * Math.abs(home.sx) * this.zoom,
+          signY * Math.abs(home.sy) * this.zoom,
+          Math.round(home.x + home.y),
+        );
+      }
+      this.billboarded.add(s);
+    }
+  }
+
+  private remapWalkStick(dx: number, dy: number): { x: number; y: number } {
+    if (!this.altViewOn() || (dx === 0 && dy === 0)) return { x: dx, y: dy };
+    this.syncViewTransform();
+    return screenStickToTile(dx, dy, this.viewRot, this.viewSx, this.viewSy);
+  }
+
+  private remapDriveStick(dx: number, dy: number): { x: number; y: number } {
+    if (!this.cenitalOn() || (dx === 0 && dy === 0)) return { x: dx, y: dy };
+    this.syncViewTransform();
+    return screenStickToTile(dx, dy, this.viewRot, this.viewSx, this.viewSy);
+  }
+
+  private spriteHeadCanvas(sprite: Sprite): { x: number; y: number } {
+    if (this.altViewOn() && isBillboarded(sprite)) {
+      const tex = sprite.texture;
+      const local = textureOpaqueTop(tex);
+      const lx = local ? local.x - sprite.anchor.x * tex.width : 0;
+      const ly = local ? local.y - sprite.anchor.y * tex.height : -(sprite.anchor.y * tex.height);
+      this.headScratch.set(lx, ly);
+      const g = sprite.toGlobal(this.headScratch);
+      return { x: g.x, y: g.y };
+    }
+    const top = spriteOpaqueTopWorld(sprite);
+    return this.worldToScreen(top.x, top.y);
+  }
+
+  private namePillGap(): number {
+    return this.altViewOn() ? ALT_LABEL_GAP_PX : NAME_PILL_GAP_PX;
   }
 
   private cullVisibleTiles(): void {
@@ -2397,8 +2717,12 @@ export class IsoScene {
     if (dx === 0 && dy === 0) return;
     if (this.jac?.driving) return;
     this.suspendCameraFollow();
-    this.cameraX += dx / this.zoom;
-    this.cameraY += dy / this.zoom;
+    this.syncViewTransform();
+    const delta = this.identityView()
+      ? { dx: dx / this.zoom, dy: dy / this.zoom }
+      : screenDragToCameraDelta(dx, dy, this.viewRot, this.viewSx, this.viewSy, this.zoom);
+    this.cameraX += delta.dx;
+    this.cameraY += delta.dy;
     this.panDragScreenPx += Math.hypot(dx, dy);
     this.applyCamera();
   }
@@ -3079,8 +3403,12 @@ export class IsoScene {
           this.panMoved = true;
           document.body.classList.add('is-canvas-dragging');
           this.suspendCameraFollow();
-          this.cameraX += dx / this.zoom;
-          this.cameraY += dy / this.zoom;
+          this.syncViewTransform();
+          const delta = this.identityView()
+            ? { dx: dx / this.zoom, dy: dy / this.zoom }
+            : screenDragToCameraDelta(dx, dy, this.viewRot, this.viewSx, this.viewSy, this.zoom);
+          this.cameraX += delta.dx;
+          this.cameraY += delta.dy;
           this.lastPanPos = { x: e.clientX, y: e.clientY };
           this.panDragScreenPx += Math.hypot(dx, dy);
           this.applyCamera();
@@ -3140,6 +3468,7 @@ export class IsoScene {
   private update(): void {
     this.rescueAvatarIfTrapped();
     this.releaseFailedScript();
+    this.restoreBillboards();
     this.updateMovement();
     this.updateAvatars(Math.min(0.25, this.app.ticker.elapsedMS / 1000));
     this.updateCameraFollow();
@@ -3148,6 +3477,9 @@ export class IsoScene {
       this.npcs.update(dt);
       this.fillActors?.update(dt);
     }
+    this.syncPerspective();
+    this.applyBillboards();
+    this.events.onFrame?.();
   }
 
   /**
@@ -3298,6 +3630,15 @@ export class IsoScene {
   }
 
   private followTargetScreen(): { x: number; y: number } {
+    if (this.perspectiveOn()) {
+      this.syncPerspective();
+      const follow =
+        this.jac?.driving && !this.interiorActive
+          ? worldToTileFrac(this.jac.worldCenter().x, this.jac.worldCenter().y)
+          : { x: this.charTx, y: this.charTy };
+      const p = this.perspective.playerScreen(follow.x, follow.y, 0);
+      if (p) return { x: p.x, y: p.y };
+    }
     const t = this.followTargetWorld();
     return this.worldToScreen(t.x, t.y);
   }
@@ -3342,20 +3683,37 @@ export class IsoScene {
     if (this.canvasEl) {
       this.canvasEl.dataset.follow = f.suspended ? 'suspended' : f.engaged ? 'engaged' : 'idle';
     }
-    if (jumped || f.suspended) return;
+    if (jumped || f.suspended || this.mapOverview) return;
     const moved = Math.hypot(stepX, stepY) > 1e-4;
     const walking = this.interiorActive ? this.interiorPath.length > 0 : this.path.length > 0;
     if (moved || walking || driving) f.engaged = true;
     if (!f.engaged) return;
 
+    this.syncViewTransform();
+    const yawNow = this.cameraYawQuarter();
+    const yawChanged = yawNow !== this.lastFollowYaw;
+    this.lastFollowYaw = yawNow;
     const dt = Math.min(0.1, this.app.ticker.deltaMS / 1000);
     const camBeforeX = this.cameraX;
     const camBeforeY = this.cameraY;
+    const aim = this.followAimScreen();
+    if (yawChanged && this.viewMode === 'perspectiva' && !this.interiorActive) {
+      f.vx = 0;
+      f.vy = 0;
+      this.placeWorldAtScreen(t.x, t.y, aim.x, aim.y);
+      this.applyCamera(false);
+      this.shiftGestureBaselines(this.cameraX - camBeforeX, this.cameraY - camBeforeY);
+      return;
+    }
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
-    const aim = this.freeRectCenter();
-    const aimWx = (aim.x - sw / 2) / this.zoom;
-    const aimWy = (aim.y - sh / 2) / this.zoom;
+    const z = this.zoom || 1;
+    const dxAim = aim.x - sw / 2;
+    const dyAim = aim.y - sh / 2;
+    const cos = Math.cos(this.viewRot);
+    const sin = Math.sin(this.viewRot);
+    const aimWx = ((dxAim * cos + dyAim * sin) / (this.viewSx || 1)) / z;
+    const aimWy = ((-dxAim * sin + dyAim * cos) / (this.viewSy || 1)) / z;
     // Offset of the character from the map hole (free-rect) centre, in world px.
     let ox = this.cameraX - stepX + t.x - aimWx;
     let oy = this.cameraY - stepY + t.y - aimWy;
@@ -3419,13 +3777,22 @@ export class IsoScene {
       if (this.jac.isExiting()) {
         dx = 0;
         dy = 0;
+      } else {
+        const mapped = this.remapDriveStick(dx, dy);
+        dx = mapped.x;
+        dy = mapped.y;
       }
       if (dx !== 0 || dy !== 0) this.pendingDriveEnter = null;
       this.startCameraFollow();
       if (dx !== 0 || dy !== 0 || stickHeld || this.jac.drivePath.length > 0) {
         if (dx !== 0 || dy !== 0) this.fireMoveCommand();
       }
-      this.jac.update(this.app.ticker.deltaMS / 1000, { dx, dy, autoShift: true });
+      this.jac.update(this.app.ticker.deltaMS / 1000, {
+        dx,
+        dy,
+        autoShift: true,
+        tileDir: this.cenitalOn(),
+      });
       this.charTx = this.jac.cx;
       this.charTy = this.jac.cy;
       if (this.pendingJacExit && this.jac.readyToExit()) this.finishJacGetOut();
@@ -3447,6 +3814,11 @@ export class IsoScene {
       if (dx === 0 && dy === 0 && stickLive) {
         dx = stick.x;
         dy = stick.y;
+      }
+      if (!this.interiorActive) {
+        const mapped = this.remapWalkStick(dx, dy);
+        dx = mapped.x;
+        dy = mapped.y;
       }
       if (this.interiorActive && this.interiorDef) {
         if (dx !== 0 || dy !== 0) {
@@ -3747,6 +4119,7 @@ export class IsoScene {
     buildingId: string,
     opts?: { skipFade?: boolean; fromHash?: boolean },
   ): void {
+    this.restoreBillboards();
     if (this.interiorActive && this.interiorDef?.id === buildingId) return;
     const def = getInteriorDef(buildingId);
     const building = objects.find((o) => o.type === 'building' && o.name === buildingId);
@@ -4040,23 +4413,28 @@ export class IsoScene {
       visual: v,
       tapBox: this.objectTapBoxes,
       onStuck: () => {
-        if (this.pendingDriveEnter) this.jacGetOut({ thenEnter: true });
+        if (this.pendingDriveEnter) this.retryDriveEnterOrGetOut();
         else this.events.onUnreachable?.();
       },
     });
     g.label = JAC_ID;
   }
 
-  /** A tap on the van sprite always wins, even under a building or tile. */
+  /** Van sprite wins over ground, but a door tap always beats the parked van. */
   private claimJacTap(e: { clientX?: number; clientY?: number; global?: { x: number; y: number }; nativeEvent?: unknown }): boolean {
     if (!this.jac || this.jac.driving) return false;
     const local = this.federatedToCanvas(e);
-    return !!local && this.pickJacAtScreen(local.x, local.y);
+    if (!local) return false;
+    if (this.pickBuildingDoorAtScreen(local.x, local.y)) return false;
+    return this.pickJacAtScreen(local.x, local.y);
   }
 
   private pickJacAtScreen(sx: number, sy: number): boolean {
     if (!this.jac || this.interiorActive) return false;
+    if (this.pickBuildingDoorAtScreen(sx, sy)) return false;
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
+    const doorTile = worldToTile(wx, wy);
+    if (doorTile && getBuildingAtDoor(doorTile.x, doorTile.y)) return false;
     const g = this.objectGraphics.get(this.jac.obj.id);
     if (g) {
       const lx = wx - g.x;
@@ -4070,7 +4448,7 @@ export class IsoScene {
     if (tile && this.jac.tapHitsTile(tile.x, tile.y)) return true;
     const c = this.jac.worldCenter();
     const s = this.worldToScreen(c.x, c.y);
-    return Math.hypot(sx - s.x, sy - s.y) < 92;
+    return Math.hypot(sx - s.x, sy - s.y) < 32;
   }
 
   tapJac(): void {
@@ -4244,23 +4622,47 @@ export class IsoScene {
   private tryFinishDriveEnter(): void {
     if (!this.pendingDriveEnter || !this.jac?.driving || this.jac.isExiting()) return;
     const door = this.pendingDriveEnter.door;
-    const goal = this.jac.driveGoal ?? door;
-    const distGoal = Math.hypot(this.jac.cx - goal.x, this.jac.cy - goal.y);
+    const sit = this.jac.driveGoal;
+    const distSit = sit ? Math.hypot(this.jac.cx - sit.x, this.jac.cy - sit.y) : Infinity;
     const distDoor = Math.hypot(this.jac.cx - door.x, this.jac.cy - door.y);
     const idle = this.jac.drivePath.length === 0 && !this.jac.driveGoal;
-    const arrived = distGoal < 1.8 && this.jac.mph < 1.2;
-    const nearDoor = distDoor < 5 && this.jac.mph < 1;
-    const stalledNear = idle && this.jac.mph <= 0.25 && distDoor < 8;
-    const waiting = this.pendingDriveEnterAt > 0 ? performance.now() - this.pendingDriveEnterAt : 0;
-    if (arrived || nearDoor || stalledNear) {
+    const along = this.jac.doorSideAlong(door.x, door.y);
+    const arrived = sit && distSit < 1.15 && this.jac.mph < 1.2;
+    const doorSideSit = idle && this.jac.mph < 1.2 && along >= 0 && distDoor <= 6.2;
+    if (arrived || doorSideSit) {
       this.jacGetOut({ thenEnter: true });
       return;
     }
-    if (waiting > 22000 && idle) {
-      this.pendingDriveEnter = null;
-      this.pendingDriveEnterAt = 0;
-      this.moveCommandArmed = true;
+    if (this.jac.mph < 0.8 && distSit > 2.5) {
+      this.jac.unstickIfStopped();
     }
+    if (idle && this.jac.mph < 1.2) {
+      this.retryDriveEnterOrGetOut();
+    }
+  }
+
+  /** Stay on the door-side sit. A mid-route stall re-plans instead of getting out behind a house. */
+  private retryDriveEnterOrGetOut(): void {
+    const entry = this.pendingDriveEnter;
+    if (!entry || !this.jac?.driving) return;
+    const along = this.jac.doorSideAlong(entry.door.x, entry.door.y);
+    const dist = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
+    if (along >= 0 && dist <= 6.2) {
+      this.jacGetOut({ thenEnter: true });
+      return;
+    }
+    const sit = this.jac.parkForDoor(entry.door.x, entry.door.y);
+    if (!sit) {
+      this.jacGetOut({ thenEnter: true });
+      return;
+    }
+    const path = sit.path.length > 0 ? sit.path : this.jac.findDrivePath(sit.x, sit.y);
+    if (!path || path.length === 0) {
+      this.jacGetOut({ thenEnter: true });
+      return;
+    }
+    this.pendingDriveEnterAt = performance.now();
+    this.jac.setDrivePath(path, { x: sit.x, y: sit.y }, { loose: true });
   }
 
   private rescueAvatarIfTrapped(): void {
@@ -4355,9 +4757,16 @@ export class IsoScene {
     return this.jac?.canDriveAt(cx, cy) ?? false;
   }
 
-  qaParkForDoor(doorX: number, doorY: number): { x: number; y: number; path?: { x: number; y: number }[] } | null {
+  qaParkForDoor(doorX: number, doorY: number): {
+    x: number;
+    y: number;
+    path?: { x: number; y: number }[];
+    heading?: string;
+    ms: number;
+  } | null {
     const sit = this.jac?.parkForDoor(doorX, doorY);
-    return sit ? { x: sit.x, y: sit.y, path: sit.path } : null;
+    const ms = this.jac?.lastParkMs ?? 0;
+    return sit ? { x: sit.x, y: sit.y, path: sit.path, heading: sit.heading, ms } : null;
   }
 
   qaInputReady(): {
@@ -4395,7 +4804,7 @@ export class IsoScene {
     this.qaStick = vec;
   }
 
-  qaJacDriveStep(dt: number, dx: number, dy: number): {
+  qaJacDriveStep(dt: number, dx: number, dy: number, opts?: { render?: boolean }): {
     cx: number;
     cy: number;
     dir: string;
@@ -4408,8 +4817,12 @@ export class IsoScene {
     this.charTy = this.jac.cy;
     this.startCameraFollow();
     this.updateCameraFollow();
-    this.app?.render();
-    this.events.onFrame?.();
+    if (this.pendingJacExit && this.jac.readyToExit()) this.finishJacGetOut();
+    else this.tryFinishDriveEnter();
+    if (opts?.render !== false) {
+      this.app?.render();
+      this.events.onFrame?.();
+    }
     const s = this.jac.snapshot();
     return { cx: s.cx, cy: s.cy, dir: s.dir, overlap: this.jac.overlapsProp(), mph: s.mph };
   }
@@ -4690,6 +5103,33 @@ export class IsoScene {
 
   getCharacterPosForQa(): { x: number; y: number } {
     return { x: this.charTx, y: this.charTy };
+  }
+
+  /** QA: one burst of keyboard walking (iso tile space, remapped in alt cameras). */
+  qaWalk(dx: number, dy: number, sprint = false): { x: number; y: number } {
+    if (this.interiorActive) return this.getCharacterPosForQa();
+    this.restoreBillboards();
+    const mapped = this.remapWalkStick(dx, dy);
+    const mag = Math.hypot(mapped.x, mapped.y);
+    if (mag < 1e-6) return this.getCharacterPosForQa();
+    const step = sprint ? 1 : 0.6;
+    const sx = (mapped.x / mag) * step;
+    const sy = (mapped.y / mag) * step;
+    const at = { x: Math.round(this.charTx), y: Math.round(this.charTy) };
+    const next = slideStep(
+      this.charTx,
+      this.charTy,
+      sx,
+      sy,
+      (x, y) => (x === at.x && y === at.y) || !!cells[y]?.[x]?.walkable,
+    );
+    this.charTx = next.x;
+    this.charTy = next.y;
+    this.syncCharacterGraphic();
+    this.applyCamera(false);
+    this.applyBillboards();
+    this.app?.render();
+    return this.getCharacterPosForQa();
   }
 
   /** Same code path as a tap on the drawn door (QA / Playwright). */
@@ -4973,6 +5413,48 @@ export class IsoScene {
     return { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y };
   }
 
+  qaCameraViews(): {
+    mode: Camera;
+    yaw: number;
+    cameraYaw: number;
+    overview: boolean;
+    rot: number;
+    sy: number;
+    altView: string;
+    altLayer: boolean;
+    roofsHidden: number;
+    roofsTotal: number;
+    adonayScreen: { x: number; y: number; w: number; h: number };
+    charScreen: { x: number; y: number };
+    aim: { x: number; y: number };
+    labels: { id: string; x: number; y: number; visible: boolean }[];
+  } {
+    this.restoreBillboards();
+    this.applyCamera(false);
+    this.applyBillboards();
+    this.app?.render();
+    const b = this.avatar.adonay.sprite.getBounds();
+    let roofsHidden = 0;
+    let roofsTotal = 0;
+    for (const v of this.objectVisuals.values()) {
+      if (!hideIsoPropSprite(v.obj) || v.obj.id === JAC_ID) continue;
+      roofsTotal += 1;
+      if (!v.sprite.visible) roofsHidden += 1;
+    }
+    return {
+      ...this.getViewMode(),
+      cameraYaw: this.cameraYawQuarter(),
+      altView: this.canvasEl?.dataset.altView ?? 'off',
+      altLayer: this.perspectiveOn() ? this.perspective.layer.visible : this.altViewLayer.visible,
+      roofsHidden,
+      roofsTotal,
+      adonayScreen: { x: b.x, y: b.y, w: b.width, h: b.height },
+      charScreen: this.followTargetScreen(),
+      aim: this.followAimScreen(),
+      labels: this.nameLabelAnchors().map((l) => ({ id: l.id, x: l.x, y: l.y, visible: l.visible })),
+    };
+  }
+
   /** Client pixels of the name-pill anchors (just above each head). */
   nameLabelAnchors(): {
     id: 'adonay' | 'pantone' | 'noah' | 'jac';
@@ -4985,14 +5467,14 @@ export class IsoScene {
     const rect = this.canvasEl?.getBoundingClientRect();
     const sw = this.app?.screen.width ?? 0;
     const sh = this.app?.screen.height ?? 0;
+    const gap = this.namePillGap();
     const aboveHead = (sprite: Sprite) => {
-      const top = spriteOpaqueTopWorld(sprite);
-      const s = this.worldToScreen(top.x, top.y);
+      const s = this.spriteHeadCanvas(sprite);
       return {
         x: (rect?.left ?? 0) + s.x,
-        y: (rect?.top ?? 0) + s.y - NAME_PILL_GAP_PX,
+        y: (rect?.top ?? 0) + s.y - gap,
         sx: s.x,
-        sy: s.y - NAME_PILL_GAP_PX,
+        sy: s.y - gap,
       };
     };
     const onScreen = (sx: number, sy: number) => sx > -40 && sy > -40 && sx < sw + 40 && sy < sh + 40;
@@ -5006,6 +5488,15 @@ export class IsoScene {
       !!this.jac &&
       !this.jac.driving &&
       Math.hypot(this.charTx - this.jac.cx, this.charTy - this.jac.cy) < 4;
+    let jacRoof: { x: number; y: number } | null = null;
+    if (!this.interiorActive && this.jac && (this.jac.driving || this.jac.mode === 'parked')) {
+      const anchor = this.cenitalOn() ? this.jac.worldCenter() : this.jac.labelAnchorWorld();
+      const s = this.worldToScreen(anchor.x, anchor.y);
+      const jacGap = this.cenitalOn() ? gap + 22 : NAME_PILL_GAP_PX;
+      jacRoof = { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y - jacGap };
+    }
+    const adonayOverJac =
+      !!jacRoof && !this.jac?.driving && Math.hypot(adonay.x - jacRoof.x, adonay.y - jacRoof.y) < 64;
     const out: {
       id: 'adonay' | 'pantone' | 'noah' | 'jac';
       name: string;
@@ -5019,7 +5510,7 @@ export class IsoScene {
         name: 'Adonay',
         x: adonay.x,
         y: nearJac ? adonay.y - 18 : adonay.y,
-        visible: this.jac?.driving
+        visible: this.jac?.driving || adonayOverJac
           ? false
           : snap.adonay.visible && onScreen(adonay.sx, adonay.sy),
       },
@@ -5042,21 +5533,63 @@ export class IsoScene {
         visible: n.visible && n.loaded && onScreen(head.sx, head.sy),
       });
     }
-    if (!this.interiorActive && this.jac && (this.jac.driving || this.jac.mode === 'parked')) {
-      const roof = this.jac.labelAnchorWorld();
-      const s = this.worldToScreen(roof.x, roof.y);
-      const x = (rect?.left ?? 0) + s.x;
-      const y = (rect?.top ?? 0) + s.y - NAME_PILL_GAP_PX;
+    if (!this.interiorActive && this.jac && jacRoof) {
       out.push({
         id: 'jac',
         name: 'JAC T9',
-        x,
-        y,
-        visible: onScreen(s.x, s.y),
+        x: jacRoof.x,
+        y: jacRoof.y,
+        visible: onScreen(jacRoof.x - (rect?.left ?? 0), jacRoof.y - (rect?.top ?? 0)),
         info: !this.jac.driving,
       });
     }
     return out;
+  }
+
+  /** Client pixels for full building names in top-down (HTML overlay). */
+  cenitalBuildingLabelAnchors(): { id: string; name: string; x: number; y: number; visible: boolean }[] {
+    if (!this.cenitalOn() || this.interiorActive) return [];
+    const rect = this.canvasEl?.getBoundingClientRect();
+    const sw = this.app?.screen.width ?? 0;
+    const sh = this.app?.screen.height ?? 0;
+    const zMin = this.zoomMinForCurrentView(sw, sh);
+    const midZoom = this.zoom >= zMin * 0.55 && !this.mapOverview;
+    const onScreen = (sx: number, sy: number) => sx > -60 && sy > -60 && sx < sw + 60 && sy < sh + 60;
+    const out: { id: string; name: string; x: number; y: number; visible: boolean }[] = [];
+    for (const o of objects) {
+      if (o.type !== 'building' || !o.panelTitle) continue;
+      const fx = o.footprintX ?? o.x;
+      const fy = o.footprintY ?? o.y;
+      const w = o.w ?? 1;
+      const h = o.h ?? 1;
+      const p = tileToWorld(fx + (w - 1) / 2, fy + (h - 1) / 2);
+      const s = this.worldToScreen(p.x, p.y);
+      const cx = (rect?.left ?? 0) + s.x;
+      const cy = (rect?.top ?? 0) + s.y;
+      out.push({
+        id: o.name ?? o.id,
+        name: o.panelTitle,
+        x: cx,
+        y: cy,
+        visible: midZoom && onScreen(s.x, s.y),
+      });
+    }
+    return out;
+  }
+
+  /** QA: expected van heading (0–3 quarters) for a screen stick in cenital drive. */
+  qaCenitalExpectedHeading(screenDx: number, screenDy: number): number | null {
+    const mag = Math.hypot(screenDx, screenDy);
+    if (mag < 0.08 || !this.cenitalOn()) return null;
+    this.syncViewTransform();
+    const { x, y } = screenStickToTile(
+      screenDx / mag,
+      screenDy / mag,
+      this.viewRot,
+      this.viewSx,
+      this.viewSy,
+    );
+    return headingFromTileStick(x, y, this.jac?.dir ?? 'se');
   }
 
   /** QA: opaque-top client point vs the HTML pill's bottom (gap should stay ~NAME_PILL_GAP_PX). */
@@ -5064,8 +5597,7 @@ export class IsoScene {
     const rect = this.canvasEl?.getBoundingClientRect();
     const avatar = this.interiorActive ? this.interiorAvatar : this.avatar;
     const of = (id: string, sprite: Sprite) => {
-      const top = spriteOpaqueTopWorld(sprite);
-      const s = this.worldToScreen(top.x, top.y);
+      const s = this.spriteHeadCanvas(sprite);
       return { id, headX: (rect?.left ?? 0) + s.x, headY: (rect?.top ?? 0) + s.y };
     };
     const heads = [of('adonay', avatar.adonay.sprite), of('pantone', avatar.pantone.sprite)];

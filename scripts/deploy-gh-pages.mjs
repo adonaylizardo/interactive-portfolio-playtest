@@ -20,14 +20,26 @@ const pushDir = path.join(root, '.gh-pages-push');
 
 const LIVE_BASE = '/interactive-portfolio-playtest/';
 const PREVIEW_BASE = '/interactive-portfolio-playtest/preview/';
+const PREVIEW_CAMARAS_BASE = '/interactive-portfolio-playtest/preview-camaras/';
 const LIVE_URL = 'https://adonaylizardo.github.io/interactive-portfolio-playtest/';
 const PREVIEW_URL = 'https://adonaylizardo.github.io/interactive-portfolio-playtest/preview/';
+const PREVIEW_CAMARAS_URL =
+  'https://adonaylizardo.github.io/interactive-portfolio-playtest/preview-camaras/';
 
 const argv = process.argv.slice(2);
-const target =
-  process.env.DEPLOY_TARGET === 'live' || argv.includes('--live') || argv.includes('live')
-    ? 'live'
-    : 'preview';
+const target = (() => {
+  if (process.env.DEPLOY_TARGET === 'live' || argv.includes('--live') || argv.includes('live')) {
+    return 'live';
+  }
+  if (
+    process.env.DEPLOY_TARGET === 'preview-camaras' ||
+    argv.includes('--preview-camaras') ||
+    argv.includes('preview-camaras')
+  ) {
+    return 'preview-camaras';
+  }
+  return 'preview';
+})();
 
 if (target === 'live' && process.env.DEPLOY_LIVE_APPROVED !== '1') {
   console.error(
@@ -39,8 +51,10 @@ if (target === 'live' && process.env.DEPLOY_LIVE_APPROVED !== '1') {
   process.exit(1);
 }
 
-const base = target === 'live' ? LIVE_BASE : PREVIEW_BASE;
-const url = target === 'live' ? LIVE_URL : PREVIEW_URL;
+const base =
+  target === 'live' ? LIVE_BASE : target === 'preview-camaras' ? PREVIEW_CAMARAS_BASE : PREVIEW_BASE;
+const url =
+  target === 'live' ? LIVE_URL : target === 'preview-camaras' ? PREVIEW_CAMARAS_URL : PREVIEW_URL;
 
 function run(cmd, cwd = root) {
   execSync(cmd, { cwd, stdio: 'inherit' });
@@ -51,7 +65,7 @@ if (process.env.DEPLOY_GATE_PASSED === '1') {
   run(`npx vite build --base ${base}`);
 } else {
   run('npm run qa:gate');
-  if (target === 'preview') run(`npx vite build --base ${base}`);
+  if (target === 'preview' || target === 'preview-camaras') run(`npx vite build --base ${base}`);
 }
 
 if (!existsSync(path.join(dist, 'index.html'))) {
@@ -70,8 +84,14 @@ try {
     mkdirSync(dest, { recursive: true });
     cpSync(dist, dest, { recursive: true });
     writeFileSync(path.join(pushDir, '.nojekyll'), '');
+  } else if (target === 'preview-camaras') {
+    const dest = path.join(pushDir, 'preview-camaras');
+    rmSync(dest, { recursive: true, force: true });
+    mkdirSync(dest, { recursive: true });
+    cpSync(dist, dest, { recursive: true });
+    writeFileSync(path.join(pushDir, '.nojekyll'), '');
   } else {
-    const keep = new Set(['.git', 'preview']);
+    const keep = new Set(['.git', 'preview', 'preview-camaras']);
     for (const name of readdirSync(pushDir)) {
       if (keep.has(name)) continue;
       rmSync(path.join(pushDir, name), { recursive: true, force: true });
@@ -88,7 +108,9 @@ try {
     const msg =
       target === 'preview'
         ? 'Deploy candidate to /preview/ (live root unchanged)'
-        : 'Promote approved candidate to live gh-pages root';
+        : target === 'preview-camaras'
+          ? 'Deploy top-down camera candidate to /preview-camaras/'
+          : 'Promote approved candidate to live gh-pages root';
     run('git -c user.email=agent@cursor.com -c user.name="Cursor Agent" commit -m "' + msg + '"', pushDir);
     run('git push origin HEAD:gh-pages', pushDir);
   }

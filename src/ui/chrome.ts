@@ -71,6 +71,7 @@ export class ChromeUI {
     this.bind();
     this.applyI18n();
     onLangChange(() => this.applyI18n());
+    if (this.shortLandscape()) this.mobileSheet = false;
     this.sync();
     studio.onChange(() => {
       this.syncSound();
@@ -78,11 +79,13 @@ export class ChromeUI {
     });
     const onLayout = () => {
       this.mobile = isMobileLayout();
+      if (this.shortLandscape()) this.mobileSheet = false;
       this.sync();
       this.callbacks.onLayoutChange();
     };
     window.matchMedia('(max-width: 767px)').addEventListener('change', onLayout);
     window.matchMedia('(max-height: 500px)').addEventListener('change', onLayout);
+    window.matchMedia('(orientation: landscape)').addEventListener('change', onLayout);
     const draw = () => {
       this.drawMinimap();
       this.syncViewButtons();
@@ -120,6 +123,7 @@ export class ChromeUI {
   setLayout(next: DesktopLayout): void {
     if (this.mobile) {
       this.mobileSheet = next !== 'map';
+      if (this.shortLandscape()) this.mobileSheet = false;
     } else {
       this.layout = next;
     }
@@ -300,7 +304,6 @@ export class ChromeUI {
           <button type="button" class="ui-view" data-view="rotate" aria-label="Rotate" data-i18n-aria="chrome.rotate">${iconSvg('rotate')}</button>
           <button type="button" class="ui-view is-active" data-view="isometrica" aria-label="Isometric" data-i18n-aria="chrome.isometric">${iconSvg('cube')}</button>
           <button type="button" class="ui-view" data-view="cenital" aria-label="Top-down" data-i18n-aria="chrome.topdown">${iconSvg('grid')}</button>
-          <button type="button" class="ui-view" data-view="perspectiva" aria-label="Perspective" data-i18n-aria="chrome.perspective">${iconSvg('persp')}</button>
           <button type="button" class="ui-view" data-view="map" aria-label="Map overview" data-i18n-aria="chrome.map">${iconSvg('map')}</button>
         </div>
       </div>
@@ -508,6 +511,14 @@ export class ChromeUI {
       if (key !== 'rotate' && key !== 'map') btn.classList.toggle('is-active', key === v.mode);
       if (key === 'map') btn.classList.toggle('is-active', v.overview);
     });
+    this.root.classList.toggle('chrome--alt-view', v.mode !== 'isometrica');
+    const hint = this.root.querySelector('.chrome__sound') as HTMLElement | null;
+    if (hint && v.mode !== 'isometrica' && !hint.hidden) {
+      hint.hidden = true;
+      hint.dataset.hint = '0';
+      hint.setAttribute('aria-hidden', 'true');
+      hint.classList.remove('chrome__sound--fade');
+    }
   }
 
   private placeSubtitle(): void {
@@ -526,14 +537,17 @@ export class ChromeUI {
     sub.style.top = '';
   }
 
+  private shortLandscape(): boolean {
+    return window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
+  }
+
   private placeLang(): void {
     const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
     if (!lang) return;
-    const shortLand = window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
-    if (shortLand) {
+    if (this.shortLandscape() || (this.mobile && window.innerWidth > window.innerHeight)) {
       lang.style.top = '12px';
-      lang.style.left = '16px';
-      lang.style.right = 'auto';
+      lang.style.right = '16px';
+      lang.style.left = 'auto';
       return;
     }
     lang.style.left = '';
@@ -555,17 +569,25 @@ export class ChromeUI {
     if (!ctx) return;
     const w = this.minimap.width;
     const h = this.minimap.height;
+    const view = this.getView();
+    const cenital = view.mode === 'cenital';
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = '#0B0C0E';
-    ctx.beginPath();
-    ctx.moveTo(w / 2, 4);
-    ctx.lineTo(w - 4, h / 2);
-    ctx.lineTo(w / 2, h - 4);
-    ctx.lineTo(4, h / 2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = '#2A2C31';
-    ctx.stroke();
+    if (cenital) {
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = '#2A2C31';
+      ctx.strokeRect(2, 2, w - 4, h - 4);
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(w / 2, 4);
+      ctx.lineTo(w - 4, h / 2);
+      ctx.lineTo(w / 2, h - 4);
+      ctx.lineTo(4, h / 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#2A2C31';
+      ctx.stroke();
+    }
 
     const buildings = getEnterableBuildings();
     let minX = Infinity;
@@ -592,7 +614,8 @@ export class ChromeUI {
     ctx.fillStyle = '#24262B';
     for (const { p } of pts) {
       const s = map(p.x, p.y);
-      ctx.fillRect(s.x - 4, s.y - 3, 8, 6);
+      if (cenital) ctx.fillRect(s.x - 5, s.y - 4, 10, 8);
+      else ctx.fillRect(s.x - 4, s.y - 3, 8, 6);
     }
     const t = this.getCharTile();
     const c = map(tileToWorld(t.x, t.y).x, tileToWorld(t.x, t.y).y);
