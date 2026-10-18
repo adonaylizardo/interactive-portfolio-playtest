@@ -255,6 +255,7 @@ async function newArmedPage(browser, w) {
   });
   await hideWebdriver(ctx);
   const page = await ctx.newPage();
+  page.on('crash', () => log('page crash', w.tag));
   await boot(page);
   if (!report.hash) {
     report.hash = await page.evaluate(() => document.querySelector('script[src*="assets/index-"]')?.src ?? '');
@@ -264,80 +265,113 @@ async function newArmedPage(browser, w) {
   return { ctx, page, cdp };
 }
 
+async function safeClose(ctx) {
+  try {
+    await ctx?.close();
+  } catch {
+    /* already dead */
+  }
+}
+
 async function measureDoors(browser) {
   for (const w of WIDTHS) {
-    const { ctx, page, cdp } = await newArmedPage(browser, w);
     const rows = [];
     for (const name of DOORS) {
-      await spawnDrive(page);
-      await armSampler(page);
-      await tapDoor(page, cdp, name, w.touch);
-      const end = await waitEntered(page, 50000);
-      const samples = await readTrace(page);
-      const trace = analyzeTrace(samples);
-      const jumpFail = trace.jumps.some((j) => j.kind === 'van');
-      const ok = end.ok && !jumpFail;
-      log(
-        `door ${w.tag} ${name} ${ok ? 'OK' : 'FAIL'} ${end.ms}ms @${end.cx?.toFixed?.(2)},${end.cy?.toFixed?.(2)} vanΔ=${trace.vanJump.toFixed(2)} hops=${trace.jumps.length} why=${end.sitWhy ?? ''}`,
-      );
-      if (!ok) report.errors.push(`door ${w.tag} ${name}`);
-      rows.push({ name, ok, ms: end.ms, cx: end.cx, cy: end.cy, vanJump: trace.vanJump, overlap: end.overlap });
-      await page.evaluate(() => {
-        window.__playtestQa.dismissBuildingPanel?.();
-        window.__playtestQa.leaveInteriorNow?.();
-        if (window.__playtestQa.jac().driving) window.__playtestQa.jacGetOut?.();
-      });
+      let ctx;
+      try {
+        const armed = await newArmedPage(browser, w);
+        ctx = armed.ctx;
+        const { page, cdp } = armed;
+        await spawnDrive(page);
+        await armSampler(page);
+        await tapDoor(page, cdp, name, w.touch);
+        const end = await waitEntered(page, 50000);
+        const samples = await readTrace(page);
+        const trace = analyzeTrace(samples);
+        const jumpFail = trace.jumps.some((j) => j.kind === 'van');
+        const ok = end.ok && !jumpFail;
+        log(
+          `door ${w.tag} ${name} ${ok ? 'OK' : 'FAIL'} ${end.ms}ms @${end.cx?.toFixed?.(2)},${end.cy?.toFixed?.(2)} vanΔ=${trace.vanJump.toFixed(2)} hops=${trace.jumps.length} why=${end.sitWhy ?? ''}`,
+        );
+        if (!ok) report.errors.push(`door ${w.tag} ${name}`);
+        rows.push({ name, ok, ms: end.ms, cx: end.cx, cy: end.cy, vanJump: trace.vanJump, overlap: end.overlap });
+      } catch (err) {
+        log(`door ${w.tag} ${name} CRASH ${err?.message ?? err}`);
+        report.errors.push(`door ${w.tag} ${name}`);
+        rows.push({ name, ok: false, crash: String(err?.message ?? err) });
+      } finally {
+        await safeClose(ctx);
+      }
     }
     report.doors[w.tag] = rows;
-    await ctx.close();
   }
 }
 
 async function measureGround(browser) {
   for (const w of WIDTHS) {
-    const { ctx, page, cdp } = await newArmedPage(browser, w);
     for (const [gx, gy] of GROUND_GOALS) {
-      await spawnDrive(page);
-      await armSampler(page);
-      await tapTile(page, cdp, gx, gy, w.touch);
-      const end = await waitArrive(page, gx, gy);
-      const samples = await readTrace(page);
-      const trace = analyzeTrace(samples);
-      const ratio = pathRatio(samples, gx, gy);
-      const flips = headingFlips(samples);
-      const jumpFail = trace.jumps.some((j) => j.kind === 'van');
-      const ok = end.ok && !jumpFail && ratio <= 1.5 && flips === 0;
-      log(
-        `ground ${w.tag} (${gx},${gy}) ${ok ? 'OK' : 'FAIL'} ${end.ms}ms d=${end.dist?.toFixed?.(2)} ratio=${ratio.toFixed(2)} flips180=${flips} vanΔ=${trace.vanJump.toFixed(2)} goal=${JSON.stringify(end.goal)}`,
-      );
-      if (!ok) report.errors.push(`ground ${w.tag} (${gx},${gy})`);
-      report.ground.push({ w: w.tag, gx, gy, ok, ms: end.ms, dist: end.dist, ratio, flips180: flips, vanJump: trace.vanJump });
+      let ctx;
+      try {
+        const armed = await newArmedPage(browser, w);
+        ctx = armed.ctx;
+        const { page, cdp } = armed;
+        await spawnDrive(page);
+        await armSampler(page);
+        await tapTile(page, cdp, gx, gy, w.touch);
+        const end = await waitArrive(page, gx, gy);
+        const samples = await readTrace(page);
+        const trace = analyzeTrace(samples);
+        const ratio = pathRatio(samples, gx, gy);
+        const flips = headingFlips(samples);
+        const jumpFail = trace.jumps.some((j) => j.kind === 'van');
+        const ok = end.ok && !jumpFail && ratio <= 1.5 && flips === 0;
+        log(
+          `ground ${w.tag} (${gx},${gy}) ${ok ? 'OK' : 'FAIL'} ${end.ms}ms d=${end.dist?.toFixed?.(2)} ratio=${ratio.toFixed(2)} flips180=${flips} vanΔ=${trace.vanJump.toFixed(2)} goal=${JSON.stringify(end.goal)}`,
+        );
+        if (!ok) report.errors.push(`ground ${w.tag} (${gx},${gy})`);
+        report.ground.push({ w: w.tag, gx, gy, ok, ms: end.ms, dist: end.dist, ratio, flips180: flips, vanJump: trace.vanJump });
+      } catch (err) {
+        log(`ground ${w.tag} (${gx},${gy}) CRASH ${err?.message ?? err}`);
+        report.errors.push(`ground ${w.tag} (${gx},${gy})`);
+        report.ground.push({ w: w.tag, gx, gy, ok: false, crash: String(err?.message ?? err) });
+      } finally {
+        await safeClose(ctx);
+      }
     }
-    await ctx.close();
   }
 }
 
 async function measureRetarget(browser) {
   for (const w of WIDTHS) {
     for (const pair of RETARGET_PAIRS) {
-      const { ctx, page, cdp } = await newArmedPage(browser, w);
-      await spawnDrive(page);
-      await armSampler(page);
-      await tapDoor(page, cdp, pair.from, w.touch);
-      await wait(pair.delay);
-      await tapDoor(page, cdp, pair.to, w.touch);
-      const end = await waitEntered(page, 35000);
-      const samples = await readTrace(page);
-      const trace = analyzeTrace(samples);
-      const jumpFail = trace.jumps.some((j) => j.kind === 'van');
-      const hit = pair.want.test(end.panel || '') || pair.want.test(end.interior || '');
-      const ok = end.ok && hit && !jumpFail && !end.driving;
-      log(
-        `retarget ${w.tag} ${pair.from}→${pair.to} ${ok ? 'OK' : 'FAIL'} ${end.ms}ms panel=${end.panel} int=${end.interior} driving=${end.driving} @${end.cx?.toFixed?.(2)},${end.cy?.toFixed?.(2)} vanΔ=${trace.vanJump.toFixed(2)}`,
-      );
-      if (!ok) report.errors.push(`retarget ${w.tag} ${pair.from}→${pair.to}`);
-      report.retarget.push({ w: w.tag, pair: `${pair.from}→${pair.to}`, ok, ms: end.ms, panel: end.panel });
-      await ctx.close();
+      let ctx;
+      try {
+        const armed = await newArmedPage(browser, w);
+        ctx = armed.ctx;
+        const { page, cdp } = armed;
+        await spawnDrive(page);
+        await armSampler(page);
+        await tapDoor(page, cdp, pair.from, w.touch);
+        await wait(pair.delay);
+        await tapDoor(page, cdp, pair.to, w.touch);
+        const end = await waitEntered(page, 35000);
+        const samples = await readTrace(page);
+        const trace = analyzeTrace(samples);
+        const jumpFail = trace.jumps.some((j) => j.kind === 'van');
+        const hit = pair.want.test(end.panel || '') || pair.want.test(end.interior || '');
+        const ok = end.ok && hit && !jumpFail && !end.driving;
+        log(
+          `retarget ${w.tag} ${pair.from}→${pair.to} ${ok ? 'OK' : 'FAIL'} ${end.ms}ms panel=${end.panel} int=${end.interior} driving=${end.driving} @${end.cx?.toFixed?.(2)},${end.cy?.toFixed?.(2)} vanΔ=${trace.vanJump.toFixed(2)}`,
+        );
+        if (!ok) report.errors.push(`retarget ${w.tag} ${pair.from}→${pair.to}`);
+        report.retarget.push({ w: w.tag, pair: `${pair.from}→${pair.to}`, ok, ms: end.ms, panel: end.panel });
+      } catch (err) {
+        log(`retarget ${w.tag} ${pair.from}→${pair.to} CRASH ${err?.message ?? err}`);
+        report.errors.push(`retarget ${w.tag} ${pair.from}→${pair.to}`);
+        report.retarget.push({ w: w.tag, pair: `${pair.from}→${pair.to}`, ok: false, crash: String(err?.message ?? err) });
+      } finally {
+        await safeClose(ctx);
+      }
     }
   }
 }
@@ -345,25 +379,33 @@ async function measureRetarget(browser) {
 async function montage(browser) {
   const { default: sharp } = await import('sharp').catch(() => ({ default: null }));
   const files = [];
-  const { ctx, page, cdp } = await newArmedPage(browser, WIDTHS[0]);
   for (const name of DOORS) {
-    await spawnDrive(page);
-    await tapDoor(page, cdp, name, true);
-    await waitEntered(page, 40000);
-    await page.evaluate(() => {
-      window.__playtestQa.dismissBuildingPanel?.();
-      window.__playtestQa.leaveInteriorNow?.();
-      if (window.__playtestQa.jac().driving) window.__playtestQa.jacGetOut?.();
-      window.__playtestQa.focusJac?.();
-      window.__playtestQa.setZoom?.(0.7);
-    });
-    await wait(200);
-    const file = path.join(OUT, `parked-${name}.png`);
-    await page.screenshot({ path: file, fullPage: false });
-    files.push(file);
-    log('shot', name, file);
+    let ctx;
+    try {
+      const armed = await newArmedPage(browser, WIDTHS[0]);
+      ctx = armed.ctx;
+      const { page, cdp } = armed;
+      await spawnDrive(page);
+      await tapDoor(page, cdp, name, true);
+      await waitEntered(page, 40000);
+      await page.evaluate(() => {
+        window.__playtestQa.dismissBuildingPanel?.();
+        window.__playtestQa.leaveInteriorNow?.();
+        if (window.__playtestQa.jac().driving) window.__playtestQa.jacGetOut?.();
+        window.__playtestQa.focusJac?.();
+        window.__playtestQa.setZoom?.(0.7);
+      });
+      await wait(200);
+      const file = path.join(OUT, `parked-${name}.png`);
+      await page.screenshot({ path: file, fullPage: false });
+      files.push(file);
+      log('shot', name, file);
+    } catch (err) {
+      log('shot', name, 'CRASH', err?.message ?? err);
+    } finally {
+      await safeClose(ctx);
+    }
   }
-  await ctx.close();
   const dest = path.join(OUT, 'montage390.png');
   if (!sharp) return dest;
   const bufs = await Promise.all(files.map((f) => sharp(f).resize(260, 260, { fit: 'cover' }).png().toBuffer()));

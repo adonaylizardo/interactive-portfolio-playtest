@@ -4453,13 +4453,19 @@ export class IsoScene {
       if (near) entry = near;
     }
     if (entry) {
+      const building = getBuildingAtDoor(entry.door.x, entry.door.y);
+      const d = Math.min(
+        Math.hypot(this.charTx - entry.door.x, this.charTy - entry.door.y),
+        Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y),
+      );
+      // Drive-enter sits are already on the door side. A blocked walk around
+      // the parked 5×3 left Mentoría parked with no panel for 35 s.
+      if (building && d <= 6) {
+        this.enterBuildingFromDoor(building);
+        return;
+      }
       this.pendingWalkInAt = performance.now();
       this.requestWalk(entry.door.x, entry.door.y, false, { buildingEntry: entry });
-      if (this.interiorActive) return;
-      if (this.pendingBuildingEntry && this.path.length > 0) return;
-      const building = getBuildingAtDoor(entry.door.x, entry.door.y);
-      const d = Math.hypot(this.charTx - entry.door.x, this.charTy - entry.door.y);
-      if (building && d <= 6) this.enterBuildingFromDoor(building);
     }
   }
 
