@@ -16,6 +16,7 @@ import {
   isReadingHash,
   leaveReadingHash,
   navigateReading,
+  readingDepth,
   syncReadingDepthFromHistory,
   parseReadingRoute,
   resetReadingNavigationForLoad,
@@ -101,8 +102,9 @@ async function main(): Promise<void> {
   };
 
   const closeReading = (): void => {
+    const depthBeforeLeave = readingDepth();
     leaveReadingHash();
-    syncReadingFromHash();
+    if (depthBeforeLeave < 1) syncReadingFromHash();
   };
 
   const reading = new ReadingView(uiRoot, closeReading);

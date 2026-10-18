@@ -48,10 +48,8 @@ function inferReadingDepthFromHash(): number {
 
 /** Sync depth from history.state.rDepth after back/forward (not +/- counting). */
 export function syncReadingDepthFromHistory(): void {
-  if (skipNextReadingPopstateDepth) {
-    skipNextReadingPopstateDepth = false;
-    return;
-  }
+  const skipped = skipNextReadingPopstateDepth;
+  skipNextReadingPopstateDepth = false;
   if (!isReadingHash()) {
     setReadingDepth(0);
     return;
@@ -61,7 +59,7 @@ export function syncReadingDepthFromHistory(): void {
     setReadingDepth(st.rDepth);
     return;
   }
-  setReadingDepth(inferReadingDepthFromHash());
+  if (!skipped) setReadingDepth(inferReadingDepthFromHash());
 }
 
 export function canNavigateReadingBack(): boolean {

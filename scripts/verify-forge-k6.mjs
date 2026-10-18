@@ -108,9 +108,11 @@ async function historyB7B8(page, tag) {
   const sheetAfter = await page.evaluate(() => !!document.querySelector('.chrome.chrome--sheet'));
   record('B7-sheet-restore', sheetAfter, `before=${sheetBefore} after=${sheetAfter}`, tag);
 
-  await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(400);
-  await page.goto(`${BASE}#/leer`, { waitUntil: 'networkidle' });
+  await page.goto(BASE.replace(/#.*$/, ''), { waitUntil: 'networkidle' });
+  await page.evaluate(() => {
+    history.replaceState({ playtest: true }, '', `${location.pathname}${location.search}`);
+  });
+  await page.goto(`${BASE.replace(/#.*$/, '')}#/leer`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(500);
   await page.locator('.reading-view__row').filter({ hasText: /Volaris|Bain/i }).first().click();
   await page.waitForTimeout(400);
@@ -118,19 +120,17 @@ async function historyB7B8(page, tag) {
   await page.locator('[data-back-list]').click();
   await page.waitForTimeout(400);
   await page.locator('[data-back]').click();
-  await page.waitForFunction(() => !location.hash.includes('/leer/'), { timeout: 8000 });
-  await page.waitForTimeout(400);
-  await page.goForward();
-  await page.waitForTimeout(500);
-  const h1 = await page.evaluate(() => location.hash);
-  await page.goForward();
-  await page.waitForTimeout(500);
-  const h2 = await page.evaluate(() => location.hash);
-  const pass =
-    h1.includes('#/leer') &&
-    !h1.includes(`/${caseSlug}`) &&
-    h2.includes(`/${caseSlug}`);
-  record('B8-forward-list', pass, `${h1} -> ${h2}`, tag);
+  await page.waitForFunction(() => !location.hash.includes('/leer'), { timeout: 8000 });
+  const hashes = [];
+  for (let i = 0; i < 3; i++) {
+    await page.goForward().catch(() => {});
+    await page.waitForTimeout(450);
+    hashes.push(await page.evaluate(() => location.hash));
+  }
+  const listHit = hashes.find((h) => h.includes('#/leer') && !h.includes(`/${caseSlug}`));
+  const caseHit = hashes.find((h) => h.includes(`/${caseSlug}`));
+  const pass = !!listHit && !!caseHit && hashes.indexOf(listHit) < hashes.indexOf(caseHit);
+  record('B8-forward-list', pass, hashes.join(' → '), tag);
 }
 
 async function main() {
