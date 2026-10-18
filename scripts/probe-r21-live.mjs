@@ -247,22 +247,64 @@ async function readTrace(page) {
   return page.evaluate(() => window.__r21s ?? []);
 }
 
-async function newArmedPage(browser, w) {
-  const ctx = await browser.newContext({
-    viewport: w.size,
-    hasTouch: w.touch,
-    isMobile: w.touch,
+async function launchQaBrowser() {
+  return launchBrowser(chromium, {
+    headless: true,
+    args: ['--disable-dev-shm-usage', '--disable-extensions'],
   });
-  await hideWebdriver(ctx);
-  const page = await ctx.newPage();
-  page.on('crash', () => log('page crash', w.tag));
-  await boot(page);
-  if (!report.hash) {
-    report.hash = await page.evaluate(() => document.querySelector('script[src*="assets/index-"]')?.src ?? '');
-    log('hash', report.hash);
+}
+
+let browser = null;
+
+async function ensureBrowser() {
+  if (browser?.isConnected()) return browser;
+  try {
+    await browser?.close();
+  } catch {
+    /* dead */
   }
-  const cdp = await page.context().newCDPSession(page);
-  return { ctx, page, cdp };
+  browser = await launchQaBrowser();
+  return browser;
+}
+
+async function killBrowser() {
+  try {
+    await browser?.close();
+  } catch {
+    /* dead */
+  }
+  browser = null;
+}
+
+async function newArmedPage(w) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const b = await ensureBrowser();
+    try {
+      const ctx = await b.newContext({
+        viewport: w.size,
+        hasTouch: w.touch,
+        isMobile: w.touch,
+        deviceScaleFactor: 1,
+      });
+      await hideWebdriver(ctx);
+      const page = await ctx.newPage();
+      page.on('crash', () => {
+        log('page crash', w.tag);
+        void killBrowser();
+      });
+      await boot(page);
+      if (!report.hash) {
+        report.hash = await page.evaluate(() => document.querySelector('script[src*="assets/index-"]')?.src ?? '');
+        log('hash', report.hash);
+      }
+      const cdp = await page.context().newCDPSession(page);
+      return { ctx, page, cdp };
+    } catch (err) {
+      log('arm fail', w.tag, attempt, err?.message ?? err);
+      await killBrowser();
+    }
+  }
+  throw new Error(`could not arm ${w.tag}`);
 }
 
 async function safeClose(ctx) {
@@ -273,13 +315,13 @@ async function safeClose(ctx) {
   }
 }
 
-async function measureDoors(browser) {
+async function measureDoors() {
   for (const w of WIDTHS) {
     const rows = [];
     for (const name of DOORS) {
       let ctx;
       try {
-        const armed = await newArmedPage(browser, w);
+        const armed = await newArmedPage(w);
         ctx = armed.ctx;
         const { page, cdp } = armed;
         await spawnDrive(page);
@@ -307,12 +349,12 @@ async function measureDoors(browser) {
   }
 }
 
-async function measureGround(browser) {
+async function measureGround() {
   for (const w of WIDTHS) {
     for (const [gx, gy] of GROUND_GOALS) {
       let ctx;
       try {
-        const armed = await newArmedPage(browser, w);
+        const armed = await newArmedPage(w);
         ctx = armed.ctx;
         const { page, cdp } = armed;
         await spawnDrive(page);
@@ -341,12 +383,12 @@ async function measureGround(browser) {
   }
 }
 
-async function measureRetarget(browser) {
+async function measureRetarget() {
   for (const w of WIDTHS) {
     for (const pair of RETARGET_PAIRS) {
       let ctx;
       try {
-        const armed = await newArmedPage(browser, w);
+        const armed = await newArmedPage(w);
         ctx = armed.ctx;
         const { page, cdp } = armed;
         await spawnDrive(page);
@@ -376,13 +418,13 @@ async function measureRetarget(browser) {
   }
 }
 
-async function montage(browser) {
+async function montage() {
   const { default: sharp } = await import('sharp').catch(() => ({ default: null }));
   const files = [];
   for (const name of DOORS) {
     let ctx;
     try {
-      const armed = await newArmedPage(browser, WIDTHS[0]);
+      const armed = await newArmedPage(WIDTHS[0]);
       ctx = armed.ctx;
       const { page, cdp } = armed;
       await spawnDrive(page);
@@ -417,12 +459,15 @@ async function montage(browser) {
   return dest;
 }
 
-const browser = await launchBrowser(chromium, { headless: true });
 try {
-  await measureRetarget(browser);
-  if (!process.env.R21_ONLY) { await measureGround(browser); await measureDoors(browser); await montage(browser); }
+  await measureRetarget();
+  if (!process.env.R21_ONLY) {
+    await measureGround();
+    await measureDoors();
+    await montage();
+  }
 } finally {
-  await browser.close();
+  await killBrowser();
 }
 fs.writeFileSync(path.join(OUT, 'r21-live.json'), JSON.stringify(report, null, 2));
 log('errors', report.errors.length, report.errors);

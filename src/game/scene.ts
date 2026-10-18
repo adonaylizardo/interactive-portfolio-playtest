@@ -4511,8 +4511,19 @@ export class IsoScene {
       this.jacGetOut({ thenEnter: true });
       return;
     }
-    if (leftSpawn && slow && along >= 0 && distDoor <= 4.2 && (distSit > 1.5 || stalled || this.jac.mph < 0.5)) {
-      this.jac.sitWhy = `door-side sitD=${distSit.toFixed(2)} doorD=${distDoor.toFixed(2)}`;
+    if (leftSpawn && along >= 0 && distDoor <= 3.6 && this.jac.mph < 3) {
+      this.jac.sitWhy = `door-close sitD=${distSit.toFixed(2)} doorD=${distDoor.toFixed(2)} mph=${this.jac.mph}`;
+      this.jacGetOut({ thenEnter: true });
+      return;
+    }
+    if (
+      leftSpawn &&
+      distDoor <= 5 &&
+      this.pendingDriveEnterAt &&
+      performance.now() - this.pendingDriveEnterAt > 7000 &&
+      this.jac.mph < 4
+    ) {
+      this.jac.sitWhy = `door-timeout sitD=${distSit.toFixed(2)} doorD=${distDoor.toFixed(2)}`;
       this.jacGetOut({ thenEnter: true });
       return;
     }
