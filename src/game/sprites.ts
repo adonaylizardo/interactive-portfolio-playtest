@@ -132,10 +132,13 @@ async function loadBootAtlas(): Promise<void> {
   }
 }
 
-export async function loadKeys(keys: string[]): Promise<void> {
-  const todo = keys.filter((k) => !textures.has(k));
+export async function loadKeys(keys: string[], onKeyDone?: () => void): Promise<void> {
   await Promise.all(
-    todo.map((k) => {
+    keys.map(async (k) => {
+      if (textures.has(k)) {
+        onKeyDone?.();
+        return;
+      }
       let p = loading.get(k);
       if (!p) {
         p = (async () => {
@@ -144,7 +147,8 @@ export async function loadKeys(keys: string[]): Promise<void> {
         })();
         loading.set(k, p);
       }
-      return p;
+      await p;
+      onKeyDone?.();
     }),
   );
 }
@@ -193,7 +197,11 @@ export function buildingStateKeys(state: BuildingSpriteState): string[] {
  * Decode `keys` (spawn view) at @1x so the first frame is small. Pass nothing to load every
  * outdoor default frame (QA / `loadAllSprites` still want the old set).
  */
-export async function loadMapSprites(rendererResolution: number, keys?: string[]): Promise<void> {
+export async function loadMapSprites(
+  rendererResolution: number,
+  keys?: string[],
+  onKeyDone?: () => void,
+): Promise<void> {
   resolution = keys ? 1 : rendererResolution >= 1.5 ? 2 : 1;
   try {
     await loadBootAtlas();
@@ -201,7 +209,7 @@ export async function loadMapSprites(rendererResolution: number, keys?: string[]
     /* atlas missing in an old deploy: fall through to individual files */
   }
   if (keys) {
-    await loadKeys(keys.filter((k) => !textures.has(k)));
+    await loadKeys(keys, onKeyDone);
     return;
   }
   const stateFrames = new Set([...buildingStateKeys('hover'), ...buildingStateKeys('resaltado')]);

@@ -1,0 +1,226 @@
+body.boot-loading #ui-root {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+body.boot-welcome #ui-root .chrome,
+body.boot-welcome #ui-root .checklist {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.boot-flow {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  pointer-events: auto;
+  color: #edeef0;
+}
+
+.boot-flow--done {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+.boot-flow__loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(11 12 14 / 94%);
+  transition: opacity 0.25s ease;
+}
+
+.boot-flow__loading--out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.boot-flow__center {
+  width: min(320px, calc(100% - 48px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.boot-flow__monogram {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #1a1c20;
+  border: 1px solid #2a2c31;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.boot-flow__name {
+  margin: 0;
+  font-family: Geist, Inter, system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 22px;
+  color: #edeef0;
+}
+
+.boot-flow__track {
+  width: 100%;
+  height: 2px;
+  border-radius: 1px;
+  background: #2a2c31;
+  overflow: hidden;
+}
+
+.boot-flow__fill {
+  height: 100%;
+  width: 0%;
+  background: #edeef0;
+  transition: width 0.12s ease-out;
+}
+
+.boot-flow__meta {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-family: Geist, Inter, system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 18px;
+  color: #8a8f98;
+}
+
+.boot-flow__welcome {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.boot-flow--welcome .boot-flow__welcome {
+  pointer-events: auto;
+}
+
+.boot-flow__lang {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  left: 16px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 22px;
+  border: 1px solid #2a2c31;
+  background: #141518;
+  color: #edeef0;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 45%);
+}
+
+.boot-flow__lang:focus-visible {
+  outline: 2px solid #ffb547;
+  outline-offset: 2px;
+}
+
+.boot-flow__sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 12px 20px max(24px, env(safe-area-inset-bottom));
+  background: #141518;
+  border: 1px solid #2a2c31;
+  border-bottom: none;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -8px 32px rgb(0 0 0 / 45%);
+}
+
+.boot-flow__handle {
+  width: 40px;
+  height: 4px;
+  margin: 0 auto 16px;
+  border-radius: 2px;
+  background: #3a3d44;
+}
+
+.boot-flow__headline {
+  margin: 0 0 20px;
+  font-family: Geist, Inter, system-ui, sans-serif;
+  font-size: clamp(18px, 4.5vw, 22px);
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: center;
+  color: #edeef0;
+}
+
+.boot-flow__actions {
+  display: flex;
+  gap: 12px;
+}
+
+.boot-flow__btn {
+  flex: 1;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-family: Geist, Inter, system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 22px;
+  cursor: pointer;
+}
+
+.boot-flow__btn--primary {
+  border: none;
+  background: #edeef0;
+  color: #0b0c0e;
+}
+
+.boot-flow__btn--ghost {
+  border: 1px solid #edeef0;
+  background: transparent;
+  color: #edeef0;
+}
+
+.boot-flow__btn:focus-visible {
+  outline: 2px solid #ffb547;
+  outline-offset: 2px;
+}
+
+@media (min-width: 768px) {
+  .boot-flow__lang {
+    left: auto;
+    right: 16px;
+  }
+
+  .boot-flow__sheet {
+    left: 50%;
+    right: auto;
+    bottom: 32px;
+    transform: translateX(-50%);
+    width: min(520px, calc(100% - 48px));
+    border-radius: 20px;
+    border-bottom: 1px solid #2a2c31;
+    padding: 24px 28px 28px;
+  }
+
+  .boot-flow__handle {
+    display: none;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .boot-flow__sheet {
+    max-height: min(70vh, 280px);
+    overflow-y: auto;
+  }
+}

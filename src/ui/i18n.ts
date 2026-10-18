@@ -193,6 +193,10 @@ const DICT = {
     'chrome.audience': 'Audience',
 
     'boot.error': 'Failed to load:',
+    'boot.loading': 'Loading the map',
+    'welcome.headline': 'Hey there, my name is Adonay Lizardo 👋',
+    'welcome.start': 'Get started',
+    'welcome.readOnly': 'Read only',
   },
   es: {
     'check.label': 'Primeros pasos',
@@ -375,6 +379,10 @@ const DICT = {
     'chrome.audience': 'Audiencia',
 
     'boot.error': 'Error al cargar:',
+    'boot.loading': 'Cargando el mapa',
+    'welcome.headline': 'Hola, me llamo Adonay Lizardo 👋',
+    'welcome.start': 'Empezar',
+    'welcome.readOnly': 'Solo leer',
   },
 } as const;
 

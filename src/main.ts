@@ -33,6 +33,12 @@ import { BuildingMapLabels } from './ui/buildingMapLabels';
 import { NameLabels } from './ui/nameLabels';
 import { hideToast, showToast } from './ui/toast';
 import { formatContentDate } from './ui/contentLabels';
+import {
+  BootFlow,
+  enterReadingFromWelcome,
+  markWelcomeDone,
+  shouldSkipWelcomeFlow,
+} from './ui/bootFlow';
 import { getLang, onLangChange, setLang, t } from './ui/i18n';
 import type { Camera } from './tokens';
 
@@ -46,6 +52,9 @@ async function main(): Promise<void> {
   onLangChange(applyCanvasLabel);
 
   const checklist = new ChecklistUI(uiRoot, { onSkip: () => {}, onDismiss: () => {} });
+  const bootFlow = new BootFlow();
+  bootFlow.mount();
+  const skipWelcome = shouldSkipWelcomeFlow();
 
   let scene!: IsoScene;
 
@@ -159,6 +168,10 @@ async function main(): Promise<void> {
       scene?.schedulePresentationRefresh(3);
     },
     () => scene.leaveInteriorNow(),
+    () => {
+      scene?.refreshCanvasPresentation(true);
+      scene?.schedulePresentationRefresh(8);
+    },
   );
   joystick.onStickStart(() => {
     if (panel.isPreviewMode()) panel.hide();
@@ -269,6 +282,7 @@ async function main(): Promise<void> {
       },
       onJacHud: () => chrome.setLayout('map'),
     },
+    onLoadProgress: (pct) => bootFlow.setProgress(pct),
   });
 
   chrome.bindScene({
@@ -306,6 +320,23 @@ async function main(): Promise<void> {
   if (bootReading) setHashWriteSuppressed(true);
 
   await scene.init(canvas);
+
+  let enteredViaWelcomeRead = false;
+  if (skipWelcome) {
+    await bootFlow.finishLoading(true);
+  } else {
+    const choice = await bootFlow.finishLoading(false);
+    markWelcomeDone();
+    if (choice === 'read') {
+      enteredViaWelcomeRead = true;
+      enterReadingFromWelcome();
+    } else {
+      if (isMobileLayout()) chrome.setLayout('map');
+      else chrome.setLayout('split');
+    }
+    bootFlow.dismiss();
+  }
+
   chrome.beginSoundHint();
   const bootFocus = new URLSearchParams(location.search).get('focus');
   if (bootFocus === 'jac') {
@@ -313,7 +344,7 @@ async function main(): Promise<void> {
     scene.focusJac();
   }
 
-  if (bootReading) {
+  if (bootReading || enteredViaWelcomeRead) {
     syncReadingFromHash();
   } else {
     const bootInterior = parseInteriorFromHash();

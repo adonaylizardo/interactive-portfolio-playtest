@@ -94,7 +94,6 @@ import {
   worldBackgroundColor,
   type BuildingSpriteState,
 } from './sprites';
-import { dismissBootScreen } from './assetUrl';
 import {
   buildInteriorGrid,
   drawInteriorFloor,
@@ -236,6 +235,7 @@ export type SceneEvents = {
   onGetOutToEnter?: () => void;
   onMoveCommand?: () => void;
   onFrame?: () => void;
+  onLoadProgress?: (pct: number) => void;
   stick?: () => { x: number; y: number };
   stickActive?: () => boolean;
   /** Touch/coarse pad is the 1-finger move control — do not pan or capture the pointer. */
@@ -457,6 +457,11 @@ export class IsoScene {
   async init(canvas: HTMLCanvasElement): Promise<void> {
     this.canvasEl = canvas;
     this.app = new Application();
+    const reportLoad = (pct: number): void => {
+      this.events.onLoadProgress?.(Math.max(0, Math.min(100, Math.round(pct))));
+    };
+    reportLoad(2);
+
     await this.app.init({
       canvas,
       background: worldBackgroundColor(),
@@ -510,9 +515,22 @@ export class IsoScene {
     }
     this.syncViewTransform();
 
-    await loadMapSprites(this.app.renderer.resolution, this.firstPaintKeys());
-    if (bootInterior && isSpriteInterior(bootInterior)) await loadInteriorSprite(bootInterior);
+    reportLoad(8);
+    const paintKeys = this.firstPaintKeys();
+    const spriteSpan = 62;
+    let spritesDone = 0;
+    const spriteTotal = Math.max(1, paintKeys.length);
+    await loadMapSprites(this.app.renderer.resolution, paintKeys, () => {
+      spritesDone += 1;
+      reportLoad(8 + (spritesDone / spriteTotal) * spriteSpan);
+    });
+    reportLoad(72);
+    if (bootInterior && isSpriteInterior(bootInterior)) {
+      await loadInteriorSprite(bootInterior);
+      reportLoad(78);
+    }
     await loadPlayerSheets(1);
+    reportLoad(88);
     this.avatar = new PlayerAvatar(
       this.objectsLayer,
       {
@@ -613,7 +631,7 @@ export class IsoScene {
     this.applyCamera(true);
     this.app.render();
     this.events.onFrame?.();
-    dismissBootScreen();
+    reportLoad(100);
     this.hydrateMap();
   }
 
