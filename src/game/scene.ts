@@ -5144,9 +5144,18 @@ export class IsoScene {
     const innerH = Math.max(1, sh - m.top - m.bottom);
     const zoomX = innerW / spanX;
     const zoomY = innerH / spanY;
-    this.zoom = clampZoom(Math.min(zoomX, zoomY) * 0.88, sw, sh);
+    // Below ~0.15 door picks become body hits and the van radius (8/zoom)
+    // covers the stoop. Landscape Catedral→Flor used to frame at 0.057.
+    const fitted = clampZoom(Math.min(zoomX, zoomY) * 0.88, sw, sh);
+    const minTap = 0.18;
     const aim = this.freeRectCenter();
-    this.placeWorldAtScreen(mid.x, mid.y - 40, aim.x, aim.y);
+    if (fitted < minTap) {
+      this.zoom = clampZoom(minTap, sw, sh);
+      this.placeWorldAtScreen(doorW.x, doorW.y - 40, aim.x, aim.y);
+    } else {
+      this.zoom = fitted;
+      this.placeWorldAtScreen(mid.x, mid.y - 40, aim.x, aim.y);
+    }
     this.applyCamera(false);
     this.flushTownWarm();
   }

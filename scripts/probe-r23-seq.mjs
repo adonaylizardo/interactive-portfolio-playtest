@@ -237,6 +237,12 @@ async function tapDoor(page, cdp, name, touch) {
   }
   if (!pt) return { tapped: false, accepted: false, pt, pick };
   await realTap(page, cdp, pt.x, pt.y, touch);
+  // frameDoorForQa fits van+door and can drop landscape to ~0.06. Software-GL
+  // then crawls; restore a playable follow zoom after the real tap lands.
+  await page.evaluate(() => {
+    window.__playtestQa.setZoom?.(0.32);
+    window.__playtestQa.focusJac?.();
+  });
   await wait(160);
   const after = await snap(page);
   const hit = await page.evaluate((n) => {
@@ -259,7 +265,7 @@ async function tapDoor(page, cdp, name, touch) {
   };
 }
 
-async function waitEntered(page, timeout = 50000) {
+async function waitEntered(page, timeout = 80000) {
   const t0 = Date.now();
   let last = null;
   let zeroGoalMs = 0;
