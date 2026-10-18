@@ -1,0 +1,57 @@
+<!-- Figma get_metadata: hoja-writings 199:1999 -->
+<frame id="199:1999" name="hoja-writings" x="0" y="0" width="375" height="620">
+  <frame id="199:2000" name="agarre" x="16" y="1" width="343" height="16">
+    <frame id="199:2001" name="barra" x="151.5" y="10" width="40" height="4" />
+  </frame>
+  <frame id="199:2002" name="encabezado" x="16" y="29" width="343" height="44">
+    <text id="199:2003" name="titulo" x="0" y="10" width="295" height="24" />
+    <instance id="199:2004" name="cerrar" x="299" y="0" width="44" height="44" />
+  </frame>
+  <frame id="199:2007" name="filtros" x="16" y="85" width="343" height="44">
+    <frame id="199:2008" name="chip · All" x="0" y="0" width="44" height="44">
+      <text id="199:2009" name="etiqueta" x="14" y="14" width="16" height="16" />
+    </frame>
+    <frame id="199:2010" name="chip · UXSC" x="52" y="0" width="67" height="44">
+      <text id="199:2011" name="etiqueta" x="15" y="14" width="37" height="16" />
+    </frame>
+    <frame id="199:2012" name="chip · Sinergia" x="127" y="0" width="81" height="44">
+      <text id="199:2013" name="etiqueta" x="15" y="14" width="51" height="16" />
+    </frame>
+    <frame id="199:2014" name="chip · Guest" x="216" y="0" width="67" height="44">
+      <text id="199:2015" name="etiqueta" x="15" y="14" width="37" height="16" />
+    </frame>
+  </frame>
+  <frame id="199:2016" name="seccion · UX Sidekick Chronicles" x="16" y="141" width="343" height="318">
+    <frame id="199:2017" name="encabezado-seccion" x="0" y="0" width="343" height="44">
+      <text id="199:2018" name="nombre" x="0" y="10" width="180" height="24" />
+      <frame id="199:2019" name="conteo" x="188" y="13" width="23" height="18">
+        <text id="199:2020" name="etiqueta" x="8" y="2" width="7" height="14" />
+      </frame>
+      <frame id="199:2022" name="ver-todo" x="290" y="0" width="53" height="44">
+        <text id="199:2023" name="etiqueta" x="8" y="14" width="41" height="16" />
+      </frame>
+    </frame>
+    <text id="199:2024" name="descripcion" x="0" y="48" width="343" height="18" />
+    <frame id="199:2025" name="fila-articulo 0" x="0" y="70" width="343" height="80">
+      <frame id="199:2026" name="portada (placeholder)" x="0" y="8" width="64" height="64" />
+      <frame id="199:2029" name="texto" x="76" y="20" width="267" height="40">
+        <text id="199:2030" name="titulo" x="0" y="0" width="267" height="20" />
+        <text id="199:2031" name="meta" x="0" y="24" width="151" height="16" />
+      </frame>
+    </frame>
+    <frame id="199:2032" name="fila-articulo 1" x="0" y="154" width="343" height="80">
+      <frame id="199:2033" name="portada (placeholder)" x="0" y="8" width="64" height="64" />
+      <frame id="199:2036" name="texto" x="76" y="10" width="267" height="60">
+        <text id="199:2037" name="titulo" x="0" y="0" width="267" height="40" />
+        <text id="199:2038" name="meta" x="0" y="44" width="151" height="16" />
+      </frame>
+    </frame>
+    <frame id="199:2039" name="fila-articulo 2" x="0" y="238" width="343" height="80">
+      <frame id="199:2040" name="portada (placeholder)" x="0" y="8" width="64" height="64" />
+      <frame id="199:2043" name="texto" x="76" y="20" width="267" height="40">
+        <text id="199:2044" name="titulo" x="0" y="0" width="267" height="20" />
+        <text id="199:2045" name="meta" x="0" y="24" width="151" height="16" />
+      </frame>
+    </frame>
+  </frame>
+</frame>

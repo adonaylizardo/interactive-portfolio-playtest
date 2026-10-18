@@ -3,7 +3,8 @@
  * Autoplay-safe: the graph starts on the first user gesture. Mute persists.
  */
 import { caseVoiceFile } from '../data/cases';
-import { VOICE_LINES } from '../data/voice-lines';
+import { VOICE_LINES, type VoiceLine } from '../data/voice-lines';
+import { getLang, onLangChange } from '../ui/i18n';
 
 const MUTE_KEY = 'studio-audio-muted';
 const VOICE_DIR = `${import.meta.env.BASE_URL}audio/voice/`;
@@ -59,13 +60,18 @@ export class StudioAudio {
   private lastFootFrame = -1;
   private lastFootAt = 0;
   private voice: HTMLAudioElement | null = null;
+  private activeLineId: string | null = null;
   private subtitleText = '';
   private readonly played = new Set<string>();
   private readonly listeners = new Set<() => void>();
   private preferOgg: boolean | null = null;
   /** First gesture owns the intro; other lines wait until it has finished. */
   private introLock = false;
+  /** Intro was skipped because a panel was open on unlock; play when back on map. */
+  private introDeferred = false;
+  private introKickTimer: ReturnType<typeof setTimeout> | null = null;
   private pending: string | null = null;
+  private voiceQueue: string[] = [];
   private bark: HTMLAudioElement | null = null;
   private barkLines: BarkLine[] = [];
   private barkReady = new Set<string>();
@@ -78,6 +84,30 @@ export class StudioAudio {
     window.addEventListener('pointerdown', unlock, { capture: true });
     window.addEventListener('keydown', unlock, { capture: true });
     window.addEventListener('touchend', unlock, { capture: true });
+    onLangChange(() => {
+      if (!this.activeLineId) return;
+      const line = VOICE_LINES[this.activeLineId];
+      if (line) {
+        this.subtitleText = this.lineSubtitle(line);
+        this.emit();
+      }
+    });
+  }
+
+  private lineSubtitle(line: VoiceLine): string {
+    if (getLang() === 'es' && line.script_text_es) return line.script_text_es;
+    return line.script_text;
+  }
+
+  private enqueueVoice(id: string): void {
+    if (this.voiceQueue.includes(id)) return;
+    this.voiceQueue.push(id);
+  }
+
+  private drainVoiceQueue(): void {
+    const next = this.voiceQueue.shift() ?? this.pending;
+    this.pending = null;
+    if (next) this.playLine(next, { force: true });
   }
 
   isMuted(): boolean {
@@ -90,6 +120,10 @@ export class StudioAudio {
 
   isVoicePlaying(): boolean {
     return !!this.voice;
+  }
+
+  hasIntroCompleted(): boolean {
+    return this.played.has('01-intro');
   }
 
   qaBarks(): { ready: string[]; lastId: string; cooldownMs: number } {
@@ -108,6 +142,71 @@ export class StudioAudio {
   clearSubtitle(): void {
     this.stopVoice();
     this.emit();
+  }
+
+  /** Map-only: play intro if unlock happened while a panel was open. */
+  maybePlayDeferredIntro(): void {
+    if (!this.unlocked || this.muted || this.played.has('01-intro')) return;
+    if (this.isVoicePlaying()) {
+      this.introDeferred = true;
+      this.scheduleIntroWhenMapIdle(450);
+      return;
+    }
+    if (this.shouldDeferIntro()) {
+      this.introDeferred = true;
+      return;
+    }
+    this.introDeferred = false;
+    this.playLine('01-intro');
+  }
+
+  /** Panel / preview opened — cancel pending intro kick and defer playback. */
+  noteIntroPanelOpen(): void {
+    this.cancelIntroKick();
+    this.introDeferred = true;
+    if (this.activeLineId === '01-intro') this.stopVoice();
+  }
+
+  /** After returning to the map with no panel, try intro again (debounced). */
+  scheduleIntroWhenMapIdle(delayMs = 500): void {
+    if (this.played.has('01-intro') || this.muted || !this.unlocked) return;
+    if (!this.introDeferred) this.introDeferred = true;
+    this.cancelIntroKick();
+    this.introKickTimer = window.setTimeout(() => {
+      this.introKickTimer = null;
+      this.maybePlayDeferredIntro();
+    }, delayMs);
+  }
+
+  private cancelIntroKick(): void {
+    if (this.introKickTimer != null) {
+      clearTimeout(this.introKickTimer);
+      this.introKickTimer = null;
+    }
+  }
+
+  private shouldDeferIntro(): boolean {
+    if (typeof document === 'undefined') return false;
+    const layout = document.body.dataset.layout;
+    if (layout === 'panel') return true;
+    const chrome = document.querySelector('.chrome');
+    if (chrome?.classList.contains('chrome--sheet')) return true;
+    const panel = document.querySelector(
+      '#ui-root > .building-panel.building-panel--open',
+    );
+    if (panel) return true;
+    return false;
+  }
+
+  /** User-initiated chrome voice (Contact, etc.) while intro is playing. */
+  playLineForced(id: string): void {
+    this.cancelIntroKick();
+    this.introDeferred = true;
+    this.introLock = false;
+    this.pending = null;
+    this.voiceQueue = [];
+    if (this.activeLineId === '01-intro') this.stopVoice();
+    this.playLine(id, { force: true });
   }
 
   onChange(fn: () => void): () => void {
@@ -147,13 +246,14 @@ export class StudioAudio {
     // After the gesture frame: starting the graph mid-setZoom / interior swap
     // takes WebKit's renderer down.
     const phone = window.matchMedia('(pointer: coarse), (max-width: 767px)').matches;
-    window.setTimeout(() => this.startGraphAndIntro(), phone ? 900 : 80);
+    window.setTimeout(() => this.startGraphAndIntro(), phone ? 900 : 320);
   }
 
   private startGraphAndIntro(): void {
     if (automatedWebKitPhone()) {
-      this.playLine('01-intro');
-      if (this.muted || !this.played.has('01-intro')) this.introLock = false;
+      this.introDeferred = true;
+      this.introLock = false;
+      this.scheduleIntroWhenMapIdle(900);
       return;
     }
     try {
@@ -172,8 +272,9 @@ export class StudioAudio {
     } catch {
       /* autoplay / context limits: mute state still flips */
     }
-    this.playLine('01-intro');
-    if (this.muted || !this.played.has('01-intro')) this.introLock = false;
+    this.introDeferred = true;
+    this.introLock = false;
+    this.scheduleIntroWhenMapIdle(700);
   }
 
   setInterior(open: boolean): void {
@@ -209,11 +310,15 @@ export class StudioAudio {
   playCaseVoice(id: string | null | undefined): void {
     const file = caseVoiceFile(id);
     if (!file) return;
-    this.playLine(file);
+    this.playLineForced(file);
   }
 
   /** Move command: a random bark ≠ last, ~6 s cooldown, never over a case line. */
   noteMoveCommand(): void {
+    if (!this.played.has('01-intro') && this.unlocked) {
+      this.introDeferred = true;
+      this.scheduleIntroWhenMapIdle(900);
+    }
     if (this.muted || !this.unlocked || this.voice) return;
     if (automatedWebKitPhone()) return;
     const now = performance.now();
@@ -245,21 +350,33 @@ export class StudioAudio {
     });
   }
 
-  playLine(id: string): void {
+  playLine(id: string, opts: { force?: boolean } = {}): void {
     const line = VOICE_LINES[id];
-    if (!line || this.played.has(id) || this.muted) return;
+    if (!line || this.muted) return;
+    if (!opts.force && this.played.has(id)) return;
     if (!this.unlocked) return;
-    if (this.introLock && id !== '01-intro') {
-      this.pending = id;
+    if (id === '01-intro' && this.shouldDeferIntro()) {
+      this.introDeferred = true;
+      this.introLock = false;
       return;
     }
-    this.stopVoice();
+    if (this.voice && id !== '01-intro' && !opts.force) {
+      this.enqueueVoice(id);
+      return;
+    }
+    if (this.introLock && id !== '01-intro' && !opts.force) {
+      this.enqueueVoice(id);
+      return;
+    }
+    if (this.voice && opts.force) this.stopVoice({ preserveQueue: true });
+    else this.stopVoice();
     this.stopBark();
-    this.played.add(id);
-    this.subtitleText = line.script_text;
+    if (id !== '01-intro') this.played.add(id);
+    this.activeLineId = id;
+    this.subtitleText = this.lineSubtitle(line);
     this.emit();
     if (automatedWebKitPhone()) {
-      window.setTimeout(() => this.finishVoice(), 80);
+      window.setTimeout(() => this.finishVoice(true), 80);
       return;
     }
     this.preferOgg ??= canPlayOgg();
@@ -267,37 +384,49 @@ export class StudioAudio {
     const el = new Audio(`${VOICE_DIR}${file}`);
     el.preload = 'auto';
     el.addEventListener('error', () => {
-      if (this.voice === el) this.finishVoice();
+      if (this.voice === el) this.finishVoice(false);
     });
     el.addEventListener('ended', () => {
-      if (this.voice === el) this.finishVoice();
+      if (this.voice === el) this.finishVoice(true);
     });
     this.voice = el;
-    this.subtitleText = line.script_text;
+    this.subtitleText = this.lineSubtitle(line);
     this.duckAmbience(true);
     this.emit();
     void el.play().catch(() => {
-      if (this.voice === el) this.finishVoice();
+      if (this.voice === el) this.finishVoice(false);
     });
   }
 
-  private finishVoice(): void {
+  private finishVoice(completed = true): void {
+    if (completed && this.activeLineId === '01-intro') this.played.add('01-intro');
+    if (!completed && this.activeLineId === '01-intro') this.introDeferred = true;
+    this.activeLineId = null;
     this.introLock = false;
-    this.stopVoice();
+    this.stopVoice({ preserveQueue: true });
     this.syncAmbience();
     this.emit();
-    const next = this.pending;
-    this.pending = null;
-    if (next) this.playLine(next);
+    this.drainVoiceQueue();
   }
 
-  private stopVoice(): void {
+  private stopVoice(opts: { preserveQueue?: boolean } = {}): void {
+    const hadVoice = !!this.voice;
+    const interruptedIntro = this.activeLineId === '01-intro';
     if (this.voice) {
       this.voice.pause();
       this.voice.src = '';
       this.voice = null;
     }
+    if (interruptedIntro) {
+      this.introDeferred = true;
+      this.activeLineId = null;
+    }
     this.subtitleText = '';
+    if (hadVoice || this.introLock) {
+      this.introLock = false;
+      if (!opts.preserveQueue) this.pending = null;
+    }
+    this.duckAmbience(false);
   }
 
   private startAmbience(): void {

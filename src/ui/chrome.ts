@@ -2,9 +2,15 @@ import { studio } from '../audio/studio';
 import { getEnterableBuildings } from '../data/map';
 import { tileToWorld } from '../iso/math';
 import { isMobileLayout } from '../checklist/ui';
+import { CV_HREF } from '../data/contactLinks';
 import { iconSvg, type IconName } from './icons';
 import type { Camera } from '../tokens';
 import { getLang, onLangChange, setLang, t, type Lang } from './i18n';
+
+export type AboutPanelOpenOpts = {
+  highlightContact?: boolean;
+  sectionId?: string;
+};
 
 export type DesktopLayout = 'split' | 'map' | 'panel';
 export type Audience = 'recruiter' | 'mentoria' | 'cliente';
@@ -17,6 +23,8 @@ export type ChromeCallbacks = {
   onMapOverview: () => void;
   onCenter: () => void;
   onLocate: (buildingId: string) => void;
+  onOpenAbout: (opts?: AboutPanelOpenOpts) => void;
+  onOpenSearch: () => void;
 };
 
 const EXPERIENCE: { id: string; label: string; nda?: boolean }[] = [
@@ -35,9 +43,6 @@ const CASES_ROWS: { id: string; label: string; nda?: boolean }[] = [
   { id: 'pg', label: 'P&G' },
 ];
 
-const CV_HREF = 'https://adonaylizardo.com';
-const CONTACT_HREF = 'mailto:hello@adonaylizardo.com';
-
 function roundBtn(icon: IconName, label: string, extra = '', action?: string): string {
   const act = action ? ` data-action="${action}"` : '';
   return `<button type="button" class="ui-round ${extra}" data-icon="${icon}"${act} aria-label="${label}">${iconSvg(icon)}</button>`;
@@ -45,7 +50,7 @@ function roundBtn(icon: IconName, label: string, extra = '', action?: string): s
 
 export class ChromeUI {
   readonly root: HTMLElement;
-  private layout: DesktopLayout = 'split';
+  private layout: DesktopLayout = 'map';
   private mobileSheet = true;
   private audience: Audience = 'recruiter';
   private lang: Lang = getLang();
@@ -136,7 +141,7 @@ export class ChromeUI {
       if (this.mobileSheet) {
         const sheet = this.root.querySelector('.chrome__intro')?.getBoundingClientRect();
         const bottom = sheet ? Math.ceil(window.innerHeight - sheet.top + 8) : 280;
-        return { left: 0, top: 72, right: 0, bottom };
+        return { left: 0, top: 12, right: 0, bottom };
       }
       return { left: 0, top: 72, right: 0, bottom: 72 };
     }
@@ -150,16 +155,16 @@ export class ChromeUI {
       (row) => `
       <button type="button" class="chrome__exp-row" data-locate="${row.id}">
         <span class="chrome__exp-name">${row.label}${row.nda ? '<span class="chrome__nda">NDA</span>' : ''}</span>
-        <span class="chrome__exp-meta"><span class="chrome__skeleton chrome__skeleton--bar"></span>${iconSvg('locate', 16)}</span>
+        <span class="chrome__exp-meta">${iconSvg('locate', 16)}</span>
       </button>`,
     ).join('');
     const caseRows = CASES_ROWS.map((row) => {
       return `
       <button type="button" class="chrome__case-row" data-locate="${row.id}">
         <span class="chrome__case-thumb">${iconSvg('map')}${row.nda ? '<span class="chrome__nda">NDA</span>' : ''}</span>
-        <span class="chrome__case-copy">
+          <span class="chrome__case-copy">
           <span class="chrome__case-title">${row.label}</span>
-          <span class="chrome__skeleton-stack"><span class="chrome__skeleton"></span><span class="chrome__skeleton chrome__skeleton--short"></span></span>
+          <span class="chrome__case-meta" data-i18n="chrome.caseMeta">Case on the map</span>
         </span>
       </button>`;
     }).join('');
@@ -189,15 +194,11 @@ export class ChromeUI {
         <div class="chrome__intro-body">
           <div class="chrome__lede">
             <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
-            <div class="chrome__skeleton-stack" aria-hidden="true">
-              <span class="chrome__skeleton"></span>
-              <span class="chrome__skeleton"></span>
-              <span class="chrome__skeleton chrome__skeleton--half"></span>
-            </div>
+            <p class="chrome__blurb" data-i18n="chrome.lede">Explore the map, open cases from the doors, and browse talks and writings inside the buildings.</p>
           </div>
-          <div class="chrome__ctas">
-            <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer">${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
-            <a class="ui-btn ui-btn--secondary" href="${CONTACT_HREF}">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></a>
+          <div class="chrome__ctas" id="chrome-contact">
+            <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer" download>${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
+            <button type="button" class="ui-btn ui-btn--secondary" data-action="about-contact">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></button>
           </div>
           <div class="chrome__audience">
             <p class="chrome__label" data-i18n="chrome.who">¿Quién eres?</p>
@@ -247,10 +248,7 @@ export class ChromeUI {
         <button type="button" class="chrome__intro-close" data-action="intro-close" aria-label="Close" data-i18n-aria="jac.close">${iconSvg('close')}</button>
         <div class="chrome__lede">
           <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
-          <div class="chrome__skeleton-stack" aria-hidden="true">
-            <span class="chrome__skeleton"></span>
-            <span class="chrome__skeleton chrome__skeleton--half"></span>
-          </div>
+          <p class="chrome__blurb" data-i18n="chrome.lede">Explore the map, open cases from the doors, and browse talks and writings inside the buildings.</p>
         </div>
         <div class="chrome__audience">
           <p class="chrome__label" data-i18n="chrome.who">¿Quién eres?</p>
@@ -261,8 +259,8 @@ export class ChromeUI {
           </div>
         </div>
         <div class="chrome__ctas">
-          <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer">${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
-          <a class="ui-btn ui-btn--secondary" href="${CONTACT_HREF}">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></a>
+          <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer" download>${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
+          <button type="button" class="ui-btn ui-btn--secondary" data-action="about-contact">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></button>
         </div>
         <div class="chrome__card-row">
           <div class="chrome__card-id">
@@ -273,6 +271,34 @@ export class ChromeUI {
             </span>
           </div>
           <button type="button" class="ui-btn ui-btn--secondary" data-details data-i18n="chrome.details">Detalles</button>
+        </div>
+        <div class="chrome__sheet-body" data-sheet-body hidden>
+          <section class="chrome__section" id="chrome-mobile-logros">
+            <div class="chrome__section-head">
+              <h2 data-i18n="chrome.achievements">Logros</h2>
+            </div>
+            <div class="chrome__logros">
+              <div class="chrome__logro">
+                <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
+                <p data-i18n="chrome.mentorshipStat">Mentoría: 30+ personas</p>
+              </div>
+              <div class="chrome__logro chrome__logro--empty">
+                <div class="chrome__logro-art">?</div>
+                <p data-i18n="chrome.comingSoon">Coming soon</p>
+              </div>
+              <div class="chrome__logro chrome__logro--empty">
+                <div class="chrome__logro-art">?</div>
+                <p data-i18n="chrome.comingSoon">Coming soon</p>
+              </div>
+            </div>
+          </section>
+          <section class="chrome__section" id="chrome-mobile-casos">
+            <h2 data-i18n="chrome.cases">Casos</h2>
+            <div class="chrome__cases">${caseRows}</div>
+          </section>
+          <div class="chrome__sheet-contact" id="chrome-mobile-contact">
+            <button type="button" class="ui-btn ui-btn--secondary" data-action="about-contact">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></button>
+          </div>
         </div>
       </div>
       <nav class="chrome__dock" aria-label="Dock" data-i18n-aria="chrome.dock">
@@ -297,7 +323,6 @@ export class ChromeUI {
           ${roundBtn('locate', 'Center on Adonay', 'chrome__locate', 'center')}
         </div>
         <div class="chrome__view-btns">
-          <button type="button" class="ui-view" data-view="rotate" aria-label="Rotate" data-i18n-aria="chrome.rotate">${iconSvg('rotate')}</button>
           <button type="button" class="ui-view is-active" data-view="isometrica" aria-label="Isometric" data-i18n-aria="chrome.isometric">${iconSvg('cube')}</button>
           <button type="button" class="ui-view" data-view="cenital" aria-label="Top-down" data-i18n-aria="chrome.topdown">${iconSvg('grid')}</button>
           <button type="button" class="ui-view" data-view="perspectiva" aria-label="Perspective" data-i18n-aria="chrome.perspective">${iconSvg('persp')}</button>
@@ -313,11 +338,14 @@ export class ChromeUI {
     this.root.querySelector('[data-action="show-panel"]')?.addEventListener('click', () => this.setLayout('split'));
     this.root.querySelector('[data-action="intro-close"]')?.addEventListener('click', () => this.setLayout('map'));
     this.root.querySelector('[data-details]')?.addEventListener('click', () => {
-      this.root.querySelector('.chrome__intro')?.classList.toggle('chrome__intro--expanded');
+      this.expandMobileSheet(true);
     });
+    this.bindMobileSheetGestures();
     this.root.querySelector('[data-action="home"]')?.addEventListener('click', () => {
-      this.setLayout('split');
-      this.scrollTo('#chrome-experiencia');
+      this.openAboutPanel();
+    });
+    this.root.querySelectorAll('[data-action="about-contact"]').forEach((btn) => {
+      btn.addEventListener('click', () => this.openAboutPanel({ highlightContact: true }));
     });
     this.root.querySelectorAll('[data-audience]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -348,18 +376,22 @@ export class ChromeUI {
     this.root.querySelectorAll('[data-action="center"]').forEach((btn) => {
       btn.addEventListener('click', () => this.callbacks.onCenter());
     });
-    this.root.querySelector('[data-dock="intro"]')?.addEventListener('click', () => this.setLayout('split'));
+    this.root.querySelector('[data-dock="intro"]')?.addEventListener('click', () => {
+      this.openAboutPanel();
+    });
     this.root.querySelector('.chrome__dock [data-action="cases"]')?.addEventListener('click', () => {
-      this.setLayout('split');
+      this.openMobileSheetSection('casos');
     });
     this.root.querySelector('.chrome__dock [data-action="achievements"]')?.addEventListener('click', () => {
-      this.setLayout('split');
+      this.openMobileSheetSection('logros');
     });
     this.root.querySelector('.chrome__dock [data-action="contact"]')?.addEventListener('click', () => {
-      studio.playLine('11-contact');
-      this.callbacks.onLocate('contacto');
+      this.openContact();
     });
-    this.root.querySelector('.chrome__dock [data-action="map"]')?.addEventListener('click', () => this.setLayout('map'));
+    this.root.querySelector('.chrome__dock [data-action="map"]')?.addEventListener('click', () => {
+      this.setLayout('map');
+      this.callbacks.onMapOverview();
+    });
     this.root.querySelector('.chrome__rail [data-action="cases"]')?.addEventListener('click', () => {
       this.setLayout('split');
       this.scrollTo('#chrome-casos');
@@ -369,8 +401,7 @@ export class ChromeUI {
       this.scrollTo('#chrome-logros');
     });
     this.root.querySelector('.chrome__rail [data-action="contact"]')?.addEventListener('click', () => {
-      studio.playLine('11-contact');
-      this.callbacks.onLocate('contacto');
+      this.openContact();
     });
     this.root.querySelector('[data-action="fullpage"]')?.addEventListener('click', () => {
       if (this.layout === 'panel') this.setLayout('split');
@@ -382,10 +413,19 @@ export class ChromeUI {
         studio.toggleMute();
       });
     });
-    this.syncSound();
-    this.root.querySelectorAll(`a[href="${CONTACT_HREF}"]`).forEach((a) => {
-      a.addEventListener('click', () => studio.playLine('11-contact'));
+    this.root.querySelectorAll('[data-action="search"]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.openSearch();
+      });
     });
+    this.root.querySelectorAll('[data-action="download"]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.downloadCv();
+      });
+    });
+    this.syncSound();
     this.syncSubtitle();
   }
 
@@ -469,6 +509,81 @@ export class ChromeUI {
     this.root.querySelector(sel)?.scrollIntoView({ block: 'start' });
   }
 
+  openSearch(): void {
+    studio.playClick();
+    this.callbacks.onOpenSearch();
+  }
+
+  openAboutPanel(opts?: AboutPanelOpenOpts): void {
+    studio.playClick();
+    this.callbacks.onOpenAbout(opts);
+  }
+
+  expandMobileSheet(expanded: boolean): void {
+    const intro = this.root.querySelector('.chrome__intro') as HTMLElement | null;
+    const body = this.root.querySelector('[data-sheet-body]') as HTMLElement | null;
+    if (!intro) return;
+    intro.classList.toggle('chrome__intro--expanded', expanded);
+    if (body) body.hidden = !expanded;
+    this.sync();
+  }
+
+  openMobileSheetSection(target: 'casos' | 'logros' | 'intro' | 'contact'): void {
+    this.setLayout('split');
+    if (target === 'intro') {
+      this.expandMobileSheet(false);
+      return;
+    }
+    this.expandMobileSheet(true);
+    window.requestAnimationFrame(() => {
+      const sel =
+        target === 'logros'
+          ? '#chrome-mobile-logros'
+          : target === 'contact'
+            ? '#chrome-mobile-contact'
+            : '#chrome-mobile-casos';
+      this.scrollTo(sel);
+    });
+  }
+
+  private downloadCv(): void {
+    const a = document.createElement('a');
+    a.href = CV_HREF;
+    a.download = 'adonay-lizardo-cv.pdf';
+    a.rel = 'noopener';
+    document.body.append(a);
+    a.click();
+    a.remove();
+  }
+
+  private bindMobileSheetGestures(): void {
+    const intro = this.root.querySelector('.chrome__intro');
+    if (!intro) return;
+    let startY = 0;
+    intro.addEventListener(
+      'touchstart',
+      (e) => {
+        const te = e as TouchEvent;
+        startY = te.touches[0]?.clientY ?? 0;
+      },
+      { passive: true },
+    );
+    intro.addEventListener(
+      'touchend',
+      (e) => {
+        const te = e as TouchEvent;
+        const endY = te.changedTouches[0]?.clientY ?? startY;
+        if (startY - endY > 48) this.expandMobileSheet(true);
+      },
+      { passive: true },
+    );
+  }
+
+  private openContact(): void {
+    this.openAboutPanel({ highlightContact: true });
+    studio.playLineForced('11-contact');
+  }
+
   private syncAudience(): void {
     this.root.querySelectorAll('[data-audience]').forEach((b) => {
       b.classList.toggle('is-active', (b as HTMLElement).dataset.audience === this.audience);
@@ -490,6 +605,8 @@ export class ChromeUI {
     this.root.classList.toggle('chrome--panel', !this.mobile && this.layout === 'panel');
     this.root.classList.toggle('chrome--split', !this.mobile && this.layout === 'split');
     this.syncSound();
+    this.placeLang();
+    this.placeSubtitle();
     if (opts?.deferColumn) return;
     const col = this.root.querySelector('.chrome__column') as HTMLElement | null;
     if (col) {
@@ -530,23 +647,25 @@ export class ChromeUI {
     const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
     if (!lang) return;
     const shortLand = window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
-    if (shortLand) {
+    if (shortLand && this.mobile) {
       lang.style.top = '12px';
-      lang.style.left = '16px';
-      lang.style.right = 'auto';
+      lang.style.right = '12px';
+      lang.style.left = 'auto';
       return;
     }
     lang.style.left = '';
-    const cl = document.querySelector('.checklist') as HTMLElement | null;
-    const ring = cl && !cl.hidden ? cl.getBoundingClientRect() : null;
-    if (ring && ring.width > 8) {
-      const top = Math.max(this.mobile ? 24 : 16, ring.top + (ring.height - 40) / 2);
-      const right = Math.max(16, window.innerWidth - ring.left + 8);
-      lang.style.top = `${top}px`;
-      lang.style.right = `${right}px`;
+    if (!this.mobile) {
+      lang.style.top = '20px';
+      lang.style.right = '16px';
       return;
     }
-    lang.style.top = this.mobile ? '24px' : '20px';
+    if (this.mobile && document.body.dataset.layout === 'map') {
+      lang.style.top = '';
+      lang.style.left = '';
+      lang.style.right = '';
+      return;
+    }
+    lang.style.top = '24px';
     lang.style.right = '16px';
   }
 
