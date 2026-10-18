@@ -1410,6 +1410,19 @@ export class IsoScene {
     return personaEnabled() && !this.interiorActive && this.viewMode === 'persona';
   }
 
+  /** Persona preview deploy: cenital + third-person kit (controls, E-only prompts). */
+  private personaPreviewOn(): boolean {
+    return (
+      personaEnabled() &&
+      !this.interiorActive &&
+      (this.viewMode === 'persona' || this.viewMode === 'cenital')
+    );
+  }
+
+  personaKitActive(): boolean {
+    return this.personaPreviewOn();
+  }
+
   private remapPersonaStick(dx: number, dy: number): { x: number; y: number } {
     if (dx === 0 && dy === 0) return { x: 0, y: 0 };
     this.syncViewTransform();
@@ -2014,15 +2027,19 @@ export class IsoScene {
       this.jacClose();
       return;
     }
-    const doorFirst = this.pickBuildingDoorAtScreen(sx, sy);
-    if (doorFirst?.door && doorFirst.panelTitle) {
-      if (!this.prepareMapTap(doorFirst)) return;
-      this.requestWalk(doorFirst.door.x, doorFirst.door.y, sprint, {
-        buildingEntry: { panelTitle: doorFirst.panelTitle, door: doorFirst.door },
-      });
-      return;
+    const personaWalkOnly =
+      personaEnabled() && (this.viewMode === 'cenital' || this.viewMode === 'persona') && !this.jac?.driving;
+    if (!personaWalkOnly) {
+      const doorFirst = this.pickBuildingDoorAtScreen(sx, sy);
+      if (doorFirst?.door && doorFirst.panelTitle) {
+        if (!this.prepareMapTap(doorFirst)) return;
+        this.requestWalk(doorFirst.door.x, doorFirst.door.y, sprint, {
+          buildingEntry: { panelTitle: doorFirst.panelTitle, door: doorFirst.door },
+        });
+        return;
+      }
     }
-    if (this.pickJacAtScreen(sx, sy)) {
+    if (!personaWalkOnly && this.pickJacAtScreen(sx, sy)) {
       this.tapJac();
       return;
     }
@@ -2032,13 +2049,15 @@ export class IsoScene {
       this.requestWalk(sceneryTile.tx, sceneryTile.ty, sprint);
       return;
     }
-    const building = this.pickBuildingAtScreen(sx, sy);
-    if (building?.door && building.panelTitle) {
-      if (!this.prepareMapTap(building)) return;
-      this.requestWalk(building.door.x, building.door.y, sprint, {
-        buildingEntry: { panelTitle: building.panelTitle, door: building.door },
-      });
-      return;
+    if (!personaWalkOnly) {
+      const building = this.pickBuildingAtScreen(sx, sy);
+      if (building?.door && building.panelTitle) {
+        if (!this.prepareMapTap(building)) return;
+        this.requestWalk(building.door.x, building.door.y, sprint, {
+          buildingEntry: { panelTitle: building.panelTitle, door: building.door },
+        });
+        return;
+      }
     }
     const bench = this.pickBenchAtScreen(sx, sy);
     if (bench) {
@@ -2048,13 +2067,15 @@ export class IsoScene {
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
     const tile = this.resolveGroundTap(wx, wy);
     if (tile) {
-      const onDoor = getBuildingAtDoor(tile.x, tile.y);
-      if (onDoor?.panelTitle && onDoor.door) {
-        if (!this.prepareMapTap(onDoor)) return;
-        this.requestWalk(onDoor.door.x, onDoor.door.y, sprint, {
-          buildingEntry: { panelTitle: onDoor.panelTitle, door: onDoor.door },
-        });
-        return;
+      if (!personaWalkOnly) {
+        const onDoor = getBuildingAtDoor(tile.x, tile.y);
+        if (onDoor?.panelTitle && onDoor.door) {
+          if (!this.prepareMapTap(onDoor)) return;
+          this.requestWalk(onDoor.door.x, onDoor.door.y, sprint, {
+            buildingEntry: { panelTitle: onDoor.panelTitle, door: onDoor.door },
+          });
+          return;
+        }
       }
       if (!this.prepareMapTap(undefined, tile.x, tile.y)) return;
       this.requestWalk(tile.x, tile.y, sprint);
@@ -3441,8 +3462,8 @@ export class IsoScene {
         else if (this.seatedBench && !this.interiorActive) {
           this.standThen(null);
           e.preventDefault();
-        } else if (this.tryPersonaEnterBuilding()) e.preventDefault();
-        else if (this.enterNearbyDoorFromKeyboard()) e.preventDefault();
+        } else if (!personaEnabled() && this.tryPersonaEnterBuilding()) e.preventDefault();
+        else if (!personaEnabled() && this.enterNearbyDoorFromKeyboard()) e.preventDefault();
         else if (this.playerNearNoah() && !this.noah.busy()) {
           this.startNoahTalk();
           e.preventDefault();
@@ -4127,7 +4148,7 @@ export class IsoScene {
   }
 
   private personaEnterOffer(): MapObject | null {
-    if (!this.personaOn() || this.interiorActive || this.jac?.driving || this.doorCooldown > 0) return null;
+    if (!this.personaPreviewOn() || this.jac?.driving || this.doorCooldown > 0) return null;
     if (this.path.length > 0) return null;
     const t = this.roundedCharTile();
     const building = getBuildingAtPersonaDoor(t.x, t.y);
@@ -5324,7 +5345,7 @@ export class IsoScene {
         if (k === 'e') this.jacGetOut();
         return k === 'e';
       }
-      if (this.personaOn()) {
+      if (this.personaPreviewOn()) {
         if (this.personaJacBoardVisible()) {
           this.jacGetIn();
           return true;
@@ -6081,13 +6102,9 @@ export class IsoScene {
   }
 
   personaJacBoardVisible(): boolean {
-    return (
-      this.personaOn() &&
-      !!this.jac &&
-      !this.jac.driving &&
-      this.atJacDoor(1.5) &&
-      this.personaJacInView()
-    );
+    if (!this.personaPreviewOn() || !this.jac || this.jac.driving || !this.atJacDoor(1.5)) return false;
+    if (this.personaOn()) return this.personaJacInView();
+    return true;
   }
 
   personaJacInView(): boolean {

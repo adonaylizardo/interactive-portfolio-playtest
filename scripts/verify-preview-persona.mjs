@@ -156,6 +156,7 @@ async function holdStick(_cdp, page, dx, dy, ms = 2200) {
 async function exitPersonaView(page, cdp, touch) {
   await page.waitForFunction(() => !window.__playtestQa.jac()?.driving, null, { timeout: 8000 }).catch(() => null);
   await tapSelector(page, cdp, touch, '[data-jac="close"]');
+  if (await tapSelector(page, cdp, touch, '.persona-kit__cam-opt[data-cam="cenital"]')) return;
   for (const mode of ['isometrica', 'cenital']) {
     const btn = page.locator(`.ui-view[data-view="${mode}"]`).first();
     if ((await btn.count()) === 0) continue;
@@ -177,6 +178,13 @@ async function exitPersonaView(page, cdp, touch) {
 }
 
 async function tapView(page, cdp, touch, mode) {
+  if (mode === 'persona' || mode === 'cenital') {
+    const kit = page.locator(`.persona-kit__cam-opt[data-cam="${mode}"]`).first();
+    if ((await kit.count()) > 0 && (await kit.isVisible().catch(() => false))) {
+      await tapSelector(page, cdp, touch, `.persona-kit__cam-opt[data-cam="${mode}"]`);
+      return;
+    }
+  }
   const btn = page.locator(`.ui-view[data-view="${mode}"]`).first();
   if ((await btn.count()) === 0) throw new Error(`missing view ${mode}`);
   let box = await btn.boundingBox().catch(() => null);
@@ -370,9 +378,9 @@ async function runViewport(tag, opts) {
         [...document.scripts].map((s) => s.src).find((s) => /index-.*\.js/.test(s)),
       ))?.split('/').pop() ?? 'dev';
 
-    const personaBtn = page.locator('.ui-view[data-view="persona"]');
-    await personaBtn.waitFor({ state: 'attached', timeout: 30000 }).catch(() => null);
-    if ((await personaBtn.count()) === 0) errors.push(`${tag}: persona view button missing`);
+    const personaBtn = page.locator('.persona-kit__cam-opt[data-cam="persona"], .ui-view[data-view="persona"]');
+    await personaBtn.first().waitFor({ state: 'attached', timeout: 30000 }).catch(() => null);
+    if ((await personaBtn.count()) === 0) errors.push(`${tag}: persona view control missing`);
     else {
       await tapView(page, cdp, touch, 'persona');
       let st = await page.evaluate(() => window.__playtestQa.personaState());

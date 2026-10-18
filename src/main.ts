@@ -1,5 +1,5 @@
 import { studio } from './audio/studio';
-import { ChecklistUI } from './checklist/ui';
+import { ChecklistUI, isMobileLayout } from './checklist/ui';
 import { isCaseHouse } from './data/cases';
 import {
   doorInwardStep,
@@ -19,6 +19,7 @@ import { ChromeUI, type DesktopLayout } from './ui/chrome';
 import { JacHud } from './ui/jacHud';
 import { PersonaJacBoard } from './ui/personaJacBoard';
 import { PersonaEnterPrompt } from './ui/personaEnterPrompt';
+import { PersonaKitUI } from './ui/personaKitUi';
 import { Joystick } from './ui/joystick';
 import { personaEnabled } from './game/persona/personaSpec';
 import { NameLabels } from './ui/nameLabels';
@@ -60,6 +61,7 @@ async function main(): Promise<void> {
   const personaEnterPrompt = new PersonaEnterPrompt(uiRoot, {
     onEnter: () => scene.personaEnterFromUi(),
   });
+  let personaKit!: PersonaKitUI;
   const jacHud = new JacHud(uiRoot, {
     onInfo: () => scene.jacOpenInfo(),
     onGetIn: () => scene.jacGetIn(),
@@ -141,9 +143,12 @@ async function main(): Promise<void> {
       } else {
         cenitalLabels.setHidden(true);
       }
-      if (personaActive && scene.jacSnapshot()?.driving) {
+      const kitActive = personaEnabled() && scene.personaKitActive();
+      const driving = !!scene.jacSnapshot()?.driving;
+      const kitDriveMobile = kitActive && driving && isMobileLayout();
+      if (personaActive && driving) {
         jacHud.park();
-      } else if (scene.jacHudActive()) {
+      } else if (scene.jacHudActive() && !kitDriveMobile) {
         const snap = scene.jacSnapshot();
         const anchors = scene.jacHudAnchors();
         jacHud.update(snap, anchors, anchors.rear);
@@ -153,24 +158,28 @@ async function main(): Promise<void> {
         if (!personaActive) labels.setHidden(false);
       }
       const ps = scene.qaPersonaState();
-      const driving = !!scene.jacSnapshot()?.driving;
       personaJacBoard.sync({
-        showIn: ps.active && ps.jacBoard && !driving,
-        showOut: ps.active && driving,
+        showIn: kitActive && ps.jacBoard && !driving,
+        showOut: kitActive && driving && (isMobileLayout() || personaActive),
       });
       personaEnterPrompt.sync(
-        ps.active && ps.enterOffer && !driving && !panel.isPreviewMode() && !panel.isPreviewExpanded(),
+        kitActive &&
+          ps.enterOffer &&
+          !driving &&
+          !panel.isPreviewMode() &&
+          !panel.isPreviewExpanded(),
       );
       document.body.dataset.view = scene.getViewMode().mode;
-      const personaWalk =
+      const thirdPersonWalk =
         personaEnabled() && scene.getViewMode().mode === 'persona' && !scene.isInInterior();
-      joystick.setPersonaWalk(personaWalk);
+      joystick.setPersonaWalk(thirdPersonWalk && !driving);
       joystick.setHidden(
-        (!scene.jacSnapshot()?.driving && !personaWalk) ||
+        (!driving && !kitActive) ||
           !!scene.isInInterior() ||
           panel.isPreviewExpanded() ||
           scene.jacInfoOpen(),
       );
+      personaKit?.syncCameraSwitch();
     },
     stick: () => joystick.vector(),
     stickActive: () => joystick.isActive(),
@@ -225,7 +234,12 @@ async function main(): Promise<void> {
     (e) => {
       const t = e.target as HTMLElement | null;
       if (!t) return;
-      if (t.closest('.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock, .persona-jac-board, .persona-enter-prompt')) return;
+      if (
+        t.closest(
+          '.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock, .persona-kit, .persona-jac-board, .persona-enter-prompt',
+        )
+      )
+        return;
       if (t === canvas || t.closest('#app, .joystick, #game-canvas, #ui-root')) {
         if (joystick.isActive() || scene?.jacSnapshot()?.driving) e.preventDefault();
       }
@@ -236,12 +250,25 @@ async function main(): Promise<void> {
     'touchmove',
     (e) => {
       const t = e.target as HTMLElement | null;
-      if (t?.closest('.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock, .persona-jac-board, .persona-enter-prompt')) return;
+      if (
+        t?.closest(
+          '.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock, .persona-kit, .persona-jac-board, .persona-enter-prompt',
+        )
+      )
+        return;
       if (joystick.isActive() || scene?.jacSnapshot()?.driving) e.preventDefault();
     },
     { passive: false, capture: true },
   );
   await scene.init(canvas);
+  personaKit = new PersonaKitUI(uiRoot, {
+    getViewMode: () => scene.getViewMode().mode,
+    setViewMode: (mode) => scene.setViewMode(mode),
+  });
+  if (personaEnabled()) {
+    scene.setViewMode('cenital');
+    personaKit.onBoot();
+  }
   chrome.beginSoundHint();
   const bootFocus = new URLSearchParams(location.search).get('focus');
   if (bootFocus === 'jac') {
