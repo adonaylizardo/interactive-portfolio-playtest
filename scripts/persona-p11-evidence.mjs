@@ -46,9 +46,12 @@ async function landscape844(page) {
     sheet: document.querySelector('.chrome')?.classList.contains('chrome--sheet'),
     dockVisible: !!document.querySelector('.chrome__dock')?.offsetParent,
     dockDisplay: getComputedStyle(document.querySelector('.chrome__dock')).display,
-    panel: document.querySelector('.chrome')?.dataset.sheetPanel,
-    casesActive: document.querySelector('[data-sheet-panel="cases"]')?.classList.contains('is-active'),
-    caseRowCount: document.querySelectorAll('[data-sheet-panel="cases"] .chrome__case-row').length,
+    panel: document.querySelector('.chrome')?.dataset.mobileSheet,
+    casesActive: document
+      .querySelector('.chrome__sheet-stack [data-sheet-panel="cases"]')
+      ?.classList.contains('is-active'),
+    caseRowCount: document.querySelectorAll('.chrome__sheet-stack [data-sheet-panel="cases"] .chrome__case-row')
+      .length,
   }));
 
   await tapDock(page, '[data-action="achievements"]');
@@ -56,10 +59,15 @@ async function landscape844(page) {
   const logrosShot = path.join(OUT, 'p11-844-logros-sheet.png');
   await page.screenshot({ path: logrosShot });
   const logrosDom = await page.evaluate(() => ({
-    panel: document.querySelector('.chrome')?.dataset.sheetPanel,
-    logrosActive: document.querySelector('[data-sheet-panel="achievements"]')?.classList.contains('is-active'),
-    logroCount: document.querySelectorAll('[data-sheet-panel="achievements"] .chrome__logro').length,
-    introHidden: !document.querySelector('[data-sheet-panel="intro"]')?.classList.contains('is-active'),
+    panel: document.querySelector('.chrome')?.dataset.mobileSheet,
+    logrosActive: document
+      .querySelector('.chrome__sheet-stack [data-sheet-panel="achievements"]')
+      ?.classList.contains('is-active'),
+    logroCount: document.querySelectorAll('.chrome__sheet-stack [data-sheet-panel="achievements"] .chrome__logro')
+      .length,
+    introHidden: !document
+      .querySelector('.chrome__sheet-stack [data-sheet-panel="intro"]')
+      ?.classList.contains('is-active'),
   }));
 
   await tapDock(page, '[data-action="map"]');
@@ -77,8 +85,14 @@ async function landscape844(page) {
 
 async function toast1280(page) {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto(`${BASE}#in=bogus-place`, { waitUntil: 'networkidle', timeout: 120000 });
-  await wait(1500);
+  await page.goto(BASE, { waitUntil: 'networkidle', timeout: 120000 });
+  await page.waitForFunction(() => window.__playtestQa?.setViewMode);
+  await wait(2000);
+  await page.evaluate(() => {
+    location.hash = '#in=bogus-place';
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  });
+  await wait(1800);
   const toastShot = path.join(OUT, 'p11-1280-unknown-route-toast.png');
   await page.screenshot({ path: toastShot });
   const toastDom = await page.evaluate(() => {

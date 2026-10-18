@@ -548,7 +548,7 @@ export class ChromeUI {
   }
 
   private syncSheetPanel(): void {
-    this.root.dataset.sheetPanel = this.mobileSheetPanel;
+    this.root.dataset.mobileSheet = this.mobileSheetPanel;
     this.root.querySelectorAll('[data-sheet-panel]').forEach((el) => {
       const key = (el as HTMLElement).dataset.sheetPanel as MobileSheetPanel | undefined;
       el.classList.toggle('is-active', key === this.mobileSheetPanel);
