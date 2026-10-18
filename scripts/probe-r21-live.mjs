@@ -222,6 +222,7 @@ function polylineLen(path, sx, sy) {
 }
 
 async function snapshot(page) {
+  if (page.isClosed() || page._r21Dead) throw new Error('page dead');
   return page.evaluate(() => {
     const j = window.__playtestQa.jac();
     const r = window.__playtestQa.inputReady();
@@ -307,7 +308,11 @@ async function waitEntered(page, timeout = 35000) {
   const t0 = Date.now();
   let last = null;
   while (Date.now() - t0 < timeout) {
-    last = await snapshot(page);
+    try {
+      last = await snapshot(page);
+    } catch (err) {
+      return { ...last, ok: false, ms: Date.now() - t0, why: `page-dead:${err?.message ?? err}` };
+    }
     const away = Math.hypot((last.cx ?? 0) - 25.5, (last.cy ?? 0) - 17) > 2.2;
     if ((last.interior || last.panel) && away && !last.driving) return { ...last, ok: true, ms: Date.now() - t0 };
     const elapsed = Date.now() - t0;
@@ -324,7 +329,12 @@ async function waitArrive(page, gx, gy, timeout = 20000) {
   const t0 = Date.now();
   let last = null;
   while (Date.now() - t0 < timeout) {
-    last = await snapshot(page);
+    try {
+      last = await snapshot(page);
+    } catch (err) {
+      const d = Math.hypot((last?.cx ?? 0) - gx, (last?.cy ?? 0) - gy);
+      return { ...last, ok: false, ms: Date.now() - t0, dist: d, why: `page-dead:${err?.message ?? err}` };
+    }
     const d = Math.hypot((last.cx ?? 0) - gx, (last.cy ?? 0) - gy);
     if (!last.goal && d <= 1.45 && last.mph < 2) return { ...last, ok: true, ms: Date.now() - t0, dist: d };
     await wait(50);
@@ -355,7 +365,16 @@ async function launchFresh(w) {
       });
       await hideWebdriver(ctx);
       const page = await ctx.newPage();
-      page.on('crash', () => log('page crash', w.tag));
+      page.setDefaultTimeout(15000);
+      page.setDefaultNavigationTimeout(25000);
+      page.on('crash', () => {
+        log('page crash', w.tag);
+        try {
+          page._r21Dead = true;
+        } catch {
+          /* ignore */
+        }
+      });
       await boot(page);
       if (!report.hash) {
         report.hash = await readHash(page);
@@ -535,7 +554,6 @@ async function measureRetarget() {
           armed = await launchFresh(w);
           const { page, cdp } = armed;
           await spawnDrive(page);
-          if (w.tag !== 'desk-1280') await armSampler(page);
           await tapDoor(page, cdp, pair.from, w.touch);
           await wait(pair.delay);
           const mid = await snapshot(page);
