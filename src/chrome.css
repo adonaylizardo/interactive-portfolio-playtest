@@ -751,11 +751,13 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
 
 @media (max-height: 500px) and (orientation: landscape) {
   .chrome--sheet .chrome__intro {
-    top: auto;
+    top: 12px;
     bottom: 12px;
-    left: 12px;
-    right: 12px;
-    max-height: min(268px, calc(100dvh - 80px));
+    left: auto;
+    right: 59px;
+    width: 360px;
+    max-width: calc(100vw - 80px);
+    max-height: calc(100dvh - 24px);
     overflow-y: auto;
     z-index: 5;
   }

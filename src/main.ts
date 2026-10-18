@@ -41,8 +41,9 @@ async function main(): Promise<void> {
   let scene!: IsoScene;
   let chrome!: ChromeUI;
   let panel!: BuildingPanel;
-  const aboutPanel = new AboutMePanel(uiRoot);
-  const searchPalette = new SearchPalette(uiRoot, { onSelect: (result) => routeSearchResult(result) });
+  let aboutPanel!: AboutMePanel;
+  let searchPalette!: SearchPalette;
+  let labels!: NameLabels;
 
   function routeSearchResult(result: SearchResult): void {
     switch (result.kind) {
@@ -82,6 +83,7 @@ async function main(): Promise<void> {
           break;
         }
         aboutPanel.open({ highlightContact: true });
+        syncMapOverlays();
         break;
       case 'achievements':
         chrome.setLayout('split');
@@ -92,29 +94,51 @@ async function main(): Promise<void> {
         aboutPanel.open({
           sectionId: result.targetId === 'about' ? undefined : result.targetId,
         });
+        syncMapOverlays();
         break;
     }
   }
+
+  const syncMapOverlays = (): void => {
+    labels.setHidden(
+      isMobileLayout() &&
+        (chrome.isMobileSheetOpen() ||
+          panel.isOpen() ||
+          aboutPanel.isOpen() ||
+          searchPalette.isOpen()),
+    );
+    scene?.applyCameraFromUi();
+  };
+
+  labels = new NameLabels(uiRoot, { onJacInfo: () => scene.jacOpenInfo() });
+  aboutPanel = new AboutMePanel(uiRoot, {
+    onClose: () => syncMapOverlays(),
+  });
+  searchPalette = new SearchPalette(uiRoot, {
+    onSelect: (result) => routeSearchResult(result),
+    onOpenChange: () => syncMapOverlays(),
+  });
 
   chrome = new ChromeUI(uiRoot, {
     onLayoutChange: () => {
       if (!isMobileLayout()) checklist.setCollapsed(true);
       else checklist.collapseMobile();
-      labels.setHidden(isMobileLayout() && (chrome.isMobileSheetOpen() || panel.isOpen()));
+      syncMapOverlays();
       if (chrome.getLayout() === 'map' && !panel.isOpen()) studio.scheduleIntroWhenMapIdle(450);
-      scene?.applyCameraFromUi();
     },
     onView: (mode: Camera) => scene?.setViewMode(mode),
     onRotate: () => scene?.rotateView(),
     onMapOverview: () => scene?.toggleMapOverview(),
     onCenter: () => scene?.recenterOnCharacter(),
     onLocate: (id) => scene?.walkToBuildingForQa(id),
-    onOpenAbout: (opts) => aboutPanel.open(opts),
+    onOpenAbout: (opts) => {
+      aboutPanel.open(opts);
+      syncMapOverlays();
+    },
     onOpenSearch: () => searchPalette.open(),
   });
 
   const joystick = new Joystick(uiRoot);
-  const labels = new NameLabels(uiRoot, { onJacInfo: () => scene.jacOpenInfo() });
   const mapLabels = new BuildingMapLabels(uiRoot);
   const jacHud = new JacHud(uiRoot, {
     onInfo: () => scene.jacOpenInfo(),

@@ -77,6 +77,10 @@ try {
     mkdirSync(dest, { recursive: true });
     cpSync(dist, dest, { recursive: true });
     writeFileSync(path.join(pushDir, '.nojekyll'), '');
+    writeFileSync(
+      path.join(pushDir, '.pages-deploy'),
+      `${target} ${new Date().toISOString()}\n`,
+    );
   } else {
     const keep = new Set(['.git', 'preview']);
     for (const name of readdirSync(pushDir)) {

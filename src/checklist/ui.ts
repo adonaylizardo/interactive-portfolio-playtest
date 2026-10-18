@@ -303,18 +303,20 @@ export class ChecklistUI {
     if (!Number.isNaN(top)) {
       top = Math.min(Math.max(12, top), window.innerHeight - 120);
     }
+    left = Math.max(margin, Math.min(left, window.innerWidth - width - margin));
     this.root.classList.add('checklist--anchored');
-    this.root.style.width = `${width}px`;
-    this.root.style.left = `${left}px`;
-    this.root.style.right = 'auto';
+    this.root.style.setProperty('width', `${width}px`, 'important');
+    this.root.style.setProperty('left', `${left}px`, 'important');
+    this.root.style.setProperty('right', 'auto', 'important');
     if (bottom != null) {
-      this.root.style.bottom = `${bottom}px`;
-      this.root.style.top = 'auto';
+      this.root.style.setProperty('bottom', `${bottom}px`, 'important');
+      this.root.style.setProperty('top', 'auto', 'important');
     } else {
-      this.root.style.top = `${top}px`;
-      this.root.style.bottom = 'auto';
+      const clampedTop = Math.max(margin, Math.min(top, window.innerHeight - Math.max(120, maxH) - margin));
+      this.root.style.setProperty('top', `${clampedTop}px`, 'important');
+      this.root.style.setProperty('bottom', 'auto', 'important');
     }
-    this.root.style.maxHeight = `${Math.max(120, maxH)}px`;
+    this.root.style.setProperty('max-height', `${Math.max(120, maxH)}px`, 'important');
   }
 
   private applyLayoutClasses(): void {

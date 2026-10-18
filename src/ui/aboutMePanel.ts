@@ -133,7 +133,7 @@ export class AboutMePanel {
           this.scrollEl.querySelector(`[data-about-section="${CSS.escape(opts.sectionId)}"]`);
         target?.scrollIntoView({ block: 'start' });
       } else if (opts.highlightContact) {
-        this.scrollEl.scrollTop = Math.max(0, this.contactEl.offsetTop - 80);
+        this.contactEl.scrollIntoView({ block: 'center' });
       } else {
         this.scrollEl.scrollTop = 0;
       }

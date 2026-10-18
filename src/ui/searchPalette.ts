@@ -12,6 +12,7 @@ import { getLang, onLangChange, t } from './i18n';
 export type SearchPaletteCallbacks = {
   onSelect: (result: SearchResult) => void;
   onChip?: (kind: SearchResultKind) => void;
+  onOpenChange?: (open: boolean) => void;
 };
 
 const KIND_ICON: Record<SearchResultKind, IconName> = {
@@ -153,6 +154,7 @@ export class SearchPalette {
     this.renderChips();
     this.syncView();
     requestAnimationFrame(() => this.input.focus());
+    this.callbacks.onOpenChange?.(true);
   }
 
   close(): void {
@@ -165,6 +167,7 @@ export class SearchPalette {
     this.input.blur();
     this.flatHits = [];
     this.activeHit = -1;
+    this.callbacks.onOpenChange?.(false);
   }
 
   private syncView(): void {

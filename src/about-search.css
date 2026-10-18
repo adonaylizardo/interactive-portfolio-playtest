@@ -41,6 +41,10 @@
   display: block;
 }
 
+.about-panel--phone-portrait [data-about-expand] {
+  display: none;
+}
+
 .about-panel__header {
   display: flex;
   align-items: center;
@@ -156,13 +160,17 @@ body[data-chrome='phone'] .about-panel--phone-portrait .about-panel__sheet {
 @media (max-height: 500px) and (orientation: landscape) and (max-width: 900px) {
   body[data-chrome='phone'] .about-panel__sheet {
     top: 12px;
-    right: 16px;
+    right: 59px;
     left: auto;
     bottom: 12px;
-    width: min(360px, calc(100vw - 428px));
-    max-width: calc(100vw - 32px);
+    width: 360px;
+    max-width: calc(100vw - 80px);
     max-height: none;
     border-radius: 12px;
+  }
+
+  .about-panel--phone-portrait [data-about-expand] {
+    display: none;
   }
 }
 
@@ -468,4 +476,11 @@ body.about-panel-open .chrome__subtitle {
 body.about-panel-open[data-chrome='desktop'] .playtest-toast {
   left: calc(64px + 432px + (100% - 64px - 432px) / 2);
   transform: translateX(-50%);
+}
+
+@media (max-height: 500px) and (orientation: landscape) and (max-width: 900px) {
+  body.about-panel-open .playtest-toast {
+    left: calc((100vw - 360px - 59px) / 2);
+    transform: translateX(-50%);
+  }
 }
