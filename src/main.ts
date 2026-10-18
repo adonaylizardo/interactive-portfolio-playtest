@@ -168,11 +168,11 @@ async function main(): Promise<void> {
         checklist.setBuildingPanelOpen(true);
         if (interiorId === 'teresa') {
           studio.clearSubtitle();
-          chrome.setInteriorOpen(false, { skipLayout: true });
+          chrome.setInteriorOpen(true, { skipLayout: true });
           panel.showTalks(t('panel.talks'), interiorId);
         } else if (interiorId === 'biblioteca') {
           studio.clearSubtitle();
-          chrome.setInteriorOpen(false, { skipLayout: true });
+          chrome.setInteriorOpen(true, { skipLayout: true });
           panel.showWritings(t('panel.writings'), interiorId);
         } else {
           chrome.setInteriorOpen(true);

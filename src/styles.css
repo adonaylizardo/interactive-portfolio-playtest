@@ -894,7 +894,7 @@ body[data-layout='panel'] .checklist {
     bottom: 0;
     left: 64px;
     right: auto;
-    width: min(360px, 58vw);
+    width: min(360px, calc(100vw - 64px - 8px));
     max-height: none;
     border-radius: 0 16px 16px 0;
     transform: none;
@@ -1333,6 +1333,14 @@ body[data-layout='panel'] .checklist {
 
 .building-panel--experience .exp-header {
   display: flex;
+}
+
+.building-panel--writings .exp-header {
+  gap: 4px;
+}
+
+.building-panel--writings .exp-header__actions {
+  gap: 0;
 }
 
 .exp-header__btn {

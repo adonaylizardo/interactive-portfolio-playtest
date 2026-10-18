@@ -1095,8 +1095,9 @@ export class BuildingPanel {
       const peek = this.el.classList.contains('building-panel--peek');
       if (this.isExperienceMode() && !peek) {
         if (this.mode === 'talks') {
-          const bottom = Math.min(sheet.height, Math.round(window.innerHeight * 0.42));
-          return { left: 0, top: 0, right: 0, bottom: Math.ceil(bottom + 8) };
+          const cap = Math.min(window.innerHeight * 0.42, 340);
+          const bottom = Math.min(sheet.height, cap, window.innerHeight - 120);
+          return { left: 0, top: 0, right: 0, bottom: Math.ceil(Math.max(88, bottom) + 8) };
         }
         return { left: Math.ceil(sheet.right + 8), top: 0, right: 0, bottom: 0 };
       }

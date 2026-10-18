@@ -648,13 +648,28 @@ export class ChromeUI {
     lang.style.top = shortLand ? '12px' : this.mobile ? '24px' : '20px';
 
     if (this.mobile) {
-      lang.style.top = shortLand ? '12px' : '24px';
+      if (shortLand) {
+        lang.style.left = '72px';
+        lang.style.right = 'auto';
+        lang.style.top = '12px';
+        return;
+      }
+      lang.style.top = '24px';
       lang.style.right = '16px';
+      lang.style.left = 'auto';
       const tools = this.root.querySelector('.chrome__tools-phone') as HTMLElement | null;
       const tr = tools?.getBoundingClientRect();
       const langRect = lang.getBoundingClientRect();
+      const cl = document.querySelector('.checklist') as HTMLElement | null;
+      const ring = cl && !cl.hidden ? cl.getBoundingClientRect() : null;
       if (tr && tr.width > 8 && langRect.width > 8 && langRect.left < tr.right + 8) {
-        lang.style.top = `${Math.round(tr.bottom + 8)}px`;
+        const candidateTop = Math.round(tr.bottom + 8);
+        const langH = langRect.height > 8 ? langRect.height : 40;
+        if (ring && ring.width > 8 && candidateTop + langH > ring.top - 4) {
+          lang.style.top = `${Math.max(12, Math.round(ring.bottom + 8))}px`;
+        } else {
+          lang.style.top = `${candidateTop}px`;
+        }
       }
       return;
     }
