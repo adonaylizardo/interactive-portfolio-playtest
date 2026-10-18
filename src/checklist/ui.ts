@@ -1,5 +1,5 @@
 import { studio } from '../audio/studio';
-import { CHECKLIST_PHONE_PILL, CHECKLIST_PHONE_PILL_2X, figmaAsset } from '../ui/figmaAssets';
+import { figmaAsset } from '../ui/figmaAssets';
 import { onLangChange, t } from '../ui/i18n';
 import {
   countCompleted,
@@ -92,15 +92,6 @@ export class ChecklistUI {
     this.applyLayoutClasses();
 
     this.root.innerHTML = `
-      <img
-        class="checklist__pill-raster"
-        src="${CHECKLIST_PHONE_PILL}"
-        srcset="${CHECKLIST_PHONE_PILL_2X} 2x"
-        width="237"
-        height="52"
-        alt=""
-        aria-hidden="true"
-      />
       <button type="button" class="checklist__ring-hit" aria-label=""></button>
       <header class="checklist__header">
         <div class="checklist__header-text">
@@ -298,12 +289,6 @@ export class ChecklistUI {
     this.root.classList.toggle('checklist--panel-open', this.mobile && this.panelOpen);
     this.root.classList.toggle('checklist--complete', done >= total);
     this.root.classList.toggle('checklist--skipped', this.state.skipped);
-    const mapClosed =
-      this.mobile &&
-      !this.state.mobileExpanded &&
-      document.body.dataset.layout === 'map';
-    const mapRaster = mapClosed && done === 3 && total === 5;
-    this.root.classList.toggle('checklist--map-raster', mapRaster);
   }
 
   complete(step: ChecklistStepId): void {

@@ -309,10 +309,10 @@ body[data-layout='panel'] .checklist {
 }
 
 .checklist--collapsed {
-  right: max(16px, env(safe-area-inset-right));
-  left: auto;
+  right: auto;
+  left: max(16px, env(safe-area-inset-left));
   width: fit-content;
-  max-width: min(360px, calc(100vw - 32px));
+  max-width: min(360px, calc(100vw - 200px));
   padding: 0;
 }
 
@@ -583,8 +583,8 @@ body[data-layout='panel'] .checklist {
   body[data-layout='map'] .checklist--mobile-closed {
     -webkit-font-smoothing: subpixel-antialiased;
     pointer-events: none;
-    top: 56px;
-    left: 122px;
+    top: max(56px, calc(env(safe-area-inset-top) + 56px));
+    left: max(122px, calc(env(safe-area-inset-left) + 122px));
     right: auto;
     width: 237px;
     min-width: 237px;
@@ -688,48 +688,8 @@ body[data-layout='panel'] .checklist {
     display: none !important;
   }
 
-  .checklist__pill-raster,
   .checklist__ring-hit {
     display: none;
-  }
-
-  body[data-layout='map'] .checklist--map-raster.checklist--mobile-closed {
-    position: absolute;
-    padding: 0;
-    width: 237px;
-    height: 52px;
-    min-height: 52px;
-    overflow: hidden;
-    background: transparent;
-    border: 0;
-    box-shadow: none;
-  }
-
-  body[data-layout='map'] .checklist--map-raster.checklist--mobile-closed .checklist__pill-raster {
-    display: block;
-    width: 237px;
-    height: 52px;
-    pointer-events: none;
-  }
-
-  body[data-layout='map'] .checklist--map-raster.checklist--mobile-closed .checklist__ring-hit {
-    display: block;
-    position: absolute;
-    top: 4px;
-    right: 0;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    cursor: pointer;
-    pointer-events: auto;
-  }
-
-  body[data-layout='map'] .checklist--map-raster.checklist--mobile-closed .checklist__header,
-  body[data-layout='map'] .checklist--map-raster.checklist--mobile-closed .checklist__list,
-  body[data-layout='map'] .checklist--map-raster.checklist--mobile-closed .checklist__footer {
-    display: none !important;
   }
 
   .checklist--mobile-closed .checklist__list,
@@ -1500,8 +1460,8 @@ body[data-layout='panel'] .checklist {
   }
 
   .building-panel--experience.building-panel--writings .experience__row-title {
-    font-size: 13.35px;
-    line-height: 19.5px;
+    font-size: 13.25px;
+    line-height: 19px;
   }
 
   .building-panel--experience.building-panel--writings .experience__row {

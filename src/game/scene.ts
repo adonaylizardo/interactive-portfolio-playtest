@@ -619,7 +619,7 @@ export class IsoScene {
       this.cameraY = v.y;
       this.zoom = clampZoom(v.zoom);
     }
-    if (id && !this.interiorActive) {
+    if (id) {
       if (state?.outdoorCam && !this.outdoorCamBeforeInterior) {
         this.outdoorCamBeforeInterior = { ...state.outdoorCam };
       }
@@ -3831,6 +3831,7 @@ export class IsoScene {
         pushInteriorEntry(buildingId, cam, outdoor);
         this.interiorHistoryEntries += 1;
       }
+      this.jacClose();
       this.events.onInteriorIdChange?.(buildingId);
       studio.setInterior(true);
       if (!opts?.fromHash && !opts?.skipFade) studio.playDoor();

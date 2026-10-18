@@ -531,9 +531,15 @@ export class ChromeUI {
     if (!lang) return;
     const shortLand = window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
     if (shortLand) {
-      lang.style.top = '12px';
-      lang.style.left = '16px';
-      lang.style.right = 'auto';
+      if (this.mobile && document.body.dataset.layout === 'map') {
+        lang.style.top = '12px';
+        lang.style.right = '12px';
+        lang.style.left = 'auto';
+      } else {
+        lang.style.top = '12px';
+        lang.style.left = '16px';
+        lang.style.right = 'auto';
+      }
       return;
     }
     lang.style.left = '';
@@ -543,9 +549,9 @@ export class ChromeUI {
       return;
     }
     if (this.mobile && document.body.dataset.layout === 'map') {
-      lang.style.top = '112px';
-      lang.style.left = '16px';
-      lang.style.right = 'auto';
+      lang.style.top = '';
+      lang.style.left = '';
+      lang.style.right = '';
       return;
     }
     lang.style.top = '24px';

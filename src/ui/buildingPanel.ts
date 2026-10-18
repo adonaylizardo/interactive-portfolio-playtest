@@ -7,10 +7,7 @@ import {
   FIGMA_BACK_PHONE_READING,
   FIGMA_CLOSE_PHONE_READING,
   FIGMA_DOC,
-  FIGMA_DOC_2X,
   FIGMA_DOC_PHONE,
-  FIGMA_DOC_RASTER,
-  FIGMA_PAUSE,
   FIGMA_PLAY,
   FIGMA_SUBSTACK_PHONE,
   figmaAsset,
@@ -472,7 +469,33 @@ export class BuildingPanel {
 
   private onCloseClick(): void {
     if (this.mode === 'preview') this.closePreview();
-    else if (this.mode === 'talks' || this.mode === 'writings') this.salir();
+    else if (this.mode === 'talks' || this.mode === 'writings') {
+      this.salir();
+      this.clearExperiencePresentation();
+    }
+  }
+
+  /** Drop Talks/Writings chrome so the next building sheet is not stacked underneath. */
+  private clearExperiencePresentation(): void {
+    this.experienceView = 'list';
+    this.activeTalkId = null;
+    this.activeWriting = null;
+    if (this.experienceEl) this.experienceEl.hidden = true;
+    if (this.experienceList) this.experienceList.hidden = true;
+    if (this.experienceDetail) {
+      this.experienceDetail.hidden = true;
+      this.experienceDetail.replaceChildren();
+    }
+    if (this.experienceFilters) this.experienceFilters.hidden = true;
+    if (this.experienceIntro) this.experienceIntro.hidden = true;
+    if (this.expHeader) this.expHeader.hidden = true;
+    if (this.expMobileChrome) this.expMobileChrome.hidden = true;
+    this.el.classList.remove(
+      'building-panel--experience',
+      'building-panel--writings',
+      'building-panel--exp-list',
+      'building-panel--exp-detail',
+    );
   }
 
   private onExperienceBack(): void {
@@ -679,8 +702,7 @@ export class BuildingPanel {
     if (kind === 'writing') {
       const doc = document.createElement('img');
       doc.className = 'experience__doc-icon';
-      doc.src = FIGMA_DOC_RASTER;
-      if (!this.isMobile()) doc.srcset = `${FIGMA_DOC_2X} 2x`;
+      doc.src = this.isMobile() ? FIGMA_DOC_PHONE : FIGMA_DOC;
       doc.width = 15;
       doc.height = 15;
       doc.alt = '';
@@ -728,28 +750,51 @@ export class BuildingPanel {
     if (this.isMobile() && this.peekOnly) this.setPeek(false);
   }
 
+  private talkVideoUrl(item: TalkItem): string | null {
+    const key = item.titleKey.replace(/\.title$/, '.url') as I18nKey;
+    const url = t(key);
+    return url.startsWith('http') ? url : null;
+  }
+
+  private writingArticleUrl(item: TalkItem): string | null {
+    const key = item.titleKey.replace(/\.title$/, '.url') as I18nKey;
+    const url = t(key);
+    return url.startsWith('http') ? url : null;
+  }
+
   private renderTalkPlayer(item: TalkItem): void {
     if (!this.experienceDetail) return;
     const title = t(item.titleKey as I18nKey);
     const meta = t(item.metaKey as I18nKey);
+    const videoUrl = this.talkVideoUrl(item);
     const upNextLimit = this.isMobile() ? 3 : 4;
     const upNext = TALKS.filter((x) => x.id !== item.id).slice(0, upNextLimit);
     const wrap = document.createElement('div');
     wrap.className = 'talks-player';
-    wrap.innerHTML = `
-      <div class="talks-player__stage">
-        <p class="talks-player__label">${t('talks.videoLabel')}</p>
-        <button type="button" class="talks-player__pause" aria-label="">
-          <img class="talks-player__pause-icon" src="${FIGMA_PAUSE}" width="14" height="14" alt="" />
-        </button>
-        <div class="talks-player__progress" aria-hidden="true"><span class="talks-player__progress-fill"></span></div>
-        <p class="talks-player__time">0:00 / 0:00</p>
-      </div>
-      <h3 class="talks-player__title"></h3>
-      <p class="talks-player__meta"></p>
-      <hr class="experience__divider" />
-      <div class="experience__up-next-list" data-up-next></div>
-    `;
+    if (videoUrl) {
+      wrap.innerHTML = `
+        <div class="talks-player__stage talks-player__stage--link">
+          <p class="talks-player__label">${t('talks.videoLabel')}</p>
+          <button type="button" class="talks-player__pause" aria-label="${t('talks.play')}">
+            <img class="talks-player__pause-icon" src="${FIGMA_PLAY}" width="14" height="14" alt="" />
+          </button>
+        </div>
+        <h3 class="talks-player__title"></h3>
+        <p class="talks-player__meta"></p>
+        <hr class="experience__divider" />
+        <div class="experience__up-next-list" data-up-next></div>
+      `;
+      wrap.querySelector('.talks-player__pause')!.addEventListener('click', () => {
+        window.open(videoUrl, '_blank', 'noopener,noreferrer');
+      });
+    } else {
+      wrap.innerHTML = `
+        <h3 class="talks-player__title"></h3>
+        <p class="talks-player__meta"></p>
+        <hr class="experience__divider" />
+        <div class="experience__up-next-list" data-up-next></div>
+      `;
+    }
     wrap.querySelector('.talks-player__title')!.textContent = title;
     wrap.querySelector('.talks-player__meta')!.textContent = meta;
     const list = wrap.querySelector('[data-up-next]')!;
@@ -816,7 +861,7 @@ export class BuildingPanel {
       h.textContent = t(section.titleKey as I18nKey);
       const badge = document.createElement('span');
       badge.className = 'experience__section-count';
-      badge.textContent = '0';
+      badge.textContent = String(section.items.length);
       const seeAll = document.createElement('button');
       seeAll.type = 'button';
       seeAll.className = 'experience__see-all';
@@ -852,6 +897,7 @@ export class BuildingPanel {
     wrap.className = 'writings-reader';
     const docIcon = this.isMobile() ? FIGMA_DOC_PHONE : FIGMA_DOC;
     const substackIcon = this.isMobile() ? FIGMA_SUBSTACK_PHONE : FIGMA_SUBSTACK;
+    const articleUrl = this.writingArticleUrl(item);
     wrap.innerHTML = `
       <div class="writings-reader__hero" aria-hidden="true">
         <img class="writings-reader__hero-icon" src="${docIcon}" width="15" height="15" alt="" />
@@ -859,23 +905,27 @@ export class BuildingPanel {
       <p class="writings-reader__kicker"></p>
       <h3 class="writings-reader__title"></h3>
       <p class="writings-reader__meta"></p>
-      <a class="writings-reader__substack" href="#" rel="noopener noreferrer">
+      ${
+        articleUrl
+          ? `<a class="writings-reader__substack" href="${articleUrl}" target="_blank" rel="noopener noreferrer">
         <img class="writings-reader__substack-icon" src="${substackIcon}" width="15" height="15" alt="" />
         <span class="writings-reader__substack-label"></span>
-      </a>
+      </a>`
+          : ''
+      }
     `;
     wrap.querySelector('.writings-reader__kicker')!.textContent = t('writings.reader.kicker');
     wrap.querySelector('.writings-reader__title')!.textContent = t(item.titleKey as I18nKey);
     wrap.querySelector('.writings-reader__meta')!.textContent = t(item.metaKey as I18nKey);
-    const sub = wrap.querySelector('.writings-reader__substack') as HTMLAnchorElement;
+    const sub = wrap.querySelector('.writings-reader__substack') as HTMLAnchorElement | null;
     for (const key of ['writings.reader.p1', 'writings.reader.p2', 'writings.reader.p3'] as const) {
       const p = document.createElement('p');
       p.className = 'writings-reader__p';
       p.textContent = t(key);
-      wrap.insertBefore(p, sub);
+      if (sub) wrap.insertBefore(p, sub);
+      else wrap.appendChild(p);
     }
-    sub.querySelector('.writings-reader__substack-label')!.textContent = t('writings.substackCta');
-    sub.addEventListener('click', (e) => e.preventDefault());
+    if (sub) sub.querySelector('.writings-reader__substack-label')!.textContent = t('writings.substackCta');
     this.experienceDetail.replaceChildren(wrap);
   }
 
@@ -912,6 +962,7 @@ export class BuildingPanel {
     this.leaveArmed = false;
     this.exitPress = null;
     this.exitFromPointer = false;
+    this.clearExperiencePresentation();
     this.mode = 'preview';
     this.interiorId = interiorId;
     this.peekOnly = true;
@@ -1031,6 +1082,8 @@ export class BuildingPanel {
   }
 
   hide(opts?: { snap?: boolean; silent?: boolean }): void {
+    this.leaveArmed = false;
+    this.clearExperiencePresentation();
     // Snap out of the hit tree on this frame (same as the mat). A transforming sheet still
     // intercepts iOS taps even with pointer-events:none, so Salir waited ~250 ms for map input.
     this.el.classList.add('building-panel--snap');

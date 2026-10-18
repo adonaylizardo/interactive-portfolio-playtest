@@ -236,6 +236,7 @@ async function main(): Promise<void> {
 
   const bootInterior = parseInteriorFromHash();
   if (bootInterior) {
+    chrome.setLayout('map');
     syncInteriorPanel(bootInterior);
   }
 
