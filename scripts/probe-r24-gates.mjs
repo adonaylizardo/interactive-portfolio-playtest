@@ -18,6 +18,34 @@ fs.mkdirSync(OUT, { recursive: true });
 const log = (...a) => console.log(...a);
 
 const DOORS = ['estudio', 'volaris', 'bain', 'mentoria', 'finoa', 'pg', 'sambil', 'catedral', 'flor'];
+const DOOR_XY = {
+  estudio: { x: 31, y: 36 },
+  volaris: { x: 39, y: 36 },
+  bain: { x: 39, y: 26 },
+  mentoria: { x: 32, y: 26 },
+  finoa: { x: 24, y: 24 },
+  pg: { x: 24, y: 31 },
+  sambil: { x: 47, y: 16 },
+  catedral: { x: 14, y: 17 },
+  flor: { x: 46, y: 46 },
+};
+
+function panelMatches(s, name) {
+  const panel = String(s?.panel ?? '').toLowerCase();
+  const key = String(name ?? '').toLowerCase();
+  if (!key) return !!(s?.preview || s?.interior || s?.panel);
+  if (panel.includes(key)) return true;
+  if (key === 'pg' && (panel.includes('procter') || panel.includes('gamble'))) return true;
+  return false;
+}
+
+function nearDoor(s, name, max = 8) {
+  const d = DOOR_XY[name];
+  if (!d || !s) return false;
+  const van = Math.hypot((s.cx ?? 0) - d.x, (s.cy ?? 0) - d.y);
+  const ch = Math.hypot((s.char?.x ?? 0) - d.x, (s.char?.y ?? 0) - d.y);
+  return van <= max || ch <= max;
+}
 const WIDTHS = [
   { tag: 'phone-390', size: { width: 390, height: 844 }, touch: true },
   { tag: 'land-844', size: { width: 844, height: 390 }, touch: true },
@@ -282,7 +310,15 @@ async function tapDoor(page, cdp, name, touch) {
   const view = page.viewportSize();
   const accepts0 = (await snap(page)).accepts;
   const raw = await page.evaluate((n) => window.__playtestQa.doorScreenPoint?.(n), name);
-  let found = await findCanvasDoorTap(page, name, raw);
+  let found = { pt: null, hit: null };
+  if (raw && view) {
+    const rawHit = await hitAt(page, raw.x, raw.y);
+    const inView = raw.x >= 8 && raw.y >= 8 && raw.x <= view.width - 8 && raw.y <= view.height - 8;
+    if (inView && rawHit.canvas && rawHit.pick?.door === name && !rawHit.pick.jac) {
+      found = { pt: raw, hit: rawHit };
+    }
+  }
+  if (!found.pt) found = await findCanvasDoorTap(page, name, raw);
   if (!found.pt && raw && view) {
     const toward = clampToSafe(raw, view);
     const towardHit = await hitAt(page, toward.x, toward.y);
@@ -290,17 +326,20 @@ async function tapDoor(page, cdp, name, touch) {
       log('nudge', name, toward, towardHit.pick);
       await realTap(page, cdp, toward.x, toward.y, touch);
       const t0 = Date.now();
-      while (Date.now() - t0 < 8000) {
+      while (Date.now() - t0 < 12000) {
         const s = await snap(page);
-        if (s.preview || s.interior || s.panel) break;
-        if (s.mph < 0.4 && s.goal == null) break;
+        if (panelMatches(s, name) || nearDoor(s, name, 7)) break;
+        if (s.mph < 0.3 && s.goal == null && Date.now() - t0 > 1800) break;
         await wait(120);
       }
-      found = await findCanvasDoorTap(
-        page,
-        name,
-        await page.evaluate((n) => window.__playtestQa.doorScreenPoint?.(n), name),
-      );
+      const next = await page.evaluate((n) => window.__playtestQa.doorScreenPoint?.(n), name);
+      if (next) {
+        const nextHit = await hitAt(page, next.x, next.y);
+        if (nextHit.canvas && nextHit.pick?.door === name && !nextHit.pick.jac) {
+          found = { pt: next, hit: nextHit };
+        }
+      }
+      if (!found.pt) found = await findCanvasDoorTap(page, name, next);
     }
   }
   const pt = found.pt;
@@ -311,7 +350,7 @@ async function tapDoor(page, cdp, name, touch) {
   const after = await snap(page);
   return {
     tapped,
-    accepted: after.accepts > accepts0 || after.preview || after.interior || after.panel || !!after.goal,
+    accepted: after.accepts > accepts0 || panelMatches(after, name) || !!after.goal,
     pt,
     pick,
     hit: found.hit,
@@ -320,13 +359,12 @@ async function tapDoor(page, cdp, name, touch) {
   };
 }
 
-async function waitEntered(page, timeout = 80000) {
+async function waitEntered(page, name, timeout = 80000) {
   const t0 = Date.now();
   let last = null;
   while (Date.now() - t0 < timeout) {
     last = await snap(page);
-    const away = Math.hypot((last.cx ?? 0) - 25.5, (last.cy ?? 0) - 17) > 2.2;
-    if (away && !last.driving && (last.interior || last.panel || last.preview)) {
+    if (!last.driving && panelMatches(last, name) && nearDoor(last, name, 10)) {
       return { ...last, ok: true, ms: Date.now() - t0 };
     }
     await wait(80);
@@ -466,19 +504,28 @@ async function driveToDoor(page, cdp, spec, name) {
     const boarded = await boardVan(page, cdp, spec.touch);
     if (!boarded.ok) return { ok: false, why: 'reboard-failed', boarded };
   }
-  const z = await pinchToward(page, cdp, 0.14, spec.touch);
+  const z = await pinchToward(page, cdp, 0.16, spec.touch);
   let tap = await tapDoor(page, cdp, name, spec.touch);
   log('tap', spec.tag, name, 'z', z, tap.accepted, tap.pick, tap.pt, tap.hit?.canvas, tap.hit?.tag);
-  if (!tap.accepted && !(await snap(page)).preview && !(await snap(page)).interior) {
+  if (!tap.accepted && !panelMatches(await snap(page), name)) {
     await wait(240);
     tap = await tapDoor(page, cdp, name, spec.touch);
     log('tap-retry', spec.tag, name, tap.accepted, tap.pick, tap.pt, tap.hit?.canvas, tap.hit?.tag);
   }
-  if (!tap.accepted && !(await snap(page)).preview && !(await snap(page)).interior && !(await snap(page)).goal) {
+  if (!tap.accepted && !panelMatches(await snap(page), name) && !(await snap(page)).goal) {
     return { ok: false, why: 'tap-miss', tap };
   }
-  const entered = await waitEntered(page);
-  log('enter', spec.tag, name, entered.ok, entered.ms, entered.cx, entered.cy, entered.why);
+  const entered = await waitEntered(page, name);
+  if (!entered.ok && nearDoor(entered, name, 8) && !entered.driving) {
+    const again = await tapDoor(page, cdp, name, spec.touch);
+    log('enter-retap', spec.tag, name, again.accepted, again.pick, again.pt);
+    const second = await waitEntered(page, name, 20000);
+    if (second.ok) {
+      log('enter', spec.tag, name, true, Date.now() - (Date.now() - entered.ms), second.cx, second.cy);
+      return { ok: true, entered: { ...second, ms: entered.ms + second.ms }, tap: again };
+    }
+  }
+  log('enter', spec.tag, name, entered.ok, entered.ms, entered.cx, entered.cy, entered.panel, entered.why);
   return { ok: entered.ok, entered, tap };
 }
 
