@@ -232,6 +232,7 @@ export type ChromeBridge = {
 };
 
 export type SceneEvents = {
+  onInteriorLoadFailed?: () => void;
   onChecklist: (step: ChecklistStepId) => void;
   onEnterBuilding: (buildingId: string, panelTitle: string) => void;
   onExitInterior?: () => void;
@@ -3956,7 +3957,11 @@ export class IsoScene {
     const door = building?.door;
     if (!def || !door) return;
     if (def.sprite && !spritesLoaded(interiorSpriteKey(def.id, false))) {
-      void loadInteriorSprite(def.id).then(() => this.enterInterior(buildingId, opts));
+      void loadInteriorSprite(def.id)
+        .then(() => this.enterInterior(buildingId, opts))
+        .catch(() => {
+          this.events.onInteriorLoadFailed?.();
+        });
       return;
     }
 

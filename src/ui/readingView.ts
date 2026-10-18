@@ -291,10 +291,25 @@ export class ReadingView {
       this.renderCase(slug);
       return;
     }
+    const wrap = document.createElement('div');
+    wrap.className = 'reading-view__miss';
     const miss = document.createElement('p');
     miss.className = 'reading-view__empty';
     miss.textContent = t('read.notFound');
-    this.main.replaceChildren(miss);
+    const backList = document.createElement('button');
+    backList.type = 'button';
+    backList.className = 'reading-view__inline-back ui-btn ui-btn--secondary';
+    backList.innerHTML = `${iconSvg('chevron')} <span>${t('read.backToList')}</span>`;
+    backList.addEventListener('click', () => {
+      goBackToReadingList(() => {
+        this.route = { kind: 'list' };
+        this.applyI18n();
+        this.render();
+        this.scroll.scrollTop = 0;
+      });
+    });
+    wrap.append(miss, backList);
+    this.main.replaceChildren(wrap);
   }
 
   private renderAbout(): void {

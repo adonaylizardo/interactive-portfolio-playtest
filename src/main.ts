@@ -41,6 +41,9 @@ import {
   markWelcomeDone,
   shouldSkipWelcomeFlow,
 } from './ui/bootFlow';
+import { showFatalState, setOnFatalReadInstead } from './ui/fatalState';
+import { startOfflineMonitor, isOfflineBannerVisible } from './ui/offlineBanner';
+import { canUseWebGL } from './ui/webglCheck';
 import { getLang, onLangChange, setLang, t } from './ui/i18n';
 import type { Camera } from './tokens';
 
@@ -119,6 +122,11 @@ async function main(): Promise<void> {
   };
 
   const reading = new ReadingView(uiRoot, closeReading);
+
+  setOnFatalReadInstead(() => {
+    bootFlow.dismiss();
+    syncReadingFromHash();
+  });
 
   const chrome = new ChromeUI(uiRoot, {
     onLayoutChange: () => {
@@ -217,6 +225,9 @@ async function main(): Promise<void> {
   };
 
   scene = new IsoScene({
+    onInteriorLoadFailed: () => {
+      showToast(t('state.loadFailed.sub'));
+    },
     onChecklist: (step) => checklist.complete(step),
     onEnterBuilding: (buildingId) => {
       checklist.complete('enter-building');
@@ -338,7 +349,20 @@ async function main(): Promise<void> {
   const bootReading = parseReadingRoute();
   if (bootReading) setHashWriteSuppressed(true);
 
-  await scene.init(canvas);
+  if (!canUseWebGL()) {
+    showFatalState('webgl');
+    return;
+  }
+
+  try {
+    await scene.init(canvas);
+  } catch (err) {
+    console.error(err);
+    showFatalState('load-failed');
+    return;
+  }
+
+  startOfflineMonitor();
 
   let enteredViaWelcomeRead = false;
   if (skipWelcome) {
@@ -505,6 +529,7 @@ async function main(): Promise<void> {
     openPanelTitle: () => panel.openTitle(),
     isCasePreviewExpanded: () => panel.isPreviewExpanded(),
     showCasePreview: (id: string) => panel.showPreview(id),
+    showTalksEmptyForQa: () => panel.showTalksEmptyForQa(),
     expandCasePreview: () => panel.expandPreviewForQa(),
     collapseCasePreview: () => panel.collapsePreviewForQa(),
     jac: () => scene.qaJac(),
@@ -550,13 +575,12 @@ async function main(): Promise<void> {
     setLang: (lang: 'en' | 'es') => setLang(lang),
     getLang: () => getLang(),
     t: (key: Parameters<typeof t>[0]) => t(key),
+    showFatalState: (kind: 'webgl' | 'load-failed') => showFatalState(kind),
+    isOfflineBannerVisible: () => isOfflineBannerVisible(),
   };
 }
 
 main().catch((err) => {
   console.error(err);
-  document.body.insertAdjacentHTML(
-    'beforeend',
-    `<p style="padding:16px;color:red">${t('boot.error')} ${String(err)}</p>`,
-  );
+  showFatalState('load-failed');
 });

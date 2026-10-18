@@ -527,6 +527,17 @@ export class BuildingPanel {
     this.renderTalksList();
   }
 
+  /** QA / gate: Talks shell with empty list copy (refs `talks-vacio`). */
+  showTalksEmptyForQa(): void {
+    this.showTalks(t('panel.talks'), 'teresa');
+    if (!this.experienceList) return;
+    const p = document.createElement('p');
+    p.className = 'experience__empty';
+    p.textContent = t('talks.comingSoon');
+    this.experienceList.replaceChildren(p);
+    if (this.isMobile() && this.peekOnly) this.setPeek(false);
+  }
+
   showWritings(title: string, interiorId: string | null = 'biblioteca'): void {
     this.openExperience('writings', title, interiorId);
     this.renderWritingsList();

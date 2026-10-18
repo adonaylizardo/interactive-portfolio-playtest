@@ -226,7 +226,11 @@ export async function loadAllSprites(): Promise<void> {
 }
 
 export async function loadInteriorSprite(id: string): Promise<void> {
-  await loadKeys([interiorSpriteKey(id, false), interiorSpriteKey(id, true)]);
+  try {
+    await loadKeys([interiorSpriteKey(id, false), interiorSpriteKey(id, true)]);
+  } catch (err) {
+    throw new Error(`loadInteriorSprite(${id}) failed`, { cause: err });
+  }
 }
 
 export function spriteTexture(key: string): Texture {

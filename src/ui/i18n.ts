@@ -192,6 +192,13 @@ const DICT = {
     'chrome.dock': 'Dock',
     'chrome.audience': 'Audience',
 
+    'state.webgl.title': "The map can't run in this browser",
+    'state.loadFailed.title': "Couldn't load the map",
+    'state.loadFailed.sub': 'Check your connection and try again.',
+    'state.tryAgain': 'Try again',
+    'state.readInstead': 'Read instead',
+    'state.offline': "You're offline. Some places may not load.",
+
     'boot.error': 'Failed to load:',
     'boot.loading': 'Loading the map',
     'welcome.headline': 'Hey there, my name is Adonay Lizardo 👋',
@@ -377,6 +384,13 @@ const DICT = {
     'chrome.primary': 'Principal',
     'chrome.dock': 'Barra',
     'chrome.audience': 'Audiencia',
+
+    'state.webgl.title': "The map can't run in this browser",
+    'state.loadFailed.title': "Couldn't load the map",
+    'state.loadFailed.sub': 'Check your connection and try again.',
+    'state.tryAgain': 'Try again',
+    'state.readInstead': 'Solo leer',
+    'state.offline': "You're offline. Some places may not load.",
 
     'boot.error': 'Error al cargar:',
     'boot.loading': 'Cargando el mapa',
