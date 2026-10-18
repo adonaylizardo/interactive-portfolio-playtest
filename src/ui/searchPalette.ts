@@ -54,7 +54,7 @@ export class SearchPalette {
             <button type="button" class="search-palette__clear" data-search-clear hidden aria-label="Clear">${iconSvg('close')}</button>
           </label>
           <button type="button" class="search-palette__close" data-search-close aria-label="Close">${iconSvg('close')}</button>
-          <span class="search-palette__hint-key" aria-hidden="true">EN</span>
+          <span class="search-palette__hint-key" aria-hidden="true">ESC</span>
         </div>
         <div class="search-palette__chips" data-chips></div>
         <div class="search-palette__results" data-results></div>
@@ -182,6 +182,7 @@ export class SearchPalette {
     if (!q) {
       this.resultsEl.replaceChildren();
       this.chipsEl.hidden = false;
+      this.root.classList.remove('search-palette--no-results');
       this.flatHits = [];
       this.activeHit = -1;
       return;
@@ -211,6 +212,7 @@ export class SearchPalette {
     this.activeHit = -1;
     this.resultsEl.replaceChildren();
     this.chipsEl.hidden = groups.length > 0;
+    this.root.classList.toggle('search-palette--no-results', !groups.length && !!query.trim());
 
     if (!groups.length) {
       const empty = document.createElement('div');
@@ -227,6 +229,7 @@ export class SearchPalette {
       this.chipsEl.hidden = false;
       return;
     }
+    this.root.classList.remove('search-palette--no-results');
 
     for (const group of groups) {
       const section = document.createElement('section');

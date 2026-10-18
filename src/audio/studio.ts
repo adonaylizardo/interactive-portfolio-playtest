@@ -205,7 +205,12 @@ export class StudioAudio {
     this.introLock = false;
     this.pending = null;
     this.voiceQueue = [];
-    if (this.activeLineId === '01-intro') this.stopVoice();
+    if (this.activeLineId === '01-intro') this.stopVoice({ preserveQueue: true });
+    const line = VOICE_LINES[id];
+    if (line) {
+      this.subtitleText = this.lineSubtitle(line);
+      this.emit();
+    }
     this.playLine(id, { force: true });
   }
 
@@ -352,9 +357,11 @@ export class StudioAudio {
 
   playLine(id: string, opts: { force?: boolean } = {}): void {
     const line = VOICE_LINES[id];
-    if (!line || this.muted) return;
+    if (!line) return;
+    if (!opts.force && this.muted) return;
     if (!opts.force && this.played.has(id)) return;
-    if (!this.unlocked) return;
+    if (!this.unlocked && !opts.force) return;
+    if (opts.force && (this.muted || !this.unlocked)) return;
     if (id === '01-intro' && this.shouldDeferIntro()) {
       this.introDeferred = true;
       this.introLock = false;
@@ -403,13 +410,13 @@ export class StudioAudio {
     if (!completed && this.activeLineId === '01-intro') this.introDeferred = true;
     this.activeLineId = null;
     this.introLock = false;
-    this.stopVoice({ preserveQueue: true });
+    this.stopVoice({ preserveQueue: true, clearCaption: false });
     this.syncAmbience();
     this.emit();
     this.drainVoiceQueue();
   }
 
-  private stopVoice(opts: { preserveQueue?: boolean } = {}): void {
+  private stopVoice(opts: { preserveQueue?: boolean; clearCaption?: boolean } = {}): void {
     const hadVoice = !!this.voice;
     const interruptedIntro = this.activeLineId === '01-intro';
     if (this.voice) {
@@ -421,7 +428,7 @@ export class StudioAudio {
       this.introDeferred = true;
       this.activeLineId = null;
     }
-    this.subtitleText = '';
+    if (opts.clearCaption !== false) this.subtitleText = '';
     if (hadVoice || this.introLock) {
       this.introLock = false;
       if (!opts.preserveQueue) this.pending = null;

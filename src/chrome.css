@@ -998,7 +998,7 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
     right: 59px !important;
     width: 360px !important;
     max-width: calc(100vw - 80px) !important;
-    max-height: none !important;
+    max-height: calc(100dvh - 26px) !important;
     height: auto !important;
     overflow-x: hidden;
     overflow-y: auto;

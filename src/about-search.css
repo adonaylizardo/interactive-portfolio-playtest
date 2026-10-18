@@ -164,9 +164,9 @@ body[data-chrome='phone'] .about-panel--phone-portrait .about-panel__sheet {
   left: 0;
   right: 0;
   bottom: 0;
-  top: 145px;
+  top: 237px;
   border-radius: 16px 16px 0 0;
-  max-height: calc(100dvh - 145px);
+  max-height: calc(100dvh - 237px);
 }
 
 @media (max-height: 500px) and (orientation: landscape) and (max-width: 900px) {
@@ -328,8 +328,9 @@ body[data-chrome='desktop'] .search-palette__hint-key {
   gap: 6px;
   border: 1px solid #2a2c31;
   border-radius: 999px;
-  height: 26px;
-  padding: 0 10px;
+  min-height: 28px;
+  height: 28px;
+  padding: 0 12px;
   background: #141518;
   color: #edeef0;
   font: 500 12px/16px Inter, system-ui, sans-serif;
@@ -454,13 +455,26 @@ body[data-chrome='phone'] .search-palette--phone-full .search-palette__panel {
   border: 0;
 }
 
+.search-palette--no-results .search-palette__field {
+  order: 0;
+}
+
+.search-palette--no-results .search-palette__results {
+  order: 1;
+}
+
+.search-palette--no-results .search-palette__chips {
+  order: 2;
+}
+
 @media (max-height: 500px) and (orientation: landscape) and (max-width: 900px) {
   body[data-chrome='phone'] .search-palette__panel {
     top: 12px;
-    right: 12px;
+    right: 59px;
     left: auto;
     bottom: 12px;
-    width: min(360px, calc(100vw - 24px));
+    width: 360px;
+    max-width: calc(100vw - 80px);
     max-height: none;
     border-radius: 12px;
     border: 1px solid #2a2c31;
@@ -493,7 +507,16 @@ body.about-panel-open[data-chrome='desktop'] .chrome__subtitle:not(:empty) {
 }
 
 @media (max-width: 767px) and (orientation: portrait) {
-  body.about-panel-open[data-chrome='phone'] .chrome__subtitle:not(:empty) {
+  body.about-panel-open[data-chrome='phone'] .chrome__views {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+body.about-panel-open[data-chrome='desktop'] .checklist {
+  z-index: 4;
+}
+
+body.about-panel-open[data-chrome='phone'] .chrome__subtitle:not(:empty) {
     left: 50% !important;
     width: min(340px, calc(100vw - 32px)) !important;
     transform: translateX(-50%) !important;

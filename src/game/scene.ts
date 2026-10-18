@@ -590,8 +590,18 @@ export class IsoScene {
     this.app.ticker.add(() => this.update(), undefined, UPDATE_PRIORITY.NORMAL);
     this.app.ticker.add(() => this.composeRearPass(), undefined, UPDATE_PRIORITY.NORMAL);
     this.app.ticker.add(() => this.events.onFrame?.(), undefined, UPDATE_PRIORITY.UTILITY);
-    window.addEventListener('resize', () => this.onWindowViewportChange());
-    window.visualViewport?.addEventListener('resize', () => this.onWindowViewportChange());
+    const scheduleViewportReflow = () => this.scheduleViewportReflow();
+    window.addEventListener('resize', scheduleViewportReflow);
+    window.visualViewport?.addEventListener('resize', scheduleViewportReflow);
+    window.addEventListener('orientationchange', () => {
+      window.setTimeout(() => this.reflowViewport(), 50);
+    });
+    for (const mq of [
+      window.matchMedia('(orientation: portrait)'),
+      window.matchMedia('(orientation: landscape)'),
+    ]) {
+      mq.addEventListener('change', scheduleViewportReflow);
+    }
     const lockViewport = () => {
       if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
     };
@@ -2087,7 +2097,10 @@ export class IsoScene {
       }
       bottom = Math.max(bottom, panelInsets.bottom + pad);
     }
-    const checklist = document.querySelector('.checklist');
+    const phoneChromeSheet =
+      document.body.dataset.chrome === 'phone' &&
+      document.querySelector('.chrome.chrome--sheet') != null;
+    const checklist = phoneChromeSheet ? null : document.querySelector('.checklist');
     if (checklist) {
       const box = checklist.getBoundingClientRect();
       if (box.width > 8 && box.height > 8) {
@@ -2566,7 +2579,7 @@ export class IsoScene {
     }
   }
 
-  private onWindowViewportChange(): void {
+  private scheduleViewportReflow(): void {
     if (
       this.pointers.size > 0 ||
       this.pinchGestureActive ||
@@ -2576,14 +2589,37 @@ export class IsoScene {
       this.pendingViewportApply = true;
       return;
     }
+    this.reflowViewport();
+  }
+
+  /** Resize renderer and repaint after viewport / chrome inset changes (rotation, sheets). */
+  reflowViewport(): void {
+    if (!this.app) return;
+    this.pendingViewportApply = false;
+    const vv = window.visualViewport;
+    const w = Math.max(1, Math.round(vv?.width ?? window.innerWidth));
+    const h = Math.max(1, Math.round(vv?.height ?? window.innerHeight));
+    this.app.renderer.resize(w, h);
+    this.paintScreenFill();
+    this.updateCameraFitMargins();
+    if (this.interiorActive && this.interiorDef) {
+      this.fitInteriorCamera();
+    } else if (!this.follow.engaged) {
+      this.centerOnCharacter(false);
+    }
     this.applyCamera(false);
+    try {
+      this.app.render();
+    } catch {
+      /* render may skip before first frame */
+    }
   }
 
   private flushPendingViewport(): void {
     if (!this.pendingViewportApply) return;
     this.pendingViewportApply = false;
     if (this.pointers.size > 0 || this.pinchGestureActive || this.gestureActive) return;
-    this.applyCamera(false);
+    this.reflowViewport();
   }
 
   private applyPinchCamera(next: { cameraX: number; cameraY: number; zoom: number }): void {

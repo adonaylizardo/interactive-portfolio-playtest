@@ -169,7 +169,7 @@ export class AboutMePanel {
 
   /** Voice-line caption must sit above the About layer (chrome is z-index 10 vs panel 60). */
   private portalVoiceSubtitle(): void {
-    const sub = document.querySelector('.chrome__subtitle') as HTMLElement | null;
+    const sub = document.getElementById('voice-subtitle') as HTMLElement | null;
     if (!sub || this.subtitleHome) return;
     this.subtitleHome = { el: sub, parent: sub.parentElement!, next: sub.nextSibling };
     document.body.append(sub);

@@ -83,6 +83,8 @@ async function main(): Promise<void> {
           break;
         }
         aboutPanel.open({ highlightContact: true });
+        studio.unlock();
+        studio.playLineForced('11-contact');
         syncMapOverlays();
         break;
       case 'achievements':
@@ -124,6 +126,7 @@ async function main(): Promise<void> {
       if (!isMobileLayout()) checklist.setCollapsed(true);
       else checklist.collapseMobile();
       syncMapOverlays();
+      scene?.reflowViewport();
       if (chrome.getLayout() === 'map' && !panel.isOpen()) studio.scheduleIntroWhenMapIdle(450);
     },
     onView: (mode: Camera) => scene?.setViewMode(mode),

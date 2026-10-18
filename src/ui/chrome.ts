@@ -50,6 +50,8 @@ function roundBtn(icon: IconName, label: string, extra = '', action?: string): s
 
 export class ChromeUI {
   readonly root: HTMLElement;
+  /** Voice caption; may be portaled to `document.body` while About is open. */
+  private subtitleEl: HTMLElement;
   private layout: DesktopLayout = 'map';
   private mobileSheet = true;
   private audience: Audience = 'recruiter';
@@ -72,6 +74,7 @@ export class ChromeUI {
     this.root.className = 'chrome';
     this.root.innerHTML = this.template();
     container.appendChild(this.root);
+    this.subtitleEl = this.root.querySelector('.chrome__subtitle') as HTMLElement;
     this.minimap = this.root.querySelector('.chrome__minimap') as HTMLCanvasElement;
     this.bind();
     this.applyI18n();
@@ -335,7 +338,7 @@ export class ChromeUI {
         ${iconSvg('info')}
         <span data-i18n="chrome.soundHint">No sound? Check silent mode</span>
       </div>
-      <p class="chrome__subtitle"></p>
+      <p class="chrome__subtitle" id="voice-subtitle" data-voice-subtitle></p>
       <div class="chrome__views" data-views>
         <div class="chrome__minimap-wrap">
           <canvas class="chrome__minimap" width="248" height="161" aria-hidden="true"></canvas>
@@ -364,7 +367,7 @@ export class ChromeUI {
       this.openAboutPanel();
     });
     this.root.querySelectorAll('[data-action="about-contact"]').forEach((btn) => {
-      btn.addEventListener('click', () => this.openAboutPanel({ highlightContact: true }));
+      btn.addEventListener('click', () => this.openContact());
     });
     this.root.querySelectorAll('[data-audience]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -448,10 +451,19 @@ export class ChromeUI {
     this.syncSubtitle();
   }
 
+  private subtitleElement(): HTMLElement {
+    return (
+      (document.getElementById('voice-subtitle') as HTMLElement | null) ??
+      (document.querySelector('[data-voice-subtitle]') as HTMLElement | null) ??
+      this.subtitleEl
+    );
+  }
+
   private syncSubtitle(): void {
-    const sub = this.root.querySelector('.chrome__subtitle') as HTMLElement | null;
-    if (!sub) return;
-    sub.textContent = studio.subtitle();
+    const sub = this.subtitleElement();
+    const text = studio.subtitle();
+    sub.textContent = text;
+    sub.hidden = !text;
   }
 
   /** 'No sound? Check silent mode' is a boot hint — fade out after ~4s, then stay gone. */
@@ -545,6 +557,7 @@ export class ChromeUI {
     intro.classList.toggle('chrome__intro--expanded', expanded);
     if (body) body.hidden = !expanded;
     this.sync();
+    this.callbacks.onLayoutChange();
   }
 
   openMobileSheetSection(target: 'casos' | 'logros' | 'intro' | 'contact'): void {
@@ -600,6 +613,7 @@ export class ChromeUI {
 
   private openContact(): void {
     this.openAboutPanel({ highlightContact: true });
+    studio.unlock();
     studio.playLineForced('11-contact');
   }
 
@@ -647,7 +661,7 @@ export class ChromeUI {
   }
 
   private placeSubtitle(): void {
-    const sub = this.root.querySelector('.chrome__subtitle') as HTMLElement | null;
+    const sub = this.subtitleElement();
     if (!sub) return;
     if (document.body.classList.contains('about-panel-open')) {
       const sheet = document.querySelector('.about-panel__sheet')?.getBoundingClientRect();
@@ -717,7 +731,7 @@ export class ChromeUI {
     const shortLand = window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
     if (shortLand && this.mobile) {
       if (this.mobileSheet && !this.interiorOpen) {
-        lang.style.top = '12px';
+        lang.style.top = '68px';
         lang.style.left = '12px';
         lang.style.right = 'auto';
       } else {

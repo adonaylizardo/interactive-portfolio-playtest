@@ -2,7 +2,8 @@ import { ABOUT, type AboutBlock } from './about';
 import { CASES, CASE_CARD_TITLES, CASE_HOUSE_IDS, type CaseHouseId } from './cases';
 import { TALKS, WRITINGS } from './experiences';
 import { aboutSectionId } from './aboutSectionId';
-import { talkTitle, writingTitle } from '../ui/contentLabels';
+import { formatContentDate, talkTitle, writingTitle } from '../ui/contentLabels';
+import type { WritingItem } from './experiences';
 import { t, getLang } from '../ui/i18n';
 import { CONTACT_EMAIL, CV_HREF } from './contactLinks';
 
@@ -102,6 +103,12 @@ function pushRow(out: SearchResult[], row: Omit<SearchResult, 'score'> & { score
   out.push({ ...row, score: row.score ?? 0 });
 }
 
+function writingSearchSnippet(item: WritingItem): string {
+  const raw = item.date?.trim();
+  if (raw) return formatContentDate(raw);
+  return item.publication ?? 'adonaylizardo.com';
+}
+
 function buildIndex(): SearchResult[] {
   const out: SearchResult[] = [];
 
@@ -123,7 +130,7 @@ function buildIndex(): SearchResult[] {
       pushRow(out, {
         kind: 'articles',
         title,
-        snippet: item.publication ?? 'adonaylizardo.com',
+        snippet: writingSearchSnippet(item),
         targetId: item.id,
         haystack: `${title} ${item.publication ?? ''} ${item.url ?? ''} artículo article diseño design`,
       });
