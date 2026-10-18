@@ -328,18 +328,24 @@ async function main(): Promise<void> {
     cenitalExpectedHeading: (dx: number, dy: number) => scene.qaCenitalExpectedHeading(dx, dy),
     cenitalBuildingLabels: () => {
       const base = cenitalLabels.qa();
+      const visibleBox = (el: HTMLElement) => {
+        if (el.hidden) return null;
+        const st = getComputedStyle(el);
+        if (st.display === 'none' || st.visibility === 'hidden' || Number(st.opacity) < 0.08) {
+          return null;
+        }
+        const r = el.getBoundingClientRect();
+        if (r.width < 2 || r.height < 2) return null;
+        return { x: r.left, y: r.top, w: r.width, h: r.height };
+      };
       const boxes: { x: number; y: number; w: number; h: number }[] = [];
       for (const pill of document.querySelectorAll('.cenital-building-label')) {
-        const el = pill as HTMLElement;
-        if (el.hidden) continue;
-        const r = el.getBoundingClientRect();
-        boxes.push({ x: r.left, y: r.top, w: r.width, h: r.height });
+        const box = visibleBox(pill as HTMLElement);
+        if (box) boxes.push(box);
       }
       for (const pill of document.querySelectorAll('.name-label')) {
-        const el = pill as HTMLElement;
-        if (el.hidden) continue;
-        const r = el.getBoundingClientRect();
-        boxes.push({ x: r.left, y: r.top, w: r.width, h: r.height });
+        const box = visibleBox(pill as HTMLElement);
+        if (box) boxes.push(box);
       }
       let overlaps = base.overlaps;
       for (let i = 0; i < boxes.length; i++) {

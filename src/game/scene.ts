@@ -1421,15 +1421,9 @@ export class IsoScene {
     }
     const yaw = this.cameraYawQuarter() * (Math.PI / 2);
     if (this.viewMode === 'cenital') {
-      if (this.mapOverview) {
-        this.viewRot = yaw;
-        this.viewSx = 1;
-        this.viewSy = 1;
-      } else {
-        this.viewRot = yaw + CENITAL_VIEW_TILT;
-        this.viewSx = 1;
-        this.viewSy = CENITAL_VIEW_SY;
-      }
+      this.viewRot = yaw + CENITAL_VIEW_TILT;
+      this.viewSx = 1;
+      this.viewSy = CENITAL_VIEW_SY;
     } else {
       this.viewRot = yaw;
       this.viewSx = 1;
@@ -1607,9 +1601,11 @@ export class IsoScene {
     let bestCam = { x: this.cameraX, y: this.cameraY };
     let bestBounds = this.overviewPlayBounds();
     const boundSets = [this.overviewPlayBounds(), mapWorldBounds()];
+    const yawTrials =
+      this.viewMode === 'cenital' ? [savedYaw] : [0, 1, 2, 3];
     for (const b of boundSets) {
       this.overviewFitTrial = b;
-      for (let q = 0; q < 4; q++) {
+      for (const q of yawTrials) {
         this.yaw = q;
         this.syncViewTransform();
         const wx = (b.minX + b.maxX) / 2;
@@ -1841,7 +1837,7 @@ export class IsoScene {
   /** Door pick in world space (stable at min zoom ~0.04–0.15); closest opening wins. */
   private pickBuildingDoorAtScreen(sx: number, sy: number): MapObject | undefined {
     if (this.cenitalOn() && !this.mapOverview) {
-      const slop = this.jac?.driving ? 44 : 24;
+      const slop = this.jac?.driving ? 56 : 24;
       const buildings = objects.filter((o) => o.type === 'building' && o.door && o.panelTitle);
       let best: { obj: MapObject; dist: number } | null = null;
       for (const obj of buildings) {
@@ -2172,6 +2168,11 @@ export class IsoScene {
       this.jacGetOut({ thenEnter: true });
       return true;
     }
+    if (sit) {
+      this.driveToTile(sit.x, sit.y, true);
+      return true;
+    }
+    this.pendingDriveEnter = entry;
     this.jacGetOut({ thenEnter: true });
     return true;
   }
@@ -4882,7 +4883,9 @@ export class IsoScene {
     const hereOk = this.jac.canParkHere();
     const arrived = !!sit && distSit < 0.85 && this.jac.mph < 1.4;
     const doorSideSit = idle && hereOk && this.jac.mph < 1.2 && along >= 0 && distDoor <= 8;
-    if (arrived || doorSideSit) {
+    const doorClose =
+      along >= 0 && distDoor <= 2.4 && this.jac.mph < 0.65 && (hereOk || distSit < 1.35);
+    if (arrived || doorSideSit || doorClose) {
       if (sit && distSit < 1.1) {
         this.jac.cx = sit.x;
         this.jac.cy = sit.y;
@@ -5073,7 +5076,7 @@ export class IsoScene {
     mph: number;
   } | null {
     if (!this.jac?.driving) return null;
-    this.jac.update(dt, { dx, dy, autoShift: true });
+    this.jac.update(dt, { dx, dy, autoShift: true, tileDir: this.cenitalOn() });
     this.charTx = this.jac.cx;
     this.charTy = this.jac.cy;
     this.startCameraFollow();
@@ -5421,9 +5424,9 @@ export class IsoScene {
     const midTy = (ay + d.y) / 2;
     const mid = tileToWorld(midTx, midTy);
     const doorW = tileToWorld(d.x, d.y);
-    const charW = tileToWorld(this.charTx, this.charTy);
-    const spanX = Math.abs(doorW.x - charW.x) + TILE_W * 2;
-    const spanY = Math.abs(doorW.y - charW.y) + TILE_H * 4;
+    const charW = tileToWorld(ax, ay);
+    const spanX = Math.abs(doorW.x - charW.x) + TILE_W * 3.5;
+    const spanY = Math.abs(doorW.y - charW.y) + TILE_H * 5;
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     this.updateCameraFitMargins();
@@ -5436,6 +5439,23 @@ export class IsoScene {
     const aim = this.freeRectCenter();
     this.placeWorldAtScreen(mid.x, mid.y - 40, aim.x, aim.y);
     this.applyCamera(false);
+    for (let pass = 0; pass < 5 && this.canvasEl; pass++) {
+      const pt = this.getDoorScreenClientPoint(name);
+      const rect = this.canvasEl.getBoundingClientRect();
+      const pad = 48;
+      if (
+        pt &&
+        pt.x >= rect.left + pad &&
+        pt.x <= rect.right - pad &&
+        pt.y >= rect.top + pad &&
+        pt.y <= rect.bottom - pad
+      ) {
+        break;
+      }
+      this.zoom = clampZoom(this.zoom * 0.84, sw, sh);
+      this.placeWorldAtScreen(mid.x, mid.y - 40, aim.x, aim.y);
+      this.applyCamera(false);
+    }
     this.app?.render();
   }
 
@@ -5870,22 +5890,27 @@ export class IsoScene {
       out.sort((a, b) => a.y - b.y || a.x - b.x);
       const kept: typeof out = [];
       for (const t of out) {
-        let ox = 0;
-        let oy = -28;
-        for (let attempt = 0; attempt < 6; attempt++) {
-          const px = t.x + ox;
-          const py = t.y + oy;
-          const clash = kept.some((k) => Math.hypot(k.x - px, k.y - py) < 44);
-          if (!clash) {
-            t.x = px;
-            t.y = py;
-            kept.push(t);
-            break;
+        let placed = false;
+        for (let ring = 0; ring < 5 && !placed; ring++) {
+          for (let i = 0; i < 8; i++) {
+            const ang = (i / 8) * Math.PI * 2;
+            const rad = 26 + ring * 18;
+            const px = t.x + Math.cos(ang) * rad;
+            const py = t.y + Math.sin(ang) * rad - 28;
+            const clash = kept.some((k) => Math.hypot(k.x - px, k.y - py) < 36);
+            if (!clash) {
+              t.x = px;
+              t.y = py;
+              kept.push(t);
+              placed = true;
+              break;
+            }
           }
-          oy -= 22;
-          ox = (attempt % 2 === 0 ? 1 : -1) * (14 + attempt * 6);
         }
-        if (!kept.includes(t)) t.visible = false;
+        if (!placed) {
+          t.y -= 28;
+          kept.push(t);
+        }
       }
       return out;
     }

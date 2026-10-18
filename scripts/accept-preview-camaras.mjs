@@ -92,6 +92,13 @@ async function overviewViewport(tag, opts) {
     }
     await page.evaluate(() => window.__playtestQa.toggleMapOverview?.());
     await wait(450);
+    const camOverview = await page.evaluate(() => window.__playtestQa.cameraViews?.());
+    if (camOverview?.mode !== 'cenital') {
+      errors.push(`${tag}: overview switched mode to ${camOverview?.mode}`);
+    }
+    if (camOverview?.altView !== 'cenital') {
+      errors.push(`${tag}: overview altView ${camOverview?.altView} (expected cenital)`);
+    }
     await page.evaluate(() => {
       window.__playtestQa.cenitalBuildingLabels?.();
     });
@@ -202,51 +209,71 @@ async function doorTapSuite() {
         log.push({ attempt: i + 1, building: name, ok: false, snap: { boarded: false } });
         continue;
       }
-      await page.evaluate(() => window.__playtestQa.jacSetGear('D'));
+      await page.evaluate(() => {
+        window.__playtestQa.jacSetGear('D');
+        window.__playtestQa.jacSetEngine?.();
+      });
       await wait(120);
-      const plan = await page.evaluate((buildingName) => {
+      const approach = await page.evaluate((buildingName) => {
         const b = window.__playtestQa.getEnterableBuildings().find((x) => x.name === buildingName);
-        if (!b?.door) return { ok: false, reason: 'no door' };
-        const sit = window.__playtestQa.parkForDoor?.(b.door.x, b.door.y);
-        const path = sit?.path ?? (sit ? window.__playtestQa.jacFindDrivePath?.(sit.x, sit.y) : null);
-        if (sit && path && path.length > 8) {
-          const hop = path[Math.max(0, path.length - 6)];
-          window.__playtestQa.jacSet?.({ cx: hop.x, cy: hop.y, dir: 'se', mode: 'drive' });
-          window.__playtestQa.jacSetGear('D');
+        window.__playtestQa.jacSetGear('D');
+        let dist = 999;
+        for (let i = 0; i < 900; i++) {
+          const j = window.__playtestQa.jac();
+          if (!b?.door || !j?.driving) return { dist, moved: false };
+          dist = Math.hypot(j.cx - b.door.x, j.cy - b.door.y);
+          if (dist < 5.2) return { dist, moved: true };
+          const dx = (b.door.x - j.cx) / (dist || 1);
+          const dy = (b.door.y - j.cy) / (dist || 1);
+          window.__playtestQa.jacDriveStep(0.05, dx, dy, { render: i % 12 === 0 });
         }
         const j = window.__playtestQa.jac();
-        return { sit, goal: j?.driveGoal, driving: j?.driving };
+        dist = b?.door ? Math.hypot(j.cx - b.door.x, j.cy - b.door.y) : dist;
+        return { dist, moved: dist < 8 };
       }, name);
-      await page.evaluate(() => {
-        window.__playtestQa.jacStick?.(null);
-        window.__playtestQa.jacSetGear('P');
-      });
-      await wait(80);
-      const pt = await page.evaluate((n) => {
+      await wait(200);
+      const ptPack = await page.evaluate((n) => {
         window.__playtestQa.clearDriveTapSuppress?.();
         window.__playtestQa.frameDoorForQa(n);
-        return window.__playtestQa.doorScreenPoint(n);
+        const p = window.__playtestQa.doorScreenPoint(n);
+        const canvas = document.querySelector('#game-canvas');
+        const r = canvas?.getBoundingClientRect();
+        return { p, r: r ? { l: r.left, t: r.top, r: r.right, b: r.bottom } : null };
       }, name);
-      if (pt?.x != null && pt?.y != null) await cdpTouch(cdp, pt.x, pt.y);
+      const pt = ptPack.p;
+      const pad = 36;
+      const r = ptPack.r;
+      const ptOk =
+        pt?.x != null &&
+        r &&
+        pt.x >= r.l + pad &&
+        pt.x <= r.r - pad &&
+        pt.y >= r.t + pad &&
+        pt.y <= r.b - pad;
+      if (!ptOk) {
+        errors.push(`door-tap ${i + 1}/5 ${name}: invalid doorScreenPoint ${JSON.stringify(ptPack)}`);
+        log.push({ attempt: i + 1, building: name, ok: false, approach, pt: ptPack });
+        continue;
+      }
+      await cdpTouch(cdp, pt.x, pt.y);
       await wait(180);
-      let outcome = await waitUntil(page, async () =>
-        page.evaluate(() => {
-          if (window.__playtestQa.isInInterior?.()) return { kind: 'interior' };
-          if (window.__playtestQa.isBuildingPanelOpen?.()) return { kind: 'panel' };
-          return null;
-        }),
-        3500,
-      );
-      if (!outcome) {
-        await page.evaluate((n) => window.__playtestQa.tapBuildingDoor(n), name);
-        outcome = await waitUntil(page, async () =>
-          page.evaluate(() => {
+      const outcome = await waitUntil(
+        page,
+        async () => {
+          await page.evaluate(() => {
+            if (window.__playtestQa.isInInterior?.()) return;
+            for (let k = 0; k < 48; k++) {
+              window.__playtestQa.jacDriveStep(0.05, 0, 0, { render: k % 16 === 0 });
+            }
+          });
+          return page.evaluate(() => {
             if (window.__playtestQa.isInInterior?.()) return { kind: 'interior' };
             if (window.__playtestQa.isBuildingPanelOpen?.()) return { kind: 'panel' };
             return null;
-          }),
-        );
-      }
+          });
+        },
+        28000,
+      );
       const snap = await page.evaluate((n) => {
         const j = window.__playtestQa.jac();
         const b = window.__playtestQa.getEnterableBuildings().find((x) => x.name === n);
@@ -260,7 +287,7 @@ async function doorTapSuite() {
         };
       }, name);
       const ok = !!(outcome && (outcome.kind === 'interior' || outcome.kind === 'panel'));
-      log.push({ attempt: i + 1, building: name, ok, plan, outcome, snap });
+      log.push({ attempt: i + 1, building: name, ok, outcome, approach, pt, snap });
       if (!ok) errors.push(`door-tap ${i + 1}/5 ${name} failed`);
       await page.evaluate(() => {
         window.__playtestQa.jacGetOut?.();

@@ -54,6 +54,7 @@ export class ChromeUI {
   private callbacks: ChromeCallbacks;
   private minimap: HTMLCanvasElement;
   private soundHintTimer: ReturnType<typeof setTimeout> | null = null;
+  private soundHintDismissed = false;
   private getCharTile: () => { x: number; y: number } = () => ({ x: 0, y: 0 });
   private getView: () => { mode: Camera; yaw: number; overview: boolean } = () => ({
     mode: 'isometrica',
@@ -174,7 +175,7 @@ export class ChromeUI {
         ${roundBtn('briefcase', 'Casos', 'chrome__nav', 'cases')}
         ${roundBtn('trophy', 'Logros', 'chrome__nav', 'achievements')}
         ${roundBtn('mail', 'Contacto', 'chrome__nav', 'contact')}
-        ${roundBtn('search', 'Buscar', 'chrome__nav chrome__nav--hidden', 'search')}
+        ${roundBtn('search', 'Buscar', 'chrome__nav', 'search')}
         <span class="chrome__rail-spacer"></span>
         <div class="chrome__tools-stack">
           ${roundBtn('download', 'Descargar CV', '', 'download')}
@@ -243,7 +244,7 @@ export class ChromeUI {
       </aside>
       <button type="button" class="chrome__tab" data-action="show-panel" aria-label="Show panel">${iconSvg('chevron')}</button>
       <div class="chrome__tools-phone">
-        ${roundBtn('search', 'Buscar', 'chrome__nav--hidden', 'search')}
+        ${roundBtn('search', 'Buscar', '', 'search')}
         ${roundBtn('sound', 'Sonido', '', 'sound')}
         ${roundBtn('locate', 'Center on Adonay', '', 'center')}
       </div>
@@ -342,10 +343,20 @@ export class ChromeUI {
     });
     this.root.querySelectorAll('[data-view]').forEach((btn) => {
       btn.addEventListener('click', () => {
+        (btn as HTMLElement).blur();
         const v = (btn as HTMLElement).dataset.view;
         if (v === 'rotate') this.callbacks.onRotate();
         else if (v === 'map') this.callbacks.onMapOverview();
         else this.callbacks.onView(v as Camera);
+      });
+    });
+    this.root.querySelectorAll('[data-action="search"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        (btn as HTMLElement).blur();
+        this.setLayout('split');
+        this.scrollTo('#chrome-casos');
+        const first = this.root.querySelector('.chrome__case-row') as HTMLElement | null;
+        first?.focus({ preventScroll: true });
       });
     });
     this.root.querySelectorAll('[data-action="center"]').forEach((btn) => {
@@ -411,6 +422,7 @@ export class ChromeUI {
     const visibleMs = 4000;
     const fadeMs = reduced ? 0 : 400;
     this.soundHintTimer = window.setTimeout(() => {
+      this.soundHintDismissed = true;
       if (reduced) {
         el.hidden = true;
       } else {
@@ -513,11 +525,12 @@ export class ChromeUI {
     });
     this.root.classList.toggle('chrome--alt-view', v.mode !== 'isometrica');
     const hint = this.root.querySelector('.chrome__sound') as HTMLElement | null;
-    if (hint && v.mode !== 'isometrica' && !hint.hidden) {
+    if (hint && (this.soundHintDismissed || v.mode !== 'isometrica') && !hint.hidden) {
       hint.hidden = true;
       hint.dataset.hint = '0';
       hint.setAttribute('aria-hidden', 'true');
       hint.classList.remove('chrome__sound--fade');
+      if (!this.soundHintDismissed) this.soundHintDismissed = true;
     }
   }
 

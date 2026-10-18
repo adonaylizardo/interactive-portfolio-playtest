@@ -2106,10 +2106,12 @@ body.jac-menu-open .checklist {
 }
 
 .jac-icon-btn {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border: 1px solid #2a2c31;
-  border-radius: 18px;
+  border-radius: 22px;
   background: #141518;
   color: #edeef0;
   display: inline-flex;
@@ -2553,12 +2555,14 @@ body.jac-menu-open .checklist {
 }
 
 .jac-gear {
-  width: 28px;
-  height: 22px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border: 0;
   background: transparent;
   color: #8a8f98;
-  font: 600 13px/22px Inter, sans-serif;
+  font: 600 13px/1 Inter, sans-serif;
   pointer-events: auto;
   cursor: pointer;
   display: inline-flex;
@@ -2620,12 +2624,14 @@ body.jac-menu-open .checklist {
 }
 
 .jac-toggles--dock {
-  grid-template-columns: repeat(3, 40px);
+  grid-template-columns: repeat(3, 44px);
 }
 
 .jac-toggles--dock .jac-toggle {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
 }
 
 .jac-rear {
@@ -2741,15 +2747,22 @@ body.jac-drive .chrome__locate {
 }
 
 @media (min-width: 768px) and (min-height: 501px) {
-  body.jac-drive .chrome__views {
+  body.jac-drive:not([data-chrome='phone']) .chrome__views {
     visibility: hidden;
     pointer-events: none;
   }
 }
 
 body.jac-drive .chrome__view-btns {
-  z-index: 120;
+  z-index: 140;
   pointer-events: auto;
+}
+
+body.jac-drive[data-chrome='phone'] .chrome__views,
+body.jac-drive .chrome--dock .chrome__views {
+  visibility: visible !important;
+  pointer-events: auto !important;
+  display: block !important;
 }
 
 body.jac-drive .chrome__dock,

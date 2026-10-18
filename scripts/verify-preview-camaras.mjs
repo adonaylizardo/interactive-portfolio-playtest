@@ -306,6 +306,9 @@ async function runViewport(tag, options) {
 
     await page.evaluate(() => window.__playtestQa.toggleMapOverview?.());
     await wait(350);
+    const camOverview = await page.evaluate(() => window.__playtestQa.cameraViews());
+    if (camOverview.mode !== 'cenital') errors.push(`${tag}: overview mode ${camOverview.mode}`);
+    if (camOverview.altView !== 'cenital') errors.push(`${tag}: overview altView ${camOverview.altView}`);
     const overview = await page.evaluate(() => window.__playtestQa.overviewCoverage?.());
     notes.push(`${tag}: overview coverage ${JSON.stringify(overview)}`);
     const fill =

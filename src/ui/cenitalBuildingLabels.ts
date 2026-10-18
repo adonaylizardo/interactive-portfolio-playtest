@@ -58,8 +58,13 @@ export class CenitalBuildingLabels {
     const boxes: { x: number; y: number; w: number; h: number }[] = [];
     for (const pill of this.pills.values()) {
       if (pill.hidden) continue;
-      visible += 1;
+      const st = getComputedStyle(pill);
+      if (st.display === 'none' || st.visibility === 'hidden' || Number(st.opacity) < 0.08) {
+        continue;
+      }
       const r = pill.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) continue;
+      visible += 1;
       boxes.push({ x: r.left, y: r.top, w: r.width, h: r.height });
     }
     let overlaps = 0;
