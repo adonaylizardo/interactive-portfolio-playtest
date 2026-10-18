@@ -291,7 +291,7 @@ const CHAR_BODY_CENTRE_RISE = 48;
 /** Glide time when the camera catches up to the character (walk start, after a manual pan). */
 const FOLLOW_SMOOTH_S = 0.35;
 /** Persona mode: A/D and stick X rotate this yaw (rad/s), not strafe. */
-const PERSONA_TURN_RATE = 2.65;
+const PERSONA_TURN_RATE = 1.35;
 /** ~1.7 m/s on foot vs map keyboard walk (~4.5 tiles/s). */
 const PERSONA_WALK_MUL = 0.43;
 const PERSONA_STICK_DEAD = 0;
@@ -5046,19 +5046,14 @@ export class IsoScene {
       return;
     }
     this.pendingJacExit = false;
-    const snap = this.jac.snapshot();
     this.jac.cancelExit();
-    if (snap.exitCx != null && snap.exitCy != null) {
-      this.jac.cx = snap.exitCx;
-      this.jac.cy = snap.exitCy;
-    }
     if (this.pendingDriveEnter) {
       this.jac.faceClearOfDoor(this.pendingDriveEnter.door.x, this.pendingDriveEnter.door.y);
     }
     this.jac.setMode('parked');
     this.jac.relayoutParked();
-    const doorSpot = this.jac.driverDoorTile({ x: this.jac.cx, y: this.jac.cy });
-    const spot = doorSpot ?? this.jac.exitTile();
+    const doorSpot = this.jac.driverExitStandTile();
+    const spot = doorSpot ?? this.jac.driverDoorTile({ x: this.jac.cx, y: this.jac.cy }) ?? this.jac.exitTile();
     if (spot) {
       this.charTx = spot.x;
       this.charTy = spot.y;

@@ -77,8 +77,7 @@ export function personaT9WidthFrac(
   jacCy?: number,
 ): number | null {
   const player = tileToPersonaMeters(charTx, charTy);
-  const fwd = forwardFromYawRad(yawRad);
-  const cam = { x: player.x - fwd.x * BEHIND_TP_M, z: player.z - fwd.z * BEHIND_TP_M };
+  const cam = personaCam(player.x, player.z, yawRad);
   const anchor =
     jacCx != null && jacCy != null
       ? jacPersonaAnchorMeters(jacCx, jacCy)
@@ -89,11 +88,23 @@ export function personaT9WidthFrac(
   return (texWidth * sc) / sw;
 }
 
+type PersonaCam = { x: number; z: number; yaw: number };
+
+function personaCam(px: number, pz: number, yawRad: number): PersonaCam {
+  const fwd = forwardFromYawRad(yawRad);
+  return {
+    x: px - fwd.x * BEHIND_TP_M,
+    z: pz - fwd.z * BEHIND_TP_M,
+    yaw: yawRad,
+  };
+}
+
+/** Camera-relative third-person: +depth along view axis, lateral for screen X. */
 function projectTp(
   wx: number,
   wy: number,
   wz: number,
-  cam: { x: number; z: number },
+  cam: PersonaCam,
   sw: number,
   sh: number,
 ): { x: number; y: number; scale: number } | null {
@@ -101,11 +112,15 @@ function projectTp(
   const horY = HORIZON_Y_1X * (sh / PERSONA_REF.h);
   const dx = wx - cam.x;
   const dz = wz - cam.z;
-  if (dz < 0.4) return null;
+  const sin = Math.sin(cam.yaw);
+  const cos = Math.cos(cam.yaw);
+  const depth = dx * sin + dz * cos;
+  const lateral = dx * cos - dz * sin;
+  if (depth < 0.4) return null;
   return {
-    x: sw / 2 + (dx * f) / dz,
-    y: horY - ((wy - EYE_TP_M) * f) / dz,
-    scale: f / (dz * PX_PER_M),
+    x: sw / 2 + (lateral * f) / depth,
+    y: horY - ((wy - EYE_TP_M) * f) / depth,
+    scale: f / (depth * PX_PER_M),
   };
 }
 
@@ -139,6 +154,8 @@ export class PersonaView {
   private propSprites: { sprite: Sprite; x: number; z: number; piezaId: string }[] = [];
   private lastGroundKey = '';
   private booted = false;
+  private bootDpr = 0;
+  private bootPromise: Promise<void> | null = null;
   private adonayStrip: { idle: import('pixi.js').Texture | null; walk: import('pixi.js').Texture | null } = {
     idle: null,
     walk: null,
@@ -179,7 +196,13 @@ export class PersonaView {
 
   async ensureLoaded(dpr: number): Promise<void> {
     await ensurePersonaBoot(dpr);
-    if (this.booted) return;
+    if (this.booted && this.bootDpr === dpr) return;
+    if (this.bootPromise) return this.bootPromise;
+    this.bootPromise = this.loadOnce(dpr);
+    return this.bootPromise;
+  }
+
+  private async loadOnce(dpr: number): Promise<void> {
     this.adonayStrip.idle = await loadStrip('adonay-espalda__idle', dpr);
     this.adonayStrip.walk = await loadStrip('adonay-espalda__walk', dpr);
     this.pantoneStrip.idle = await loadStrip('pantone-espalda__idle', dpr);
@@ -227,6 +250,8 @@ export class PersonaView {
       this.propSprites.push({ sprite: sp, x: pl.x, z: pl.z, piezaId: pl.id });
     }
     this.booted = true;
+    this.bootDpr = dpr;
+    this.bootPromise = null;
   }
 
   private async refreshFacades(dpr: number): Promise<void> {
@@ -253,7 +278,7 @@ export class PersonaView {
   }
 
   private fillGroundRect(
-    cam: { x: number; z: number },
+    cam: PersonaCam,
     sw: number,
     sh: number,
     x0: number,
@@ -271,21 +296,22 @@ export class PersonaView {
     this.ground.poly([tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y]).fill({ color, alpha });
   }
 
-  private drawGround(cam: { x: number; z: number }, sw: number, sh: number): void {
-    const key = `${Math.round(cam.x * 2) / 2}:${Math.round(cam.z * 4) / 4}:${sw}x${sh}`;
+  private drawGround(cam: PersonaCam, sw: number, sh: number): void {
+    const yawKey = Math.round((cam.yaw * 180) / Math.PI / 6);
+    const key = `${Math.round(cam.x * 2) / 2}:${Math.round(cam.z * 4) / 4}:${yawKey}:${sw}x${sh}`;
     if (key === this.lastGroundKey) return;
     this.lastGroundKey = key;
     this.ground.clear();
     const horY = HORIZON_Y_1X * (sh / PERSONA_REF.h);
     this.ground.rect(0, horY, sw, sh - horY).fill({ color: 0x1a1c20, alpha: 1 });
-    const zFar = 52;
+    const zFar = 58;
     const SW0 = -3.2;
     const CURB0 = 1.6;
     const CURB1 = 1.77;
     const STR1 = 11.3;
     const FC1 = 11.47;
     const FS1 = 15.5;
-    const ZX0 = 38;
+    const ZX0 = zFar;
     const grass = 0x1e261c;
     const acera = 0x24262b;
     const brocal = 0xd8dbe0;
@@ -326,11 +352,10 @@ export class PersonaView {
 
   async sync(input: PersonaFrameInput): Promise<void> {
     const { sw, sh, dpr } = input;
-    await this.ensureLoaded(dpr);
+    if (!this.booted) await this.ensureLoaded(dpr);
     const player = tileToPersonaMeters(input.charTx, input.charTy);
     const yawRad = input.yawRad ?? input.yawQuarter * (Math.PI / 2);
-    const fwd = forwardFromYawRad(yawRad);
-    const cam = { x: player.x - fwd.x * BEHIND_TP_M, z: player.z - fwd.z * BEHIND_TP_M };
+    const cam = personaCam(player.x, player.z, yawRad);
 
     this.syncBackdrops(sw, sh, yawRad / (Math.PI / 2));
     this.drawGround(cam, sw, sh);

@@ -2772,7 +2772,7 @@ body.jac-info[data-chrome='phone'] .chrome__dock {
   left: max(72px, env(safe-area-inset-left, 0px));
   top: auto;
   bottom: calc(96px + env(safe-area-inset-bottom, 0px));
-  z-index: 130;
+  z-index: 125;
   transform: none;
   display: flex;
   flex-direction: column;
@@ -2802,15 +2802,21 @@ body.jac-info[data-chrome='phone'] .chrome__dock {
 @media (max-width: 767px) {
   body[data-layout='split'] .persona-jac-board {
     left: max(12px, env(safe-area-inset-left, 0px));
-    bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(248px + env(safe-area-inset-bottom, 0px));
+    max-width: min(200px, 52vw);
+  }
+
+  body[data-view='persona'] .persona-jac-board {
+    bottom: calc(248px + env(safe-area-inset-bottom, 0px));
+    max-width: min(200px, 52vw);
   }
 }
 
 @media (max-height: 430px) {
   body[data-view='persona'] .persona-jac-board {
     left: max(8px, env(safe-area-inset-left, 0px));
-    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
-    max-width: 200px;
+    bottom: calc(200px + env(safe-area-inset-bottom, 0px));
+    max-width: min(200px, 46vw);
   }
 }
 
@@ -2820,7 +2826,7 @@ body.jac-info[data-chrome='phone'] .chrome__dock {
   left: auto;
   top: auto;
   bottom: calc(168px + env(safe-area-inset-bottom, 0px));
-  z-index: 129;
+  z-index: 125;
   transform: none;
   pointer-events: auto;
 }
@@ -2840,14 +2846,19 @@ body.jac-info[data-chrome='phone'] .chrome__dock {
 
 @media (max-width: 767px) {
   body[data-view='persona'] .persona-enter-prompt {
-    bottom: calc(176px + env(safe-area-inset-bottom, 0px));
+    left: max(12px, env(safe-area-inset-left, 0px));
+    right: auto;
+    top: calc(88px + env(safe-area-inset-top, 0px));
+    bottom: auto;
   }
 }
 
 @media (max-height: 430px) {
   body[data-view='persona'] .persona-enter-prompt {
-    right: max(8px, env(safe-area-inset-right, 0px));
-    bottom: calc(132px + env(safe-area-inset-bottom, 0px));
+    left: max(8px, env(safe-area-inset-left, 0px));
+    right: auto;
+    top: calc(56px + env(safe-area-inset-top, 0px));
+    bottom: auto;
   }
 
   body[data-view='persona'] .chrome__view-btns {

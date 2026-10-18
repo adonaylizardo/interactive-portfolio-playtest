@@ -1126,6 +1126,27 @@ export class JacT9 {
     return this.nearestReachableApproach(Math.round(from?.x ?? this.cx), Math.round(from?.y ?? this.cy));
   }
 
+  /** Stand tile beside the driver door (≤~1.5 tiles from van centre when possible). */
+  driverExitStandTile(): { x: number; y: number } | null {
+    const cx = this.cx;
+    const cy = this.cy;
+    const edges = this.approachTiles();
+    if (!edges.length) return this.exitTile();
+    let best: { x: number; y: number } | null = null;
+    let bestD = Infinity;
+    for (const t of edges) {
+      const d = Math.hypot(t.x - cx, t.y - cy);
+      if (d > 2.05) continue;
+      if (d < bestD) {
+        bestD = d;
+        best = t;
+      }
+    }
+    if (best) return best;
+    edges.sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy));
+    return edges[0] ?? this.exitTile();
+  }
+
   /** Walkable cells touching the current solid footprint (door + every edge). */
   approachTiles(): { x: number; y: number }[] {
     const blocked = new Set(this.solidCells().map(([x, y]) => k(x, y)));
