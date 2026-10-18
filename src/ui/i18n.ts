@@ -1,5 +1,17 @@
 export type Lang = 'en' | 'es';
 
+const LANG_STORAGE_KEY = 'portfolio-playtest-lang';
+
+function readStoredLang(): Lang | null {
+  try {
+    const v = localStorage.getItem(LANG_STORAGE_KEY);
+    if (v === 'en' || v === 'es') return v;
+  } catch {
+    /* private mode */
+  }
+  return null;
+}
+
 const DICT = {
   en: {
     'check.label': 'Getting started',
@@ -48,8 +60,11 @@ const DICT = {
     'panel.exit': 'Exit',
     'panel.close': 'Close',
     'panel.readCase': 'Read case',
+    'panel.caseTag': 'CASE',
+    'panel.expandSheet': 'Expand panel',
     'panel.talks': 'Talks',
-    'panel.writings': 'Writings',
+    'panel.writings': 'Articles',
+    'writings.openArticle': '↗ Read on adonaylizardo.com',
 
     'experience.back': 'Back to list',
     'experience.example': 'Example data',
@@ -144,11 +159,12 @@ const DICT = {
     'chrome.achievement3':
       'AI Transformation Lead for Design at Applaudo, 5/7 phases complete (Q3 2026, in progress)',
     'chrome.achievement4': 'ADPList 2023: 31 mentoring sessions, 930 minutes, 15 countries',
-    'chrome.exp.volaris': 'Product Strategist · Volaris · Q4 2026',
+    'chrome.exp.volaris': 'Senior UX/UI Designer & Mentoring Program Lead · Applaudo · 2024–present',
     'chrome.exp.bain': 'Squad lead · Bain · 2024–present',
     'chrome.exp.mentoria': 'Mentoring lead · Applaudo · 2024–present',
-    'chrome.exp.finoa': 'UX Designer · LoremLabs',
-    'chrome.exp.pg': 'UX/UI Designer · Talpor',
+    'chrome.exp.finoa': 'UX Consultant · talPor · 2019–2024',
+    'chrome.exp.pg': 'UX Consultant · talPor · 2019–2024',
+    'chrome.expRow.mentoria': 'Mentoring at Applaudo',
     'chrome.caseSub.volaris': 'Product strategist and sole approver',
     'chrome.caseSub.bain': 'Squad lead, mentor, and hands-on designer',
     'chrome.caseSub.mentoria': 'Mentoring lead and Design Senior Council',
@@ -220,8 +236,11 @@ const DICT = {
     'panel.exit': 'Salir',
     'panel.close': 'Cerrar',
     'panel.readCase': 'Leer caso',
-    'panel.talks': 'Talks',
-    'panel.writings': 'Writings',
+    'panel.caseTag': 'CASO',
+    'panel.expandSheet': 'Expandir panel',
+    'panel.talks': 'Charlas',
+    'panel.writings': 'Artículos',
+    'writings.openArticle': '↗ Leer en adonaylizardo.com',
 
     'experience.back': 'Volver a la lista',
     'experience.example': 'Datos de ejemplo',
@@ -253,7 +272,7 @@ const DICT = {
     'read.section.cases': 'Casos',
     'read.section.talks': 'Charlas',
     'read.section.writings': 'Artículos',
-    'read.section.landmarks': 'Landmarks',
+    'read.section.landmarks': 'Lugares',
     'read.notFound': 'Esta sección no está disponible.',
 
     'writings.intro': 'Artículos y notas (placeholder).',
@@ -316,11 +335,13 @@ const DICT = {
     'chrome.achievement3':
       'Líder de transformación con IA para Diseño en Applaudo, 5/7 fases completadas (Q3 2026, en curso)',
     'chrome.achievement4': 'ADPList 2023: 31 sesiones de mentoría, 930 minutos, 15 países',
-    'chrome.exp.volaris': 'Product Strategist · Volaris · Q4 2026',
+    'chrome.exp.volaris':
+      'Senior UX/UI Designer & Mentoring Program Lead · Applaudo · 2024–presente',
     'chrome.exp.bain': 'Squad lead · Bain · 2024–presente',
     'chrome.exp.mentoria': 'Líder de mentoría · Applaudo · 2024–presente',
-    'chrome.exp.finoa': 'Diseñador UX · LoremLabs',
-    'chrome.exp.pg': 'Diseñador UX/UI · Talpor',
+    'chrome.exp.finoa': 'Consultor UX · talPor · 2019–2024',
+    'chrome.exp.pg': 'Consultor UX · talPor · 2019–2024',
+    'chrome.expRow.mentoria': 'Mentoría en Applaudo',
     'chrome.caseSub.volaris': 'Product Strategist y único aprobador',
     'chrome.caseSub.bain': 'Squad lead, mentor y diseñador hands-on',
     'chrome.caseSub.mentoria': 'Líder de mentoría y Design Senior Council',
@@ -349,7 +370,7 @@ const DICT = {
 
 export type I18nKey = keyof typeof DICT.en;
 
-let lang: Lang = 'es';
+let lang: Lang = readStoredLang() ?? 'es';
 const listeners = new Set<() => void>();
 
 export function getLang(): Lang {
@@ -364,6 +385,11 @@ export function setLang(next: Lang): void {
   }
   lang = next;
   document.documentElement.lang = next;
+  try {
+    localStorage.setItem(LANG_STORAGE_KEY, next);
+  } catch {
+    /* private mode */
+  }
   for (const fn of listeners) fn();
 }
 

@@ -12,7 +12,6 @@ import {
   TALKS,
   TALKS_COMING_SOON,
   WRITINGS,
-  WRITINGS_SUBSTACK_URL,
   type TalkItem,
   type WritingItem,
 } from '../data/experiences';
@@ -193,13 +192,9 @@ export class ReadingView {
     const backList = this.root.querySelector('[data-back-list]') as HTMLElement;
     const backMapDetail = this.root.querySelector('[data-back-map]') as HTMLElement;
     const onDetail = this.route.kind === 'detail';
-    const slug = this.route.kind === 'detail' ? this.route.slug : '';
-    const caseLike =
-      onDetail &&
-      (isCaseHouse(slug) || LANDMARK_IDS.includes(slug as (typeof LANDMARK_IDS)[number]));
     backMap.hidden = onDetail;
-    backList.hidden = !onDetail || caseLike;
-    backMapDetail.hidden = !caseLike;
+    backList.hidden = !onDetail;
+    backMapDetail.hidden = true;
   }
 
   private render(): void {
@@ -356,6 +351,21 @@ export class ReadingView {
     body.className = 'case__version case__version--full';
     body.replaceChildren(...(content ? content.full.map(caseBlockNode) : []));
     wrap.appendChild(body);
+    const backList = document.createElement('button');
+    backList.type = 'button';
+    backList.className = 'reading-view__back ui-btn ui-btn--secondary reading-view__back--inline';
+    backList.innerHTML = `${iconSvg('chevron')} <span data-i18n="read.backToList">${t('read.backToList')}</span>`;
+    backList.addEventListener('click', () => {
+      if (window.history.length > 1) window.history.back();
+      else {
+        navigateReading({ kind: 'list' }, 'replace');
+        this.route = { kind: 'list' };
+        this.applyI18n();
+        this.render();
+        this.scroll.scrollTop = 0;
+      }
+    });
+    wrap.appendChild(backList);
     this.main.replaceChildren(wrap);
   }
 
@@ -438,13 +448,6 @@ export class ReadingView {
       }
     }
     wrap.appendChild(list);
-    const sub = document.createElement('a');
-    sub.className = 'writings-reader__substack reading-view__substack';
-    sub.href = WRITINGS_SUBSTACK_URL;
-    sub.target = '_blank';
-    sub.rel = 'noopener noreferrer';
-    sub.textContent = t('writings.substack');
-    wrap.appendChild(sub);
     this.main.replaceChildren(wrap);
   }
 

@@ -25,7 +25,7 @@ export type ChromeCallbacks = {
 const EXPERIENCE: { id: CaseHouseId; label: string }[] = [
   { id: 'volaris', label: CASE_CARD_TITLES.volaris },
   { id: 'bain', label: CASE_CARD_TITLES.bain },
-  { id: 'mentoria', label: 'Mentoría en Applaudo' },
+  { id: 'mentoria', label: 'Mentoring at Applaudo' },
   { id: 'finoa', label: CASE_CARD_TITLES.finoa },
   { id: 'pg', label: CASE_CARD_TITLES.pg },
 ];
@@ -33,7 +33,7 @@ const EXPERIENCE: { id: CaseHouseId; label: string }[] = [
 const CASES_ROWS: { id: CaseHouseId; label: string }[] = [
   { id: 'volaris', label: CASE_CARD_TITLES.volaris },
   { id: 'bain', label: CASE_CARD_TITLES.bain },
-  { id: 'mentoria', label: 'Mentoría en Applaudo' },
+  { id: 'mentoria', label: 'Mentoring at Applaudo' },
   { id: 'finoa', label: CASE_CARD_TITLES.finoa },
   { id: 'pg', label: CASE_CARD_TITLES.pg },
 ];
@@ -157,7 +157,7 @@ export class ChromeUI {
     const expRows = EXPERIENCE.map(
       (row) => `
       <button type="button" class="chrome__exp-row" data-locate="${row.id}">
-        <span class="chrome__exp-name">${row.label}</span>
+        <span class="chrome__exp-name"${row.id === 'mentoria' ? ' data-i18n="chrome.expRow.mentoria"' : ''}>${row.id === 'mentoria' ? 'Mentoring at Applaudo' : row.label}</span>
         <span class="chrome__exp-meta"><span data-i18n="chrome.exp.${row.id}"></span>${iconSvg('locate', 16)}</span>
       </button>`,
     ).join('');
@@ -549,24 +549,30 @@ export class ChromeUI {
     const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
     if (!lang) return;
     const shortLand = window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
-    if (shortLand) {
-      lang.style.top = '12px';
-      lang.style.left = '16px';
-      lang.style.right = 'auto';
+    lang.style.left = 'auto';
+    lang.style.right = '16px';
+    lang.style.top = shortLand ? '12px' : this.mobile ? '24px' : '20px';
+
+    if (this.mobile) {
+      lang.style.top = shortLand ? '12px' : '24px';
+      lang.style.right = '16px';
+      const tools = this.root.querySelector('.chrome__tools-phone') as HTMLElement | null;
+      const tr = tools?.getBoundingClientRect();
+      const langRect = lang.getBoundingClientRect();
+      if (tr && tr.width > 8 && langRect.width > 8 && langRect.left < tr.right + 8) {
+        lang.style.top = `${Math.round(tr.bottom + 8)}px`;
+      }
       return;
     }
-    lang.style.left = '';
+
     const cl = document.querySelector('.checklist') as HTMLElement | null;
     const ring = cl && !cl.hidden ? cl.getBoundingClientRect() : null;
     if (ring && ring.width > 8) {
-      const top = Math.max(this.mobile ? 24 : 16, ring.top + (ring.height - 40) / 2);
+      const top = Math.max(16, ring.top + (ring.height - 40) / 2);
       const right = Math.max(16, window.innerWidth - ring.left + 8);
       lang.style.top = `${top}px`;
       lang.style.right = `${right}px`;
-      return;
     }
-    lang.style.top = this.mobile ? '24px' : '20px';
-    lang.style.right = '16px';
   }
 
   private drawMinimap(): void {

@@ -268,8 +268,8 @@ export const CASES_ES: Record<string, CaseContent> = {
     headline: 'Sambil',
     subtitle: 'Sambil',
     voice: '10-sambil',
-    full: [{ kind: 'section', paragraphs: ['Sambil, Barquisimeto. Un centro comercial con forma de cuatro, nuestra guitarra pequeña.'] }],
-    short: [{ kind: 'section', paragraphs: ['Sambil, Barquisimeto. Un centro comercial con forma de cuatro, nuestra guitarra pequeña.'] }],
+    full: [{ kind: 'section', paragraphs: ['Sambil, Barquisimeto. Un centro comercial con forma de cuatro, nuestra guitarrita.'] }],
+    short: [{ kind: 'section', paragraphs: ['Sambil, Barquisimeto. Un centro comercial con forma de cuatro, nuestra guitarrita.'] }],
   },
   catedral: {
     headline: 'Catedral',

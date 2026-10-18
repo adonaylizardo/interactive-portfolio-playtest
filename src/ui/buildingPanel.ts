@@ -6,7 +6,6 @@ import {
   TALKS,
   TALKS_COMING_SOON,
   WRITINGS,
-  WRITINGS_SUBSTACK_URL,
   type TalkItem,
   type WritingItem,
   type WritingSection,
@@ -17,6 +16,7 @@ import {
   talkThumbnailUrl,
   talkTitle,
   writingMeta,
+  writingSourceLabel,
   writingTitle,
 } from './contentLabels';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
@@ -182,7 +182,7 @@ export class BuildingPanel {
           <button type="button" class="exp-header__btn exp-header__back" data-exp-back aria-label="">‹</button>
           <h2 class="exp-header__title"></h2>
           <div class="exp-header__actions">
-            <button type="button" class="exp-header__btn" data-exp-expand aria-label="">${iconSvg('expand')}</button>
+            <button type="button" class="exp-header__btn" data-exp-expand data-i18n-aria="panel.expandSheet" aria-label="">${iconSvg('expand')}</button>
             <button type="button" class="exp-header__btn exp-header__close" data-close aria-label="">×</button>
           </div>
         </header>
@@ -799,24 +799,20 @@ export class BuildingPanel {
       <p class="writings-reader__meta"></p>
       <a class="writings-reader__substack" href="#" rel="noopener noreferrer"></a>
     `;
-    wrap.querySelector('.writings-reader__kicker')!.textContent = t('writings.reader.kicker');
+    wrap.querySelector('.writings-reader__kicker')!.textContent = writingSourceLabel(item);
     wrap.querySelector('.writings-reader__title')!.textContent = title;
     const metaEl = wrap.querySelector('.writings-reader__meta') as HTMLElement;
     metaEl.textContent = meta;
     metaEl.hidden = !meta;
     const articleUrl = item.url;
     const sub = wrap.querySelector('.writings-reader__substack') as HTMLAnchorElement;
-    sub.textContent = t('writings.substack');
-    sub.href = WRITINGS_SUBSTACK_URL;
-    sub.target = '_blank';
     if (articleUrl) {
-      const open = document.createElement('a');
-      open.className = 'writings-reader__open';
-      open.href = articleUrl;
-      open.target = '_blank';
-      open.rel = 'noopener noreferrer';
-      open.textContent = title;
-      wrap.insertBefore(open, sub);
+      sub.textContent = t('writings.openArticle');
+      sub.href = articleUrl;
+      sub.target = '_blank';
+      sub.hidden = false;
+    } else {
+      sub.hidden = true;
     }
     this.experienceDetail.replaceChildren(wrap);
   }
@@ -880,14 +876,21 @@ export class BuildingPanel {
         ? title
         : `${title}: ${subtitle.charAt(0).toLowerCase()}${subtitle.slice(1)}`;
     }
-    if (this.readKicker) this.readKicker.textContent = preview?.kicker ?? 'CASE';
+    if (this.readKicker) {
+      const tag = t('panel.caseTag');
+      const raw = preview?.kicker ?? tag;
+      this.readKicker.textContent = raw.replace(/^CASE\b/, tag);
+    }
     if (this.readHeadline) {
       this.readHeadline.textContent = this.isMobile()
         ? (preview?.teaser ?? title).replace(/[.]$/, '')
         : (preview?.teaserFull ?? preview?.teaser ?? title);
     }
     if (this.readLede) this.readLede.textContent = subtitle;
-    if (this.readHeroLabel) this.readHeroLabel.textContent = preview?.placeholder ?? 'IMAGE PLACEHOLDER';
+    if (this.readHeroLabel) {
+      this.readHeroLabel.textContent = '';
+      this.readHeroLabel.hidden = true;
+    }
     this.setTitle(interiorId, title);
     this.renderWorkedWith();
     this.renderAbout();

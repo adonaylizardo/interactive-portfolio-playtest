@@ -37,6 +37,7 @@ async function main(): Promise<void> {
   const uiRoot = document.getElementById('ui-root')!;
   const applyCanvasLabel = () => canvas.setAttribute('aria-label', t('canvas.label'));
   applyCanvasLabel();
+  document.documentElement.lang = getLang();
   onLangChange(applyCanvasLabel);
 
   const checklist = new ChecklistUI(uiRoot, { onSkip: () => {}, onDismiss: () => {} });
@@ -62,6 +63,32 @@ async function main(): Promise<void> {
     scene?.setReadingPaused(false);
     mapLabels.setHidden(false);
     if (!isMobileLayout()) chrome.setLayout('split');
+    scene?.applyCameraFromUi();
+  };
+
+  /** Keep chrome, reading, and map panel aligned with history (incl. back/forward). */
+  const syncNavigationFromHistory = (): void => {
+    const route = parseReadingRoute();
+    if (route) {
+      syncReadingFromHash();
+      return;
+    }
+    setHashWriteSuppressed(false);
+    reading.syncRoute(null);
+    scene?.setReadingPaused(false);
+    mapLabels.setHidden(false);
+    const interiorId = parseInteriorFromHash();
+    if (interiorId) {
+      syncInteriorPanel(interiorId);
+    } else {
+      panel.hide({ snap: true, silent: true });
+      chrome.setInteriorOpen(false, { skipLayout: true });
+      if (!isMobileLayout()) {
+        if (chrome.getLayout() === 'panel') chrome.setLayout('split');
+      } else {
+        chrome.setLayout('map');
+      }
+    }
     scene?.applyCameraFromUi();
   };
 
@@ -276,18 +303,8 @@ async function main(): Promise<void> {
     }
   }
 
-  window.addEventListener('hashchange', () => {
-    if (parseReadingRoute()) syncReadingFromHash();
-    else if (!isReadingHash()) {
-      reading.syncRoute(null);
-      const interiorId = parseInteriorFromHash();
-      if (interiorId) syncInteriorPanel(interiorId);
-    }
-  });
-  window.addEventListener('popstate', () => {
-    if (parseReadingRoute()) syncReadingFromHash();
-    else if (!isReadingHash()) reading.syncRoute(null);
-  });
+  window.addEventListener('hashchange', () => syncNavigationFromHistory());
+  window.addEventListener('popstate', () => syncNavigationFromHistory());
 
   (window as unknown as { __playtestQa?: Record<string, unknown> }).__playtestQa = {
     validateWalkGridFootprint,

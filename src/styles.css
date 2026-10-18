@@ -608,10 +608,9 @@ body[data-layout='panel'] .checklist {
     overflow: hidden;
   }
 
-  .chrome__lang {
-    left: max(16px, env(safe-area-inset-left));
-    right: auto;
-    top: 12px;
+  #ui-root:has(> .chrome.chrome--mobile) > .checklist {
+    top: 68px;
+    max-width: min(280px, calc(100vw - 120px));
   }
 
   .building-panel__sheet {
@@ -1832,6 +1831,11 @@ body[data-layout='panel'] .checklist {
 
 .case-preview__kicker,
 .case-read__kicker,
+.case-read__hero-label:empty,
+.case-read__hero-label[hidden] {
+  display: none;
+}
+
 .case-read__hero-label {
   margin: 0;
   font-family: 'Geist Mono', ui-monospace, monospace;

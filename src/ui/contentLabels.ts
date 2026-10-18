@@ -1,5 +1,14 @@
 import type { TalkItem, TalkSection, WritingItem } from '../data/experiences';
-import { t, type I18nKey } from './i18n';
+import { getLang, t, type I18nKey } from './i18n';
+
+function formatContentDate(raw: string): string {
+  const parsed = Date.parse(raw);
+  if (Number.isNaN(parsed)) return raw;
+  const locale = getLang() === 'es' ? 'es-VE' : 'en-US';
+  return new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'long', day: 'numeric' }).format(
+    new Date(parsed),
+  );
+}
 
 export function writingTitle(item: WritingItem): string {
   if (item.title) return item.title;
@@ -10,7 +19,7 @@ export function writingTitle(item: WritingItem): string {
 export function writingMeta(item: WritingItem): string {
   const parts: string[] = [];
   if (item.publication) parts.push(item.publication);
-  if (item.date) parts.push(item.date);
+  if (item.date) parts.push(formatContentDate(item.date));
   if (item.readTime) parts.push(item.readTime);
   if (parts.length) return parts.join(' · ');
   if (item.metaKey) return t(item.metaKey as I18nKey);
@@ -23,7 +32,7 @@ export function talkTitle(item: TalkItem): string {
 
 export function talkMeta(item: TalkItem): string {
   const parts: string[] = [];
-  if (item.date) parts.push(item.date);
+  if (item.date) parts.push(formatContentDate(item.date));
   if (item.duration) parts.push(item.duration);
   return parts.join(' · ');
 }
@@ -31,6 +40,10 @@ export function talkMeta(item: TalkItem): string {
 export function talkSectionTitle(section: TalkSection): string {
   if (section.titleKey) return t(section.titleKey as I18nKey);
   return section.title ?? '';
+}
+
+export function writingSourceLabel(item: WritingItem): string {
+  return item.publication ?? 'adonaylizardo.com';
 }
 
 export function talkYoutubeId(item: TalkItem): string | null {

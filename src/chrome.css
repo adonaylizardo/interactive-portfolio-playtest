@@ -438,6 +438,19 @@ body[data-interior='1'] .chrome__column {
   font-size: 22px;
 }
 
+.chrome--split .chrome__logro-art {
+  display: none;
+}
+
+.chrome--split .chrome__logro p {
+  margin-top: 0;
+  padding: 12px;
+  border: 1px solid #2a2c31;
+  border-radius: 8px;
+  background: #1a1c20;
+  min-height: 0;
+}
+
 .chrome__logro p {
   margin: 8px 0 0;
   font-size: 13px;
@@ -694,6 +707,11 @@ body[data-layout='panel'] #game-canvas {
 
 .chrome--mobile .chrome__lang {
   left: auto;
+  z-index: 16;
+}
+
+#ui-root:has(> .chrome.chrome--mobile) > .checklist {
+  top: 84px;
 }
 
 .chrome--mobile .chrome__intro {

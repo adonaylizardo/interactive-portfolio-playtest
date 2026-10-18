@@ -66,5 +66,4 @@ export const TALKS_COMING_SOON =
   !!talksFile.comingSoon || (TALKS.length === 0 && !talksFile.sections?.length);
 
 export const WRITINGS: WritingSection[] = (writingsJson as WritingsFile).sections;
-export const WRITINGS_SUBSTACK_URL =
-  (writingsJson as WritingsFile).substackUrl ?? 'https://uxsidekick.substack.com/';
+export const WRITINGS_SUBSTACK_URL = (writingsJson as WritingsFile).substackUrl;

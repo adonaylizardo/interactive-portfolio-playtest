@@ -40,6 +40,14 @@
   min-height: 44px;
 }
 
+.reading-view__back svg {
+  transform: scaleX(-1);
+}
+
+.reading-view__back--inline {
+  margin-top: 24px;
+}
+
 .reading-view__scroll {
   flex: 1;
   overflow: auto;
