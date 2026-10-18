@@ -21,6 +21,86 @@ function inBounds(x: number, y: number): boolean {
   return x >= 0 && y >= 0 && x < MAP_WIDTH && y < MAP_HEIGHT;
 }
 
+/** Drop colinear midpoints so followers see long axis runs, not stair steps. */
+export function compressColinear(path: { x: number; y: number }[]): { x: number; y: number }[] {
+  if (path.length < 3) return path;
+  const out: { x: number; y: number }[] = [path[0]];
+  for (let i = 1; i < path.length - 1; i++) {
+    const a = out[out.length - 1];
+    const b = path[i];
+    const c = path[i + 1];
+    const abx = b.x - a.x;
+    const aby = b.y - a.y;
+    const bcx = c.x - b.x;
+    const bcy = c.y - b.y;
+    if (abx * bcy === aby * bcx && Math.sign(abx) === Math.sign(bcx) && Math.sign(aby) === Math.sign(bcy)) {
+      continue;
+    }
+    out.push(b);
+  }
+  out.push(path[path.length - 1]);
+  return out;
+}
+
+/**
+ * Shortest 4-way path that prefers long straight runs. A turn costs extra so
+ * the search does not emit Manhattan staircases (ne↔sw flips every tile).
+ */
+export function findPathPreferStraight(
+  sx: number,
+  sy: number,
+  gx: number,
+  gy: number,
+  passable: (x: number, y: number) => boolean,
+): { x: number; y: number }[] | null {
+  if (!inBounds(gx, gy)) return null;
+  if (!passable(gx, gy)) return null;
+  if (sx === gx && sy === gy) return [];
+
+  type TurnNode = Node & { dir: number };
+  const open: TurnNode[] = [];
+  const bestG = new Map<string, number>();
+  const start: TurnNode = { x: sx, y: sy, g: 0, f: heuristic(sx, sy, gx, gy), dir: -1 };
+  open.push(start);
+  bestG.set(key(sx, sy), 0);
+
+  while (open.length > 0) {
+    open.sort((a, b) => a.f - b.f);
+    const current = open.shift()!;
+    if (current.x === gx && current.y === gy) {
+      const path: { x: number; y: number }[] = [];
+      let n: Node | undefined = current;
+      while (n?.parent) {
+        path.push({ x: n.x, y: n.y });
+        n = n.parent;
+      }
+      path.reverse();
+      return compressColinear(path);
+    }
+    for (let di = 0; di < NEIGHBORS.length; di++) {
+      const [dx, dy] = NEIGHBORS[di];
+      const nx = current.x + dx;
+      const ny = current.y + dy;
+      if (!inBounds(nx, ny) || !passable(nx, ny)) continue;
+      const turned = current.dir >= 0 && current.dir !== di;
+      const g = current.g + 1 + (turned ? 0.65 : 0);
+      const nk = `${key(nx, ny)}:${di}`;
+      const prev = bestG.get(nk);
+      if (prev != null && prev <= g) continue;
+      bestG.set(nk, g);
+      open.push({
+        x: nx,
+        y: ny,
+        g,
+        f: g + heuristic(nx, ny, gx, gy),
+        dir: di,
+        parent: current,
+      });
+    }
+  }
+  return null;
+}
+
 export function findPathWith(
   sx: number,
   sy: number,

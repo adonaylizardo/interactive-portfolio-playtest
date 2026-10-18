@@ -18,6 +18,7 @@ import {
   getBuildingAt,
   getBuildingAtDoor,
   getBuildingByName,
+  getEnterableBuildings,
   getSceneryAt,
   INICIO,
   MAP_HEIGHT,
@@ -185,6 +186,10 @@ const ALPHA_TAP_PROPS = new Set(['tree', 'bench', 'lamp', 'fill']);
  * pan threshold is easy to cross with a physical trackpad click (touch already allows 14 px).
  */
 const NOAH_CLICK_SLOP_PX = 12;
+/** A map tap is still a tap only if the pointer stayed inside this slop. */
+const TAP_SLOP_PX = 10;
+/** And only if the press lasted less than this. A pan must never become a ground tap. */
+const TAP_MAX_MS = 300;
 
 /**
  * Keyboard step on a tile grid: move on both axes if the target tile is walkable, otherwise slide
@@ -416,6 +421,8 @@ export class IsoScene {
     null;
   private pendingDriveEnter: { panelTitle: string; door: { x: number; y: number } } | null = null;
   private pendingDriveEnterAt = 0;
+  private pendingDriveFrom: { x: number; y: number } | null = null;
+  private pathPreviewRaf = 0;
   private pendingWalkInAt = 0;
   private pendingJacEnter = false;
   private pendingJacPanel = false;
@@ -423,6 +430,8 @@ export class IsoScene {
   private tileByCell = new Map<string, { g: Sprite; tx: number; ty: number }>();
   private readonly tileHit = new Polygon(TILE_DIAMOND);
   private tilesBackfilled = false;
+  private skipTileCullFrames = 0;
+  private townBake: Sprite | null = null;
   private pointerGestureSerial = 0;
   private pixiTapGestureSerial = -1;
   private firstPointerDownAt = 0;
@@ -454,14 +463,15 @@ export class IsoScene {
   async init(canvas: HTMLCanvasElement): Promise<void> {
     this.canvasEl = canvas;
     this.app = new Application();
+    const qaLite = new URLSearchParams(location.search).has('npcs');
     await this.app.init({
       canvas,
       background: worldBackgroundColor(),
       backgroundAlpha: 1,
-      antialias: true,
+      antialias: !qaLite,
       autoDensity: true,
       premultipliedAlpha: true,
-      resolution: Math.min(window.devicePixelRatio || 1, 2),
+      resolution: qaLite ? 1 : Math.min(window.devicePixelRatio || 1, 2),
       resizeTo: window,
       preference: 'webgl',
     });
@@ -538,6 +548,16 @@ export class IsoScene {
     this.buildOutskirts();
     this.buildObjects();
     this.initJac();
+    if (fromHash?.jacX != null && fromHash.jacY != null && this.jac) {
+      const dir = fromHash.jacDir === 'se' || fromHash.jacDir === 'sw' || fromHash.jacDir === 'nw' || fromHash.jacDir === 'ne'
+        ? fromHash.jacDir
+        : this.jac.dir;
+      this.jac.qaPlace(fromHash.jacX, fromHash.jacY, dir, false);
+    }
+    if (fromHash?.charX != null && fromHash.charY != null) {
+      this.charTx = fromHash.charX;
+      this.charTy = fromHash.charY;
+    }
     this.npcs = new NpcCrowd(
       this.objectsLayer,
       {
@@ -612,11 +632,6 @@ export class IsoScene {
   private applyHashNavigation(state: HistoryNavigationState | null): void {
     const v = parseCameraFromHash();
     const id = parseInteriorFromHash();
-    if (v && !this.interiorActive) {
-      this.cameraX = v.x;
-      this.cameraY = v.y;
-      this.zoom = clampZoom(v.zoom);
-    }
     if (id && !this.interiorActive) {
       if (state?.outdoorCam && !this.outdoorCamBeforeInterior) {
         this.outdoorCamBeforeInterior = { ...state.outdoorCam };
@@ -633,6 +648,10 @@ export class IsoScene {
       this.cameraY = v.y;
       this.zoom = clampZoom(v.zoom);
       this.applyCamera(false);
+    } else if (!id && !this.interiorActive) {
+      // Outdoor Back: keep the live van/player. Position writes use replaceState
+      // so an old jx/jy entry cannot teleport after reload.
+      this.applyCamera(true);
     }
     this.rebaselineChecklistFromCamera();
   }
@@ -795,7 +814,7 @@ export class IsoScene {
     };
   }
 
-  private ensureTile(tx: number, ty: number): Sprite | null {
+  private ensureTile(tx: number, ty: number, attach = true): Sprite | null {
     const id = `${tx},${ty}`;
     const existing = this.tileByCell.get(id);
     if (existing) return existing.g;
@@ -810,26 +829,9 @@ export class IsoScene {
     const a = spriteAsset(key);
     g.position.set(foot.x - a.vfs.x, foot.y - a.vfs.y);
     g.hitArea = this.tileHit;
-    g.eventMode = 'static';
+    g.eventMode = 'none';
     g.cursor = cell.walkable ? 'pointer' : 'default';
-    g.on('pointertap', (e) => {
-      if (this.shouldBlockTap()) return;
-      this.pixiTapGestureSerial = this.pointerGestureSerial;
-      if (this.jac?.driving) {
-        const local = this.federatedToCanvas(e);
-        if (!local) return;
-        this.handleScreenTap(local.x, local.y, false);
-        return;
-      }
-      if (this.claimJacTap(e)) {
-        this.tapJac();
-        return;
-      }
-      if (!this.prepareMapTap(undefined, tx, ty)) return;
-      const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
-      this.requestWalk(tx, ty, sprint);
-    });
-    this.tilesLayer.addChild(g);
+    if (attach) this.tilesLayer.addChild(g);
     const entry = { g, tx, ty };
     this.tileByCell.set(id, entry);
     this.tileCullEntries.push(entry);
@@ -837,7 +839,7 @@ export class IsoScene {
   }
 
   private ensureVisibleTiles(): void {
-    if (!this.app?.screen) return;
+    if (!this.app?.screen || this.tilesBackfilled) return;
     const { minX, maxX, minY, maxY } = this.viewWorldAabb(TILE_W * 1.5);
     for (let ty = 0; ty < MAP_HEIGHT; ty++) {
       for (let tx = 0; tx < MAP_WIDTH; tx++) {
@@ -852,7 +854,7 @@ export class IsoScene {
 
   private ensureAllTiles(): void {
     for (let ty = 0; ty < MAP_HEIGHT; ty++) {
-      for (let tx = 0; tx < MAP_WIDTH; tx++) this.ensureTile(tx, ty);
+      for (let tx = 0; tx < MAP_WIDTH; tx++) this.ensureTile(tx, ty, false);
     }
     this.tilesBackfilled = true;
   }
@@ -873,20 +875,135 @@ export class IsoScene {
       this.refreshTileTextures();
       this.syncObjectSprites(true);
       await loadKeys(remainingMapKeys(loadedSpriteKeys()));
-      this.ensureVisibleTiles();
+      await loadKeys(allSpriteKeys().filter((k) => k.endsWith('/lejos')));
+      await loadBuildingStateSprites();
+      this.ensureAllTiles();
+      this.prewarmDoorNeighborhoods();
       this.syncObjectSprites(true);
+      this.uploadTownGpu();
+      this.prewarmDoorViews();
+      this.bakeTownTiles();
+      this.app.render();
       this.queueTileBackfill();
     })();
-    window.setTimeout(() => {
-      void loadKeys(allSpriteKeys().filter((k) => k.endsWith('/lejos'))).then(() => this.syncObjectSprites(true));
-    }, 800);
-    window.setTimeout(() => {
-      void loadBuildingStateSprites().then(() => this.syncObjectSprites(true));
-    }, 2500);
     void loadSpriteProbes();
     if (this.npcs.isEnabled()) this.loadNpcs();
-    const fillLoad = this.fillActors.load(hi).then(() => this.cullVisibleTiles());
+    const fillLoad = this.fillActors.load(hi).then(() => {
+      this.cullVisibleTiles();
+      this.uploadTownGpu();
+    });
     void Promise.allSettled([fillLoad, this.buildNoah()]).then(prefetchRestSheets);
+  }
+
+  /** Create tiles around every door so a later tap does not spawn Flor-area sprites. */
+  private prewarmDoorNeighborhoods(): void {
+    for (const b of getEnterableBuildings()) {
+      if (!b.door) continue;
+      const x0 = Math.max(0, b.door.x - 12);
+      const x1 = Math.min(MAP_WIDTH - 1, b.door.x + 12);
+      const y0 = Math.max(0, b.door.y - 12);
+      const y1 = Math.min(MAP_HEIGHT - 1, b.door.y + 12);
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) this.ensureTile(x, y, false);
+      }
+    }
+  }
+
+  /** Push decoded map textures to the GPU before the first 4× door-tap frame. */
+  private uploadTownGpu(): void {
+    const r = this.app.renderer;
+    const upload = (tex?: Texture | null) => {
+      const src = tex?.source;
+      if (!src) return;
+      try {
+        r.texture.initSource(src);
+      } catch {
+        /* already on the GPU */
+      }
+    };
+    for (const key of loadedSpriteKeys()) {
+      if (spritesLoaded(key)) upload(spriteTexture(key));
+    }
+    for (const { g } of this.tileCullEntries) upload(g.texture);
+    for (const v of this.objectVisuals.values()) upload(v.sprite.texture);
+  }
+
+  /** Flatten the 64×64 tile field once so a 0.28 door tap does not render ~2400 sprites. */
+  private bakeTownTiles(): void {
+    if (this.townBake || !this.app || this.tileCullEntries.length === 0) return;
+    for (const { g } of this.tileCullEntries) {
+      g.visible = true;
+      if (!g.parent) this.tilesLayer.addChild(g);
+    }
+    const b = mapWorldBounds();
+    const width = Math.max(1, b.maxX - b.minX);
+    const height = Math.max(1, b.maxY - b.minY);
+    const scale = Math.min(1, 2048 / width, 2048 / height);
+    const tw = Math.max(2, Math.ceil(width * scale));
+    const th = Math.max(2, Math.ceil(height * scale));
+    const px = this.tilesLayer.position.x;
+    const py = this.tilesLayer.position.y;
+    const sx = this.tilesLayer.scale.x;
+    const sy = this.tilesLayer.scale.y;
+    this.tilesLayer.position.set(-b.minX * scale, -b.minY * scale);
+    this.tilesLayer.scale.set(scale);
+    const rt = RenderTexture.create({ width: tw, height: th });
+    try {
+      this.app.renderer.render({ container: this.tilesLayer, target: rt, clear: true });
+    } catch {
+      /* bake skip */
+    }
+    this.tilesLayer.position.set(px, py);
+    this.tilesLayer.scale.set(sx, sy);
+    for (const { g } of this.tileCullEntries) {
+      g.visible = false;
+      if (g.parent) g.parent.removeChild(g);
+    }
+    const spr = new Sprite(rt);
+    spr.position.set(b.minX, b.minY);
+    spr.scale.set(1 / scale);
+    spr.eventMode = 'none';
+    spr.label = 'town-bake';
+    this.tilesLayer.addChild(spr);
+    this.townBake = spr;
+    try {
+      this.app.renderer.texture.initSource(rt.source);
+    } catch {
+      /* already on the GPU */
+    }
+  }
+
+  /** Finish tile sprites + GPU upload so a door tap does not pay first-frame create/upload. */
+  private flushTownWarm(): void {
+    this.ensureAllTiles();
+    this.prewarmDoorNeighborhoods();
+    this.syncObjectSprites(true);
+    this.uploadTownGpu();
+    this.bakeTownTiles();
+    this.lastTileCullKey = '';
+    this.cullVisibleTiles();
+    this.app.render();
+  }
+
+  /** Draw each door framing once so the first tap is not the first GPU upload of that view. */
+  private prewarmDoorViews(): void {
+    const saved = { x: this.cameraX, y: this.cameraY, zoom: this.zoom };
+    for (const b of getEnterableBuildings()) {
+      if (!b.name) continue;
+      this.frameBuildingDoorForQa(b.name);
+      this.zoom = 0.28;
+      this.applyCamera(false);
+      this.lastTileCullKey = '';
+      this.cullVisibleTiles();
+      this.uploadTownGpu();
+      this.app.render();
+    }
+    this.cameraX = saved.x;
+    this.cameraY = saved.y;
+    this.zoom = saved.zoom;
+    this.applyCamera(false);
+    this.lastTileCullKey = '';
+    this.cullVisibleTiles();
   }
 
   private queueTileBackfill(): void {
@@ -1474,15 +1591,23 @@ export class IsoScene {
     const destWalkable = !!cells[ty]?.[tx]?.walkable;
     const scenery = !!getSceneryAt(tx, ty);
     const extra = this.vanWalkBlock();
+    const wantDoor =
+      !!this.pendingBuildingEntry &&
+      this.pendingBuildingEntry.door.x === tx &&
+      this.pendingBuildingEntry.door.y === ty;
+    if (wantDoor && this.pendingBuildingEntry) {
+      const d = this.pendingBuildingEntry.door;
+      extra.delete(`${d.x},${d.y}`);
+      extra.delete(`${d.x + 1},${d.y}`);
+      extra.delete(`${d.x - 1},${d.y}`);
+      extra.delete(`${d.x},${d.y + 1}`);
+      extra.delete(`${d.x},${d.y - 1}`);
+    }
     const pass = (x: number, y: number) => {
       if (extra.has(`${x},${y}`)) return false;
       return !!cells[y]?.[x]?.walkable;
     };
     const destOk = destWalkable && pass(tx, ty);
-    const wantDoor =
-      !!this.pendingBuildingEntry &&
-      this.pendingBuildingEntry.door.x === tx &&
-      this.pendingBuildingEntry.door.y === ty;
     const result = destOk
       ? (() => {
           const path = findPathWith(sx, sy, tx, ty, pass);
@@ -1553,6 +1678,23 @@ export class IsoScene {
       if (!best || dist < best.dist - 0.5 || (Math.abs(dist - best.dist) < 0.5 && depth > best.depth)) {
         best = { obj, dist, depth };
       }
+    }
+    return best?.obj;
+  }
+
+  /** Pinch-zoomed door taps miss the diamond; take the nearest door within 2.4 tiles. */
+  private pickNearbyDriveDoor(sx: number, sy: number): MapObject | undefined {
+    if (this.zoom > 0.32) return undefined;
+    const { x: wx, y: wy } = this.screenToWorld(sx, sy);
+    const tile = worldToTile(wx, wy);
+    if (!tile) return undefined;
+    let best: { obj: MapObject; d: number } | null = null;
+    for (const obj of objects) {
+      if (obj.type !== 'building' || !obj.door || !obj.panelTitle) continue;
+      const d = Math.hypot(tile.x - obj.door.x, tile.y - obj.door.y);
+      // Tight slop so a ground tap like (37,26) does not steal Bain (39,26).
+      if (d > 1.8) continue;
+      if (!best || d < best.d) best = { obj, d };
     }
     return best?.obj;
   }
@@ -1707,16 +1849,16 @@ export class IsoScene {
       this.jacClose();
       return;
     }
+    if (this.pickJacAtScreen(sx, sy)) {
+      this.tapJac();
+      return;
+    }
     const doorFirst = this.pickBuildingDoorAtScreen(sx, sy);
     if (doorFirst?.door && doorFirst.panelTitle) {
       if (!this.prepareMapTap(doorFirst)) return;
       this.requestWalk(doorFirst.door.x, doorFirst.door.y, sprint, {
         buildingEntry: { panelTitle: doorFirst.panelTitle, door: doorFirst.door },
       });
-      return;
-    }
-    if (this.pickJacAtScreen(sx, sy)) {
-      this.tapJac();
       return;
     }
     const sceneryTile = this.pickSceneryAtScreen(sx, sy);
@@ -1811,39 +1953,49 @@ export class IsoScene {
   private requestDriveToEnter(entry: { panelTitle: string; door: { x: number; y: number } }): boolean {
     if (!this.jac?.driving || this.jac.isExiting()) return false;
     if (performance.now() < this.suppressDriveTapUntil) return false;
-    const sit = this.jac.parkForDoor(entry.door.x, entry.door.y);
-    if (!sit) {
-      this.pendingDriveEnter = entry;
-      this.jacGetOut({ thenEnter: true });
-      return true;
-    }
-    const path = sit.path.length > 0 ? sit.path : this.jac.findDrivePath(sit.x, sit.y);
-    if (!path) {
-      this.pendingDriveEnter = entry;
-      this.jacGetOut({ thenEnter: true });
-      return true;
-    }
+    // Swap the goal first. A failed replan must not keep the previous door.
     this.events.stickCancel?.();
     this.pendingBuildingEntry = null;
     this.pendingDriveEnter = entry;
     this.pendingDriveEnterAt = performance.now();
-    const dest = path.length > 0 ? path[path.length - 1] : sit;
+    this.pendingDriveFrom = { x: this.jac.cx, y: this.jac.cy };
+    let sit = this.jac.parkForDoor(entry.door.x, entry.door.y);
+    if (sit && this.jac.leftoverSitForDoor(sit, entry.door.x, entry.door.y)) {
+      this.jac.rejectSit(sit.x, sit.y);
+      sit = this.jac.parkForDoor(entry.door.x, entry.door.y);
+      if (sit && this.jac.leftoverSitForDoor(sit, entry.door.x, entry.door.y)) sit = null;
+    }
     const alongNow = this.jac.doorSideAlong(entry.door.x, entry.door.y);
     const distDoorNow = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
-    const atSit = path.length === 0 || (Math.hypot(this.jac.cx - dest.x, this.jac.cy - dest.y) < 1.2 && this.jac.mph < 1);
-    if (atSit && alongNow >= 0 && distDoorNow <= 5.5) {
+    const atDoor = alongNow >= 0 && distDoorNow <= 6;
+    const dest = sit ? { x: sit.x, y: sit.y } : { x: entry.door.x, y: entry.door.y };
+    let path =
+      sit && sit.path.length > 0
+        ? sit.path
+        : sit
+          ? this.jac.findDrivePath(sit.x, sit.y, { loose: true }) ??
+            this.jac.findDrivePath(sit.x, sit.y, { loose: false })
+          : null;
+    if (!path) {
+      path =
+        this.jac.findDrivePath(dest.x, dest.y, { loose: false }) ??
+        this.jac.findDrivePath(dest.x, dest.y, { loose: true });
+    }
+    const spawn = this.jac.spawn?.center ?? { x: 25.5, y: 17 };
+    const leftSpawn = Math.hypot(this.jac.cx - spawn.x, this.jac.cy - spawn.y) > 2.4;
+    const atSit = this.jac.atParkSit(dest) && this.jac.mph < 1.2;
+    if ((atSit || atDoor) && leftSpawn && (!path || path.length === 0 || atSit)) {
       this.jacGetOut({ thenEnter: true });
       return true;
     }
-    if (path.length === 0) {
-      this.jacGetOut({ thenEnter: true });
+    if (!path || path.length === 0) {
       return true;
     }
-    this.qaLastDriveTap = { x: dest.x, y: dest.y };
+    const pathDest = path[path.length - 1];
+    this.qaLastDriveTap = { x: pathDest.x, y: pathDest.y };
     this.qaPointerDriveAccepts += 1;
-    this.jac.setDrivePath(path, dest, { loose: true });
-    this.startCameraFollow();
-    this.drawPathPreview();
+    this.skipTileCullFrames = 8;
+    this.jac.setDrivePath(path, sit ?? pathDest, { loose: true, door: true });
     this.fireMoveCommand();
     return true;
   }
@@ -1853,7 +2005,7 @@ export class IsoScene {
     if (performance.now() < this.suppressDriveTapUntil) return;
     if (this.pickJacAtScreen(sx, sy)) return;
     const doorHit = this.pickBuildingDoorAtScreen(sx, sy);
-    const buildingHit = doorHit ?? this.pickBuildingAtScreen(sx, sy);
+    const buildingHit = doorHit ?? this.pickBuildingAtScreen(sx, sy) ?? this.pickNearbyDriveDoor(sx, sy);
     if (buildingHit?.door && buildingHit.panelTitle) {
       this.requestDriveToEnter({ panelTitle: buildingHit.panelTitle, door: buildingHit.door });
       return;
@@ -1877,7 +2029,14 @@ export class IsoScene {
       this.toastDriveUnreachable();
       return false;
     }
-    const path = this.jac.findDrivePath(gx, gy);
+    // 1-cell first: the 2×2 box detours around props and is what made (18,36)
+    // and (44,36) wander at 2–3× the straight path.
+    let path = this.jac.findDrivePath(gx, gy, { loose: true });
+    let loose = true;
+    if (!path) {
+      path = this.jac.findDrivePath(gx, gy, { loose: false });
+      loose = false;
+    }
     if (!path) {
       this.toastDriveUnreachable();
       return false;
@@ -1885,16 +2044,24 @@ export class IsoScene {
     this.qaLastDriveTap = { x: gx, y: gy };
     if (fromPointer) this.qaPointerDriveAccepts += 1;
     const dest = path.length > 0 ? path[path.length - 1] : { x: gx, y: gy };
-    this.jac.setDrivePath(path.length > 0 ? path : [dest], dest);
-    this.startCameraFollow();
-    this.drawPathPreview();
+    this.jac.setDrivePath(path.length > 0 ? path : [dest], dest, loose ? { loose: true } : undefined);
+    this.schedulePathPreview();
     this.fireMoveCommand();
     return true;
+  }
+
+  private schedulePathPreview(): void {
+    if (this.pathPreviewRaf) return;
+    this.pathPreviewRaf = requestAnimationFrame(() => {
+      this.pathPreviewRaf = 0;
+      this.drawPathPreview();
+    });
   }
 
   private drawPathPreview(): void {
     this.pathGfx.clear();
     if (this.events.buildingPanel?.isOpen()) return;
+    if (this.pendingDriveEnter) return;
     const drivePts =
       this.jac?.driving && (this.jac.drivePath.length > 0 || this.jac.driveGoal)
         ? [
@@ -2166,6 +2333,11 @@ export class IsoScene {
         x: this.cameraX,
         y: this.cameraY,
         zoom: this.zoom,
+        jacX: this.jac?.cx,
+        jacY: this.jac?.cy,
+        jacDir: this.jac?.dir,
+        charX: this.charTx,
+        charY: this.charTy,
       });
     }
     if (
@@ -2182,9 +2354,11 @@ export class IsoScene {
       this.events.onChecklist('move-camera');
       this.panDragScreenPx = 0;
     }
-    this.syncObjectSprites();
+    if (this.skipTileCullFrames <= 0) this.syncObjectSprites();
     this.cullVisibleTiles();
   }
+
+  private lastTileCullKey = '';
 
   private cullVisibleTiles(): void {
     if (!this.app?.screen) return;
@@ -2195,25 +2369,56 @@ export class IsoScene {
     this.noah?.setHidden(!!iso || this.interiorActive);
     this.npcs?.cull({ minX, maxX, minY, maxY }, !!iso || this.interiorActive);
     this.fillActors?.cull({ minX, maxX, minY, maxY }, !!iso || this.interiorActive);
-    for (const { g, tx, ty } of this.tileCullEntries) {
-      if (iso) {
-        g.visible = iso.has(`tile:${tx},${ty}`);
-        continue;
+    const cullKey = `${minX | 0},${maxX | 0},${minY | 0},${maxY | 0},${iso ? 1 : 0},${this.interiorActive ? 1 : 0}`;
+    const skipWarm = this.tilesBackfilled && this.skipTileCullFrames > 0;
+    if (this.skipTileCullFrames > 0) this.skipTileCullFrames -= 1;
+    const useBake = !!this.townBake && this.zoom <= 0.45 && !iso && !this.interiorActive;
+    if (this.townBake) this.townBake.visible = useBake;
+    if (useBake && this.tilesLayer.children.length > 1) {
+      for (const { g } of this.tileCullEntries) {
+        g.visible = false;
+        if (g.parent) g.parent.removeChild(g);
       }
-      const foot = tileFootWorld(tx, ty);
-      g.visible =
-        foot.x >= minX - TILE_W &&
-        foot.x <= maxX + TILE_W &&
-        foot.y >= minY - TILE_H &&
-        foot.y <= maxY + TILE_H;
     }
-    for (const v of this.objectVisuals.values()) {
-      const g = this.objectGraphics.get(v.obj.id);
-      if (!g) continue;
-      const c = v.cull;
-      g.visible = iso
-        ? iso.has(v.obj.id)
-        : c.x1 >= minX && c.x0 <= maxX && c.y1 >= minY && c.y0 <= maxY;
+    const skipTiles =
+      useBake || skipWarm || (this.tilesBackfilled && cullKey === this.lastTileCullKey);
+    if (!skipTiles) this.lastTileCullKey = cullKey;
+    if (!skipTiles) {
+      for (const { g, tx, ty } of this.tileCullEntries) {
+        if (iso) {
+          const vis = iso.has(`tile:${tx},${ty}`);
+          g.visible = vis;
+          if (vis) {
+            if (!g.parent) this.tilesLayer.addChild(g);
+          } else if (g.parent) {
+            g.parent.removeChild(g);
+          }
+          continue;
+        }
+        const foot = tileFootWorld(tx, ty);
+        const vis =
+          foot.x >= minX - TILE_W &&
+          foot.x <= maxX + TILE_W &&
+          foot.y >= minY - TILE_H &&
+          foot.y <= maxY + TILE_H;
+        g.visible = vis;
+        if (vis) {
+          if (!g.parent) this.tilesLayer.addChild(g);
+        } else if (g.parent) {
+          g.parent.removeChild(g);
+        }
+      }
+    }
+    if (!skipWarm) {
+      for (const v of this.objectVisuals.values()) {
+        const g = this.objectGraphics.get(v.obj.id);
+        if (!g) continue;
+        const c = v.cull;
+        const vis = iso
+          ? iso.has(v.obj.id)
+          : c.x1 >= minX && c.x0 <= maxX && c.y1 >= minY && c.y0 <= maxY;
+        g.visible = vis;
+      }
     }
   }
 
@@ -2653,10 +2858,10 @@ export class IsoScene {
     if (hadMulti || hadSecond || this.panMoved) return;
 
     const dist = Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y);
-    if (dist >= 10) return;
-    // Rooms have no long-press action, so any still press is a tap there. On the map, press length
-    // comes from input timestamps: handlers and timers run late on a busy main thread.
-    if (!this.interiorActive && e.timeStamp - this.tapDownStamp > 450) return;
+    if (dist >= TAP_SLOP_PX) return;
+    // Rooms have no long-press action, so any still press is a tap there. On the map, a tap is
+    // movement below TAP_SLOP_PX and a press shorter than TAP_MAX_MS.
+    if (!this.interiorActive && e.timeStamp - this.tapDownStamp > TAP_MAX_MS) return;
     const upStamp = e.timeStamp;
     const gestureSerial = this.pointerGestureSerial;
 
@@ -2917,6 +3122,12 @@ export class IsoScene {
     const onTouchPinchMove = (e: TouchEvent) => {
       if (!isGameTouchTarget(e.target)) return;
       if (e.touches.length >= 1) e.preventDefault();
+      if (driveTap && e.touches.length === 1) {
+        const t = e.touches[0];
+        if (Math.hypot(t.clientX - driveTap.x, t.clientY - driveTap.y) > TAP_SLOP_PX) {
+          driveTap = null;
+        }
+      }
       if (e.touches.length >= 2) {
         if (this.pointers.size >= 2) return;
         if (this.touchOnlyPinch && this.zoomSource === 'pointer') {
@@ -2997,8 +3208,8 @@ export class IsoScene {
           const dist = Math.hypot(t.clientX - driveTap.x, t.clientY - driveTap.y);
           driveTap = null;
           if (
-            dt < 450 &&
-            dist < 22 &&
+            dt < TAP_MAX_MS &&
+            dist < TAP_SLOP_PX &&
             !this.jac.isExiting() &&
             performance.now() >= this.suppressDriveTapUntil
           ) {
@@ -3050,13 +3261,18 @@ export class IsoScene {
     };
 
     const onPointerMove = (e: PointerEvent) => {
-      if (this.pointers.size < 2 && (this.events.stickActive?.() || this.jac?.driving)) {
-        if (this.tapStart) {
-          this.tapDriftPx = Math.max(
-            this.tapDriftPx,
-            Math.hypot(e.clientX - this.tapStart.x, e.clientY - this.tapStart.y),
-          );
+      if (this.tapStart) {
+        this.tapDriftPx = Math.max(
+          this.tapDriftPx,
+          Math.hypot(e.clientX - this.tapStart.x, e.clientY - this.tapStart.y),
+        );
+        if (this.tapDriftPx > TAP_SLOP_PX) {
+          this.panMoved = true;
+          this.clearDeferredTap();
+          driveTap = null;
         }
+      }
+      if (this.pointers.size < 2 && this.events.stickActive?.()) {
         return;
       }
       if (!this.pointers.has(e.pointerId)) return;
@@ -3151,7 +3367,7 @@ export class IsoScene {
     this.updateMovement();
     this.updateAvatars(Math.min(0.25, this.app.ticker.elapsedMS / 1000));
     this.updateCameraFollow();
-    if (!this.interiorActive) {
+    if (!this.interiorActive && this.skipTileCullFrames <= 0) {
       const dt = Math.min(0.25, this.app.ticker.elapsedMS / 1000);
       this.npcs.update(dt);
       this.fillActors?.update(dt);
@@ -3405,7 +3621,7 @@ export class IsoScene {
   private moveCommandArmed = true;
 
   private updateMovement(): void {
-    this.syncObjectSprites();
+    if (this.skipTileCullFrames <= 0) this.syncObjectSprites();
     if (this.doorCooldown > 0) {
       this.doorCooldown -= this.app.ticker.deltaMS;
     }
@@ -3428,7 +3644,7 @@ export class IsoScene {
         dx = 0;
         dy = 0;
       }
-      if (dx !== 0 || dy !== 0) this.pendingDriveEnter = null;
+      if ((dx !== 0 || dy !== 0) && !this.pendingJacExit) this.pendingDriveEnter = null;
       this.startCameraFollow();
       if (dx !== 0 || dy !== 0 || stickHeld || this.jac.drivePath.length > 0) {
         if (dx !== 0 || dy !== 0) this.fireMoveCommand();
@@ -3902,6 +4118,11 @@ export class IsoScene {
             x: this.cameraX,
             y: this.cameraY,
             zoom: this.zoom,
+            jacX: this.jac?.cx,
+            jacY: this.jac?.cy,
+            jacDir: this.jac?.dir,
+            charX: this.charTx,
+            charY: this.charTy,
           });
         }
         this.outdoorCamBeforeInterior = null;
@@ -4055,21 +4276,17 @@ export class IsoScene {
     g.label = JAC_ID;
   }
 
-  /** Van sprite wins over ground, but a door tap always beats the parked van. */
+  /** Van sprite wins over the building it sits on, including that building's door. */
   private claimJacTap(e: { clientX?: number; clientY?: number; global?: { x: number; y: number }; nativeEvent?: unknown }): boolean {
     if (!this.jac || this.jac.driving) return false;
     const local = this.federatedToCanvas(e);
     if (!local) return false;
-    if (this.pickBuildingDoorAtScreen(local.x, local.y)) return false;
     return this.pickJacAtScreen(local.x, local.y);
   }
 
   private pickJacAtScreen(sx: number, sy: number): boolean {
     if (!this.jac || this.interiorActive) return false;
-    if (this.pickBuildingDoorAtScreen(sx, sy)) return false;
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
-    const doorTile = worldToTile(wx, wy);
-    if (doorTile && getBuildingAtDoor(doorTile.x, doorTile.y)) return false;
     const g = this.objectGraphics.get(this.jac.obj.id);
     if (g) {
       const lx = wx - g.x;
@@ -4083,7 +4300,8 @@ export class IsoScene {
     if (tile && this.jac.tapHitsTile(tile.x, tile.y)) return true;
     const c = this.jac.worldCenter();
     const s = this.worldToScreen(c.x, c.y);
-    return Math.hypot(sx - s.x, sy - s.y) < 32;
+    const r = this.zoom < 0.2 ? Math.max(48, 8 / this.zoom) : 32;
+    return Math.hypot(sx - s.x, sy - s.y) < r;
   }
 
   tapJac(): void {
@@ -4194,6 +4412,9 @@ export class IsoScene {
     }
     this.pendingJacEnter = false;
     this.pendingJacPanel = false;
+    this.pendingJacExit = false;
+    this.pendingDriveEnter = null;
+    this.suppressDriveTapUntil = 0;
     this.path = [];
     this.drawPathPreview();
     this.pendingBuildingEntry = null;
@@ -4202,6 +4423,7 @@ export class IsoScene {
     this.avatar.setVisible(false);
     this.startCameraFollow();
     void this.jac.ensureLoaded();
+    this.flushTownWarm();
   }
 
   jacGetOut(opts?: { thenEnter?: boolean }): void {
@@ -4228,9 +4450,6 @@ export class IsoScene {
       this.jac.cx = snap.exitCx;
       this.jac.cy = snap.exitCy;
     }
-    if (this.pendingDriveEnter) {
-      this.jac.faceClearOfDoor(this.pendingDriveEnter.door.x, this.pendingDriveEnter.door.y);
-    }
     this.jac.setMode('parked');
     this.jac.relayoutParked();
     if (spot) {
@@ -4246,58 +4465,163 @@ export class IsoScene {
     }
     this.rescueAvatarIfTrapped();
     this.startCameraFollow();
-    const entry = this.pendingDriveEnter;
+    let entry = this.pendingDriveEnter;
     this.pendingDriveEnter = null;
+    if (!entry) {
+      const near = this.nearestEnterableDoor(this.jac.cx, this.jac.cy, 6);
+      if (near) entry = near;
+    }
     if (entry) {
+      const building = getBuildingAtDoor(entry.door.x, entry.door.y);
+      const d = Math.min(
+        Math.hypot(this.charTx - entry.door.x, this.charTy - entry.door.y),
+        Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y),
+      );
+      // Drive-enter sits are already on the door side. A blocked walk around
+      // the parked 5×3 left Mentoría parked with no panel for 35 s.
+      if (building && d <= 6) {
+        this.enterBuildingFromDoor(building);
+        return;
+      }
       this.pendingWalkInAt = performance.now();
       this.requestWalk(entry.door.x, entry.door.y, false, { buildingEntry: entry });
     }
   }
 
+  private nearestEnterableDoor(
+    x: number,
+    y: number,
+    maxD: number,
+  ): { panelTitle: string; door: { x: number; y: number } } | null {
+    let best: { panelTitle: string; door: { x: number; y: number }; d: number } | null = null;
+    for (const obj of objects) {
+      if (obj.type !== 'building' || !obj.door || !obj.panelTitle) continue;
+      const d = Math.hypot(x - obj.door.x, y - obj.door.y);
+      if (d > maxD) continue;
+      if (!best || d < best.d) best = { panelTitle: obj.panelTitle, door: obj.door, d };
+    }
+    return best ? { panelTitle: best.panelTitle, door: best.door } : null;
+  }
+
   private tryFinishDriveEnter(): void {
-    if (!this.pendingDriveEnter || !this.jac?.driving || this.jac.isExiting()) return;
+    if (!this.pendingDriveEnter || !this.jac?.driving) return;
+    if (this.jac.isExiting()) return;
     const door = this.pendingDriveEnter.door;
     const sit = this.jac.driveGoal;
     const distSit = sit ? Math.hypot(this.jac.cx - sit.x, this.jac.cy - sit.y) : Infinity;
     const distDoor = Math.hypot(this.jac.cx - door.x, this.jac.cy - door.y);
     const idle = this.jac.drivePath.length === 0 && !this.jac.driveGoal;
     const along = this.jac.doorSideAlong(door.x, door.y);
-    const arrived = sit && distSit < 1.15 && this.jac.mph < 1.2;
-    const doorSideSit = idle && this.jac.mph < 1.2 && along >= 0 && distDoor <= 6.2;
-    if (arrived || doorSideSit) {
+    const arrived = this.jac.atParkSit();
+    const from = this.pendingDriveFrom;
+    const traveled = !from || Math.hypot(this.jac.cx - from.x, this.jac.cy - from.y) > 2.2;
+    const spawn = this.jac.spawn?.center;
+    const lot = spawn ?? { x: 25.5, y: 17 };
+    const leftSpawn = Math.hypot(this.jac.cx - lot.x, this.jac.cy - lot.y) > 2.4;
+    const pathLeft = this.jac.drivePath.length;
+    const slow = this.jac.mph < 2;
+    const stalled = this.jac.mph < 1.2 && pathLeft === 0;
+    if (arrived && !leftSpawn) {
+      this.retryDriveEnterOrGetOut();
+      return;
+    }
+    if (arrived && leftSpawn && slow && (this.jac.parkFaceReady() || this.jac.mph < 0.5)) {
+      this.jac.sitWhy = `arrived sit=(${sit?.x},${sit?.y}) d=${distSit.toFixed(2)} mph=${this.jac.mph}`;
       this.jacGetOut({ thenEnter: true });
       return;
     }
-    if (this.jac.mph < 0.8 && distSit > 2.5) {
+    if (leftSpawn && along >= 0 && distDoor <= 2.8) {
+      this.jac.sitWhy = `door-close sitD=${distSit.toFixed(2)} doorD=${distDoor.toFixed(2)} mph=${this.jac.mph}`;
+      this.jacGetOut({ thenEnter: true });
+      return;
+    }
+    if (
+      leftSpawn &&
+      this.pendingDriveEnterAt &&
+      performance.now() - this.pendingDriveEnterAt > 7000 &&
+      (distDoor <= 5 || (stalled && distDoor <= 10))
+    ) {
+      this.jac.sitWhy = `door-timeout sitD=${distSit.toFixed(2)} doorD=${distDoor.toFixed(2)}`;
+      this.jacGetOut({ thenEnter: true });
+      return;
+    }
+    this.noteSitSkip({
+      sit,
+      distSit,
+      distDoor,
+      along,
+      mph: this.jac.mph,
+      idle,
+      traveled,
+      pathN: this.jac.drivePath.length,
+    });
+    if (this.jac.mph < 0.8 && distSit > 2.5 && pathLeft === 0) {
       this.jac.unstickIfStopped();
     }
-    if (idle && this.jac.mph < 1.2) {
+    if (stalled || (idle && this.jac.mph < 1.2)) {
       this.retryDriveEnterOrGetOut();
     }
+  }
+
+  private lastSitSkipKey = '';
+  private noteSitSkip(row: {
+    sit: { x: number; y: number } | null;
+    distSit: number;
+    distDoor: number;
+    along: number;
+    mph: number;
+    idle: boolean;
+    traveled: boolean;
+    pathN: number;
+  }): void {
+    const why = [
+      `sit=${row.sit ? `${row.sit.x},${row.sit.y}` : 'none'}`,
+      `sitD=${row.distSit.toFixed(2)}`,
+      `doorD=${row.distDoor.toFixed(2)}`,
+      `along=${row.along.toFixed(2)}`,
+      `mph=${row.mph}`,
+      `pathN=${row.pathN}`,
+      row.idle ? 'idle' : 'follow',
+      row.traveled ? 'moved' : 'spawn',
+      row.sit && row.distSit > 1.2 ? 'outside-sit-radius' : '',
+      row.along < 0 ? 'behind-door' : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    if (why === this.lastSitSkipKey) return;
+    this.lastSitSkipKey = why;
+    if (this.jac) this.jac.sitWhy = why;
   }
 
   /** Stay on the door-side sit. A mid-route stall re-plans instead of getting out behind a house. */
   private retryDriveEnterOrGetOut(): void {
     const entry = this.pendingDriveEnter;
     if (!entry || !this.jac?.driving) return;
-    const along = this.jac.doorSideAlong(entry.door.x, entry.door.y);
-    const dist = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
-    if (along >= 0 && dist <= 6.2) {
+    const spawn = this.jac.spawn?.center;
+    const lot = spawn ?? { x: 25.5, y: 17 };
+    const leftSpawn = Math.hypot(this.jac.cx - lot.x, this.jac.cy - lot.y) > 2.4;
+    if (leftSpawn && this.jac.atParkSit() && this.jac.mph < 2) {
+      this.jac.sitWhy = `retry arrived mph=${this.jac.mph}`;
       this.jacGetOut({ thenEnter: true });
       return;
     }
     const sit = this.jac.parkForDoor(entry.door.x, entry.door.y);
-    if (!sit) {
-      this.jacGetOut({ thenEnter: true });
-      return;
-    }
-    const path = sit.path.length > 0 ? sit.path : this.jac.findDrivePath(sit.x, sit.y);
+    const dest = sit ?? entry.door;
+    const path =
+      sit && sit.path.length > 0
+        ? sit.path
+        : this.jac.findDrivePath(dest.x, dest.y, { loose: true }) ??
+          this.jac.findDrivePath(dest.x, dest.y, { loose: false });
     if (!path || path.length === 0) {
-      this.jacGetOut({ thenEnter: true });
+      const distDoor = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
+      if (leftSpawn && this.jac.mph < 2 && distDoor <= 5) {
+        this.jac.sitWhy = `retry door-close d=${distDoor.toFixed(2)}`;
+        this.jacGetOut({ thenEnter: true });
+      }
       return;
     }
     this.pendingDriveEnterAt = performance.now();
-    this.jac.setDrivePath(path, sit, { loose: true });
+    this.jac.setDrivePath(path, sit ? { x: sit.x, y: sit.y } : path[path.length - 1], { loose: true, door: true });
   }
 
   private rescueAvatarIfTrapped(): void {
@@ -4332,12 +4656,12 @@ export class IsoScene {
       return;
     }
     if (!this.pendingWalkInAt || this.interiorActive) return;
-    if (this.pendingBuildingEntry && performance.now() - this.pendingWalkInAt < 8000) return;
+    if (this.pendingBuildingEntry && performance.now() - this.pendingWalkInAt < 16000) return;
     if (!this.pendingBuildingEntry && !this.pendingJacExit) {
       this.pendingWalkInAt = 0;
       return;
     }
-    if (this.pendingWalkInAt && performance.now() - this.pendingWalkInAt < 8000) return;
+    if (this.pendingWalkInAt && performance.now() - this.pendingWalkInAt < 16000) return;
     this.pendingBuildingEntry = null;
     this.pendingDriveEnter = null;
     this.pendingWalkInAt = 0;
@@ -4352,8 +4676,8 @@ export class IsoScene {
     return this.driveToTile(tx, ty, false);
   }
 
-  qaFindDrivePath(tx: number, ty: number): { x: number; y: number }[] | null {
-    return this.jac?.findDrivePath(tx, ty) ?? null;
+  qaFindDrivePath(tx: number, ty: number, loose?: boolean): { x: number; y: number }[] | null {
+    return this.jac?.findDrivePath(tx, ty, loose == null ? undefined : { loose }) ?? null;
   }
 
   qaFps(): { fps: number; elapsedMS: number; sameCanvas: boolean } {
@@ -4392,9 +4716,25 @@ export class IsoScene {
     return this.jac?.canDriveAt(cx, cy) ?? false;
   }
 
-  qaParkForDoor(doorX: number, doorY: number): { x: number; y: number; path?: { x: number; y: number }[] } | null {
+  qaTownWarmStats(): { tiles: number; objects: number; fills: number; bake: boolean } {
+    return {
+      tiles: this.tilesLayer.children.length,
+      objects: this.objectsLayer.children.length,
+      fills: this.fillActors?.snapshot().length ?? 0,
+      bake: !!this.townBake?.visible,
+    };
+  }
+
+  qaParkForDoor(doorX: number, doorY: number): {
+    x: number;
+    y: number;
+    path?: { x: number; y: number }[];
+    heading?: string;
+    ms: number;
+  } | null {
     const sit = this.jac?.parkForDoor(doorX, doorY);
-    return sit ? { x: sit.x, y: sit.y, path: sit.path } : null;
+    const ms = this.jac?.lastParkMs ?? 0;
+    return sit ? { x: sit.x, y: sit.y, path: sit.path, heading: sit.heading, ms } : null;
   }
 
   qaInputReady(): {
@@ -4742,18 +5082,27 @@ export class IsoScene {
     return true;
   }
 
-  /** QA: pan so the character and target door are both on screen before a real pointer tap. */
+  /** QA: start a door-park from the current drive pose without a pointer hit-test. */
+  qaDriveEnter(name: string): boolean {
+    const obj = objects.find((o) => o.type === 'building' && o.name === name);
+    if (!obj?.door || !obj.panelTitle) return false;
+    this.suppressDriveTapUntil = 0;
+    return this.requestDriveToEnter({ panelTitle: obj.panelTitle, door: obj.door });
+  }
+
+  /** QA: pan so the van (when driving) or the walker and target door are both on screen. */
   frameBuildingDoorForQa(name: string): void {
     const obj = objects.find((o) => o.type === 'building' && o.name === name);
     if (!obj?.door) return;
     const d = obj.door;
-    const midTx = (this.charTx + d.x) / 2;
-    const midTy = (this.charTy + d.y) / 2;
+    const from = this.jac?.driving ? { x: this.jac.cx, y: this.jac.cy } : { x: this.charTx, y: this.charTy };
+    const midTx = (from.x + d.x) / 2;
+    const midTy = (from.y + d.y) / 2;
     const mid = tileToWorld(midTx, midTy);
     const doorW = tileToWorld(d.x, d.y);
-    const charW = tileToWorld(this.charTx, this.charTy);
-    const spanX = Math.abs(doorW.x - charW.x) + TILE_W * 2;
-    const spanY = Math.abs(doorW.y - charW.y) + TILE_H * 4;
+    const fromW = tileToWorld(from.x, from.y);
+    const spanX = Math.abs(doorW.x - fromW.x) + TILE_W * 4;
+    const spanY = Math.abs(doorW.y - fromW.y) + TILE_H * 6;
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     this.updateCameraFitMargins();
@@ -4766,6 +5115,7 @@ export class IsoScene {
     const aim = this.freeRectCenter();
     this.placeWorldAtScreen(mid.x, mid.y - 40, aim.x, aim.y);
     this.applyCamera(false);
+    this.flushTownWarm();
   }
 
   /** Client coordinates for tapping the drawn door of a building (QA). */
@@ -4814,6 +5164,7 @@ export class IsoScene {
   setZoomLevel(level: number, anchorScreen?: { x: number; y: number }): void {
     this.setZoom(level, anchorScreen);
     this.applyCamera(false);
+    this.flushTownWarm();
   }
 
   /** QA: synthetic map tap (scenery / ground) matching player pointer routing. */
@@ -4821,6 +5172,14 @@ export class IsoScene {
     const c = tileToWorld(tx, ty);
     const scr = this.worldToScreen(c.x, c.y);
     this.handleScreenTap(scr.x, scr.y, false);
+  }
+
+  getMapTileScreenClientPoint(tx: number, ty: number): { x: number; y: number } | null {
+    if (!this.canvasEl) return null;
+    const c = tileToWorld(tx, ty);
+    const scr = this.worldToScreen(c.x, c.y);
+    const rect = this.canvasEl.getBoundingClientRect();
+    return { x: rect.left + scr.x, y: rect.top + scr.y };
   }
 
   /** QA: client/screen coords (same routing as pointer release → handleScreenTap). */
@@ -5047,6 +5406,14 @@ export class IsoScene {
       !!this.jac &&
       !this.jac.driving &&
       Math.hypot(this.charTx - this.jac.cx, this.charTy - this.jac.cy) < 4;
+    let jacRoof: { x: number; y: number } | null = null;
+    if (!this.interiorActive && this.jac && (this.jac.driving || this.jac.mode === 'parked')) {
+      const roof = this.jac.labelAnchorWorld();
+      const s = this.worldToScreen(roof.x, roof.y);
+      jacRoof = { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y - NAME_PILL_GAP_PX };
+    }
+    const adonayOverJac =
+      !!jacRoof && !this.jac?.driving && Math.hypot(adonay.x - jacRoof.x, adonay.y - jacRoof.y) < 64;
     const out: {
       id: 'adonay' | 'pantone' | 'noah' | 'jac';
       name: string;
@@ -5060,7 +5427,7 @@ export class IsoScene {
         name: 'Adonay',
         x: adonay.x,
         y: nearJac ? adonay.y - 18 : adonay.y,
-        visible: this.jac?.driving
+        visible: this.jac?.driving || adonayOverJac
           ? false
           : snap.adonay.visible && onScreen(adonay.sx, adonay.sy),
       },
@@ -5083,17 +5450,13 @@ export class IsoScene {
         visible: n.visible && n.loaded && onScreen(head.sx, head.sy),
       });
     }
-    if (!this.interiorActive && this.jac && (this.jac.driving || this.jac.mode === 'parked')) {
-      const roof = this.jac.labelAnchorWorld();
-      const s = this.worldToScreen(roof.x, roof.y);
-      const x = (rect?.left ?? 0) + s.x;
-      const y = (rect?.top ?? 0) + s.y - NAME_PILL_GAP_PX;
+    if (!this.interiorActive && this.jac && jacRoof) {
       out.push({
         id: 'jac',
         name: 'JAC T9',
-        x,
-        y,
-        visible: onScreen(s.x, s.y),
+        x: jacRoof.x,
+        y: jacRoof.y,
+        visible: onScreen(jacRoof.x - (rect?.left ?? 0), jacRoof.y - (rect?.top ?? 0) + NAME_PILL_GAP_PX),
         info: !this.jac.driving,
       });
     }

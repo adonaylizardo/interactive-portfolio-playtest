@@ -1,9 +1,9 @@
 import { studio } from '../audio/studio';
 import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
-import { CASES, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
+import { caseForLang, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
 import { iconSvg } from './icons';
-import { onLangChange, t } from './i18n';
+import { getLang, onLangChange, t } from './i18n';
 
 function aboutBlockNode(block: AboutBlock): HTMLElement {
   if (block.kind === 'heading') {
@@ -63,6 +63,19 @@ function appendMarkdown(el: HTMLElement, text: string): void {
   if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
 }
 
+function localizeCaseHeading(heading: string): string {
+  const n = heading.trim().toLowerCase();
+  const key =
+    n === 'problem'
+      ? 'case.problem'
+      : n === 'what i did'
+        ? 'case.whatIDid'
+        : n === 'result'
+          ? 'case.result'
+          : null;
+  return key ? t(key) : heading;
+}
+
 function caseBlockNode(block: CaseBlock): HTMLElement {
   if (block.kind === 'closing') {
     const p = document.createElement('p');
@@ -77,7 +90,7 @@ function caseBlockNode(block: CaseBlock): HTMLElement {
   if (block.heading) {
     const h = document.createElement('h3');
     h.className = 'case__heading';
-    h.textContent = block.heading;
+    h.textContent = localizeCaseHeading(block.heading);
     section.appendChild(h);
   }
   for (const text of block.paragraphs) {
@@ -431,31 +444,8 @@ export class BuildingPanel {
     this.aboutEl.style.contentVisibility = '';
     this.el.removeAttribute('inert');
     this.el.classList.remove('building-panel--snap');
-    const preview = casePreviewCopy(interiorId);
     const shown = this.renderCase();
-    const title = preview?.title ?? shown ?? interiorId;
-    const subtitle = preview?.subtitle ?? '';
-    const teaser = this.isMobile()
-      ? (preview?.teaser ?? '')
-      : (preview?.teaserFull ?? preview?.teaser ?? '');
-    if (this.previewTitle) this.previewTitle.textContent = title;
-    if (this.previewSubtitle) this.previewSubtitle.textContent = subtitle;
-    if (this.previewTeaser) this.previewTeaser.textContent = teaser;
-    const meta = this.el.querySelector('.case-preview__read-meta');
-    if (meta) meta.textContent = preview?.pillMeta ?? 'Problem · What I did · Result';
-    if (this.readBarTitle) {
-      this.readBarTitle.textContent = this.isMobile() || !subtitle
-        ? title
-        : `${title}: ${subtitle.charAt(0).toLowerCase()}${subtitle.slice(1)}`;
-    }
-    if (this.readKicker) this.readKicker.textContent = preview?.kicker ?? 'CASE';
-    if (this.readHeadline) {
-      this.readHeadline.textContent = this.isMobile()
-        ? (preview?.teaser ?? title).replace(/[.]$/, '')
-        : (preview?.teaserFull ?? preview?.teaser ?? title);
-    }
-    if (this.readLede) this.readLede.textContent = subtitle;
-    if (this.readHeroLabel) this.readHeroLabel.textContent = preview?.placeholder ?? 'IMAGE PLACEHOLDER';
+    const title = this.fillPreviewCopy(interiorId) ?? shown ?? interiorId;
     this.setTitle(interiorId, title);
     this.renderWorkedWith();
     this.renderAbout();
@@ -482,6 +472,42 @@ export class BuildingPanel {
     this.el.classList.add('building-panel--open');
   }
 
+  private fillPreviewCopy(interiorId: string): string | null {
+    const preview = casePreviewCopy(interiorId, getLang());
+    const title = preview?.title ?? null;
+    const subtitle = preview?.subtitle ?? '';
+    const teaser = this.isMobile()
+      ? (preview?.teaser ?? '')
+      : (preview?.teaserFull ?? preview?.teaser ?? '');
+    if (this.previewTitle) this.previewTitle.textContent = title ?? interiorId;
+    if (this.previewSubtitle) this.previewSubtitle.textContent = subtitle;
+    if (this.previewTeaser) this.previewTeaser.textContent = teaser;
+    const meta = this.el.querySelector('.case-preview__read-meta');
+    if (meta) {
+      meta.textContent = `${t('case.problem')} · ${t('case.whatIDid')} · ${t('case.result')}`;
+    }
+    if (this.readBarTitle) {
+      this.readBarTitle.textContent = this.isMobile() || !subtitle
+        ? (title ?? interiorId)
+        : `${title}: ${subtitle.charAt(0).toLowerCase()}${subtitle.slice(1)}`;
+    }
+    const kickerEl = this.el.querySelector('.case-preview__kicker');
+    if (kickerEl) kickerEl.textContent = t('case.kicker');
+    if (this.readKicker) {
+      this.readKicker.textContent = `${t('case.kicker')} · ${(title ?? interiorId).toUpperCase()}`;
+    }
+    if (this.readHeadline) {
+      this.readHeadline.textContent = this.isMobile()
+        ? (preview?.teaser ?? title ?? interiorId).replace(/[.]$/, '')
+        : (preview?.teaserFull ?? preview?.teaser ?? title ?? interiorId);
+    }
+    if (this.readLede) this.readLede.textContent = subtitle;
+    if (this.readHeroLabel) {
+      this.readHeroLabel.textContent = `${(title ?? interiorId).toUpperCase()} · ${t('case.placeholder')}`;
+    }
+    return title;
+  }
+
   private setTitle(key: string, shown: string | null): void {
     this.openKey = key;
     this.el.dataset.panelKey = key;
@@ -496,8 +522,10 @@ export class BuildingPanel {
 
   /** Fills the case article for the current interior; returns its headline, or null when there is no case. */
   private renderCase(): string | null {
-    const content = this.interiorId ? CASES[this.interiorId] : undefined;
+    const lang = getLang();
+    const content = this.interiorId ? caseForLang(this.interiorId, lang) : undefined;
     this.caseEl.hidden = !content;
+    this.caseEl.lang = lang;
     this.el.classList.toggle('building-panel--case', !!content);
     const full = this.caseEl.querySelector('.case__version--full')!;
     const short = this.caseEl.querySelector('.case__version--short')!;
@@ -675,5 +703,7 @@ export class BuildingPanel {
     });
     const read = this.el.querySelector('.case-preview__read-label');
     if (read) read.textContent = t('panel.readCase');
+    if (this.mode === 'preview' && this.interiorId) this.fillPreviewCopy(this.interiorId);
+    if (this.interiorId && !this.caseEl.hidden) this.renderCase();
   }
 }

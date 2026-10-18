@@ -1,8 +1,11 @@
+import { CASES_ES } from './cases.es';
+
 /**
  * Panel copy, keyed by building id. English text is verbatim from
  * `content/cases/{id}-panel.md` (Desktop/full on desktop, Mobile/short in the phone sheet).
- * The airline case never names the client — ignore that file's Español section. Landmark rooms
- * keep the place name as the title and a short placeholder. Internal draft sections are not stored here.
+ * ES bodies are the existing translations from `cursor/contenido-4b28` (`src/data/cases.es.ts`)
+ * — copied as-is, not rewritten here. The airline case never names the client in EN.
+ * Landmark rooms keep the place name as the title and a short placeholder.
  */
 export type CaseBlock =
   | { kind: 'section'; heading?: string; paragraphs: string[]; bullets?: string[] }
@@ -66,21 +69,60 @@ export type CasePreviewCopy = {
   pillMeta: string;
 };
 
+const CASE_PREVIEW_ES: Record<CaseHouseId, { subtitle: string; headline: string; shortHeadline?: string }> = {
+  volaris: {
+    subtitle: 'Product strategist y único aprobador',
+    headline: 'Un contrato que ingeniería no podía malinterpretar',
+  },
+  bain: {
+    subtitle: 'Líder de squad, mentor y diseñador hands-on',
+    headline: 'Lideré a 9 diseñadores en Bain, y seguí entregando el trabajo',
+    shortHeadline: 'Lideré a 9 diseñadores en Bain',
+  },
+  mentoria: {
+    subtitle: 'Lead de mentoría y Design Senior Council',
+    headline: 'Mentoré con el mismo rigor que el trabajo de cliente',
+    shortHeadline: 'La mentoría como sistema',
+  },
+  finoa: {
+    subtitle: 'UX designer, plataforma de custodia institucional',
+    headline: 'Una plataforma de custodia que las instituciones leen de un vistazo',
+    shortHeadline: 'Custodia que las instituciones pueden confiar',
+  },
+  pg: {
+    subtitle: 'Diseñador UX/UI, app de salud para panelistas',
+    headline: 'Una app que las panelistas sí quieren abrir',
+  },
+};
+
 /** Door-step card: CASE label, name, one-line role, headline teaser. */
-export function casePreviewCopy(id: string): CasePreviewCopy | null {
+const CASE_CARD_TITLES_ES: Record<CaseHouseId, string> = {
+  volaris: 'Aerolínea',
+  bain: 'Bain',
+  mentoria: 'Mentoría',
+  finoa: 'Finoa',
+  pg: 'P&G',
+};
+
+export function casePreviewCopy(id: string, lang: 'en' | 'es' = 'en'): CasePreviewCopy | null {
   if (!isCaseHouse(id)) return null;
   const content = CASES[id];
   if (!content) return null;
-  const title = CASE_CARD_TITLES[id];
-  const headings = sectionHeadings(content.full).slice(0, 3);
+  const title = lang === 'es' ? CASE_CARD_TITLES_ES[id] : CASE_CARD_TITLES[id];
+  const es = lang === 'es' ? CASE_PREVIEW_ES[id] : null;
+  const headline = es?.headline ?? content.headline;
+  const shortHeadline = es?.shortHeadline ?? content.shortHeadline;
+  const headings = es
+    ? ['Problema', 'Lo que hice', 'Resultado']
+    : sectionHeadings(content.full).slice(0, 3);
   return {
     title,
-    subtitle: content.subtitle,
-    teaser: endSentence(content.shortHeadline ?? content.headline),
-    teaserFull: content.headline,
+    subtitle: es?.subtitle ?? content.subtitle,
+    teaser: endSentence(shortHeadline ?? headline),
+    teaserFull: headline,
     kicker: `CASE · ${title.toUpperCase()}`,
     placeholder: `${title.toUpperCase()} · IMAGE PLACEHOLDER`,
-    pillMeta: headings.length ? headings.join(' · ') : 'Problem · What I did · Result',
+    pillMeta: headings.length ? headings.join(' · ') : es ? 'Problema · Lo que hice · Resultado' : 'Problem · What I did · Result',
   };
 }
 
@@ -357,3 +399,11 @@ export const CASES: Record<string, CaseContent> = {
   catedral: landmarkPlaceholder('Catedral', '09-cathedral'),
   flor: landmarkPlaceholder('Flor de Venezuela', '08-flor-de-venezuela'),
 };
+
+/** ES panel bodies from `cursor/contenido-4b28`. Falls back to EN when a slot has no ES file. */
+export function caseForLang(id: string, lang: 'en' | 'es'): CaseContent | undefined {
+  const en = CASES[id];
+  if (!en) return undefined;
+  if (lang === 'es') return CASES_ES[id] ?? en;
+  return en;
+}
