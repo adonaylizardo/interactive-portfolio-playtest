@@ -168,7 +168,7 @@ import {
   zoomMinForView,
 } from './altView';
 import { billboardHeightM, PerspectiveView } from './perspectiveView';
-import { PersonaView, personaT9WidthFrac } from './persona/personaView';
+import { PersonaView, personaScreenForwardDeg, personaT9WidthFrac } from './persona/personaView';
 import {
   ADONAY_ALTO_PX_1X,
   CAL_M,
@@ -1424,10 +1424,10 @@ export class IsoScene {
     return this.personaPreviewOn();
   }
 
-  /** Unit forward on the tile grid from third-person camera yaw (not iso screen→tile). */
+  /** Unit forward on the tile grid — matches personaCam forwardFromYawRad (sin x, cos z → tile x,y). */
   private personaTileForward(sign = 1): { x: number; y: number } {
-    const fx = Math.cos(this.personaCamYaw) * sign;
-    const fy = Math.sin(this.personaCamYaw) * sign;
+    const fx = Math.sin(this.personaCamYaw) * sign;
+    const fy = Math.cos(this.personaCamYaw) * sign;
     const m = Math.hypot(fx, fy);
     if (m < 1e-6) return { x: 0, y: 0 };
     return { x: fx / m, y: fy / m };
@@ -1688,11 +1688,17 @@ export class IsoScene {
     this.syncViewTransform();
     if (mode === 'persona') {
       this.personaIdleSec = 0;
+      this.cenitalVanScreen.clear();
+      this.cenitalVanScreen.visible = false;
+      this.altViewLayer.clear();
+      this.altJacLayer.clear();
       if (!this.personaSpawnFramed) {
         this.framePersonaSpawnView();
         this.personaSpawnFramed = true;
       }
       void this.persona.ensureLoaded(Math.min(window.devicePixelRatio || 1, 2));
+    } else if (mode === 'cenital') {
+      this.cenitalVanScreen.visible = true;
     }
     this.centerOnCharacter(false);
     this.applyCamera(true);
@@ -1714,8 +1720,14 @@ export class IsoScene {
     this.setViewMode(mode);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     if (mode === 'persona') {
+      this.cenitalVanScreen.clear();
+      this.cenitalVanScreen.visible = false;
+      this.altViewLayer.clear();
+      this.altJacLayer.clear();
+      this.applyCamera(true);
       await this.persona.ensureLoaded(dpr);
       await this.qaFlushPersonaView();
+      this.applyCamera(true);
       return;
     }
     this.syncAltView();
@@ -2512,9 +2524,14 @@ export class IsoScene {
       this.camera.scale.set(1, 1);
       this.camera.rotation = 0;
       this.world.visible = false;
+      this.tilesLayer.visible = false;
       this.persona.layer.visible = this.personaOn();
       this.perspective.layer.visible = this.perspectiveOn();
+      this.cenitalVanScreen.visible = false;
+      this.cenitalVanScreen.clear();
     } else {
+      this.tilesLayer.visible = true;
+      this.cenitalVanScreen.visible = this.cenitalOn();
       this.camera.scale.set(this.viewSx, this.viewSy);
       this.camera.rotation = this.viewRot;
       this.world.visible = true;
@@ -6179,6 +6196,40 @@ export class IsoScene {
       yawRad: this.personaCamYaw,
       yawQuarter: this.cameraYawQuarter(),
       yawDeg: (this.personaCamYaw * 180) / Math.PI,
+    };
+  }
+
+  qaPersonaScreenForwardDeg(): number {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    return personaScreenForwardDeg(this.charTx, this.charTy, this.personaCamYaw, sw, sh);
+  }
+
+  qaPersonaClientChar(): { x: number; y: number } {
+    const s = this.followTargetScreen();
+    const rect = this.canvasEl?.getBoundingClientRect();
+    return { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y };
+  }
+
+  qaPersonaRenderProbe(): {
+    viewMode: Camera;
+    worldVisible: boolean;
+    tilesVisible: boolean;
+    personaLayerVisible: boolean;
+    cenitalVanVisible: boolean;
+    altLayerVisible: boolean;
+    adonayVisible: boolean;
+    skyVisible: boolean;
+  } {
+    return {
+      viewMode: this.viewMode,
+      worldVisible: this.world.visible,
+      tilesVisible: this.tilesLayer.visible,
+      personaLayerVisible: this.persona.layer.visible,
+      cenitalVanVisible: this.cenitalVanScreen.visible,
+      altLayerVisible: this.altViewLayer.visible,
+      adonayVisible: this.persona.qaAdonayVisible(),
+      skyVisible: this.persona.qaSkyVisible(),
     };
   }
 

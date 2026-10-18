@@ -242,7 +242,7 @@ export class ChecklistUI {
     const done = countCompleted(this.state, this.compactSteps);
     const counterText = `${done} / ${total}`;
     this.counterEl.textContent = counterText;
-    this.counterInRing.textContent = counterText;
+    this.counterInRing.textContent = `${done}/${total}`;
     const circumference = 69.12;
     const offset = circumference * (1 - done / total);
     this.ringEl.style.strokeDashoffset = String(offset);

@@ -90,6 +90,23 @@ export function personaT9WidthFrac(
 
 type PersonaCam = { x: number; z: number; yaw: number };
 
+/** Screen-space angle (deg) of walking forward at yaw — for Forge W-key QA. */
+export function personaScreenForwardDeg(
+  charTx: number,
+  charTy: number,
+  yawRad: number,
+  sw: number,
+  sh: number,
+): number {
+  const player = tileToPersonaMeters(charTx, charTy);
+  const cam = personaCam(player.x, player.z, yawRad);
+  const fwd = forwardFromYawRad(yawRad);
+  const a = projectTp(player.x, 0, player.z, cam, sw, sh);
+  const b = projectTp(player.x + fwd.x * 3, 0, player.z + fwd.z * 3, cam, sw, sh);
+  if (!a || !b) return NaN;
+  return ((Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI + 360) % 360;
+}
+
 function personaCam(px: number, pz: number, yawRad: number): PersonaCam {
   const fwd = forwardFromYawRad(yawRad);
   return {
@@ -195,6 +212,14 @@ export class PersonaView {
 
   jacT9TextureWidth(): number {
     return this.jacT9Ext.texture?.width ?? 0;
+  }
+
+  qaAdonayVisible(): boolean {
+    return this.adonay.visible;
+  }
+
+  qaSkyVisible(): boolean {
+    return !!this.sky?.visible;
   }
 
   async ensureLoaded(dpr: number): Promise<void> {
