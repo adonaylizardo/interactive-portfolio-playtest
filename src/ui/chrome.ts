@@ -406,7 +406,18 @@ export class ChromeUI {
   private syncSubtitle(): void {
     const sub = this.root.querySelector('.chrome__subtitle') as HTMLElement | null;
     if (!sub) return;
-    sub.textContent = studio.subtitle();
+    const v = this.getView();
+    const text = studio.subtitle();
+    const blocksLabels =
+      v.overview ||
+      (v.mode === 'cenital' && (this.shortLandscape() || text.startsWith('Hey, welcome')));
+    if (blocksLabels && text) {
+      sub.textContent = '';
+      sub.style.visibility = 'hidden';
+      return;
+    }
+    sub.style.visibility = text ? 'visible' : 'hidden';
+    sub.textContent = text;
   }
 
   /** 'No sound? Check silent mode' is a boot hint — fade out after ~4s, then stay gone. */
@@ -524,6 +535,7 @@ export class ChromeUI {
       if (key === 'map') btn.classList.toggle('is-active', v.overview);
     });
     this.root.classList.toggle('chrome--alt-view', v.mode !== 'isometrica');
+    this.root.classList.toggle('chrome--overview', v.overview);
     const hint = this.root.querySelector('.chrome__sound') as HTMLElement | null;
     if (hint && (this.soundHintDismissed || v.mode !== 'isometrica') && !hint.hidden) {
       hint.hidden = true;
@@ -571,10 +583,20 @@ export class ChromeUI {
       const right = Math.max(16, window.innerWidth - ring.left + 8);
       lang.style.top = `${top}px`;
       lang.style.right = `${right}px`;
-      return;
+    } else {
+      lang.style.top = this.mobile ? '24px' : '20px';
+      lang.style.right = '16px';
     }
-    lang.style.top = this.mobile ? '24px' : '20px';
-    lang.style.right = '16px';
+    const locate = this.root.querySelector('.chrome__locate') as HTMLElement | null;
+    const wrap = this.root.querySelector('.chrome__minimap-wrap') as HTMLElement | null;
+    if (locate && wrap && wrap.offsetParent !== null && !locate.hidden) {
+      const lr = locate.getBoundingClientRect();
+      const gr = lang.getBoundingClientRect();
+      if (gr.bottom > lr.top - 4 && gr.right > lr.left - 4 && gr.left < lr.right + 4) {
+        lang.style.top = `${Math.max(8, lr.bottom + 6)}px`;
+        lang.style.right = `${Math.max(16, window.innerWidth - lr.right)}px`;
+      }
+    }
   }
 
   private drawMinimap(): void {

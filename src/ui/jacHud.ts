@@ -312,6 +312,7 @@ export class JacHud {
       if ((el as HTMLElement).dataset.jac === 'in') (el as HTMLElement).hidden = inBtn;
       if ((el as HTMLElement).dataset.jac === 'out') (el as HTMLElement).hidden = !inBtn;
     });
+    this.syncDockViews();
   }
 
   private syncDockViews(): void {

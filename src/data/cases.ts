@@ -105,21 +105,37 @@ export function casePreviewCopy(id: string, lang: 'en' | 'es' = 'en'): CasePrevi
   if (!isCaseHouse(id)) return null;
   const content = CASES[id];
   if (!content) return null;
-  const title = lang === 'es' ? CASE_CARD_TITLES_ES[id] : CASE_CARD_TITLES[id];
+  const title = lang === 'es' ? CASE_CARD_TITLES_ES[id] ?? content.headline : CASE_CARD_TITLES[id] ?? content.headline;
   const es = lang === 'es' ? CASE_PREVIEW_ES[id] : null;
-  const headline = es?.headline ?? content.headline;
-  const shortHeadline = es?.shortHeadline ?? content.shortHeadline;
+  const landmarkIds = new Set(['sambil', 'catedral', 'flor']);
+  const landmarkEs =
+    lang === 'es' && !es && landmarkIds.has(id)
+      ? {
+          subtitle: `${title} — hito del mapa`,
+          headline: `${title} — próximamente`,
+          shortHeadline: 'Próximamente en el mapa.',
+        }
+      : null;
+  const headline = es?.headline ?? landmarkEs?.headline ?? content.headline;
+  const shortHeadline = es?.shortHeadline ?? landmarkEs?.shortHeadline ?? content.shortHeadline;
   const headings = es
     ? ['Problema', 'Lo que hice', 'Resultado']
     : sectionHeadings(content.full).slice(0, 3);
   return {
     title,
-    subtitle: es?.subtitle ?? content.subtitle,
+    subtitle: es?.subtitle ?? landmarkEs?.subtitle ?? content.subtitle,
     teaser: endSentence(shortHeadline ?? headline),
     teaserFull: headline,
     kicker: `CASE · ${title.toUpperCase()}`,
     placeholder: `${title.toUpperCase()} · IMAGE PLACEHOLDER`,
-    pillMeta: headings.length ? headings.join(' · ') : es ? 'Problema · Lo que hice · Resultado' : 'Problem · What I did · Result',
+    pillMeta:
+      lang === 'es'
+        ? headings.length
+          ? headings.join(' · ')
+          : 'Problema · Lo que hice · Resultado'
+        : headings.length
+          ? headings.join(' · ')
+          : 'Problem · What I did · Result',
   };
 }
 

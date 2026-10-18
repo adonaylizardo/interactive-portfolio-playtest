@@ -112,6 +112,13 @@ async function overviewViewport(tag, opts) {
         `${tag}: limiting ${overview?.limitingAxis} fill ${((overview?.limitingFill ?? 0) * 100).toFixed(1)}% < 90%`,
       );
     }
+    const vpFill = overview?.viewportLimitingFill ?? 0;
+    if (vpFill >= 0.99) {
+      errors.push(`${tag}: viewport coverage stuck at ${(vpFill * 100).toFixed(1)}% (metric should reflect drawn bbox)`);
+    }
+    if (vpFill < 0.28) {
+      errors.push(`${tag}: viewport limiting fill ${(vpFill * 100).toFixed(1)}% too small`);
+    }
     if ((labels?.overlaps ?? 0) > 0) errors.push(`${tag}: label overlaps ${labels.overlaps}`);
     return { tag, errors, bundle, overview, labels };
   } finally {
@@ -334,6 +341,61 @@ for (const [tag, opts] of [
   overviewResults.push(await overviewViewport(tag, opts));
 }
 
+async function roadTapNoBuildingHijack() {
+  const errors = [];
+  const browser = await launchBrowser(chromium, {
+    args: ['--disable-dev-shm-usage', '--no-sandbox'],
+  });
+  const ctx = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+    deviceScaleFactor: 1,
+  });
+  const page = await ctx.newPage();
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    await boot(page, true);
+    await page.evaluate(() => {
+      window.__playtestQa.setViewMode('cenital');
+      window.__playtestQa.dismissBuildingPanel?.();
+    });
+    await wait(250);
+    const boarded = await ensureDriving(page);
+    if (!boarded) {
+      errors.push('road-tap: never boarded van');
+      return { errors };
+    }
+    const pt = await page.evaluate(() => {
+      const tx = 47;
+      const ty = 19;
+      const wx = (tx - ty) * 64;
+      const wy = (tx + ty) * 32;
+      return window.__playtestQa.worldToClient(wx, wy);
+    });
+    const pick = await page.evaluate(
+      ([x, y]) => window.__playtestQa.pickAt(x, y),
+      [pt.x, pt.y],
+    );
+    if (pick?.door || pick?.building) {
+      errors.push(`road-tap: pickAt reports building/door ${JSON.stringify(pick)} before tap`);
+    }
+    await cdpTouch(cdp, pt.x, pt.y);
+    await wait(220);
+    const opened = await page.evaluate(() => window.__playtestQa.isBuildingPanelOpen?.());
+    const title = await page.evaluate(() => window.__playtestQa.openPanelTitle?.());
+    if (opened) {
+      errors.push(`road-tap: opened panel ${title ?? '?'} from road tile (47,19)`);
+    }
+  } finally {
+    await ctx.close();
+    await browser.close();
+  }
+  return { errors };
+}
+
+const roadTap = await roadTapNoBuildingHijack();
+
 const doors1 = await doorTapSuite();
 const doors2 = await doorTapSuite();
 const doors = {
@@ -356,11 +418,13 @@ fs.writeFileSync(path.join(OUT, 'verify-accept-run.log'), verify.stdout + verify
 
 const verifyOk = verify.status === 0;
 const overviewOk = overviewResults.every((r) => r.errors.length === 0);
+const roadOk = roadTap.errors.length === 0;
 const doorsOk = doors1.pass === 5 && doors2.pass === 5 && doors.errors.length === 0;
 const bundleOk = overviewResults.every((r) => r.bundle === bundleTarget);
 
 const report = {
-  ok: verifyOk && overviewOk && doorsOk && bundleOk,
+  ok: verifyOk && overviewOk && roadOk && doorsOk && bundleOk,
+  roadTap,
   liveUrl: BASE,
   verifiedBundle: bundleTarget,
   overviewResults,

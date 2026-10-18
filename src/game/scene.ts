@@ -1550,6 +1550,16 @@ export class IsoScene {
     return { covW: iw / freeW, covH: ih / freeH };
   }
 
+  /** Map AABB vs full canvas (QA / hostile checks — not chrome margins). */
+  private overviewViewportFillFraction(): { covW: number; covH: number } {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const r = this.mapScreenRectOnCanvas();
+    const iw = Math.max(0, Math.min(sw, r.right) - Math.max(0, r.left));
+    const ih = Math.max(0, Math.min(sh, r.bottom) - Math.max(0, r.top));
+    return { covW: iw / Math.max(1, sw), covH: ih / Math.max(1, sh) };
+  }
+
   /** Overview: ≥90% on the bottleneck axis; the other axis may crop slightly. */
   private overviewCoverageFits(): boolean {
     const cov = this.overviewFillFraction();
@@ -1837,7 +1847,9 @@ export class IsoScene {
   /** Door pick in world space (stable at min zoom ~0.04–0.15); closest opening wins. */
   private pickBuildingDoorAtScreen(sx: number, sy: number): MapObject | undefined {
     if (this.cenitalOn() && !this.mapOverview) {
-      const slop = this.jac?.driving ? 56 : 24;
+      const driving = !!this.jac?.driving;
+      const mph = this.jac?.mph ?? 0;
+      const slop = driving ? 12 + Math.min(22, mph * 1.6) : 24;
       const buildings = objects.filter((o) => o.type === 'building' && o.door && o.panelTitle);
       let best: { obj: MapObject; dist: number } | null = null;
       for (const obj of buildings) {
@@ -1845,14 +1857,14 @@ export class IsoScene {
         if (!m) continue;
         const s = this.worldToScreen(m.x, m.y);
         const hitX = Math.abs(sx - s.x) <= m.hw + slop;
-        const hitY = Math.abs(sy - s.y) <= m.hh + slop + 10;
+        const hitY = Math.abs(sy - s.y) <= m.hh + slop;
         if (!hitX || !hitY) continue;
         const dist = Math.hypot(sx - s.x, sy - s.y);
         if (!best || dist < best.dist) best = { obj, dist };
       }
       if (best) return best.obj;
     }
-    if (this.zoom <= 0.15) {
+    if (this.zoom <= 0.15 && !this.jac?.driving) {
       const body = this.pickBuildingAtScreen(sx, sy);
       if (body?.door && body.panelTitle) return body;
     }
@@ -1935,6 +1947,21 @@ export class IsoScene {
     return undefined;
   }
 
+  /** While driving: enter only on door glyph / non-walkable building tile — never from open road. */
+  private pickDrivingBuildingEnterAtScreen(sx: number, sy: number): MapObject | undefined {
+    const door = this.pickBuildingDoorAtScreen(sx, sy);
+    if (door) return door;
+    const { x: wx, y: wy } = this.screenToWorld(sx, sy);
+    const tile = worldToTile(wx, wy);
+    if (!tile || !cells[tile.y]?.[tile.x]) return undefined;
+    if (cells[tile.y][tile.x].walkable) return undefined;
+    const onBuilding = getBuildingAt(tile.x, tile.y);
+    if (onBuilding?.door && onBuilding.panelTitle && buildingBodyHit(onBuilding, wx, wy)) {
+      return onBuilding;
+    }
+    return undefined;
+  }
+
   /**
    * When the building panel is open: dismiss it and continue the map action, unless the
    * tap is on the same building (keep panel). Returns false to abort the tap entirely.
@@ -1999,8 +2026,7 @@ export class IsoScene {
       if (this.jac.isExiting()) return;
       if (performance.now() < this.suppressDriveTapUntil) return;
       if (this.pickJacAtScreen(sx, sy)) return;
-      const doorHit = this.pickBuildingDoorAtScreen(sx, sy);
-      const buildingHit = doorHit ?? this.pickBuildingAtScreen(sx, sy);
+      const buildingHit = this.pickDrivingBuildingEnterAtScreen(sx, sy);
       if (buildingHit?.door && buildingHit.panelTitle) {
         this.requestDriveToEnter({ panelTitle: buildingHit.panelTitle, door: buildingHit.door });
         return;
@@ -2181,8 +2207,7 @@ export class IsoScene {
     if (!this.jac?.driving || this.jac.isExiting()) return;
     if (performance.now() < this.suppressDriveTapUntil) return;
     if (this.pickJacAtScreen(sx, sy)) return;
-    const doorHit = this.pickBuildingDoorAtScreen(sx, sy);
-    const buildingHit = doorHit ?? this.pickBuildingAtScreen(sx, sy);
+    const buildingHit = this.pickDrivingBuildingEnterAtScreen(sx, sy);
     if (buildingHit?.door && buildingHit.panelTitle) {
       this.requestDriveToEnter({ panelTitle: buildingHit.panelTitle, door: buildingHit.door });
       return;
@@ -5897,7 +5922,7 @@ export class IsoScene {
             const rad = 26 + ring * 18;
             const px = t.x + Math.cos(ang) * rad;
             const py = t.y + Math.sin(ang) * rad - 28;
-            const clash = kept.some((k) => Math.hypot(k.x - px, k.y - py) < 36);
+            const clash = kept.some((k) => Math.hypot(k.x - px, k.y - py) < 42);
             if (!clash) {
               t.x = px;
               t.y = py;
@@ -5911,6 +5936,18 @@ export class IsoScene {
           t.y -= 28;
           kept.push(t);
         }
+      }
+      const vw = typeof window !== 'undefined' ? window.innerWidth : sw;
+      const vh = typeof window !== 'undefined' ? window.innerHeight : sh;
+      for (const t of out) {
+        const estW = Math.min(132, t.name.length * 7.2 + 22);
+        const pad = 6;
+        const minX = pad + estW / 2;
+        const maxX = vw - pad - estW / 2;
+        const minY = pad + 14;
+        const maxY = vh - pad - 14;
+        if (minX <= maxX) t.x = Math.max(minX, Math.min(maxX, t.x));
+        if (minY <= maxY) t.y = Math.max(minY, Math.min(maxY, t.y));
       }
       return out;
     }
@@ -5938,22 +5975,30 @@ export class IsoScene {
   qaOverviewCoverage(): {
     covW: number;
     covH: number;
+    viewportCovW: number;
+    viewportCovH: number;
     overview: boolean;
     limitingAxis: 'width' | 'height';
     limitingFill: number;
+    viewportLimitingFill: number;
     mapFullyVisible: boolean;
     targetFill: number;
   } {
     this.applyCamera(false);
     const cov = this.overviewFillFraction();
+    const vp = this.overviewViewportFillFraction();
     const limitingAxis: 'width' | 'height' = cov.covW <= cov.covH - 1e-6 ? 'width' : 'height';
     const limitingFill = Math.min(cov.covW, cov.covH);
+    const viewportLimitingFill = Math.min(vp.covW, vp.covH);
     return {
       covW: cov.covW,
       covH: cov.covH,
+      viewportCovW: vp.covW,
+      viewportCovH: vp.covH,
       overview: this.mapOverview,
       limitingAxis,
       limitingFill,
+      viewportLimitingFill,
       mapFullyVisible: this.mapOverview
         ? limitingFill >= 0.9 - 1e-4
         : this.mapFullyInFreeRect(),

@@ -347,14 +347,27 @@ async function main(): Promise<void> {
         const box = visibleBox(pill as HTMLElement);
         if (box) boxes.push(box);
       }
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const clip = (r: { x: number; y: number; w: number; h: number }) => {
+        const left = Math.max(r.x, 0);
+        const top = Math.max(r.y, 0);
+        const right = Math.min(r.x + r.w, vw);
+        const bottom = Math.min(r.y + r.h, vh);
+        const w = right - left;
+        const h = bottom - top;
+        if (w <= 0 || h <= 0) return null;
+        return { x: left, y: top, w, h };
+      };
+      const clipped = boxes.map(clip).filter(Boolean) as { x: number; y: number; w: number; h: number }[];
       let overlaps = base.overlaps;
-      for (let i = 0; i < boxes.length; i++) {
-        for (let j = i + 1; j < boxes.length; j++) {
-          const a = boxes[i];
-          const b = boxes[j];
+      for (let i = 0; i < clipped.length; i++) {
+        for (let j = i + 1; j < clipped.length; j++) {
+          const a = clipped[i];
+          const b = clipped[j];
           const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
           const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
-          if (ox > 4 && oy > 4) overlaps += 1;
+          if (ox > 0 && oy > 0) overlaps += 1;
         }
       }
       return { ...base, overlaps };

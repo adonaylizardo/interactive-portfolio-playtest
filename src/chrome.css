@@ -853,13 +853,18 @@ body[data-layout='panel'] #game-canvas {
   display: none;
 }
 
+/* Phone dock: keep Mapa in its own slot so Cenital double-taps do not hit Mapa. */
 .chrome--dock .chrome__view-btns [data-view='map'] {
-  display: none;
+  display: inline-flex;
 }
 
-/* Phone dock: show map/overview control in cenital (≥44px via media query below). */
-.chrome--dock.chrome--alt-view .chrome__view-btns [data-view='map'] {
-  display: inline-flex;
+.chrome--overview .chrome__minimap-wrap {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.chrome--overview .chrome__view-btns {
+  pointer-events: auto;
 }
 
 .chrome--dock .chrome__view-btns {
@@ -890,6 +895,15 @@ body[data-layout='panel'] #game-canvas {
     height: 44px;
     min-width: 44px;
     min-height: 44px;
+  }
+
+  .chrome__lang-opt {
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 

@@ -518,6 +518,11 @@ body[data-layout='panel'] .checklist {
     border-radius: 16px;
   }
 
+  .checklist--mobile-closed .checklist__ring {
+    width: 44px;
+    height: 44px;
+  }
+
   .checklist--mobile-closed {
     width: 48px;
     height: 48px;
@@ -593,6 +598,11 @@ body[data-layout='panel'] .checklist {
 
 /* Phone landscape (e.g. 844×390): treat as compact. Checklist is a pill; lang stays off the panel. */
 @media (max-height: 500px) and (orientation: landscape) {
+  body.jac-drive .checklist:not(.checklist--mobile-closed) {
+    max-height: min(55vh, 168px);
+    top: max(8px, env(safe-area-inset-top));
+  }
+
   .checklist:not(.checklist--mobile-closed) {
     max-height: min(70vh, 220px);
     max-width: min(260px, calc(100vw - 160px));
@@ -1839,8 +1849,17 @@ body[data-layout='panel'] .checklist {
   .joystick {
     left: 16px;
     right: auto;
-    bottom: 84px;
+    bottom: 92px;
   }
+}
+
+body.jac-drive[data-chrome='phone'] .joystick {
+  bottom: 132px;
+}
+
+body.jac-drive[data-chrome='phone']:has(.building-panel--open) .joystick {
+  bottom: 148px;
+  right: 12px;
 }
 
 /* Name pills — HTML so they stay sharp above the depth sort. */
@@ -2406,6 +2425,9 @@ body.jac-menu-open .checklist {
 .jac-bar__btn {
   flex: 0 0 auto;
   margin-left: auto;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 14px;
 }
 
 .jac-steer {
