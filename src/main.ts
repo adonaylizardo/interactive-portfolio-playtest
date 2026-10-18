@@ -70,7 +70,10 @@ async function main(): Promise<void> {
       checklist.setBuildingPanelOpen(open);
       if (panel.isExperienceMode()) {
         chrome.setInteriorOpen(false, { skipLayout: true });
-        if (!isMobileLayout() && open) chrome.setLayout('split');
+        if (!isMobileLayout() && open) {
+          chrome.setLayout('split');
+          checklist.setCollapsed(true);
+        }
       } else {
         chrome.setInteriorOpen(open);
       }
@@ -79,6 +82,7 @@ async function main(): Promise<void> {
       if (!panel.isOpen() && !scene?.isInInterior()) {
         if (!isMobileLayout()) checklist.setCollapsed(true);
         scene?.resetMapDoorChainState();
+        studio.maybePlayDeferredIntro();
       } else {
         scene?.applyCameraFromUi();
       }
@@ -276,7 +280,10 @@ async function main(): Promise<void> {
     dismissBuildingPanel: () => panel.hide(),
     setChecklistProgressForQa: (completed: Partial<Record<string, boolean>>) =>
       checklist.setProgressForQa(completed as Partial<Record<import('./checklist/storage').ChecklistStepId, boolean>>),
-    collapseChecklistForQa: () => checklist.collapseMobile(),
+    collapseChecklistForQa: () => {
+      checklist.collapseMobile();
+      if (!isMobileLayout()) checklist.setCollapsed(true);
+    },
     showPanelOverlayForQa: (title: string) => {
       checklist.setBuildingPanelOpen(true);
       panel.showOverlayForQa(title);

@@ -761,6 +761,11 @@ body[data-layout='panel'] .checklist {
 
 /* Phone landscape (e.g. 844×390): treat as compact. Checklist is a pill; lang stays off the panel. */
 @media (max-height: 500px) and (orientation: landscape) {
+  .checklist--mobile-closed .checklist__list,
+  .checklist--mobile-closed .checklist__footer {
+    display: none !important;
+  }
+
   .checklist:not(.checklist--mobile-closed) {
     max-height: min(70vh, 220px);
     max-width: min(260px, calc(100vw - 160px));
@@ -771,10 +776,61 @@ body[data-layout='panel'] .checklist {
     bottom: max(12px, env(safe-area-inset-bottom));
     left: max(12px, env(safe-area-inset-left));
     right: auto;
-    width: fit-content;
+    width: min(279px, calc(100vw - 120px));
     max-width: min(279px, calc(100vw - 120px));
     height: auto;
-    overflow: visible;
+    max-height: 52px;
+    overflow: hidden;
+    pointer-events: none;
+    border-radius: 26px;
+  }
+
+  body[data-layout='map'] .checklist--mobile-closed .checklist__header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 0 8px 0 18px;
+    min-height: 52px;
+    height: 52px;
+    border-bottom: 0;
+  }
+
+  body[data-layout='map'] .checklist--mobile-closed .checklist__header-text {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0;
+    min-width: 0;
+  }
+
+  body[data-layout='map'] .checklist--mobile-closed .checklist__progress-wrap {
+    display: contents;
+  }
+
+  body[data-layout='map'] .checklist--mobile-closed .checklist__ring-btn {
+    width: 44px;
+    height: 44px;
+    pointer-events: auto;
+  }
+
+  body[data-layout='map'] .checklist--mobile-closed .checklist__ring,
+  body[data-layout='map'] .checklist--mobile-closed .checklist__map-arc,
+  body[data-layout='map'] .checklist--mobile-closed .checklist__clipboard-figma {
+    display: none !important;
+  }
+
+  body[data-layout='map'] .checklist--mobile-closed .checklist__ring-figma {
+    display: block;
+    width: 44px;
+    height: 44px;
+    pointer-events: none;
+  }
+
+  #ui-root:has(> .building-panel--preview) > .checklist,
+  #ui-root:has(> .building-panel--preview) .chrome__intro {
+    display: none !important;
   }
 
   .building-panel__sheet {
@@ -792,9 +848,15 @@ body[data-layout='panel'] .checklist {
 
 @media (min-width: 768px) {
   .checklist--collapsed {
-    right: max(16px, env(safe-area-inset-right));
+    right: max(124px, calc(env(safe-area-inset-right) + 112px));
     left: auto;
-    max-width: min(360px, calc(100vw - 96px));
+    max-width: min(360px, calc(100vw - 64px - 140px));
+  }
+
+  .checklist:not(.checklist--mobile) .checklist__map-arc,
+  .checklist:not(.checklist--mobile) .checklist__ring-figma,
+  .checklist:not(.checklist--mobile) .checklist__clipboard-figma {
+    display: none !important;
   }
 
   .checklist__counter--label {

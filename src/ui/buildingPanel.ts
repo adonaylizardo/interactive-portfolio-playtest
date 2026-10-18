@@ -142,6 +142,8 @@ export class BuildingPanel {
   private experienceView: 'list' | 'detail' = 'list';
   private experiencePanelTitle = '';
   private writingsFilter: 'all' | 'uxsc' | 'sinergia' | 'guest' = 'all';
+  /** Writings “See all” — single-section list before reader detail. */
+  private writingsSectionFocus: string | null = null;
   private activeTalkId: string | null = null;
   private activeWriting: { sectionId: string; itemId: string } | null = null;
   private previewEl: HTMLElement | null = null;
@@ -500,8 +502,17 @@ export class BuildingPanel {
 
   private onExperienceBack(): void {
     if (!this.isExperienceMode()) return;
-    if (this.experienceView === 'detail') this.setExperienceView('list');
-    else this.salir();
+    if (this.experienceView === 'detail') {
+      this.setExperienceView('list');
+      return;
+    }
+    if (this.mode === 'writings' && this.writingsSectionFocus) {
+      this.writingsSectionFocus = null;
+      this.renderWritingsList();
+      this.syncExperienceBackButton();
+      return;
+    }
+    this.salir();
   }
 
   private closePreview(): void {
@@ -562,6 +573,7 @@ export class BuildingPanel {
     this.mode = mode;
     this.interiorId = interiorId;
     this.writingsFilter = 'all';
+    this.writingsSectionFocus = null;
     this.activeTalkId = null;
     this.activeWriting = null;
     this.peekOnly = this.isMobile();
@@ -662,7 +674,11 @@ export class BuildingPanel {
     }
     const back = this.el.querySelector('[data-exp-back]') as HTMLElement | null;
     const expand = this.el.querySelector('[data-exp-expand]') as HTMLElement | null;
-    if (back) back.hidden = this.isMobile() && view === 'list';
+    if (back) {
+      const showWritingsSection =
+        this.mode === 'writings' && view === 'list' && !!this.writingsSectionFocus;
+      back.hidden = this.isMobile() && view === 'list' && !showWritingsSection;
+    }
     if (expand) expand.hidden = this.isMobile();
     this.el.classList.toggle('building-panel--exp-list', view === 'list');
     this.el.classList.toggle('building-panel--exp-detail', view === 'detail');
@@ -670,6 +686,7 @@ export class BuildingPanel {
     if (view === 'list') {
       this.activeTalkId = null;
       this.activeWriting = null;
+      this.writingsSectionFocus = null;
       if (this.experienceDetail) this.experienceDetail.replaceChildren();
       if (this.mode === 'talks') this.renderTalksList();
       else this.renderWritingsList();
@@ -829,6 +846,7 @@ export class BuildingPanel {
           e.stopPropagation();
           if (this.writingsFilter === id) return;
           this.writingsFilter = id;
+          this.writingsSectionFocus = null;
           this.renderWritingsFilters();
           this.renderWritingsList();
         });
@@ -837,12 +855,25 @@ export class BuildingPanel {
     );
   }
 
+  private syncExperienceBackButton(): void {
+    const back = this.el.querySelector('[data-exp-back]') as HTMLElement | null;
+    if (!back) return;
+    const showWritingsSection =
+      this.mode === 'writings' &&
+      this.experienceView === 'list' &&
+      !!this.writingsSectionFocus;
+    back.hidden = this.isMobile() && this.experienceView === 'list' && !showWritingsSection;
+  }
+
   private renderWritingsList(): void {
     if (!this.experienceList) return;
-    const sections =
+    let sections =
       this.writingsFilter === 'all'
         ? WRITINGS
         : WRITINGS.filter((s) => s.id === this.writingsFilter);
+    if (this.writingsSectionFocus) {
+      sections = WRITINGS.filter((s) => s.id === this.writingsSectionFocus);
+    }
     const frag = document.createDocumentFragment();
     const rowLimit: Record<string, number> = { uxsc: 3, sinergia: 2, guest: 2 };
     let firstSection = true;
@@ -853,7 +884,12 @@ export class BuildingPanel {
         frag.appendChild(divider);
       }
       firstSection = false;
-      const limit = rowLimit[section.id] ?? 3;
+      const previewLimit = rowLimit[section.id] ?? 3;
+      const truncated = section.items.length > previewLimit;
+      const showAll =
+        this.writingsSectionFocus === section.id || this.writingsFilter === section.id;
+      const visibleItems =
+        showAll || !truncated ? section.items : section.items.slice(0, previewLimit);
       const block = document.createElement('div');
       block.className = 'experience__section';
       const head = document.createElement('div');
@@ -865,11 +901,19 @@ export class BuildingPanel {
       h.textContent = t(section.titleKey as I18nKey);
       const badge = document.createElement('span');
       badge.className = 'experience__section-count';
-      badge.textContent = String(section.items.length);
+      badge.textContent = String(visibleItems.length);
       const seeAll = document.createElement('button');
       seeAll.type = 'button';
       seeAll.className = 'experience__see-all';
       seeAll.textContent = t('writings.seeAll');
+      seeAll.hidden = this.writingsSectionFocus === section.id;
+      seeAll.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.writingsSectionFocus = section.id;
+        this.renderWritingsList();
+        this.syncExperienceBackButton();
+      });
       const spacer = document.createElement('div');
       spacer.className = 'experience__section-spacer';
       spacer.setAttribute('aria-hidden', 'true');
@@ -879,12 +923,13 @@ export class BuildingPanel {
       p.textContent = t(section.descKey as I18nKey);
       head.append(row, p);
       block.appendChild(head);
-      for (const item of section.items.slice(0, limit)) {
+      for (const item of visibleItems) {
         block.appendChild(this.writingRow(item, section));
       }
       frag.appendChild(block);
     }
     this.experienceList.replaceChildren(frag);
+    this.syncExperienceBackButton();
   }
 
   private openWriting(section: WritingSection, item: TalkItem): void {

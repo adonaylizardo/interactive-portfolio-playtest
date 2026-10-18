@@ -516,6 +516,12 @@ body[data-interior='1'] .chrome__column {
   z-index: 5;
 }
 
+@media (min-width: 768px) {
+  .chrome__lang {
+    z-index: 18;
+  }
+}
+
 /* Lang sits above the map checklist pill (z-index 14) on phone map dock. */
 .chrome--mobile.chrome--dock {
   z-index: 16;
