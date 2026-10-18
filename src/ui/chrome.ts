@@ -375,9 +375,7 @@ export class ChromeUI {
     this.root.querySelectorAll('[data-action="search"]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
-        if (this.mobile) this.setLayout('split');
-        else this.setLayout('split');
-        this.scrollTo('#chrome-casos');
+        this.openSearch();
       });
     });
     this.root.querySelectorAll('[data-action="download"]').forEach((btn) => {
@@ -471,6 +469,12 @@ export class ChromeUI {
 
   private scrollTo(sel: string): void {
     this.root.querySelector(sel)?.scrollIntoView({ block: 'start' });
+  }
+
+  /** Stub until content-branch site search wires in here. */
+  openSearch(): void {
+    this.setLayout('split');
+    this.scrollTo('#chrome-casos');
   }
 
   private openContact(): void {

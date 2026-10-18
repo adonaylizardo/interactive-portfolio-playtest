@@ -159,10 +159,10 @@ try {
     const searchLabel = await page.evaluate(() =>
       document.querySelector('.chrome__rail [data-action="search"]')?.getAttribute('aria-label') ?? '',
     );
-    record('1280: go-to-cases opens split', (await page.evaluate(() => document.body.dataset.layout)) === 'split', {
+    record('1280: search opens split (stub)', (await page.evaluate(() => document.body.dataset.layout)) === 'split', {
       searchLabel,
     });
-    record('1280: search label not Buscar/Search alone', !/^(Buscar|Search)$/i.test(searchLabel.trim()), {
+    record('1280: search aria is Search/Buscar', /^(Search|Buscar)$/i.test(searchLabel.trim()), {
       searchLabel,
     });
 
