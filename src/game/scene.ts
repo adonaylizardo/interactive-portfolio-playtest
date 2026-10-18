@@ -1416,9 +1416,15 @@ export class IsoScene {
     }
     const yaw = this.cameraYawQuarter() * (Math.PI / 2);
     if (this.viewMode === 'cenital') {
-      this.viewRot = yaw + CENITAL_VIEW_TILT;
-      this.viewSx = 1;
-      this.viewSy = CENITAL_VIEW_SY;
+      if (this.mapOverview) {
+        this.viewRot = yaw;
+        this.viewSx = 1;
+        this.viewSy = 1;
+      } else {
+        this.viewRot = yaw + CENITAL_VIEW_TILT;
+        this.viewSx = 1;
+        this.viewSy = CENITAL_VIEW_SY;
+      }
     } else {
       this.viewRot = yaw;
       this.viewSx = 1;
@@ -1460,18 +1466,20 @@ export class IsoScene {
     );
   }
 
+  /** Map AABB in canvas pixels (view rot / cenital scale applied). */
   private mapScreenRectOnCanvas(): { left: number; top: number; right: number; bottom: number } {
-    const pts = [
-      tileToWorld(0, 0),
-      tileToWorld(MAP_WIDTH - 1, 0),
-      tileToWorld(0, MAP_HEIGHT - 1),
-      tileToWorld(MAP_WIDTH - 1, MAP_HEIGHT - 1),
+    const b = mapWorldBounds();
+    const corners = [
+      { x: b.minX, y: b.minY },
+      { x: b.maxX, y: b.minY },
+      { x: b.minX, y: b.maxY },
+      { x: b.maxX, y: b.maxY },
     ];
     let left = Infinity;
     let right = -Infinity;
     let top = Infinity;
     let bottom = -Infinity;
-    for (const p of pts) {
+    for (const p of corners) {
       const s = this.worldToScreen(p.x, p.y);
       if (s.x < left) left = s.x;
       if (s.x > right) right = s.x;
@@ -1481,19 +1489,7 @@ export class IsoScene {
     return { left, top, right, bottom };
   }
 
-  private overviewFillFraction(): { covW: number; covH: number } {
-    const sw = this.app.screen.width;
-    const sh = this.app.screen.height;
-    const m = cameraFitMargins();
-    const freeW = Math.max(1, sw - m.left - m.right);
-    const freeH = Math.max(1, sh - m.top - m.bottom);
-    const r = this.mapScreenRectOnCanvas();
-    const iw = Math.max(0, Math.min(m.left + freeW, r.right) - Math.max(m.left, r.left));
-    const ih = Math.max(0, Math.min(m.top + freeH, r.bottom) - Math.max(m.top, r.top));
-    return { covW: iw / freeW, covH: ih / freeH };
-  }
-
-  private mapFitsOverviewMargins(): boolean {
+  private overviewFitMargins(): { ml: number; mr: number; mt: number; mb: number; freeW: number; freeH: number } {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     const m = cameraFitMargins();
@@ -1501,59 +1497,61 @@ export class IsoScene {
     const mr = Math.max(MAP_FIT_MARGIN_PX, m.right);
     const mt = Math.max(MAP_FIT_MARGIN_PX, m.top);
     const mb = Math.max(MAP_FIT_MARGIN_PX, m.bottom);
+    return {
+      ml,
+      mr,
+      mt,
+      mb,
+      freeW: Math.max(1, sw - ml - mr),
+      freeH: Math.max(1, sh - mt - mb),
+    };
+  }
+
+  private overviewFillFraction(): { covW: number; covH: number } {
+    const { ml, mt, freeW, freeH } = this.overviewFitMargins();
     const r = this.mapScreenRectOnCanvas();
-    return r.left >= ml - 2 && r.right <= sw - mr + 2 && r.top >= mt - 2 && r.bottom <= sh - mb + 2;
+    const iw = Math.max(0, Math.min(ml + freeW, r.right) - Math.max(ml, r.left));
+    const ih = Math.max(0, Math.min(mt + freeH, r.bottom) - Math.max(mt, r.top));
+    return { covW: iw / freeW, covH: ih / freeH };
+  }
+
+  /** Entire map stays inside chrome-aware free rect (no crop). */
+  private mapFullyInFreeRect(): boolean {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const { ml, mr, mt, mb } = this.overviewFitMargins();
+    const r = this.mapScreenRectOnCanvas();
+    return (
+      r.left >= ml - 2.5 &&
+      r.right <= sw - mr + 2.5 &&
+      r.top >= mt - 2.5 &&
+      r.bottom <= sh - mb + 2.5
+    );
   }
 
   private frameMapOverview(): void {
-    const sw = this.app.screen.width;
-    const sh = this.app.screen.height;
     this.updateCameraFitMargins();
     this.syncViewTransform();
     const b = mapWorldBounds();
     const aim = this.freeRectCenter();
     const wx = (b.minX + b.maxX) / 2;
     const wy = (b.minY + b.maxY) / 2;
-    const zMin = this.zoomMinForCurrentView(sw, sh);
-    let zoom = zMin;
-    let best = { zoom: zMin, cameraX: this.cameraX, cameraY: this.cameraY, score: 0 };
-    for (let i = 0; i < 56; i++) {
-      this.zoom = clampZoom(zoom, sw, sh);
+    const { freeW, freeH } = this.overviewFitMargins();
+    const zFloor = zoomMinForView(this.viewRot, this.viewSx, this.viewSy, freeW, freeH);
+    let lo = zFloor * 0.98;
+    let hi = zFloor * 1.35;
+    const applyAtZoom = (zoom: number) => {
+      this.zoom = Math.min(1.5, Math.max(zFloor * 0.96, zoom));
       this.placeWorldAtScreen(wx, wy, aim.x, aim.y);
       this.applyCamera(false);
-      if (!this.mapFitsOverviewMargins()) {
-        zoom *= 0.965;
-        if (zoom < zMin * 0.82) break;
-        continue;
-      }
-      const cov = this.overviewFillFraction();
-      const score = Math.min(cov.covW, cov.covH);
-      if (score >= best.score) {
-        best = { zoom: this.zoom, cameraX: this.cameraX, cameraY: this.cameraY, score };
-      }
-      const goal = sh < 500 && sw > sh ? 0.8 : 0.85;
-      if (score >= goal) break;
-      const zoomCap = sh < 500 && sw > sh ? 4.8 : 3.2;
-      if (this.zoom >= clampZoom(zMin * zoomCap, sw, sh) - 1e-4) break;
-      zoom *= sh < 500 && sw > sh ? 1.04 : 1.022;
+    };
+    for (let i = 0; i < 52; i++) {
+      const mid = (lo + hi) / 2;
+      applyAtZoom(mid);
+      if (this.mapFullyInFreeRect()) lo = mid;
+      else hi = mid;
     }
-    if (best.score < 0.05) {
-      this.zoom = zMin;
-      this.placeWorldAtScreen(wx, wy, aim.x, aim.y);
-      const fitted = clampPanMapFullyInView(
-        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
-        sw,
-        sh,
-      );
-      this.cameraX = fitted.cameraX;
-      this.cameraY = fitted.cameraY;
-      this.zoom = fitted.zoom;
-    } else {
-      this.zoom = best.zoom;
-      this.cameraX = best.cameraX;
-      this.cameraY = best.cameraY;
-    }
-    this.applyCamera(false);
+    applyAtZoom(lo);
   }
 
   private leaveMapOverview(opts?: { restorePan?: boolean }): void {
@@ -2216,7 +2214,7 @@ export class IsoScene {
       right = Math.max(right, chromeInsets.right);
       bottom = Math.max(bottom, chromeInsets.bottom);
     }
-    if (this.jac && (this.jac.mode === 'info' || this.jac.mode === 'drive')) {
+    if (this.jac && (this.jac.mode === 'info' || this.jac.mode === 'drive') && !this.mapOverview) {
       const phone = this.app.screen.width <= 767;
       bottom = Math.max(bottom, phone ? (this.jac.mode === 'info' ? 320 : 80) : 180);
       if (this.jac.rearCam) top = Math.max(top, phone ? 140 : 160);
@@ -2324,9 +2322,8 @@ export class IsoScene {
         this.zoom = Math.min(1.5, Math.max(zFloor, this.zoom));
       }
       const zMin = zoomMinForViewport(sw, sh);
-      // Only the map-overview button may snap to a full-map fit. Doing it whenever
-      // zoom ≈ zMin undoes Center / Rotate and keeps overview framing after leaving it.
-      if (this.mapOverview && this.identityView() && this.zoom <= zMin + 0.001) {
+      // Snap to full-map fit at min zoom (overview uses frameMapOverview + view-aware bounds).
+      if (!this.mapOverview && this.identityView() && this.zoom <= zMin + 0.001) {
         const fitted = clampPanMapFullyInView(
           { cameraX: this.cameraX, cameraY: this.cameraY, zoom: zMin },
           sw,
@@ -5682,9 +5679,12 @@ export class IsoScene {
     const zMin = this.zoomMinForCurrentView(sw, sh);
     const midZoom = this.zoom >= zMin * 0.55 && !this.mapOverview;
     const onScreen = (sx: number, sy: number) => sx > -60 && sy > -60 && sx < sw + 60 && sy < sh + 60;
+    const overviewLandmarks = ['catedral', 'flor', 'sambil', 'estudio'];
     const out: { id: string; name: string; x: number; y: number; visible: boolean }[] = [];
     for (const o of objects) {
       if (o.type !== 'building' || !o.panelTitle) continue;
+      const id = o.name ?? o.id;
+      if (this.mapOverview && !overviewLandmarks.includes(id)) continue;
       const fx = o.footprintX ?? o.x;
       const fy = o.footprintY ?? o.y;
       const w = o.w ?? 1;
@@ -5694,12 +5694,23 @@ export class IsoScene {
       const cx = (rect?.left ?? 0) + s.x;
       const cy = (rect?.top ?? 0) + s.y;
       out.push({
-        id: o.name ?? o.id,
+        id,
         name: o.panelTitle,
         x: cx,
         y: cy,
-        visible: midZoom && onScreen(s.x, s.y),
+        visible: (midZoom || this.mapOverview) && onScreen(s.x, s.y),
       });
+    }
+    if (this.mapOverview && out.length > 1) {
+      const priority = new Map(overviewLandmarks.map((id, i) => [id, i]));
+      out.sort((a, b) => (priority.get(a.id) ?? 99) - (priority.get(b.id) ?? 99));
+      const kept: typeof out = [];
+      for (const t of out) {
+        const clash = kept.some((k) => Math.hypot(k.x - t.x, k.y - t.y) < 52);
+        if (!clash) kept.push(t);
+        else t.visible = false;
+      }
+      return out;
     }
     return out;
   }
@@ -5722,10 +5733,28 @@ export class IsoScene {
   }
 
   /** QA: map fill fraction in the viewport while overview is active. */
-  qaOverviewCoverage(): { covW: number; covH: number; overview: boolean } {
+  qaOverviewCoverage(): {
+    covW: number;
+    covH: number;
+    overview: boolean;
+    limitingAxis: 'width' | 'height';
+    limitingFill: number;
+    mapFullyVisible: boolean;
+    targetFill: number;
+  } {
     this.applyCamera(false);
     const cov = this.overviewFillFraction();
-    return { covW: cov.covW, covH: cov.covH, overview: this.mapOverview };
+    const limitingAxis: 'width' | 'height' = cov.covW >= cov.covH - 1e-6 ? 'width' : 'height';
+    const limitingFill = limitingAxis === 'width' ? cov.covW : cov.covH;
+    return {
+      covW: cov.covW,
+      covH: cov.covH,
+      overview: this.mapOverview,
+      limitingAxis,
+      limitingFill,
+      mapFullyVisible: this.mapFullyInFreeRect(),
+      targetFill: 0.9,
+    };
   }
 
   /** QA: opaque-top client point vs the HTML pill's bottom (gap should stay ~NAME_PILL_GAP_PX). */

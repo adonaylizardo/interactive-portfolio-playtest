@@ -123,6 +123,8 @@
   box-sizing: border-box;
   width: 36px;
   height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   padding: 0;
   border: 1px solid #2a2c31;
   border-radius: 20px;
@@ -843,9 +845,17 @@ body[data-layout='panel'] #game-canvas {
   display: none;
 }
 
-.chrome--dock .chrome__view-btns [data-view='rotate'],
+.chrome--dock .chrome__view-btns [data-view='rotate'] {
+  display: none;
+}
+
 .chrome--dock .chrome__view-btns [data-view='map'] {
   display: none;
+}
+
+/* Phone dock: show map/overview control in cenital (≥44px via media query below). */
+.chrome--dock.chrome--alt-view .chrome__view-btns [data-view='map'] {
+  display: inline-flex;
 }
 
 .chrome--dock .chrome__view-btns {
@@ -867,6 +877,16 @@ body[data-layout='panel'] #game-canvas {
   visibility: visible;
   bottom: 24px;
   top: auto;
+}
+
+@media (max-width: 900px), (pointer: coarse) {
+  .chrome__view-btns .ui-view[data-view='map'],
+  .chrome__view-btns .ui-view {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 
 @media (max-height: 500px) and (orientation: landscape) {

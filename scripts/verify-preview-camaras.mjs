@@ -295,12 +295,29 @@ async function runViewport(tag, options) {
     if (cen.altView !== 'cenital') errors.push(`${tag}: altView ${cen.altView}`);
     await page.screenshot({ path: path.join(OUT, `${tag}-cenital.png`) });
 
+    if (touch) {
+      const mapBtn = page.locator('.ui-view[data-view="map"]').first();
+      const box = await mapBtn.boundingBox();
+      if (!box) errors.push(`${tag}: map button missing`);
+      else if (box.width < 44 || box.height < 44) {
+        errors.push(`${tag}: map button ${box.width.toFixed(0)}×${box.height.toFixed(0)} (<44px)`);
+      }
+    }
+
     await page.evaluate(() => window.__playtestQa.toggleMapOverview?.());
     await wait(350);
     const overview = await page.evaluate(() => window.__playtestQa.overviewCoverage?.());
     notes.push(`${tag}: overview coverage ${JSON.stringify(overview)}`);
-    const minCov = Math.min(overview?.covW ?? 0, overview?.covH ?? 0);
-    notes.push(`${tag}: overview limiting dim ${(minCov * 100).toFixed(1)}% (goal ≥85%)`);
+    const fill = overview?.limitingFill ?? Math.min(overview?.covW ?? 0, overview?.covH ?? 0);
+    const axis = overview?.limitingAxis ?? 'min';
+    notes.push(
+      `${tag}: overview limiting ${axis} ${(fill * 100).toFixed(1)}% (goal ≥90%, mapFullyVisible=${overview?.mapFullyVisible ?? '?'})`,
+    );
+    if (fill < 0.9) errors.push(`${tag}: overview limiting ${axis} fill ${(fill * 100).toFixed(1)}% < 90%`);
+    if (overview?.mapFullyVisible === false) errors.push(`${tag}: overview cropped map`);
+    await page.evaluate(() => window.__playtestQa.cenitalBuildingLabels?.());
+    const labels = await page.evaluate(() => window.__playtestQa.cenitalBuildingLabels?.());
+    if ((labels?.overlaps ?? 0) > 0) errors.push(`${tag}: cenital label overlaps ${labels.overlaps}`);
     await page.screenshot({ path: path.join(OUT, `${tag}-overview.png`) });
     await page.evaluate(() => window.__playtestQa.toggleMapOverview?.());
     await wait(200);
@@ -481,6 +498,7 @@ async function runViewport(tag, options) {
 const results = [];
 for (const [tag, opts] of [
   ['390', { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' }],
+  ['844x390', { viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' }],
   ['1280', { viewport: { width: 1280, height: 800 } }],
 ]) {
   results.push(await runViewport(tag, opts));

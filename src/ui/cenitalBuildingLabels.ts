@@ -53,10 +53,26 @@ export class CenitalBuildingLabels {
     }
   }
 
-  qa(): { count: number; visible: number } {
+  qa(): { count: number; visible: number; overlaps: number } {
     let visible = 0;
-    for (const pill of this.pills.values()) if (!pill.hidden) visible += 1;
-    return { count: this.pills.size, visible };
+    const boxes: { x: number; y: number; w: number; h: number }[] = [];
+    for (const pill of this.pills.values()) {
+      if (pill.hidden) continue;
+      visible += 1;
+      const r = pill.getBoundingClientRect();
+      boxes.push({ x: r.left, y: r.top, w: r.width, h: r.height });
+    }
+    let overlaps = 0;
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i];
+        const b = boxes[j];
+        const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+        const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+        if (ox > 4 && oy > 4) overlaps += 1;
+      }
+    }
+    return { count: this.pills.size, visible, overlaps };
   }
 }
 
