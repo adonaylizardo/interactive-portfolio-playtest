@@ -64,6 +64,8 @@ const DICT = {
     'persona.cam.label': 'Camera',
     'persona.cam.cenital': 'Top-down',
     'persona.cam.thirdPerson': 'Third person',
+    'persona.cam.switchingToThird': 'Switching to third person',
+    'persona.cam.switchingToCenital': 'Switching to top-down',
 
     'canvas.label': 'Isometric playtest world',
 
@@ -169,6 +171,8 @@ const DICT = {
     'persona.cam.label': 'Cámara',
     'persona.cam.cenital': 'Cenital',
     'persona.cam.thirdPerson': 'Tercera persona',
+    'persona.cam.switchingToThird': 'Cambiando a Tercera persona',
+    'persona.cam.switchingToCenital': 'Cambiando a Cenital',
 
     'canvas.label': 'Mundo isométrico de prueba',
 

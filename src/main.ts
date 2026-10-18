@@ -263,7 +263,7 @@ async function main(): Promise<void> {
   await scene.init(canvas);
   personaKit = new PersonaKitUI(uiRoot, {
     getViewMode: () => scene.getViewMode().mode,
-    setViewMode: (mode) => scene.setViewMode(mode),
+    switchView: (mode) => scene.setViewModeWhenReady(mode),
   });
   if (personaEnabled()) {
     scene.setViewMode('cenital');

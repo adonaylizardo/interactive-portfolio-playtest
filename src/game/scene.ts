@@ -1699,6 +1699,30 @@ export class IsoScene {
     this.applyBillboards();
   }
 
+  /** Persona kit: switch cenital ↔ persona and wait until the new view has painted. */
+  async setViewModeWhenReady(mode: Camera): Promise<void> {
+    if (this.interiorActive) return;
+    if (mode !== 'cenital' && mode !== 'persona') {
+      this.setViewMode(mode);
+      return;
+    }
+    if (!personaEnabled()) {
+      this.setViewMode(mode);
+      return;
+    }
+    if (this.viewMode === mode) return;
+    this.setViewMode(mode);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (mode === 'persona') {
+      await this.persona.ensureLoaded(dpr);
+      await this.qaFlushPersonaView();
+      return;
+    }
+    this.syncAltView();
+    this.applyCamera(false);
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  }
+
   rotateView(): void {
     if (this.interiorActive) return;
     if (this.personaOn()) {

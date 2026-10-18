@@ -172,6 +172,8 @@ body.is-canvas-dragging * {
 
 #ui-root > .persona-kit,
 #ui-root > .persona-kit .persona-kit__card,
+#ui-root > .persona-kit .persona-kit__cam-load,
+#ui-root > .persona-kit .persona-kit__cam-load-pill,
 #ui-root > .persona-kit .persona-kit__cam,
 #ui-root > .persona-kit .persona-kit__help,
 #ui-root > .persona-kit .persona-kit__lang,
@@ -3074,6 +3076,87 @@ body.persona-kit .persona-kit__cam-opt {
 body.persona-kit .persona-kit__cam-opt.is-active {
   background: #edeef0;
   color: #0b0c0e;
+}
+
+body.persona-kit .persona-kit__cam-opt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+body.persona-kit .persona-kit__cam-opt-spin {
+  display: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(138, 143, 152, 0.35);
+  border-top-color: #8a8f98;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: persona-kit-spin 0.75s linear infinite;
+}
+
+body.persona-kit .persona-kit__cam-opt-spin.is-on {
+  display: block;
+}
+
+body.persona-kit .persona-kit__cam.is-switching .persona-kit__cam-opt.is-pending {
+  background: #edeef0;
+  color: #0b0c0e;
+}
+
+body.persona-kit .persona-kit__cam.is-switching .persona-kit__cam-opt.is-pending.is-active {
+  background: transparent;
+  color: #8a8f98;
+}
+
+body.persona-kit .persona-kit__cam-load {
+  position: fixed;
+  inset: 0;
+  z-index: 132;
+  pointer-events: auto;
+}
+
+body.persona-kit .persona-kit__cam-load-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(11, 12, 14, 0.5);
+  pointer-events: none;
+}
+
+body.persona-kit .persona-kit__cam-load-pill {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(calc(100vw - 32px), 420px);
+  padding: 12px 20px;
+  border: 1px solid #2a2c31;
+  border-radius: 999px;
+  background: rgba(20, 21, 24, 0.92);
+  color: #edeef0;
+  font: 500 15px/1.25 Geist, system-ui, sans-serif;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+body.persona-kit .persona-kit__cam-load-spin {
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(138, 143, 152, 0.25);
+  border-top-color: #ffb547;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: persona-kit-spin 0.8s linear infinite;
+}
+
+@keyframes persona-kit-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 body.persona-kit .persona-kit__lang,

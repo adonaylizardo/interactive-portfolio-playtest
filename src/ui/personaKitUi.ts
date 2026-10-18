@@ -8,22 +8,28 @@ const STORAGE_KEY = 'portfolio-persona-controls-v1';
 
 export type PersonaKitCallbacks = {
   getViewMode: () => Camera;
-  setViewMode: (mode: Camera) => void;
+  switchView: (mode: Camera) => Promise<void>;
 };
 
 export class PersonaKitUI {
   readonly root: HTMLElement;
   private overlay: HTMLElement;
   private camSwitch: HTMLElement;
+  private camLoad: HTMLElement;
+  private camLoadLabel: HTMLElement;
   private helpBtn: HTMLButtonElement;
   private langBtn: HTMLButtonElement;
   private callbacks: PersonaKitCallbacks;
+  private switching = false;
+  private showLoadRaf = 0;
 
   constructor(container: HTMLElement, callbacks: PersonaKitCallbacks) {
     if (!personaEnabled()) {
       this.root = document.createElement('div');
       this.overlay = this.root;
       this.camSwitch = this.root;
+      this.camLoad = this.root;
+      this.camLoadLabel = this.root;
       this.helpBtn = document.createElement('button');
       this.langBtn = document.createElement('button');
       this.callbacks = callbacks;
@@ -61,9 +67,22 @@ export class PersonaKitUI {
           <button type="button" class="persona-kit__primary" data-persona-close data-i18n="persona.controls.understood"></button>
         </div>
       </div>
+      <div class="persona-kit__cam-load" data-cam-load hidden inert>
+        <div class="persona-kit__cam-load-dim" aria-hidden="true"></div>
+        <div class="persona-kit__cam-load-pill" role="status" aria-live="polite">
+          <span class="persona-kit__cam-load-spin" aria-hidden="true"></span>
+          <span data-cam-load-label></span>
+        </div>
+      </div>
       <div class="persona-kit__cam" role="tablist" aria-label="">
-        <button type="button" class="persona-kit__cam-opt" role="tab" data-cam="cenital"></button>
-        <button type="button" class="persona-kit__cam-opt" role="tab" data-cam="persona"></button>
+        <button type="button" class="persona-kit__cam-opt" role="tab" data-cam="cenital">
+          <span class="persona-kit__cam-opt-spin" aria-hidden="true"></span>
+          <span class="persona-kit__cam-opt-label"></span>
+        </button>
+        <button type="button" class="persona-kit__cam-opt" role="tab" data-cam="persona">
+          <span class="persona-kit__cam-opt-spin" aria-hidden="true"></span>
+          <span class="persona-kit__cam-opt-label"></span>
+        </button>
       </div>
       <button type="button" class="persona-kit__icon-btn persona-kit__help" data-persona-help aria-label="">
         ${iconSvg('info', 18)}
@@ -72,6 +91,8 @@ export class PersonaKitUI {
     `;
     container.appendChild(this.root);
     this.overlay = this.root.querySelector('[data-persona-overlay]')!;
+    this.camLoad = this.root.querySelector('[data-cam-load]')!;
+    this.camLoadLabel = this.root.querySelector('[data-cam-load-label]')!;
     this.camSwitch = this.root.querySelector('.persona-kit__cam')!;
     this.helpBtn = this.root.querySelector('[data-persona-help]')!;
     this.langBtn = this.root.querySelector('[data-persona-lang]')!;
@@ -92,10 +113,73 @@ export class PersonaKitUI {
     this.camSwitch.querySelectorAll('[data-cam]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const mode = (btn as HTMLElement).dataset.cam as Camera;
-        if (mode === 'cenital' || mode === 'persona') this.callbacks.setViewMode(mode);
-        this.syncCameraSwitch();
+        if (mode === 'cenital' || mode === 'persona') void this.requestCam(mode);
       });
     });
+  }
+
+  private switchingLabel(target: 'cenital' | 'persona'): string {
+    return target === 'persona' ? t('persona.cam.switchingToThird') : t('persona.cam.switchingToCenital');
+  }
+
+  private lockCamWidths(): void {
+    this.camSwitch.querySelectorAll('[data-cam]').forEach((btn) => {
+      const w = (btn as HTMLElement).getBoundingClientRect().width;
+      if (w > 0) (btn as HTMLElement).style.minWidth = `${Math.ceil(w)}px`;
+    });
+  }
+
+  private clearCamWidthLock(): void {
+    this.camSwitch.querySelectorAll('[data-cam]').forEach((btn) => {
+      (btn as HTMLElement).style.minWidth = '';
+    });
+  }
+
+  private showCamLoading(target: 'cenital' | 'persona'): void {
+    this.camLoadLabel.textContent = this.switchingLabel(target);
+    this.camLoad.hidden = false;
+    this.camLoad.removeAttribute('inert');
+    this.camSwitch.classList.add('is-switching');
+    this.camSwitch.dataset.switchTo = target;
+    this.camSwitch.querySelectorAll('[data-cam]').forEach((btn) => {
+      const el = btn as HTMLElement;
+      const pending = el.dataset.cam === target;
+      el.classList.toggle('is-pending', pending);
+      el.querySelector('.persona-kit__cam-opt-spin')?.classList.toggle('is-on', pending);
+    });
+  }
+
+  private hideCamLoading(): void {
+    this.camLoad.hidden = true;
+    this.camLoad.setAttribute('inert', '');
+    this.camSwitch.classList.remove('is-switching');
+    delete this.camSwitch.dataset.switchTo;
+    this.camSwitch.querySelectorAll('[data-cam]').forEach((btn) => {
+      btn.classList.remove('is-pending');
+      btn.querySelector('.persona-kit__cam-opt-spin')?.classList.remove('is-on');
+    });
+    this.clearCamWidthLock();
+  }
+
+  private async requestCam(mode: 'cenital' | 'persona'): Promise<void> {
+    if (this.switching) return;
+    if (this.callbacks.getViewMode() === mode) return;
+    this.switching = true;
+    this.lockCamWidths();
+    let shown = false;
+    this.showLoadRaf = requestAnimationFrame(() => {
+      if (!this.switching) return;
+      this.showCamLoading(mode);
+      shown = true;
+    });
+    try {
+      await this.callbacks.switchView(mode);
+    } finally {
+      cancelAnimationFrame(this.showLoadRaf);
+      if (shown) this.hideCamLoading();
+      this.switching = false;
+      this.syncCameraSwitch();
+    }
   }
 
   private applyI18n(): void {
@@ -106,10 +190,15 @@ export class PersonaKitUI {
     this.camSwitch.setAttribute('aria-label', t('persona.cam.label'));
     const cen = this.camSwitch.querySelector('[data-cam="cenital"]')!;
     const tp = this.camSwitch.querySelector('[data-cam="persona"]')!;
-    cen.textContent = t('persona.cam.cenital');
-    tp.textContent = t('persona.cam.thirdPerson');
+    cen.querySelector('.persona-kit__cam-opt-label')!.textContent = t('persona.cam.cenital');
+    tp.querySelector('.persona-kit__cam-opt-label')!.textContent = t('persona.cam.thirdPerson');
     cen.setAttribute('aria-label', t('persona.cam.cenital'));
     tp.setAttribute('aria-label', t('persona.cam.thirdPerson'));
+    if (this.switching && this.camSwitch.dataset.switchTo) {
+      this.camLoadLabel.textContent = this.switchingLabel(
+        this.camSwitch.dataset.switchTo as 'cenital' | 'persona',
+      );
+    }
     this.helpBtn.setAttribute('aria-label', t('persona.controls.title'));
     this.root.querySelectorAll('[data-persona-close]').forEach((el) => {
       if (el.classList.contains('persona-kit__close')) {
@@ -131,7 +220,7 @@ export class PersonaKitUI {
   }
 
   syncCameraSwitch(): void {
-    if (!personaEnabled()) return;
+    if (!personaEnabled() || this.switching) return;
     const mode = this.callbacks.getViewMode();
     this.camSwitch.querySelectorAll('[data-cam]').forEach((btn) => {
       const on = (btn as HTMLElement).dataset.cam === mode;
