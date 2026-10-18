@@ -4068,6 +4068,11 @@ export class IsoScene {
             x: this.cameraX,
             y: this.cameraY,
             zoom: this.zoom,
+            jacX: this.jac?.cx,
+            jacY: this.jac?.cy,
+            jacDir: this.jac?.dir,
+            charX: this.charTx,
+            charY: this.charTy,
           });
         }
         this.outdoorCamBeforeInterior = null;
@@ -4442,8 +4447,16 @@ export class IsoScene {
       this.retryDriveEnterOrGetOut();
       return;
     }
-    if (arrived && leftSpawn && slow && traveled) {
+    if (arrived && leftSpawn && slow) {
       this.jac.sitWhy = `arrived sit=(${sit?.x},${sit?.y}) d=${distSit.toFixed(2)} mph=${this.jac.mph}`;
+      this.jacGetOut({ thenEnter: true });
+      return;
+    }
+    const stalled = this.jac.mph < 1.2 && pathLeft === 0;
+    const nearSit = distSit <= 2.15;
+    const nearDoor = along >= 0 && distDoor <= 5.5;
+    if (stalled && leftSpawn && (nearSit || nearDoor)) {
+      this.jac.sitWhy = `approach sitD=${distSit.toFixed(2)} doorD=${distDoor.toFixed(2)}`;
       this.jacGetOut({ thenEnter: true });
       return;
     }
@@ -4460,7 +4473,7 @@ export class IsoScene {
     if (this.jac.mph < 0.8 && distSit > 2.5 && pathLeft === 0) {
       this.jac.unstickIfStopped();
     }
-    if (idle && this.jac.mph < 1.2) {
+    if (stalled || (idle && this.jac.mph < 1.2)) {
       this.retryDriveEnterOrGetOut();
     }
   }

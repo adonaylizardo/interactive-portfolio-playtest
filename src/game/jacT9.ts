@@ -212,6 +212,13 @@ function buildPropCells(): { all: Set<string>; hard: Set<string> } {
         const key = k(fx + dx, fy + dy);
         all.add(key);
         if (HARD_PROP_NAMES.has(o.name)) hard.add(key);
+        if (o.name === 'tree') {
+          for (const [adx, ady] of CARDINALS) {
+            const pit = k(fx + dx + adx, fy + dy + ady);
+            all.add(pit);
+            hard.add(pit);
+          }
+        }
       }
     }
   }
@@ -1115,14 +1122,7 @@ export class JacT9 {
 
   /** Parked 5×3 / 3×5 plus the 1.6× sprite — used to pick a sit, never the live 2×2 drive box. */
   private parkSitOk(cx: number, cy: number, dir: FacingDir): boolean {
-    const size = parkSize(dir);
-    return (
-      this.driveBoxWalkable(cx, cy) &&
-      this.footprintClear(cx, cy, size.w, size.h) &&
-      this.spriteFootprintClear(cx, cy, dir) &&
-      this.visualSpriteClear(cx, cy, dir) &&
-      !this.sitOverlapsBuilding(cx, cy, dir)
-    );
+    return this.driveBoxWalkable(cx, cy) && !this.hullOverlapsWorld(cx, cy, dir);
   }
 
   private sitOverlapsBuilding(cx: number, cy: number, dir: FacingDir): boolean {
@@ -1262,6 +1262,29 @@ export class JacT9 {
     return this.rect(o.x, o.y, size.w, size.h);
   }
 
+  /** Parked AABB. Tree pits are already expanded in PROP_CELLS. */
+  private hullCellsAt(cx: number, cy: number, dir: FacingDir): [number, number][] {
+    return this.parkCellsAt(cx, cy, dir);
+  }
+
+  private cellBlocked(x: number, y: number): boolean {
+    if (x < 0 || y < 0 || x >= MAP_WIDTH || y >= MAP_HEIGHT) return true;
+    if (PROP_CELLS.has(k(x, y))) return true;
+    const b = getBuildingAt(x, y);
+    if (b && b.id !== JAC_ID && b.name !== 'muro' && b.name !== 'obelisco') return true;
+    const c = cells[y]?.[x];
+    if (!c) return true;
+    return c.groundId.includes('borde') || c.groundId.includes('building/footprint');
+  }
+
+  /** Rotated parked rectangle + margin vs every prop and building footprint. */
+  private hullOverlapsWorld(cx: number, cy: number, dir: FacingDir): boolean {
+    for (const [x, y] of this.hullCellsAt(cx, cy, dir)) {
+      if (this.cellBlocked(x, y)) return true;
+    }
+    return !this.visualSpriteClear(cx, cy, dir);
+  }
+
   /** Nearest walkable tile beside the footprint that `from` can actually path to. */
   driverDoorTile(from?: { x: number; y: number }): { x: number; y: number } | null {
     return this.nearestReachableApproach(Math.round(from?.x ?? this.cx), Math.round(from?.y ?? this.cy));
@@ -1391,13 +1414,13 @@ export class JacT9 {
     }
     if (this.unstickHold > 0) this.unstickHold = Math.max(0, this.unstickHold - dt);
     if (this.dirHoldT > 0) this.dirHoldT = Math.max(0, this.dirHoldT - dt);
+    const ox0 = this.cx;
+    const oy0 = this.cy;
     const live = !this.pendingExit && mag > 0.15 && this.unstickHold <= 0;
     if (live) {
       this.clearDrivePath();
       this.qaSteer = null;
     }
-
-    this.resolveOverlap();
 
     const stickMag = Math.min(1, mag);
     let throttle = 0;
@@ -1444,8 +1467,6 @@ export class JacT9 {
     this.reversing = this.vel < -0.08;
     this.tickRearHold(dt);
     if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 0.33);
-    const ox = this.cx;
-    const oy = this.cy;
     const fwd = DIR_VEC[this.dir];
     if (moving) {
       const mx = fwd.x;
@@ -1500,7 +1521,6 @@ export class JacT9 {
         this.occupy(this.driveCells());
         this.layout();
       }
-      this.resolveOverlap();
       this.wheelAcc += dt * WHEEL_FPS * Math.min(1.4, Math.abs(this.vel) / DRIVE_TILES_PER_S);
       while (this.wheelAcc >= 1) {
         this.wheel = (this.wheel + 1) & 3;
@@ -1520,7 +1540,16 @@ export class JacT9 {
     } else {
       this.wheelAcc = 0;
     }
-    return Math.hypot(this.cx - ox, this.cy - oy);
+    const traveled = Math.hypot(this.cx - ox0, this.cy - oy0);
+    const cap = Math.max(Math.abs(this.vel) * dt, 0.04) + 0.08;
+    if (traveled > cap) {
+      this.cx = ox0 + ((this.cx - ox0) / traveled) * cap;
+      this.cy = oy0 + ((this.cy - oy0) / traveled) * cap;
+      const clamped = this.clampSit(this.cx, this.cy);
+      this.cx = clamped.x;
+      this.cy = clamped.y;
+    }
+    return Math.hypot(this.cx - ox0, this.cy - oy0);
   }
 
   /** Stick / S / down: brake to 0, dwell, then shift. Never skip the stop. */
@@ -1927,7 +1956,7 @@ export class JacT9 {
     const dy = t.y - this.cy;
     const d = Math.hypot(dx, dy);
     if (d < 0.85 || d > 6) return;
-    const pull = Math.min(0.16, d - 0.7);
+    const pull = Math.min(0.06, d - 0.7);
     const nx = this.cx + (dx / d) * pull;
     const ny = this.cy + (dy / d) * pull;
     if (!this.driveLaneWalkable(nx, ny)) return;
@@ -2449,12 +2478,13 @@ export class JacT9 {
 
   /** Nudge at most a fraction of a tile. Never hop to another sit or flip heading. */
   resolveOverlap(): boolean {
+    if (this.driving && !this.pendingExit) return true;
     if (!this.overlapsProp()) return true;
     const hit = this.overlapCells();
     if (hit.length === 0) return true;
     const mtv = this.mtvFor(hit);
     const pull = Math.hypot(mtv.x, mtv.y);
-    if (pull > 1e-4 && pull <= 0.28) {
+    if (pull > 1e-4 && pull <= 0.12) {
       const cand = this.clampSit(this.cx + mtv.x, this.cy + mtv.y);
       if (this.sitWith(cand.x, cand.y, this.dir)) {
         this.cx = cand.x;
@@ -2588,18 +2618,9 @@ export class JacT9 {
     return true;
   }
 
-  /** QA: parked 5×3 / 3×5 plus the drawn sprite vs every prop and building. */
+  /** QA: parked rotated rectangle + margin vs every prop and building. */
   overlapsProp(): boolean {
-    const hull = this.parkCellsAt(this.cx, this.cy, this.dir);
-    for (const [x, y] of hull) {
-      if (PROP_CELLS.has(k(x, y))) return true;
-      const b = getBuildingAt(x, y);
-      if (b && b.id !== JAC_ID && b.name !== 'muro' && b.name !== 'obelisco') return true;
-      const c = cells[y]?.[x];
-      if (c?.groundId.includes('building/footprint') || c?.groundId.includes('borde')) return true;
-    }
-    if (!this.visualSpriteClear(this.cx, this.cy, this.dir)) return true;
-    return false;
+    return this.hullOverlapsWorld(this.cx, this.cy, this.dir);
   }
 
   /** Reclaim the parked footprint, refresh the live hit box, and retarget the door. */

@@ -64,12 +64,13 @@ function appendMarkdown(el: HTMLElement, text: string): void {
 }
 
 function localizeCaseHeading(heading: string): string {
+  const n = heading.trim().toLowerCase();
   const key =
-    heading === 'Problem'
+    n === 'problem'
       ? 'case.problem'
-      : heading === 'What I did' || heading === 'What I Did'
+      : n === 'what i did'
         ? 'case.whatIDid'
-        : heading === 'Result'
+        : n === 'result'
           ? 'case.result'
           : null;
   return key ? t(key) : heading;
