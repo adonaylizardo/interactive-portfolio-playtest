@@ -706,6 +706,7 @@ async function runVisitor(spec) {
         break;
       }
       await closePreview(page, cdp, spec.touch, 'x');
+      await pinchToward(page, cdp, 0.18, spec.touch);
     }
     return row;
   } finally {
