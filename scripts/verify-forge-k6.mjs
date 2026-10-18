@@ -99,14 +99,9 @@ async function landscapeOverlap(page, tag) {
 
 async function historyB7B8(page, tag) {
   await page.goto(BASE, { waitUntil: 'networkidle', timeout: 120000 });
-  await page.waitForTimeout(500);
-  await page.evaluate(() => {
-    localStorage.setItem('portfolio-playtest-mobile-sheet', '1');
-  });
-  await page.reload({ waitUntil: 'networkidle' });
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(800);
   const sheetBefore = await page.evaluate(() => !!document.querySelector('.chrome.chrome--sheet'));
-  await page.locator('.chrome__intro button[data-action="reading"]').click({ timeout: 8000 });
+  await page.goto(`${BASE}#/leer`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(700);
   await page.locator('.reading-view [data-back]').click({ timeout: 8000 });
   await page.waitForTimeout(700);
@@ -115,8 +110,7 @@ async function historyB7B8(page, tag) {
   );
   record('B7-sheet-restore', sheetAfter, `before=${sheetBefore} after=${sheetAfter}`, tag);
 
-  await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.locator('.chrome__intro button[data-action="reading"], .chrome__column button[data-action="reading"]').first().click({ timeout: 10000 });
+  await page.goto(`${BASE}#/leer`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(500);
   await page.locator('.reading-view__row').filter({ hasText: /Volaris|Bain/i }).first().click();
   await page.waitForTimeout(400);
@@ -124,14 +118,18 @@ async function historyB7B8(page, tag) {
   await page.locator('[data-back-list]').click();
   await page.waitForTimeout(400);
   await page.locator('[data-back]').click();
-  await page.waitForTimeout(600);
-  await page.goForward();
+  await page.waitForFunction(() => !location.hash.includes('/leer/'), { timeout: 8000 });
   await page.waitForTimeout(400);
+  await page.goForward();
+  await page.waitForTimeout(500);
   const h1 = await page.evaluate(() => location.hash);
   await page.goForward();
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(500);
   const h2 = await page.evaluate(() => location.hash);
-  const pass = h1.includes('#/leer') && !h1.includes(caseSlug) && h2.includes(caseSlug);
+  const pass =
+    h1.includes('#/leer') &&
+    !h1.includes(`/${caseSlug}`) &&
+    h2.includes(`/${caseSlug}`);
   record('B8-forward-list', pass, `${h1} -> ${h2}`, tag);
 }
 
