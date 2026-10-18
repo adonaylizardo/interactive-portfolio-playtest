@@ -47,12 +47,16 @@ async function overviewProbe(page, vp) {
     window.__playtestQa.setViewMode('cenital');
   });
   await wait(400);
-  const z0 = await page.evaluate(() => window.__playtestQa.getViewMode().zoom);
+  const z0 = await page.evaluate(
+    () => Number(document.querySelector('canvas')?.dataset.zoom ?? 1),
+  );
   await page.evaluate(() => window.__playtestQa.toggleMapOverview());
   await wait(500);
   let z1 = z0;
   for (let i = 0; i < 8; i++) {
-    z1 = await page.evaluate(() => window.__playtestQa.getViewMode().zoom);
+    z1 = await page.evaluate(
+      () => Number(document.querySelector('canvas')?.dataset.zoom ?? 1),
+    );
     if (z1 < z0 * 0.85) break;
     await wait(400);
   }

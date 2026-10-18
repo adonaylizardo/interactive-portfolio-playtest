@@ -420,12 +420,29 @@ export class ChromeUI {
       sub.style.visibility = 'hidden';
       return;
     }
+    const checklist = this.root.querySelector('.checklist') as HTMLElement | null;
+    const checklistExpanded =
+      checklist &&
+      !checklist.hidden &&
+      !checklist.classList.contains('checklist--collapsed') &&
+      !checklist.classList.contains('checklist--mobile-closed');
+    const checklistRect = checklistExpanded ? checklist.getBoundingClientRect() : null;
+    const checklistBlocksTop =
+      checklistRect &&
+      checklistRect.height > 40 &&
+      checklistRect.bottom > 48 &&
+      !this.mobile;
     const blocksLabels =
       v.overview ||
       (v.mode === 'cenital' && (this.mobile || this.shortLandscape()));
     sub.classList.toggle('chrome__subtitle--compact', !!(blocksLabels && text));
-    if (blocksLabels && text) {
+    if (blocksLabels && text && !checklistBlocksTop) {
       sub.style.visibility = 'visible';
+      sub.textContent = text;
+      return;
+    }
+    if (blocksLabels && text && checklistBlocksTop) {
+      sub.style.visibility = 'hidden';
       sub.textContent = text;
       return;
     }
@@ -563,6 +580,15 @@ export class ChromeUI {
   private placeSubtitle(): void {
     const sub = this.root.querySelector('.chrome__subtitle') as HTMLElement | null;
     if (!sub) return;
+    const previewOpen = document.querySelector('.building-panel--preview.building-panel--open');
+    if (this.mobile && previewOpen && !this.interiorOpen) {
+      sub.style.bottom = '76px';
+      sub.style.top = 'auto';
+      sub.style.left = '50%';
+      sub.style.transform = 'translateX(-50%)';
+      sub.style.width = 'min(560px, calc(100vw - 32px))';
+      return;
+    }
     if (this.mobile && this.mobileSheet && !this.interiorOpen) {
       const intro = this.root.querySelector('.chrome__intro') as HTMLElement | null;
       const r = intro?.getBoundingClientRect();
@@ -574,6 +600,8 @@ export class ChromeUI {
     }
     sub.style.bottom = '';
     sub.style.top = '';
+    sub.style.width = '';
+    sub.style.transform = '';
   }
 
   private shortLandscape(): boolean {

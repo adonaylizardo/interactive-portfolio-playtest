@@ -623,8 +623,9 @@ body[data-interior='1'] .chrome__column {
 }
 
 .chrome--alt-view .chrome__lang-opt {
-  text-shadow: 0 0 6px rgba(11, 12, 14, 0.85);
-  background: rgba(11, 12, 14, 0.55);
+  text-shadow: none;
+  background: rgba(11, 12, 14, 0.92);
+  box-shadow: 0 0 0 1px rgba(11, 12, 14, 0.35);
 }
 
 .chrome--split .chrome__subtitle {

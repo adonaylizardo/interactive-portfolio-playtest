@@ -1554,10 +1554,9 @@ export class IsoScene {
     return { covW: iw / freeW, covH: ih / freeH };
   }
 
-  /** Map screen footprint vs full canvas (grid sample — tighter than corner AABB in cenital). */
+  /** Map screen footprint vs chrome-aware free rect (grid sample — tighter than corner AABB in cenital). */
   private overviewViewportFillFraction(): { covW: number; covH: number } {
-    const sw = this.app.screen.width;
-    const sh = this.app.screen.height;
+    const { ml, mt, freeW, freeH } = this.overviewFitMargins();
     const b = this.overviewFramingBounds();
     let left = Infinity;
     let right = -Infinity;
@@ -1576,17 +1575,15 @@ export class IsoScene {
         if (s.y > bottom) bottom = s.y;
       }
     }
-    const iw = Math.max(0, Math.min(sw, right) - Math.max(0, left));
-    const ih = Math.max(0, Math.min(sh, bottom) - Math.max(0, top));
-    return { covW: iw / Math.max(1, sw), covH: ih / Math.max(1, sh) };
+    const iw = Math.max(0, Math.min(ml + freeW, right) - Math.max(ml, left));
+    const ih = Math.max(0, Math.min(mt + freeH, bottom) - Math.max(mt, top));
+    return { covW: iw / Math.max(1, freeW), covH: ih / Math.max(1, freeH) };
   }
 
-  /** Overview: ≥90% on the bottleneck axis; the other axis may crop slightly. */
+  /** Overview: ≥90% of the limiting dimension inside chrome margins. */
   private overviewCoverageFits(): boolean {
     const vp = this.overviewViewportFillFraction();
-    const min = Math.min(vp.covW, vp.covH);
-    const max = Math.max(vp.covW, vp.covH);
-    return min >= 0.9 - 1e-4 && max <= 1.28 + 1e-4;
+    return Math.min(vp.covW, vp.covH) >= 0.9 - 1e-4;
   }
 
   /** Entire map stays inside chrome-aware free rect (no crop). */
@@ -1622,6 +1619,39 @@ export class IsoScene {
     );
   }
 
+  /** Raise zoom until the framed bounds fill ~90% of the chrome-aware free rect. */
+  private fitOverviewZoomForBounds(
+    b: { minX: number; minY: number; maxX: number; maxY: number },
+    aim: { x: number; y: number },
+  ): { zoom: number; cameraX: number; cameraY: number; fill: number } {
+    const wx = (b.minX + b.maxX) / 2;
+    const wy = (b.minY + b.maxY) / 2;
+    const { freeW, freeH } = this.overviewFitMargins();
+    const zFloor = zoomMinForView(this.viewRot, this.viewSx, this.viewSy, freeW, freeH);
+    const applyAtZoom = (zoom: number) => {
+      this.zoom = Math.min(8, Math.max(zFloor * 0.45, zoom));
+      this.placeWorldAtScreen(wx, wy, aim.x, aim.y);
+      this.applyCamera(false);
+    };
+    let lo = zFloor * 0.45;
+    let hi = Math.max(zFloor * 2.5, 0.12);
+    applyAtZoom(hi);
+    for (let k = 0; k < 14 && !this.overviewCoverageFits() && hi < 10; k++) {
+      hi *= 1.45;
+      applyAtZoom(hi);
+    }
+    for (let i = 0; i < 56; i++) {
+      const mid = (lo + hi) / 2;
+      applyAtZoom(mid);
+      if (this.overviewCoverageFits()) lo = mid;
+      else hi = mid;
+    }
+    applyAtZoom(lo);
+    const vp = this.overviewViewportFillFraction();
+    const fill = Math.min(vp.covW, vp.covH);
+    return { zoom: this.zoom, cameraX: this.cameraX, cameraY: this.cameraY, fill };
+  }
+
   private frameMapOverview(): void {
     this.updateCameraFitMargins();
     const savedYaw = this.yaw;
@@ -1639,63 +1669,28 @@ export class IsoScene {
       for (const q of yawTrials) {
         this.yaw = q;
         this.syncViewTransform();
-        const wx = (b.minX + b.maxX) / 2;
-        const wy = (b.minY + b.maxY) / 2;
-        const { freeW, freeH } = this.overviewFitMargins();
-        const zFloor = zoomMinForView(this.viewRot, this.viewSx, this.viewSy, freeW, freeH);
-        let lo = zFloor * 0.98;
-        let hi = zFloor * 2.2;
-        const applyAtZoom = (zoom: number) => {
-          this.zoom = Math.min(2.2, Math.max(zFloor * 0.96, zoom));
-          this.placeWorldAtScreen(wx, wy, aim.x, aim.y);
-          this.applyCamera(false);
-        };
-        for (let i = 0; i < 52; i++) {
-          const mid = (lo + hi) / 2;
-          applyAtZoom(mid);
-          if (this.mapFullyInFreeRect()) lo = mid;
-          else hi = mid;
-        }
-        applyAtZoom(lo);
-        if (!this.mapFullyInFreeRect()) continue;
-        const cov = this.overviewFillFraction();
-        const fill = Math.min(cov.covW, cov.covH);
-        if (fill > bestFill) {
-          bestFill = fill;
+        const fit = this.fitOverviewZoomForBounds(b, aim);
+        if (fit.fill > bestFill) {
+          bestFill = fit.fill;
           bestYaw = q;
-          bestZoom = this.zoom;
-          bestCam = { x: this.cameraX, y: this.cameraY };
+          bestZoom = fit.zoom;
+          bestCam = { x: fit.cameraX, y: fit.cameraY };
           bestBounds = b;
         }
       }
     }
-    if (bestFill < 0.08) {
-      const b = mapWorldBounds();
-      this.overviewFitTrial = b;
+    if (bestFill < 0.85) {
+      this.overviewFitTrial = mapWorldBounds();
       this.yaw = savedYaw;
       this.syncViewTransform();
-      const wx = (b.minX + b.maxX) / 2;
-      const wy = (b.minY + b.maxY) / 2;
-      const aim = this.freeRectCenter();
-      const { freeW, freeH } = this.overviewFitMargins();
-      const zFloor = zoomMinForView(this.viewRot, this.viewSx, this.viewSy, freeW, freeH);
-      let lo = zFloor * 0.96;
-      let hi = Math.max(this.zoom, zFloor * 2.2);
-      for (let i = 0; i < 52; i++) {
-        const mid = (lo + hi) / 2;
-        this.zoom = mid;
-        this.placeWorldAtScreen(wx, wy, aim.x, aim.y);
-        this.applyCamera(false);
-        if (this.mapFullyInFreeRect()) lo = mid;
-        else hi = mid;
+      const fit = this.fitOverviewZoomForBounds(mapWorldBounds(), aim);
+      if (fit.fill > bestFill) {
+        bestFill = fit.fill;
+        bestYaw = savedYaw;
+        bestZoom = fit.zoom;
+        bestCam = { x: fit.cameraX, y: fit.cameraY };
+        bestBounds = mapWorldBounds();
       }
-      this.zoom = lo;
-      this.placeWorldAtScreen(wx, wy, aim.x, aim.y);
-      bestFill = Math.min(this.overviewFillFraction().covW, this.overviewFillFraction().covH);
-      bestYaw = savedYaw;
-      bestZoom = this.zoom;
-      bestCam = { x: this.cameraX, y: this.cameraY };
-      bestBounds = b;
     }
     this.overviewFitTrial = null;
     this.overviewLockedBounds = bestBounds;
@@ -1994,7 +1989,36 @@ export class IsoScene {
     return undefined;
   }
 
-  /** Cenital driving: enter only when the tap hits the door glyph (screen px, zoom-independent). */
+  /** Screen AABB of the cenital door glyph (matches painted marker in world space). */
+  private cenitalDoorMarkerScreenRect(m: { x: number; y: number; hw: number; hh: number }): {
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+    cx: number;
+    cy: number;
+  } {
+    const corners = [
+      { x: m.x - m.hw, y: m.y - m.hh },
+      { x: m.x + m.hw, y: m.y - m.hh },
+      { x: m.x - m.hw, y: m.y + m.hh },
+      { x: m.x + m.hw, y: m.y + m.hh },
+    ];
+    let left = Infinity;
+    let right = -Infinity;
+    let top = Infinity;
+    let bottom = -Infinity;
+    for (const p of corners) {
+      const s = this.worldToScreen(p.x, p.y);
+      if (s.x < left) left = s.x;
+      if (s.x > right) right = s.x;
+      if (s.y < top) top = s.y;
+      if (s.y > bottom) bottom = s.y;
+    }
+    return { left, top, right, bottom, cx: (left + right) / 2, cy: (top + bottom) / 2 };
+  }
+
+  /** Cenital driving: enter only when the tap hits the door glyph (+8px screen slop). */
   private pickDrivingCenitalDoorAtScreen(sx: number, sy: number): MapObject | undefined {
     if (!this.cenitalOn() || this.mapOverview) return undefined;
     const slop = 8;
@@ -2002,25 +2026,23 @@ export class IsoScene {
     for (const obj of objects.filter((o) => o.type === 'building' && o.door && o.panelTitle)) {
       const m = cenitalDoorMarker(obj);
       if (!m) continue;
-      const s = this.worldToScreen(m.x, m.y);
-      const hitX = Math.abs(sx - s.x) <= m.hw + slop;
-      const hitY = Math.abs(sy - s.y) <= m.hh + slop;
-      if (!hitX || !hitY) continue;
-      const dist = Math.hypot(sx - s.x, sy - s.y);
+      const r = this.cenitalDoorMarkerScreenRect(m);
+      if (sx < r.left - slop || sx > r.right + slop || sy < r.top - slop || sy > r.bottom + slop) {
+        continue;
+      }
+      const dist = Math.hypot(sx - r.cx, sy - r.cy);
       if (!best || dist < best.dist) best = { obj, dist };
     }
     return best?.obj;
   }
 
-  /** While driving: enter only on door glyph / non-walkable building tile — never from open road. */
+  /** While driving: enter only on door glyph (cenital) or door/body rules (other views). */
   private pickDrivingBuildingEnterAtScreen(sx: number, sy: number): MapObject | undefined {
     if (this.cenitalOn() && !this.mapOverview) {
-      const strict = this.pickDrivingCenitalDoorAtScreen(sx, sy);
-      if (strict) return strict;
-    } else {
-      const door = this.pickBuildingDoorAtScreen(sx, sy);
-      if (door) return door;
+      return this.pickDrivingCenitalDoorAtScreen(sx, sy);
     }
+    const door = this.pickBuildingDoorAtScreen(sx, sy);
+    if (door) return door;
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
     const tile = worldToTile(wx, wy);
     if (!tile || !cells[tile.y]?.[tile.x]) return undefined;
@@ -2099,7 +2121,7 @@ export class IsoScene {
       if (
         this.driveGlyphPickSerial === this.pointerGestureSerial &&
         this.driveGlyphPickEntry &&
-        this.tapDriftPx < 56
+        this.tapDriftPx < 20
       ) {
         this.requestDriveToEnter(this.driveGlyphPickEntry);
         this.driveGlyphPickEntry = null;
@@ -3724,6 +3746,9 @@ export class IsoScene {
             this.tapDriftPx,
             Math.hypot(e.clientX - this.tapStart.x, e.clientY - this.tapStart.y),
           );
+          if (this.jac?.driving && this.tapDriftPx > 20) {
+            this.driveGlyphPickEntry = null;
+          }
         }
         return;
       }
@@ -5963,6 +5988,45 @@ export class IsoScene {
     return out;
   }
 
+  private cenitalLabelChromeRects(): DOMRect[] {
+    if (typeof document === 'undefined') return [];
+    const sels = [
+      '.chrome__views',
+      '.chrome__dock',
+      '.chrome__tools-phone',
+      '.checklist',
+      '.chrome__lang',
+    ];
+    const out: DOMRect[] = [];
+    for (const sel of sels) {
+      const el = document.querySelector(sel) as HTMLElement | null;
+      if (!el || el.hidden) continue;
+      const st = getComputedStyle(el);
+      if (st.display === 'none' || st.visibility === 'hidden' || Number(st.opacity) < 0.08) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 4 || r.height < 4) continue;
+      out.push(r);
+    }
+    return out;
+  }
+
+  private cenitalLabelPillOverlapsChrome(
+    cx: number,
+    cy: number,
+    w: number,
+    h: number,
+    pad = 6,
+  ): boolean {
+    const l = cx - w / 2 - pad;
+    const r = cx + w / 2 + pad;
+    const t = cy - h / 2 - pad;
+    const b = cy + h / 2 + pad;
+    for (const zone of this.cenitalLabelChromeRects()) {
+      if (l < zone.right && r > zone.left && t < zone.bottom && b > zone.top) return true;
+    }
+    return false;
+  }
+
   /** Client pixels for full building names in top-down (HTML overlay). */
   cenitalBuildingLabelAnchors(): { id: string; name: string; x: number; y: number; visible: boolean }[] {
     if (!this.cenitalOn() || this.interiorActive) return [];
@@ -6012,29 +6076,29 @@ export class IsoScene {
         visible: (midZoom || this.mapOverview) && onScreen(s.x, s.y),
       });
     }
+    const pillSize = (name: string, overview: boolean) => ({
+      w: Math.min(overview ? 132 : 132, name.length * 7.2 + 22),
+      h: 24,
+    });
+    const rectsOverlap = (
+      ax: number,
+      ay: number,
+      aw: number,
+      ah: number,
+      bx: number,
+      by: number,
+      bw: number,
+      bh: number,
+    ) => {
+      const ox = Math.min(ax + aw / 2, bx + bw / 2) - Math.max(ax - aw / 2, bx - bw / 2);
+      const oy = Math.min(ay + ah / 2, by + bh / 2) - Math.max(ay - ah / 2, by - bh / 2);
+      return ox > 0 && oy > 0;
+    };
     if (this.mapOverview && out.length > 1) {
-      const pillSize = (name: string) => ({
-        w: Math.min(132, name.length * 7.2 + 22),
-        h: 24,
-      });
-      const rectsOverlap = (
-        ax: number,
-        ay: number,
-        aw: number,
-        ah: number,
-        bx: number,
-        by: number,
-        bw: number,
-        bh: number,
-      ) => {
-        const ox = Math.min(ax + aw / 2, bx + bw / 2) - Math.max(ax - aw / 2, bx - bw / 2);
-        const oy = Math.min(ay + ah / 2, by + bh / 2) - Math.max(ay - ah / 2, by - bh / 2);
-        return ox > 0 && oy > 0;
-      };
       out.sort((a, b) => a.y - b.y || a.x - b.x);
       const kept: typeof out = [];
       for (const t of out) {
-        const sz = pillSize(t.name);
+        const sz = pillSize(t.name, true);
         let placed = false;
         for (let ring = 0; ring < 6 && !placed; ring++) {
           for (let i = 0; i < 12; i++) {
@@ -6042,10 +6106,12 @@ export class IsoScene {
             const rad = 24 + ring * 16;
             const px = t.x + Math.cos(ang) * rad;
             const py = t.y + Math.sin(ang) * rad - 28;
-            const clash = kept.some((k) => {
-              const ks = pillSize(k.name);
-              return rectsOverlap(px, py, sz.w, sz.h, k.x, k.y, ks.w, ks.h);
-            });
+            const clash =
+              this.cenitalLabelPillOverlapsChrome(px, py, sz.w, sz.h) ||
+              kept.some((k) => {
+                const ks = pillSize(k.name, true);
+                return rectsOverlap(px, py, sz.w, sz.h, k.x, k.y, ks.w, ks.h);
+              });
             if (!clash) {
               t.x = px;
               t.y = py;
@@ -6055,37 +6121,23 @@ export class IsoScene {
             }
           }
         }
-        if (!placed) {
-          t.y -= 28;
-          kept.push(t);
-        }
+        if (!placed) t.visible = false;
       }
-      const vw = typeof window !== 'undefined' ? window.innerWidth : sw;
-      const vh = typeof window !== 'undefined' ? window.innerHeight : sh;
-      for (const t of out) {
-        const estW = Math.min(132, t.name.length * 7.2 + 22);
-        const pad = 6;
-        const minX = pad + estW / 2;
-        const maxX = vw - pad - estW / 2;
-        const minY = pad + 14;
-        const maxY = vh - pad - 14;
-        if (minX <= maxX) t.x = Math.max(minX, Math.min(maxX, t.x));
-        if (minY <= maxY) t.y = Math.max(minY, Math.min(maxY, t.y));
-      }
-      return out;
     }
     const vw = typeof window !== 'undefined' ? window.innerWidth : sw;
     const vh = typeof window !== 'undefined' ? window.innerHeight : sh;
     for (const t of out) {
       if (!t.visible) continue;
-      const estW = Math.min(220, Math.min(132, t.name.length * 7.2 + 22));
-      const pad = 8;
-      const minX = pad + estW / 2;
-      const maxX = vw - pad - estW / 2;
-      const minY = 76 + 14;
-      const maxY = vh - pad - 14;
-      if (minX <= maxX) t.x = Math.max(minX, Math.min(maxX, t.x));
-      if (minY <= maxY) t.y = Math.max(minY, Math.min(maxY, t.y));
+      const sz = pillSize(t.name, this.mapOverview);
+      const pad = 10;
+      const offX =
+        t.x < pad + sz.w / 2 ||
+        t.x > vw - pad - sz.w / 2 ||
+        t.y < pad + sz.h / 2 ||
+        t.y > vh - pad - sz.h / 2;
+      if (offX || this.cenitalLabelPillOverlapsChrome(t.x, t.y, sz.w, sz.h)) {
+        t.visible = false;
+      }
     }
     return out;
   }
@@ -6107,6 +6159,40 @@ export class IsoScene {
     return headingFromTileStick(x / mag, y / mag, this.jac?.dir ?? 'se');
   }
 
+  /** QA: cenital door glyph bounds in canvas + client pixels (for off-glyph tap probes). */
+  qaCenitalDoorGlyphScreen(name: string): {
+    cx: number;
+    cy: number;
+    left: number;
+    right: number;
+    top: number;
+    bottom: number;
+    clientCx: number;
+    clientCy: number;
+    zoom: number;
+  } | null {
+    const obj = objects.find((o) => o.type === 'building' && o.name === name);
+    const m = obj ? cenitalDoorMarker(obj) : null;
+    if (!m) return null;
+    this.syncViewTransform();
+    const r = this.cenitalDoorMarkerScreenRect(m);
+    const rect = this.canvasEl?.getBoundingClientRect();
+    const ox = rect?.left ?? 0;
+    const oy = rect?.top ?? 0;
+    return {
+      ...r,
+      clientCx: ox + r.cx,
+      clientCy: oy + r.cy,
+      zoom: this.zoom,
+    };
+  }
+
+  /** QA: driving enter pick at canvas-local screen px (same as handleScreenTap). */
+  qaPickDrivingEnterAtScreen(sx: number, sy: number): string | null {
+    const hit = this.pickDrivingBuildingEnterAtScreen(sx, sy);
+    return hit?.name ?? hit?.id ?? null;
+  }
+
   /** QA: map fill fraction in the viewport while overview is active. */
   qaOverviewCoverage(): {
     covW: number;
@@ -6120,7 +6206,7 @@ export class IsoScene {
     mapFullyVisible: boolean;
     targetFill: number;
   } {
-    this.applyCamera(false);
+    this.syncViewTransform();
     const cov = this.overviewFillFraction();
     const vp = this.overviewViewportFillFraction();
     const limitingAxis: 'width' | 'height' = vp.covW <= vp.covH - 1e-6 ? 'width' : 'height';

@@ -325,6 +325,9 @@ async function main(): Promise<void> {
     rotateView: () => scene.rotateView(),
     toggleMapOverview: () => scene.toggleMapOverview(),
     overviewCoverage: () => scene.qaOverviewCoverage(),
+    cenitalDoorGlyphScreen: (name: string) => scene.qaCenitalDoorGlyphScreen(name),
+    pickDrivingEnterAtScreen: (sx: number, sy: number) =>
+      scene.qaPickDrivingEnterAtScreen(sx, sy),
     cameraViews: () => scene.qaCameraViews(),
     cenitalExpectedHeading: (dx: number, dy: number) => scene.qaCenitalExpectedHeading(dx, dy),
     cenitalBuildingLabels: () => {
