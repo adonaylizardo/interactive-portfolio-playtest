@@ -293,6 +293,7 @@ async function boardVan(page, cdp, touch) {
       await closePreview(page, cdp, touch, 'x');
       await wait(200);
     }
+    if (i === 2) await pinchToward(page, cdp, 0.22, touch);
     const raw = await vanClient(page);
     const view = page.viewportSize();
     const pt = raw && view ? clampToSafe(raw, view) : clampTap(raw, view);
@@ -320,8 +321,15 @@ async function tapDoor(page, cdp, name, touch) {
   }
   if (!found.pt) found = await findCanvasDoorTap(page, name, raw);
   if (!found.pt && raw && view) {
-    for (let nudge = 0; nudge < 4 && !found.pt; nudge++) {
-      const toward = clampToSafe(raw, view);
+    for (let nudge = 0; nudge < 5 && !found.pt; nudge++) {
+      const van = await vanClient(page);
+      const aimed = van
+        ? {
+            x: van.x + (raw.x - van.x) * 0.65,
+            y: van.y + (raw.y - van.y) * 0.65,
+          }
+        : raw;
+      const toward = clampToSafe(aimed, view);
       const towardHit = await hitAt(page, toward.x, toward.y);
       if (!towardHit.canvas) break;
       log('nudge', name, nudge, toward, towardHit.pick);
@@ -364,13 +372,21 @@ async function tapDoor(page, cdp, name, touch) {
   };
 }
 
-async function waitEntered(page, name, timeout = 80000) {
+async function waitEntered(page, cdp, spec, name, timeout = 80000) {
   const t0 = Date.now();
   let last = null;
+  let lastRetap = 0;
   while (Date.now() - t0 < timeout) {
     last = await snap(page);
-    if (!last.driving && panelMatches(last, name) && nearDoor(last, name, 10)) {
+    if (panelMatches(last, name) && nearDoor(last, name, 10) && !last.driving) {
       return { ...last, ok: true, ms: Date.now() - t0 };
+    }
+    const parkedNear =
+      nearDoor(last, name, 6) && (last.mph ?? 1) < 0.45 && !panelMatches(last, name);
+    if (parkedNear && Date.now() - lastRetap > 2500) {
+      lastRetap = Date.now();
+      log('parked-retap', spec.tag, name, last.cx, last.cy);
+      await tapDoor(page, cdp, name, spec.touch);
     }
     await wait(80);
   }
@@ -527,11 +543,11 @@ async function driveToDoor(page, cdp, spec, name) {
   if (!tap.accepted && !panelMatches(await snap(page), name) && !(await snap(page)).goal) {
     return { ok: false, why: 'tap-miss', tap };
   }
-  const entered = await waitEntered(page, name);
-  if (!entered.ok && nearDoor(entered, name, 8) && !entered.driving) {
+  const entered = await waitEntered(page, cdp, spec, name);
+  if (!entered.ok && nearDoor(entered, name, 8)) {
     const again = await tapDoor(page, cdp, name, spec.touch);
     log('enter-retap', spec.tag, name, again.accepted, again.pick, again.pt);
-    const second = await waitEntered(page, name, 20000);
+    const second = await waitEntered(page, cdp, spec, name, 20000);
     if (second.ok) {
       log('enter', spec.tag, name, true, Date.now() - (Date.now() - entered.ms), second.cx, second.cy);
       return { ok: true, entered: { ...second, ms: entered.ms + second.ms }, tap: again };
