@@ -80,7 +80,7 @@ const DIR_HYSTERESIS = 20 / 90;
 const DIR_HOLD_S = 0.32;
 const STUCK_REPLAN_S = 0.5;
 /** One BFS on a door tap; replans may search further. */
-const TAP_BFS_BUDGET = 1;
+const TAP_BFS_BUDGET = 0;
 
 export type JacVisual = {
   obj: MapObject;

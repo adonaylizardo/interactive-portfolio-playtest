@@ -4279,11 +4279,11 @@ export class IsoScene {
     const distDoor = Math.hypot(this.jac.cx - door.x, this.jac.cy - door.y);
     const idle = this.jac.drivePath.length === 0 && !this.jac.driveGoal;
     const along = this.jac.doorSideAlong(door.x, door.y);
-    const arrived = !!sit && distSit < 0.85 && this.jac.mph < 1.4;
+    const arrived = !!sit && distSit < 1.25 && this.jac.mph < 2;
     const from = this.pendingDriveFrom;
     const traveled = !from || Math.hypot(this.jac.cx - from.x, this.jac.cy - from.y) > 2.2;
     const doorSideSit =
-      this.jac.mph < 1.2 &&
+      this.jac.mph < 2 &&
       along >= 0 &&
       (distDoor <= 5.5 || (traveled && distDoor <= 10));
     if (arrived || doorSideSit) {
