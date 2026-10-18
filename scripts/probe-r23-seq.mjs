@@ -125,7 +125,6 @@ async function snap(page) {
 
 async function vanClient(page) {
   return page.evaluate(() => {
-    window.__playtestQa.focusJac?.();
     const e = window.__playtestQa.jacEntities();
     return window.__playtestQa.worldToClient(e.worldX, e.worldY);
   });
@@ -142,8 +141,9 @@ async function boardVan(page, cdp, touch) {
     }
     await page.evaluate(() => {
       window.__playtestQa.dismissBuildingPanel?.();
-      window.__playtestQa.focusJac?.();
       window.__playtestQa.setZoom?.(0.45);
+      const e = window.__playtestQa.jacEntities();
+      if (e) window.__playtestQa.frameWorld?.(e.worldX, e.worldY, 0.45);
     });
     await wait(160);
     const pt = await vanClient(page);
@@ -201,9 +201,16 @@ async function tapClose(page, cdp, touch) {
   }
   const before = await snap(page);
   if (before.preview || before.panel || before.interior) {
-    await page.goBack().catch(() => {});
+    await page.evaluate(() => window.__playtestQa.dismissBuildingPanel?.());
     const t0 = Date.now();
     while (Date.now() - t0 < 2000) {
+      const s = await snap(page);
+      if (!s.interior && !s.panel && !s.preview) return { ok: true, how: 'dismiss' };
+      await wait(80);
+    }
+    await page.goBack().catch(() => {});
+    const t1 = Date.now();
+    while (Date.now() - t1 < 2000) {
       const s = await snap(page);
       if (!s.interior && !s.panel && !s.preview) return { ok: true, how: 'back' };
       await wait(80);
@@ -241,7 +248,6 @@ async function tapDoor(page, cdp, name, touch) {
   // then crawls; restore a playable follow zoom after the real tap lands.
   await page.evaluate(() => {
     window.__playtestQa.setZoom?.(0.32);
-    window.__playtestQa.focusJac?.();
   });
   await wait(160);
   const after = await snap(page);
