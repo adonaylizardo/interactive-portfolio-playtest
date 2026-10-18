@@ -1579,9 +1579,9 @@ export class IsoScene {
 
   /** Overview: ≥90% on the bottleneck axis; the other axis may crop slightly. */
   private overviewCoverageFits(): boolean {
-    const cov = this.overviewFillFraction();
-    const min = Math.min(cov.covW, cov.covH);
-    const max = Math.max(cov.covW, cov.covH);
+    const vp = this.overviewViewportFillFraction();
+    const min = Math.min(vp.covW, vp.covH);
+    const max = Math.max(vp.covW, vp.covH);
     return min >= 0.9 - 1e-4 && max <= 1.28 + 1e-4;
   }
 
@@ -1964,10 +1964,44 @@ export class IsoScene {
     return undefined;
   }
 
+  /** Cenital door glyph while driving — tight circle; road taps beside a facade do not enter. */
+  private pickDrivingCenitalDoorAtScreen(sx: number, sy: number): MapObject | undefined {
+    if (!this.cenitalOn() || this.mapOverview) return undefined;
+    const mph = this.jac?.mph ?? 0;
+    const slop = 5 + Math.min(6, mph * 0.45);
+    const { x: wx, y: wy } = this.screenToWorld(sx, sy);
+    const tile = worldToTile(wx, wy);
+    const onWalkable = !!(tile && cells[tile.y]?.[tile.x]?.walkable);
+    let best: { obj: MapObject; dist: number } | null = null;
+    for (const obj of objects.filter((o) => o.type === 'building' && o.door && o.panelTitle)) {
+      const m = cenitalDoorMarker(obj);
+      if (!m) continue;
+      const s = this.worldToScreen(m.x, m.y);
+      const dist = Math.hypot(sx - s.x, sy - s.y);
+      const hitR = Math.max(m.hw, m.hh) + slop;
+      if (dist > hitR) continue;
+      if (onWalkable) {
+        const tight = Math.max(m.hw, m.hh) + 4;
+        if (dist > tight) continue;
+        if (tile && obj.door) {
+          const manhattan = Math.abs(tile.x - obj.door.x) + Math.abs(tile.y - obj.door.y);
+          if (manhattan > 2 && !doorHit(obj, wx, wy)) continue;
+        }
+      }
+      if (!best || dist < best.dist) best = { obj, dist };
+    }
+    return best?.obj;
+  }
+
   /** While driving: enter only on door glyph / non-walkable building tile — never from open road. */
   private pickDrivingBuildingEnterAtScreen(sx: number, sy: number): MapObject | undefined {
-    const door = this.pickBuildingDoorAtScreen(sx, sy);
-    if (door) return door;
+    if (this.cenitalOn() && !this.mapOverview) {
+      const strict = this.pickDrivingCenitalDoorAtScreen(sx, sy);
+      if (strict) return strict;
+    } else {
+      const door = this.pickBuildingDoorAtScreen(sx, sy);
+      if (door) return door;
+    }
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
     const tile = worldToTile(wx, wy);
     if (!tile || !cells[tile.y]?.[tile.x]) return undefined;
@@ -5734,8 +5768,11 @@ export class IsoScene {
     const rect = this.canvasEl?.getBoundingClientRect();
     const sx = cx - (rect?.left ?? 0);
     const sy = cy - (rect?.top ?? 0);
+    const drivingDoor = this.jac?.driving
+      ? this.pickDrivingBuildingEnterAtScreen(sx, sy)?.name ?? null
+      : this.pickBuildingDoorAtScreen(sx, sy)?.name ?? null;
     return {
-      door: this.pickBuildingDoorAtScreen(sx, sy)?.name ?? null,
+      door: drivingDoor,
       building: this.pickBuildingAtScreen(sx, sy)?.name ?? null,
       jac: this.pickJacAtScreen(sx, sy),
     };
@@ -5990,6 +6027,19 @@ export class IsoScene {
       }
       return out;
     }
+    const vw = typeof window !== 'undefined' ? window.innerWidth : sw;
+    const vh = typeof window !== 'undefined' ? window.innerHeight : sh;
+    for (const t of out) {
+      if (!t.visible) continue;
+      const estW = Math.min(220, Math.min(132, t.name.length * 7.2 + 22));
+      const pad = 8;
+      const minX = pad + estW / 2;
+      const maxX = vw - pad - estW / 2;
+      const minY = 76 + 14;
+      const maxY = vh - pad - 14;
+      if (minX <= maxX) t.x = Math.max(minX, Math.min(maxX, t.x));
+      if (minY <= maxY) t.y = Math.max(minY, Math.min(maxY, t.y));
+    }
     return out;
   }
 
@@ -6026,9 +6076,9 @@ export class IsoScene {
     this.applyCamera(false);
     const cov = this.overviewFillFraction();
     const vp = this.overviewViewportFillFraction();
-    const limitingAxis: 'width' | 'height' = cov.covW <= cov.covH - 1e-6 ? 'width' : 'height';
-    const limitingFill = Math.min(cov.covW, cov.covH);
-    const viewportLimitingFill = Math.min(vp.covW, vp.covH);
+    const limitingAxis: 'width' | 'height' = vp.covW <= vp.covH - 1e-6 ? 'width' : 'height';
+    const limitingFill = Math.min(vp.covW, vp.covH);
+    const viewportLimitingFill = limitingFill;
     return {
       covW: cov.covW,
       covH: cov.covH,

@@ -1862,6 +1862,10 @@ body.jac-drive[data-chrome='phone']:has(.building-panel--open) .joystick {
   right: 12px;
 }
 
+body[data-chrome='phone']:has(.building-panel--preview.building-panel--open) .joystick {
+  display: none !important;
+}
+
 /* Name pills — HTML so they stay sharp above the depth sort. */
 .name-labels {
   position: fixed;

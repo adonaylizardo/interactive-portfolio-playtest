@@ -73,7 +73,7 @@ async function main(): Promise<void> {
       const open = panel.isInteriorMode();
       checklist.setBuildingPanelOpen(open);
       chrome.setInteriorOpen(open);
-      joystick.setHidden(open || panel.isPreviewExpanded());
+      joystick.setHidden(open || panel.isPreviewMode() || panel.isPreviewExpanded());
       if (panel.isPreviewExpanded()) checklist.setCollapsed(true);
       scene?.applyCameraFromUi();
     },
@@ -141,6 +141,7 @@ async function main(): Promise<void> {
       joystick.setHidden(
         !scene.jacSnapshot()?.driving ||
           !!scene.isInInterior() ||
+          panel.isPreviewMode() ||
           panel.isPreviewExpanded() ||
           scene.jacInfoOpen(),
       );

@@ -260,7 +260,8 @@ export class JacHud {
   }
 
   private fillDash(snap: JacSnapshot, phone: boolean): void {
-    const key = `${getLang()}|${snap.mode}|${snap.lights}|${snap.gear}|${snap.rpm}|${snap.mph}|${snap.engineOn}|${JSON.stringify(snap.toggles)}|${phone}`;
+    const view = this.callbacks.getView?.();
+    const key = `${getLang()}|${snap.mode}|${snap.lights}|${snap.gear}|${snap.rpm}|${snap.mph}|${snap.engineOn}|${JSON.stringify(snap.toggles)}|${phone}|${view?.mode ?? ''}|${view?.overview ? 1 : 0}`;
     if (key === this.lastHtml && (snap.mode === 'drive' || snap.mode === 'info')) {
       this.syncLive(snap);
       return;

@@ -410,7 +410,10 @@ export class ChromeUI {
     const text = studio.subtitle();
     const blocksLabels =
       v.overview ||
-      (v.mode === 'cenital' && (this.shortLandscape() || text.startsWith('Hey, welcome')));
+      (v.mode === 'cenital' &&
+        (this.mobile ||
+          this.shortLandscape() ||
+          text.startsWith('Hey, welcome')));
     if (blocksLabels && text) {
       sub.textContent = '';
       sub.style.visibility = 'hidden';
@@ -596,6 +599,13 @@ export class ChromeUI {
         lang.style.top = `${Math.max(8, lr.bottom + 6)}px`;
         lang.style.right = `${Math.max(16, window.innerWidth - lr.right)}px`;
       }
+    }
+    const tools = this.root.querySelector('.chrome__tools-phone') as HTMLElement | null;
+    if (this.mobile && tools && tools.offsetParent !== null) {
+      const tr = tools.getBoundingClientRect();
+      lang.style.left = 'auto';
+      lang.style.right = '16px';
+      lang.style.top = `${Math.max(tr.bottom + 10, 24)}px`;
     }
   }
 
