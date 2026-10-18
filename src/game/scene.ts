@@ -749,10 +749,23 @@ export class IsoScene {
         this.tapBeyondMapEdge(pos.x, pos.y, sprint);
         return;
       }
-      if (!this.prepareMapTap(undefined, tile.x, tile.y)) return;
-      this.requestWalk(tile.x, tile.y, sprint);
+      this.mapTapWalkTile(tile.x, tile.y, sprint);
     });
     this.world.addChildAt(g, 0);
+  }
+
+  /** Map ground tap: door tiles enter the building; other tiles walk. */
+  private mapTapWalkTile(tx: number, ty: number, sprint: boolean): void {
+    const onDoor = getBuildingAtDoor(tx, ty);
+    if (onDoor?.panelTitle && onDoor.door) {
+      if (!this.prepareMapTap(onDoor)) return;
+      this.requestWalk(onDoor.door.x, onDoor.door.y, sprint, {
+        buildingEntry: { panelTitle: onDoor.panelTitle, door: onDoor.door },
+      });
+      return;
+    }
+    if (!this.prepareMapTap(undefined, tx, ty)) return;
+    this.requestWalk(tx, ty, sprint);
   }
 
   /** Unique cerca keys whose art overlaps the current camera (plus the outskirts tile). */
@@ -827,9 +840,8 @@ export class IsoScene {
         this.tapJac();
         return;
       }
-      if (!this.prepareMapTap(undefined, tx, ty)) return;
       const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
-      this.requestWalk(tx, ty, sprint);
+      this.mapTapWalkTile(tx, ty, sprint);
     });
     this.tilesLayer.addChild(g);
     const entry = { g, tx, ty };

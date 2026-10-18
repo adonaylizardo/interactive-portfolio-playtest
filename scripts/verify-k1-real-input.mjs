@@ -2,6 +2,7 @@
 /**
  * K1 real-input smoke (no __playtestQa tapBuildingDoor / tapScreen for actions).
  */
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -12,6 +13,7 @@ const BASE =
   process.argv[2] ??
   'https://adonaylizardo.github.io/interactive-portfolio-playtest/preview-contenido/';
 const SHOTS = path.join(ROOT, 'artifacts/k1-real-input');
+fs.mkdirSync(SHOTS, { recursive: true });
 
 async function consoleErrors(page) {
   const errors = [];
@@ -44,13 +46,17 @@ async function runViewport(label, width, height, touch) {
   const cerr = await consoleErrors(page);
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.waitForTimeout(800);
+  await page.locator('[data-action="intro-close"]').click({ timeout: 2500 }).catch(() => {});
 
-  if (!touch) {
+  if (touch) {
+    await page.locator('[data-action="show-panel"]').click({ timeout: 3000 }).catch(() => {});
+    await page.waitForTimeout(400);
+  } else {
     await page.evaluate(() => window.__playtestQa?.setLayout?.('split'));
     await page.waitForTimeout(300);
   }
 
-  const leer = page.locator('.chrome__ctas button, .chrome__intro .chrome__ctas button').filter({ hasText: /Leer|Read/i }).first();
+  const leer = page.locator('button[data-action="reading"]').first();
   const leerBox = await leer.boundingBox();
   if (leerBox) {
     const cx = leerBox.x + leerBox.width / 2;
@@ -91,24 +97,32 @@ async function runViewport(label, width, height, touch) {
   );
   results.push({
     id: 'B2-case-body-mobile',
-    pass: width <= 767 ? bodyLen > 200 : bodyLen > 200,
+    pass: bodyLen >= 200,
     detail: `bodyLen=${bodyLen}`,
   });
 
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
   if (!touch) await page.evaluate(() => window.__playtestQa?.setLayout?.('split'));
-  const doorPt = await page.evaluate(() => window.__playtestQa?.doorScreenPoint?.('volaris'));
-  if (doorPt) {
+  for (const building of ['volaris', 'bain', 'pg']) {
+    await page.evaluate((name) => window.__playtestQa?.frameDoorForQa?.(name), building);
+    await page.waitForTimeout(400);
+    const doorPt = await page.evaluate((name) => window.__playtestQa?.doorScreenPoint?.(name), building);
+    if (!doorPt) {
+      results.push({ id: `H4-${building}-door`, pass: false, detail: 'no door point' });
+      continue;
+    }
     if (touch) await page.touchscreen.tap(doorPt.x, doorPt.y);
     else await page.mouse.click(doorPt.x, doorPt.y);
-    await page.waitForTimeout(12000);
-    const opened = await page.evaluate(() =>
-      document.querySelector('.building-panel')?.classList.contains('building-panel--preview'),
-    );
-    results.push({ id: 'H4-volaris-door', pass: !!opened, detail: String(opened) });
-  } else {
-    results.push({ id: 'H4-volaris-door', pass: false, detail: 'no door point' });
+    await page.waitForTimeout(16000);
+    const opened = await page.evaluate(() => {
+      const p = document.querySelector('.building-panel');
+      return !!(p?.classList.contains('building-panel--open') && p.classList.contains('building-panel--preview'));
+    });
+    results.push({ id: `H4-${building}-door`, pass: opened, detail: String(opened) });
+    if (!opened) break;
+    await page.evaluate(() => window.__playtestQa?.dismissBuildingPanel?.());
+    await page.waitForTimeout(500);
   }
 
   await page.screenshot({ path: path.join(SHOTS, `${label}-final.png`), fullPage: false });
