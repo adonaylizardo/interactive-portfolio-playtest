@@ -13,7 +13,7 @@ import {
 import { parseInteriorFromHash } from './camera/hash';
 import { getInteriorDef, interiorBlockedTilesHaveProps } from './game/interior';
 import { IsoScene } from './game/scene';
-import { findPath } from './iso/pathfinding';
+import { findPath, findPathOrNearest } from './iso/pathfinding';
 import { BuildingPanel } from './ui/buildingPanel';
 import { ChromeUI, type DesktopLayout } from './ui/chrome';
 import { JacHud } from './ui/jacHud';
@@ -248,6 +248,7 @@ async function main(): Promise<void> {
     inicio: INICIO,
     mapTramos: MAP_TRAMOS,
     findPath,
+    findPathOrNearest,
     getCharacterTile: () => scene.getCharacterTile(),
     getCharacterPos: () => scene.getCharacterPosForQa(),
     walk: (dx: number, dy: number, sprint = false) => scene.qaWalk(dx, dy, sprint),

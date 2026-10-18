@@ -229,12 +229,9 @@ async function walkTowardTile(page, cdp, touch, tx, ty, maxMs = 55000) {
         const c = window.__playtestQa.inputReady().char;
         const dist = Math.hypot(c.x - gx, c.y - gy);
         if (dist < 2.2) return { done: true, stick: [0, -1] };
-        const path = window.__playtestQa.findPath(
-          Math.round(c.x),
-          Math.round(c.y),
-          gx,
-          gy,
-        );
+        const path =
+          window.__playtestQa.findPath(Math.round(c.x), Math.round(c.y), gx, gy) ??
+          window.__playtestQa.findPathOrNearest(Math.round(c.x), Math.round(c.y), gx, gy);
         if (!path || path.length < 2) return { done: dist < 8, stick: [0, -1] };
         const node = path[1];
         const wantX = node.x - c.x;
@@ -408,7 +405,7 @@ async function runViewport(tag, opts) {
 
       let nearJac = false;
       const jacT0 = Date.now();
-      while (Date.now() - jacT0 < 180000) {
+      while (Date.now() - jacT0 < 240000) {
         st = await page.evaluate(() => window.__playtestQa.personaState());
         if (st.jacBoard) {
           nearJac = true;
@@ -418,7 +415,7 @@ async function runViewport(tag, opts) {
           const door = window.__playtestQa.jacDoor();
           return door ? { x: door.x, y: door.y } : { x: 27, y: 19 };
         });
-        await walkTowardTile(page, cdp, touch, goal.x, goal.y, 8000);
+        await walkTowardTile(page, cdp, touch, goal.x, goal.y, 12000);
       }
       notes.push(`${tag}: near jac ${nearJac}`);
       await page

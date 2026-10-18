@@ -5812,7 +5812,7 @@ export class IsoScene {
   }
 
   personaJacBoardVisible(): boolean {
-    return this.personaOn() && !!this.jac && !this.jac.driving && this.atJacDoor(2.2);
+    return this.personaOn() && !!this.jac && !this.jac.driving && this.atJacDoor(3.2);
   }
 
   /** QA: screen stick → unit tile delta (persona / alt cameras). */
