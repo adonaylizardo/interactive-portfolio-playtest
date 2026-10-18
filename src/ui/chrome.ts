@@ -1,4 +1,5 @@
 import { studio } from '../audio/studio';
+import { CASES, CASE_CARD_TITLES, type CaseHouseId } from '../data/cases';
 import { getEnterableBuildings } from '../data/map';
 import { tileToWorld } from '../iso/math';
 import { isMobileLayout } from '../checklist/ui';
@@ -17,23 +18,30 @@ export type ChromeCallbacks = {
   onMapOverview: () => void;
   onCenter: () => void;
   onLocate: (buildingId: string) => void;
+  onReadingOpen?: () => void;
+  onReadingClose?: () => void;
 };
 
-const EXPERIENCE: { id: string; label: string; nda?: boolean }[] = [
-  { id: 'volaris', label: 'Airline', nda: true },
-  { id: 'bain', label: 'Bain' },
+const EXPERIENCE: { id: CaseHouseId; label: string }[] = [
+  { id: 'volaris', label: CASE_CARD_TITLES.volaris },
+  { id: 'bain', label: CASE_CARD_TITLES.bain },
   { id: 'mentoria', label: 'Mentoría en Applaudo' },
-  { id: 'finoa', label: 'Finoa' },
-  { id: 'pg', label: 'P&G' },
+  { id: 'finoa', label: CASE_CARD_TITLES.finoa },
+  { id: 'pg', label: CASE_CARD_TITLES.pg },
 ];
 
-const CASES_ROWS: { id: string; label: string; nda?: boolean }[] = [
-  { id: 'volaris', label: 'Airline', nda: true },
-  { id: 'bain', label: 'Bain' },
+const CASES_ROWS: { id: CaseHouseId; label: string }[] = [
+  { id: 'volaris', label: CASE_CARD_TITLES.volaris },
+  { id: 'bain', label: CASE_CARD_TITLES.bain },
   { id: 'mentoria', label: 'Mentoría en Applaudo' },
-  { id: 'finoa', label: 'Finoa' },
-  { id: 'pg', label: 'P&G' },
+  { id: 'finoa', label: CASE_CARD_TITLES.finoa },
+  { id: 'pg', label: CASE_CARD_TITLES.pg },
 ];
+
+function caseRowSummary(id: CaseHouseId): string {
+  const content = CASES[id];
+  return content?.subtitle ?? content?.shortHeadline ?? '';
+}
 
 const CV_HREF = `${import.meta.env.BASE_URL}cv/adonay-lizardo-cv.pdf`;
 const CONTACT_HREF = 'mailto:hello@adonaylizardo.com';
@@ -149,17 +157,17 @@ export class ChromeUI {
     const expRows = EXPERIENCE.map(
       (row) => `
       <button type="button" class="chrome__exp-row" data-locate="${row.id}">
-        <span class="chrome__exp-name">${row.label}${row.nda ? '<span class="chrome__nda">NDA</span>' : ''}</span>
+        <span class="chrome__exp-name">${row.label}</span>
         <span class="chrome__exp-meta"><span class="chrome__skeleton chrome__skeleton--bar"></span>${iconSvg('locate', 16)}</span>
       </button>`,
     ).join('');
     const caseRows = CASES_ROWS.map((row) => {
       return `
       <button type="button" class="chrome__case-row" data-locate="${row.id}">
-        <span class="chrome__case-thumb">${iconSvg('map')}${row.nda ? '<span class="chrome__nda">NDA</span>' : ''}</span>
+        <span class="chrome__case-thumb">${iconSvg('map')}</span>
         <span class="chrome__case-copy">
           <span class="chrome__case-title">${row.label}</span>
-          <span class="chrome__skeleton-stack"><span class="chrome__skeleton"></span><span class="chrome__skeleton chrome__skeleton--short"></span></span>
+          <span class="chrome__case-subtitle">${caseRowSummary(row.id)}</span>
         </span>
       </button>`;
     }).join('');
@@ -198,6 +206,7 @@ export class ChromeUI {
           <div class="chrome__ctas">
             <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer">${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
             <a class="ui-btn ui-btn--secondary" href="${CONTACT_HREF}">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></a>
+            <button type="button" class="ui-btn ui-btn--secondary" data-action="reading">${iconSvg('page')} <span data-i18n="read.title">Leer</span></button>
           </div>
           <div class="chrome__audience">
             <p class="chrome__label" data-i18n="chrome.who">¿Quién eres?</p>
@@ -263,6 +272,7 @@ export class ChromeUI {
         <div class="chrome__ctas">
           <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer">${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
           <a class="ui-btn ui-btn--secondary" href="${CONTACT_HREF}">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></a>
+          <button type="button" class="ui-btn ui-btn--secondary" data-action="reading">${iconSvg('page')} <span data-i18n="read.title">Leer</span></button>
         </div>
         <div class="chrome__card-row">
           <div class="chrome__card-id">
@@ -308,7 +318,13 @@ export class ChromeUI {
   }
 
   private bind(): void {
-    this.root.querySelector('[data-action="panel-only"]')?.addEventListener('click', () => this.setLayout('panel'));
+    this.root.querySelectorAll('[data-action="reading"]').forEach((btn) => {
+      btn.addEventListener('click', () => this.callbacks.onReadingOpen?.());
+    });
+    this.root.querySelector('[data-action="panel-only"]')?.addEventListener('click', () => {
+      if (this.callbacks.onReadingOpen) this.callbacks.onReadingOpen();
+      else this.setLayout('panel');
+    });
     this.root.querySelector('[data-action="hide-panel"]')?.addEventListener('click', () => this.setLayout('map'));
     this.root.querySelector('[data-action="show-panel"]')?.addEventListener('click', () => this.setLayout('split'));
     this.root.querySelector('[data-action="intro-close"]')?.addEventListener('click', () => this.setLayout('map'));
@@ -373,8 +389,16 @@ export class ChromeUI {
       this.callbacks.onLocate('contacto');
     });
     this.root.querySelector('[data-action="fullpage"]')?.addEventListener('click', () => {
+      if (this.callbacks.onReadingOpen && this.callbacks.onReadingClose) {
+        if (document.body.dataset.reading === '1') this.callbacks.onReadingClose();
+        else this.callbacks.onReadingOpen();
+        return;
+      }
       if (this.layout === 'panel') this.setLayout('split');
       else this.setLayout('panel');
+    });
+    this.root.querySelector('[data-action="download"]')?.addEventListener('click', () => {
+      window.open(CV_HREF, '_blank', 'noopener,noreferrer');
     });
     this.root.querySelectorAll('[data-action="sound"]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
@@ -494,7 +518,7 @@ export class ChromeUI {
     const col = this.root.querySelector('.chrome__column') as HTMLElement | null;
     if (col) {
       // Inline display wins over `.chrome--split { display:block }`, so innerText
-      // cannot leak the airline's name from the intro list while a case is open.
+      // Hide the intro column while a case interior is open.
       col.style.display = this.interiorOpen ? 'none' : '';
       col.hidden = this.interiorOpen;
       col.setAttribute('aria-hidden', this.interiorOpen ? 'true' : 'false');

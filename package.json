@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "build:preview-edificios": "tsc && vite build --base /interactive-portfolio-playtest/preview-edificios/",
+    "build:preview-contenido": "tsc && vite build --base /interactive-portfolio-playtest/preview-contenido/",
+    "deploy:preview-contenido": "DEPLOY_TARGET=preview-contenido node scripts/deploy-gh-pages.mjs --preview-contenido",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "qa": "npm run build && node scripts/qa.mjs",

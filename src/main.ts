@@ -11,6 +11,14 @@ import {
   validateWalkGridFootprint,
 } from './data/map';
 import { parseInteriorFromHash } from './camera/hash';
+import { isMobileLayout } from './checklist/ui';
+import {
+  isReadingHash,
+  leaveReadingHash,
+  navigateReading,
+  parseReadingRoute,
+} from './ui/readingRoute';
+import { ReadingView } from './ui/readingView';
 import { getInteriorDef, interiorBlockedTilesHaveProps } from './game/interior';
 import { IsoScene } from './game/scene';
 import { findPath } from './iso/pathfinding';
@@ -34,17 +42,49 @@ async function main(): Promise<void> {
   const checklist = new ChecklistUI(uiRoot, { onSkip: () => {}, onDismiss: () => {} });
 
   let scene!: IsoScene;
+
+  const syncReadingFromHash = (): void => {
+    const route = parseReadingRoute();
+    if (route) {
+      reading.syncRoute(route);
+      checklist.setCollapsed(true);
+      if (!isMobileLayout()) chrome.setLayout('panel');
+      else chrome.setLayout('map');
+      panel.hide({ snap: true, silent: true });
+      scene?.applyCameraFromUi();
+      return;
+    }
+    reading.syncRoute(null);
+    scene?.applyCameraFromUi();
+  };
+
+  const closeReading = (): void => {
+    leaveReadingHash();
+    syncReadingFromHash();
+    if (!isMobileLayout()) chrome.setLayout('split');
+  };
+
+  const reading = new ReadingView(uiRoot, closeReading);
+
   const chrome = new ChromeUI(uiRoot, {
     onLayoutChange: () => {
       const layout = chrome.getLayout();
-      checklist.setCollapsed(layout === 'map' || layout === 'panel');
+      checklist.setCollapsed(layout === 'map' || layout === 'panel' || isReadingHash());
       scene?.applyCameraFromUi();
     },
     onView: (mode: Camera) => scene?.setViewMode(mode),
     onRotate: () => scene?.rotateView(),
     onMapOverview: () => scene?.toggleMapOverview(),
     onCenter: () => scene?.recenterOnCharacter(),
-    onLocate: (id) => scene?.walkToBuildingForQa(id),
+    onLocate: (id) => {
+      if (isReadingHash()) return;
+      scene?.walkToBuildingForQa(id);
+    },
+    onReadingOpen: () => {
+      navigateReading({ kind: 'list' });
+      syncReadingFromHash();
+    },
+    onReadingClose: closeReading,
   });
 
   const joystick = new Joystick(uiRoot);
@@ -217,10 +257,28 @@ async function main(): Promise<void> {
     scene.focusJac();
   }
 
-  const bootInterior = parseInteriorFromHash();
-  if (bootInterior) {
-    syncInteriorPanel(bootInterior);
+  const bootReading = parseReadingRoute();
+  if (bootReading) {
+    syncReadingFromHash();
+  } else {
+    const bootInterior = parseInteriorFromHash();
+    if (bootInterior) {
+      syncInteriorPanel(bootInterior);
+    }
   }
+
+  window.addEventListener('hashchange', () => {
+    if (parseReadingRoute()) syncReadingFromHash();
+    else if (!isReadingHash()) {
+      reading.syncRoute(null);
+      const interiorId = parseInteriorFromHash();
+      if (interiorId) syncInteriorPanel(interiorId);
+    }
+  });
+  window.addEventListener('popstate', () => {
+    if (parseReadingRoute()) syncReadingFromHash();
+    else if (!isReadingHash()) reading.syncRoute(null);
+  });
 
   (window as unknown as { __playtestQa?: Record<string, unknown> }).__playtestQa = {
     validateWalkGridFootprint,

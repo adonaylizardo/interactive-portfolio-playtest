@@ -21,19 +21,26 @@ const pushDir = path.join(root, '.gh-pages-push');
 const LIVE_BASE = '/interactive-portfolio-playtest/';
 const PREVIEW_BASE = '/interactive-portfolio-playtest/preview/';
 const PREVIEW_EDIFICIOS_BASE = '/interactive-portfolio-playtest/preview-edificios/';
+const PREVIEW_CONTENIDO_BASE = '/interactive-portfolio-playtest/preview-contenido/';
 const LIVE_URL = 'https://adonaylizardo.github.io/interactive-portfolio-playtest/';
 const PREVIEW_URL = 'https://adonaylizardo.github.io/interactive-portfolio-playtest/preview/';
 const PREVIEW_EDIFICIOS_URL =
   'https://adonaylizardo.github.io/interactive-portfolio-playtest/preview-edificios/';
+const PREVIEW_CONTENIDO_URL =
+  'https://adonaylizardo.github.io/interactive-portfolio-playtest/preview-contenido/';
 
 const argv = process.argv.slice(2);
-const target = argv.includes('--preview-edificios')
-  ? 'preview-edificios'
-  : process.env.DEPLOY_TARGET === 'live' || argv.includes('--live') || argv.includes('live')
-    ? 'live'
-    : process.env.DEPLOY_TARGET === 'preview-edificios'
-      ? 'preview-edificios'
-      : 'preview';
+const target = argv.includes('--preview-contenido')
+  ? 'preview-contenido'
+  : argv.includes('--preview-edificios')
+    ? 'preview-edificios'
+    : process.env.DEPLOY_TARGET === 'live' || argv.includes('--live') || argv.includes('live')
+      ? 'live'
+      : process.env.DEPLOY_TARGET === 'preview-contenido'
+        ? 'preview-contenido'
+        : process.env.DEPLOY_TARGET === 'preview-edificios'
+          ? 'preview-edificios'
+          : 'preview';
 
 if (target === 'live' && process.env.DEPLOY_LIVE_APPROVED !== '1') {
   console.error(
@@ -46,8 +53,21 @@ if (target === 'live' && process.env.DEPLOY_LIVE_APPROVED !== '1') {
 }
 
 const base =
-  target === 'live' ? LIVE_BASE : target === 'preview-edificios' ? PREVIEW_EDIFICIOS_BASE : PREVIEW_BASE;
-const url = target === 'live' ? LIVE_URL : target === 'preview-edificios' ? PREVIEW_EDIFICIOS_URL : PREVIEW_URL;
+  target === 'live'
+    ? LIVE_BASE
+    : target === 'preview-edificios'
+      ? PREVIEW_EDIFICIOS_BASE
+      : target === 'preview-contenido'
+        ? PREVIEW_CONTENIDO_BASE
+        : PREVIEW_BASE;
+const url =
+  target === 'live'
+    ? LIVE_URL
+    : target === 'preview-edificios'
+      ? PREVIEW_EDIFICIOS_URL
+      : target === 'preview-contenido'
+        ? PREVIEW_CONTENIDO_URL
+        : PREVIEW_URL;
 
 function run(cmd, cwd = root) {
   execSync(cmd, { cwd, stdio: 'inherit' });
@@ -58,7 +78,9 @@ if (process.env.DEPLOY_GATE_PASSED === '1') {
   run(`npx vite build --base ${base}`);
 } else {
   run('npm run qa:gate');
-  if (target === 'preview' || target === 'preview-edificios') run(`npx vite build --base ${base}`);
+  if (target === 'preview' || target === 'preview-edificios' || target === 'preview-contenido') {
+    run(`npx vite build --base ${base}`);
+  }
 }
 
 if (!existsSync(path.join(dist, 'index.html'))) {
@@ -71,8 +93,15 @@ run('git fetch origin gh-pages');
 run(`git worktree add --detach ${pushDir} origin/gh-pages`);
 
 try {
-  if (target === 'preview' || target === 'preview-edificios') {
-    const dest = path.join(pushDir, target === 'preview-edificios' ? 'preview-edificios' : 'preview');
+  if (target === 'preview' || target === 'preview-edificios' || target === 'preview-contenido') {
+    const dest = path.join(
+      pushDir,
+      target === 'preview-edificios'
+        ? 'preview-edificios'
+        : target === 'preview-contenido'
+          ? 'preview-contenido'
+          : 'preview',
+    );
     rmSync(dest, { recursive: true, force: true });
     mkdirSync(dest, { recursive: true });
     cpSync(dist, dest, { recursive: true });
@@ -95,9 +124,11 @@ try {
     const msg =
       target === 'preview-edificios'
         ? 'Deploy Teatro/Biblioteca candidate to /preview-edificios/'
-        : target === 'preview'
-          ? 'Deploy candidate to /preview/ (live root unchanged)'
-          : 'Promote approved candidate to live gh-pages root';
+        : target === 'preview-contenido'
+          ? 'Deploy content candidate to /preview-contenido/'
+          : target === 'preview'
+            ? 'Deploy candidate to /preview/ (live root unchanged)'
+            : 'Promote approved candidate to live gh-pages root';
     run('git -c user.email=agent@cursor.com -c user.name="Cursor Agent" commit -m "' + msg + '"', pushDir);
     run('git push origin HEAD:gh-pages', pushDir);
   }

@@ -15,6 +15,7 @@ export type HistoryNavigationState = {
 
 function hashParams(): URLSearchParams {
   const raw = location.hash.replace(/^#/, '');
+  if (raw.startsWith('/leer')) return new URLSearchParams();
   if (!raw) return new URLSearchParams();
   if (raw.startsWith(HASH_PREFIX)) {
     return new URLSearchParams(raw.slice(HASH_PREFIX.length));
@@ -22,8 +23,8 @@ function hashParams(): URLSearchParams {
   return new URLSearchParams(raw);
 }
 
-/** Building ids that name an NDA client get a neutral public id in the URL. */
-const PUBLIC_INTERIOR_IDS: Record<string, string> = { volaris: 'airline' };
+/** Optional public URL aliases for interior building ids (empty = use id as-is). */
+const PUBLIC_INTERIOR_IDS: Record<string, string> = {};
 
 export function publicInteriorId(interiorId: string): string {
   return PUBLIC_INTERIOR_IDS[interiorId] ?? interiorId;

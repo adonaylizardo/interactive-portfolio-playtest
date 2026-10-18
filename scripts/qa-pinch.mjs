@@ -1266,7 +1266,7 @@ async function testRun30AllInteriorsClick(page, errors) {
     }
     await wait(400);
     const hash = await page.evaluate(() => location.hash);
-    const publicId = b.name === 'volaris' ? 'airline' : b.name;
+    const publicId = b.name;
     if (!hash.includes(`in=${publicId}`)) {
       errors.push(`run30-interiors: hash missing in=${publicId} (${hash})`);
     }

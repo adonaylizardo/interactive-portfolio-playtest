@@ -1,7 +1,16 @@
 import { studio } from '../audio/studio';
 import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
 import { CASES, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
-import { TALKS, WRITINGS, type TalkItem, type WritingSection } from '../data/experiences';
+import {
+  TALKS,
+  TALKS_COMING_SOON,
+  WRITINGS,
+  WRITINGS_SUBSTACK_URL,
+  type TalkItem,
+  type WritingItem,
+  type WritingSection,
+} from '../data/experiences';
+import { talkMeta, talkTitle, writingMeta, writingTitle } from './contentLabels';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
 import { iconSvg } from './icons';
 import { onLangChange, t, type I18nKey } from './i18n';
@@ -505,7 +514,7 @@ export class BuildingPanel {
 
   private syncExperienceIntro(): void {
     if (!this.experienceIntro) return;
-    const showTalksIntro = this.mode === 'talks';
+    const showTalksIntro = this.mode === 'talks' && !TALKS_COMING_SOON && TALKS.length > 0;
     this.experienceIntro.hidden = !showTalksIntro;
     if (showTalksIntro) this.experienceIntro.textContent = t('talks.intro');
   }
@@ -552,13 +561,20 @@ export class BuildingPanel {
 
   private renderTalksList(): void {
     if (!this.experienceList) return;
+    if (TALKS_COMING_SOON || TALKS.length === 0) {
+      const p = document.createElement('p');
+      p.className = 'experience__empty';
+      p.textContent = t('talks.comingSoon');
+      this.experienceList.replaceChildren(p);
+      return;
+    }
     this.experienceList.replaceChildren(
       ...TALKS.slice(0, 5).map((item) => this.talkRow(item, () => this.openTalk(item))),
     );
   }
 
   private talkRow(
-    item: TalkItem,
+    item: TalkItem | WritingItem,
     onOpen: () => void,
     opts?: { compact?: boolean; kind?: 'talk' | 'writing' },
   ): HTMLElement {
@@ -582,10 +598,12 @@ export class BuildingPanel {
     copy.className = 'experience__copy';
     const title = document.createElement('span');
     title.className = 'experience__row-title';
-    title.textContent = t(item.titleKey as I18nKey);
+    title.textContent = kind === 'writing' ? writingTitle(item) : talkTitle(item);
     const meta = document.createElement('span');
     meta.className = 'experience__row-meta';
-    meta.textContent = t(item.metaKey as I18nKey);
+    const metaText = kind === 'writing' ? writingMeta(item) : talkMeta(item);
+    meta.textContent = metaText;
+    meta.hidden = !metaText;
     copy.append(title, meta);
     btn.append(thumb, copy);
     btn.addEventListener('click', (e) => {
@@ -596,7 +614,7 @@ export class BuildingPanel {
     return btn;
   }
 
-  private writingRow(item: TalkItem, section: WritingSection, compact = false): HTMLElement {
+  private writingRow(item: WritingItem, section: WritingSection, compact = false): HTMLElement {
     return this.talkRow(item, () => this.openWriting(section, item), { compact, kind: 'writing' });
   }
 
@@ -610,8 +628,8 @@ export class BuildingPanel {
 
   private renderTalkPlayer(item: TalkItem): void {
     if (!this.experienceDetail) return;
-    const title = t(item.titleKey as I18nKey);
-    const meta = t(item.metaKey as I18nKey);
+    const title = talkTitle(item);
+    const meta = talkMeta(item);
     const upNext = TALKS.filter((x) => x.id !== item.id).slice(0, 3);
     const wrap = document.createElement('div');
     wrap.className = 'talks-player';
@@ -687,16 +705,20 @@ export class BuildingPanel {
       h.textContent = t(section.titleKey as I18nKey);
       const badge = document.createElement('span');
       badge.className = 'experience__section-count';
-      badge.textContent = '0';
+      badge.textContent = String(section.items.length);
       const seeAll = document.createElement('button');
       seeAll.type = 'button';
       seeAll.className = 'experience__see-all';
       seeAll.textContent = t('chrome.seeAll');
       row.append(h, badge, seeAll);
-      const p = document.createElement('p');
-      p.className = 'experience__section-desc';
-      p.textContent = t(section.descKey as I18nKey);
-      head.append(row, p);
+      if (section.descKey) {
+        const p = document.createElement('p');
+        p.className = 'experience__section-desc';
+        p.textContent = t(section.descKey as I18nKey);
+        head.append(row, p);
+      } else {
+        head.append(row);
+      }
       frag.appendChild(head);
       for (const item of section.items.slice(0, 3)) {
         frag.appendChild(this.writingRow(item, section));
@@ -705,7 +727,7 @@ export class BuildingPanel {
     this.experienceList.replaceChildren(frag);
   }
 
-  private openWriting(section: WritingSection, item: TalkItem): void {
+  private openWriting(section: WritingSection, item: WritingItem): void {
     this.activeWriting = { sectionId: section.id, itemId: item.id };
     this.activeTalkId = null;
     this.renderWritingReader(section, item);
@@ -713,8 +735,10 @@ export class BuildingPanel {
     if (this.isMobile() && this.peekOnly) this.setPeek(false);
   }
 
-  private renderWritingReader(_section: WritingSection, item: TalkItem): void {
+  private renderWritingReader(_section: WritingSection, item: WritingItem): void {
     if (!this.experienceDetail) return;
+    const title = writingTitle(item);
+    const meta = writingMeta(item);
     const wrap = document.createElement('article');
     wrap.className = 'writings-reader';
     wrap.innerHTML = `
@@ -722,23 +746,27 @@ export class BuildingPanel {
       <p class="writings-reader__kicker"></p>
       <h3 class="writings-reader__title"></h3>
       <p class="writings-reader__meta"></p>
-      <div class="writings-reader__body">
-        <p class="writings-reader__p"></p>
-        <p class="writings-reader__p"></p>
-        <p class="writings-reader__p"></p>
-      </div>
       <a class="writings-reader__substack" href="#" rel="noopener noreferrer"></a>
     `;
     wrap.querySelector('.writings-reader__kicker')!.textContent = t('writings.reader.kicker');
-    wrap.querySelector('.writings-reader__title')!.textContent = t(item.titleKey as I18nKey);
-    wrap.querySelector('.writings-reader__meta')!.textContent = t(item.metaKey as I18nKey);
-    const paras = wrap.querySelectorAll('.writings-reader__p');
-    paras[0]!.textContent = t('writings.reader.p1');
-    paras[1]!.textContent = t('writings.reader.p2');
-    paras[2]!.textContent = t('writings.reader.p3');
+    wrap.querySelector('.writings-reader__title')!.textContent = title;
+    const metaEl = wrap.querySelector('.writings-reader__meta') as HTMLElement;
+    metaEl.textContent = meta;
+    metaEl.hidden = !meta;
+    const articleUrl = item.url;
     const sub = wrap.querySelector('.writings-reader__substack') as HTMLAnchorElement;
     sub.textContent = t('writings.substack');
-    sub.addEventListener('click', (e) => e.preventDefault());
+    sub.href = WRITINGS_SUBSTACK_URL;
+    sub.target = '_blank';
+    if (articleUrl) {
+      const open = document.createElement('a');
+      open.className = 'writings-reader__open';
+      open.href = articleUrl;
+      open.target = '_blank';
+      open.rel = 'noopener noreferrer';
+      open.textContent = title;
+      wrap.insertBefore(open, sub);
+    }
     this.experienceDetail.replaceChildren(wrap);
   }
 
