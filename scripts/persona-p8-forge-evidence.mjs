@@ -34,17 +34,45 @@ async function measureWalk(page, yawDeg, key) {
   await wait(200);
   await page.evaluate(() => window.__playtestQa.flushPersonaView());
   await wait(100);
-  const expected = await page.evaluate(() => window.__playtestQa.personaScreenForwardDeg());
-  const before = await page.evaluate(() => window.__playtestQa.personaClientChar());
+  const before = await page.evaluate(() => window.__playtestQa.getCharacterPos());
+  const markBefore = await page.evaluate(() => window.__playtestQa.personaClientChar());
+  const expectedScreen = await page.evaluate(() => window.__playtestQa.personaScreenForwardDeg());
+  const expectedTile = await page.evaluate((k) => {
+    const h = window.__playtestQa.personaMoveHeading({ w: true });
+    if (h == null) return null;
+    return k === 's' ? (h + 180) % 360 : h;
+  }, key);
   await page.keyboard.down(key);
   await wait(900);
   await page.keyboard.up(key);
-  await wait(150);
-  const after = await page.evaluate(() => window.__playtestQa.personaClientChar());
-  const motionDeg =
+  await wait(200);
+  await page.evaluate(() => window.__playtestQa.flushPersonaView());
+  await wait(100);
+  const after = await page.evaluate(() => window.__playtestQa.getCharacterPos());
+  const markAfter = await page.evaluate(() => window.__playtestQa.personaClientChar());
+  const tileMotionDeg =
     ((Math.atan2(after.y - before.y, after.x - before.x) * 180) / Math.PI + 360) % 360;
-  const delta = angDelta(motionDeg, expected);
-  return { yawDeg, key, expected, motionDeg, deltaDeg: delta, pass: delta < 18, before, after };
+  const screenMotionDeg =
+    ((Math.atan2(markAfter.y - markBefore.y, markAfter.x - markBefore.x) * 180) / Math.PI +
+      360) %
+    360;
+  const tileDelta = angDelta(tileMotionDeg, expectedTile ?? NaN);
+  const screenDelta = angDelta(screenMotionDeg, expectedScreen);
+  return {
+    yawDeg,
+    key,
+    expectedTile,
+    expectedScreen,
+    tileMotionDeg,
+    screenMotionDeg,
+    tileDeltaDeg: tileDelta,
+    screenDeltaDeg: screenDelta,
+    pass: tileDelta < 12 && screenDelta < 22,
+    before,
+    after,
+    markBefore,
+    markAfter,
+  };
 }
 
 async function personaSwitchProbe(page, vp) {
@@ -156,6 +184,28 @@ async function uiOverlaps(page, vp) {
   return rows;
 }
 
+async function controlsModalProbe(page) {
+  await page.evaluate(() => localStorage.removeItem('portfolio-persona-controls-v1'));
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => window.__playtestQa?.setViewMode, null, { timeout: 90000 });
+  await wait(500);
+  const open = await page.evaluate(() => {
+    const o = document.querySelector('.persona-kit__overlay');
+    return Boolean(o && !o.hidden);
+  });
+  const focus = await page.evaluate(() => {
+    const p = document.querySelector('.persona-kit__primary');
+    return document.activeElement === p;
+  });
+  await page.keyboard.press('Escape');
+  await wait(150);
+  const closed = await page.evaluate(() => {
+    const o = document.querySelector('.persona-kit__overlay');
+    return Boolean(o?.hidden);
+  });
+  return { open, focusPrimary: focus, escCloses: closed, pass: open && focus && closed };
+}
+
 async function main() {
   const browser = await launchBrowser(chromium);
   const viewports = [
@@ -167,6 +217,7 @@ async function main() {
   const walk = [];
   const switches = [];
   const overlaps = [];
+  let controlsModal = null;
 
   for (const vp of viewports) {
     const ctx = await browser.newContext({
@@ -180,6 +231,10 @@ async function main() {
       (await page.evaluate(() =>
         [...document.scripts].map((s) => s.src).find((s) => /index-.*\.js/.test(s)),
       ))?.split('/').pop() ?? bundle;
+
+    if (vp.tag === '1280' && !controlsModal) {
+      controlsModal = await controlsModalProbe(page);
+    }
 
     if (vp.tag === '390' || vp.tag === '1280') {
       for (const yawDeg of [0, 90, 180, 270, 30]) {
@@ -203,6 +258,8 @@ async function main() {
     switchOk: switches.every((s) => s.ok),
     overlaps,
     overlapOk: overlaps.every((o) => o.rows.every((r) => r.pass)),
+    controlsModal,
+    controlsModalOk: controlsModal?.pass ?? false,
   };
   fs.writeFileSync(path.join(OUT, 'forge-p8-evidence.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));

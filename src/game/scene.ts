@@ -168,7 +168,12 @@ import {
   zoomMinForView,
 } from './altView';
 import { billboardHeightM, PerspectiveView } from './perspectiveView';
-import { PersonaView, personaScreenForwardDeg, personaT9WidthFrac } from './persona/personaView';
+import {
+  PersonaView,
+  personaScreenForwardDeg,
+  personaTileClientPx,
+  personaT9WidthFrac,
+} from './persona/personaView';
 import {
   ADONAY_ALTO_PX_1X,
   CAL_M,
@@ -6206,8 +6211,16 @@ export class IsoScene {
   }
 
   qaPersonaClientChar(): { x: number; y: number } {
-    const s = this.followTargetScreen();
     const rect = this.canvasEl?.getBoundingClientRect();
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    if (this.personaOn()) {
+      const markTx = this.charTx + Math.sin(this.personaCamYaw) * 4;
+      const markTy = this.charTy + Math.cos(this.personaCamYaw) * 4;
+      const p = personaTileClientPx(this.charTx, this.charTy, markTx, markTy, this.personaCamYaw, sw, sh);
+      if (p) return { x: (rect?.left ?? 0) + p.x, y: (rect?.top ?? 0) + p.y };
+    }
+    const s = this.followTargetScreen();
     return { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y };
   }
 

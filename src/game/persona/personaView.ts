@@ -91,6 +91,23 @@ export function personaT9WidthFrac(
 type PersonaCam = { x: number; z: number; yaw: number };
 
 /** Screen-space angle (deg) of walking forward at yaw — for Forge W-key QA. */
+/** Client pixel of a map tile as drawn in persona view (for Forge screen-motion QA). */
+export function personaTileClientPx(
+  charTx: number,
+  charTy: number,
+  markTx: number,
+  markTy: number,
+  yawRad: number,
+  sw: number,
+  sh: number,
+): { x: number; y: number } | null {
+  const player = tileToPersonaMeters(charTx, charTy);
+  const mark = tileToPersonaMeters(markTx, markTy);
+  const cam = personaCam(player.x, player.z, yawRad);
+  const p = projectTp(mark.x, 0, mark.z, cam, sw, sh);
+  return p ? { x: p.x, y: p.y } : null;
+}
+
 export function personaScreenForwardDeg(
   charTx: number,
   charTy: number,
