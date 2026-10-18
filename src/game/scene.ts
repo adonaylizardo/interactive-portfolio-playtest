@@ -4448,6 +4448,10 @@ export class IsoScene {
       return;
     }
     if (arrived && leftSpawn && slow) {
+      if (this.jac.overlapsProp()) {
+        this.jac.sitWhy = `overlap sit=(${sit?.x},${sit?.y}) d=${distSit.toFixed(2)}`;
+        if (this.jac.skipCurrentSit()) return;
+      }
       this.jac.sitWhy = `arrived sit=(${sit?.x},${sit?.y}) d=${distSit.toFixed(2)} mph=${this.jac.mph}`;
       this.jacGetOut({ thenEnter: true });
       return;

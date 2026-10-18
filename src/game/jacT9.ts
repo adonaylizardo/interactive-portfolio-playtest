@@ -81,7 +81,7 @@ const STUCK_REPLAN_S = 0.5;
 /** Door taps use the spawn cache. Replans may search further. */
 const TAP_BFS_BUDGET = 0;
 /** Arrival = inside this radius of the collision-validated sit cell. */
-const SIT_CELL_R = 0.55;
+const SIT_CELL_R = 0.8;
 
 export type JacVisual = {
   obj: MapObject;
@@ -183,7 +183,7 @@ const EDGE_DIRS: [number, number][] = [
 const HARD_PROP_NAMES = new Set(['tree', 'muro']);
 
 /** Trees, benches, lamps, muro walls and fill solids — never this van's own cells. */
-function buildPropCells(): { all: Set<string>; hard: Set<string> } {
+function buildPropCells(): { all: Set<string>; hard: Set<string>; pits: Set<string> } {
   const self = new Set<string>();
   for (const o of objects) {
     if (o.id !== JAC_ID) continue;
@@ -197,6 +197,7 @@ function buildPropCells(): { all: Set<string>; hard: Set<string> } {
   }
   const all = new Set<string>(muroWallTiles());
   const hard = new Set<string>(muroWallTiles());
+  const pits = new Set<string>();
   for (const [x, y] of fill.solidCells) {
     const key = k(x, y);
     if (!self.has(key)) all.add(key);
@@ -214,17 +215,18 @@ function buildPropCells(): { all: Set<string>; hard: Set<string> } {
         if (HARD_PROP_NAMES.has(o.name)) hard.add(key);
         if (o.name === 'tree') {
           for (const [adx, ady] of CARDINALS) {
-            all.add(k(fx + dx + adx, fy + dy + ady));
+            pits.add(k(fx + dx + adx, fy + dy + ady));
           }
         }
       }
     }
   }
-  return { all, hard };
+  return { all, hard, pits };
 }
 const PROP_SETS = buildPropCells();
 const PROP_CELLS = PROP_SETS.all;
 const HARD_PROP_CELLS = PROP_SETS.hard;
+const TREE_PIT_CELLS = PROP_SETS.pits;
 
 function dirIndex(dir: FacingDir): number {
   const i = DIR_ORDER.indexOf(dir);
@@ -1267,7 +1269,7 @@ export class JacT9 {
 
   private cellBlocked(x: number, y: number): boolean {
     if (x < 0 || y < 0 || x >= MAP_WIDTH || y >= MAP_HEIGHT) return true;
-    if (PROP_CELLS.has(k(x, y))) return true;
+    if (PROP_CELLS.has(k(x, y)) || TREE_PIT_CELLS.has(k(x, y))) return true;
     const b = getBuildingAt(x, y);
     if (b && b.id !== JAC_ID && b.name !== 'muro' && b.name !== 'obelisco') return true;
     const c = cells[y]?.[x];
@@ -2087,6 +2089,10 @@ export class JacT9 {
     return !stepX && !stepY;
   }
 
+  skipCurrentSit(): boolean {
+    return this.tryNextSit();
+  }
+
   private tryNextSit(): boolean {
     if (!this.parkDoor) return false;
     if (this.driveGoal) this.skippedSits.add(k(this.driveGoal.x, this.driveGoal.y));
@@ -2522,7 +2528,7 @@ export class JacT9 {
     };
     for (const [x, y] of this.rect(o.x, o.y, w, h)) {
       if (x < 0 || y < 0 || x >= MAP_WIDTH || y >= MAP_HEIGHT) return false;
-      if (PROP_CELLS.has(k(x, y))) return false;
+      if (PROP_CELLS.has(k(x, y)) || TREE_PIT_CELLS.has(k(x, y))) return false;
       const b = getBuildingAt(x, y);
       if (b && b.id !== JAC_ID && b.name !== 'muro' && b.name !== 'obelisco') return false;
       const c = cells[y]?.[x];
@@ -2543,7 +2549,7 @@ export class JacT9 {
     const rear = DIR_VEC[dir];
     const extra = rear.x !== 0 ? this.rect(o.x - rear.x, o.y, 1, size.h) : this.rect(o.x, o.y - rear.y, size.w, 1);
     for (const [x, y] of extra) {
-      if (PROP_CELLS.has(k(x, y))) return false;
+      if (PROP_CELLS.has(k(x, y)) || TREE_PIT_CELLS.has(k(x, y))) return false;
     }
     return true;
   }
@@ -2565,7 +2571,7 @@ export class JacT9 {
       [o.x - 1, o.y - 1],
     ];
     for (const [x, y] of extra) {
-      if (PROP_CELLS.has(k(x, y))) return false;
+      if (PROP_CELLS.has(k(x, y)) || TREE_PIT_CELLS.has(k(x, y))) return false;
     }
     return true;
   }
