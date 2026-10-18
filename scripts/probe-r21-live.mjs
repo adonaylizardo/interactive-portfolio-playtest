@@ -61,7 +61,8 @@ async function realTap(page, cdp, x, y, touch) {
 }
 
 async function boot(page) {
-  await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+  const url = /[?&]npcs=/.test(BASE) ? BASE : `${BASE}${BASE.includes('?') ? '&' : '?'}npcs=0`;
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
   for (let i = 0; i < 80; i++) {
     if (await page.evaluate(() => Boolean(window.__playtestQa?.jac))) return;
     await wait(150);
