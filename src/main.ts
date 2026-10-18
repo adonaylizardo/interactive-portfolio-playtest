@@ -10,7 +10,7 @@ import {
   MAP_TRAMOS,
   validateWalkGridFootprint,
 } from './data/map';
-import { parseInteriorFromHash } from './camera/hash';
+import { parseInteriorFromHash, setHashWriteSuppressed } from './camera/hash';
 import { isMobileLayout } from './checklist/ui';
 import {
   isReadingHash,
@@ -46,6 +46,7 @@ async function main(): Promise<void> {
   const syncReadingFromHash = (): void => {
     const route = parseReadingRoute();
     if (route) {
+      setHashWriteSuppressed(true);
       reading.syncRoute(route);
       checklist.setCollapsed(true);
       if (!isMobileLayout()) chrome.setLayout('panel');
@@ -54,6 +55,7 @@ async function main(): Promise<void> {
       scene?.applyCameraFromUi();
       return;
     }
+    setHashWriteSuppressed(false);
     reading.syncRoute(null);
     scene?.applyCameraFromUi();
   };
@@ -249,6 +251,9 @@ async function main(): Promise<void> {
     },
     { passive: false, capture: true },
   );
+  const bootReading = parseReadingRoute();
+  if (bootReading) setHashWriteSuppressed(true);
+
   await scene.init(canvas);
   chrome.beginSoundHint();
   const bootFocus = new URLSearchParams(location.search).get('focus');
@@ -257,7 +262,6 @@ async function main(): Promise<void> {
     scene.focusJac();
   }
 
-  const bootReading = parseReadingRoute();
   if (bootReading) {
     syncReadingFromHash();
   } else {

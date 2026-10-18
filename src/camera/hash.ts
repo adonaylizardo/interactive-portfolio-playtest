@@ -1,3 +1,5 @@
+import { isReadingHash } from '../ui/readingRoute';
+
 const HASH_PREFIX = 'view=';
 
 export type CameraView = {
@@ -77,6 +79,7 @@ export function setHashWriteSuppressed(suppressed: boolean): void {
 }
 
 function flushHash(view: CameraView, replace: boolean): void {
+  if (isReadingHash()) return;
   const interiorId = view.interiorId !== undefined ? view.interiorId : lastInteriorId;
   if (view.interiorId !== undefined) lastInteriorId = view.interiorId;
   const next = buildHash({ ...view, interiorId: interiorId || null });
@@ -106,6 +109,7 @@ export function writeInteriorToHash(
   cam: CameraView,
   mode: 'replace' | 'push' = 'replace',
 ): void {
+  if (isReadingHash() || suppressDebouncedHash) return;
   if (writeTimer) clearTimeout(writeTimer);
   writeTimer = null;
   lastInteriorId = interiorId;
@@ -117,6 +121,7 @@ export function pushInteriorEntry(
   cam: CameraView,
   outdoorCam: { x: number; y: number; zoom: number },
 ): void {
+  if (isReadingHash() || suppressDebouncedHash) return;
   if (writeTimer) clearTimeout(writeTimer);
   writeTimer = null;
   lastInteriorId = interiorId;
@@ -130,6 +135,7 @@ export function pushInteriorEntry(
 }
 
 export function replaceOutdoorHash(cam: CameraView): void {
+  if (isReadingHash() || suppressDebouncedHash) return;
   if (writeTimer) clearTimeout(writeTimer);
   writeTimer = null;
   lastInteriorId = null;

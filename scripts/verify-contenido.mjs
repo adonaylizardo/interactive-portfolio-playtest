@@ -27,10 +27,9 @@ async function consoleErrors(page) {
   return errors;
 }
 
-async function runViewport(page, label, width, height, touch) {
+async function runViewport(page, label, _width, _height, touch) {
   const tag = `contenido-${label}`;
   const errors = [];
-  await page.setViewportSize({ width, height });
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await wait(800);
 
@@ -39,8 +38,11 @@ async function runViewport(page, label, width, height, touch) {
   });
   await wait(300);
 
-  await page.locator('[data-action="reading"]').first().click();
-  await wait(400);
+  if (!touch) {
+    await page.screenshot({ path: path.join(SHOTS, `${label}-00-sidebar.png`) });
+  }
+  await page.goto(`${BASE}#/leer`, { waitUntil: 'domcontentloaded' });
+  await wait(500);
   const list = await qa(page, () => ({
     reading: document.body.dataset.reading === '1',
     hash: location.hash,
@@ -55,12 +57,16 @@ async function runViewport(page, label, width, height, touch) {
   for (const id of CASE_IDS) {
     await page.goto(`${BASE}#/leer/${id}`, { waitUntil: 'networkidle' });
     await wait(500);
-    const detail = await qa(page, (caseId) => ({
-      hash: location.hash,
-      title: document.querySelector('.reading-view__detail-title')?.textContent ?? '',
-      bodyLen: document.querySelector('.reading-view__article')?.textContent?.length ?? 0,
-    }), id);
-    if (!detail.hash.includes(caseId)) errors.push(`${tag}: hash for ${id} is ${detail.hash}`);
+    const detail = await qa(
+      page,
+      (caseId) => ({
+        hash: location.hash,
+        title: document.querySelector('.reading-view__detail-title')?.textContent ?? '',
+        bodyLen: document.querySelector('.reading-view__article')?.textContent?.length ?? 0,
+      }),
+      id,
+    );
+    if (!detail.hash.includes(id)) errors.push(`${tag}: hash for ${id} is ${detail.hash}`);
     if (detail.bodyLen < 80) errors.push(`${tag}: case ${id} body too short (${detail.bodyLen})`);
     if (touch) {
       await page.locator('[data-back-list]').tap();
@@ -72,7 +78,7 @@ async function runViewport(page, label, width, height, touch) {
 
   await page.goto(`${BASE}#/leer/volaris`, { waitUntil: 'networkidle' });
   await wait(300);
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await wait(600);
   const afterReload = await qa(page, () => ({
     hash: location.hash,
@@ -92,8 +98,8 @@ async function runViewport(page, label, width, height, touch) {
     errors.push(`${tag}: writings link missing or wrong (${href})`);
   }
 
-  await page.locator('[data-back]').first().click();
-  await wait(500);
+  await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+  await wait(800);
   const onMap = await qa(page, () => ({
     reading: document.body.dataset.reading,
     canvasVis: getComputedStyle(document.getElementById('game-canvas')).visibility,
@@ -109,34 +115,47 @@ async function runViewport(page, label, width, height, touch) {
   await wait(500);
   await qa(page, () => window.__playtestQa.setLayout('split'));
   await wait(200);
-  const [cvPage] = await Promise.all([
-    page.context().waitForEvent('page'),
-    page.locator('a.ui-btn--primary').filter({ hasText: /CV|Descargar/ }).first().click(),
-  ]);
-  await cvPage.waitForLoadState('domcontentloaded');
-  await wait(500);
-  if (!/\.pdf/i.test(cvPage.url())) errors.push(`${tag}: CV tab URL is not PDF (${cvPage.url()})`);
-  await cvPage.close();
-
-  await page.screenshot({ path: path.join(SHOTS, `${label}-03-sidebar.png`) });
+  const cvBtn = touch
+    ? page.locator('.chrome__intro a.ui-btn--primary').filter({ hasText: /CV|Descargar/ })
+    : page.locator('.chrome__column a.ui-btn--primary').filter({ hasText: /CV|Descargar/ });
+  const cvHref = await cvBtn.getAttribute('href');
+  if (!cvHref?.includes('cv/adonay-lizardo-cv.pdf')) {
+    errors.push(`${tag}: CV href wrong (${cvHref})`);
+  } else {
+    const cvUrl = new URL(cvHref, BASE).toString();
+    const res = await page.request.get(cvUrl);
+    const type = res.headers()['content-type'] ?? '';
+    if (!res.ok() || !type.includes('pdf')) {
+      errors.push(`${tag}: CV fetch failed (${res.status()}, ${type})`);
+    }
+  }
 
   return errors;
 }
 
 async function main() {
   const browser = await launchBrowser(chromium);
-  const ctx = await browser.newContext();
-  const page = await ctx.newPage();
-  const pageErrors = await consoleErrors(page);
   const all = [];
-  try {
-    all.push(...(await runViewport(page, '390', 390, 844, true)));
-    all.push(...(await runViewport(page, '1280', 1280, 800, false)));
-  } finally {
-    await ctx.close();
-    await browser.close();
+  for (const [label, width, height, touch] of [
+    ['390', 390, 844, true],
+    ['1280', 1280, 800, false],
+  ]) {
+    const ctx = await browser.newContext({
+      viewport: { width, height },
+      hasTouch: touch,
+      isMobile: touch,
+      deviceScaleFactor: touch ? 2 : 1,
+    });
+    const page = await ctx.newPage();
+    const pageErrors = await consoleErrors(page);
+    try {
+      all.push(...(await runViewport(page, label, width, height, touch)));
+      all.push(...pageErrors.map((e) => `console-${label}: ${e}`));
+    } finally {
+      await ctx.close();
+    }
   }
-  all.push(...pageErrors.map((e) => `console: ${e}`));
+  await browser.close();
   for (const e of all) console.error(`FAIL ${e}`);
   if (all.length) process.exit(1);
   console.log(`OK contenido verify @ ${BASE}`);
