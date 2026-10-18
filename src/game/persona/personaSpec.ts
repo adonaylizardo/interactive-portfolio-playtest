@@ -19,7 +19,7 @@ export const JAC_T9_POSE = { x: 2.0, z: 8.2, widthM: 1.96 } as const;
 /** Beside-van target width @1280 reference (frame C ≈0.24–0.35 vw). */
 export const T9_TARGET_VW = 0.24;
 /** Single art-pipeline multiplier on projected billboard scale (not per-frame vw renorm). */
-export const T9_PROJECTION_CALIB = 1.12;
+export const T9_PROJECTION_CALIB = 1.48;
 
 /** Calibration: jac spawn tile ↔ frame-C player meters. */
 export const CAL_TILE = { x: 27, y: 18 };

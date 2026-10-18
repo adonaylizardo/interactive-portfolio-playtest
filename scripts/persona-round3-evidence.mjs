@@ -241,8 +241,6 @@ async function runViewport(tag, vp) {
     t9Near <= 0.42 &&
     Number.isFinite(t9Far) &&
     t9Far < t9Near * 0.72;
-  console.log(`${tag} t9 near=${t9Near} far=${t9Far} pass=${t9PerspectivePass}`);
-
   const leak = await uiLeakCheck(page);
   const overlaps = await overlapProbe(page);
 
