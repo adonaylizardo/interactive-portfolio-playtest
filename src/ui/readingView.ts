@@ -2,9 +2,10 @@ import { ABOUT } from '../data/about';
 import {
   CASE_CARD_TITLES,
   CASE_HOUSE_IDS,
-  CASES,
+  caseForLang,
   isCaseHouse,
   type CaseBlock,
+  type CaseHouseId,
 } from '../data/cases';
 import {
   TALK_SECTIONS,
@@ -15,9 +16,8 @@ import {
   type TalkItem,
   type WritingItem,
 } from '../data/experiences';
-import { VOICE_LINES } from '../data/voice-lines';
 import { iconSvg } from './icons';
-import { onLangChange, setLang, t, type I18nKey } from './i18n';
+import { getLang, onLangChange, setLang, t, type I18nKey } from './i18n';
 import {
   talkMeta,
   talkSectionTitle,
@@ -30,21 +30,19 @@ import { navigateReading, type ReadingRoute } from './readingRoute';
 
 const LANDMARK_IDS = ['sambil', 'catedral', 'flor'] as const;
 
-const LIST_ROWS: { slug: string; section: I18nKey; label: string; summary?: string }[] = [
-  { slug: 'estudio', section: 'read.section.about', label: 'Estudio' },
+const LIST_ROWS: { slug: string; section: I18nKey; labelKey?: I18nKey; label?: string }[] = [
+  { slug: 'estudio', section: 'read.section.about', labelKey: 'read.section.about' },
   ...CASE_HOUSE_IDS.map((id) => ({
     slug: id,
     section: 'read.section.cases' as I18nKey,
     label: CASE_CARD_TITLES[id],
-    summary: CASES[id]?.subtitle,
   })),
-  { slug: 'talks', section: 'read.section.talks', label: 'Talks' },
-  { slug: 'writings', section: 'read.section.writings', label: 'Writings' },
+  { slug: 'talks', section: 'read.section.talks', labelKey: 'read.section.talks' },
+  { slug: 'writings', section: 'read.section.writings', labelKey: 'read.section.writings' },
   ...LANDMARK_IDS.map((id) => ({
     slug: id,
     section: 'read.section.landmarks' as I18nKey,
-    label: CASES[id]?.headline ?? id,
-    summary: VOICE_LINES[CASES[id]?.voice ?? '']?.script_text,
+    label: id === 'flor' ? 'Flor de Venezuela' : id === 'catedral' ? 'Catedral' : 'Sambil',
   })),
 ];
 
@@ -119,6 +117,9 @@ export class ReadingView {
         <button type="button" class="reading-view__back ui-btn ui-btn--secondary" data-back-list hidden>
           ${iconSvg('chevron')} <span data-i18n="read.backToList">Volver a la lista</span>
         </button>
+        <button type="button" class="reading-view__back ui-btn ui-btn--secondary" data-back-map hidden>
+          ${iconSvg('chevron')} <span data-i18n="read.backToMap">Volver al mapa</span>
+        </button>
         <h1 class="reading-view__site-title" data-i18n="read.title">Leer</h1>
         <div class="reading-view__lang chrome__lang" role="group" aria-label="Language" data-i18n-aria="chrome.language">
           <button type="button" class="chrome__lang-opt" data-lang="en">EN</button>
@@ -133,18 +134,25 @@ export class ReadingView {
     this.main.className = 'reading-view__main';
     this.scroll.appendChild(this.main);
     this.bind();
-    onLangChange(() => this.applyI18n());
+    onLangChange(() => {
+      this.applyI18n();
+      if (!this.root.hidden) this.render();
+    });
   }
 
   private bind(): void {
     this.root.querySelector('[data-back]')?.addEventListener('click', () => this.onExitMap());
     this.root.querySelector('[data-back-list]')?.addEventListener('click', () => {
-      navigateReading({ kind: 'list' });
-      this.route = { kind: 'list' };
-      this.applyI18n();
-      this.render();
-      this.scroll.scrollTop = 0;
+      if (window.history.length > 1) window.history.back();
+      else {
+        navigateReading({ kind: 'list' }, 'replace');
+        this.route = { kind: 'list' };
+        this.applyI18n();
+        this.render();
+        this.scroll.scrollTop = 0;
+      }
     });
+    this.root.querySelector('[data-back-map]')?.addEventListener('click', () => this.onExitMap());
     this.root.querySelectorAll('[data-lang]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const lang = (btn as HTMLElement).dataset.lang;
@@ -183,9 +191,15 @@ export class ReadingView {
     });
     const backMap = this.root.querySelector('[data-back]') as HTMLElement;
     const backList = this.root.querySelector('[data-back-list]') as HTMLElement;
+    const backMapDetail = this.root.querySelector('[data-back-map]') as HTMLElement;
     const onDetail = this.route.kind === 'detail';
+    const slug = this.route.kind === 'detail' ? this.route.slug : '';
+    const caseLike =
+      onDetail &&
+      (isCaseHouse(slug) || LANDMARK_IDS.includes(slug as (typeof LANDMARK_IDS)[number]));
     backMap.hidden = onDetail;
-    backList.hidden = !onDetail;
+    backList.hidden = !onDetail || caseLike;
+    backMapDetail.hidden = !caseLike;
   }
 
   private render(): void {
@@ -212,7 +226,16 @@ export class ReadingView {
         h.textContent = t(row.section);
         frag.appendChild(h);
       }
-      frag.appendChild(this.listRow(row.slug, row.label, row.summary));
+      const label = row.label ?? (row.labelKey ? t(row.labelKey) : row.slug);
+      const summary = isCaseHouse(row.slug as CaseHouseId)
+        ? caseForLang(row.slug, getLang())?.subtitle
+        : LANDMARK_IDS.includes(row.slug as (typeof LANDMARK_IDS)[number])
+          ? (() => {
+              const b = caseForLang(row.slug, getLang())?.full[0];
+              return b && b.kind === 'section' ? b.paragraphs[0] : undefined;
+            })()
+          : undefined;
+      frag.appendChild(this.listRow(row.slug, label, summary));
     }
     this.main.replaceChildren(frag);
   }
@@ -269,7 +292,7 @@ export class ReadingView {
     wrap.className = 'reading-view__article reading-view__article--about';
     const h = document.createElement('h2');
     h.className = 'reading-view__detail-title';
-    h.textContent = 'Estudio';
+    h.textContent = t('read.section.about');
     wrap.appendChild(h);
     for (const block of ABOUT) {
       if (block.kind === 'heading') {
@@ -315,9 +338,10 @@ export class ReadingView {
   }
 
   private renderCase(id: string): void {
-    const content = CASES[id];
+    const content = caseForLang(id, getLang());
     const wrap = document.createElement('article');
     wrap.className = 'reading-view__article case-read';
+    wrap.lang = getLang();
     const h = document.createElement('h2');
     h.className = 'reading-view__detail-title';
     h.textContent = isCaseHouse(id) ? CASE_CARD_TITLES[id] : (content?.headline ?? id);
@@ -340,7 +364,7 @@ export class ReadingView {
     wrap.className = 'reading-view__article';
     const h = document.createElement('h2');
     h.className = 'reading-view__detail-title';
-    h.textContent = 'Talks';
+    h.textContent = t('read.section.talks');
     wrap.appendChild(h);
     if (TALKS_COMING_SOON || TALKS.length === 0) {
       const p = document.createElement('p');
@@ -404,7 +428,7 @@ export class ReadingView {
     wrap.className = 'reading-view__article';
     const h = document.createElement('h2');
     h.className = 'reading-view__detail-title';
-    h.textContent = 'Writings';
+    h.textContent = t('read.section.writings');
     wrap.appendChild(h);
     const list = document.createElement('div');
     list.className = 'reading-view__stack';

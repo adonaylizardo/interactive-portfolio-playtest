@@ -4764,6 +4764,13 @@ export class IsoScene {
     return { x: rect.left + screen.x, y: rect.top + screen.y };
   }
 
+  /** Pause map simulation while the reading view is open (saves CPU on long-form pages). */
+  setReadingPaused(paused: boolean): void {
+    if (!this.app) return;
+    if (paused) this.app.ticker.stop();
+    else this.app.ticker.start();
+  }
+
   /** For QA — place character on a walkable tile without opening doors. */
   setSuppressTapForQa(ms: number): void {
     this.suppressTapUntil = performance.now() + ms;

@@ -1,6 +1,6 @@
 import { studio } from '../audio/studio';
 import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
-import { CASES, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
+import { caseForLang, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
 import {
   TALK_SECTIONS,
   TALKS,
@@ -21,7 +21,7 @@ import {
 } from './contentLabels';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
 import { iconSvg } from './icons';
-import { onLangChange, t, type I18nKey } from './i18n';
+import { getLang, onLangChange, t, type I18nKey } from './i18n';
 
 function aboutBlockNode(block: AboutBlock): HTMLElement {
   if (block.kind === 'heading') {
@@ -289,6 +289,12 @@ export class BuildingPanel {
     onLangChange(() => {
       this.applyI18n();
       this.refreshExperienceCopy();
+      if (this.interiorId && this.mode === 'interior') {
+        this.setTitle(this.openKey, this.renderCase());
+      }
+      if (this.isPreviewMode() && this.interiorId) {
+        this.syncCasePreview(this.interiorId);
+      }
     });
     // Touch has no hover: a tap shows that logo's colours until another logo (or the same one) is tapped.
     this.workedWithEl.addEventListener('click', (e) => {
@@ -522,9 +528,7 @@ export class BuildingPanel {
 
   private syncExperienceIntro(): void {
     if (!this.experienceIntro) return;
-    const showTalksIntro = this.mode === 'talks' && !TALKS_COMING_SOON && TALKS.length > 0;
-    this.experienceIntro.hidden = !showTalksIntro;
-    if (showTalksIntro) this.experienceIntro.textContent = t('talks.intro');
+    this.experienceIntro.hidden = true;
   }
 
   private refreshExperienceCopy(): void {
@@ -859,7 +863,7 @@ export class BuildingPanel {
     this.aboutEl.style.contentVisibility = '';
     this.el.removeAttribute('inert');
     this.el.classList.remove('building-panel--snap');
-    const preview = casePreviewCopy(interiorId);
+    const preview = casePreviewCopy(interiorId, getLang());
     const shown = this.renderCase();
     const title = preview?.title ?? shown ?? interiorId;
     const subtitle = preview?.subtitle ?? '';
@@ -924,8 +928,10 @@ export class BuildingPanel {
 
   /** Fills the case article for the current interior; returns its headline, or null when there is no case. */
   private renderCase(): string | null {
-    const content = this.interiorId ? CASES[this.interiorId] : undefined;
+    const lang = getLang();
+    const content = this.interiorId ? caseForLang(this.interiorId, lang) : undefined;
     this.caseEl.hidden = !content;
+    this.caseEl.lang = lang;
     this.el.classList.toggle('building-panel--case', !!content);
     const full = this.caseEl.querySelector('.case__version--full')!;
     const short = this.caseEl.querySelector('.case__version--short')!;
@@ -933,6 +939,15 @@ export class BuildingPanel {
     short.replaceChildren(...(content ? content.short.map(caseBlockNode) : []));
     if (!content) return null;
     return this.isMobile() ? (content.shortHeadline ?? content.headline) : content.headline;
+  }
+
+  private syncCasePreview(interiorId: string): void {
+    const preview = casePreviewCopy(interiorId, getLang());
+    if (!preview) return;
+    const teaser = this.isMobile() ? preview.teaser : (preview.teaserFull ?? preview.teaser);
+    if (this.previewTitle) this.previewTitle.textContent = preview.title;
+    if (this.previewSubtitle) this.previewSubtitle.textContent = preview.subtitle;
+    if (this.previewTeaser) this.previewTeaser.textContent = teaser;
   }
 
   private renderAbout(): void {

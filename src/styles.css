@@ -169,6 +169,10 @@ body.is-canvas-dragging * {
   pointer-events: auto;
 }
 
+#ui-root > .building-map-labels {
+  pointer-events: none;
+}
+
 #ui-root > .building-panel.building-panel--open .building-panel__sheet {
   pointer-events: auto;
 }
@@ -933,11 +937,11 @@ body[data-layout='panel'] .checklist {
 }
 
 @media (max-width: 767px) {
-  .case__version--full {
+  .building-panel .case__version--full {
     display: none;
   }
 
-  .case__version--short {
+  .building-panel .case__version--short {
     display: block;
   }
 }
@@ -1231,6 +1235,7 @@ body[data-layout='panel'] .checklist {
 }
 
 .building-map-label {
+  pointer-events: none;
   position: absolute;
   top: 0;
   left: 0;

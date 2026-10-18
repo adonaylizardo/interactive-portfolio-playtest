@@ -1,4 +1,6 @@
 import { VOICE_LINES } from './voice-lines';
+import type { Lang } from '../ui/i18n';
+import { CASES_ES } from './cases.es';
 
 /**
  * Panel copy, keyed by building id. English text is verbatim from
@@ -69,9 +71,9 @@ export type CasePreviewCopy = {
 };
 
 /** Door-step card: CASE label, name, one-line role, headline teaser. */
-export function casePreviewCopy(id: string): CasePreviewCopy | null {
+export function casePreviewCopy(id: string, lang: Lang = 'es'): CasePreviewCopy | null {
   if (!isCaseHouse(id)) return null;
-  const content = CASES[id];
+  const content = caseForLang(id, lang);
   if (!content) return null;
   const title = CASE_CARD_TITLES[id];
   const headings = sectionHeadings(content.full).slice(0, 3);
@@ -360,3 +362,10 @@ export const CASES: Record<string, CaseContent> = {
   catedral: landmarkVoiceCopy('Catedral', '09-cathedral', '09-cathedral'),
   flor: landmarkVoiceCopy('Flor de Venezuela', '08-flor-de-venezuela', '08-flor-de-venezuela'),
 };
+
+export function caseForLang(id: string, lang: Lang): CaseContent | undefined {
+  const en = CASES[id];
+  if (!en) return undefined;
+  if (lang === 'es') return CASES_ES[id] ?? en;
+  return en;
+}

@@ -52,11 +52,16 @@ async function main(): Promise<void> {
       if (!isMobileLayout()) chrome.setLayout('panel');
       else chrome.setLayout('map');
       panel.hide({ snap: true, silent: true });
+      scene?.setReadingPaused(true);
+      mapLabels.setHidden(true);
       scene?.applyCameraFromUi();
       return;
     }
     setHashWriteSuppressed(false);
     reading.syncRoute(null);
+    scene?.setReadingPaused(false);
+    mapLabels.setHidden(false);
+    if (!isMobileLayout()) chrome.setLayout('split');
     scene?.applyCameraFromUi();
   };
 

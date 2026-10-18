@@ -166,6 +166,16 @@
   font-size: 16px;
 }
 
+.reading-view .case__text,
+.reading-view .case__list {
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.reading-view .case__heading {
+  font-size: 14px;
+}
+
 .reading-view__substack {
   display: inline-flex;
   margin-top: 20px;
