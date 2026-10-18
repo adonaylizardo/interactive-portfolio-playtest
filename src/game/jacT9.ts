@@ -2010,7 +2010,7 @@ export class JacT9 {
   /** True when the 2×2 sit is inside the arrival radius of the chosen park cell. */
   atParkSit(goal = this.driveGoal): boolean {
     if (!goal) return false;
-    const r = this.followLoose ? SIT_CELL_R : 1.25;
+    const r = this.followLoose ? SIT_CELL_R : 1.4;
     return Math.hypot(goal.x - this.cx, goal.y - this.cy) <= r;
   }
 
