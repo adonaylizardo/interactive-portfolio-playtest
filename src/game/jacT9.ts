@@ -179,8 +179,10 @@ const EDGE_DIRS: [number, number][] = [
   [-1, -1],
 ];
 
+const HARD_PROP_NAMES = new Set(['tree', 'muro']);
+
 /** Trees, benches, lamps, muro walls and fill solids — never this van's own cells. */
-function buildPropCells(): Set<string> {
+function buildPropCells(): { all: Set<string>; hard: Set<string> } {
   const self = new Set<string>();
   for (const o of objects) {
     if (o.id !== JAC_ID) continue;
@@ -192,10 +194,11 @@ function buildPropCells(): Set<string> {
       for (let dx = 0; dx < w; dx++) self.add(k(fx + dx, fy + dy));
     }
   }
-  const out = new Set<string>(muroWallTiles());
+  const all = new Set<string>(muroWallTiles());
+  const hard = new Set<string>(muroWallTiles());
   for (const [x, y] of fill.solidCells) {
     const key = k(x, y);
-    if (!self.has(key)) out.add(key);
+    if (!self.has(key)) all.add(key);
   }
   for (const o of objects) {
     if (o.id === JAC_ID || o.flat || !PROP_NAMES.has(o.name)) continue;
@@ -204,12 +207,18 @@ function buildPropCells(): Set<string> {
     const w = o.w ?? 1;
     const h = o.h ?? 1;
     for (let dy = 0; dy < h; dy++) {
-      for (let dx = 0; dx < w; dx++) out.add(k(fx + dx, fy + dy));
+      for (let dx = 0; dx < w; dx++) {
+        const key = k(fx + dx, fy + dy);
+        all.add(key);
+        if (HARD_PROP_NAMES.has(o.name)) hard.add(key);
+      }
     }
   }
-  return out;
+  return { all, hard };
 }
-const PROP_CELLS = buildPropCells();
+const PROP_SETS = buildPropCells();
+const PROP_CELLS = PROP_SETS.all;
+const HARD_PROP_CELLS = PROP_SETS.hard;
 
 function dirIndex(dir: FacingDir): number {
   const i = DIR_ORDER.indexOf(dir);
@@ -569,6 +578,21 @@ export class JacT9 {
   setDrivePath(path: { x: number; y: number }[], goal: { x: number; y: number }, opts?: { loose?: boolean }): void {
     this.drivePath = path;
     this.driveGoal = goal;
+    if (opts?.loose && path.length > 0) {
+      const start = path[0];
+      if (Math.hypot(this.cx - start.x, this.cy - start.y) <= 2.6) {
+        this.cx = start.x;
+        this.cy = start.y;
+        const nxt = path[1] ?? goal;
+        const dx = nxt.x - start.x;
+        const dy = nxt.y - start.y;
+        const dir: FacingDir =
+          Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'se' : 'nw') : dy >= 0 ? 'sw' : 'ne';
+        this.dir = dir;
+        this.heading = dirIndex(dir);
+        if (path.length > 1) this.drivePath = path.slice(1);
+      }
+    }
     this.gearHeld = false;
     this.gearReleased = true;
     this.replanN = 0;
@@ -709,7 +733,8 @@ export class JacT9 {
     if (this.driveGoal && this.stuckT >= STUCK_REPLAN_S * 0.4) {
       this.skippedSits.add(k(this.driveGoal.x, this.driveGoal.y));
     }
-    const origin = k(Math.round(this.cx), Math.round(this.cy));
+    const originCell = this.laneOrigin();
+    const origin = k(originCell.x, originCell.y);
     const cacheKey = `${origin}>${doorX},${doorY}`;
     const cached = this.doorRouteCache.get(cacheKey);
     if (cached && !this.skippedSits.has(k(cached.x, cached.y)) && this.sitCellHoldable(cached.x, cached.y)) {
@@ -734,31 +759,36 @@ export class JacT9 {
     doorY: number,
     _bfsBudget: number,
   ): { x: number; y: number; path: { x: number; y: number }[]; heading: FacingDir } | null {
-    const sx = Math.round(this.cx);
-    const sy = Math.round(this.cy);
+    const originCell = this.laneOrigin();
+    const sx = originCell.x;
+    const sy = originCell.y;
     const usable = this.sitsForDoor(doorX, doorY).filter(
       (c) => !this.skippedSits.has(k(c.x, c.y)) && this.sitCellHoldable(c.x, c.y),
     );
-    const doorSide = usable.filter((c) => c.along >= 0);
+    const doorSide = usable.filter(
+      (c) => c.along >= 0 && Math.hypot(c.x - sx, c.y - sy) > 2.4,
+    );
     const closeEnough = doorSide.filter((c) => Math.hypot(c.x - doorX, c.y - doorY) <= 8);
-    const pool = closeEnough.length ? closeEnough : doorSide.length ? doorSide : usable;
+    const front = closeEnough.filter((c) => c.along >= 1 && c.doorD >= 3 && c.doorD <= 6);
+    const pool = front.length ? front : closeEnough.length ? closeEnough : doorSide.length ? doorSide : usable;
     if (pool.length === 0) return null;
     const prefer = (c: DoorSit) => (cells[c.y]?.[c.x]?.groundId?.includes('park') ? 0 : 1);
     const closeness = (c: DoorSit) => Math.abs(c.doorD - 3.5);
     const doorHug = (c: DoorSit) => (this.parkTouchesDoor(c.x, c.y, c.heading, doorX, doorY) ? 1 : 0);
-    const front = (c: DoorSit) => (c.along >= 1 && c.doorD >= 3 && c.doorD <= 5 ? 0 : 1);
     const origin = k(sx, sy);
     const exit = this.nearestRoadExit(sx, sy);
+    const start = this.driveLaneWalkable(sx, sy) ? { x: sx, y: sy } : exit;
     const goals = new Set(pool.map((c) => k(c.x, c.y)));
-    const fromExit = this.driveBfsMany(exit.x, exit.y, goals);
-    const pass = (x: number, y: number) => this.driveBoxWalkable(x, y) || (x === exit.x && y === exit.y);
+    const fromStart = this.driveBfsMany(start.x, start.y, goals);
+    const pass = (x: number, y: number) => this.driveLaneWalkable(x, y) || (x === start.x && y === start.y);
     const scored: { c: DoorSit; path: { x: number; y: number }[] }[] = [];
     for (const cand of pool) {
       const rest =
-        this.axisDrivePath(exit.x, exit.y, cand.x, cand.y, pass) ??
-        fromExit.get(k(cand.x, cand.y));
-      if (!rest && !(cand.x === exit.x && cand.y === exit.y)) continue;
-      const path = exit.path.concat(rest ?? []);
+        this.axisDrivePath(start.x, start.y, cand.x, cand.y, pass) ??
+        fromStart.get(k(cand.x, cand.y));
+      if (!rest && !(cand.x === start.x && cand.y === start.y)) continue;
+      const hop = start.x === sx && start.y === sy ? [] : exit.path;
+      const path = hop.concat(rest ?? []);
       if (!this.pathReachesSit(path, cand.x, cand.y, sx, sy)) continue;
       if (this.pathsFrom === origin) this.pathToSit.set(k(cand.x, cand.y), path);
       scored.push({ c: cand, path });
@@ -767,7 +797,6 @@ export class JacT9 {
       (a, b) =>
         doorHug(a.c) - doorHug(b.c) ||
         a.path.length - b.path.length ||
-        front(a.c) - front(b.c) ||
         prefer(a.c) - prefer(b.c) ||
         closeness(a.c) - closeness(b.c) ||
         a.c.walkD - b.c.walkD,
@@ -792,16 +821,44 @@ export class JacT9 {
     return false;
   }
 
+  /** Integer lane cell nearest the sit — `round(25.5)` is 26 and misses the south road. */
+  private laneOrigin(): { x: number; y: number } {
+    const gx = this.cx;
+    const gy = this.cy;
+    const seeds: { x: number; y: number }[] = [
+      { x: Math.round(gx - 0.5), y: Math.round(gy) },
+      { x: Math.floor(gx), y: Math.round(gy) },
+      { x: Math.round(gx), y: Math.round(gy) },
+      { x: Math.ceil(gx), y: Math.round(gy) },
+    ];
+    let best = seeds[0];
+    let bestD = Infinity;
+    const seen = new Set<string>();
+    for (const s of seeds) {
+      const id = k(s.x, s.y);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      if (!this.driveLaneWalkable(s.x, s.y) && !this.driveBoxWalkable(s.x, s.y, true)) continue;
+      const d = Math.hypot(s.x - gx, s.y - gy) + (this.onRoad(s.x, s.y) ? 0 : 0.25);
+      if (d < bestD) {
+        bestD = d;
+        best = s;
+      }
+    }
+    if (bestD < Infinity) return best;
+    return { x: Math.round(gx - 0.5), y: Math.round(gy) };
+  }
+
   /** Closest 2×2-walkable road cell, and the short hop off the lot onto it. */
   private nearestRoadExit(sx: number, sy: number): { x: number; y: number; path: { x: number; y: number }[] } {
-    const pass = (x: number, y: number) => this.driveBoxWalkable(x, y) || (x === sx && y === sy);
+    const pass = (x: number, y: number) => this.driveLaneWalkable(x, y) || (x === sx && y === sy);
     if (this.onRoad(sx, sy) && pass(sx, sy)) return { x: sx, y: sy, path: [] };
     const seen = new Set<string>([k(sx, sy)]);
     type Node = { x: number; y: number; parent: Node | null };
     const q: Node[] = [{ x: sx, y: sy, parent: null }];
     for (let i = 0; i < q.length; i++) {
       const cur = q[i];
-      if ((cur.x !== sx || cur.y !== sy) && this.onRoad(cur.x, cur.y) && this.driveBoxWalkable(cur.x, cur.y)) {
+      if ((cur.x !== sx || cur.y !== sy) && this.onRoad(cur.x, cur.y) && this.driveLaneWalkable(cur.x, cur.y)) {
         return { x: cur.x, y: cur.y, path: this.reconstructDrivePath(cur, sx, sy) };
       }
       for (const [dx, dy] of CARDINALS) {
@@ -841,7 +898,7 @@ export class JacT9 {
     const out = new Map<string, { x: number; y: number }[]>();
     if (goals.has(k(sx, sy))) out.set(k(sx, sy), []);
     if (out.size >= goals.size) return out;
-    const pass = (x: number, y: number) => this.driveBoxWalkable(x, y) || (x === sx && y === sy);
+    const pass = (x: number, y: number) => this.driveLaneWalkable(x, y) || (x === sx && y === sy);
     const seen = new Set<string>([k(sx, sy)]);
     type Node = { x: number; y: number; parent: Node | null };
     const q: Node[] = [{ x: sx, y: sy, parent: null }];
@@ -887,7 +944,8 @@ export class JacT9 {
 
   /** Warm per-door routes from this cell so a later tap is a cache hit (no BFS). */
   private precomputeDoorRoutes(): void {
-    const origin = k(Math.round(this.cx), Math.round(this.cy));
+    const originCell = this.laneOrigin();
+    const origin = k(originCell.x, originCell.y);
     this.pathsFrom = origin;
     for (const b of getEnterableBuildings()) {
       if (!b.door) continue;
@@ -1681,9 +1739,11 @@ export class JacT9 {
     const stepY: FacingDir = ay >= 0 ? 'sw' : 'ne';
     const clearStep = (dir: FacingDir) => {
       const v = DIR_VEC[dir];
-      return this.driveBoxWalkable(this.cx + v.x * 0.4, this.cy + v.y * 0.4);
+      return this.followLoose
+        ? this.driveLaneWalkable(this.cx + v.x * 0.4, this.cy + v.y * 0.4)
+        : this.driveBoxWalkable(this.cx + v.x * 0.4, this.cy + v.y * 0.4);
     };
-    const wantDir: FacingDir = (() => {
+    let wantDir: FacingDir = (() => {
       const offX = Math.abs(ax) > 0.18;
       const offY = Math.abs(ay) > 0.18;
       const xOk = offX && clearStep(stepX);
@@ -1700,6 +1760,17 @@ export class JacT9 {
       if (offY) return stepY;
       return Math.abs(ax) >= Math.abs(ay) ? stepX : stepY;
     })();
+    let runDir: FacingDir = wantDir;
+    let runLen = this.pathStraightAhead(wantDir);
+    for (const dir of DIR_ORDER) {
+      const n = this.pathStraightAhead(dir);
+      if (n > runLen) {
+        runLen = n;
+        runDir = dir;
+      }
+    }
+    // Stay on a long polyline run — a side street must not steal the heading.
+    if (runLen >= 1.6) wantDir = runDir;
     const want = dirIndex(wantDir);
     let err = want - this.heading;
     if (err > 2) err -= 4;
@@ -1916,8 +1987,12 @@ export class JacT9 {
     if (!n) return true;
     const sx = Math.sign(n.x - this.cx);
     const sy = Math.sign(n.y - this.cy);
-    const stepX = sx !== 0 && this.driveBoxWalkable(this.cx + sx * 0.4, this.cy);
-    const stepY = sy !== 0 && this.driveBoxWalkable(this.cx, this.cy + sy * 0.4);
+    const stepX = sx !== 0 && (this.followLoose
+      ? this.driveLaneWalkable(this.cx + sx * 0.4, this.cy)
+      : this.driveBoxWalkable(this.cx + sx * 0.4, this.cy));
+    const stepY = sy !== 0 && (this.followLoose
+      ? this.driveLaneWalkable(this.cx, this.cy + sy * 0.4)
+      : this.driveBoxWalkable(this.cx, this.cy + sy * 0.4));
     return !stepX && !stepY;
   }
 
@@ -2120,6 +2195,7 @@ export class JacT9 {
   }
 
   private driveCells(): [number, number][] {
+    if (this.followLoose) return [[Math.round(this.cx), Math.round(this.cy)]];
     const o = this.origin(DRIVE_BOX, DRIVE_BOX);
     return this.rect(o.x, o.y, DRIVE_BOX, DRIVE_BOX);
   }
@@ -2140,20 +2216,49 @@ export class JacT9 {
     return out;
   }
 
-  private driveBoxWalkable(cx: number, cy: number): boolean {
+  /**
+   * 2×2 drive collider. `loose` is the street lane: the box may cover a lamp /
+   * bench / fill shoulder when it already overlaps a carved road. Trees, muro
+   * and building footprints stay solid.
+   */
+  private driveBoxWalkable(cx: number, cy: number, loose = false): boolean {
     const o = {
       x: Math.round(cx - (DRIVE_BOX - 1) / 2),
       y: Math.round(cy - (DRIVE_BOX - 1) / 2),
     };
-    for (const [x, y] of this.rect(o.x, o.y, DRIVE_BOX, DRIVE_BOX)) {
+    const tiles = this.rect(o.x, o.y, DRIVE_BOX, DRIVE_BOX);
+    let street = false;
+    for (const [x, y] of tiles) {
+      if (this.isStreetCell(x, y)) street = true;
+    }
+    const shoulder = loose && street;
+    for (const [x, y] of tiles) {
       if (x < 0 || y < 0 || x >= MAP_WIDTH || y >= MAP_HEIGHT) return false;
-      if (PROP_CELLS.has(k(x, y))) return false;
       const c = cells[y]?.[x];
       if (!c) return false;
       if (c.groundId.includes('borde')) return false;
-      if (!c.walkable && !this.claimed.has(k(x, y))) return false;
+      if (c.groundId.includes('building/footprint')) return false;
+      if (HARD_PROP_CELLS.has(k(x, y))) return false;
+      if (PROP_CELLS.has(k(x, y)) && !shoulder) return false;
+      if (!c.walkable && !this.claimed.has(k(x, y)) && !shoulder) return false;
     }
     return true;
+  }
+
+  /**
+   * Door-route lane: one walkable cell, not a tree / muro / building. The 2×2
+   * may hang over a street shoulder; the sit cell at the end stays 2×2-strict.
+   */
+  private driveLaneWalkable(cx: number, cy: number): boolean {
+    const x = Math.round(cx);
+    const y = Math.round(cy);
+    if (x < 0 || y < 0 || x >= MAP_WIDTH || y >= MAP_HEIGHT) return false;
+    if (HARD_PROP_CELLS.has(k(x, y))) return false;
+    const c = cells[y]?.[x];
+    if (!c) return false;
+    if (c.groundId.includes('borde') || c.groundId.includes('building/footprint')) return false;
+    if (c.walkable || this.claimed.has(k(x, y)) || this.isStreetCell(x, y)) return true;
+    return PROP_CELLS.has(k(x, y));
   }
 
   private canSit(cx: number, cy: number): boolean {
@@ -2162,7 +2267,9 @@ export class JacT9 {
 
   /** Current pose with an explicit facing — used to reject a turn that would clip. */
   private sitWith(cx: number, cy: number, dir: FacingDir): boolean {
-    if (this.driving && !this.pendingExit) return this.driveBoxWalkable(cx, cy);
+    if (this.driving && !this.pendingExit) {
+      return this.followLoose ? this.driveLaneWalkable(cx, cy) : this.driveBoxWalkable(cx, cy);
+    }
     const size = parkSize(dir);
     return (
       this.driveBoxWalkable(cx, cy) &&
@@ -2307,7 +2414,7 @@ export class JacT9 {
 
   /** Planner / replan: same 2×2 box the van actually drives with, so tight door corridors stay open. */
   private pathSit(cx: number, cy: number): boolean {
-    return this.driveBoxWalkable(cx, cy);
+    return this.followLoose ? this.driveLaneWalkable(cx, cy) : this.driveBoxWalkable(cx, cy);
   }
 
   /** Last-hop sit: the 2×2 box often clips a wall two tiles short of the tap. */
@@ -2429,8 +2536,9 @@ export class JacT9 {
 
   /** QA: true when the current solid / parked sprite footprint covers a prop cell. */
   overlapsProp(): boolean {
+    const blocked = this.followLoose ? HARD_PROP_CELLS : PROP_CELLS;
     for (const [x, y] of this.solidCells()) {
-      if (PROP_CELLS.has(k(x, y))) return true;
+      if (blocked.has(k(x, y))) return true;
     }
     if (!this.driving && !this.visualSpriteClear(this.cx, this.cy, this.dir)) return true;
     return false;

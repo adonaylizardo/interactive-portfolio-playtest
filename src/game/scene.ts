@@ -840,7 +840,7 @@ export class IsoScene {
   }
 
   private ensureVisibleTiles(): void {
-    if (!this.app?.screen) return;
+    if (!this.app?.screen || this.tilesBackfilled) return;
     const { minX, maxX, minY, maxY } = this.viewWorldAabb(TILE_W * 1.5);
     for (let ty = 0; ty < MAP_HEIGHT; ty++) {
       for (let tx = 0; tx < MAP_WIDTH; tx++) {
@@ -882,6 +882,7 @@ export class IsoScene {
       this.prewarmDoorNeighborhoods();
       this.syncObjectSprites(true);
       this.uploadTownGpu();
+      this.prewarmDoorViews();
       this.app.render();
       this.queueTileBackfill();
     })();
@@ -934,6 +935,22 @@ export class IsoScene {
     this.syncObjectSprites(true);
     this.uploadTownGpu();
     this.app.render();
+  }
+
+  /** Draw each door framing once so the first tap is not the first GPU upload of that view. */
+  private prewarmDoorViews(): void {
+    const saved = { x: this.cameraX, y: this.cameraY, zoom: this.zoom };
+    for (const b of getEnterableBuildings()) {
+      if (!b.name) continue;
+      this.frameBuildingDoorForQa(b.name);
+      this.zoom = 0.28;
+      this.applyCamera(false);
+      this.app.render();
+    }
+    this.cameraX = saved.x;
+    this.cameraY = saved.y;
+    this.zoom = saved.zoom;
+    this.applyCamera(false);
   }
 
   private queueTileBackfill(): void {
@@ -2244,6 +2261,8 @@ export class IsoScene {
     this.cullVisibleTiles();
   }
 
+  private lastTileCullKey = '';
+
   private cullVisibleTiles(): void {
     if (!this.app?.screen) return;
     this.ensureVisibleTiles();
@@ -2253,6 +2272,10 @@ export class IsoScene {
     this.noah?.setHidden(!!iso || this.interiorActive);
     this.npcs?.cull({ minX, maxX, minY, maxY }, !!iso || this.interiorActive);
     this.fillActors?.cull({ minX, maxX, minY, maxY }, !!iso || this.interiorActive);
+    const cullKey = `${minX | 0},${maxX | 0},${minY | 0},${maxY | 0},${iso ? 1 : 0},${this.interiorActive ? 1 : 0}`;
+    const skipTiles = this.tilesBackfilled && cullKey === this.lastTileCullKey;
+    this.lastTileCullKey = cullKey;
+    if (!skipTiles) {
     for (const { g, tx, ty } of this.tileCullEntries) {
       if (iso) {
         g.visible = iso.has(`tile:${tx},${ty}`);
@@ -2264,6 +2287,7 @@ export class IsoScene {
         foot.x <= maxX + TILE_W &&
         foot.y >= minY - TILE_H &&
         foot.y <= maxY + TILE_H;
+    }
     }
     for (const v of this.objectVisuals.values()) {
       const g = this.objectGraphics.get(v.obj.id);
