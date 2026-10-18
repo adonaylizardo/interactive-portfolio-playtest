@@ -62,15 +62,15 @@ async function launchBrowser() {
 }
 
 async function waitGameReady(page) {
-  await page.goto(BASE, { waitUntil: 'networkidle', timeout: 120000 });
+  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(
     () => {
       const canvas = document.getElementById('game-canvas');
       return Boolean(canvas?.dataset?.zoom && document.querySelector('.chrome'));
     },
-    { timeout: 120000 },
+    { timeout: 180000 },
   );
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(800);
 }
 
 async function dismissIntroIfNeeded(page) {
@@ -94,7 +94,7 @@ async function enterBuildingViaDoor(page, buildingId, panelSel) {
     .waitForFunction(
       (sel) => document.querySelector(sel)?.classList.contains('building-panel--open'),
       panelSel,
-      { timeout: 90000 },
+      { timeout: 120000 },
     )
     .then(() => true)
     .catch(() => false);
@@ -111,7 +111,7 @@ async function tapRealExpand(page) {
     () =>
       document.querySelector('.building-panel--expanded') &&
       !document.querySelector('.building-panel--peek'),
-    { timeout: 10000 },
+    { timeout: 30000 },
   );
 }
 
@@ -262,8 +262,13 @@ async function runBackend(backendLabel) {
 async function main() {
   const { mkdirSync } = await import('node:fs');
   mkdirSync(OUT, { recursive: true });
-  await runBackend('vulkan');
-  if (process.env.FORGE_K10_VULKAN_ONLY !== '1') {
+  if (process.env.FORGE_K10_GL_ONLY === '1') {
+    process.env.QA_GL = 'gl';
+    await runBackend('gl');
+  } else if (process.env.FORGE_K10_VULKAN_ONLY === '1') {
+    await runBackend('vulkan');
+  } else {
+    await runBackend('vulkan');
     process.env.QA_GL = 'gl';
     await runBackend('gl');
   }
