@@ -77,6 +77,7 @@ async function main(): Promise<void> {
       joystick.setHidden(open || panel.isPreviewExpanded());
       if (panel.isPreviewExpanded()) checklist.setCollapsed(true);
       if (!panel.isOpen() && !scene?.isInInterior()) {
+        if (!isMobileLayout()) checklist.setCollapsed(true);
         scene?.resetMapDoorChainState();
       } else {
         scene?.applyCameraFromUi();
@@ -113,6 +114,7 @@ async function main(): Promise<void> {
       checklist.setBuildingPanelOpen(false);
       chrome.setInteriorOpen(false);
       panel.hide({ snap: true });
+      if (!isMobileLayout()) checklist.setCollapsed(true);
     }
     scene.applyCameraFromUi();
   };
