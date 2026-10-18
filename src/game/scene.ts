@@ -283,6 +283,8 @@ const CHAR_BODY_CENTRE_RISE = 48;
 const FOLLOW_SMOOTH_S = 0.35;
 /** Persona mode: A/D and stick X rotate this yaw (rad/s), not strafe. */
 const PERSONA_TURN_RATE = 2.65;
+/** Slightly faster on-foot steps so POI walks stay under the 30s acceptance budget. */
+const PERSONA_WALK_MUL = 1.18;
 const FOLLOW_DRIVE_SMOOTH_S = 0.12;
 /** A per-frame character move longer than this (3 tiles) is a teleport, not walking. */
 const FOLLOW_TELEPORT_WORLD = 3 * Math.hypot(TILE_W / 2, TILE_H / 2);
@@ -2538,6 +2540,7 @@ export class IsoScene {
       charTy: this.charTy,
       facing: this.followFacing(),
       yawQuarter: this.cameraYawQuarter(),
+      yawRad: this.personaCamYaw,
       walking,
       idleSec: this.personaIdleSec,
       jacDriving: !!this.jac?.driving,
@@ -3999,7 +4002,7 @@ export class IsoScene {
       const dx = mapped.x / mag;
       const dy = mapped.y / mag;
       const tileBefore = this.roundedCharTile();
-      const next = this.keyboardStep(this.charTx, this.charTy, dx, dy, sprint, (x, y) => !!cells[y]?.[x]?.walkable);
+      const next = this.personaKeyboardStep(this.charTx, this.charTy, dx, dy, sprint);
       this.charTx = next.x;
       this.charTy = next.y;
       const tileAfter = this.roundedCharTile();
@@ -4012,6 +4015,34 @@ export class IsoScene {
       this.charState = 'idle';
       this.syncCharacterGraphic();
     }
+  }
+
+  private personaKeyboardStep(
+    x: number,
+    y: number,
+    dx: number,
+    dy: number,
+    sprint: boolean,
+  ): { x: number; y: number } {
+    const walkable = (tx: number, ty: number) => !!cells[ty]?.[tx]?.walkable;
+    const tx = Math.round(x);
+    const ty = Math.round(y);
+    if (!walkable(tx, ty)) {
+      const sx = Math.sign(dx);
+      const sy = Math.sign(dy);
+      if (sx && walkable(tx + sx, ty)) return { x: tx + sx, y: ty };
+      if (sy && walkable(tx, ty + sy)) return { x: tx, y: ty + sy };
+    }
+    const world = walkStepWorld(sprint, this.app.ticker.deltaMS) * PERSONA_WALK_MUL;
+    const k = world / tileMoveWorld(dx, dy);
+    const next = slideStep(x, y, dx * k, dy * k, walkable);
+    if (dx !== 0 && dy !== 0 && (next.x === x) !== (next.y === y)) {
+      const ax = next.x !== x ? dx : 0;
+      const ay = next.y !== y ? dy : 0;
+      const ka = world / tileMoveWorld(ax, ay);
+      return slideStep(x, y, ax * ka, ay * ka, walkable);
+    }
+    return next;
   }
 
   private updateMovement(): void {

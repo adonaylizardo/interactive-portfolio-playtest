@@ -41,6 +41,8 @@ export type PersonaFrameInput = {
   charTy: number;
   facing: FacingDir;
   yawQuarter: number;
+  /** Continuous camera yaw (radians); drives chase cam when set. */
+  yawRad?: number;
   walking: boolean;
   idleSec: number;
   jacDriving: boolean;
@@ -58,12 +60,8 @@ function tileToPersonaMeters(tx: number, ty: number): { x: number; z: number } {
   };
 }
 
-function forwardFromYaw(yawQ: number): { x: number; z: number } {
-  const q = ((yawQ % 4) + 4) % 4;
-  if (q === 0) return { x: 0, z: 1 };
-  if (q === 1) return { x: 1, z: 0 };
-  if (q === 2) return { x: 0, z: -1 };
-  return { x: -1, z: 0 };
+function forwardFromYawRad(yawRad: number): { x: number; z: number } {
+  return { x: Math.sin(yawRad), z: Math.cos(yawRad) };
 }
 
 function projectTp(
@@ -114,7 +112,8 @@ export class PersonaView {
   private jacWheel = new Sprite();
   private jacT9Ext = new Sprite();
   private propSprites: { sprite: Sprite; x: number; z: number }[] = [];
-  private lastGroundCamZ = NaN;
+  private lastGroundKey = '';
+  private facadeTick = 0;
   private booted = false;
   private adonayStrip: { idle: import('pixi.js').Texture | null; walk: import('pixi.js').Texture | null } = {
     idle: null,
@@ -221,11 +220,11 @@ export class PersonaView {
   }
 
   private drawGround(cam: { x: number; z: number }, sw: number, sh: number): void {
-    const key = Math.round(cam.z * 4) / 4;
-    if (key === this.lastGroundCamZ) return;
-    this.lastGroundCamZ = key;
+    const key = `${Math.round(cam.x * 2) / 2}:${Math.round(cam.z * 4) / 4}`;
+    if (key === this.lastGroundKey) return;
+    this.lastGroundKey = key;
     this.ground.clear();
-    const stripes = 24;
+    const stripes = 16;
     for (let i = 0; i < stripes; i++) {
       const z0 = cam.z + i * 3;
       const z1 = z0 + 3;
@@ -260,13 +259,21 @@ export class PersonaView {
     const { sw, sh, dpr } = input;
     await this.ensureLoaded(dpr);
     const player = tileToPersonaMeters(input.charTx, input.charTy);
-    const fwd = forwardFromYaw(input.yawQuarter);
+    const yawRad = input.yawRad ?? input.yawQuarter * (Math.PI / 2);
+    const fwd = forwardFromYawRad(yawRad);
     const cam = { x: player.x - fwd.x * BEHIND_TP_M, z: player.z - fwd.z * BEHIND_TP_M };
 
-    this.syncBackdrops(sw, sh, input.yawQuarter);
+    this.syncBackdrops(sw, sh, yawRad / (Math.PI / 2));
     this.drawGround(cam, sw, sh);
 
+    this.facadeTick += 1;
+    const heavyFacades = input.walking || this.facadeTick % 2 === 0;
     for (const f of this.facades) {
+      if (Math.abs(f.z - player.z) > 52) {
+        f.sprite.visible = false;
+        continue;
+      }
+      if (!heavyFacades) continue;
       const p = projectTp(f.x, 0, f.z, cam, sw, sh);
       if (!p) {
         f.sprite.visible = false;
