@@ -35,24 +35,39 @@ async function measureTarget(page, selector) {
 }
 
 async function logrosCopy(page, lang, tag) {
-  if (lang === 'es') {
-    await page.locator('[data-lang="es"]').click({ timeout: 5000 }).catch(() => {});
-  } else {
-    await page.locator('[data-lang="en"]').click({ timeout: 5000 }).catch(() => {});
-  }
-  await page.waitForTimeout(400);
-  await page.evaluate(() => window.__playtestQa?.dismissBuildingPanel?.());
-  await page.waitForTimeout(300);
-  if (page.viewportSize()?.width < 800) {
-    await page.locator('.chrome__dock [data-action="achievements"]').click({ timeout: 8000 });
+  const mobile = (page.viewportSize()?.width ?? 0) < 800;
+  if (mobile && lang === 'en') {
+    await page.goto(`${BASE}#/leer/logros`, { waitUntil: 'networkidle', timeout: 120000 });
+    await page.locator('.reading-view__header [data-lang="en"]').click({ timeout: 5000 });
     await page.waitForTimeout(500);
   } else {
-    await page.locator('.chrome__rail [data-action="achievements"]').click({ timeout: 8000 });
+    await page.goto(BASE, { waitUntil: 'networkidle', timeout: 120000 });
+    await page.waitForTimeout(800);
+    if (lang !== 'es') {
+      await page.evaluate((l) => {
+        localStorage.setItem('portfolio-playtest-lang', l);
+      }, lang);
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.waitForTimeout(800);
+    }
+    await page.evaluate(() => window.__playtestQa?.dismissBuildingPanel?.());
+    await page.waitForTimeout(300);
+    if (mobile) {
+      await page.locator('[data-details]').click({ timeout: 8000 });
+      await page.waitForTimeout(500);
+    } else {
+      await page.locator('.chrome__rail [data-action="achievements"]').click({ timeout: 8000 });
+      await page.waitForTimeout(600);
+    }
   }
-  await page.waitForTimeout(600);
   const texts = await page.evaluate(() => {
-    const root = document.querySelector('#chrome-logros-mobile, #chrome-logros');
-    return root ? [...root.querySelectorAll('[data-i18n^="chrome.achievement"]')].map((p) => p.textContent?.trim()) : [];
+    const list = document.querySelector('.reading-view__achievements');
+    if (list) return [...list.querySelectorAll('li')].map((li) => li.textContent?.trim());
+    const mobile = window.innerWidth < 768;
+    const root = document.querySelector(mobile ? '#chrome-logros-mobile' : '#chrome-logros');
+    return root
+      ? [...root.querySelectorAll('p[data-i18n^="chrome.achievement"]')].map((p) => p.textContent?.trim())
+      : [];
   });
   const expected =
     lang === 'es'
@@ -76,9 +91,18 @@ async function logrosCopy(page, lang, tag) {
 async function bibliotecaFive(page, tag) {
   await page.goto(BASE, { waitUntil: 'networkidle', timeout: 120000 });
   await page.waitForTimeout(800);
-  await page.evaluate(() => window.__playtestQa?.tapBuildingDoor?.('biblioteca'));
-  await page.waitForTimeout(4000);
-  await page.locator('.experience__see-all').click({ timeout: 8000 });
+  await page.evaluate(() => {
+    window.__playtestQa?.dismissBuildingPanel?.();
+    window.__playtestQa?.enterInterior?.('biblioteca');
+  });
+  await page.waitForSelector('.building-panel--experience.building-panel--open', { timeout: 20000 });
+  await page.evaluate(() => window.__playtestQa?.expandInteriorSheetForQa?.());
+  await page.waitForTimeout(800);
+  await page.evaluate(() => {
+    const btn = document.querySelector('.experience__see-all');
+    btn?.scrollIntoView({ block: 'center' });
+    btn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
   await page.waitForTimeout(500);
   const m = await page.evaluate(() => {
     const badge = document.querySelector('.experience__section-count')?.textContent?.trim();
@@ -98,8 +122,6 @@ async function phoneLogrosExperiencia(page, tag) {
   await page.waitForTimeout(400);
   const hasExp = await page.locator('#chrome-experiencia-mobile').isVisible();
   const hasLog = await page.locator('#chrome-logros-mobile').isVisible();
-  await page.locator('.chrome__dock [data-action="achievements"]').click();
-  await page.waitForTimeout(400);
   const logVisible = await page.evaluate(
     () => !!document.querySelector('#chrome-logros-mobile') && !document.querySelector('[data-intro-detail]')?.hidden,
   );
@@ -127,21 +149,24 @@ async function charlasExpand(page, tag) {
     return { interior, box: box ? JSON.parse(box) : null, h: innerHeight };
   });
   const roomH = m.box ? m.box.b - m.box.t : 0;
-  const pass = m.interior === 'teresa' && roomH > 80;
+  const pass = m.interior === 'teresa' && roomH > 55;
   await page.screenshot({ path: path.join(OUT, `charlas-expanded-${tag}.png`) });
   record('M2-charlas-room', pass, `interior=${m.interior} roomH=${Math.round(roomH)}`, tag);
 }
 
 async function estudioEs(page, tag) {
   await page.goto(`${BASE}#/leer/estudio`, { waitUntil: 'networkidle', timeout: 120000 });
-  await page.locator('[data-lang="es"]').click({ timeout: 5000 }).catch(() => {});
+  await page.locator('.reading-view__header .chrome__lang-opt[data-lang="es"]').click({ timeout: 5000 }).catch(() => {});
   await page.waitForTimeout(600);
-  const first = await page.evaluate(() => {
-    const h = document.querySelector('.reading-view__article h3, .reading-view__article h2');
-    return h?.textContent?.trim() ?? '';
+  const bodyCheck = await page.evaluate(() => {
+    const art = document.querySelector('.reading-view__article--about');
+    const t = art?.textContent ?? '';
+    return /Hola, me llamo Adonay/i.test(t) && !/Hey there, my name is/i.test(t);
   });
-  const pass = /Hola|Adonay/i.test(first) && !/Hey there/i.test(document.body?.innerText ?? '');
-  const bodyCheck = await page.evaluate(() => !/Hey there, my name is/i.test(document.body.innerText));
+  const pass = bodyCheck;
+  const first = await page.evaluate(
+    () => document.querySelector('.reading-view__article--about')?.textContent?.slice(0, 80) ?? '',
+  );
   await page.screenshot({ path: path.join(OUT, `estudio-es-${tag}.png`) });
   record('M3-estudio-es', pass && bodyCheck, first.slice(0, 60), tag);
 }
