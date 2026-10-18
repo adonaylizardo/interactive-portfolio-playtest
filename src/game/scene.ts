@@ -1009,7 +1009,9 @@ export class IsoScene {
         if (obj.type === 'building' && obj.panelTitle && !this.prepareMapTap(obj)) return;
         const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
         if (obj.type === 'building' && obj.door && obj.panelTitle) {
-          this.requestWalk(obj.door.x, obj.door.y, sprint, { walkOnly: true });
+          this.requestWalk(obj.door.x, obj.door.y, sprint, {
+            buildingEntry: { panelTitle: obj.panelTitle, door: obj.door },
+          });
           return;
         }
         this.pendingBuildingEntry = null;

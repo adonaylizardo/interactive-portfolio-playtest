@@ -46,17 +46,22 @@ async function runViewport(label, width, height, touch) {
   const cerr = await consoleErrors(page);
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.waitForTimeout(800);
-  await page.locator('[data-action="intro-close"]').click({ timeout: 2500 }).catch(() => {});
-
   if (touch) {
-    await page.locator('[data-action="show-panel"]').click({ timeout: 3000 }).catch(() => {});
-    await page.waitForTimeout(400);
+    // Mobile Leer lives in the intro sheet; closing it hides CTAs (map-only dock).
+    const sheetOpen = await page.locator('.chrome--sheet').count();
+    if (!sheetOpen) {
+      await page.locator('[data-dock="intro"]').click({ timeout: 2500 });
+      await page.waitForTimeout(400);
+    }
   } else {
+    await page.locator('[data-action="intro-close"]').click({ timeout: 2500 }).catch(() => {});
     await page.evaluate(() => window.__playtestQa?.setLayout?.('split'));
     await page.waitForTimeout(300);
   }
 
-  const leer = page.locator('button[data-action="reading"]').first();
+  const leer = touch
+    ? page.locator('.chrome__intro button[data-action="reading"]')
+    : page.locator('.chrome__column button[data-action="reading"]');
   const leerBox = await leer.boundingBox();
   if (leerBox) {
     const cx = leerBox.x + leerBox.width / 2;
@@ -101,28 +106,51 @@ async function runViewport(label, width, height, touch) {
     detail: `bodyLen=${bodyLen}`,
   });
 
-  await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(600);
-  if (!touch) await page.evaluate(() => window.__playtestQa?.setLayout?.('split'));
   for (const building of ['volaris', 'bain', 'pg']) {
-    await page.evaluate((name) => window.__playtestQa?.frameDoorForQa?.(name), building);
-    await page.waitForTimeout(400);
-    const doorPt = await page.evaluate((name) => window.__playtestQa?.doorScreenPoint?.(name), building);
+    // Fresh browser per door: three Pixi WebGL contexts in one Chromium instance break the 3rd map input.
+    const doorBrowser = await launchBrowser(chromium);
+    const doorCtx = await doorBrowser.newContext({
+      viewport: { width, height },
+      hasTouch: touch,
+      isMobile: touch,
+    });
+    const doorPage = await doorCtx.newPage();
+    const doorErr = await consoleErrors(doorPage);
+    cerr.push(...doorErr);
+    await doorPage.goto(BASE, { waitUntil: 'networkidle' });
+    await doorPage.waitForTimeout(600);
+    if (touch) {
+      const sheetOpen = await doorPage.locator('.chrome--sheet').count();
+      if (!sheetOpen) {
+        await doorPage.locator('[data-dock="intro"]').click({ timeout: 2500 });
+        await doorPage.waitForTimeout(300);
+      }
+    } else {
+      await doorPage.evaluate(() => window.__playtestQa?.setLayout?.('split'));
+      await doorPage.waitForTimeout(300);
+    }
+    await doorPage.evaluate((name) => window.__playtestQa?.frameDoorForQa?.(name), building);
+    await doorPage.waitForTimeout(400);
+    const doorPt = await doorPage.evaluate((name) => window.__playtestQa?.doorScreenPoint?.(name), building);
     if (!doorPt) {
       results.push({ id: `H4-${building}-door`, pass: false, detail: 'no door point' });
+      await doorBrowser.close();
       continue;
     }
-    if (touch) await page.touchscreen.tap(doorPt.x, doorPt.y);
-    else await page.mouse.click(doorPt.x, doorPt.y);
-    await page.waitForTimeout(16000);
-    const opened = await page.evaluate(() => {
-      const p = document.querySelector('.building-panel');
-      return !!(p?.classList.contains('building-panel--open') && p.classList.contains('building-panel--preview'));
-    });
+    if (touch) await doorPage.touchscreen.tap(doorPt.x, doorPt.y);
+    else await doorPage.mouse.click(doorPt.x, doorPt.y);
+    let opened = false;
+    const deadline = Date.now() + (touch ? 22000 : 28000);
+    while (Date.now() < deadline) {
+      opened = await doorPage.evaluate(() => {
+        const p = document.querySelector('.building-panel');
+        return !!(p?.classList.contains('building-panel--open') && p.classList.contains('building-panel--preview'));
+      });
+      if (opened) break;
+      await doorPage.waitForTimeout(400);
+    }
     results.push({ id: `H4-${building}-door`, pass: opened, detail: String(opened) });
-    if (!opened) break;
-    await page.evaluate(() => window.__playtestQa?.dismissBuildingPanel?.());
-    await page.waitForTimeout(500);
+    await doorBrowser.close();
   }
 
   await page.screenshot({ path: path.join(SHOTS, `${label}-final.png`), fullPage: false });
