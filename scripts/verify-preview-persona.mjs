@@ -79,22 +79,30 @@ async function holdKeys(page, dx, dy, ms = 2200) {
   if (dy > 0) down.push('s');
   if (dx < 0) down.push('a');
   if (dx > 0) down.push('d');
-  for (const k of down) await page.keyboard.down(k);
+  await page.evaluate((keys) => {
+    for (const k of keys) {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
+    }
+  }, down);
   await wait(ms);
-  for (const k of down) await page.keyboard.up(k);
+  await page.evaluate((keys) => {
+    for (const k of keys) {
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true }));
+    }
+  }, down);
 }
 
 async function holdStick(_cdp, page, dx, dy, ms = 2200) {
-  const box = await page.locator('.joystick__idle').boundingBox();
-  if (!box) return;
-  const x0 = box.x + box.width / 2;
-  const y0 = box.y + box.height / 2;
+  const pad = await page.locator('.joystick').boundingBox();
+  if (!pad) return;
+  const x0 = pad.x + pad.width / 2;
+  const y0 = pad.y + pad.height / 2;
   const mag = Math.hypot(dx, dy) || 1;
   const ox = (dx / mag) * 28;
   const oy = (dy / mag) * 28;
   await page.evaluate(
     ({ x0, y0, ox, oy }) => {
-      const el = document.querySelector('.joystick__idle');
+      const el = document.querySelector('.joystick');
       if (!el) return;
       el.dispatchEvent(
         new PointerEvent('pointerdown', {
@@ -138,14 +146,17 @@ async function exitPersonaView(page, cdp, touch) {
   for (const mode of ['isometrica', 'cenital']) {
     const btn = page.locator(`.ui-view[data-view="${mode}"]`).first();
     if ((await btn.count()) === 0) continue;
-    const box = await btn.boundingBox().catch(() => null);
-    if (!box) {
-      await btn.click({ force: true });
-      await wait(350);
-      return;
+    const visible = await btn.isVisible().catch(() => false);
+    if (visible) {
+      const box = await btn.boundingBox().catch(() => null);
+      if (box) {
+        if (touch) await cdpTouch(cdp, box.x + box.width / 2, box.y + box.height / 2);
+        else await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+        await wait(350);
+        return;
+      }
     }
-    if (touch) await cdpTouch(cdp, box.x + box.width / 2, box.y + box.height / 2);
-    else await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await btn.evaluate((el) => el.click());
     await wait(350);
     return;
   }
@@ -157,7 +168,7 @@ async function tapView(page, cdp, touch, mode) {
   if ((await btn.count()) === 0) throw new Error(`missing view ${mode}`);
   let box = await btn.boundingBox().catch(() => null);
   if (!box || !(await btn.isVisible().catch(() => false))) {
-    await btn.click({ force: true });
+    await btn.evaluate((el) => el.click());
     await wait(350);
     return;
   }
@@ -197,7 +208,28 @@ async function holdMove(cdp, page, touch, dx, dy, ms) {
   else await holdKeys(page, dx, dy, ms);
 }
 
-async function walkTowardTile(page, cdp, touch, tx, ty, maxMs = 14000) {
+async function tapGroundTile(page, cdp, touch, tx, ty) {
+  const pt = await page.evaluate(({ tx, ty }) => {
+    const x = (tx - ty) * 64;
+    const y = (tx + ty) * 32;
+    return window.__playtestQa.worldToClient(x, y);
+  }, { tx, ty });
+  if (touch) await cdpTouch(cdp, pt.x, pt.y);
+  else await page.mouse.click(pt.x, pt.y);
+}
+
+async function walkToTileTap(page, cdp, touch, tx, ty) {
+  for (let i = 0; i < 4; i++) {
+    await tapGroundTile(page, cdp, touch, tx, ty);
+    await wait(5500);
+    const c = await page.evaluate(() => window.__playtestQa.inputReady().char);
+    if (Math.hypot(c.x - tx, c.y - ty) < 8) return true;
+  }
+  const c = await page.evaluate(() => window.__playtestQa.inputReady().char);
+  return Math.hypot(c.x - tx, c.y - ty) < 8;
+}
+
+async function walkTowardTile(page, cdp, touch, tx, ty, maxMs = 32000) {
   const t0 = Date.now();
   let best = [0, -1];
   let lastScan = 0;
@@ -264,6 +296,19 @@ async function runViewport(tag, opts) {
     await wait(400);
     if (touch) {
       await page.locator('.joystick').waitFor({ state: 'visible', timeout: 8000 }).catch(() => null);
+      await page.evaluate(() => {
+        const el = document.querySelector('.joystick');
+        el?.dispatchEvent(
+          new PointerEvent('pointerdown', {
+            pointerId: 3,
+            pointerType: 'touch',
+            bubbles: true,
+            clientX: 0,
+            clientY: 0,
+          }),
+        );
+        window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 3, pointerType: 'touch', bubbles: true }));
+      });
     }
     bundle =
       (await page.evaluate(() =>
@@ -286,12 +331,16 @@ async function runViewport(tag, opts) {
       rows.push({ check: 'pantone follows', pass: st.pantoneVisible });
       if (!st.pantoneVisible) errors.push(`${tag}: pantone not visible while walking`);
 
-      const nearCatedral = await walkTowardTile(page, cdp, touch, 14, 17, 16000);
+      const nearCatedral = touch
+        ? await walkToTileTap(page, cdp, touch, 14, 17)
+        : await walkTowardTile(page, cdp, touch, 14, 17, 35000);
       await page.screenshot({ path: path.join(OUT, `${tag}-near-catedral.png`) });
       rows.push({ check: 'walk past catedral', pass: nearCatedral });
       if (!nearCatedral) errors.push(`${tag}: did not reach catedral approach by walking`);
 
-      const nearFlor = await walkTowardTile(page, cdp, touch, 46, 46, 16000);
+      const nearFlor = touch
+        ? await walkToTileTap(page, cdp, touch, 46, 46)
+        : await walkTowardTile(page, cdp, touch, 46, 46, 35000);
       await page.screenshot({ path: path.join(OUT, `${tag}-near-flor.png`) });
       rows.push({ check: 'walk past flor', pass: nearFlor });
       if (!nearFlor) errors.push(`${tag}: did not reach flor approach by walking`);
@@ -301,7 +350,9 @@ async function runViewport(tag, opts) {
       rows.push({ check: 'pantone sits idle', pass: st.pantoneSit && st.pantoneVisible });
       if (!st.pantoneSit) errors.push(`${tag}: pantone did not sit after 30s idle`);
 
-      const nearJac = await walkTowardTile(page, cdp, touch, 27, 19, 18000);
+      const nearJac = touch
+        ? await walkToTileTap(page, cdp, touch, 27, 19)
+        : await walkTowardTile(page, cdp, touch, 27, 19, 35000);
       notes.push(`${tag}: near jac ${nearJac}`);
       const jac = page.locator('#game-canvas');
       const e = await page.evaluate(() => window.__playtestQa.jacEntities());

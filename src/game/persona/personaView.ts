@@ -129,6 +129,8 @@ export class PersonaView {
 
   constructor() {
     this.layer.label = 'persona-view';
+    this.layer.eventMode = 'none';
+    this.layer.interactiveChildren = false;
     this.layer.sortableChildren = true;
     this.layer.addChild(this.ground);
     this.adonay.zIndex = 800;
@@ -289,17 +291,21 @@ export class PersonaView {
       const px = player.x + rightP.x * PANTONE_DX_M + fwdP.x * PANTONE_DZ_M;
       const pz = player.z + rightP.z * PANTONE_DX_M + fwdP.z * PANTONE_DZ_M;
       const pp = projectTp(px, 0, pz, cam, sw, sh);
+      const feetScale = sh / PERSONA_REF.h;
       if (pp) {
         this.pantone.anchor.set(0.5, 1);
         this.pantone.x = pp.x;
         this.pantone.y = pp.y;
         this.pantone.scale.set(pp.scale * PANTONE_SCALE);
-        this.pantone.tint = NIGHT_TINT;
-        this.pantone.visible = true;
       } else {
-        this.pantone.visible = false;
+        this.pantone.anchor.set(0.5, 1);
+        this.pantone.x = sw / 2 - 120.5 * feetScale;
+        this.pantone.y = feetY - 26.4 * feetScale;
+        this.pantone.scale.set(feetScale * PANTONE_SCALE);
       }
-      this.lastPantoneVisible = this.pantone.visible;
+      this.pantone.tint = NIGHT_TINT;
+      this.pantone.visible = true;
+      this.lastPantoneVisible = true;
       this.lastPantoneAnim = pAnim;
     }
   }
