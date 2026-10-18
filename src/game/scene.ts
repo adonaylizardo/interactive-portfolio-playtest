@@ -4256,6 +4256,11 @@ export class IsoScene {
     const entry = this.pendingDriveEnter;
     this.pendingDriveEnter = null;
     if (entry) {
+      const building = getBuildingAtDoor(entry.door.x, entry.door.y);
+      if (building?.panelTitle) {
+        this.enterBuildingFromDoor(building);
+        return;
+      }
       this.pendingWalkInAt = performance.now();
       this.requestWalk(entry.door.x, entry.door.y, false, { buildingEntry: entry });
     }
@@ -4271,7 +4276,7 @@ export class IsoScene {
     const along = this.jac.doorSideAlong(door.x, door.y);
     const hereOk = this.jac.canParkHere();
     const arrived = !!sit && distSit < 0.85 && this.jac.mph < 1.4;
-    const doorSideSit = idle && hereOk && this.jac.mph < 1.2 && along >= 0 && distDoor <= 8;
+    const doorSideSit = hereOk && this.jac.mph < 1.2 && along >= 0 && distDoor <= 10;
     if (arrived || doorSideSit) {
       if (sit && distSit < 1.1) {
         this.jac.cx = sit.x;
@@ -4298,7 +4303,7 @@ export class IsoScene {
     if (!entry || !this.jac?.driving) return;
     const along = this.jac.doorSideAlong(entry.door.x, entry.door.y);
     const dist = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
-    if (along >= 0 && dist <= 8 && this.jac.canParkHere()) {
+    if (along >= 0 && dist <= 10 && this.jac.canParkHere()) {
       this.jacGetOut({ thenEnter: true });
       return;
     }
@@ -4348,12 +4353,12 @@ export class IsoScene {
       return;
     }
     if (!this.pendingWalkInAt || this.interiorActive) return;
-    if (this.pendingBuildingEntry && performance.now() - this.pendingWalkInAt < 8000) return;
+    if (this.pendingBuildingEntry && performance.now() - this.pendingWalkInAt < 16000) return;
     if (!this.pendingBuildingEntry && !this.pendingJacExit) {
       this.pendingWalkInAt = 0;
       return;
     }
-    if (this.pendingWalkInAt && performance.now() - this.pendingWalkInAt < 8000) return;
+    if (this.pendingWalkInAt && performance.now() - this.pendingWalkInAt < 16000) return;
     this.pendingBuildingEntry = null;
     this.pendingDriveEnter = null;
     this.pendingWalkInAt = 0;
