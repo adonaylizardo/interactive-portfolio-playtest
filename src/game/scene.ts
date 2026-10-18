@@ -4447,7 +4447,7 @@ export class IsoScene {
       this.retryDriveEnterOrGetOut();
       return;
     }
-    if (arrived && leftSpawn && slow) {
+    if (arrived && leftSpawn && slow && this.jac.parkFaceReady()) {
       this.jac.sitWhy = `arrived sit=(${sit?.x},${sit?.y}) d=${distSit.toFixed(2)} mph=${this.jac.mph}`;
       this.jacGetOut({ thenEnter: true });
       return;

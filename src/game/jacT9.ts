@@ -1746,6 +1746,11 @@ export class JacT9 {
     this.recoverPathFollow();
     const goal = this.driveGoal;
     const goalDist = goal ? Math.hypot(goal.x - this.cx, goal.y - this.cy) : Infinity;
+    if (this.atDriveGoal() && this.followLoose && this.lastParkHeading && !this.parkFaceReady()) {
+      const err = headingDelta(this.heading, dirIndex(this.lastParkHeading));
+      this.followDir = this.lastParkHeading;
+      return { throttle: 0, steer: Math.max(-1, Math.min(1, err * 2)) };
+    }
     if (this.holdAtGoal()) return { throttle: 0, steer: 0 };
     if (this.drivePath.length === 0) {
       if (goal) this.drivePath.push({ x: goal.x, y: goal.y });
@@ -2005,7 +2010,13 @@ export class JacT9 {
   /** True when the 2×2 sit is inside the arrival radius of the chosen park cell. */
   atParkSit(goal = this.driveGoal): boolean {
     if (!goal) return false;
-    return Math.hypot(goal.x - this.cx, goal.y - this.cy) <= SIT_CELL_R;
+    const r = this.followLoose ? SIT_CELL_R : 1.25;
+    return Math.hypot(goal.x - this.cx, goal.y - this.cy) <= r;
+  }
+
+  parkFaceReady(): boolean {
+    if (!this.followLoose || !this.lastParkHeading) return true;
+    return this.dir === this.lastParkHeading && Math.abs(headingDelta(dirIndex(this.lastParkHeading), this.heading)) < 0.22;
   }
 
   private atDriveGoal(): boolean {
