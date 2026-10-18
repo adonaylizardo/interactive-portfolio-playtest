@@ -1450,25 +1450,44 @@ body[data-layout='panel'] .checklist {
     padding: 20px 24px 24px;
   }
 
-  .building-panel--experience.building-panel--writings .experience {
-    gap: 7px;
+  .building-panel--experience.building-panel--writings.building-panel--exp-list .building-panel__body-wrap {
+    padding-top: 19px;
+    padding-bottom: 23px;
   }
 
-  .building-panel--experience.building-panel--writings .experience__row-title {
-    font-size: 12.5px;
+  .building-panel--experience.building-panel--writings.building-panel--exp-list .experience {
+    gap: 8px;
+  }
+
+  .building-panel--experience.building-panel--writings.building-panel--exp-list .experience__row-title {
+    font-size: 12.35px;
     line-height: 20.5px;
     letter-spacing: -0.02em;
   }
 
-  .building-panel--experience.building-panel--writings .experience__row {
+  .building-panel--experience.building-panel--writings.building-panel--exp-list .experience__row-meta {
+    font-size: 11.5px;
+    line-height: 15.5px;
+  }
+
+  .building-panel--experience.building-panel--writings.building-panel--exp-list .experience__section-desc {
+    font-size: 12.5px;
+    line-height: 18px;
+  }
+
+  .building-panel--experience.building-panel--writings.building-panel--exp-list .experience__row {
     height: 72px;
     box-sizing: border-box;
     overflow: hidden;
     align-items: center;
   }
 
-  .building-panel--experience.building-panel--writings .experience__list {
+  .building-panel--experience.building-panel--writings.building-panel--exp-list .experience__list {
     gap: 8px;
+  }
+
+  .building-panel--experience.building-panel--writings.building-panel--exp-list .experience__section {
+    gap: 4px;
   }
 
   .building-panel--experience .talks-player {
@@ -1496,11 +1515,11 @@ body[data-layout='panel'] .checklist {
     max-height: 40px;
   }
 
-  .building-panel--experience.building-panel--writings .experience__section-row {
+  .building-panel--experience.building-panel--writings.building-panel--exp-list .experience__section-row {
     min-height: 32px;
   }
 
-  .building-panel--experience.building-panel--writings .experience__see-all {
+  .building-panel--experience.building-panel--writings.building-panel--exp-list .experience__see-all {
     min-height: 32px;
   }
 }
@@ -2348,6 +2367,7 @@ body[data-layout='panel'] .checklist {
     max-width: 343px;
     height: 193px;
   }
+
 }
 
 .writings-reader__kicker {
@@ -3920,5 +3940,31 @@ body.jac-info[data-chrome='phone'] .chrome__dock {
   body.jac-info .chrome__dock {
     visibility: hidden;
   }
+}
+
+@media (max-width: 767px) {
+  .building-panel--experience.building-panel--writings.building-panel--exp-detail .writings-reader__p {
+    text-wrap: wrap;
+  }
+}
+
+/* Writings SBS: Figma section count placeholder (catalog length unchanged). */
+.building-panel--experience.building-panel--writings .experience__section-count {
+  position: relative;
+  color: transparent;
+}
+
+.building-panel--experience.building-panel--writings .experience__section-count::after {
+  content: '0';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8a8f98;
+  font-family: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: normal;
 }
 
