@@ -1550,13 +1550,30 @@ export class IsoScene {
     return { covW: iw / freeW, covH: ih / freeH };
   }
 
-  /** Map AABB vs full canvas (QA / hostile checks — not chrome margins). */
+  /** Map screen footprint vs full canvas (grid sample — tighter than corner AABB in cenital). */
   private overviewViewportFillFraction(): { covW: number; covH: number } {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
-    const r = this.mapScreenRectOnCanvas();
-    const iw = Math.max(0, Math.min(sw, r.right) - Math.max(0, r.left));
-    const ih = Math.max(0, Math.min(sh, r.bottom) - Math.max(0, r.top));
+    const b = this.overviewFramingBounds();
+    let left = Infinity;
+    let right = -Infinity;
+    let top = Infinity;
+    let bottom = -Infinity;
+    const nx = 8;
+    const ny = 8;
+    for (let iy = 0; iy <= ny; iy++) {
+      for (let ix = 0; ix <= nx; ix++) {
+        const wx = b.minX + ((b.maxX - b.minX) * ix) / nx;
+        const wy = b.minY + ((b.maxY - b.minY) * iy) / ny;
+        const s = this.worldToScreen(wx, wy);
+        if (s.x < left) left = s.x;
+        if (s.x > right) right = s.x;
+        if (s.y < top) top = s.y;
+        if (s.y > bottom) bottom = s.y;
+      }
+    }
+    const iw = Math.max(0, Math.min(sw, right) - Math.max(0, left));
+    const ih = Math.max(0, Math.min(sh, bottom) - Math.max(0, top));
     return { covW: iw / Math.max(1, sw), covH: ih / Math.max(1, sh) };
   }
 
@@ -5912,17 +5929,39 @@ export class IsoScene {
       });
     }
     if (this.mapOverview && out.length > 1) {
+      const pillSize = (name: string) => ({
+        w: Math.min(132, name.length * 7.2 + 22),
+        h: 24,
+      });
+      const rectsOverlap = (
+        ax: number,
+        ay: number,
+        aw: number,
+        ah: number,
+        bx: number,
+        by: number,
+        bw: number,
+        bh: number,
+      ) => {
+        const ox = Math.min(ax + aw / 2, bx + bw / 2) - Math.max(ax - aw / 2, bx - bw / 2);
+        const oy = Math.min(ay + ah / 2, by + bh / 2) - Math.max(ay - ah / 2, by - bh / 2);
+        return ox > 0 && oy > 0;
+      };
       out.sort((a, b) => a.y - b.y || a.x - b.x);
       const kept: typeof out = [];
       for (const t of out) {
+        const sz = pillSize(t.name);
         let placed = false;
-        for (let ring = 0; ring < 5 && !placed; ring++) {
-          for (let i = 0; i < 8; i++) {
-            const ang = (i / 8) * Math.PI * 2;
-            const rad = 26 + ring * 18;
+        for (let ring = 0; ring < 6 && !placed; ring++) {
+          for (let i = 0; i < 12; i++) {
+            const ang = (i / 12) * Math.PI * 2;
+            const rad = 24 + ring * 16;
             const px = t.x + Math.cos(ang) * rad;
             const py = t.y + Math.sin(ang) * rad - 28;
-            const clash = kept.some((k) => Math.hypot(k.x - px, k.y - py) < 42);
+            const clash = kept.some((k) => {
+              const ks = pillSize(k.name);
+              return rectsOverlap(px, py, sz.w, sz.h, k.x, k.y, ks.w, ks.h);
+            });
             if (!clash) {
               t.x = px;
               t.y = py;

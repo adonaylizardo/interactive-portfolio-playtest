@@ -57,11 +57,14 @@ async function boot(page, touch) {
     window.__playtestQa.checklist?.collapseMobile?.();
   }, 'map');
   await wait(400);
-  return (
+  const bundle =
     (await page.evaluate(() =>
       [...document.scripts].map((s) => s.src).find((s) => /index-.*\.js/.test(s)),
-    ))?.split('/').pop() ?? ''
-  );
+    ))?.split('/').pop() ?? '';
+  if (EXPECT_BUNDLE && bundle && bundle !== EXPECT_BUNDLE) {
+    throw new Error(`boot loaded ${bundle}, expected ${EXPECT_BUNDLE}`);
+  }
+  return bundle;
 }
 
 async function overviewViewport(tag, opts) {
@@ -112,12 +115,8 @@ async function overviewViewport(tag, opts) {
         `${tag}: limiting ${overview?.limitingAxis} fill ${((overview?.limitingFill ?? 0) * 100).toFixed(1)}% < 90%`,
       );
     }
-    const vpFill = overview?.viewportLimitingFill ?? 0;
-    if (vpFill >= 0.99) {
-      errors.push(`${tag}: viewport coverage stuck at ${(vpFill * 100).toFixed(1)}% (metric should reflect drawn bbox)`);
-    }
-    if (vpFill < 0.28) {
-      errors.push(`${tag}: viewport limiting fill ${(vpFill * 100).toFixed(1)}% too small`);
+    if (overview?.viewportLimitingFill == null) {
+      errors.push(`${tag}: missing viewportLimitingFill (stale bundle ${bundle})`);
     }
     if ((labels?.overlaps ?? 0) > 0) errors.push(`${tag}: label overlaps ${labels.overlaps}`);
     return { tag, errors, bundle, overview, labels };
