@@ -16,8 +16,10 @@ export const WHEEL_POS_1X = [640, 610] as const;
 
 /** Frame-C parked T9 (passenger side x, nose z, physical width for billboard scale). */
 export const JAC_T9_POSE = { x: 2.0, z: 8.2, widthM: 1.96 } as const;
-/** Frame C front width ≈218.5 px @1280 (~0.24 vw); correct v3 billboard under-projection. */
+/** Beside-van target width @1280 reference (frame C ≈0.24–0.35 vw). */
 export const T9_TARGET_VW = 0.24;
+/** Single art-pipeline multiplier on projected billboard scale (not per-frame vw renorm). */
+export const T9_PROJECTION_CALIB = 1.12;
 
 /** Calibration: jac spawn tile ↔ frame-C player meters. */
 export const CAL_TILE = { x: 27, y: 18 };
@@ -46,4 +48,17 @@ export const FACADE_BY_BUILDING: Record<string, string> = {
 
 export function personaEnabled(): boolean {
   return import.meta.env.BASE_URL.includes('preview-persona');
+}
+
+export function tileToPersonaMeters(tx: number, ty: number): { x: number; z: number } {
+  return {
+    x: CAL_M.x + (tx - CAL_TILE.x) * METERS_PER_TILE,
+    z: CAL_M.z + (ty - CAL_TILE.y) * METERS_PER_TILE,
+  };
+}
+
+/** Live parked T9 anchor in persona meters (van centre on the ground plane). */
+export function jacPersonaAnchorMeters(jacCx: number, jacCy: number): { x: number; z: number; widthM: number } {
+  const van = tileToPersonaMeters(jacCx, jacCy);
+  return { x: van.x, z: van.z, widthM: JAC_T9_POSE.widthM };
 }

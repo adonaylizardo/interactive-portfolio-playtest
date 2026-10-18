@@ -17,7 +17,7 @@ import {
   fill,
   getBuildingAt,
   getBuildingAtDoor,
-  getBuildingAtDoorOrAdjacent,
+  getBuildingAtPersonaDoor,
   getBuildingByName,
   getSceneryAt,
   INICIO,
@@ -172,6 +172,7 @@ import {
   ADONAY_ALTO_PX_1X,
   CAL_M,
   CAL_TILE,
+  METERS_PER_TILE,
   FEET_Y_1X,
   PERSONA_REF,
   personaEnabled,
@@ -2578,6 +2579,8 @@ export class IsoScene {
       jacLightsOn: !!this.jac?.snapshot().lightsOn,
       steer: this.jac?.snapshot().steering ?? 0,
       timeSec: this.personaTimeSec,
+      jacCx: this.jac && !this.jac.driving ? this.jac.cx : undefined,
+      jacCy: this.jac && !this.jac.driving ? this.jac.cy : undefined,
     };
   }
 
@@ -4101,11 +4104,21 @@ export class IsoScene {
 
   private framePersonaSpawnView(): void {
     if (!personaEnabled()) return;
-    this.charTx = CAL_TILE.x;
-    this.charTy = CAL_TILE.y;
-    const dx = PERSONA_FRAME_C_T9.x - CAL_M.x;
-    const dz = PERSONA_FRAME_C_T9.z - CAL_M.z;
-    this.personaCamYaw = Math.atan2(dx, dz);
+    if (this.jac) {
+      const player = {
+        x: CAL_M.x + (this.charTx - CAL_TILE.x) * METERS_PER_TILE,
+        z: CAL_M.z + (this.charTy - CAL_TILE.y) * METERS_PER_TILE,
+      };
+      const van = {
+        x: CAL_M.x + (this.jac.cx - CAL_TILE.x) * METERS_PER_TILE,
+        z: CAL_M.z + (this.jac.cy - CAL_TILE.y) * METERS_PER_TILE,
+      };
+      this.personaCamYaw = Math.atan2(van.x - player.x, van.z - player.z);
+    } else {
+      const dx = PERSONA_FRAME_C_T9.x - CAL_M.x;
+      const dz = PERSONA_FRAME_C_T9.z - CAL_M.z;
+      this.personaCamYaw = Math.atan2(dx, dz);
+    }
     this.path = [];
     this.pendingBuildingEntry = null;
     this.charState = 'idle';
@@ -4117,14 +4130,8 @@ export class IsoScene {
     if (!this.personaOn() || this.interiorActive || this.jac?.driving || this.doorCooldown > 0) return null;
     if (this.path.length > 0) return null;
     const t = this.roundedCharTile();
-    let building = getBuildingAtDoor(t.x, t.y);
-    if (!building?.panelTitle || !building.door) {
-      building = getBuildingAtDoorOrAdjacent(t.x, t.y);
-    }
+    const building = getBuildingAtPersonaDoor(t.x, t.y);
     if (!building?.panelTitle || !building.door) return null;
-    const doorDist = Math.max(Math.abs(building.door.x - t.x), Math.abs(building.door.y - t.y));
-    const maxDoor = building.name === 'catedral' ? 2 : 1;
-    if (doorDist > maxDoor) return null;
     const inward = doorInwardStep(building);
     if (!inward) return null;
     this.syncViewTransform();
@@ -4982,6 +4989,7 @@ export class IsoScene {
 
   jacGetIn(): void {
     if (!this.jac || this.interiorActive || this.jac.driving) return;
+    if (this.personaOn() && !this.personaJacBoardVisible()) return;
     this.pendingBuildingEntry = null;
     if (this.seatedBench) {
       this.standThen(() => this.jacGetIn());
@@ -5039,7 +5047,6 @@ export class IsoScene {
     }
     this.pendingJacExit = false;
     const snap = this.jac.snapshot();
-    const spot = this.jac.exitTile();
     this.jac.cancelExit();
     if (snap.exitCx != null && snap.exitCy != null) {
       this.jac.cx = snap.exitCx;
@@ -5050,6 +5057,8 @@ export class IsoScene {
     }
     this.jac.setMode('parked');
     this.jac.relayoutParked();
+    const doorSpot = this.jac.driverDoorTile({ x: this.jac.cx, y: this.jac.cy });
+    const spot = doorSpot ?? this.jac.exitTile();
     if (spot) {
       this.charTx = spot.x;
       this.charTy = spot.y;
@@ -5320,11 +5329,14 @@ export class IsoScene {
         if (k === 'e') this.jacGetOut();
         return k === 'e';
       }
-      if (this.personaOn() && this.personaJacBoardVisible()) {
-        this.jacGetIn();
-        return true;
+      if (this.personaOn()) {
+        if (this.personaJacBoardVisible()) {
+          this.jacGetIn();
+          return true;
+        }
+        if (this.tryPersonaEnterBuilding()) return true;
+        return false;
       }
-      if (this.personaOn() && this.tryPersonaEnterBuilding()) return true;
       if (this.atJacDoor(1.6) || this.jac.mode === 'menu' || this.jac.mode === 'info') {
         this.jacGetIn();
         return true;
@@ -6088,9 +6100,16 @@ export class IsoScene {
     if (!m?.visible) return false;
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
-    const pad = 24;
+    const pad = 28;
+    const visW = Math.max(0, Math.min(m.x + m.w, sw - pad) - Math.max(m.x, pad));
+    const visH = Math.max(0, Math.min(m.y + m.h, sh - pad) - Math.max(m.y, pad));
+    const area = visW * visH;
+    const total = Math.max(1, m.w * m.h);
     return (
-      m.w >= sw * 0.08 &&
+      m.w >= sw * 0.1 &&
+      visW >= m.w * 0.55 &&
+      visH >= m.h * 0.55 &&
+      area >= total * 0.35 &&
       m.x + m.w > pad &&
       m.x < sw - pad &&
       m.y + m.h > pad &&
@@ -6216,7 +6235,16 @@ export class IsoScene {
         : null;
       if (w != null && Number.isFinite(w)) return w;
       const tw = this.persona.jacT9TextureWidth() || 308;
-      const est = personaT9WidthFrac(sw, sh, this.charTx, this.charTy, this.personaCamYaw, tw);
+      const est = personaT9WidthFrac(
+        sw,
+        sh,
+        this.charTx,
+        this.charTy,
+        this.personaCamYaw,
+        tw,
+        this.jac?.cx,
+        this.jac?.cy,
+      );
       return est ?? NaN;
     })(),
       jacBoardTop: top('.persona-jac-board'),

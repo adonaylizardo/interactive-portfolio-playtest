@@ -2769,9 +2769,9 @@ body.jac-info[data-chrome='phone'] .chrome__dock {
 
 .persona-jac-board {
   position: fixed;
-  left: max(12px, env(safe-area-inset-left, 0px));
-  top: calc(108px + env(safe-area-inset-top, 0px));
-  bottom: auto;
+  left: max(72px, env(safe-area-inset-left, 0px));
+  top: auto;
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   z-index: 130;
   transform: none;
   display: flex;
@@ -2801,14 +2801,15 @@ body.jac-info[data-chrome='phone'] .chrome__dock {
 
 @media (max-width: 767px) {
   body[data-layout='split'] .persona-jac-board {
-    top: calc(112px + env(safe-area-inset-top, 0px));
+    left: max(12px, env(safe-area-inset-left, 0px));
+    bottom: calc(104px + env(safe-area-inset-bottom, 0px));
   }
 }
 
 @media (max-height: 430px) {
   body[data-view='persona'] .persona-jac-board {
-    top: calc(56px + env(safe-area-inset-top, 0px));
     left: max(8px, env(safe-area-inset-left, 0px));
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
     max-width: 200px;
   }
 }
@@ -2817,8 +2818,8 @@ body.jac-info[data-chrome='phone'] .chrome__dock {
   position: fixed;
   right: max(12px, env(safe-area-inset-right, 0px));
   left: auto;
-  top: calc(108px + env(safe-area-inset-top, 0px));
-  bottom: auto;
+  top: auto;
+  bottom: calc(168px + env(safe-area-inset-bottom, 0px));
   z-index: 129;
   transform: none;
   pointer-events: auto;
@@ -2839,14 +2840,14 @@ body.jac-info[data-chrome='phone'] .chrome__dock {
 
 @media (max-width: 767px) {
   body[data-view='persona'] .persona-enter-prompt {
-    top: calc(112px + env(safe-area-inset-top, 0px));
+    bottom: calc(176px + env(safe-area-inset-bottom, 0px));
   }
 }
 
 @media (max-height: 430px) {
   body[data-view='persona'] .persona-enter-prompt {
-    top: calc(56px + env(safe-area-inset-top, 0px));
     right: max(8px, env(safe-area-inset-right, 0px));
+    bottom: calc(132px + env(safe-area-inset-bottom, 0px));
   }
 
   body[data-view='persona'] .chrome__view-btns {

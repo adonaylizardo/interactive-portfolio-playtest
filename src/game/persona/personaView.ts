@@ -5,8 +5,6 @@ import type { FacingDir } from '../player';
 import {
   ADONAY_ALTO_PX_1X,
   BEHIND_TP_M,
-  CAL_M,
-  CAL_TILE,
   EYE_JAC_M,
   EYE_TP_M,
   FACADE_BY_BUILDING,
@@ -14,12 +12,13 @@ import {
   FOCAL_PX_1X,
   HORIZON_Y_1X,
   JAC_T9_POSE,
-  METERS_PER_TILE,
   PANTONE_SCALE,
-  T9_TARGET_VW,
+  T9_PROJECTION_CALIB,
   PERSONA_REF,
   PX_PER_M,
+  jacPersonaAnchorMeters,
   piezaById,
+  tileToPersonaMeters,
   WHEEL_POS_1X,
 } from './personaSpec';
 import {
@@ -52,16 +51,11 @@ export type PersonaFrameInput = {
   jacLightsOn: boolean;
   steer: number;
   timeSec: number;
+  jacCx?: number;
+  jacCy?: number;
 };
 
 type FacadeSlot = { sprite: Sprite; building: string; x: number; z: number };
-
-function tileToPersonaMeters(tx: number, ty: number): { x: number; z: number } {
-  return {
-    x: CAL_M.x + (tx - CAL_TILE.x) * METERS_PER_TILE,
-    z: CAL_M.z + (ty - CAL_TILE.y) * METERS_PER_TILE,
-  };
-}
 
 function forwardFromYawRad(yawRad: number): { x: number; z: number } {
   return { x: Math.sin(yawRad), z: Math.cos(yawRad) };
@@ -79,15 +73,19 @@ export function personaT9WidthFrac(
   charTy: number,
   yawRad: number,
   texWidth: number,
+  jacCx?: number,
+  jacCy?: number,
 ): number | null {
   const player = tileToPersonaMeters(charTx, charTy);
   const fwd = forwardFromYawRad(yawRad);
   const cam = { x: player.x - fwd.x * BEHIND_TP_M, z: player.z - fwd.z * BEHIND_TP_M };
-  const t9p = projectTp(JAC_T9_POSE.x, 0, JAC_T9_POSE.z, cam, sw, sh);
+  const anchor =
+    jacCx != null && jacCy != null
+      ? jacPersonaAnchorMeters(jacCx, jacCy)
+      : { x: JAC_T9_POSE.x, z: JAC_T9_POSE.z, widthM: JAC_T9_POSE.widthM };
+  const t9p = projectTp(anchor.x, 0, anchor.z, cam, sw, sh);
   if (!t9p || !texWidth) return null;
-  let sc = billboardScale(t9p.scale, texWidth, JAC_T9_POSE.widthM);
-  const wPx = texWidth * sc;
-  sc *= (sw * T9_TARGET_VW) / Math.max(1, wPx);
+  const sc = billboardScale(t9p.scale, texWidth, anchor.widthM) * T9_PROJECTION_CALIB;
   return (texWidth * sc) / sw;
 }
 
@@ -357,6 +355,8 @@ export class PersonaView {
     if (input.jacDriving) {
       this.adonay.visible = false;
       this.pantone.visible = false;
+      this.jacT9Ext.visible = false;
+      this.lastJacScreen = null;
       this.lastJacCabin = true;
       this.lastPantoneVisible = false;
       await this.syncJacCabin(input, sw, sh, dpr);
@@ -411,16 +411,18 @@ export class PersonaView {
       this.lastPantoneAnim = pAnim;
     }
 
-    const t9p = projectTp(JAC_T9_POSE.x, 0, JAC_T9_POSE.z, cam, sw, sh);
+    const jacAnchor =
+      input.jacCx != null && input.jacCy != null
+        ? jacPersonaAnchorMeters(input.jacCx, input.jacCy)
+        : { x: JAC_T9_POSE.x, z: JAC_T9_POSE.z, widthM: JAC_T9_POSE.widthM };
+    const t9p = projectTp(jacAnchor.x, 0, jacAnchor.z, cam, sw, sh);
     if (t9p && this.jacT9Ext.texture) {
       this.jacT9Ext.visible = !input.jacDriving;
       this.jacT9Ext.x = t9p.x;
       this.jacT9Ext.y = t9p.y;
       const tw = this.jacT9Ext.texture.width;
       const th = this.jacT9Ext.texture.height;
-      let sc = billboardScale(t9p.scale, tw, JAC_T9_POSE.widthM);
-      const wPx = tw * sc;
-      sc *= (sw * T9_TARGET_VW) / Math.max(1, wPx);
+      const sc = billboardScale(t9p.scale, tw, jacAnchor.widthM) * T9_PROJECTION_CALIB;
       this.jacT9Ext.scale.set(sc);
       const w = tw * sc;
       const h = th * sc;

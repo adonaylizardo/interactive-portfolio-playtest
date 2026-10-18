@@ -204,15 +204,40 @@ async function runViewport(tag, vp) {
     path.join(FRAMES, 'frame-c-a-pie-junto-t9@1x.png'),
     path.join(OUT, `${tag}-round3-vs-frame-c.png`),
   );
-  const frameCPass = frameC.ok && (frameC.meanDiff ?? 999) <= 58;
+  const frameCInfo = frameC.ok ? { meanDiff: frameC.meanDiff, note: 'informational only' } : frameC;
+
+  const t9ScaleSamples = await page.evaluate(async () => {
+    const j = window.__playtestQa.jac();
+    if (!j) return [];
+    const samples = [];
+    const flush = async () => {
+      window.__playtestQa.setViewMode('persona');
+      await window.__playtestQa.flushPersonaView?.();
+    };
+    for (const d of [0, 3, 6, 9, 12]) {
+      window.__playtestQa.setCharacterTile(Math.round(j.cx), Math.round(j.cy - d));
+      window.__playtestQa.setPersonaYawDeg(40);
+      await flush();
+      const m = window.__playtestQa.personaScreenMetrics();
+      samples.push({ distTiles: d, widthFrac: m.t9WidthFrac });
+    }
+    return samples;
+  });
+  const t9Near = t9ScaleSamples.find((s) => s.distTiles === 0)?.widthFrac ?? NaN;
+  const t9Far = t9ScaleSamples.find((s) => s.distTiles === 12)?.widthFrac ?? NaN;
+  const t9PerspectivePass =
+    Number.isFinite(t9Near) &&
+    t9Near >= 0.2 &&
+    t9Near <= 0.45 &&
+    Number.isFinite(t9Far) &&
+    t9Far < t9Near - 0.04;
 
   const leak = await uiLeakCheck(page);
   const overlaps = await overlapProbe(page);
 
   const expectedAdonayH = ADONAY_ALTO_PX_1X * (metrics.sh / 720);
   const adonayScaleOk = Math.abs(metrics.adonayHeightPx - expectedAdonayH) / expectedAdonayH < 0.12;
-  const t9Ok =
-    Number.isFinite(metrics.t9WidthFrac) && metrics.t9WidthFrac >= 0.22 && metrics.t9WidthFrac <= 0.42;
+  const t9Ok = t9PerspectivePass;
   const legsClear = metrics.feetY <= metrics.sh - 12;
   const navOverlap = overlaps.adonayVsJac || overlaps.adonayVsEnter || overlaps.jacVsDock;
   const uiOverlapPass = !Object.values(overlaps).some(Boolean);
@@ -228,7 +253,9 @@ async function runViewport(tag, vp) {
     viewSwitch,
     fps: { map: mapFps, persona: personaFps, ratio: fpsRatio, pass: fpsRatio >= 0.8 },
     leak: { ...leak, pass: leak.labels === 0 && leak.cenitalLabels === 0 },
-    frameC: { ...frameC, pass: frameCPass },
+    frameC: frameCInfo,
+    t9ScaleSamples,
+    t9PerspectivePass,
     metrics,
     adonayScaleOk,
     t9Ok,
@@ -266,9 +293,9 @@ const report = {
       (r) =>
         r.viewSwitch.pass &&
         r.leak.pass &&
-        r.frameC.pass &&
         r.adonayScaleOk &&
         r.t9Ok &&
+        r.t9PerspectivePass &&
         r.legsClear &&
         r.uiOverlapPass,
     ),

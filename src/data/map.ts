@@ -128,6 +128,20 @@ export function getBuildingAtDoorOrAdjacent(tx: number, ty: number): MapObject |
   });
 }
 
+/** Persona “Entrar”: door tile, adjacent, or (Catedral) up to 2 tiles from the door. */
+export function getBuildingAtPersonaDoor(tx: number, ty: number): MapObject | undefined {
+  let best: { obj: MapObject; dist: number } | null = null;
+  for (const o of objects) {
+    if (o.type !== 'building' || !o.door || !o.panelTitle) continue;
+    const d = o.door;
+    const max = o.name === 'catedral' ? 2 : 1;
+    const dist = Math.max(Math.abs(d.x - tx), Math.abs(d.y - ty));
+    if (dist > max) continue;
+    if (!best || dist < best.dist) best = { obj: o, dist };
+  }
+  return best?.obj;
+}
+
 export function getBuildingAt(tx: number, ty: number): MapObject | undefined {
   for (const o of objects) {
     if (o.type !== 'building') continue;
