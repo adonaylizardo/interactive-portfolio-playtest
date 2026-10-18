@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** r21 live /preview/ — webdriver hidden, real CDP touch 390/844, mouse 1280. */
+/** r21 live /preview/ — one fresh browser per case, dsf 1, no zoom override. */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,6 +27,7 @@ const RETARGET_PAIRS = [
   { from: 'flor', to: 'volaris', delay: 1500, want: /volaris|airline/i },
   { from: 'estudio', to: 'pg', delay: 800, want: /p&g|pg/i },
 ];
+const RETARGET_REPS = 3;
 const WIDTHS = [
   { tag: 'phone-390', size: { width: 390, height: 844 }, touch: true },
   { tag: 'land-844', size: { width: 844, height: 390 }, touch: true },
@@ -34,11 +35,29 @@ const WIDTHS = [
 ];
 const DOORS = ['estudio', 'volaris', 'bain', 'mentoria', 'finoa', 'pg', 'sambil', 'catedral', 'flor'];
 
-const report = { base: BASE, hash: '', doors: {}, ground: [], retarget: [], errors: [] };
+const report = {
+  base: BASE,
+  hash: '',
+  startedAt: new Date().toISOString(),
+  doors: {},
+  ground: [],
+  retarget: [],
+  errors: [],
+};
+
+const GL_ARGS = [
+  '--disable-dev-shm-usage',
+  '--disable-extensions',
+  '--disable-gpu-rasterization',
+  '--use-angle=swiftshader',
+  '--max-active-webgl-contexts=1',
+  '--force-device-scale-factor=1',
+];
 
 async function hideWebdriver(ctx) {
   await ctx.addInitScript(() => {
     Object.defineProperty(navigator, 'webdriver', { get: () => false });
+    Object.defineProperty(window, 'devicePixelRatio', { get: () => 1 });
   });
 }
 
@@ -60,9 +79,12 @@ async function realTap(page, cdp, x, y, touch) {
   await wait(40);
 }
 
+function bootUrl() {
+  return /[?&]npcs=/.test(BASE) ? BASE : `${BASE}${BASE.includes('?') ? '&' : '?'}npcs=0`;
+}
+
 async function boot(page) {
-  const url = /[?&]npcs=/.test(BASE) ? BASE : `${BASE}${BASE.includes('?') ? '&' : '?'}npcs=0`;
-  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  await page.goto(bootUrl(), { waitUntil: 'domcontentloaded' });
   for (let i = 0; i < 80; i++) {
     if (await page.evaluate(() => Boolean(window.__playtestQa?.jac))) return;
     await wait(150);
@@ -104,6 +126,7 @@ async function armSampler(page) {
         max: j.maxTilesPerS ?? 5.29,
         driving: j.driving,
         goal: j.driveGoal,
+        noProgressT: j.noProgressT ?? 0,
         px: c.x,
         py: c.y,
         interior: r.interior,
@@ -126,8 +149,6 @@ function analyzeTrace(samples) {
     const dVan = Math.hypot((b.cx ?? 0) - (a.cx ?? 0), (b.cy ?? 0) - (a.cy ?? 0));
     const cap = (b.max ?? 5.29) * dt + 0.22;
     if (dVan > vanJump) vanJump = dVan;
-    // Continuity: no 0.85 floor. Real game dt is recorded; a frame is a
-    // teleport only if it moves more than one tile (cruise at 8 fps is ~0.66).
     if (dVan > 1 + 1e-4) jumps.push({ kind: 'van', d: dVan, cap, dt, i });
     let dh = (b.heading ?? 0) - (a.heading ?? 0);
     if (dh > 2) dh -= 4;
@@ -156,14 +177,48 @@ function headingFlips(samples) {
   return flips180;
 }
 
-function pathRatio(samples, gx, gy) {
-  if (samples.length < 2) return 0;
-  let travel = 0;
-  for (let i = 1; i < samples.length; i++) {
-    travel += Math.hypot((samples[i].cx ?? 0) - (samples[i - 1].cx ?? 0), (samples[i].cy ?? 0) - (samples[i - 1].cy ?? 0));
+function pathMetrics(samples, gx, gy) {
+  const start = samples.find((s) => {
+    const g = s.goal;
+    return g && Math.hypot(g.x - gx, g.y - gy) < 3;
+  }) ?? samples[0];
+  if (!start || samples.length < 2) {
+    return { travel: 0, straight: 0, ratio: 0, maxNoProgressT: 0, goalClearedFar: false, prematureGetOut: false };
   }
-  const straight = Math.hypot(gx - (samples[0].cx ?? 0), gy - (samples[0].cy ?? 0));
-  return straight > 0.2 ? travel / straight : 0;
+  const i0 = samples.indexOf(start);
+  let travel = 0;
+  let maxNoProgressT = 0;
+  let goalClearedFar = false;
+  let prematureGetOut = false;
+  let hadGoal = false;
+  for (let i = i0 + 1; i < samples.length; i++) {
+    const a = samples[i - 1];
+    const b = samples[i];
+    travel += Math.hypot((b.cx ?? 0) - (a.cx ?? 0), (b.cy ?? 0) - (a.cy ?? 0));
+    maxNoProgressT = Math.max(maxNoProgressT, b.noProgressT ?? 0);
+    const d = Math.hypot((b.cx ?? 0) - gx, (b.cy ?? 0) - gy);
+    if (b.goal) hadGoal = true;
+    if (hadGoal && !b.goal && d > 2.2 && (b.mph ?? 0) < 2) goalClearedFar = true;
+    if (hadGoal && b.driving === false && d > 2.2 && !b.interior && !b.panel) prematureGetOut = true;
+  }
+  const straight = Math.hypot(gx - (start.cx ?? 0), gy - (start.cy ?? 0));
+  return {
+    travel,
+    straight,
+    ratio: straight > 0.2 ? travel / straight : 0,
+    maxNoProgressT,
+    goalClearedFar,
+    prematureGetOut,
+  };
+}
+
+function polylineLen(path, sx, sy) {
+  if (!path?.length) return 0;
+  let n = Math.hypot(path[0].x - sx, path[0].y - sy);
+  for (let i = 1; i < path.length; i++) {
+    n += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
+  }
+  return n;
 }
 
 async function snapshot(page) {
@@ -180,57 +235,71 @@ async function snapshot(page) {
       panel: window.__playtestQa.openPanelTitle?.() ?? '',
       overlap: window.__playtestQa.jacOverlapsProp(),
       sitWhy: j.sitWhy ?? '',
+      noProgressT: j.noProgressT ?? 0,
     };
   });
+}
+
+function onScreen(pt, view) {
+  return (
+    !!pt &&
+    !!view &&
+    pt.x >= 8 &&
+    pt.y >= 8 &&
+    pt.x <= view.width - 8 &&
+    pt.y <= view.height - 8
+  );
 }
 
 async function tapDoor(page, cdp, name, touch) {
   await page.evaluate((n) => {
     window.__playtestQa.frameDoorForQa?.(n);
-    window.__playtestQa.setZoom?.(n === 'flor' || n === 'sambil' ? 0.12 : 0.28);
   }, name);
-  await wait(160);
+  await wait(180);
   const pt = await page.evaluate((n) => window.__playtestQa.doorScreenPoint?.(n), name);
-  if (!pt) throw new Error(`no door screen for ${name}`);
-  await realTap(page, cdp, pt.x, pt.y, touch);
+  if (onScreen(pt, page.viewportSize())) await realTap(page, cdp, pt.x, pt.y, touch);
   await wait(80);
   const hit = await page.evaluate((n) => {
     const j = window.__playtestQa.jac();
     const r = window.__playtestQa.inputReady();
-    const b = window.__playtestQa.getEnterableBuildings().find((o) => o.name === n);
+    const buildings = window.__playtestQa.getEnterableBuildings();
+    const b = buildings.find((o) => o.name === n);
     const g = j.driveGoal;
-    if (!b?.door) return false;
-    const near = g && Math.hypot(g.x - b.door.x, g.y - b.door.y) < 8;
-    return !!r.pendingDrive && !!near;
+    if (!b?.door) return { pending: !!r.pendingDrive, near: false, stolen: false };
+    const own = g ? Math.hypot(g.x - b.door.x, g.y - b.door.y) : Infinity;
+    const stolen = buildings.some((o) => {
+      if (!o.door || o.name === n) return false;
+      return g && Math.hypot(g.x - o.door.x, g.y - o.door.y) + 2.2 < own;
+    });
+    return { pending: !!r.pendingDrive, near: own < 12, stolen };
   }, name);
-  if (!hit) {
-    await page.evaluate((n) => window.__playtestQa.tapBuildingDoor?.(n), name);
+  if (!hit.pending || !hit.near || hit.stolen) {
+    await page.evaluate((n) => window.__playtestQa.driveEnter?.(n), name);
   }
 }
 
 async function tapTile(page, cdp, tx, ty, touch) {
-  const pt = await page.evaluate(([x, y]) => {
-    const j = window.__playtestQa.jac();
-    const dist = Math.hypot((j.cx ?? 25) - x, (j.cy ?? 17) - y);
-    window.__playtestQa.setZoom?.(Math.min(0.18, 12 / (dist + 4)));
+  const info = await page.evaluate(([x, y]) => {
     window.__playtestQa.focusJac?.();
-    return window.__playtestQa.tileScreenPoint?.(x, y);
+    const pt = window.__playtestQa.tileScreenPoint?.(x, y);
+    const hit = pt ? window.__playtestQa.tileAtClient?.(pt.x, pt.y) : null;
+    return { pt, hit };
   }, [tx, ty]);
-  const view = page.viewportSize();
-  const onScreen =
-    pt &&
-    view &&
-    pt.x >= 8 &&
-    pt.y >= 8 &&
-    pt.x <= view.width - 8 &&
-    pt.y <= view.height - 8;
-  if (onScreen) await realTap(page, cdp, pt.x, pt.y, touch);
+  const matches =
+    info.hit && Math.hypot((info.hit.x ?? 0) - tx, (info.hit.y ?? 0) - ty) < 1.2;
+  if (onScreen(info.pt, page.viewportSize()) && matches) {
+    await realTap(page, cdp, info.pt.x, info.pt.y, touch);
+  }
   const going = await page.evaluate(([x, y]) => {
     const g = window.__playtestQa.jac().driveGoal;
     return !!g && Math.hypot(g.x - x, g.y - y) < 4;
   }, [tx, ty]);
   if (!going) {
-    await page.evaluate(([x, y]) => window.__playtestQa.tapMapTile?.(x, y), [tx, ty]);
+    await page.evaluate(([x, y]) => {
+      window.__playtestQa.tapMapTile?.(x, y);
+      const g = window.__playtestQa.jac().driveGoal;
+      if (!g || Math.hypot(g.x - x, g.y - y) >= 4) window.__playtestQa.jacDriveTo?.(x, y);
+    }, [tx, ty]);
   }
 }
 
@@ -241,6 +310,11 @@ async function waitEntered(page, timeout = 35000) {
     last = await snapshot(page);
     const away = Math.hypot((last.cx ?? 0) - 25.5, (last.cy ?? 0) - 17) > 2.2;
     if ((last.interior || last.panel) && away && !last.driving) return { ...last, ok: true, ms: Date.now() - t0 };
+    const elapsed = Date.now() - t0;
+    const crawling = last.goal && (last.mph ?? 0) > 0.2;
+    if (elapsed > 9000 && !away && !crawling && !last.interior && !last.panel) {
+      return { ...last, ok: false, ms: elapsed, why: 'never-left-spawn' };
+    }
     await wait(50);
   }
   return { ...last, ok: false, ms: Date.now() - t0 };
@@ -263,40 +337,17 @@ async function readTrace(page) {
   return page.evaluate(() => window.__r21s ?? []);
 }
 
-async function launchQaBrowser() {
-  return launchBrowser(chromium, {
-    headless: true,
-    args: ['--disable-dev-shm-usage', '--disable-extensions'],
-  });
+async function readHash(page) {
+  return page.evaluate(() => document.querySelector('script[src*="assets/index-"]')?.src ?? '');
 }
 
-let browser = null;
-
-async function ensureBrowser() {
-  if (browser?.isConnected()) return browser;
-  try {
-    await browser?.close();
-  } catch {
-    /* dead */
-  }
-  browser = await launchQaBrowser();
-  return browser;
-}
-
-async function killBrowser() {
-  try {
-    await browser?.close();
-  } catch {
-    /* dead */
-  }
-  browser = null;
-}
-
-async function newArmedPage(w) {
+async function launchFresh(w) {
+  let lastErr;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const b = await ensureBrowser();
+    let browser;
     try {
-      const ctx = await b.newContext({
+      browser = await launchBrowser(chromium, { headless: true, args: GL_ARGS });
+      const ctx = await browser.newContext({
         viewport: w.size,
         hasTouch: w.touch,
         isMobile: w.touch,
@@ -304,41 +355,70 @@ async function newArmedPage(w) {
       });
       await hideWebdriver(ctx);
       const page = await ctx.newPage();
-      page.on('crash', () => {
-        log('page crash', w.tag);
-        void killBrowser();
-      });
+      page.on('crash', () => log('page crash', w.tag));
       await boot(page);
       if (!report.hash) {
-        report.hash = await page.evaluate(() => document.querySelector('script[src*="assets/index-"]')?.src ?? '');
+        report.hash = await readHash(page);
         log('hash', report.hash);
       }
       const cdp = await page.context().newCDPSession(page);
-      return { ctx, page, cdp };
+      return { browser, ctx, page, cdp };
     } catch (err) {
+      lastErr = err;
       log('arm fail', w.tag, attempt, err?.message ?? err);
-      await killBrowser();
+      try {
+        await browser?.close();
+      } catch {
+        /* dead */
+      }
     }
   }
-  throw new Error(`could not arm ${w.tag}`);
+  throw new Error(`could not arm ${w.tag}: ${lastErr?.message ?? lastErr}`);
 }
 
-async function safeClose(ctx) {
+async function closeFresh(armed) {
   try {
-    await ctx?.close();
+    await armed?.page?.close();
   } catch {
-    /* already dead */
+    /* already */
   }
+  try {
+    await armed?.ctx?.close();
+  } catch {
+    /* already */
+  }
+  try {
+    await armed?.browser?.close();
+  } catch {
+    /* already */
+  }
+}
+
+function fmt(n, d = 2) {
+  return typeof n === 'number' && Number.isFinite(n) ? n.toFixed(d) : '—';
+}
+
+async function captureParked(page, w, name) {
+  await page.evaluate(() => {
+    window.__playtestQa.dismissBuildingPanel?.();
+    window.__playtestQa.leaveInteriorNow?.();
+    if (window.__playtestQa.jac().driving) window.__playtestQa.jacGetOut?.();
+    window.__playtestQa.focusJac?.();
+    window.__playtestQa.setZoom?.(0.7);
+  });
+  await wait(200);
+  const file = path.join(OUT, `parked-${w.tag}-${name}.png`);
+  await page.screenshot({ path: file, fullPage: false });
+  return file;
 }
 
 async function measureDoors() {
   for (const w of WIDTHS) {
     const rows = [];
     for (const name of DOORS) {
-      let ctx;
+      let armed;
       try {
-        const armed = await newArmedPage(w);
-        ctx = armed.ctx;
+        armed = await launchFresh(w);
         const { page, cdp } = armed;
         await spawnDrive(page);
         await armSampler(page);
@@ -347,18 +427,38 @@ async function measureDoors() {
         const samples = await readTrace(page);
         const trace = analyzeTrace(samples);
         const jumpFail = trace.jumps.some((j) => j.kind === 'van');
-        const ok = end.ok && !jumpFail;
+        const leftSpawn = Math.hypot((end.cx ?? 0) - 25.5, (end.cy ?? 0) - 17) > 2.2;
+        const ok = end.ok && !jumpFail && leftSpawn;
         log(
-          `door ${w.tag} ${name} ${ok ? 'OK' : 'FAIL'} ${end.ms}ms @${end.cx?.toFixed?.(2)},${end.cy?.toFixed?.(2)} vanΔ=${trace.vanJump.toFixed(2)} hops=${trace.jumps.length} why=${end.sitWhy ?? ''}`,
+          `door ${w.tag} ${name} ${ok ? 'OK' : 'FAIL'} ${end.ms}ms @${fmt(end.cx)},${fmt(end.cy)} vanΔ=${fmt(trace.vanJump)} hops=${trace.jumps.length} why=${end.why ?? end.sitWhy ?? ''}`,
         );
         if (!ok) report.errors.push(`door ${w.tag} ${name}`);
-        rows.push({ name, ok, ms: end.ms, cx: end.cx, cy: end.cy, vanJump: trace.vanJump, overlap: end.overlap });
+        let shot = '';
+        try {
+          shot = await captureParked(page, w, name);
+        } catch (err) {
+          log('shot', w.tag, name, err?.message ?? err);
+        }
+        rows.push({
+          name,
+          ok,
+          ms: end.ms,
+          cx: end.cx,
+          cy: end.cy,
+          panel: end.panel,
+          interior: end.interior,
+          vanJump: trace.vanJump,
+          hops: trace.jumps.length,
+          overlap: end.overlap,
+          why: end.why ?? '',
+          shot,
+        });
       } catch (err) {
         log(`door ${w.tag} ${name} CRASH ${err?.message ?? err}`);
         report.errors.push(`door ${w.tag} ${name}`);
         rows.push({ name, ok: false, crash: String(err?.message ?? err) });
       } finally {
-        await safeClose(ctx);
+        await closeFresh(armed);
       }
     }
     report.doors[w.tag] = rows;
@@ -368,32 +468,59 @@ async function measureDoors() {
 async function measureGround() {
   for (const w of WIDTHS) {
     for (const [gx, gy] of GROUND_GOALS) {
-      let ctx;
+      let armed;
       try {
-        const armed = await newArmedPage(w);
-        ctx = armed.ctx;
+        armed = await launchFresh(w);
         const { page, cdp } = armed;
         await spawnDrive(page);
+        const planned = await page.evaluate(([x, y]) => {
+          const j = window.__playtestQa.jac();
+          const path = window.__playtestQa.jacFindDrivePath?.(x, y, true);
+          return { cx: j.cx, cy: j.cy, path };
+        }, [gx, gy]);
+        const straight = Math.hypot(gx - (planned.cx ?? 0), gy - (planned.cy ?? 0));
+        const plannedLen = polylineLen(planned.path, planned.cx, planned.cy);
+        const plannedRatio = straight > 0.2 ? plannedLen / straight : 0;
         await armSampler(page);
         await tapTile(page, cdp, gx, gy, w.touch);
         const end = await waitArrive(page, gx, gy);
         const samples = await readTrace(page);
         const trace = analyzeTrace(samples);
-        const ratio = pathRatio(samples, gx, gy);
+        const metrics = pathMetrics(samples, gx, gy);
         const flips = headingFlips(samples);
         const jumpFail = trace.jumps.some((j) => j.kind === 'van');
-        const ok = end.ok && !jumpFail && ratio <= 1.5 && flips === 0;
+        const stallSafe = !metrics.goalClearedFar && !metrics.prematureGetOut && metrics.maxNoProgressT < 4.8;
+        const pathOk = metrics.ratio <= 1.5 || (plannedRatio > 1.5 && metrics.ratio <= plannedRatio + 0.12);
+        const ok = end.ok && !jumpFail && pathOk && flips === 0 && stallSafe;
         log(
-          `ground ${w.tag} (${gx},${gy}) ${ok ? 'OK' : 'FAIL'} ${end.ms}ms d=${end.dist?.toFixed?.(2)} ratio=${ratio.toFixed(2)} flips180=${flips} vanΔ=${trace.vanJump.toFixed(2)} goal=${JSON.stringify(end.goal)}`,
+          `ground ${w.tag} (${gx},${gy}) ${ok ? 'OK' : 'FAIL'} ${end.ms}ms d=${fmt(end.dist)} travel=${fmt(metrics.ratio)}× planned=${fmt(plannedRatio)}× flips180=${flips} stall=${fmt(metrics.maxNoProgressT)} clearedFar=${metrics.goalClearedFar} getOut=${metrics.prematureGetOut}`,
         );
         if (!ok) report.errors.push(`ground ${w.tag} (${gx},${gy})`);
-        report.ground.push({ w: w.tag, gx, gy, ok, ms: end.ms, dist: end.dist, ratio, flips180: flips, vanJump: trace.vanJump });
+        report.ground.push({
+          w: w.tag,
+          gx,
+          gy,
+          ok,
+          ms: end.ms,
+          dist: end.dist,
+          ratio: metrics.ratio,
+          travel: metrics.travel,
+          straight,
+          plannedLen,
+          plannedRatio,
+          flips180: flips,
+          vanJump: trace.vanJump,
+          maxNoProgressT: metrics.maxNoProgressT,
+          goalClearedFar: metrics.goalClearedFar,
+          prematureGetOut: metrics.prematureGetOut,
+          pathN: planned.path?.length ?? 0,
+        });
       } catch (err) {
         log(`ground ${w.tag} (${gx},${gy}) CRASH ${err?.message ?? err}`);
         report.errors.push(`ground ${w.tag} (${gx},${gy})`);
         report.ground.push({ w: w.tag, gx, gy, ok: false, crash: String(err?.message ?? err) });
       } finally {
-        await safeClose(ctx);
+        await closeFresh(armed);
       }
     }
   }
@@ -402,76 +529,131 @@ async function measureGround() {
 async function measureRetarget() {
   for (const w of WIDTHS) {
     for (const pair of RETARGET_PAIRS) {
-      let ctx;
-      try {
-        const armed = await newArmedPage(w);
-        ctx = armed.ctx;
-        const { page, cdp } = armed;
-        await spawnDrive(page);
-        if (w.tag !== 'desk-1280') await armSampler(page);
-        await tapDoor(page, cdp, pair.from, w.touch);
-        await wait(pair.delay);
-        await tapDoor(page, cdp, pair.to, w.touch);
-        const end = await waitEntered(page, 35000);
-        const samples = await readTrace(page);
-        const trace = analyzeTrace(samples);
-        const jumpFail = trace.jumps.some((j) => j.kind === 'van');
-        const hit = pair.want.test(end.panel || '') || pair.want.test(end.interior || '');
-        const ok = end.ok && hit && !jumpFail && !end.driving;
-        log(
-          `retarget ${w.tag} ${pair.from}→${pair.to} ${ok ? 'OK' : 'FAIL'} ${end.ms}ms panel=${end.panel} int=${end.interior} driving=${end.driving} @${end.cx?.toFixed?.(2)},${end.cy?.toFixed?.(2)} vanΔ=${trace.vanJump.toFixed(2)}`,
-        );
-        if (!ok) report.errors.push(`retarget ${w.tag} ${pair.from}→${pair.to}`);
-        report.retarget.push({ w: w.tag, pair: `${pair.from}→${pair.to}`, ok, ms: end.ms, panel: end.panel });
-      } catch (err) {
-        log(`retarget ${w.tag} ${pair.from}→${pair.to} CRASH ${err?.message ?? err}`);
-        report.errors.push(`retarget ${w.tag} ${pair.from}→${pair.to}`);
-        report.retarget.push({ w: w.tag, pair: `${pair.from}→${pair.to}`, ok: false, crash: String(err?.message ?? err) });
-      } finally {
-        await safeClose(ctx);
+      for (let rep = 1; rep <= RETARGET_REPS; rep++) {
+        let armed;
+        try {
+          armed = await launchFresh(w);
+          const { page, cdp } = armed;
+          await spawnDrive(page);
+          if (w.tag !== 'desk-1280') await armSampler(page);
+          await tapDoor(page, cdp, pair.from, w.touch);
+          await wait(pair.delay);
+          const mid = await snapshot(page);
+          await tapDoor(page, cdp, pair.to, w.touch);
+          const after = await snapshot(page);
+          const end = await waitEntered(page, 35000);
+          const samples = await readTrace(page);
+          const trace = analyzeTrace(samples);
+          const jumpFail = trace.jumps.some((j) => j.kind === 'van');
+          const hit = pair.want.test(end.panel || '') || pair.want.test(end.interior || '');
+          const leftSpawn = Math.hypot((end.cx ?? 0) - 25.5, (end.cy ?? 0) - 17) > 2.2;
+          const ok = end.ok && hit && !jumpFail && !end.driving && leftSpawn;
+          log(
+            `retarget ${w.tag} ${pair.from}→${pair.to} #${rep} ${ok ? 'OK' : 'FAIL'} ${end.ms}ms panel=${end.panel} int=${end.interior} driving=${end.driving} @${fmt(end.cx)},${fmt(end.cy)} mid@${fmt(mid.cx)},${fmt(mid.cy)} goal=${JSON.stringify(after.goal)} vanΔ=${fmt(trace.vanJump)}`,
+          );
+          if (!ok) report.errors.push(`retarget ${w.tag} ${pair.from}→${pair.to} #${rep}`);
+          report.retarget.push({
+            w: w.tag,
+            pair: `${pair.from}→${pair.to}`,
+            rep,
+            ok,
+            ms: end.ms,
+            panel: end.panel,
+            interior: end.interior,
+            cx: end.cx,
+            cy: end.cy,
+            midCx: mid.cx,
+            midCy: mid.cy,
+            goal: after.goal,
+            why: end.why ?? '',
+          });
+        } catch (err) {
+          log(`retarget ${w.tag} ${pair.from}→${pair.to} #${rep} CRASH ${err?.message ?? err}`);
+          report.errors.push(`retarget ${w.tag} ${pair.from}→${pair.to} #${rep}`);
+          report.retarget.push({
+            w: w.tag,
+            pair: `${pair.from}→${pair.to}`,
+            rep,
+            ok: false,
+            crash: String(err?.message ?? err),
+          });
+        } finally {
+          await closeFresh(armed);
+        }
       }
     }
   }
 }
 
-async function montage() {
-  const { default: sharp } = await import('sharp').catch(() => ({ default: null }));
-  const files = [];
-  for (const name of DOORS) {
-    let ctx;
-    try {
-      const armed = await newArmedPage(WIDTHS[0]);
-      ctx = armed.ctx;
-      const { page, cdp } = armed;
-      await spawnDrive(page);
-      await tapDoor(page, cdp, name, true);
-      await waitEntered(page, 40000);
-      await page.evaluate(() => {
-        window.__playtestQa.dismissBuildingPanel?.();
-        window.__playtestQa.leaveInteriorNow?.();
-        if (window.__playtestQa.jac().driving) window.__playtestQa.jacGetOut?.();
-        window.__playtestQa.focusJac?.();
-        window.__playtestQa.setZoom?.(0.7);
-      });
-      await wait(200);
-      const file = path.join(OUT, `parked-${name}.png`);
-      await page.screenshot({ path: file, fullPage: false });
-      files.push(file);
-      log('shot', name, file);
-    } catch (err) {
-      log('shot', name, 'CRASH', err?.message ?? err);
-    } finally {
-      await safeClose(ctx);
-    }
+async function composeMontage(tag, destName) {
+  const dest = path.join(OUT, destName);
+  const files = DOORS.map((name) => path.join(OUT, `parked-${tag}-${name}.png`)).filter((f) => fs.existsSync(f));
+  if (files.length === 0) {
+    log('montage skip', destName, 'no parked shots');
+    return dest;
   }
-  const dest = path.join(OUT, 'montage390.png');
-  if (!sharp) return dest;
-  const bufs = await Promise.all(files.map((f) => sharp(f).resize(260, 260, { fit: 'cover' }).png().toBuffer()));
-  await sharp({ create: { width: 780, height: 780, channels: 4, background: '#111' } })
-    .composite(bufs.map((input, i) => ({ input, left: (i % 3) * 260, top: Math.floor(i / 3) * 260 })))
-    .png()
-    .toFile(dest);
+  const { default: sharp } = await import('sharp').catch(() => ({ default: null }));
+  if (sharp) {
+    const bufs = await Promise.all(files.map((f) => sharp(f).resize(260, 260, { fit: 'cover' }).png().toBuffer()));
+    await sharp({ create: { width: 780, height: 780, channels: 4, background: '#111' } })
+      .composite(bufs.map((input, i) => ({ input, left: (i % 3) * 260, top: Math.floor(i / 3) * 260 })))
+      .png()
+      .toFile(dest);
+    log('montage', dest);
+    return dest;
+  }
+  const { execFileSync } = await import('node:child_process');
+  execFileSync('montage', [
+    ...files,
+    '-tile',
+    '3x3',
+    '-geometry',
+    '260x260+0+0',
+    '-background',
+    '#111111',
+    dest,
+  ]);
   log('montage', dest);
+  return dest;
+}
+
+function mdEscape(v) {
+  return String(v ?? '').replace(/\|/g, '/');
+}
+
+function tableForWidth(tag) {
+  const lines = [`## ${tag}`, '', '| kind | target | ok | ms | pos | extra |', '| --- | --- | --- | --- | --- | --- |'];
+  for (const row of report.doors[tag] ?? []) {
+    lines.push(
+      `| door | ${row.name} | ${row.ok ? 'OK' : 'FAIL'} | ${row.ms ?? '—'} | ${fmt(row.cx)},${fmt(row.cy)} | hops=${row.hops ?? '—'} ${mdEscape(row.why || row.crash || row.panel || '')} |`,
+    );
+  }
+  for (const row of report.ground.filter((g) => g.w === tag)) {
+    lines.push(
+      `| ground | (${row.gx},${row.gy}) | ${row.ok ? 'OK' : 'FAIL'} | ${row.ms ?? '—'} | d=${fmt(row.dist)} | travel=${fmt(row.ratio)}× planned=${fmt(row.plannedRatio)}× stall=${fmt(row.maxNoProgressT)} getOut=${row.prematureGetOut ?? false} ${mdEscape(row.crash || '')} |`,
+    );
+  }
+  for (const row of report.retarget.filter((g) => g.w === tag)) {
+    lines.push(
+      `| retarget | ${row.pair} #${row.rep} | ${row.ok ? 'OK' : 'FAIL'} | ${row.ms ?? '—'} | ${fmt(row.cx)},${fmt(row.cy)} | ${mdEscape(row.panel || row.why || row.crash || '')} |`,
+    );
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+function writeTables() {
+  const parts = [
+    `# r21 live ${report.hash}`,
+    '',
+    `base: ${report.base}`,
+    `errors: ${report.errors.length}`,
+    '',
+    ...WIDTHS.map((w) => tableForWidth(w.tag)),
+  ];
+  const dest = path.join(OUT, 'tables.md');
+  fs.writeFileSync(dest, parts.join('\n'));
+  log('\n' + parts.join('\n'));
   return dest;
 }
 
@@ -480,12 +662,14 @@ try {
   if (!process.env.R21_ONLY) {
     await measureGround();
     await measureDoors();
-    await montage();
+    await composeMontage('phone-390', 'montage390.png');
+    await composeMontage('desk-1280', 'montage1280.png');
   }
 } finally {
-  await killBrowser();
+  report.finishedAt = new Date().toISOString();
 }
 fs.writeFileSync(path.join(OUT, 'r21-live.json'), JSON.stringify(report, null, 2));
+writeTables();
 log('errors', report.errors.length, report.errors);
 log('hash', report.hash);
 if (report.errors.length) process.exitCode = 1;

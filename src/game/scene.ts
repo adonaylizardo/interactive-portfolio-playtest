@@ -459,14 +459,15 @@ export class IsoScene {
   async init(canvas: HTMLCanvasElement): Promise<void> {
     this.canvasEl = canvas;
     this.app = new Application();
+    const qaLite = new URLSearchParams(location.search).has('npcs');
     await this.app.init({
       canvas,
       background: worldBackgroundColor(),
       backgroundAlpha: 1,
-      antialias: true,
+      antialias: !qaLite,
       autoDensity: true,
       premultipliedAlpha: true,
-      resolution: Math.min(window.devicePixelRatio || 1, 2),
+      resolution: qaLite ? 1 : Math.min(window.devicePixelRatio || 1, 2),
       resizeTo: window,
       preference: 'webgl',
     });
@@ -4658,8 +4659,8 @@ export class IsoScene {
     return this.driveToTile(tx, ty, false);
   }
 
-  qaFindDrivePath(tx: number, ty: number): { x: number; y: number }[] | null {
-    return this.jac?.findDrivePath(tx, ty) ?? null;
+  qaFindDrivePath(tx: number, ty: number, loose?: boolean): { x: number; y: number }[] | null {
+    return this.jac?.findDrivePath(tx, ty, loose == null ? undefined : { loose }) ?? null;
   }
 
   qaFps(): { fps: number; elapsedMS: number; sameCanvas: boolean } {

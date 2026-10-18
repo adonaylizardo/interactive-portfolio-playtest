@@ -112,6 +112,7 @@ export type JacSnapshot = {
   driveGoal: { x: number; y: number } | null;
   pathN: number;
   lastParkMs: number;
+  noProgressT: number;
   sitWhy: string;
   maxTilesPerS: number;
   visualTx: number;
@@ -783,12 +784,15 @@ export class JacT9 {
     const sx = originCell.x;
     const sy = originCell.y;
     const usable = this.sitsForDoor(doorX, doorY).filter(
-      (c) => !this.skippedSits.has(k(c.x, c.y)) && this.sitCellHoldable(c.x, c.y),
+      (c) =>
+        !this.skippedSits.has(k(c.x, c.y)) &&
+        this.sitCellHoldable(c.x, c.y) &&
+        !this.sitCloserToOtherDoor(c, doorX, doorY),
     );
     const doorSide = usable.filter(
       (c) => c.along >= 0 && Math.hypot(c.x - sx, c.y - sy) > 3.2,
     );
-    const closeEnough = doorSide.filter((c) => Math.hypot(c.x - doorX, c.y - doorY) <= 8);
+    const closeEnough = doorSide.filter((c) => Math.hypot(c.x - doorX, c.y - doorY) <= 6);
     const front = closeEnough.filter((c) => c.along >= 1 && c.doorD >= 3 && c.doorD <= 6);
     const pool = front.length ? front : closeEnough.length ? closeEnough : doorSide;
     if (pool.length === 0) return null;
@@ -813,16 +817,31 @@ export class JacT9 {
       if (this.pathsFrom === origin) this.pathToSit.set(k(cand.x, cand.y), path);
       scored.push({ c: cand, path });
     }
+    // Closeness to *this* door first. Shortest-path used to steal Finoa's
+    // stoop at (25,24) for the P&G door at (24,31).
     scored.sort(
       (a, b) =>
+        closeness(a.c) - closeness(b.c) ||
+        b.c.along - a.c.along ||
         doorHug(a.c) - doorHug(b.c) ||
         a.path.length - b.path.length ||
         prefer(a.c) - prefer(b.c) ||
-        closeness(a.c) - closeness(b.c) ||
         a.c.walkD - b.c.walkD,
     );
     const best = scored[0];
     return best ? { x: best.c.x, y: best.c.y, path: best.path, heading: best.c.heading } : null;
+  }
+
+  /** A sit hypot-closer to another enterable door is that other stoop, not this one. */
+  private sitCloserToOtherDoor(c: DoorSit, doorX: number, doorY: number): boolean {
+    const own = Math.hypot(c.x - doorX, c.y - doorY);
+    for (const b of getEnterableBuildings()) {
+      if (!b.door) continue;
+      if (b.door.x === doorX && b.door.y === doorY) continue;
+      const d = Math.hypot(c.x - b.door.x, c.y - b.door.y);
+      if (d + 2.2 < own) return true;
+    }
+    return false;
   }
 
   private isStreetCell(x: number, y: number): boolean {
@@ -2318,6 +2337,7 @@ export class JacT9 {
       driveGoal: this.driveGoal,
       pathN: this.drivePath.length,
       lastParkMs: this.lastParkMs,
+      noProgressT: this.noProgressT,
       sitWhy: this.sitWhy,
       maxTilesPerS: DRIVE_TILES_PER_S,
       visualTx: this.visualCenterTile().x,
