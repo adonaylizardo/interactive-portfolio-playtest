@@ -14,7 +14,7 @@ const FRAMES = path.join(ROOT, 'art', 'primera-persona', 'frames');
 const BASE =
   process.argv[2] ??
   'https://adonaylizardo.github.io/interactive-portfolio-playtest/preview-persona/';
-const EXPECT_BUNDLE = process.argv[3] ?? 'index-kMCgwdVt.js';
+const EXPECT_BUNDLE = process.argv[3] ?? 'index-By5KgPBy.js';
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 fs.mkdirSync(OUT, { recursive: true });
