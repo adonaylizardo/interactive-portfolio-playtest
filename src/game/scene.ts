@@ -739,7 +739,9 @@ export class IsoScene {
       return tx >= 0.5 && ty >= 0.5 && tx <= MAP_WIDTH - 1.5 && ty <= MAP_HEIGHT - 1.5;
     };
     const covered = inTown(left, top) && inTown(right, top) && inTown(left, bottom) && inTown(right, bottom);
-    g.visible = !this.interiorActive && !covered;
+    const phoneSheet =
+      document.body.dataset.chrome === 'phone' && document.body.dataset.layout === 'split';
+    g.visible = !this.interiorActive && (!covered || phoneSheet);
     if (!g.visible) return;
     const x0 = Math.floor(left / TILE_W - 1) * TILE_W;
     const y0 = Math.floor(top / TILE_H - 1) * TILE_H;
