@@ -92,6 +92,7 @@ body {
   overflow: hidden;
   touch-action: none;
   overscroll-behavior: none;
+  background: #0b0c0e;
 }
 
 body > canvas:not(#game-canvas),

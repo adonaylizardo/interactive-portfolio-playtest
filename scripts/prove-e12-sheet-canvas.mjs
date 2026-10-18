@@ -64,7 +64,9 @@ try {
     const page = await ctx.newPage();
     await page.goto(BASE, { waitUntil: 'networkidle', timeout: 120000 });
     await page.waitForTimeout(1000);
-    await page.evaluate(() => document.querySelector('[data-dock="achievements"]')?.click());
+    await page.evaluate(() =>
+      document.querySelector('.chrome__dock [data-action="achievements"]')?.click(),
+    );
     await page.waitForTimeout(800);
     const hole = await mapPaintsAboveSheet(page);
     const tags = await page.evaluate(() => ({

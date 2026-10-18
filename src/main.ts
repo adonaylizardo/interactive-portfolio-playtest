@@ -245,7 +245,13 @@ async function main(): Promise<void> {
         labels.setHidden(false);
       } else {
         jacHud.park();
-        labels.setHidden(false);
+        const hideNameLabels =
+          isMobileLayout() &&
+          (chrome.isMobileSheetOpen() ||
+            panel.isOpen() ||
+            aboutPanel.isOpen() ||
+            searchPalette.isOpen());
+        labels.setHidden(hideNameLabels);
       }
       joystick.setHidden(
         !scene.jacSnapshot()?.driving ||
