@@ -3,7 +3,8 @@
  * UI gate: 12 frames vs public/figma-specs PNGs — real app only (strict 8% diff, no masks).
  * Default locale es; switch via real EN/ES toggle when the Figma frame is EN.
  */
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +15,49 @@ import { launchBrowser } from './qa-ready.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'artifacts', 'verify-edificios-sbs');
 const FIGMA = path.join(ROOT, 'public', 'figma-specs');
+
+/** Approved Figma exports (never build-refreshed writings phone / pre-4de12ed desktop list). */
+const APPROVED_REF_SHA256 = {
+  'writings-desktop-list.png': '1484f89e54efc00fecfa19498a3c51585aacd73ff8a851098ce6d7ec2e02d564',
+  'writings-phone-list.png': 'd82aa2a84521d8f537e42df7f85379af9368371eb009fbbaaf6c4a5f6efa03e7',
+  'writings-phone-reading.png': '82a978ee5077e41ab6fa6dffc658fd4da65490fbeaed8287f374561ffb8135e2',
+};
+
+const refreshScript = path.join(ROOT, 'scripts', 'refresh-writings-sbs-refs.mjs');
+if (fs.existsSync(refreshScript)) {
+  console.error(`Ref refresh script must not exist: ${refreshScript}`);
+  process.exit(1);
+}
+
+const refHashes = {};
+for (const name of fs.readdirSync(FIGMA).filter((f) => f.endsWith('.png'))) {
+  refHashes[name] = crypto.createHash('sha256').update(fs.readFileSync(path.join(FIGMA, name))).digest('hex');
+}
+for (const [name, expected] of Object.entries(APPROVED_REF_SHA256)) {
+  const actual = refHashes[name];
+  if (actual !== expected) {
+    console.error(`Writings ref ${name} sha256 mismatch (expected approved export).`);
+    console.error(`  expected: ${expected}`);
+    console.error(`  actual:   ${actual ?? 'missing'}`);
+    process.exit(1);
+  }
+}
+
+try {
+  execSync('pkill -f serve-preview-edificios', { stdio: 'ignore' });
+} catch {
+  /* no server */
+}
+try {
+  execSync('npx vite build --base /interactive-portfolio-playtest/preview-edificios/', {
+    cwd: ROOT,
+    stdio: 'inherit',
+  });
+} catch {
+  console.error('vite build failed before SBS gate');
+  process.exit(1);
+}
+
 const BASE = `http://127.0.0.1:4195/interactive-portfolio-playtest/preview-edificios/`;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -426,7 +470,28 @@ for (const r of table) {
   md += `| ${r.screen} | ${r.step} | ${r.crop} | ${r.locale} | ${r.diffPct} | ${r.gate} |\n`;
 }
 fs.writeFileSync(path.join(OUT, 'DIFF-TABLE.md'), md);
-console.log(`\nWrote ${OUT}/diff-table.json, sbs/, sbs-full/, crops/, zoom/`);
+let hashMd = '# Figma spec PNG sha256\n\n| File | sha256 |\n|---|---|\n';
+for (const name of Object.keys(refHashes).sort()) {
+  hashMd += `| ${name} | \`${refHashes[name]}\` |\n`;
+}
+hashMd +=
+  '\n## Portfolio cross-check (`portfolio/writings-ui/`)\n\n' +
+  '| Portfolio file | sha256 | Matches `public/figma-specs` |\n|---|---|---|\n';
+const portfolioPairs = [
+  ['phone-2-list.png', 'writings-phone-list.png'],
+  ['phone-3-reader.png', 'writings-phone-reading.png'],
+  ['desktop-2-list.png', 'writings-desktop-list.png'],
+];
+for (const [port, spec] of portfolioPairs) {
+  const portPath = path.join(ROOT, 'portfolio', 'writings-ui', port);
+  const portHash = fs.existsSync(portPath)
+    ? crypto.createHash('sha256').update(fs.readFileSync(portPath)).digest('hex')
+    : 'missing';
+  const match = portHash === refHashes[spec] ? 'yes' : 'no';
+  hashMd += `| ${port} | \`${portHash}\` | ${match} (${spec}) |\n`;
+}
+fs.writeFileSync(path.join(OUT, 'REF-HASHES.md'), hashMd);
+console.log(`\nWrote ${OUT}/diff-table.json, REF-HASHES.md, sbs/, sbs-full/, crops/, zoom/`);
 const gated = table.filter((r) => r.gate !== 'SKIP');
 const failed = gated.filter((r) => r.gate === 'FAIL');
 if (failed.length) {
