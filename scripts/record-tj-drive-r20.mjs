@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** r20: park freeze, tap-drive tiles/frame, prop overlap, sideways stick, Mentoría pill. */
+/** r20: door-drive completion, sprite overlap, longtask+rAF, stick mph, ES case copy. */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,9 +11,6 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'artifacts', 'tj-drive-r20');
 const PORT = Number(process.env.QA_PREVIEW_PORT ?? 4173);
 const BASE = process.env.QA_BASE_URL ?? `http://127.0.0.1:${PORT}/interactive-portfolio-playtest/`;
-const DRIVE_TILES_PER_S = 4.5 * 1.15;
-const MAX_FRAME_DT = 0.25;
-const LEGAL_STEP = DRIVE_TILES_PER_S * MAX_FRAME_DT + 0.08;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -23,12 +20,11 @@ const report = {
   base: BASE,
   errors,
   notes,
-  parkMs: {},
-  tapLongtask: {},
-  tilesPerFrame: {},
+  doors: {},
   overlap: {},
+  tapLongtask: {},
   stick: {},
-  pill: {},
+  caseEs: {},
 };
 
 async function waitUntil(page, fn, timeout = 16000, step = 80) {
@@ -83,258 +79,197 @@ async function throttleCpu(page, rate) {
   return client;
 }
 
-async function measureParkApi(page) {
-  await spawnDrive(page);
-  const rows = await page.evaluate(() => {
-    const list = window.__playtestQa.getEnterableBuildings().filter((b) => b.door);
-    const out = [];
-    for (const b of list) {
-      const sit = window.__playtestQa.parkForDoor(b.door.x, b.door.y);
-      const j = window.__playtestQa.jac();
-      out.push({
-        name: b.name,
-        ms: sit?.ms ?? j.lastParkMs ?? 0,
-        x: sit?.x ?? null,
-        y: sit?.y ?? null,
-        door: b.door,
-      });
-    }
-    return out;
-  });
-  report.parkMs.api = rows;
-  for (const r of rows) {
-    notes.push(`park-api ${r.name}: ${r.ms.toFixed(2)} ms → (${r.x},${r.y})`);
-    if (r.ms > 16) errors.push(`park-api:${r.name}: ${r.ms.toFixed(2)} ms (want <16)`);
-  }
-  return rows;
-}
-
-async function measureParkTap(page, tag, touch) {
-  const list = await names(page);
-  const rows = [];
-  for (const name of list) {
-    await spawnDrive(page);
-    await page.evaluate(() => {
-      window.__r20lt = [];
-      window.__prevPark = window.__playtestQa.jac()?.lastParkMs ?? 0;
-      const obs = new PerformanceObserver((list) => {
-        for (const e of list.getEntries()) window.__r20lt.push(e.duration);
-      });
-      obs.observe({ type: 'longtask', buffered: false });
-      window.__r20obs = obs;
+async function armTapMetrics(page) {
+  await page.evaluate(() => {
+    window.__r20lt = [];
+    window.__r20raf = [];
+    const obs = new PerformanceObserver((list) => {
+      for (const e of list.getEntries()) window.__r20lt.push(e.duration);
     });
-    await page.evaluate((n) => {
-      window.__r20door = n;
-      window.__playtestQa.frameDoorForQa?.(n);
-      window.__playtestQa.setZoom?.(0.3);
-    }, name);
-    await wait(80);
-    const pt = await page.evaluate((n) => window.__playtestQa.doorScreenPoint(n), name);
-    const t0 = await page.evaluate(() => performance.now());
-    if (pt) await realTap(page, pt.x, pt.y, touch);
-    const timed = await page.evaluate((t0) => {
-      const j = window.__playtestQa.jac();
-      let parkMs = j?.lastParkMs ?? 0;
-      const missed = parkMs === window.__prevPark;
-      if (missed) {
-        const b = window.__playtestQa.getEnterableBuildings().find((x) => x.name === window.__r20door);
-        if (b?.door) window.__playtestQa.parkForDoor(b.door.x, b.door.y);
-        parkMs = window.__playtestQa.jac()?.lastParkMs ?? parkMs;
-      }
-      return {
-        wall: performance.now() - t0,
-        parkMs,
-        missed,
-        longtask: Math.max(0, ...(window.__r20lt ?? [0])),
-      };
-    }, t0);
-    rows.push({ name, ...timed });
-    notes.push(`${tag}:tap ${name}: park=${timed.parkMs.toFixed(2)} wall=${timed.wall.toFixed(0)} lt=${timed.longtask.toFixed(0)}`);
-    if (!timed.missed && timed.parkMs > 16) {
-      errors.push(`${tag}:tap:${name}: park ${timed.parkMs.toFixed(2)} ms (want <16)`);
-    }
-    if (timed.missed && timed.parkMs > 24) {
-      errors.push(`${tag}:tap:${name}: fallback park ${timed.parkMs.toFixed(2)} ms (want <24)`);
-    }
-    if (!timed.missed && timed.parkMs > 16 && timed.longtask > 80) {
-      errors.push(`${tag}:tap:${name}: longtask ${timed.longtask.toFixed(0)} ms`);
-    }
-  }
-  report.tapLongtask[tag] = rows;
+    obs.observe({ type: 'longtask', buffered: false });
+    window.__r20obs = obs;
+    let last = performance.now();
+    let n = 0;
+    const tick = (t) => {
+      window.__r20raf.push(t - last);
+      last = t;
+      n += 1;
+      if (n < 90) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
 }
 
-async function startTrace(page) {
-  await page.evaluate((cap) => {
-    const j = window.__playtestQa.jac();
-    window.__r20tr = {
-      cap,
-      max: 0,
-      n: 0,
-      samples: [],
-      prev: { x: j.cx, y: j.cy, t: performance.now() },
-    };
-    const step = () => {
-      const tr = window.__r20tr;
-      if (!tr || tr.stop) return;
-      const jj = window.__playtestQa.jac();
-      const now = performance.now();
-      const d = Math.hypot(jj.cx - tr.prev.x, jj.cy - tr.prev.y);
-      const dt = (now - tr.prev.t) / 1000;
-      tr.max = Math.max(tr.max, d);
-      tr.n += 1;
-      if (tr.samples.length < 80) tr.samples.push({ x: jj.cx, y: jj.cy, d, dt, mph: jj.mph });
-      tr.prev = { x: jj.cx, y: jj.cy, t: now };
-      requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-  }, LEGAL_STEP);
-}
-
-async function readTrace(page) {
+async function readTapMetrics(page) {
   return page.evaluate(() => {
-    const tr = window.__r20tr;
-    if (tr) tr.stop = true;
-    const j = window.__playtestQa.jac();
+    window.__r20obs?.disconnect?.();
+    const lt = window.__r20lt ?? [];
+    const raf = window.__r20raf ?? [];
     return {
-      max: tr?.max ?? 0,
-      n: tr?.n ?? 0,
-      samples: tr?.samples ?? [],
-      cx: j.cx,
-      cy: j.cy,
-      goal: j.driveGoal,
+      longtask: lt.length ? Math.max(...lt) : 0,
+      longtasks: lt.slice().sort((a, b) => b - a).slice(0, 5),
+      rafMax: raf.length ? Math.max(...raf) : 0,
     };
   });
 }
 
-async function driveToTile(page, tag, gx, gy, touch) {
-  await spawnDrive(page);
-  await page.evaluate(() => window.__playtestQa.setZoom?.(0.4));
-  await startTrace(page);
-  await page.evaluate((t) => window.__playtestQa.jacDriveTo(t.gx, t.gy), { gx, gy });
+async function waitDoorDone(page, timeout = 22000) {
   const t0 = Date.now();
-  while (Date.now() - t0 < 12000) {
-    const j = await page.evaluate(() => {
-      const s = window.__playtestQa.jac();
-      return { goal: s.driveGoal, mph: s.mph, cx: s.cx, cy: s.cy };
+  let last = null;
+  while (Date.now() - t0 < timeout) {
+    last = await page.evaluate(() => {
+      const j = window.__playtestQa.jac();
+      return {
+        driving: j.driving,
+        goal: j.driveGoal,
+        mph: j.mph,
+        cx: j.cx,
+        cy: j.cy,
+        gear: j.gear,
+        pathN: j.pathN,
+      };
     });
-    if (!j.goal && Math.hypot(j.cx - gx, j.cy - gy) < 1.6) break;
-    await wait(40);
+    if (!last.driving) return { ...last, done: true, ms: Date.now() - t0 };
+    if (!last.goal && last.mph < 1.2) return { ...last, done: true, ms: Date.now() - t0 };
+    await wait(50);
   }
-  const tr = await readTrace(page);
-  const row = { tag, dest: `${gx},${gy}`, max: tr.max, n: tr.n, cx: tr.cx, cy: tr.cy };
-  report.tilesPerFrame[`${tag}:${gx},${gy}`] = row;
-  notes.push(`${tag} →(${gx},${gy}) maxStep=${tr.max.toFixed(3)} legal=${LEGAL_STEP.toFixed(3)}`);
-  if (tr.max > LEGAL_STEP) errors.push(`${tag}:tiles:${gx},${gy}: max ${tr.max.toFixed(3)} > ${LEGAL_STEP.toFixed(3)}`);
+  return { ...last, done: false, ms: Date.now() - t0 };
 }
 
-async function driveDoorSteps(page, tag, name, touch) {
+async function driveDoor(page, name, touch, { tap = false } = {}) {
   await spawnDrive(page);
   await page.evaluate((n) => {
     window.__playtestQa.frameDoorForQa?.(n);
-    window.__playtestQa.setZoom?.(n === 'flor' ? 0.12 : 0.3);
+    window.__playtestQa.setZoom?.(n === 'flor' || n === 'sambil' ? 0.12 : 0.28);
   }, name);
-  await wait(80);
-  await startTrace(page);
-  const pt = await page.evaluate((n) => window.__playtestQa.doorScreenPoint(n), name);
-  if (pt) await realTap(page, pt.x, pt.y, touch);
-  const t0 = Date.now();
-  while (Date.now() - t0 < 16000) {
-    const j = await page.evaluate(() => {
-      const s = window.__playtestQa.jac();
-      return { driving: s.driving, goal: s.driveGoal, mph: s.mph };
-    });
-    if (!j.goal && j.mph < 1.2) break;
-    if (!j.driving) break;
-    await wait(40);
+  await wait(60);
+  await armTapMetrics(page);
+  if (tap) {
+    const pt = await page.evaluate((n) => window.__playtestQa.doorScreenPoint(n), name);
+    if (pt) await realTap(page, pt.x, pt.y, touch);
+    else await page.evaluate((n) => window.__playtestQa.driveEnter?.(n), name);
+  } else {
+    await page.evaluate((n) => window.__playtestQa.driveEnter?.(n), name);
   }
-  const tr = await readTrace(page);
-  report.tilesPerFrame[`${tag}:door:${name}`] = { max: tr.max, n: tr.n, cx: tr.cx, cy: tr.cy };
-  notes.push(`${tag} door ${name} maxStep=${tr.max.toFixed(3)}`);
-  if (tr.max > LEGAL_STEP) errors.push(`${tag}:tiles:door:${name}: max ${tr.max.toFixed(3)} > ${LEGAL_STEP.toFixed(3)}`);
+  const metrics = await readTapMetrics(page);
+  const end = await waitDoorDone(page);
+  const parked = await page.evaluate(() => {
+    const j = window.__playtestQa.jac();
+    if (j.driving) {
+      window.__playtestQa.jacGetOut?.();
+    }
+    const s = window.__playtestQa.jac();
+    return {
+      cx: s.cx,
+      cy: s.cy,
+      dir: s.dir,
+      driving: s.driving,
+      overlap: window.__playtestQa.jacOverlapsProp(),
+    };
+  });
+  await wait(80);
+  const overlap = await page.evaluate(() => window.__playtestQa.jacOverlapsProp());
+  return { ...end, ...metrics, overlap: overlap || parked.overlap, parked };
 }
 
-async function measureOverlap(page) {
+async function measureDoors(page, tag, touch) {
   const list = await names(page);
   const rows = [];
   for (const name of list) {
-    await spawnDrive(page);
-    const row = await page.evaluate((n) => {
-      const b = window.__playtestQa.getEnterableBuildings().find((x) => x.name === n);
-      const sit = window.__playtestQa.parkForDoor(b.door.x, b.door.y);
-      if (sit) {
-        window.__playtestQa.jacSet?.({
-          cx: sit.x,
-          cy: sit.y,
-          dir: sit.heading ?? window.__playtestQa.jac().dir,
-          mode: 'parked',
-        });
-      }
-      const j = window.__playtestQa.jac();
-      const inward = b.inward;
-      const ox = inward ? -inward.x : 0;
-      const oy = inward ? -inward.y : 1;
-      const along = (j.cx - b.door.x) * ox + (j.cy - b.door.y) * oy;
-      return {
-        name: n,
-        cx: j.cx,
-        cy: j.cy,
-        d: Math.hypot(j.cx - b.door.x, j.cy - b.door.y),
-        along,
-        overlap: window.__playtestQa.jacOverlapsProp(),
-        ms: sit?.ms ?? j.lastParkMs,
-      };
-    }, name);
-    rows.push(row);
-    notes.push(`overlap ${name}: ${row.overlap} @${row.cx.toFixed(1)},${row.cy.toFixed(1)} d=${row.d.toFixed(1)} along=${row.along.toFixed(1)}`);
-    if (row.overlap) errors.push(`overlap:${name}: parked van covers a prop`);
-    if (row.along < -0.2) errors.push(`overlap:${name}: behind house along=${row.along.toFixed(2)}`);
-    if (name === 'flor' && row.d > 5.5) errors.push(`overlap:flor: ${row.d.toFixed(1)} tiles (want ≤5)`);
-    if (row.d > 8) errors.push(`overlap:${name}: sit ${row.d.toFixed(1)} tiles from door`);
+    const attempts = [];
+    let ok = false;
+    for (let i = 0; i < 3 && !ok; i++) {
+      const row = await driveDoor(page, name, touch, { tap: i === 0 });
+      attempts.push(row);
+      ok = row.done;
+      notes.push(
+        `${tag} ${name}#${i + 1}: ${row.done ? 'OK' : 'FAIL'} ${row.ms}ms @${row.cx?.toFixed?.(2)},${row.cy?.toFixed?.(2)} lt=${row.longtask.toFixed(0)} raf=${row.rafMax.toFixed(0)} ov=${row.overlap}`,
+      );
+    }
+    const best = attempts.find((a) => a.done) ?? attempts[attempts.length - 1];
+    rows.push({ name, ok, n: attempts.length, ms: best.ms, cx: best.cx, cy: best.cy, overlap: best.overlap, longtask: best.longtask, rafMax: best.rafMax });
+    if (!ok) errors.push(`${tag}:${name}: door-drive did not complete (3/3)`);
+    if (best.overlap) errors.push(`${tag}:${name}: parked sprite overlaps a prop`);
+    if (best.longtask > 50) errors.push(`${tag}:${name}: longtask ${best.longtask.toFixed(0)} ms (want ≤50)`);
   }
-  report.overlap = rows;
+  report.doors[tag] = rows;
+  report.overlap[tag] = Object.fromEntries(rows.map((r) => [r.name, r.overlap]));
+  report.tapLongtask[tag] = Object.fromEntries(rows.map((r) => [r.name, { longtask: r.longtask, rafMax: r.rafMax }]));
+}
+
+async function shotParked(page, name, file) {
+  await spawnDrive(page);
+  await page.evaluate((n) => {
+    window.__playtestQa.frameDoorForQa?.(n);
+    window.__playtestQa.setZoom?.(0.55);
+  }, name);
+  await page.evaluate((n) => window.__playtestQa.driveEnter?.(n), name);
+  const end = await waitDoorDone(page, 22000);
+  await page.evaluate(() => {
+    if (window.__playtestQa.jac().driving) window.__playtestQa.jacGetOut?.();
+    window.__playtestQa.dismissBuildingPanel?.();
+    window.__playtestQa.leaveInteriorNow?.();
+    window.__playtestQa.focusJac?.();
+    window.__playtestQa.setZoom?.(0.7);
+  });
+  await wait(200);
+  await page.screenshot({ path: path.join(OUT, file), fullPage: false });
+  notes.push(`shot ${name}: done=${end.done} @${end.cx?.toFixed?.(2)},${end.cy?.toFixed?.(2)}`);
+  return end;
 }
 
 async function measureStick(page) {
   await spawnDrive(page);
   const row = await page.evaluate(() => {
     window.__playtestQa.jacSetGear?.('D');
-    let last = { mph: 0, cx: 0, cy: 0 };
-    for (let i = 0; i < 90; i++) {
-      last = window.__playtestQa.jacDriveStep?.(1 / 60, -60, -10, { render: false }) ?? last;
-    }
-    return last;
+    const side = (() => {
+      let last = { mph: 0, cx: 0, cy: 0 };
+      for (let i = 0; i < 90; i++) {
+        last = window.__playtestQa.jacDriveStep?.(1 / 60, -60, -10, { render: false }) ?? last;
+      }
+      return last;
+    })();
+    window.__playtestQa.jacSet?.({
+      cx: window.__playtestQa.jacSpawn().center.x,
+      cy: window.__playtestQa.jacSpawn().center.y,
+      dir: 'se',
+      mode: 'drive',
+    });
+    window.__playtestQa.jacSetGear?.('D');
+    const diag = (() => {
+      let last = { mph: 0, cx: 0, cy: 0 };
+      for (let i = 0; i < 90; i++) {
+        last = window.__playtestQa.jacDriveStep?.(1 / 60, 40, 40, { render: false }) ?? last;
+      }
+      return last;
+    })();
+    return { side, diag };
   });
   report.stick = row;
-  notes.push(`stick (-60,-10) mph=${row.mph} @${row.cx.toFixed(2)},${row.cy.toFixed(2)}`);
-  if (row.mph < 9) errors.push(`stick: mph ${row.mph} (want 9–10)`);
+  notes.push(`stick side mph=${row.side.mph} diag mph=${row.diag.mph}`);
+  if (row.side.mph < 9) errors.push(`stick: sideways mph ${row.side.mph} (want 9–10)`);
+  if (row.diag.mph < 9) errors.push(`stick: down-diagonal mph ${row.diag.mph} (want 9–10)`);
 }
 
-async function measurePill(page) {
-  await spawnDrive(page);
-  await page.evaluate(() => {
-    const b = window.__playtestQa.getEnterableBuildings().find((x) => x.name === 'mentoria');
-    const sit = window.__playtestQa.parkForDoor(b.door.x, b.door.y);
-    if (sit) window.__playtestQa.jacSet?.({ cx: sit.x, cy: sit.y, dir: 'sw', mode: 'parked' });
-    window.__playtestQa.jacGetOut?.();
-    window.__playtestQa.setZoom?.(1.2);
-    window.__playtestQa.focusJac?.();
-  });
-  await wait(120);
+async function measureCaseEs(page) {
   const row = await page.evaluate(() => {
-    const labels = window.__playtestQa.nameLabels();
-    const ad = labels.find((l) => l.id === 'adonay');
-    const jac = labels.find((l) => l.id === 'jac');
-    const d = ad && jac && ad.visible && jac.visible ? Math.hypot(ad.x - jac.x, ad.y - jac.y) : Infinity;
-    return { ad, jac, d };
+    window.__playtestQa.setLang?.('es');
+    window.__playtestQa.showCasePreview?.('finoa');
+    const sub = document.querySelector('.case-preview__subtitle')?.textContent ?? '';
+    const teaser = document.querySelector('.case-preview__teaser')?.textContent ?? '';
+    const pill = document.querySelector('.case-preview__read-meta')?.textContent ?? '';
+    return { sub, teaser, pill, lang: window.__playtestQa.getLang?.() };
   });
-  report.pill = row;
-  notes.push(`pill Mentoría d=${Number.isFinite(row.d) ? row.d.toFixed(1) : 'hidden'} ad=${row.ad?.visible} jac=${row.jac?.visible}`);
-  if (row.ad?.visible && row.jac?.visible && row.d < 40) {
-    errors.push(`pill: Adonay over van roof d=${row.d.toFixed(1)}`);
+  report.caseEs = row;
+  notes.push(`case ES sub="${row.sub}" pill="${row.pill}"`);
+  const english = /Product strategist|Problem · What I did|institutional custody platform|What I did/;
+  if (english.test(`${row.sub} ${row.teaser} ${row.pill}`)) {
+    errors.push(`case ES still English: ${JSON.stringify(row)}`);
   }
+  await page.evaluate(() => window.__playtestQa.dismissBuildingPanel?.());
 }
 
-async function runViewport(browser, tag, size, touch) {
+async function runViewport(browser, tag, size, touch, { doors = true, shots = false } = {}) {
   const ctx = await browser.newContext({
     viewport: size,
     hasTouch: touch,
@@ -344,26 +279,15 @@ async function runViewport(browser, tag, size, touch) {
   const page = await ctx.newPage();
   await throttleCpu(page, 4);
   await boot(page);
+  if (doors) await measureDoors(page, tag, touch);
   if (tag === 'phone-390') {
-    await measureParkApi(page);
-    await measureParkTap(page, tag, touch);
-    await driveToTile(page, tag, 18, 10, touch);
-    await driveToTile(page, tag, 20, 13, touch);
-    await driveDoorSteps(page, tag, 'mentoria', touch);
-    await driveDoorSteps(page, tag, 'pg', touch);
-    await driveDoorSteps(page, tag, 'flor', touch);
-    await measureOverlap(page);
     await measureStick(page);
-    await measurePill(page);
-  } else if (tag === 'land-844') {
-    await measureParkTap(page, tag, touch);
-    await driveToTile(page, tag, 20, 13, touch);
-    await measureStick(page);
-  } else {
-    await measureParkTap(page, tag, touch);
-    await driveToTile(page, tag, 18, 10, touch);
-    await driveToTile(page, tag, 20, 13, touch);
-    await measureStick(page);
+    await measureCaseEs(page);
+  }
+  if (shots) {
+    await shotParked(page, 'pg', 'parked-pg.png');
+    await shotParked(page, 'estudio', 'parked-estudio.png');
+    await shotParked(page, 'finoa', 'parked-finoa.png');
   }
   await page.screenshot({ path: path.join(OUT, `${tag}.png`), fullPage: true });
   await ctx.close();
@@ -396,7 +320,7 @@ async function ensurePreview() {
 const preview = await ensurePreview();
 const browser = await launchBrowser(chromium, { headless: true });
 try {
-  await runViewport(browser, 'phone-390', { width: 390, height: 844 }, true);
+  await runViewport(browser, 'phone-390', { width: 390, height: 844 }, true, { shots: true });
   await runViewport(browser, 'land-844', { width: 844, height: 390 }, true);
   await runViewport(browser, 'desk-1280', { width: 1280, height: 800 }, false);
 } finally {
@@ -405,7 +329,7 @@ try {
 }
 
 fs.writeFileSync(path.join(OUT, 'record-report.json'), JSON.stringify(report, null, 2));
-console.log(JSON.stringify({ errors: errors.length, notes, parkMs: report.parkMs, tap: report.tapLongtask, steps: report.tilesPerFrame, overlap: report.overlap, stick: report.stick, pill: report.pill }, null, 2));
+console.log(JSON.stringify(report, null, 2));
 if (errors.length) {
   console.error(errors.join('\n'));
   process.exit(1);

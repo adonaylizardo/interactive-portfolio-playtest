@@ -416,6 +416,7 @@ export class IsoScene {
     null;
   private pendingDriveEnter: { panelTitle: string; door: { x: number; y: number } } | null = null;
   private pendingDriveEnterAt = 0;
+  private pathPreviewRaf = 0;
   private pendingWalkInAt = 0;
   private pendingJacEnter = false;
   private pendingJacPanel = false;
@@ -1842,8 +1843,7 @@ export class IsoScene {
     this.qaLastDriveTap = { x: dest.x, y: dest.y };
     this.qaPointerDriveAccepts += 1;
     this.jac.setDrivePath(path, dest, { loose: true });
-    this.startCameraFollow();
-    this.drawPathPreview();
+    this.schedulePathPreview();
     this.fireMoveCommand();
     return true;
   }
@@ -1886,10 +1886,17 @@ export class IsoScene {
     if (fromPointer) this.qaPointerDriveAccepts += 1;
     const dest = path.length > 0 ? path[path.length - 1] : { x: gx, y: gy };
     this.jac.setDrivePath(path.length > 0 ? path : [dest], dest);
-    this.startCameraFollow();
-    this.drawPathPreview();
+    this.schedulePathPreview();
     this.fireMoveCommand();
     return true;
+  }
+
+  private schedulePathPreview(): void {
+    if (this.pathPreviewRaf) return;
+    this.pathPreviewRaf = requestAnimationFrame(() => {
+      this.pathPreviewRaf = 0;
+      this.drawPathPreview();
+    });
   }
 
   private drawPathPreview(): void {
@@ -4265,6 +4272,10 @@ export class IsoScene {
     const arrived = sit && distSit < 1.15 && this.jac.mph < 1.2;
     const doorSideSit = idle && this.jac.mph < 1.2 && along >= 0 && distDoor <= 6.2;
     if (arrived || doorSideSit) {
+      if (sit && distSit < 1.6) {
+        this.jac.cx = sit.x;
+        this.jac.cy = sit.y;
+      }
       this.jacGetOut({ thenEnter: true });
       return;
     }
@@ -4747,6 +4758,14 @@ export class IsoScene {
     const rect = this.canvasEl.getBoundingClientRect();
     this.handleScreenTap(client.x - rect.left, client.y - rect.top, false);
     return true;
+  }
+
+  /** QA: start a door-park from the current drive pose without a pointer hit-test. */
+  qaDriveEnter(name: string): boolean {
+    const obj = objects.find((o) => o.type === 'building' && o.name === name);
+    if (!obj?.door || !obj.panelTitle) return false;
+    this.suppressDriveTapUntil = 0;
+    return this.requestDriveToEnter({ panelTitle: obj.panelTitle, door: obj.door });
   }
 
   /** QA: pan so the character and target door are both on screen before a real pointer tap. */
