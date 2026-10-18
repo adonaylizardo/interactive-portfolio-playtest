@@ -820,6 +820,7 @@ export class BuildingPanel {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'experience__filter';
+        btn.dataset.writingsFilter = id;
         if (id === this.writingsFilter) btn.classList.add('is-active');
         btn.textContent = t(key);
         btn.addEventListener('click', (e) => {

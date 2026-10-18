@@ -12,6 +12,14 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
 import { launchBrowser } from './qa-ready.mjs';
+import { runWritingsSpecGate, writeSpecGateMarkdown } from './lib/writings-spec-gate.mjs';
+
+const WRITINGS_SPEC_SCREENS = new Set([
+  'writings-desktop-list',
+  'writings-phone-list',
+  'writings-phone-reading',
+]);
+const WRITINGS_PIXEL_SANITY_CAP = 12;
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'artifacts', 'verify-edificios-sbs');
@@ -437,6 +445,11 @@ async function captureFlow(page, building, flowPrefix, steps) {
     listBadgeMasks = await badgeMasksInCrop(page, listCrop);
   }
   await page.screenshot({ path: steps.list });
+  let specList = null;
+  if (building === 'biblioteca') {
+    const specKey = steps.desktop ? 'writings-desktop-list' : 'writings-phone-list';
+    specList = await runWritingsSpecGate(page, specKey);
+  }
   await page.evaluate(() => document.querySelector('.experience__row')?.click());
   await wait(500);
   await page.evaluate(() => {
@@ -448,7 +461,11 @@ async function captureFlow(page, building, flowPrefix, steps) {
     detailSheet = await sheetRect(page);
   }
   await page.screenshot({ path: steps.detail });
-  return { listSheet, detailSheet, mapChecklistRect, locale, listBadgeMasks };
+  let specReading = null;
+  if (building === 'biblioteca' && !steps.desktop) {
+    specReading = await runWritingsSpecGate(page, 'writings-phone-reading');
+  }
+  return { listSheet, detailSheet, mapChecklistRect, locale, listBadgeMasks, specList, specReading };
 }
 
 function cropForStep(desktop, step, sheetRectByStep, checklistRect, building) {
@@ -486,6 +503,7 @@ await wait(1200);
 
 const browser = await launchBrowser(chromium);
 const table = [];
+const specGateResults = [];
 
 try {
   for (const meta of flowMeta) {
@@ -538,27 +556,49 @@ try {
           : strictRaw;
       const flowLoc = FLOW_LOCALE[meta.prefix];
       const skipPhoneMap = !meta.desktop && step === 'map';
+      const isWritingsSpec = WRITINGS_SPEC_SCREENS.has(figmaName);
+      const specResult =
+        figmaName === 'writings-desktop-list' || figmaName === 'writings-phone-list'
+          ? capture.specList
+          : figmaName === 'writings-phone-reading'
+            ? capture.specReading
+            : null;
+      if (specResult && !specGateResults.some((s) => s.frameKey === specResult.frameKey)) {
+        specGateResults.push(specResult);
+      }
+      const pixelPct = Number(strict.pct.toFixed(2));
+      let gate;
+      let gateMetric;
+      if (skipPhoneMap) {
+        gate = 'SKIP';
+        gateMetric = 'excluded (live checklist)';
+      } else if (isWritingsSpec) {
+        const specPass = specResult?.pass === true;
+        const pixelOk = pixelPct <= WRITINGS_PIXEL_SANITY_CAP;
+        gate = specPass && pixelOk ? 'PASS' : 'FAIL';
+        gateMetric = `spec gate + pixel≤${WRITINGS_PIXEL_SANITY_CAP}% (info)`;
+      } else {
+        gate = strict.pct <= 8 ? 'PASS' : 'FAIL';
+        gateMetric = badgeMasks?.length ? 'strict/8 (badge-digit masks)' : 'strict/8';
+      }
       const row = {
         screen: figmaName,
         step,
         crop: cropTag,
         locale: step === 'map' ? flowLoc?.map ?? 'es' : flowLoc?.panel ?? 'es',
-        diffPct: Number(strict.pct.toFixed(2)),
+        diffPct: pixelPct,
         diffPctUnmasked: badgeMasks?.length ? Number(strictRaw.pct.toFixed(2)) : undefined,
         badgeMasks: badgeMasks?.length
           ? badgeMasks.map((m) => `${m.x},${m.y},${m.w}×${m.h}`)
           : undefined,
-        gate: skipPhoneMap ? 'SKIP' : strict.pct <= 8 ? 'PASS' : 'FAIL',
-        gateMetric: skipPhoneMap
-          ? 'excluded (live checklist)'
-          : badgeMasks?.length
-            ? 'strict/8 (badge-digit masks)'
-            : 'strict/8',
+        specGate: isWritingsSpec ? (specResult?.pass ? 'PASS' : 'FAIL') : undefined,
+        gate,
+        gateMetric,
         sbsFull: path.join(OUT, 'sbs-full', `${figmaName}-full.png`),
         sbs: sbsPath,
         note: strict.note,
       };
-      if (strict.pct > 8) {
+      if (!isWritingsSpec && strict.pct > 8) {
         saveZoomCrop(compareBuild, compareRef, path.join(OUT, 'zoom', `${figmaName}-${step}`));
         row.zoomCrop = path.join(OUT, 'zoom', `${figmaName}-${step}-build.png`);
         row.topDiffRegions = topDiffRegions(compareBuild, compareRef, badgeMasks ?? []);
@@ -580,13 +620,16 @@ try {
 fs.mkdirSync(OUT, { recursive: true });
 fs.writeFileSync(path.join(OUT, 'diff-table.json'), JSON.stringify(table, null, 2));
 let md =
-  '| Screen | Step | Crop | Locale | Diff % | Unmasked % | Badge masks (crop px) | Gate |\n|---|---|---|---|---:|---:|---|---|\n';
+  '| Screen | Step | Crop | Locale | Pixel % | Spec | Unmasked % | Badge masks (crop px) | Gate |\n|---|---|---|---|---:|---|---:|---|---|\n';
 for (const r of table) {
   const masks = r.badgeMasks?.length ? r.badgeMasks.join('; ') : '—';
   const unmasked = r.diffPctUnmasked != null ? r.diffPctUnmasked : '—';
-  md += `| ${r.screen} | ${r.step} | ${r.crop} | ${r.locale} | ${r.diffPct} | ${unmasked} | ${masks} | ${r.gate} |\n`;
+  const spec = r.specGate ?? '—';
+  md += `| ${r.screen} | ${r.step} | ${r.crop} | ${r.locale} | ${r.diffPct} | ${spec} | ${unmasked} | ${masks} | ${r.gate} |\n`;
 }
 fs.writeFileSync(path.join(OUT, 'DIFF-TABLE.md'), md);
+writeSpecGateMarkdown(specGateResults, path.join(OUT, 'SPEC-GATE.md'));
+fs.writeFileSync(path.join(OUT, 'spec-gate.json'), JSON.stringify(specGateResults, null, 2));
 let hashMd =
   `# Figma gate PNGs (file \`${FIGMA_FILE_KEY}\`)\n\n` +
   'MCP frame exports at **1×** natural size (see `public/figma-specs/README.md`).\n\n' +
