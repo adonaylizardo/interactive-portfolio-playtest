@@ -174,7 +174,7 @@ export class ChromeUI {
         ${roundBtn('briefcase', 'Casos', 'chrome__nav', 'cases')}
         ${roundBtn('trophy', 'Logros', 'chrome__nav', 'achievements')}
         ${roundBtn('mail', 'Contacto', 'chrome__nav', 'contact')}
-        ${roundBtn('search', 'Buscar', 'chrome__nav', 'search')}
+        ${roundBtn('search', 'Buscar', 'chrome__nav chrome__nav--hidden', 'search')}
         <span class="chrome__rail-spacer"></span>
         <div class="chrome__tools-stack">
           ${roundBtn('download', 'Descargar CV', '', 'download')}
@@ -243,7 +243,7 @@ export class ChromeUI {
       </aside>
       <button type="button" class="chrome__tab" data-action="show-panel" aria-label="Show panel">${iconSvg('chevron')}</button>
       <div class="chrome__tools-phone">
-        ${roundBtn('search', 'Buscar', '', 'search')}
+        ${roundBtn('search', 'Buscar', 'chrome__nav--hidden', 'search')}
         ${roundBtn('sound', 'Sonido', '', 'sound')}
         ${roundBtn('locate', 'Center on Adonay', '', 'center')}
       </div>

@@ -4,6 +4,7 @@ import { isMobileLayout } from '../checklist/ui';
 import type { JacGear, JacLights, JacSnapshot, JacToggleId } from '../game/jacT9';
 import type { Camera } from '../tokens';
 import { getLang, onLangChange, t } from './i18n';
+import { iconSvg } from './icons';
 
 export type JacHudCallbacks = {
   onInfo: () => void;
@@ -483,9 +484,9 @@ export class JacHud {
         <div class="jac-dock__right">
           <canvas class="jac-dock__mini" width="120" height="78" aria-hidden="true"></canvas>
           <div class="jac-dock__views" role="group">
-            <button type="button" class="jac-dock__view" data-jac="view" data-val="isometrica" aria-label="${t('chrome.isometric')}"></button>
-            <button type="button" class="jac-dock__view" data-jac="view" data-val="cenital" aria-label="${t('chrome.topdown')}"></button>
-            <button type="button" class="jac-dock__view" data-jac="overview" aria-label="${t('chrome.map')}"></button>
+            <button type="button" class="jac-dock__view" data-jac="view" data-val="isometrica" aria-label="${t('chrome.isometric')}">${iconSvg('cube')}</button>
+            <button type="button" class="jac-dock__view" data-jac="view" data-val="cenital" aria-label="${t('chrome.topdown')}">${iconSvg('grid')}</button>
+            <button type="button" class="jac-dock__view" data-jac="overview" aria-label="${t('chrome.map')}">${iconSvg('map')}</button>
           </div>
         </div>
       </section>

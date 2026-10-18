@@ -416,9 +416,33 @@ export class BuildingPanel {
     studio.playCaseVoice(interiorId);
   }
 
+  /** Map peek for non-case enterable buildings (e.g. estudio) while still driving. */
+  showBuildingPeek(buildingId: string, panelTitle?: string): void {
+    const title = panelTitle ?? buildingId;
+    this.leaveArmed = false;
+    this.exitPress = null;
+    this.exitFromPointer = false;
+    this.mode = 'preview';
+    this.interiorId = buildingId;
+    this.peekOnly = true;
+    this.el.hidden = false;
+    this.el.style.visibility = '';
+    this.el.style.pointerEvents = '';
+    this.aboutEl.style.contentVisibility = '';
+    this.el.removeAttribute('inert');
+    this.el.classList.remove('building-panel--snap');
+    this.setTitle(buildingId, title);
+    this.renderWorkedWith();
+    this.renderAbout();
+    this.el.classList.add('building-panel--open');
+    this.syncPeekClass();
+    this.onVisibilityChange();
+    studio.playClick();
+  }
+
   /** Stay on the map: lower-third card, then a full-copy expand. */
   showPreview(interiorId: string): void {
-    if (!isCaseHouse(interiorId)) return;
+    if (!isCaseHouse(interiorId) && !CASES[interiorId as keyof typeof CASES]) return;
     this.leaveArmed = false;
     this.exitPress = null;
     this.exitFromPointer = false;

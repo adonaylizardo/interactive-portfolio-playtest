@@ -1,6 +1,6 @@
 import { studio } from './audio/studio';
 import { ChecklistUI } from './checklist/ui';
-import { isCaseHouse } from './data/cases';
+import { CASES, isCaseHouse } from './data/cases';
 import {
   doorInwardStep,
   getBuildingByName,
@@ -111,10 +111,21 @@ async function main(): Promise<void> {
       }
       scene.enterInterior(buildingId);
     },
+    onDriveBuildingDoor: (buildingId, panelTitle) => {
+      if (isCaseHouse(buildingId) || CASES[buildingId as keyof typeof CASES]) {
+        if (chrome.isMobileSheetOpen()) chrome.setLayout('map');
+        panel.showPreview(buildingId);
+        return;
+      }
+      panel.showBuildingPeek(buildingId, panelTitle);
+    },
     onMoveCommand: () => studio.noteMoveCommand(),
     onFrame: () => {
-      labels.update(scene.nameLabelAnchors());
-      if (scene.getViewMode().mode === 'cenital' && !scene.isInInterior()) {
+      const view = scene.getViewMode();
+      const hidePills = view.overview || scene.isInInterior();
+      labels.setHidden(hidePills);
+      if (!hidePills) labels.update(scene.nameLabelAnchors());
+      if (view.mode === 'cenital' && !scene.isInInterior()) {
         cenitalLabels.setHidden(false);
         cenitalLabels.update(scene.cenitalBuildingLabelAnchors());
       } else {
@@ -124,10 +135,8 @@ async function main(): Promise<void> {
         const snap = scene.jacSnapshot();
         const anchors = scene.jacHudAnchors();
         jacHud.update(snap, anchors, anchors.rear);
-        labels.setHidden(false);
       } else {
         jacHud.park();
-        labels.setHidden(false);
       }
       joystick.setHidden(
         !scene.jacSnapshot()?.driving ||
@@ -190,9 +199,11 @@ async function main(): Promise<void> {
       const t = e.target as HTMLElement | null;
       if (!t) return;
       if (t.closest('.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock')) return;
-      if (t === canvas || t.closest('#app, .joystick, #game-canvas, #ui-root')) {
-        if (joystick.isActive() || scene?.jacSnapshot()?.driving) e.preventDefault();
+      if (t === canvas || t.closest('#game-canvas')) {
+        if (joystick.isActive()) e.preventDefault();
+        return;
       }
+      if (t.closest('#app, .joystick, #ui-root') && joystick.isActive()) e.preventDefault();
     },
     { passive: false, capture: true },
   );
@@ -244,6 +255,7 @@ async function main(): Promise<void> {
     tapBuildingDoor: (name: string) => scene.tapBuildingDoor(name),
     driveEnter: (name: string) => scene.qaDriveEnter(name),
     setSuppressTap: (ms: number) => scene.setSuppressTapForQa(ms),
+    clearDriveTapSuppress: () => scene.clearDriveTapSuppressForQa(),
     tapMapTile: (tx: number, ty: number) => scene.tapMapTileForQa(tx, ty),
     tapScreen: (sx: number, sy: number) => scene.tapScreenForQa(sx, sy),
     isInInterior: () => scene.isInInterior(),
@@ -314,7 +326,33 @@ async function main(): Promise<void> {
     overviewCoverage: () => scene.qaOverviewCoverage(),
     cameraViews: () => scene.qaCameraViews(),
     cenitalExpectedHeading: (dx: number, dy: number) => scene.qaCenitalExpectedHeading(dx, dy),
-    cenitalBuildingLabels: () => cenitalLabels.qa(),
+    cenitalBuildingLabels: () => {
+      const base = cenitalLabels.qa();
+      const boxes: { x: number; y: number; w: number; h: number }[] = [];
+      for (const pill of document.querySelectorAll('.cenital-building-label')) {
+        const el = pill as HTMLElement;
+        if (el.hidden) continue;
+        const r = el.getBoundingClientRect();
+        boxes.push({ x: r.left, y: r.top, w: r.width, h: r.height });
+      }
+      for (const pill of document.querySelectorAll('.name-label')) {
+        const el = pill as HTMLElement;
+        if (el.hidden) continue;
+        const r = el.getBoundingClientRect();
+        boxes.push({ x: r.left, y: r.top, w: r.width, h: r.height });
+      }
+      let overlaps = base.overlaps;
+      for (let i = 0; i < boxes.length; i++) {
+        for (let j = i + 1; j < boxes.length; j++) {
+          const a = boxes[i];
+          const b = boxes[j];
+          const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+          const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+          if (ox > 4 && oy > 4) overlaps += 1;
+        }
+      }
+      return { ...base, overlaps };
+    },
     isMobileSheetOpen: () => chrome.isMobileSheetOpen(),
     audioMuted: () => studio.isMuted(),
     audioUnlocked: () => studio.isUnlocked(),

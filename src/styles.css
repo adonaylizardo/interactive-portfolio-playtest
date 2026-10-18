@@ -2496,14 +2496,21 @@ body.jac-menu-open .checklist {
 }
 
 .jac-dock__view {
-  width: 28px;
-  height: 28px;
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid #2a2c31;
   background: #1a1c20;
   cursor: pointer;
   pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #edeef0;
 }
 
 .jac-dock__view.is-on {
@@ -2733,7 +2740,7 @@ body.jac-drive .chrome__locate {
   visibility: hidden;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 768px) and (min-height: 501px) {
   body.jac-drive .chrome__views {
     visibility: hidden;
     pointer-events: none;

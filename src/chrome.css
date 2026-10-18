@@ -119,12 +119,16 @@
   color: #0b0c0e;
 }
 
+.chrome__nav--hidden {
+  display: none !important;
+}
+
 .ui-view {
   box-sizing: border-box;
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  min-height: 36px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0;
   border: 1px solid #2a2c31;
   border-radius: 20px;

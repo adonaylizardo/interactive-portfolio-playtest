@@ -232,6 +232,28 @@ function paintRoof(g: Graphics, o: MapObject, hover: boolean): void {
   }
 }
 
+/** World centre + half-size of the cyan cenital door marker (matches paintRoof). */
+export function cenitalDoorMarker(
+  o: MapObject,
+): { x: number; y: number; hw: number; hh: number } | null {
+  if (!o.door) return null;
+  const fx = o.footprintX ?? o.x;
+  const fy = o.footprintY ?? o.y;
+  const w = o.w ?? 1;
+  const h = o.h ?? 1;
+  if (o.doorFace === '+y') {
+    const door = tileToWorld(fx + (w - 1) / 2, fy + h - 0.08);
+    const hw = Math.min(26, w * TILE_W * 0.26);
+    return { x: door.x, y: door.y, hw, hh: 7 };
+  }
+  if (o.doorFace === '+x') {
+    const door = tileToWorld(fx + w - 0.08, fy + (h - 1) / 2);
+    const hh = Math.min(26, h * TILE_H * 0.26);
+    return { x: door.x, y: door.y, hw: 7, hh };
+  }
+  return null;
+}
+
 function paintStreetOverlay(g: Graphics): void {
   for (let y = 0; y < cells.length; y++) {
     for (let x = 0; x < cells[y].length; x++) {

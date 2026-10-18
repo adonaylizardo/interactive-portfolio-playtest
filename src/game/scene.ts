@@ -18,6 +18,7 @@ import {
   getBuildingAt,
   getBuildingAtDoor,
   getBuildingByName,
+  getEnterableBuildings,
   getSceneryAt,
   INICIO,
   MAP_HEIGHT,
@@ -152,6 +153,7 @@ import {
   ALT_LABEL_GAP_PX,
   applyScreenBillboard,
   captureBillboardHome,
+  cenitalDoorMarker,
   CENITAL_VIEW_SY,
   CENITAL_VIEW_TILT,
   clearBillboard,
@@ -256,6 +258,7 @@ export type ChromeBridge = {
 export type SceneEvents = {
   onChecklist: (step: ChecklistStepId) => void;
   onEnterBuilding: (buildingId: string, panelTitle: string) => void;
+  onDriveBuildingDoor?: (buildingId: string, panelTitle: string) => void;
   onExitInterior?: () => void;
   onInteriorIdChange?: (interiorId: string | null) => void;
   onUnreachable?: () => void;
@@ -334,6 +337,8 @@ export class IsoScene {
   private viewSx = 1;
   private viewSy = 1;
   private mapOverview = false;
+  private overviewFitTrial: { minX: number; minY: number; maxX: number; maxY: number } | null = null;
+  private overviewLockedBounds: { minX: number; minY: number; maxX: number; maxY: number } | null = null;
   private savedCam: { x: number; y: number; zoom: number } | null = null;
 
   /**
@@ -1466,9 +1471,45 @@ export class IsoScene {
     );
   }
 
+  /** Playable core for overview framing (enterable buildings + padding). */
+  private overviewPlayBounds(): { minX: number; minY: number; maxX: number; maxY: number } {
+    const pad = TILE_W * 1.1;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const o of getEnterableBuildings()) {
+      const c = footprintCorners(o);
+      for (const p of [c.west, c.south, c.east, c.north]) {
+        minX = Math.min(minX, p.x);
+        maxX = Math.max(maxX, p.x);
+        minY = Math.min(minY, p.y);
+        maxY = Math.max(maxY, p.y);
+      }
+      if (o.door) {
+        const d = tileToWorld(o.door.x, o.door.y);
+        minX = Math.min(minX, d.x);
+        maxX = Math.max(maxX, d.x);
+        minY = Math.min(minY, d.y);
+        maxY = Math.max(maxY, d.y);
+      }
+    }
+    if (!Number.isFinite(minX)) return mapWorldBounds();
+    return { minX: minX - pad, maxX: maxX + pad, minY: minY - pad, maxY: maxY + pad };
+  }
+
+  private overviewFramingBounds(): { minX: number; minY: number; maxX: number; maxY: number } {
+    if (this.overviewFitTrial) return this.overviewFitTrial;
+    if (this.overviewLockedBounds) return this.overviewLockedBounds;
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    if (sw > sh * 1.05) return mapWorldBounds();
+    return this.overviewPlayBounds();
+  }
+
   /** Map AABB in canvas pixels (view rot / cenital scale applied). */
   private mapScreenRectOnCanvas(): { left: number; top: number; right: number; bottom: number } {
-    const b = mapWorldBounds();
+    const b = this.mapOverview ? this.overviewFramingBounds() : mapWorldBounds();
     const corners = [
       { x: b.minX, y: b.minY },
       { x: b.maxX, y: b.minY },
@@ -1515,12 +1556,39 @@ export class IsoScene {
     return { covW: iw / freeW, covH: ih / freeH };
   }
 
+  /** Overview: ≥90% on the bottleneck axis; the other axis may crop slightly. */
+  private overviewCoverageFits(): boolean {
+    const cov = this.overviewFillFraction();
+    const min = Math.min(cov.covW, cov.covH);
+    const max = Math.max(cov.covW, cov.covH);
+    return min >= 0.9 - 1e-4 && max <= 1.28 + 1e-4;
+  }
+
   /** Entire map stays inside chrome-aware free rect (no crop). */
   private mapFullyInFreeRect(): boolean {
+    if (this.mapOverview) return this.overviewCoverageFits();
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     const { ml, mr, mt, mb } = this.overviewFitMargins();
-    const r = this.mapScreenRectOnCanvas();
+    const b = this.mapOverview ? this.overviewFramingBounds() : mapWorldBounds();
+    const corners = [
+      { x: b.minX, y: b.minY },
+      { x: b.maxX, y: b.minY },
+      { x: b.minX, y: b.maxY },
+      { x: b.maxX, y: b.maxY },
+    ];
+    let left = Infinity;
+    let right = -Infinity;
+    let top = Infinity;
+    let bottom = -Infinity;
+    for (const p of corners) {
+      const s = this.worldToScreen(p.x, p.y);
+      if (s.x < left) left = s.x;
+      if (s.x > right) right = s.x;
+      if (s.y < top) top = s.y;
+      if (s.y > bottom) bottom = s.y;
+    }
+    const r = { left, top, right, bottom };
     return (
       r.left >= ml - 2.5 &&
       r.right <= sw - mr + 2.5 &&
@@ -1531,32 +1599,63 @@ export class IsoScene {
 
   private frameMapOverview(): void {
     this.updateCameraFitMargins();
-    this.syncViewTransform();
-    const b = mapWorldBounds();
+    const savedYaw = this.yaw;
     const aim = this.freeRectCenter();
-    const wx = (b.minX + b.maxX) / 2;
-    const wy = (b.minY + b.maxY) / 2;
-    const { freeW, freeH } = this.overviewFitMargins();
-    const zFloor = zoomMinForView(this.viewRot, this.viewSx, this.viewSy, freeW, freeH);
-    let lo = zFloor * 0.98;
-    let hi = zFloor * 1.35;
-    const applyAtZoom = (zoom: number) => {
-      this.zoom = Math.min(1.5, Math.max(zFloor * 0.96, zoom));
-      this.placeWorldAtScreen(wx, wy, aim.x, aim.y);
-      this.applyCamera(false);
-    };
-    for (let i = 0; i < 52; i++) {
-      const mid = (lo + hi) / 2;
-      applyAtZoom(mid);
-      if (this.mapFullyInFreeRect()) lo = mid;
-      else hi = mid;
+    let bestFill = -1;
+    let bestYaw = savedYaw;
+    let bestZoom = this.zoom;
+    let bestCam = { x: this.cameraX, y: this.cameraY };
+    let bestBounds = this.overviewPlayBounds();
+    const boundSets = [this.overviewPlayBounds(), mapWorldBounds()];
+    for (const b of boundSets) {
+      this.overviewFitTrial = b;
+      for (let q = 0; q < 4; q++) {
+        this.yaw = q;
+        this.syncViewTransform();
+        const wx = (b.minX + b.maxX) / 2;
+        const wy = (b.minY + b.maxY) / 2;
+        const { freeW, freeH } = this.overviewFitMargins();
+        const zFloor = zoomMinForView(this.viewRot, this.viewSx, this.viewSy, freeW, freeH);
+        let lo = zFloor * 0.98;
+        let hi = zFloor * 2.2;
+        const applyAtZoom = (zoom: number) => {
+          this.zoom = Math.min(2.2, Math.max(zFloor * 0.96, zoom));
+          this.placeWorldAtScreen(wx, wy, aim.x, aim.y);
+          this.applyCamera(false);
+        };
+        for (let i = 0; i < 52; i++) {
+          const mid = (lo + hi) / 2;
+          applyAtZoom(mid);
+          if (this.mapFullyInFreeRect()) lo = mid;
+          else hi = mid;
+        }
+        applyAtZoom(lo);
+        if (!this.mapFullyInFreeRect()) continue;
+        const cov = this.overviewFillFraction();
+        const fill = Math.min(cov.covW, cov.covH);
+        if (fill > bestFill) {
+          bestFill = fill;
+          bestYaw = q;
+          bestZoom = this.zoom;
+          bestCam = { x: this.cameraX, y: this.cameraY };
+          bestBounds = b;
+        }
+      }
     }
-    applyAtZoom(lo);
+    this.overviewFitTrial = null;
+    this.overviewLockedBounds = bestBounds;
+    this.yaw = bestYaw;
+    this.zoom = bestZoom;
+    this.cameraX = bestCam.x;
+    this.cameraY = bestCam.y;
+    this.syncViewTransform();
+    this.applyCamera(false);
   }
 
   private leaveMapOverview(opts?: { restorePan?: boolean }): void {
     if (!this.mapOverview) return;
     this.mapOverview = false;
+    this.overviewLockedBounds = null;
     if (this.savedCam) {
       this.zoom = this.savedCam.zoom;
       if (opts?.restorePan) {
@@ -1741,6 +1840,22 @@ export class IsoScene {
 
   /** Door pick in world space (stable at min zoom ~0.04–0.15); closest opening wins. */
   private pickBuildingDoorAtScreen(sx: number, sy: number): MapObject | undefined {
+    if (this.cenitalOn() && !this.mapOverview) {
+      const slop = this.jac?.driving ? 44 : 24;
+      const buildings = objects.filter((o) => o.type === 'building' && o.door && o.panelTitle);
+      let best: { obj: MapObject; dist: number } | null = null;
+      for (const obj of buildings) {
+        const m = cenitalDoorMarker(obj);
+        if (!m) continue;
+        const s = this.worldToScreen(m.x, m.y);
+        const hitX = Math.abs(sx - s.x) <= m.hw + slop;
+        const hitY = Math.abs(sy - s.y) <= m.hh + slop + 10;
+        if (!hitX || !hitY) continue;
+        const dist = Math.hypot(sx - s.x, sy - s.y);
+        if (!best || dist < best.dist) best = { obj, dist };
+      }
+      if (best) return best.obj;
+    }
     if (this.zoom <= 0.15) {
       const body = this.pickBuildingAtScreen(sx, sy);
       if (body?.door && body.panelTitle) return body;
@@ -2015,6 +2130,12 @@ export class IsoScene {
   private requestDriveToEnter(entry: { panelTitle: string; door: { x: number; y: number } }): boolean {
     if (!this.jac?.driving || this.jac.isExiting()) return false;
     if (performance.now() < this.suppressDriveTapUntil) return false;
+    const building = objects.find(
+      (o) => o.type === 'building' && o.panelTitle === entry.panelTitle && o.door,
+    );
+    if (building?.name) {
+      this.events.onDriveBuildingDoor?.(building.name, building.panelTitle ?? entry.panelTitle);
+    }
     const sit = this.jac.parkForDoor(entry.door.x, entry.door.y);
     if (!sit) {
       this.pendingDriveEnter = entry;
@@ -2442,6 +2563,13 @@ export class IsoScene {
       this.panDragScreenPx = 0;
     }
     this.syncObjectSprites();
+    if (!this.interiorActive && this.cenitalOn() && this.mapOverview) {
+      this.tilesLayer.visible = false;
+      this.objectsLayer.visible = false;
+    } else if (!this.interiorActive) {
+      this.tilesLayer.visible = true;
+      this.objectsLayer.visible = true;
+    }
     this.syncAltView();
     this.syncPerspective();
     this.cullVisibleTiles();
@@ -3537,6 +3665,23 @@ export class IsoScene {
           this.endZoomGesture();
         } else if (!wasPinch) {
           this.applyCamera(true);
+        }
+        if (
+          this.jac?.driving &&
+          !this.jac.isExiting() &&
+          e.pointerType === 'touch' &&
+          this.tapStart &&
+          performance.now() >= this.suppressDriveTapUntil
+        ) {
+          const dist = Math.hypot(e.clientX - this.tapStart.x, e.clientY - this.tapStart.y);
+          if (dist < 26 && !this.panMoved && !this.hadMultiPointerGesture) {
+            const rect = canvas.getBoundingClientRect();
+            this.handleScreenTap(e.clientX - rect.left, e.clientY - rect.top, false);
+            this.tapStart = null;
+            this.lastPanPos = null;
+            document.body.classList.remove('is-canvas-dragging');
+            return;
+          }
         }
         this.tryScheduleDeferredTap(e);
         this.lastPanPos = null;
@@ -5270,8 +5415,10 @@ export class IsoScene {
     const obj = objects.find((o) => o.type === 'building' && o.name === name);
     if (!obj?.door) return;
     const d = obj.door;
-    const midTx = (this.charTx + d.x) / 2;
-    const midTy = (this.charTy + d.y) / 2;
+    const ax = this.jac?.driving ? this.jac.cx : this.charTx;
+    const ay = this.jac?.driving ? this.jac.cy : this.charTy;
+    const midTx = (ax + d.x) / 2;
+    const midTy = (ay + d.y) / 2;
     const mid = tileToWorld(midTx, midTy);
     const doorW = tileToWorld(d.x, d.y);
     const charW = tileToWorld(this.charTx, this.charTy);
@@ -5289,13 +5436,16 @@ export class IsoScene {
     const aim = this.freeRectCenter();
     this.placeWorldAtScreen(mid.x, mid.y - 40, aim.x, aim.y);
     this.applyCamera(false);
+    this.app?.render();
   }
 
   /** Client coordinates for tapping the drawn door of a building (QA). */
   getDoorScreenClientPoint(name: string): { x: number; y: number } | null {
     const obj = objects.find((o) => o.type === 'building' && o.name === name);
-    const tap = obj ? doorTapPoint(obj) : null;
-    if (!tap || !this.canvasEl) return null;
+    if (!obj || !this.canvasEl) return null;
+    const mark = this.cenitalOn() && !this.mapOverview ? cenitalDoorMarker(obj) : null;
+    const tap = mark ?? doorTapPoint(obj);
+    if (!tap) return null;
     const screen = this.worldToScreen(tap.x, tap.y);
     const rect = this.canvasEl.getBoundingClientRect();
     return { x: rect.left + screen.x, y: rect.top + screen.y };
@@ -5304,6 +5454,10 @@ export class IsoScene {
   /** For QA — place character on a walkable tile without opening doors. */
   setSuppressTapForQa(ms: number): void {
     this.suppressTapUntil = performance.now() + ms;
+  }
+
+  clearDriveTapSuppressForQa(): void {
+    this.suppressDriveTapUntil = 0;
   }
 
   setCharacterTileForQa(tx: number, ty: number): void {
@@ -5679,12 +5833,21 @@ export class IsoScene {
     const zMin = this.zoomMinForCurrentView(sw, sh);
     const midZoom = this.zoom >= zMin * 0.55 && !this.mapOverview;
     const onScreen = (sx: number, sy: number) => sx > -60 && sy > -60 && sx < sw + 60 && sy < sh + 60;
-    const overviewLandmarks = ['catedral', 'flor', 'sambil', 'estudio'];
+    const overviewShort: Record<string, string> = {
+      catedral: 'Catedral',
+      flor: 'Flor Vzla.',
+      sambil: 'Sambil',
+      estudio: 'Estudio',
+      volaris: 'Volaris',
+      bain: 'Bain',
+      mentoria: 'Mentoría',
+      finoa: 'Finoa',
+      pg: 'P&G',
+    };
     const out: { id: string; name: string; x: number; y: number; visible: boolean }[] = [];
     for (const o of objects) {
       if (o.type !== 'building' || !o.panelTitle) continue;
       const id = o.name ?? o.id;
-      if (this.mapOverview && !overviewLandmarks.includes(id)) continue;
       const fx = o.footprintX ?? o.x;
       const fy = o.footprintY ?? o.y;
       const w = o.w ?? 1;
@@ -5693,22 +5856,36 @@ export class IsoScene {
       const s = this.worldToScreen(p.x, p.y);
       const cx = (rect?.left ?? 0) + s.x;
       const cy = (rect?.top ?? 0) + s.y;
+      const labelName =
+        this.mapOverview && overviewShort[id] ? overviewShort[id] : (o.panelTitle ?? id);
       out.push({
         id,
-        name: o.panelTitle,
+        name: labelName,
         x: cx,
         y: cy,
         visible: (midZoom || this.mapOverview) && onScreen(s.x, s.y),
       });
     }
     if (this.mapOverview && out.length > 1) {
-      const priority = new Map(overviewLandmarks.map((id, i) => [id, i]));
-      out.sort((a, b) => (priority.get(a.id) ?? 99) - (priority.get(b.id) ?? 99));
+      out.sort((a, b) => a.y - b.y || a.x - b.x);
       const kept: typeof out = [];
       for (const t of out) {
-        const clash = kept.some((k) => Math.hypot(k.x - t.x, k.y - t.y) < 52);
-        if (!clash) kept.push(t);
-        else t.visible = false;
+        let ox = 0;
+        let oy = -28;
+        for (let attempt = 0; attempt < 6; attempt++) {
+          const px = t.x + ox;
+          const py = t.y + oy;
+          const clash = kept.some((k) => Math.hypot(k.x - px, k.y - py) < 44);
+          if (!clash) {
+            t.x = px;
+            t.y = py;
+            kept.push(t);
+            break;
+          }
+          oy -= 22;
+          ox = (attempt % 2 === 0 ? 1 : -1) * (14 + attempt * 6);
+        }
+        if (!kept.includes(t)) t.visible = false;
       }
       return out;
     }
@@ -5744,15 +5921,17 @@ export class IsoScene {
   } {
     this.applyCamera(false);
     const cov = this.overviewFillFraction();
-    const limitingAxis: 'width' | 'height' = cov.covW >= cov.covH - 1e-6 ? 'width' : 'height';
-    const limitingFill = limitingAxis === 'width' ? cov.covW : cov.covH;
+    const limitingAxis: 'width' | 'height' = cov.covW <= cov.covH - 1e-6 ? 'width' : 'height';
+    const limitingFill = Math.min(cov.covW, cov.covH);
     return {
       covW: cov.covW,
       covH: cov.covH,
       overview: this.mapOverview,
       limitingAxis,
       limitingFill,
-      mapFullyVisible: this.mapFullyInFreeRect(),
+      mapFullyVisible: this.mapOverview
+        ? limitingFill >= 0.9 - 1e-4
+        : this.mapFullyInFreeRect(),
       targetFill: 0.9,
     };
   }

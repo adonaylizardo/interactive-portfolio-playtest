@@ -4,7 +4,6 @@
     "building": "estudio",
     "ok": true,
     "plan": {
-      "ok": true,
       "sit": {
         "x": 24,
         "y": 38,
@@ -239,20 +238,13 @@
           }
         ],
         "heading": "ne",
-        "ms": 16.30000000447035
+        "ms": 8.899999998509884
       },
-      "goal": {
-        "x": 24,
-        "y": 38
-      },
+      "goal": null,
       "driving": true
     },
     "outcome": {
-      "kind": "driveGoal",
-      "goal": {
-        "x": 24,
-        "y": 38
-      }
+      "kind": "panel"
     },
     "snap": {
       "driving": true,
@@ -260,9 +252,9 @@
         "x": 24,
         "y": 38
       },
-      "distDoor": 7.556424766101227,
+      "distDoor": 6.580053741878748,
       "interior": false,
-      "panel": false
+      "panel": true
     }
   },
   {
@@ -270,7 +262,6 @@
     "building": "sambil",
     "ok": true,
     "plan": {
-      "ok": true,
       "sit": {
         "x": 44,
         "y": 18,
@@ -361,30 +352,20 @@
           }
         ],
         "heading": "se",
-        "ms": 1.6999999955296516
+        "ms": 1.5
       },
-      "goal": {
-        "x": 46,
-        "y": 19
-      },
+      "goal": null,
       "driving": true
     },
     "outcome": {
-      "kind": "driveGoal",
-      "goal": {
-        "x": 46,
-        "y": 19
-      }
+      "kind": "panel"
     },
     "snap": {
       "driving": true,
-      "driveGoal": {
-        "x": 46,
-        "y": 19
-      },
-      "distDoor": 4.621486715999934,
+      "driveGoal": null,
+      "distDoor": 3.6055512754639896,
       "interior": false,
-      "panel": false
+      "panel": true
     }
   },
   {
@@ -392,7 +373,6 @@
     "building": "flor",
     "ok": true,
     "plan": {
-      "ok": true,
       "sit": {
         "x": 49,
         "y": 45,
@@ -643,20 +623,13 @@
           }
         ],
         "heading": "sw",
-        "ms": 12.099999994039536
+        "ms": 6.300000004470348
       },
-      "goal": {
-        "x": 49,
-        "y": 45
-      },
+      "goal": null,
       "driving": true
     },
     "outcome": {
-      "kind": "driveGoal",
-      "goal": {
-        "x": 49,
-        "y": 45
-      }
+      "kind": "panel"
     },
     "snap": {
       "driving": true,
@@ -664,9 +637,9 @@
         "x": 49,
         "y": 45
       },
-      "distDoor": 5.281527022616351,
+      "distDoor": 3.0276571487400337,
       "interior": false,
-      "panel": false
+      "panel": true
     }
   },
   {
@@ -674,7 +647,6 @@
     "building": "mentoria",
     "ok": true,
     "plan": {
-      "ok": true,
       "sit": {
         "x": 28,
         "y": 27,
@@ -737,20 +709,13 @@
           }
         ],
         "heading": "nw",
-        "ms": 0.8000000044703484
+        "ms": 0.3999999985098839
       },
-      "goal": {
-        "x": 29,
-        "y": 28
-      },
+      "goal": null,
       "driving": true
     },
     "outcome": {
-      "kind": "driveGoal",
-      "goal": {
-        "x": 29,
-        "y": 28
-      }
+      "kind": "panel"
     },
     "snap": {
       "driving": true,
@@ -758,9 +723,9 @@
         "x": 29,
         "y": 28
       },
-      "distDoor": 3.0157519152049614,
+      "distDoor": 4.201600700397263,
       "interior": false,
-      "panel": false
+      "panel": true
     }
   },
   {
@@ -768,7 +733,6 @@
     "building": "volaris",
     "ok": true,
     "plan": {
-      "ok": true,
       "sit": {
         "x": 39,
         "y": 40,
@@ -1039,7 +1003,7 @@
           }
         ],
         "heading": "sw",
-        "ms": 4.299999997019768
+        "ms": 4
       },
       "goal": null,
       "driving": true
@@ -1048,7 +1012,7 @@
       "kind": "panel"
     },
     "snap": {
-      "driving": false,
+      "driving": true,
       "driveGoal": null,
       "distDoor": 3.6055512754639896,
       "interior": false,

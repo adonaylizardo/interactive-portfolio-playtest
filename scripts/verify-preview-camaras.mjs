@@ -308,8 +308,11 @@ async function runViewport(tag, options) {
     await wait(350);
     const overview = await page.evaluate(() => window.__playtestQa.overviewCoverage?.());
     notes.push(`${tag}: overview coverage ${JSON.stringify(overview)}`);
-    const fill = overview?.limitingFill ?? Math.min(overview?.covW ?? 0, overview?.covH ?? 0);
-    const axis = overview?.limitingAxis ?? 'min';
+    const fill =
+      overview?.limitingFill ?? Math.min(overview?.covW ?? 0, overview?.covH ?? 0);
+    const axis =
+      overview?.limitingAxis ??
+      (overview && overview.covW <= overview.covH ? 'width' : 'height');
     notes.push(
       `${tag}: overview limiting ${axis} ${(fill * 100).toFixed(1)}% (goal ≥90%, mapFullyVisible=${overview?.mapFullyVisible ?? '?'})`,
     );
