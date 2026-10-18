@@ -528,6 +528,7 @@ export class BuildingPanel {
       return;
     }
     this.hide();
+    studio.maybePlayDeferredIntro();
   }
 
   private isInteriorExperienceSheet(): boolean {

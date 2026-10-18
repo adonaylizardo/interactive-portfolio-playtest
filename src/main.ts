@@ -40,7 +40,7 @@ async function main(): Promise<void> {
     onLayoutChange: () => {
       if (!isMobileLayout()) checklist.setCollapsed(true);
       else checklist.collapseMobile();
-      if (chrome.getLayout() === 'map' && !panel.isOpen()) studio.maybePlayDeferredIntro();
+      if (chrome.getLayout() === 'map' && !panel.isOpen()) studio.scheduleIntroWhenMapIdle(450);
       scene?.applyCameraFromUi();
     },
     onView: (mode: Camera) => scene?.setViewMode(mode),
@@ -68,6 +68,7 @@ async function main(): Promise<void> {
     uiRoot,
     () => {
       const open = panel.isInteriorMode();
+      if (panel.isOpen()) studio.noteIntroPanelOpen();
       checklist.setBuildingPanelOpen(open);
       if (panel.isExperienceMode()) {
         chrome.setInteriorOpen(false, { skipLayout: true });

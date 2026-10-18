@@ -68,6 +68,7 @@ export class StudioAudio {
   private introLock = false;
   /** Intro was skipped because a panel was open on unlock; play when back on map. */
   private introDeferred = false;
+  private introKickTimer: ReturnType<typeof setTimeout> | null = null;
   private pending: string | null = null;
   private bark: HTMLAudioElement | null = null;
   private barkLines: BarkLine[] = [];
@@ -119,19 +120,51 @@ export class StudioAudio {
 
   /** Map-only: play intro if unlock happened while a panel was open. */
   maybePlayDeferredIntro(): void {
-    if (!this.unlocked || this.muted || this.played.has('01-intro') || !this.introDeferred) return;
-    if (this.shouldDeferIntro()) return;
+    if (!this.unlocked || this.muted || this.played.has('01-intro')) return;
+    if (this.shouldDeferIntro()) {
+      this.introDeferred = true;
+      return;
+    }
     this.introDeferred = false;
     this.playLine('01-intro');
+  }
+
+  /** Panel / preview opened — cancel pending intro kick and defer playback. */
+  noteIntroPanelOpen(): void {
+    this.cancelIntroKick();
+    this.introDeferred = true;
+    if (this.activeLineId === '01-intro') this.stopVoice();
+  }
+
+  /** After returning to the map with no panel, try intro again (debounced). */
+  scheduleIntroWhenMapIdle(delayMs = 500): void {
+    if (this.played.has('01-intro') || this.muted || !this.unlocked) return;
+    this.introDeferred = true;
+    this.cancelIntroKick();
+    this.introKickTimer = window.setTimeout(() => {
+      this.introKickTimer = null;
+      this.maybePlayDeferredIntro();
+    }, delayMs);
+  }
+
+  private cancelIntroKick(): void {
+    if (this.introKickTimer != null) {
+      clearTimeout(this.introKickTimer);
+      this.introKickTimer = null;
+    }
   }
 
   private shouldDeferIntro(): boolean {
     if (typeof document === 'undefined') return false;
     const layout = document.body.dataset.layout;
     if (layout === 'split' || layout === 'panel') return true;
-    const panel = document.querySelector('#ui-root > .building-panel.building-panel--open');
-    if (!panel) return false;
-    return true;
+    const chrome = document.querySelector('.chrome');
+    if (chrome?.classList.contains('chrome--sheet')) return true;
+    const panel = document.querySelector(
+      '#ui-root > .building-panel.building-panel--open',
+    );
+    if (panel) return true;
+    return false;
   }
 
   /** User-initiated chrome voice (Contact, etc.) while intro is playing. */
@@ -183,13 +216,9 @@ export class StudioAudio {
 
   private startGraphAndIntro(): void {
     if (automatedWebKitPhone()) {
-      if (this.shouldDeferIntro()) {
-        this.introDeferred = true;
-        this.introLock = false;
-        return;
-      }
-      this.playLine('01-intro');
-      if (this.muted || !this.played.has('01-intro')) this.introLock = false;
+      this.introDeferred = true;
+      this.introLock = false;
+      this.scheduleIntroWhenMapIdle(900);
       return;
     }
     try {
@@ -208,13 +237,9 @@ export class StudioAudio {
     } catch {
       /* autoplay / context limits: mute state still flips */
     }
-    if (this.shouldDeferIntro()) {
-      this.introDeferred = true;
-      this.introLock = false;
-      return;
-    }
-    this.playLine('01-intro');
-    if (this.muted || !this.played.has('01-intro')) this.introLock = false;
+    this.introDeferred = true;
+    this.introLock = false;
+    this.scheduleIntroWhenMapIdle(700);
   }
 
   setInterior(open: boolean): void {
@@ -255,6 +280,10 @@ export class StudioAudio {
 
   /** Move command: a random bark ≠ last, ~6 s cooldown, never over a case line. */
   noteMoveCommand(): void {
+    if (!this.played.has('01-intro') && this.unlocked) {
+      this.introDeferred = true;
+      this.scheduleIntroWhenMapIdle(900);
+    }
     if (this.muted || !this.unlocked || this.voice) return;
     if (automatedWebKitPhone()) return;
     const now = performance.now();
@@ -307,7 +336,7 @@ export class StudioAudio {
     this.subtitleText = line.script_text;
     this.emit();
     if (automatedWebKitPhone()) {
-      window.setTimeout(() => this.finishVoice(), 80);
+      window.setTimeout(() => this.finishVoice(true), 80);
       return;
     }
     this.preferOgg ??= canPlayOgg();
@@ -315,22 +344,23 @@ export class StudioAudio {
     const el = new Audio(`${VOICE_DIR}${file}`);
     el.preload = 'auto';
     el.addEventListener('error', () => {
-      if (this.voice === el) this.finishVoice();
+      if (this.voice === el) this.finishVoice(false);
     });
     el.addEventListener('ended', () => {
-      if (this.voice === el) this.finishVoice();
+      if (this.voice === el) this.finishVoice(true);
     });
     this.voice = el;
     this.subtitleText = line.script_text;
     this.duckAmbience(true);
     this.emit();
     void el.play().catch(() => {
-      if (this.voice === el) this.finishVoice();
+      if (this.voice === el) this.finishVoice(false);
     });
   }
 
-  private finishVoice(): void {
-    if (this.activeLineId === '01-intro') this.played.add('01-intro');
+  private finishVoice(completed = true): void {
+    if (completed && this.activeLineId === '01-intro') this.played.add('01-intro');
+    if (!completed && this.activeLineId === '01-intro') this.introDeferred = true;
     this.activeLineId = null;
     this.introLock = false;
     this.stopVoice({ preserveQueue: true });

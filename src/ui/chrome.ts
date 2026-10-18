@@ -504,6 +504,8 @@ export class ChromeUI {
     this.root.classList.toggle('chrome--panel', !this.mobile && this.layout === 'panel');
     this.root.classList.toggle('chrome--split', !this.mobile && this.layout === 'split');
     this.syncSound();
+    this.placeLang();
+    this.placeSubtitle();
     if (opts?.deferColumn) return;
     const col = this.root.querySelector('.chrome__column') as HTMLElement | null;
     if (col) {
