@@ -84,8 +84,23 @@ export function isReadingHash(rawHash = location.hash): boolean {
   return raw === PREFIX || raw.startsWith(`${PREFIX}/`);
 }
 
-export function parseReadingRoute(rawHash = location.hash): ReadingRoute | null {
+function readingPathAndAnchor(rawHash: string): { path: string; anchor: string | null } {
   const raw = rawHash.replace(/^#/, '');
+  const anchorIdx = raw.indexOf('#');
+  if (anchorIdx === -1) return { path: raw, anchor: null };
+  return {
+    path: raw.slice(0, anchorIdx),
+    anchor: decodeURIComponent(raw.slice(anchorIdx + 1)).trim() || null,
+  };
+}
+
+/** Fragment on `#/leer/estudio#<section>` for About anchors. */
+export function parseReadingAnchor(rawHash = location.hash): string | null {
+  return readingPathAndAnchor(rawHash).anchor;
+}
+
+export function parseReadingRoute(rawHash = location.hash): ReadingRoute | null {
+  const { path: raw } = readingPathAndAnchor(rawHash);
   if (raw === PREFIX) return { kind: 'list' };
   if (!raw.startsWith(`${PREFIX}/`)) return null;
   const slug = decodeURIComponent(raw.slice(PREFIX.length + 1)).trim();
@@ -93,9 +108,10 @@ export function parseReadingRoute(rawHash = location.hash): ReadingRoute | null 
   return { kind: 'detail', slug };
 }
 
-export function readingHash(slug?: string): string {
-  if (!slug) return `#${PREFIX}`;
-  return `#${PREFIX}/${encodeURIComponent(slug)}`;
+export function readingHash(slug?: string, anchor?: string): string {
+  const base = slug ? `#${PREFIX}/${encodeURIComponent(slug)}` : `#${PREFIX}`;
+  if (!anchor) return base;
+  return `${base}#${encodeURIComponent(anchor)}`;
 }
 
 export function navigateReading(route: ReadingRoute, mode: 'push' | 'replace' = 'push'): void {

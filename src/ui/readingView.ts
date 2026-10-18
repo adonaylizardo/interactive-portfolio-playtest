@@ -25,7 +25,13 @@ import {
   writingMeta,
   writingTitle,
 } from './contentLabels';
-import { goBackToReadingList, navigateReading, type ReadingRoute } from './readingRoute';
+import { createAboutContactBlock } from './aboutContactBlock';
+import {
+  goBackToReadingList,
+  navigateReading,
+  parseReadingAnchor,
+  type ReadingRoute,
+} from './readingRoute';
 
 const LANDMARK_IDS = ['sambil', 'catedral', 'flor'] as const;
 
@@ -181,7 +187,9 @@ export class ReadingView {
     document.body.dataset.reading = '1';
     this.applyI18n();
     this.render();
-    this.scroll.scrollTop = 0;
+    if (!(route.kind === 'detail' && route.slug === 'estudio' && parseReadingAnchor())) {
+      this.scroll.scrollTop = 0;
+    }
   }
 
   private applyI18n(): void {
@@ -315,15 +323,28 @@ export class ReadingView {
   private renderAbout(): void {
     const wrap = document.createElement('article');
     wrap.className = 'reading-view__article reading-view__article--about';
-    const h = document.createElement('h2');
-    h.className = 'reading-view__detail-title';
-    h.textContent = t('read.section.about');
-    wrap.appendChild(h);
+    const pageTitle = document.createElement('h2');
+    pageTitle.className = 'reading-view__detail-title';
+    pageTitle.textContent = t('read.aboutTitle');
+    wrap.appendChild(pageTitle);
+
+    let contactInserted = false;
     for (const block of aboutForLang(getLang())) {
       if (block.kind === 'heading') {
-        const hx = document.createElement(`h${Math.min(block.level + 2, 6)}`);
+        const tag = block.level === 1 ? 'h3' : block.level === 2 ? 'h4' : 'h5';
+        const hx = document.createElement(tag);
         hx.textContent = block.text;
+        if (block.level >= 2) {
+          hx.id = block.id;
+          hx.className = 'reading-about__section-title';
+        } else {
+          hx.className = 'reading-about__headline';
+        }
         wrap.appendChild(hx);
+        if (block.level === 3 && !contactInserted) {
+          wrap.appendChild(createAboutContactBlock());
+          contactInserted = true;
+        }
       } else if (block.kind === 'paragraph') {
         const p = document.createElement('p');
         p.className = 'about__text';
@@ -360,6 +381,19 @@ export class ReadingView {
       }
     }
     this.main.replaceChildren(wrap);
+    this.scrollToAboutAnchor();
+  }
+
+  private scrollToAboutAnchor(): void {
+    const anchor = parseReadingAnchor();
+    if (!anchor || this.route?.kind !== 'detail' || this.route.slug !== 'estudio') return;
+    window.requestAnimationFrame(() => {
+      const target = document.getElementById(anchor);
+      if (!target) return;
+      const scrollerTop = this.scroll.getBoundingClientRect().top;
+      const targetTop = target.getBoundingClientRect().top;
+      this.scroll.scrollTop += targetTop - scrollerTop - 12;
+    });
   }
 
   private renderAchievements(): void {

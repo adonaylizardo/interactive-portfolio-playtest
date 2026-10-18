@@ -43,8 +43,9 @@ function caseRowSummary(id: CaseHouseId): string {
   return content?.subtitle ?? content?.shortHeadline ?? '';
 }
 
-const CV_HREF = `${import.meta.env.BASE_URL}cv/adonay-lizardo-cv.pdf`;
-const CONTACT_HREF = 'mailto:adolizardo@gmail.com';
+import { CONTACT_MAILTO, CV_HREF } from '../data/contactLinks';
+
+const CONTACT_HREF = CONTACT_MAILTO;
 const MOBILE_SHEET_STORAGE_KEY = 'portfolio-playtest-mobile-sheet';
 
 function isLandscapePhone(): boolean {

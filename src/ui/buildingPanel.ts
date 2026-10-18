@@ -28,6 +28,7 @@ function aboutBlockNode(block: AboutBlock): HTMLElement {
     const h = document.createElement(`h${block.level + 3}`);
     h.className = `about__h${block.level}`;
     h.textContent = block.text;
+    if (block.level >= 2) h.id = block.id;
     return h;
   }
   if (block.kind === 'image') {
