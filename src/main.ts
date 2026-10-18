@@ -100,9 +100,7 @@ async function main(): Promise<void> {
     onLayoutChange: () => {
       if (!isMobileLayout()) checklist.setCollapsed(true);
       else checklist.collapseMobile();
-      labels.setHidden(
-        isMobileLayout() && (chrome.isMobileSheetOpen() || (panel.isOpen() && panel.isExperienceMode())),
-      );
+      labels.setHidden(isMobileLayout() && (chrome.isMobileSheetOpen() || panel.isOpen()));
       if (chrome.getLayout() === 'map' && !panel.isOpen()) studio.scheduleIntroWhenMapIdle(450);
       scene?.applyCameraFromUi();
     },

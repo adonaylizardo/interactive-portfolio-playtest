@@ -28,11 +28,15 @@ export class AboutMePanel {
     this.root.className = 'about-panel';
     this.root.hidden = true;
     this.root.innerHTML = `
-      <div class="about-panel__backdrop" data-about-backdrop hidden></div>
+      <div class="about-panel__backdrop" data-about-backdrop></div>
       <div class="about-panel__sheet" role="dialog" aria-modal="true" aria-labelledby="about-panel-title">
+        <div class="about-panel__grab" aria-hidden="true"></div>
         <header class="about-panel__header">
           <h2 class="about-panel__title" id="about-panel-title">About me</h2>
-          <button type="button" class="ui-round" data-about-close aria-label="Close">${iconSvg('close')}</button>
+          <div class="about-panel__header-actions">
+            <button type="button" class="about-panel__icon-btn" data-about-expand aria-label="Expand">${iconSvg('expand')}</button>
+            <button type="button" class="about-panel__icon-btn about-panel__icon-btn--plain" data-about-close aria-label="Close">${iconSvg('close')}</button>
+          </div>
         </header>
         <div class="about-panel__scroll"></div>
       </div>
@@ -62,7 +66,7 @@ export class AboutMePanel {
     this.contactEl.innerHTML = this.contactRowsHtml();
 
     const bodyWrap = document.createElement('div');
-    bodyWrap.className = 'about-panel__body';
+    bodyWrap.className = 'about-panel__body about-panel__photos';
     bodyWrap.append(...body.map(aboutBlockNode));
 
     this.scrollEl.append(introWrap, this.contactEl, bodyWrap);
@@ -70,23 +74,25 @@ export class AboutMePanel {
 
   private contactRowsHtml(): string {
     return `
-      <a class="about-panel__row ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer" download>
-        ${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span>
+      <div class="about-panel__cta-row">
+        <a class="ui-btn ui-btn--primary about-panel__cta-half" href="${CV_HREF}" target="_blank" rel="noopener noreferrer" download>
+          ${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span>
+        </a>
+        <a class="about-panel__cta-half ui-btn ui-btn--secondary" href="${CONTACT_MAILTO}" data-about-mailto="contact">
+          ${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span>
+        </a>
+      </div>
+      <a class="about-panel__link" href="${CONTACT_MAILTO}">
+        ${iconSvg('mail')} <span>Email</span>
+        <span class="about-panel__link-trail">${iconSvg('arrowNe', 15)}</span>
       </a>
-      <a class="about-panel__row ui-btn ui-btn--secondary" href="${CONTACT_MAILTO}" data-about-mailto="contact">
-        ${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span>
-      </a>
-      <a class="about-panel__row about-panel__link" href="${CONTACT_MAILTO}">
-        ${iconSvg('link')} <span>Email</span>
-        <span class="about-panel__link-meta">${CONTACT_MAILTO.replace('mailto:', '')}</span>
-      </a>
-      <a class="about-panel__row about-panel__link" href="${LINKEDIN_URL}" target="_blank" rel="noopener noreferrer">
+      <a class="about-panel__link" href="${LINKEDIN_URL}" target="_blank" rel="noopener noreferrer">
         ${iconSvg('link')} <span>Linked In</span>
-        ${iconSvg('arrowNe', 15)}
+        <span class="about-panel__link-trail">${iconSvg('arrowNe', 15)}</span>
       </a>
-      <a class="about-panel__row about-panel__link" href="${MEDIUM_URL}" target="_blank" rel="noopener noreferrer">
+      <a class="about-panel__link" href="${MEDIUM_URL}" target="_blank" rel="noopener noreferrer">
         ${iconSvg('link')} <span>Medium</span>
-        ${iconSvg('arrowNe', 15)}
+        <span class="about-panel__link-trail">${iconSvg('arrowNe', 15)}</span>
       </a>
     `;
   }
@@ -94,6 +100,9 @@ export class AboutMePanel {
   private bind(): void {
     this.root.querySelector('[data-about-close]')?.addEventListener('click', () => this.close());
     this.root.querySelector('[data-about-backdrop]')?.addEventListener('click', () => this.close());
+    this.root.querySelector('[data-about-expand]')?.addEventListener('click', () => {
+      this.root.classList.toggle('about-panel--expanded');
+    });
     this.root.querySelectorAll('[data-about-mailto]').forEach((a) => {
       a.addEventListener('click', () => studio.playLine('11-contact'));
     });
@@ -114,8 +123,8 @@ export class AboutMePanel {
     this.root.hidden = false;
     this.root.classList.add('about-panel--open');
     document.body.classList.add('about-panel-open');
-    const backdrop = this.root.querySelector('.about-panel__backdrop') as HTMLElement;
-    backdrop.hidden = !this.isSideSheet();
+    this.root.classList.toggle('about-panel--phone-portrait', this.isPhonePortrait());
+    this.root.classList.toggle('about-panel--landscape', this.isSideSheet());
 
     requestAnimationFrame(() => {
       if (opts.sectionId) {
@@ -124,7 +133,7 @@ export class AboutMePanel {
           this.scrollEl.querySelector(`[data-about-section="${CSS.escape(opts.sectionId)}"]`);
         target?.scrollIntoView({ block: 'start' });
       } else if (opts.highlightContact) {
-        this.contactEl.scrollIntoView({ block: 'start' });
+        this.scrollEl.scrollTop = Math.max(0, this.contactEl.offsetTop - 80);
       } else {
         this.scrollEl.scrollTop = 0;
       }
@@ -135,23 +144,19 @@ export class AboutMePanel {
   close(): void {
     if (!this.opened) return;
     this.opened = false;
-    this.root.classList.remove('about-panel--open');
+    this.root.classList.remove('about-panel--open', 'about-panel--expanded', 'about-panel--phone-portrait', 'about-panel--landscape');
     this.root.hidden = true;
     document.body.classList.remove('about-panel-open');
     this.onClose?.();
   }
 
-  scrollToSection(sectionId: string): void {
-    if (!this.opened) this.open({ sectionId });
-    else {
-      const target = this.scrollEl.querySelector(`#${CSS.escape(sectionId)}`);
-      target?.scrollIntoView({ block: 'start' });
-    }
-  }
-
   flashContact(): void {
     this.contactEl.classList.add('about-panel__contact--flash');
     window.setTimeout(() => this.contactEl.classList.remove('about-panel__contact--flash'), 1200);
+  }
+
+  private isPhonePortrait(): boolean {
+    return window.matchMedia('(max-width: 767px) and (orientation: portrait)').matches;
   }
 
   private isSideSheet(): boolean {

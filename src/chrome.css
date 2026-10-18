@@ -751,20 +751,30 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
 
 @media (max-height: 500px) and (orientation: landscape) {
   .chrome--sheet .chrome__intro {
-    top: 12px;
-    bottom: auto;
+    top: auto;
+    bottom: 12px;
     left: 12px;
     right: 12px;
-    max-height: min(280px, calc(100dvh - 24px));
+    max-height: min(268px, calc(100dvh - 80px));
     overflow-y: auto;
+    z-index: 5;
   }
 
   .chrome--sheet .chrome__intro-close {
-    z-index: 10;
+    z-index: 12;
+    top: 8px;
+    right: 8px;
   }
 
   .chrome--sheet .chrome__lang {
-    z-index: 9;
+    z-index: 11;
+    top: 12px;
+    right: 12px;
+  }
+
+  .chrome--sheet .chrome__tools-phone {
+    z-index: 12;
+    display: flex !important;
   }
 
   body[data-layout='map'] .chrome--mobile .chrome__lang {

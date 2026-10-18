@@ -1,5 +1,6 @@
 import {
   resetSearchIndexForTests,
+  searchResultsForKind,
   searchSite,
   searchTypeChips,
   type SearchResult,
@@ -29,7 +30,9 @@ export class SearchPalette {
   private resultsEl: HTMLElement;
   private chipsEl: HTMLElement;
   private backBtn: HTMLButtonElement;
+  private closeBtn: HTMLButtonElement;
   private opened = false;
+  private filterKind: SearchResultKind | null = null;
   private callbacks: SearchPaletteCallbacks;
   private flatHits: HTMLButtonElement[] = [];
   private activeHit = -1;
@@ -40,14 +43,17 @@ export class SearchPalette {
     this.root.className = 'search-palette';
     this.root.hidden = true;
     this.root.innerHTML = `
-      <div class="search-palette__backdrop" data-search-backdrop hidden></div>
+      <div class="search-palette__backdrop" data-search-backdrop></div>
       <div class="search-palette__panel" role="dialog" aria-modal="true" aria-labelledby="search-palette-label">
         <div class="search-palette__field" id="search-palette-label">
           <button type="button" class="search-palette__back" data-search-back aria-label="Back">${iconSvg('chevron')}</button>
           <label class="search-palette__input-wrap">
             ${iconSvg('search')}
-            <input type="search" class="search-palette__input" autocomplete="off" spellcheck="false" enterkeyhint="search" />
+            <input type="text" class="search-palette__input" autocomplete="off" spellcheck="false" enterkeyhint="search" />
+            <button type="button" class="search-palette__clear" data-search-clear hidden aria-label="Clear">${iconSvg('close')}</button>
           </label>
+          <button type="button" class="search-palette__close" data-search-close aria-label="Close">${iconSvg('close')}</button>
+          <span class="search-palette__hint-key" aria-hidden="true">EN</span>
         </div>
         <div class="search-palette__chips" data-chips></div>
         <div class="search-palette__results" data-results></div>
@@ -58,13 +64,13 @@ export class SearchPalette {
     this.resultsEl = this.root.querySelector('[data-results]')!;
     this.chipsEl = this.root.querySelector('[data-chips]')!;
     this.backBtn = this.root.querySelector('[data-search-back]') as HTMLButtonElement;
+    this.closeBtn = this.root.querySelector('[data-search-close]') as HTMLButtonElement;
     this.bind();
     onLangChange(() => {
       resetSearchIndexForTests();
       this.syncPlaceholder();
       this.renderChips();
-      if (this.input.value.trim()) this.render(this.input.value);
-      else this.renderEmpty();
+      this.syncView();
     });
   }
 
@@ -75,7 +81,16 @@ export class SearchPalette {
   private bind(): void {
     this.root.querySelector('[data-search-backdrop]')?.addEventListener('click', () => this.close());
     this.backBtn.addEventListener('click', () => this.close());
-    this.input.addEventListener('input', () => this.render(this.input.value));
+    this.closeBtn.addEventListener('click', () => this.close());
+    this.root.querySelector('[data-search-clear]')?.addEventListener('click', () => {
+      this.input.value = '';
+      this.filterKind = null;
+      this.syncView();
+    });
+    this.input.addEventListener('input', () => {
+      this.filterKind = null;
+      this.syncView();
+    });
     this.input.addEventListener('keydown', (e) => this.onInputKeydown(e));
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.opened) this.close();
@@ -115,18 +130,20 @@ export class SearchPalette {
     this.input.placeholder = t('search.placeholder');
     this.input.setAttribute('aria-label', t('chrome.search'));
     this.backBtn.setAttribute('aria-label', t('search.back'));
+    this.closeBtn.setAttribute('aria-label', t('panel.close'));
   }
 
   private isPhonePortrait(): boolean {
     return window.matchMedia('(max-width: 767px) and (orientation: portrait)').matches;
   }
 
-  private isSideSheet(): boolean {
-    return window.matchMedia('(max-height: 500px) and (orientation: landscape) and (max-width: 900px)').matches;
+  private isDesktop(): boolean {
+    return window.matchMedia('(min-width: 768px)').matches;
   }
 
   open(): void {
     this.opened = true;
+    this.filterKind = null;
     this.root.hidden = false;
     this.root.classList.add('search-palette--open');
     document.body.classList.add('search-palette-open');
@@ -134,15 +151,14 @@ export class SearchPalette {
     this.root.classList.toggle('search-palette--phone-full', this.isPhonePortrait());
     this.input.value = '';
     this.renderChips();
-    this.renderEmpty();
-    const backdrop = this.root.querySelector('.search-palette__backdrop') as HTMLElement;
-    backdrop.hidden = !this.isSideSheet();
+    this.syncView();
     requestAnimationFrame(() => this.input.focus());
   }
 
   close(): void {
     if (!this.opened) return;
     this.opened = false;
+    this.filterKind = null;
     this.root.classList.remove('search-palette--open', 'search-palette--phone-full');
     this.root.hidden = true;
     document.body.classList.remove('search-palette-open');
@@ -151,52 +167,61 @@ export class SearchPalette {
     this.activeHit = -1;
   }
 
+  private syncView(): void {
+    const q = this.input.value.trim();
+    const clearBtn = this.root.querySelector('[data-search-clear]') as HTMLButtonElement;
+    clearBtn.hidden = !q;
+    if (this.filterKind) {
+      const group = searchResultsForKind(this.filterKind, q);
+      this.renderGroups(group ? [group] : [], q);
+      return;
+    }
+    if (!q) {
+      this.resultsEl.replaceChildren();
+      this.chipsEl.hidden = false;
+      this.flatHits = [];
+      this.activeHit = -1;
+      return;
+    }
+    this.renderGroups(searchSite(q), q);
+  }
+
   private renderChips(): void {
     this.chipsEl.replaceChildren();
     for (const chip of searchTypeChips()) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'search-palette__chip';
-      btn.textContent = chip.label;
+      btn.innerHTML = `${iconSvg(KIND_ICON[chip.kind], 13)}<span>${chip.label}</span>`;
       btn.addEventListener('click', () => {
-        this.input.value = chip.label.split(' ')[0] ?? chip.label;
-        this.input.dispatchEvent(new Event('input', { bubbles: true }));
+        this.filterKind = chip.kind;
+        this.input.value = '';
         this.callbacks.onChip?.(chip.kind);
+        this.syncView();
       });
       this.chipsEl.append(btn);
     }
   }
 
-  private renderEmpty(): void {
-    this.resultsEl.replaceChildren();
-    const hint = document.createElement('p');
-    hint.className = 'search-palette__idle';
-    hint.textContent = t('search.tryAnother');
-    this.resultsEl.append(hint);
-  }
-
-  private render(query: string): void {
-    const q = query.trim();
+  private renderGroups(groups: ReturnType<typeof searchSite>, query: string): void {
     this.flatHits = [];
     this.activeHit = -1;
     this.resultsEl.replaceChildren();
-    if (!q) {
-      this.renderEmpty();
-      return;
-    }
+    this.chipsEl.hidden = groups.length > 0;
 
-    const groups = searchSite(q);
     if (!groups.length) {
       const empty = document.createElement('div');
       empty.className = 'search-palette__empty';
-      const title = document.createElement('p');
-      title.className = 'search-palette__empty-title';
-      title.textContent = truncateQueryDisplay(q);
-      const hint = document.createElement('p');
-      hint.className = 'search-palette__empty-hint';
-      hint.textContent = t('search.tryAnother');
-      empty.append(title, hint);
+      const row = document.createElement('div');
+      row.className = 'search-palette__empty-row';
+      row.innerHTML = `<span class="search-palette__hit-icon search-palette__hit-icon--tile">${iconSvg('search')}</span>
+        <div class="search-palette__empty-copy">
+          <p class="search-palette__empty-title">${escapeHtml(truncateQueryDisplay(query))}</p>
+          <p class="search-palette__empty-hint">${escapeHtml(t('search.tryAnother'))}</p>
+        </div>`;
+      empty.append(row);
       this.resultsEl.append(empty);
+      this.chipsEl.hidden = false;
       return;
     }
 
@@ -216,26 +241,32 @@ export class SearchPalette {
         btn.className = 'search-palette__hit';
         btn.dataset.kind = item.kind;
         btn.innerHTML = `
-          <span class="search-palette__hit-icon">${iconSvg(KIND_ICON[item.kind])}</span>
+          <span class="search-palette__hit-icon search-palette__hit-icon--tile">${iconSvg(KIND_ICON[item.kind])}</span>
           <span class="search-palette__hit-body">
-            <span class="search-palette__hit-title">${highlightMatch(escapeHtml(item.title), q)}</span>
-            <span class="search-palette__hit-snippet">${highlightMatch(escapeHtml(item.snippet), q)}</span>
+            <span class="search-palette__hit-title">${highlightMatch(escapeHtml(item.title), query)}</span>
+            <span class="search-palette__hit-snippet">${highlightMatch(escapeHtml(item.snippet), query)}</span>
           </span>`;
         btn.addEventListener('click', () => {
           this.close();
           this.callbacks.onSelect(item);
         });
-        list.append(btn);
         li.append(btn);
+        list.append(li);
         this.flatHits.push(btn);
       }
       section.append(list);
       this.resultsEl.append(section);
     }
+
+    if (this.isDesktop() && this.flatHits[0]) {
+      this.activeHit = 0;
+      this.flatHits[0].classList.add('search-palette__hit--active');
+    }
   }
 }
 
 function truncateQueryDisplay(q: string): string {
+  if (!q) return getLang() === 'es' ? 'Sin resultados' : 'No results';
   const shown = q.length > 48 ? `${q.slice(0, 45)}…` : q;
   return getLang() === 'es' ? `Sin resultados para “${shown}”` : `No results for “${shown}”`;
 }

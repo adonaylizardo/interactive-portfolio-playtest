@@ -176,9 +176,10 @@ export class ChecklistUI {
     this.ringBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       if (this.mobile) {
+        const anchor = this.ringBtn.getBoundingClientRect();
         this.state.mobileExpanded = !this.state.mobileExpanded;
         this.applyLayoutClasses();
-        this.positionMobileExpanded();
+        this.positionMobileExpanded(anchor);
         saveChecklist(this.state);
         return;
       }
@@ -274,31 +275,46 @@ export class ChecklistUI {
     this.render();
   }
 
-  private positionMobileExpanded(): void {
+  private positionMobileExpanded(anchorBeforeToggle?: DOMRect): void {
     if (!this.mobile || !this.state.mobileExpanded) {
+      this.root.classList.remove('checklist--anchored');
       for (const prop of ['top', 'bottom', 'left', 'right', 'width', 'maxHeight'] as const) {
         this.root.style.removeProperty(prop);
       }
       return;
     }
-    requestAnimationFrame(() => {
-      const anchor = this.ringBtn.getBoundingClientRect();
-      if (anchor.width < 2) return;
-      const layout = document.body.dataset.layout;
-      const margin = 8;
-      this.root.style.width = `min(360px, calc(100vw - 24px))`;
-      this.root.style.left = `${Math.max(12, anchor.left)}px`;
-      this.root.style.right = 'auto';
-      if (layout === 'map') {
-        this.root.style.top = 'auto';
-        this.root.style.bottom = `${Math.max(12, window.innerHeight - anchor.top + margin)}px`;
-        this.root.style.maxHeight = `${Math.max(120, anchor.top - margin - 12)}px`;
-      } else {
-        this.root.style.bottom = 'auto';
-        this.root.style.top = `${anchor.bottom + margin}px`;
-        this.root.style.maxHeight = `${Math.max(120, window.innerHeight - anchor.bottom - margin - 12)}px`;
-      }
-    });
+    const anchor = anchorBeforeToggle ?? this.ringBtn.getBoundingClientRect();
+    if (anchor.width < 2) return;
+    const layout = document.body.dataset.layout;
+    const margin = 8;
+    const width = Math.min(360, window.innerWidth - 24);
+    let left = Math.min(Math.max(12, anchor.left), window.innerWidth - width - 12);
+    let top: number;
+    let bottom: number | null = null;
+    let maxH: number;
+    if (layout === 'map') {
+      bottom = Math.max(12, window.innerHeight - anchor.top + margin);
+      maxH = Math.min(window.innerHeight * 0.52, anchor.top - margin - 12);
+      top = NaN;
+    } else {
+      top = anchor.bottom + margin;
+      maxH = Math.min(window.innerHeight * 0.52, window.innerHeight - top - 12);
+    }
+    if (!Number.isNaN(top)) {
+      top = Math.min(Math.max(12, top), window.innerHeight - 120);
+    }
+    this.root.classList.add('checklist--anchored');
+    this.root.style.width = `${width}px`;
+    this.root.style.left = `${left}px`;
+    this.root.style.right = 'auto';
+    if (bottom != null) {
+      this.root.style.bottom = `${bottom}px`;
+      this.root.style.top = 'auto';
+    } else {
+      this.root.style.top = `${top}px`;
+      this.root.style.bottom = 'auto';
+    }
+    this.root.style.maxHeight = `${Math.max(120, maxH)}px`;
   }
 
   private applyLayoutClasses(): void {
@@ -317,7 +333,7 @@ export class ChecklistUI {
     this.root.classList.toggle('checklist--panel-open', this.mobile && this.panelOpen);
     this.root.classList.toggle('checklist--complete', done >= total);
     this.root.classList.toggle('checklist--skipped', this.state.skipped);
-    this.positionMobileExpanded();
+    if (this.mobile && this.state.mobileExpanded) this.positionMobileExpanded();
   }
 
   complete(step: ChecklistStepId): void {

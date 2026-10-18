@@ -141,7 +141,7 @@ export class ChromeUI {
       if (this.mobileSheet) {
         const sheet = this.root.querySelector('.chrome__intro')?.getBoundingClientRect();
         const bottom = sheet ? Math.ceil(window.innerHeight - sheet.top + 8) : 280;
-        return { left: 0, top: 72, right: 0, bottom };
+        return { left: 0, top: 12, right: 0, bottom };
       }
       return { left: 0, top: 72, right: 0, bottom: 72 };
     }

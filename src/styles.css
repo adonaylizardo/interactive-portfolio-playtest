@@ -657,7 +657,7 @@ body[data-layout='panel'] .checklist {
     display: none !important;
   }
 
-  body[data-chrome='phone'] .checklist--mobile:not(.checklist--mobile-closed) {
+  body[data-chrome='phone'] .checklist--mobile:not(.checklist--mobile-closed):not(.checklist--anchored) {
     position: fixed;
     top: auto;
     left: max(12px, env(safe-area-inset-left));
@@ -669,6 +669,14 @@ body[data-layout='panel'] .checklist {
     transform: none;
     z-index: 24;
     border-radius: 16px;
+  }
+
+  .checklist.checklist--mobile.checklist--anchored {
+    position: fixed !important;
+    right: auto !important;
+    z-index: 28;
+    border-radius: 16px;
+    overflow: auto;
   }
 
   body[data-chrome='phone'][data-layout='split'] .checklist--mobile:not(.checklist--mobile-closed) {

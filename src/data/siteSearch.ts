@@ -247,7 +247,7 @@ export function searchTypeChips(): SearchTypeChip[] {
     'talks',
     'achievements',
     'landmarks',
-    'about',
+    'contact',
   ];
   const labels: Record<SearchResultKind, Parameters<typeof t>[0]> = {
     cases: 'search.group.cases',
@@ -313,4 +313,47 @@ export function searchSite(query: string): SearchResultGroup[] {
       label: t(labels[kind]),
       items: byKind.get(kind)!,
     }));
+}
+
+/** Chip filter: all items of a type (optional query narrows within that type). */
+export function searchResultsForKind(
+  kind: SearchResultKind,
+  query = '',
+): SearchResultGroup | null {
+  void getLang();
+  const q = query.trim();
+  const labels: Record<SearchResultKind, Parameters<typeof t>[0]> = {
+    cases: 'search.group.cases',
+    articles: 'search.group.articles',
+    talks: 'search.group.talks',
+    achievements: 'search.group.achievements',
+    landmarks: 'search.group.landmarks',
+    contact: 'search.group.contact',
+    about: 'search.group.about',
+  };
+
+  const scored = getIndex()
+    .filter((row) => row.kind === kind)
+    .map((row) => {
+      const score = q ? matchScore(row.haystack, q) : 1;
+      const snippet =
+        row.kind === 'about'
+          ? excerpt(row.haystack.replace(row.title, '').trim() || row.haystack, q || row.title)
+          : excerpt(row.snippet || row.haystack, q || row.title);
+      return { ...row, snippet, score };
+    })
+    .filter((r) => r.score > 0);
+
+  scored.sort((a, b) => b.score - a.score);
+  const seen = new Set<string>();
+  const items: SearchResult[] = [];
+  for (const row of scored) {
+    const key = `${row.targetId}:${row.title}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push(row);
+    if (items.length >= 20) break;
+  }
+  if (!items.length) return null;
+  return { kind, label: t(labels[kind]), items };
 }
