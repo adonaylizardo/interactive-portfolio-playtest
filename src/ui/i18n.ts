@@ -265,7 +265,7 @@ const DICT = {
     'talks.openVideo': 'Abrir video en una pestaña nueva',
 
     'read.title': 'Leer',
-    'read.listIntro': 'Contenido del portafolio sin el mapa: casos, estudio, charlas, artículos y landmarks.',
+    'read.listIntro': 'Contenido del portafolio sin el mapa: casos, estudio, charlas, artículos y lugares.',
     'read.backToMap': 'Volver al mapa',
     'read.backToList': 'Volver a la lista',
     'read.section.about': 'Estudio',

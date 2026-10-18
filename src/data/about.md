@@ -81,6 +81,6 @@ Teams don't need micromanaging. Focus on empowering them with guidance, trust, a
 
 ### And above all, treat others with kindness and respect ✨.
 
-If you read to this point, I’m gonna mention some fun facts 😛: I am also an enthusiast of [rock climbing](https://www.instagram.com/p/CYHF6WjFF8J/), [meditation](https://www.instagram.com/p/Bfv0j-QnIv5/), [stock market investing](https://adonay.design/projects-database/earning-wealth-without-working-too-hard), and [pro-bono activities](https://adplist.org/mentors/adonay-lizardo) for the design community.
+If you read to this point, I’m gonna mention some fun facts 😛: I am also an enthusiast of [rock climbing](https://www.instagram.com/p/CYHF6WjFF8J/), [meditation](https://www.instagram.com/p/Bfv0j-QnIv5/), [stock market investing](https://adonaylizardo.com/projects-database/earning-wealth-without-working-too-hard), and [pro-bono activities](https://adplist.org/mentors/adonay-lizardo) for the design community.
 
 Ps.[ Design is so noble that eventually I was able to reach space and fulfill my childhood dream 🧑‍🚀🔭](https://adonaylizardo.com/writing-database/pixels-in-orbit-a-short-story-about-how-my-designs-made-it-to-space)

@@ -52,6 +52,12 @@ export const CASE_CARD_TITLES: Record<CaseHouseId, string> = {
   pg: 'P&G',
 };
 
+/** Map / reading card title (mentoria is localized). */
+export function caseCardTitle(id: CaseHouseId, lang: 'en' | 'es'): string {
+  if (id === 'mentoria') return lang === 'en' ? 'Mentoring' : 'Mentoría';
+  return CASE_CARD_TITLES[id];
+}
+
 function sectionHeadings(blocks: CaseBlock[]): string[] {
   return blocks.flatMap((block) => (block.kind === 'section' && block.heading ? [block.heading] : []));
 }

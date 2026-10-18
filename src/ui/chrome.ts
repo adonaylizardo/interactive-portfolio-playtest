@@ -44,7 +44,7 @@ function caseRowSummary(id: CaseHouseId): string {
 }
 
 const CV_HREF = `${import.meta.env.BASE_URL}cv/adonay-lizardo-cv.pdf`;
-const CONTACT_HREF = 'mailto:hello@adonaylizardo.com';
+const CONTACT_HREF = 'mailto:adolizardo@gmail.com';
 
 function roundBtn(icon: IconName, label: string, extra = '', action?: string): string {
   const act = action ? ` data-action="${action}"` : '';

@@ -887,6 +887,8 @@ export class BuildingPanel {
         : (preview?.teaserFull ?? preview?.teaser ?? title);
     }
     if (this.readLede) this.readLede.textContent = subtitle;
+    const hero = this.el.querySelector('.case-read__hero');
+    if (hero) hero.classList.add('case-read__hero--neutral');
     if (this.readHeroLabel) {
       this.readHeroLabel.textContent = '';
       this.readHeroLabel.hidden = true;
@@ -1133,5 +1135,8 @@ export class BuildingPanel {
     if (read) read.textContent = t('panel.readCase');
     const back = this.el.querySelector('[data-exp-back]') as HTMLElement | null;
     if (back) back.setAttribute('aria-label', t('experience.back'));
+    this.el.querySelectorAll('[data-exp-expand]').forEach((el) => {
+      el.setAttribute('aria-label', t('panel.expandSheet'));
+    });
   }
 }

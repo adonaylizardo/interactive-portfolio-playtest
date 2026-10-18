@@ -1,13 +1,44 @@
 import type { TalkItem, TalkSection, WritingItem } from '../data/experiences';
 import { getLang, t, type I18nKey } from './i18n';
 
-function formatContentDate(raw: string): string {
-  const parsed = Date.parse(raw);
-  if (Number.isNaN(parsed)) return raw;
+/** Calendar-safe dates for YYYY-MM-DD / YYYY-MM / YYYY (avoids UTC midnight off-by-one). */
+export function formatContentDate(raw: string): string {
+  const trimmed = raw.trim();
   const locale = getLang() === 'es' ? 'es-VE' : 'en-US';
-  return new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'long', day: 'numeric' }).format(
-    new Date(parsed),
-  );
+
+  if (/^\d{4}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  const ym = trimmed.match(/^(\d{4})-(\d{2})$/);
+  if (ym) {
+    const y = Number(ym[1]);
+    const m = Number(ym[2]) - 1;
+    if (m >= 0 && m <= 11) {
+      return new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'long' }).format(
+        new Date(y, m, 1),
+      );
+    }
+  }
+
+  const ymd = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (ymd) {
+    const y = Number(ymd[1]);
+    const m = Number(ymd[2]) - 1;
+    const d = Number(ymd[3]);
+    return new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'long', day: 'numeric' }).format(
+      new Date(y, m, d),
+    );
+  }
+
+  const parsed = Date.parse(trimmed);
+  if (Number.isNaN(parsed)) return raw;
+  return new Intl.DateTimeFormat(locale, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(parsed));
 }
 
 export function writingTitle(item: WritingItem): string {

@@ -16,6 +16,7 @@ import {
   isReadingHash,
   leaveReadingHash,
   navigateReading,
+  noteReadingPopstate,
   parseReadingRoute,
 } from './ui/readingRoute';
 import { ReadingView } from './ui/readingView';
@@ -29,6 +30,7 @@ import { Joystick } from './ui/joystick';
 import { BuildingMapLabels } from './ui/buildingMapLabels';
 import { NameLabels } from './ui/nameLabels';
 import { hideToast, showToast } from './ui/toast';
+import { formatContentDate } from './ui/contentLabels';
 import { getLang, onLangChange, setLang, t } from './ui/i18n';
 import type { Camera } from './tokens';
 
@@ -159,11 +161,11 @@ async function main(): Promise<void> {
         if (interiorId === 'teresa') {
           studio.clearSubtitle();
           chrome.setInteriorOpen(false, { skipLayout: true });
-          panel.showTalks(b.panelTitle, interiorId);
+          panel.showTalks(t('panel.talks'), interiorId);
         } else if (interiorId === 'biblioteca') {
           studio.clearSubtitle();
           chrome.setInteriorOpen(false, { skipLayout: true });
-          panel.showWritings(b.panelTitle, interiorId);
+          panel.showWritings(t('panel.writings'), interiorId);
         } else {
           chrome.setInteriorOpen(true);
           panel.showInterior(b.panelTitle, interiorId);
@@ -304,7 +306,10 @@ async function main(): Promise<void> {
   }
 
   window.addEventListener('hashchange', () => syncNavigationFromHistory());
-  window.addEventListener('popstate', () => syncNavigationFromHistory());
+  window.addEventListener('popstate', () => {
+    noteReadingPopstate();
+    syncNavigationFromHistory();
+  });
 
   (window as unknown as { __playtestQa?: Record<string, unknown> }).__playtestQa = {
     validateWalkGridFootprint,
@@ -401,6 +406,7 @@ async function main(): Promise<void> {
     audioMuted: () => studio.isMuted(),
     audioUnlocked: () => studio.isUnlocked(),
     setAudioMuted: (muted: boolean) => studio.setMuted(muted),
+    formatContentDate: (raw: string) => formatContentDate(raw),
     soundHint: () => {
       const el = document.querySelector('.chrome__sound') as HTMLElement | null;
       if (!el) return { present: false, visible: false, opacity: 0, hint: '' };

@@ -823,18 +823,18 @@ body[data-layout='panel'] #game-canvas {
 .chrome--mobile .chrome__sound {
   left: 50%;
   transform: translateX(-50%);
-  top: 80px;
+  top: 132px;
   bottom: auto;
   width: 240px;
   max-width: calc(100vw - 32px);
 }
 
 .chrome--dock .chrome__sound {
-  top: 80px;
+  top: 132px;
 }
 
 .chrome--sheet .chrome__sound {
-  top: 80px;
+  top: 132px;
 }
 
 .chrome--mobile .chrome__subtitle {
