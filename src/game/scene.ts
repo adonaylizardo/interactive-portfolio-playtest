@@ -1813,13 +1813,18 @@ export class IsoScene {
     if (!this.jac?.driving || this.jac.isExiting()) return false;
     if (performance.now() < this.suppressDriveTapUntil) return false;
     const sit = this.jac.parkForDoor(entry.door.x, entry.door.y);
+    const alongNow = this.jac.doorSideAlong(entry.door.x, entry.door.y);
+    const distDoorNow = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
+    const atDoor = alongNow >= 0 && distDoorNow <= 6;
     if (!sit) {
+      if (!atDoor) return false;
       this.pendingDriveEnter = entry;
       this.jacGetOut({ thenEnter: true });
       return true;
     }
     const path = sit.path.length > 0 ? sit.path : this.jac.findDrivePath(sit.x, sit.y);
     if (!path) {
+      if (!atDoor) return false;
       this.pendingDriveEnter = entry;
       this.jacGetOut({ thenEnter: true });
       return true;
@@ -1829,21 +1834,19 @@ export class IsoScene {
     this.pendingDriveEnter = entry;
     this.pendingDriveEnterAt = performance.now();
     const dest = path.length > 0 ? path[path.length - 1] : sit;
-    const alongNow = this.jac.doorSideAlong(entry.door.x, entry.door.y);
-    const distDoorNow = Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y);
     const atSit = path.length === 0 || (Math.hypot(this.jac.cx - dest.x, this.jac.cy - dest.y) < 1.2 && this.jac.mph < 1);
-    if (atSit && alongNow >= 0 && distDoorNow <= 5.5) {
+    if (atSit && atDoor) {
       this.jacGetOut({ thenEnter: true });
       return true;
     }
     if (path.length === 0) {
+      if (!atDoor) return false;
       this.jacGetOut({ thenEnter: true });
       return true;
     }
     this.qaLastDriveTap = { x: dest.x, y: dest.y };
     this.qaPointerDriveAccepts += 1;
     this.jac.setDrivePath(path, dest, { loose: true });
-    this.schedulePathPreview();
     this.fireMoveCommand();
     return true;
   }
@@ -4274,17 +4277,12 @@ export class IsoScene {
     const distDoor = Math.hypot(this.jac.cx - door.x, this.jac.cy - door.y);
     const idle = this.jac.drivePath.length === 0 && !this.jac.driveGoal;
     const along = this.jac.doorSideAlong(door.x, door.y);
-    const hereOk = this.jac.canParkHere();
     const arrived = !!sit && distSit < 0.85 && this.jac.mph < 1.4;
-    const doorSideSit = hereOk && this.jac.mph < 1.2 && along >= 0 && distDoor <= 10;
+    const doorSideSit = this.jac.mph < 1.2 && along >= 0 && distDoor <= 10;
     if (arrived || doorSideSit) {
       if (sit && distSit < 1.1) {
         this.jac.cx = sit.x;
         this.jac.cy = sit.y;
-      }
-      if (!this.jac.canParkHere() && !arrived) {
-        this.retryDriveEnterOrGetOut();
-        return;
       }
       this.jacGetOut({ thenEnter: true });
       return;
