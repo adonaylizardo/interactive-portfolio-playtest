@@ -18,6 +18,7 @@ import {
   getBuildingAt,
   getBuildingAtDoor,
   getBuildingByName,
+  getEnterableBuildings,
   getSceneryAt,
   INICIO,
   MAP_HEIGHT,
@@ -875,20 +876,64 @@ export class IsoScene {
       this.refreshTileTextures();
       this.syncObjectSprites(true);
       await loadKeys(remainingMapKeys(loadedSpriteKeys()));
-      this.ensureVisibleTiles();
+      await loadKeys(allSpriteKeys().filter((k) => k.endsWith('/lejos')));
+      await loadBuildingStateSprites();
+      this.ensureAllTiles();
+      this.prewarmDoorNeighborhoods();
       this.syncObjectSprites(true);
+      this.uploadTownGpu();
+      this.app.render();
       this.queueTileBackfill();
     })();
-    window.setTimeout(() => {
-      void loadKeys(allSpriteKeys().filter((k) => k.endsWith('/lejos'))).then(() => this.syncObjectSprites(true));
-    }, 800);
-    window.setTimeout(() => {
-      void loadBuildingStateSprites().then(() => this.syncObjectSprites(true));
-    }, 2500);
     void loadSpriteProbes();
     if (this.npcs.isEnabled()) this.loadNpcs();
-    const fillLoad = this.fillActors.load(hi).then(() => this.cullVisibleTiles());
+    const fillLoad = this.fillActors.load(hi).then(() => {
+      this.cullVisibleTiles();
+      this.uploadTownGpu();
+    });
     void Promise.allSettled([fillLoad, this.buildNoah()]).then(prefetchRestSheets);
+  }
+
+  /** Create tiles around every door so a later tap does not spawn Flor-area sprites. */
+  private prewarmDoorNeighborhoods(): void {
+    for (const b of getEnterableBuildings()) {
+      if (!b.door) continue;
+      const x0 = Math.max(0, b.door.x - 12);
+      const x1 = Math.min(MAP_WIDTH - 1, b.door.x + 12);
+      const y0 = Math.max(0, b.door.y - 12);
+      const y1 = Math.min(MAP_HEIGHT - 1, b.door.y + 12);
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) this.ensureTile(x, y);
+      }
+    }
+  }
+
+  /** Push decoded map textures to the GPU before the first 4× door-tap frame. */
+  private uploadTownGpu(): void {
+    const r = this.app.renderer;
+    const upload = (tex?: Texture | null) => {
+      const src = tex?.source;
+      if (!src) return;
+      try {
+        r.texture.initSource(src);
+      } catch {
+        /* already on the GPU */
+      }
+    };
+    for (const key of loadedSpriteKeys()) {
+      if (spritesLoaded(key)) upload(spriteTexture(key));
+    }
+    for (const { g } of this.tileCullEntries) upload(g.texture);
+    for (const v of this.objectVisuals.values()) upload(v.sprite.texture);
+  }
+
+  /** Finish tile sprites + GPU upload so a door tap does not pay first-frame create/upload. */
+  private flushTownWarm(): void {
+    this.ensureAllTiles();
+    this.prewarmDoorNeighborhoods();
+    this.syncObjectSprites(true);
+    this.uploadTownGpu();
+    this.app.render();
   }
 
   private queueTileBackfill(): void {
@@ -4218,6 +4263,7 @@ export class IsoScene {
     this.avatar.setVisible(false);
     this.startCameraFollow();
     void this.jac.ensureLoaded();
+    this.flushTownWarm();
   }
 
   jacGetOut(opts?: { thenEnter?: boolean }): void {
@@ -4858,6 +4904,7 @@ export class IsoScene {
     const aim = this.freeRectCenter();
     this.placeWorldAtScreen(mid.x, mid.y - 40, aim.x, aim.y);
     this.applyCamera(false);
+    this.flushTownWarm();
   }
 
   /** Client coordinates for tapping the drawn door of a building (QA). */
@@ -4906,6 +4953,7 @@ export class IsoScene {
   setZoomLevel(level: number, anchorScreen?: { x: number; y: number }): void {
     this.setZoom(level, anchorScreen);
     this.applyCamera(false);
+    this.flushTownWarm();
   }
 
   /** QA: synthetic map tap (scenery / ground) matching player pointer routing. */

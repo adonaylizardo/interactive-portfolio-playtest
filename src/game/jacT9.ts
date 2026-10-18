@@ -732,7 +732,7 @@ export class JacT9 {
   private solvePark(
     doorX: number,
     doorY: number,
-    bfsBudget: number,
+    _bfsBudget: number,
   ): { x: number; y: number; path: { x: number; y: number }[]; heading: FacingDir } | null {
     const sx = Math.round(this.cx);
     const sy = Math.round(this.cy);
@@ -741,41 +741,124 @@ export class JacT9 {
     );
     const doorSide = usable.filter((c) => c.along >= 0);
     const closeEnough = doorSide.filter((c) => Math.hypot(c.x - doorX, c.y - doorY) <= 8);
-    const front = closeEnough.filter((c) => c.along >= 1 && c.doorD >= 3 && c.doorD <= 5);
-    const pool = front.length ? front : closeEnough.length ? closeEnough : doorSide.length ? doorSide : usable;
+    const pool = closeEnough.length ? closeEnough : doorSide.length ? doorSide : usable;
+    if (pool.length === 0) return null;
     const prefer = (c: DoorSit) => (cells[c.y]?.[c.x]?.groundId?.includes('park') ? 0 : 1);
     const closeness = (c: DoorSit) => Math.abs(c.doorD - 3.5);
     const doorHug = (c: DoorSit) => (this.parkTouchesDoor(c.x, c.y, c.heading, doorX, doorY) ? 1 : 0);
+    const front = (c: DoorSit) => (c.along >= 1 && c.doorD >= 3 && c.doorD <= 5 ? 0 : 1);
     const origin = k(sx, sy);
-    const pathLen = (c: DoorSit) => {
-      const cached = this.pathsFrom === origin ? this.pathToSit.get(k(c.x, c.y)) : undefined;
-      return cached ? cached.length : Math.abs(c.x - sx) + Math.abs(c.y - sy);
-    };
-    const reach = (c: DoorSit) => pathLen(c) + closeness(c) * 2 + c.walkD * 0.15;
-    const ranked = pool.filter((c) => !doorHug(c));
-    const order = (ranked.length ? ranked : pool)
-      .slice()
-      .sort((a, b) => doorHug(a) - doorHug(b) || prefer(a) - prefer(b) || reach(a) - reach(b) || b.along - a.along);
-    let searches = 0;
-    for (const cand of order) {
-      const cached = this.pathsFrom === origin ? this.pathToSit.get(k(cand.x, cand.y)) : undefined;
-      let found = cached;
-      if (!found) {
-        found =
-          this.axisDrivePath(sx, sy, cand.x, cand.y, (x, y) => this.driveBoxWalkable(x, y) || (x === sx && y === sy)) ??
-          undefined;
-      }
-      if (!found) {
-        if (searches >= bfsBudget) continue;
-        searches += 1;
-        found = this.driveBfsTo(cand.x, cand.y) ?? undefined;
-      }
-      if (!found) continue;
-      if (!this.pathReachesSit(found, cand.x, cand.y, sx, sy)) continue;
-      if (this.pathsFrom === origin) this.pathToSit.set(k(cand.x, cand.y), found);
-      return { x: cand.x, y: cand.y, path: found, heading: cand.heading };
+    const exit = this.nearestRoadExit(sx, sy);
+    const goals = new Set(pool.map((c) => k(c.x, c.y)));
+    const fromExit = this.driveBfsMany(exit.x, exit.y, goals);
+    const pass = (x: number, y: number) => this.driveBoxWalkable(x, y) || (x === exit.x && y === exit.y);
+    const scored: { c: DoorSit; path: { x: number; y: number }[] }[] = [];
+    for (const cand of pool) {
+      const rest =
+        this.axisDrivePath(exit.x, exit.y, cand.x, cand.y, pass) ??
+        fromExit.get(k(cand.x, cand.y));
+      if (!rest && !(cand.x === exit.x && cand.y === exit.y)) continue;
+      const path = exit.path.concat(rest ?? []);
+      if (!this.pathReachesSit(path, cand.x, cand.y, sx, sy)) continue;
+      if (this.pathsFrom === origin) this.pathToSit.set(k(cand.x, cand.y), path);
+      scored.push({ c: cand, path });
     }
-    return null;
+    scored.sort(
+      (a, b) =>
+        doorHug(a.c) - doorHug(b.c) ||
+        a.path.length - b.path.length ||
+        front(a.c) - front(b.c) ||
+        prefer(a.c) - prefer(b.c) ||
+        closeness(a.c) - closeness(b.c) ||
+        a.c.walkD - b.c.walkD,
+    );
+    const best = scored[0];
+    return best ? { x: best.c.x, y: best.c.y, path: best.path, heading: best.c.heading } : null;
+  }
+
+  private isStreetCell(x: number, y: number): boolean {
+    return cells[y]?.[x]?.groundId.includes('path/street') ?? false;
+  }
+
+  /** 2×2 drive box overlaps a carved street — the van is on the road network. */
+  private onRoad(cx: number, cy: number): boolean {
+    const o = {
+      x: Math.round(cx - (DRIVE_BOX - 1) / 2),
+      y: Math.round(cy - (DRIVE_BOX - 1) / 2),
+    };
+    for (const [x, y] of this.rect(o.x, o.y, DRIVE_BOX, DRIVE_BOX)) {
+      if (this.isStreetCell(x, y)) return true;
+    }
+    return false;
+  }
+
+  /** Closest 2×2-walkable road cell, and the short hop off the lot onto it. */
+  private nearestRoadExit(sx: number, sy: number): { x: number; y: number; path: { x: number; y: number }[] } {
+    const pass = (x: number, y: number) => this.driveBoxWalkable(x, y) || (x === sx && y === sy);
+    if (this.onRoad(sx, sy) && pass(sx, sy)) return { x: sx, y: sy, path: [] };
+    const seen = new Set<string>([k(sx, sy)]);
+    type Node = { x: number; y: number; parent: Node | null };
+    const q: Node[] = [{ x: sx, y: sy, parent: null }];
+    for (let i = 0; i < q.length; i++) {
+      const cur = q[i];
+      if ((cur.x !== sx || cur.y !== sy) && this.onRoad(cur.x, cur.y) && this.driveBoxWalkable(cur.x, cur.y)) {
+        return { x: cur.x, y: cur.y, path: this.reconstructDrivePath(cur, sx, sy) };
+      }
+      for (const [dx, dy] of CARDINALS) {
+        const nx = cur.x + dx;
+        const ny = cur.y + dy;
+        const id = k(nx, ny);
+        if (seen.has(id) || !pass(nx, ny)) continue;
+        seen.add(id);
+        q.push({ x: nx, y: ny, parent: cur });
+      }
+    }
+    return { x: sx, y: sy, path: [] };
+  }
+
+  private reconstructDrivePath(
+    node: { x: number; y: number; parent: { x: number; y: number; parent: unknown } | null },
+    sx: number,
+    sy: number,
+  ): { x: number; y: number }[] {
+    const path: { x: number; y: number }[] = [];
+    let n: { x: number; y: number; parent: { x: number; y: number; parent: unknown } | null } | null = node;
+    while (n) {
+      path.push({ x: n.x, y: n.y });
+      n = n.parent as typeof n;
+    }
+    path.reverse();
+    if (path[0]?.x === sx && path[0]?.y === sy) path.shift();
+    return path;
+  }
+
+  /** One flood fill to every sit — shortest 2×2 route in tiles, not Manhattan. */
+  private driveBfsMany(
+    sx: number,
+    sy: number,
+    goals: Set<string>,
+  ): Map<string, { x: number; y: number }[]> {
+    const out = new Map<string, { x: number; y: number }[]>();
+    if (goals.has(k(sx, sy))) out.set(k(sx, sy), []);
+    if (out.size >= goals.size) return out;
+    const pass = (x: number, y: number) => this.driveBoxWalkable(x, y) || (x === sx && y === sy);
+    const seen = new Set<string>([k(sx, sy)]);
+    type Node = { x: number; y: number; parent: Node | null };
+    const q: Node[] = [{ x: sx, y: sy, parent: null }];
+    for (let i = 0; i < q.length && out.size < goals.size; i++) {
+      const cur = q[i];
+      for (const [dx, dy] of CARDINALS) {
+        const nx = cur.x + dx;
+        const ny = cur.y + dy;
+        const id = k(nx, ny);
+        if (seen.has(id) || !pass(nx, ny)) continue;
+        seen.add(id);
+        const next: Node = { x: nx, y: ny, parent: cur };
+        q.push(next);
+        if (goals.has(id)) out.set(id, this.reconstructDrivePath(next, sx, sy));
+      }
+    }
+    return out;
   }
 
   /** Integer sit the 2×2 drive box can occupy on the collision grid. */
@@ -884,43 +967,6 @@ export class JacT9 {
       }
     }
     return false;
-  }
-
-  /** Cardinal BFS on the 2×2 drive grid — no sorted A*. */
-  private driveBfsTo(tx: number, ty: number): { x: number; y: number }[] | null {
-    const sx = Math.round(this.cx);
-    const sy = Math.round(this.cy);
-    if (sx === tx && sy === ty) return [];
-    const pass = (x: number, y: number) => this.driveBoxWalkable(x, y) || (x === sx && y === sy);
-    if (!pass(tx, ty)) return null;
-    const cheap = this.axisDrivePath(sx, sy, tx, ty, pass);
-    if (cheap) return cheap;
-    const seen = new Set<string>([k(sx, sy)]);
-    type Node = { x: number; y: number; parent: Node | null };
-    const q: Node[] = [{ x: sx, y: sy, parent: null }];
-    for (let i = 0; i < q.length; i++) {
-      const cur = q[i];
-      if (cur.x === tx && cur.y === ty) {
-        const path: { x: number; y: number }[] = [];
-        let n: Node | null = cur;
-        while (n) {
-          path.push({ x: n.x, y: n.y });
-          n = n.parent;
-        }
-        path.reverse();
-        if (path[0]?.x === sx && path[0]?.y === sy) path.shift();
-        return path;
-      }
-      for (const [dx, dy] of CARDINALS) {
-        const nx = cur.x + dx;
-        const ny = cur.y + dy;
-        const id = k(nx, ny);
-        if (seen.has(id) || !pass(nx, ny)) continue;
-        seen.add(id);
-        q.push({ x: nx, y: ny, parent: cur });
-      }
-    }
-    return null;
   }
 
   private axisDrivePath(
@@ -1661,9 +1707,12 @@ export class JacT9 {
     const steer = Math.max(-1, Math.min(1, err * 2));
     const goalSlow = goalDist < 2.2 ? Math.max(0.28, goalDist / 2.2) : 1;
     this.followDir = wantDir;
+    const straight = this.pathStraightAhead(wantDir);
+    const headingOnAxis = Math.abs(err) < 0.28;
     let throttle = goalSlow;
     if (this.dir !== wantDir) {
-      throttle = goalDist < 2.2 ? 0.35 : 0;
+      // Full cruise on a long same-axis run; stop-to-turn only at the actual corner.
+      throttle = straight >= 2 && headingOnAxis ? goalSlow : goalDist < 2.2 ? 0.35 : 0;
       if (goalDist > 2.8) this.stuckT = 0;
       if (this.gear === 'R') this.gear = 'D';
     }
@@ -1763,6 +1812,25 @@ export class JacT9 {
       y = p.y;
     }
     return { x, y };
+  }
+
+  /** How far the remaining polyline stays on `dir`'s axis before the next corner. */
+  private pathStraightAhead(dir: FacingDir): number {
+    const v = DIR_VEC[dir];
+    let x = this.cx;
+    let y = this.cy;
+    let n = 0;
+    for (const p of this.drivePath) {
+      const dx = p.x - x;
+      const dy = p.y - y;
+      const along = dx * v.x + dy * v.y;
+      const side = Math.abs(dx * v.y - dy * v.x);
+      if (along < -0.05 || side > 0.35) break;
+      n += Math.hypot(dx, dy);
+      x = p.x;
+      y = p.y;
+    }
+    return n;
   }
 
   private noteGoalProgress(dt: number): void {
