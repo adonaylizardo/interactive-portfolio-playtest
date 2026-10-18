@@ -136,10 +136,14 @@ export function leaveReadingHash(): void {
   const target = saved && saved.startsWith('#') ? `${base}${saved}` : base;
   const depth = readingDepth();
 
-  if (depth === 1 && saved) {
+  if (depth >= 1) {
     skipNextReadingPopstateDepth = true;
     setReadingDepth(0);
-    history.back();
+    if (depth === 1) {
+      history.back();
+    } else {
+      history.go(-depth);
+    }
     return;
   }
 

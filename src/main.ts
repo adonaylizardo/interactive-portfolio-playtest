@@ -67,6 +67,7 @@ async function main(): Promise<void> {
     scene?.setReadingPaused(false);
     mapLabels.setHidden(false);
     if (!isMobileLayout()) chrome.setLayout('split');
+    else chrome.restoreMobileSheetAfterReading();
     scene?.applyCameraFromUi();
   };
 
@@ -90,7 +91,7 @@ async function main(): Promise<void> {
       if (!isMobileLayout()) {
         if (chrome.getLayout() === 'panel') chrome.setLayout('split');
       } else {
-        chrome.setLayout('map');
+        chrome.restoreMobileSheetAfterReading();
       }
     }
     scene?.applyCameraFromUi();
@@ -99,8 +100,6 @@ async function main(): Promise<void> {
   const closeReading = (): void => {
     leaveReadingHash();
     syncReadingFromHash();
-    if (!isMobileLayout()) chrome.setLayout('split');
-    else chrome.restoreMobileSheetAfterReading();
   };
 
   const reading = new ReadingView(uiRoot, closeReading);

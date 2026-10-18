@@ -268,7 +268,7 @@ export class ChromeUI {
               </div>
               <div class="chrome__logro">
                 <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
-                <p data-i18n="chrome.achievement2">Propose and lead the Bain Designers Guild</p>
+                <p data-i18n="chrome.achievement2">Proposed and lead the Bain Designers Guild</p>
               </div>
               <div class="chrome__logro">
                 <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>

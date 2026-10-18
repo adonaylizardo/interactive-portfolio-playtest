@@ -731,9 +731,9 @@ body[data-layout='panel'] .checklist {
   position: absolute;
   top: 0;
   right: 0;
-  min-width: 68px;
-  min-height: 36px;
-  padding: 8px 16px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px 16px;
   border: 1px solid #2a2c31;
   border-radius: 999px;
   background: #141518;
@@ -875,7 +875,21 @@ body[data-layout='panel'] .checklist {
 }
 
 @media (max-width: 767px) {
-  .building-panel--experience.building-panel--open:not(.building-panel--peek) .building-panel__sheet {
+  .building-panel--experience:not(.building-panel--writings).building-panel--open:not(.building-panel--peek)
+    .building-panel__sheet {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    max-height: min(42vh, 340px);
+    border-radius: 16px 16px 0 0;
+    transform: none;
+    overflow-y: auto;
+  }
+
+  .building-panel--experience.building-panel--writings.building-panel--open:not(.building-panel--peek)
+    .building-panel__sheet {
     top: 0;
     bottom: 0;
     left: 64px;
@@ -1325,8 +1339,8 @@ body[data-layout='panel'] .checklist {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  min-width: 36px;
-  min-height: 36px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0;
   border: 0;
   border-radius: 8px;
@@ -1348,10 +1362,16 @@ body[data-layout='panel'] .checklist {
   flex: 1;
   min-width: 0;
   margin: 0;
-  font-size: 20px;
+  padding-right: 4px;
+  font-size: 18px;
   font-weight: 600;
   line-height: 1.25;
   color: #edeef0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  white-space: normal;
 }
 
 .exp-header__actions {
@@ -1589,33 +1609,34 @@ body[data-layout='panel'] .checklist {
 }
 
 /* Talks video player detail */
-.talks-player__stage--link {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 12px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  min-height: 0;
+.talks-player__media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #2a2c31;
+  background: #0b0c0e;
 }
 
 .talks-player__thumb {
   width: 100%;
-  aspect-ratio: 16 / 9;
+  height: 100%;
   object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid #2a2c31;
   display: block;
+  cursor: pointer;
 }
 
 .talks-player__open {
   align-self: flex-start;
   min-height: 44px;
+  min-width: 44px;
   padding: 10px 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  margin-bottom: 14px;
 }
 
 .talks-player__stage {
@@ -1957,12 +1978,6 @@ body[data-layout='panel'] .checklist {
   flex-direction: column;
 }
 
-.case-preview__read-meta {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
 .case-preview__read-label {
   font-size: 14px;
   line-height: 20px;
@@ -1972,11 +1987,22 @@ body[data-layout='panel'] .checklist {
 }
 
 .case-preview__read-meta {
-  height: 16px;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 16px;
   font-weight: 400;
   color: #8a8f98;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  .case-preview__read-meta {
+    font-size: 11px;
+    line-height: 14px;
+  }
 }
 
 .case-preview__read-go {

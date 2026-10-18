@@ -79,7 +79,7 @@ async function logrosCopy(page, lang, tag) {
         ]
       : [
           'Main speaker at Innova360, 200+ students',
-          'Propose and lead the Bain Designers Guild',
+          'Proposed and lead the Bain Designers Guild',
           'AI Transformation Lead, 5/7 phases',
           'ADPList 2023: 31 sessions, 15 countries',
         ];

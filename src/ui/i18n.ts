@@ -60,6 +60,8 @@ const DICT = {
     'panel.exit': 'Exit',
     'panel.close': 'Close',
     'panel.readCase': 'Read case',
+    'panel.workedWith': 'Worked with',
+    'panel.aboutMe': 'About me',
     'panel.caseTag': 'CASE',
     'panel.expandSheet': 'Expand panel',
     'panel.talks': 'Talks',
@@ -89,7 +91,8 @@ const DICT = {
     'talks.openVideo': 'Open video in new tab',
 
     'read.title': 'Read',
-    'read.listIntro': 'Portfolio content without the map — cases, studio, talks, articles, and landmarks.',
+    'read.listIntro':
+      'Portfolio content without the map — studio, experience, achievements, cases, talks, articles, and landmarks.',
     'read.backToMap': 'Back to map',
     'read.backToList': 'Back to list',
     'read.section.about': 'Studio',
@@ -156,7 +159,7 @@ const DICT = {
     'chrome.experience': 'Experience',
     'chrome.seeAll': 'See all',
     'chrome.achievement1': 'Main speaker at Innova360, 200+ students',
-    'chrome.achievement2': 'Propose and lead the Bain Designers Guild',
+    'chrome.achievement2': 'Proposed and lead the Bain Designers Guild',
     'chrome.achievement3': 'AI Transformation Lead, 5/7 phases',
     'chrome.achievement4': 'ADPList 2023: 31 sessions, 15 countries',
     'chrome.exp.volaris': 'Senior UX/UI Designer & Mentoring Program Lead · Applaudo · 2024–present',
@@ -236,6 +239,8 @@ const DICT = {
     'panel.exit': 'Salir',
     'panel.close': 'Cerrar',
     'panel.readCase': 'Leer caso',
+    'panel.workedWith': 'Trabajé con',
+    'panel.aboutMe': 'Sobre mí',
     'panel.caseTag': 'CASO',
     'panel.expandSheet': 'Expandir panel',
     'panel.talks': 'Charlas',
@@ -265,7 +270,8 @@ const DICT = {
     'talks.openVideo': 'Abrir video en una pestaña nueva',
 
     'read.title': 'Leer',
-    'read.listIntro': 'Contenido del portafolio sin el mapa: casos, estudio, charlas, artículos y lugares.',
+    'read.listIntro':
+      'Contenido del portafolio sin el mapa: estudio, experiencia, logros, casos, charlas, artículos y lugares.',
     'read.backToMap': 'Volver al mapa',
     'read.backToList': 'Volver a la lista',
     'read.section.about': 'Estudio',

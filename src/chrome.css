@@ -743,6 +743,21 @@ body[data-layout='panel'] #game-canvas {
 }
 
 @media (max-height: 500px) and (orientation: landscape) {
+  .chrome--mobile.chrome--landscape-side .chrome__tools-phone {
+    top: 12px;
+    left: auto;
+    right: 16px;
+  }
+
+  .chrome--mobile.chrome--landscape-side .chrome__lang {
+    top: 12px;
+    right: 16px;
+  }
+
+  .chrome--mobile.chrome--landscape-side .chrome__sound {
+    display: none !important;
+  }
+
   .chrome--mobile.chrome--landscape-side .chrome__rail {
     display: flex !important;
     background: #141518;

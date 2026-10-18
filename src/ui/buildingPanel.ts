@@ -235,11 +235,11 @@ export class BuildingPanel {
             <div class="case__version case__version--short"></div>
           </article>
           <section class="worked-with" aria-labelledby="worked-with-title" hidden>
-            <h3 class="worked-with__title" id="worked-with-title">Worked with</h3>
+            <h3 class="worked-with__title" id="worked-with-title" data-i18n="panel.workedWith">Worked with</h3>
             <ul class="worked-with__logos"></ul>
           </section>
           <section class="about" lang="en" aria-labelledby="about-title" hidden>
-            <h3 class="about__title" id="about-title">About me</h3>
+            <h3 class="about__title" id="about-title" data-i18n="panel.aboutMe">About me</h3>
           </section>
           <section class="experience" data-experience hidden>
             <p class="experience__intro"></p>
@@ -378,7 +378,17 @@ export class BuildingPanel {
     this.sheet.addEventListener('click', (e) => {
       e.stopPropagation();
     });
-    this.sheet.addEventListener('pointerdown', (e) => e.stopPropagation());
+    this.sheet.addEventListener('pointerdown', (e) => {
+      if (
+        this.isMobile() &&
+        this.mode === 'interior' &&
+        this.peekOnly &&
+        (e.target as HTMLElement).closest('[data-drag], .building-panel__title, .building-panel__bar')
+      ) {
+        this.onDragStart(e);
+      }
+      e.stopPropagation();
+    });
 
     const drag = this.el.querySelector('[data-drag]') as HTMLElement;
     drag.addEventListener('pointerdown', (e) => this.onDragStart(e));
@@ -669,6 +679,10 @@ export class BuildingPanel {
     if (this.isMobile() && this.peekOnly) this.setPeek(false);
   }
 
+  private openTalkUrl(url: string): void {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
   private renderTalkPlayer(item: TalkItem): void {
     if (!this.experienceDetail) return;
     const title = talkTitle(item);
@@ -677,14 +691,23 @@ export class BuildingPanel {
     const thumb = talkThumbnailUrl(item);
     const wrap = document.createElement('div');
     wrap.className = 'talks-player';
-    const stage = document.createElement('div');
-    stage.className = 'talks-player__stage talks-player__stage--link';
+    const media = document.createElement('div');
+    media.className = 'talks-player__media';
     if (thumb) {
       const img = document.createElement('img');
       img.className = 'talks-player__thumb';
       img.src = thumb;
       img.alt = '';
-      stage.appendChild(img);
+      img.tabIndex = 0;
+      img.role = 'button';
+      img.addEventListener('click', () => this.openTalkUrl(item.url));
+      img.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          this.openTalkUrl(item.url);
+        }
+      });
+      media.appendChild(img);
     }
     const open = document.createElement('a');
     open.className = 'ui-btn ui-btn--primary talks-player__open';
@@ -692,8 +715,7 @@ export class BuildingPanel {
     open.target = '_blank';
     open.rel = 'noopener noreferrer';
     open.textContent = t('talks.openVideo');
-    stage.appendChild(open);
-    wrap.append(stage);
+    wrap.append(media, open);
     const h3 = document.createElement('h3');
     h3.className = 'talks-player__title';
     h3.textContent = title;
@@ -1072,7 +1094,11 @@ export class BuildingPanel {
     if (this.isMobile()) {
       const peek = this.el.classList.contains('building-panel--peek');
       if (this.isExperienceMode() && !peek) {
-        return { left: Math.ceil(Math.min(sheet.width, window.innerWidth * 0.58) + 8), top: 0, right: 0, bottom: 0 };
+        if (this.mode === 'talks') {
+          const bottom = Math.min(sheet.height, Math.round(window.innerHeight * 0.42));
+          return { left: 0, top: 0, right: 0, bottom: Math.ceil(bottom + 8) };
+        }
+        return { left: Math.ceil(sheet.right + 8), top: 0, right: 0, bottom: 0 };
       }
       const bottom = peek ? Math.min(88, sheet.height) : sheet.height;
       return { left: 0, top: 0, right: 0, bottom: Math.ceil(bottom + 8) };
@@ -1093,10 +1119,8 @@ export class BuildingPanel {
 
   /** Mobile interior: outside sheet tap collapses expanded sheet or consumes (no map walk). */
   expandInteriorSheetForQa(): void {
-    if (!this.isMobile()) return;
-    this.peekOnly = false;
-    this.syncPeekClass();
-    this.onVisibilityChange();
+    if (!this.isMobile() || !this.isOpen()) return;
+    this.setPeek(false);
   }
 
   collapseToPeekOnly(): void {
@@ -1113,6 +1137,10 @@ export class BuildingPanel {
   }
 
   private applyI18n(): void {
+    this.el.querySelectorAll('[data-i18n]').forEach((el) => {
+      const key = (el as HTMLElement).dataset.i18n as Parameters<typeof t>[0];
+      if (key) el.textContent = t(key);
+    });
     const exit = this.el.querySelector('[data-exit]') as HTMLElement | null;
     if (exit) exit.textContent = t('panel.exit');
     this.el.querySelectorAll('[data-close]').forEach((el) => {
