@@ -11,7 +11,7 @@
   <frame id="199:2217" name="portada (placeholder)" x="16" y="85" width="343" height="193">
     <instance id="199:2218" name="ui/icono" x="164" y="89" width="15" height="15" />
   </frame>
-  <text id="199:2220" name="etiqueta" x="16" y="290" width="146" height="14" />
+  <text id="199:2220" name="etiqueta" x="16" y="290" width="154" height="14" />
   <text id="199:2221" name="titulo" x="16" y="316" width="343" height="28" />
   <text id="199:2222" name="meta" x="16" y="356" width="164" height="16" />
   <text id="199:2223" name="cuerpo" x="16" y="384" width="343" height="72" />

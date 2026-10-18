@@ -1,8 +1,8 @@
 <!-- Figma get_metadata excerpt: panel · dividido 199:2650 under writings-desktop-list -->
 <frame id="199:2650" name="panel · dividido" x="0" y="0" width="432" height="900">
   <instance id="199:2651" name="ui/panel-encabezado" x="0" y="0" width="431" height="65" />
-  <frame id="199:2668" name="cuerpo" x="0" y="65" width="431" height="812">
-    <frame id="199:2669" name="filtros" x="24" y="20" width="283" height="32">
+  <frame id="199:2668" name="cuerpo" x="0" y="65" width="431" height="835">
+    <frame id="199:2669" name="filtros" x="24" y="20" width="383" height="32">
       <frame id="199:2670" name="chip · All" x="0" y="0" width="44" height="32">
         <text id="199:2671" name="etiqueta" x="14" y="8" width="16" height="16" />
       </frame>

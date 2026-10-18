@@ -558,6 +558,7 @@ export class BuildingPanel {
     this.leaveArmed = false;
     this.exitPress = null;
     this.exitFromPointer = false;
+    studio.clearSubtitle();
     this.mode = mode;
     this.interiorId = interiorId;
     this.writingsFilter = 'all';

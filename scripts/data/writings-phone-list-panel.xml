@@ -7,7 +7,7 @@
     <text id="199:2003" name="titulo" x="0" y="10" width="295" height="24" />
     <instance id="199:2004" name="cerrar" x="299" y="0" width="44" height="44" />
   </frame>
-  <frame id="199:2007" name="filtros" x="16" y="85" width="283" height="44">
+  <frame id="199:2007" name="filtros" x="16" y="85" width="343" height="44">
     <frame id="199:2008" name="chip · All" x="0" y="0" width="44" height="44">
       <text id="199:2009" name="etiqueta" x="14" y="14" width="16" height="16" />
     </frame>
