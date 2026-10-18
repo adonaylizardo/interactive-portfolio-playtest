@@ -166,19 +166,28 @@ async function boardVan(page, cdp, touch) {
 }
 
 async function tapSalir(page, cdp, touch) {
-  const box = await page.evaluate(() => {
-    const el = document.querySelector('.building-panel [data-exit], [data-exit]');
-    if (!el) return null;
-    const r = el.getBoundingClientRect();
-    if (r.width < 4 || r.height < 4) return null;
-    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-  });
-  if (box) await realTap(page, cdp, box.x, box.y, touch);
-  const t0 = Date.now();
-  while (Date.now() - t0 < 4000) {
-    const s = await snap(page);
-    if (!s.interior && !s.panel) return true;
-    await wait(80);
+  const btn = page.locator('.building-panel [data-exit], [data-exit]').first();
+  for (let i = 0; i < 4; i++) {
+    const visible = await btn.isVisible().catch(() => false);
+    if (visible) {
+      if (touch) await btn.tap({ timeout: 2000 }).catch(() => {});
+      else await btn.click({ timeout: 2000 }).catch(() => {});
+    } else {
+      const box = await page.evaluate(() => {
+        const el = document.querySelector('.building-panel [data-exit], [data-exit]');
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        if (r.width < 4 || r.height < 4) return null;
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      });
+      if (box) await realTap(page, cdp, box.x, box.y, touch);
+    }
+    const t0 = Date.now();
+    while (Date.now() - t0 < 2500) {
+      const s = await snap(page);
+      if (!s.interior && !s.panel) return true;
+      await wait(80);
+    }
   }
   return false;
 }
@@ -414,6 +423,7 @@ async function runWidth(spec) {
         report.errors.push(`${tag}:${name}: ${entered.why ?? 'enter-failed'} @ ${entered.cx?.toFixed?.(1)},${entered.cy?.toFixed?.(1)}`);
         break;
       }
+      await wait(350);
       const left = await tapSalir(page, cdp, spec.touch);
       if (!left) {
         row.ok = false;
