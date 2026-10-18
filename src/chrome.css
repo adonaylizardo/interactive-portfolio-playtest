@@ -509,6 +509,21 @@ body[data-interior='1'] .chrome__column {
   display: none !important;
 }
 
+.chrome__blurb {
+  margin: 8px 0 0;
+  font-size: 15px;
+  line-height: 22px;
+  color: #b4b6bc;
+  max-width: 36em;
+}
+
+.chrome__case-meta {
+  display: block;
+  font-size: 13px;
+  line-height: 18px;
+  color: #8b8d94;
+}
+
 .chrome__lang {
   position: absolute;
   top: 20px;

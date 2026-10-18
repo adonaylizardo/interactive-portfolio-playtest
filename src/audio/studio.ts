@@ -157,7 +157,7 @@ export class StudioAudio {
   private shouldDeferIntro(): boolean {
     if (typeof document === 'undefined') return false;
     const layout = document.body.dataset.layout;
-    if (layout === 'split' || layout === 'panel') return true;
+    if (layout === 'panel') return true;
     const chrome = document.querySelector('.chrome');
     if (chrome?.classList.contains('chrome--sheet')) return true;
     const panel = document.querySelector(

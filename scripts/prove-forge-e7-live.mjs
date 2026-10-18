@@ -172,12 +172,88 @@ try {
     }
     record('1280: intro plays after preview close', subAfter.toLowerCase().includes(INTRO_SNIPPET), { subAfter });
 
+    await page.goto(BASE, { waitUntil: 'networkidle', timeout: 90000 });
+    await waitMap(page);
     await page.mouse.wheel(0, -800);
     await page.waitForTimeout(400);
-    await page.hover('#game-canvas', { position: { x: 200, y: 300 } });
+    await page.mouse.move(900, 400);
     await page.waitForTimeout(800);
     const bibErrors = errors.filter((m) => m.includes('biblioteca') && m.includes('lejos'));
     record('1280: no biblioteca hover/lejos errors', bibErrors.length === 0, { count: bibErrors.length, sample: bibErrors[0] });
+
+    const skel = await page.evaluate(
+      () => document.querySelectorAll('.chrome__skeleton, .chrome__skeleton-stack:not([aria-hidden="true"])').length,
+    );
+    record('1280: no skeleton bars in chrome', skel === 0, { skel });
+
+    {
+      const nopePage = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+      await nopePage.goto(`${BASE}#view=x=0&y=0&z=0.85&in=nope`, { waitUntil: 'networkidle', timeout: 90000 });
+      await nopePage.waitForFunction(
+        () => (document.getElementById('playtest-toast')?.textContent?.trim()?.length ?? 0) > 0,
+        null,
+        { timeout: 20000 },
+      );
+      await nopePage.waitForTimeout(500);
+      const nope = await nopePage.evaluate(() => ({
+        toast: document.getElementById('playtest-toast')?.textContent?.trim() ?? '',
+        labels: document.querySelectorAll('.building-map-label').length,
+      }));
+      record('1280 #in=nope: toast + map labels', nope.toast.length > 0 && nope.labels > 0, { nope });
+      await nopePage.close();
+    }
+
+    await page.goto(BASE, { waitUntil: 'networkidle', timeout: 90000 });
+    await waitMap(page);
+    await page.locator('.chrome__rail [data-action="cases"]').click();
+    await page.waitForTimeout(350);
+    await page.locator('.chrome__case-row[data-locate="volaris"]').click();
+    await page.waitForTimeout(3500);
+    const stack = await page.evaluate(() => {
+      const sheet = document.querySelector('.building-panel--preview .building-panel__sheet');
+      const sr = sheet?.getBoundingClientRect();
+      const caseRow = document.querySelector('.chrome__case-row[data-locate="bain"]');
+      const cr = caseRow?.getBoundingClientRect();
+      const hit = cr ? document.elementFromPoint(cr.x + cr.width / 2, cr.y + cr.height / 2) : null;
+      return {
+        sheetLeft: sr?.x ?? 0,
+        hitCaseRow: !!hit?.closest('.chrome__case-row'),
+        layout: document.body.dataset.layout,
+      };
+    });
+    record('1280 split+preview: sheet right of column', stack.sheetLeft >= 490, stack);
+    record('1280 split+preview: casos row hit-test', stack.hitCaseRow, stack);
+
+    const subCase = await page.evaluate(() => document.querySelector('.chrome__subtitle')?.textContent?.trim() ?? '');
+    record('1280 split+preview: caption visible', subCase.length > 8, { subCase: subCase.slice(0, 80) });
+
+    await page.goto(`${BASE}#view=x=0&y=0&z=0.85&in=biblioteca`, { waitUntil: 'networkidle', timeout: 90000 });
+    await waitMap(page);
+    await page.waitForTimeout(1500);
+    const writings = await page.evaluate(() => {
+      const text = document.querySelector('.experience')?.textContent ?? '';
+      const ph = /placeholder|Título del artículo/i.test(text);
+      const badges = [...document.querySelectorAll('.experience__section-count')].map((b) => b.textContent);
+      const rows = document.querySelectorAll('.experience__row').length;
+      return { ph, badges, rows, sample: text.slice(0, 120) };
+    });
+    record('1280 biblioteca: no writings placeholders', !writings.ph, writings);
+    record(
+      '1280 biblioteca: badge is full total (≥ visible rows)',
+      writings.badges.length > 0 &&
+        Number(writings.badges[0]) >= writings.rows &&
+        Number(writings.badges[0]) >= 5,
+      writings,
+    );
+
+    const railActions = ['home', 'cases', 'achievements', 'contact', 'search', 'sound', 'download'];
+    for (const action of railActions) {
+      const btn = page.locator(`.chrome__rail [data-action="${action}"]`).first();
+      const box = await btn.boundingBox().catch(() => null);
+      if (!box) continue;
+      const h = await hit(page, box.x + box.width / 2, box.y + box.height / 2);
+      record(`1280 rail fresh: ${action} hit`, h?.action === action || (action === 'home' && h?.action === 'home'), { h });
+    }
 
     await page.close();
   }

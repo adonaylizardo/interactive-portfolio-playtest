@@ -82,7 +82,6 @@ async function main(): Promise<void> {
       joystick.setHidden(open || panel.isPreviewExpanded());
       if (panel.isPreviewExpanded()) checklist.setCollapsed(true);
       if (panel.isPreviewMode() && panel.isOpen() && !isMobileLayout()) {
-        chrome.setLayout('map');
         checklist.setCollapsed(true);
       }
       if (!panel.isOpen() && !scene?.isInInterior()) {
@@ -135,7 +134,6 @@ async function main(): Promise<void> {
       checklist.complete('enter-building');
       if (isCaseHouse(buildingId)) {
         if (chrome.isMobileSheetOpen()) chrome.setLayout('map');
-        if (!isMobileLayout()) chrome.setLayout('map');
         panel.showPreview(buildingId);
         scene.pushCasePreviewHash(buildingId);
         return;
@@ -238,6 +236,7 @@ async function main(): Promise<void> {
     },
     { passive: false, capture: true },
   );
+  const bootInteriorFromUrl = parseInteriorFromHash();
   await scene.init(canvas);
   chrome.beginSoundHint();
   const bootFocus = new URLSearchParams(location.search).get('focus');
@@ -246,7 +245,7 @@ async function main(): Promise<void> {
     scene.focusJac();
   }
 
-  const bootInterior = parseInteriorFromHash();
+  const bootInterior = bootInteriorFromUrl;
   if (bootInterior) {
     const known =
       isCaseHouse(bootInterior) ||

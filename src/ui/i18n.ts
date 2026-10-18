@@ -91,7 +91,8 @@ const DICT = {
     'talks.item8.url': 'https://www.youtube.com/watch?v=K4TOrB7at0Y',
     'talks.item9.url': 'https://www.youtube.com/watch?v=K4TOrB7at0Y',
 
-    'writings.intro': 'Articles and notes (placeholder).',
+    'writings.intro': 'Articles from adonaylizardo.com — UX, research, and product craft.',
+    'writings.section.articles': 'Articles',
     'writings.filter.all': 'All',
     'writings.filter.uxsc': 'UXSC',
     'writings.filter.sinergia': 'Sinergia',
@@ -151,6 +152,9 @@ const DICT = {
     'chrome.downloadCv': 'Download CV',
     'chrome.sound': 'Sound',
     'chrome.fullPage': 'Full page',
+    'chrome.lede':
+      'Explore the map, walk into buildings, and open case studies from the doors or the side panel.',
+    'chrome.caseMeta': 'On the map',
     'chrome.title': 'Design lead working with AI.',
     'chrome.titleShort': 'Design lead working with AI',
     'chrome.who': 'Who are you?',
@@ -268,7 +272,8 @@ const DICT = {
     'talks.item8.url': 'https://www.youtube.com/watch?v=K4TOrB7at0Y',
     'talks.item9.url': 'https://www.youtube.com/watch?v=K4TOrB7at0Y',
 
-    'writings.intro': 'Artículos y notas (placeholder).',
+    'writings.intro': 'Artículos de adonaylizardo.com — UX, investigación y craft de producto.',
+    'writings.section.articles': 'Artículos',
     'writings.filter.all': 'Todos',
     'writings.filter.uxsc': 'UXSC',
     'writings.filter.sinergia': 'Sinergia',
@@ -328,6 +333,9 @@ const DICT = {
     'chrome.downloadCv': 'Descargar CV',
     'chrome.sound': 'Sonido',
     'chrome.fullPage': 'Página completa',
+    'chrome.lede':
+      'Explora el mapa, entra a los edificios y abre casos desde las puertas o el panel lateral.',
+    'chrome.caseMeta': 'En el mapa',
     'chrome.title': 'Líder de diseño con IA.',
     'chrome.titleShort': 'Líder de diseño con IA',
     'chrome.who': '¿Quién eres?',

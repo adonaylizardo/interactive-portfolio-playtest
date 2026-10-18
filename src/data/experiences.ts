@@ -11,18 +11,39 @@ export function isExperienceBuilding(id: string | null | undefined): id is Exper
 export type TalkItem = {
   id: string;
   example?: boolean;
-  titleKey: string;
-  metaKey: string;
+  title?: string;
+  url?: string;
+  date?: string;
+  duration?: string;
+  thumbnail?: string;
+  titleKey?: string;
+  metaKey?: string;
 };
 
-export type WritingItem = TalkItem;
+export type WritingItem = {
+  id: string;
+  example?: boolean;
+  title?: string;
+  url?: string;
+  date?: string;
+  publication?: string;
+  readTime?: string;
+  titleKey?: string;
+  metaKey?: string;
+};
 
 export type WritingSection = {
   id: string;
   titleKey: string;
-  descKey: string;
+  descKey?: string;
   items: WritingItem[];
 };
 
-export const TALKS: TalkItem[] = talksJson.items as TalkItem[];
-export const WRITINGS: WritingSection[] = writingsJson.sections as WritingSection[];
+type WritingsFile = {
+  sections: WritingSection[];
+  substackUrl?: string;
+};
+
+export const TALKS: TalkItem[] = (talksJson as { items?: TalkItem[] }).items ?? [];
+export const WRITINGS: WritingSection[] = (writingsJson as WritingsFile).sections;
+export const WRITINGS_SUBSTACK_URL = (writingsJson as WritingsFile).substackUrl;

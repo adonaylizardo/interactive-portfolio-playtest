@@ -150,16 +150,16 @@ export class ChromeUI {
       (row) => `
       <button type="button" class="chrome__exp-row" data-locate="${row.id}">
         <span class="chrome__exp-name">${row.label}${row.nda ? '<span class="chrome__nda">NDA</span>' : ''}</span>
-        <span class="chrome__exp-meta"><span class="chrome__skeleton chrome__skeleton--bar"></span>${iconSvg('locate', 16)}</span>
+        <span class="chrome__exp-meta">${iconSvg('locate', 16)}</span>
       </button>`,
     ).join('');
     const caseRows = CASES_ROWS.map((row) => {
       return `
       <button type="button" class="chrome__case-row" data-locate="${row.id}">
         <span class="chrome__case-thumb">${iconSvg('map')}${row.nda ? '<span class="chrome__nda">NDA</span>' : ''}</span>
-        <span class="chrome__case-copy">
+          <span class="chrome__case-copy">
           <span class="chrome__case-title">${row.label}</span>
-          <span class="chrome__skeleton-stack"><span class="chrome__skeleton"></span><span class="chrome__skeleton chrome__skeleton--short"></span></span>
+          <span class="chrome__case-meta" data-i18n="chrome.caseMeta">Case on the map</span>
         </span>
       </button>`;
     }).join('');
@@ -189,11 +189,7 @@ export class ChromeUI {
         <div class="chrome__intro-body">
           <div class="chrome__lede">
             <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
-            <div class="chrome__skeleton-stack" aria-hidden="true">
-              <span class="chrome__skeleton"></span>
-              <span class="chrome__skeleton"></span>
-              <span class="chrome__skeleton chrome__skeleton--half"></span>
-            </div>
+            <p class="chrome__blurb" data-i18n="chrome.lede">Explore the map, open cases from the doors, and browse talks and writings inside the buildings.</p>
           </div>
           <div class="chrome__ctas">
             <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer">${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
@@ -247,10 +243,7 @@ export class ChromeUI {
         <button type="button" class="chrome__intro-close" data-action="intro-close" aria-label="Close" data-i18n-aria="jac.close">${iconSvg('close')}</button>
         <div class="chrome__lede">
           <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
-          <div class="chrome__skeleton-stack" aria-hidden="true">
-            <span class="chrome__skeleton"></span>
-            <span class="chrome__skeleton chrome__skeleton--half"></span>
-          </div>
+          <p class="chrome__blurb" data-i18n="chrome.lede">Explore the map, open cases from the doors, and browse talks and writings inside the buildings.</p>
         </div>
         <div class="chrome__audience">
           <p class="chrome__label" data-i18n="chrome.who">¿Quién eres?</p>

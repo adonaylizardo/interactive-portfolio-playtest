@@ -2,76 +2,42 @@
   "sections": [
     {
       "id": "uxsc",
-      "titleKey": "writings.section.uxsc",
-      "descKey": "writings.section.uxscDesc",
+      "titleKey": "writings.section.articles",
       "items": [
         {
-          "id": "ux-example-1",
-          "example": true,
-          "titleKey": "writings.ux1.title",
-          "metaKey": "writings.ux1.meta"
+          "id": "ux-tricks-to-boost-customer-retention",
+          "title": "UX Tricks to boost customer retention",
+          "url": "https://adonaylizardo.com/writing-database/ux-tricks-to-boost-customer-retention",
+          "publication": "adonaylizardo.com",
+          "date": "May 26, 2022"
         },
         {
-          "id": "ux-example-2",
-          "example": true,
-          "titleKey": "writings.ux3.title",
-          "metaKey": "writings.ux3.meta"
+          "id": "top-10-tools-for-ux-design-and-research",
+          "title": "Top 10 tools for UX design and research",
+          "url": "https://adonaylizardo.com/writing-database/top-10-tools-for-ux-design-and-research",
+          "publication": "adonaylizardo.com",
+          "date": "December 1, 2021"
         },
         {
-          "id": "ux-example-3",
-          "example": true,
-          "titleKey": "writings.ux2.title",
-          "metaKey": "writings.ux2.meta"
-        }
-      ]
-    },
-    {
-      "id": "sinergia",
-      "titleKey": "writings.section.sinergia",
-      "descKey": "writings.section.sinergiaDesc",
-      "items": [
-        {
-          "id": "sin-example-1",
-          "example": true,
-          "titleKey": "writings.sin1.title",
-          "metaKey": "writings.sin1.meta"
+          "id": "how-to-streamline-the-construction-of-digital-products-with-ux-consulting",
+          "title": "How to streamline the construction of digital products with UX consulting",
+          "url": "https://adonaylizardo.com/writing-database/how-to-streamline-the-construction-of-digital-products-with-ux-consulting",
+          "publication": "adonaylizardo.com",
+          "date": "June 9, 2020"
         },
         {
-          "id": "sin-example-2",
-          "example": true,
-          "titleKey": "writings.sin2.title",
-          "metaKey": "writings.sin2.meta"
+          "id": "pixels-in-orbit-a-short-story-about-how-my-designs-made-it-to-space",
+          "title": "Pixels in Orbit: A short story about how my designs made it to space",
+          "url": "https://adonaylizardo.com/writing-database/pixels-in-orbit-a-short-story-about-how-my-designs-made-it-to-space",
+          "publication": "adonaylizardo.com",
+          "date": "May 1, 2020"
         },
         {
-          "id": "sin-example-3",
-          "example": true,
-          "titleKey": "writings.sin3.title",
-          "metaKey": "writings.sin3.meta"
-        }
-      ]
-    },
-    {
-      "id": "guest",
-      "titleKey": "writings.section.guest",
-      "descKey": "writings.section.guestDesc",
-      "items": [
-        {
-          "id": "guest-example-1",
-          "example": true,
-          "titleKey": "writings.guest1.title",
-          "metaKey": "writings.guest1.meta"
-        },
-        {
-          "id": "guest-example-2",
-          "example": true,
-          "titleKey": "writings.guest2.title",
-          "metaKey": "writings.guest2.meta"
-        },
-        {
-          "id": "guest-example-3",
-          "example": true,
-          "titleKey": "writings.guest3.title",
-          "metaKey": "writings.guest3.meta"
+          "id": "googles-heart-method-what-how-the-perks",
+          "title": "Google’s HEART method — what, how & the perks",
+          "url": "https://adonaylizardo.com/writing-database/googles-heart-method-what-how-the-perks",
+          "publication": "adonaylizardo.com",
+          "date": "April 30, 2020"
         }
       ]
     }

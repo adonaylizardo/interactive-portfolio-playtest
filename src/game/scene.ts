@@ -29,6 +29,7 @@ import {
   TILE_W,
   type MapObject,
 } from '../data/map';
+import { isCaseHouse } from '../data/cases';
 import {
   bindPopstate,
   navigateBackFromInterior,
@@ -600,8 +601,16 @@ export class IsoScene {
     });
 
     if (bootInterior) {
-      replaceOutdoorHash(this.outdoorCamBeforeInterior ?? { x: this.cameraX, y: this.cameraY, zoom: this.zoom });
-      this.enterInterior(bootInterior, { skipFade: true });
+      const knownInterior =
+        isCaseHouse(bootInterior) ||
+        bootInterior === 'teresa' ||
+        bootInterior === 'biblioteca' ||
+        !!getInteriorDef(bootInterior) ||
+        !!getBuildingByName(bootInterior);
+      if (knownInterior) {
+        replaceOutdoorHash(this.outdoorCamBeforeInterior ?? { x: this.cameraX, y: this.cameraY, zoom: this.zoom });
+        this.enterInterior(bootInterior, { skipFade: true });
+      }
     }
     setHashWriteSuppressed(false);
     this.applyCamera(true);

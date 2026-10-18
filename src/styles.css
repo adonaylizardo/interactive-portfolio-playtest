@@ -199,6 +199,16 @@ body.is-canvas-dragging * {
   pointer-events: none;
 }
 
+@media (min-width: 768px) {
+  #ui-root > .building-panel.building-panel--preview {
+    z-index: 12;
+  }
+
+  #ui-root > .chrome {
+    z-index: 14;
+  }
+}
+
 #ui-root > .chrome,
 #ui-root > .building-panel,
 #ui-root > .name-labels,
@@ -241,14 +251,20 @@ body.is-canvas-dragging * {
 }
 
 #ui-root:has(> .building-panel--preview) .chrome__subtitle:not(:empty) {
-  display: block;
-  visibility: visible;
-  z-index: 22;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 30;
+  pointer-events: none;
 }
 
-@media (max-width: 767px) {
+#ui-root:has(> .building-panel--preview) .chrome__subtitle:not(:empty) {
+  position: fixed;
+}
+
+@media (max-width: 767px), (max-height: 500px) {
   #ui-root:has(> .building-panel--preview) .chrome__dock {
-    display: none;
+    display: none !important;
   }
 
   #ui-root:has(> .building-panel--preview) > .checklist,
@@ -3003,9 +3019,28 @@ body[data-layout='panel'] .checklist {
     border-radius: 20px;
   }
 
-  .building-panel--preview .building-panel__sheet {
+  body[data-layout='split'] .chrome__column {
+    z-index: 24;
+  }
+
+  body[data-layout='split']:has(.building-panel--preview.building-panel--open) .chrome__column {
+    z-index: 26;
+  }
+
+  body[data-layout='split'] .building-panel--preview .building-panel__sheet {
+    left: 496px;
+    width: min(400px, calc(100vw - 496px - 24px));
+  }
+
+  body[data-layout='split'] .building-panel--preview.building-panel--expanded .building-panel__sheet {
+    left: 496px;
+    right: 16px;
+    width: auto;
+  }
+
+  .building-panel--preview.building-panel--open .building-panel__sheet {
     top: auto;
-    left: 80px;
+    left: 72px;
     right: auto;
     bottom: 24px;
     width: 400px;
@@ -3026,7 +3061,7 @@ body[data-layout='panel'] .checklist {
 
   .building-panel--preview.building-panel--expanded .building-panel__sheet {
     top: 0;
-    left: 64px;
+    left: 72px;
     right: 0;
     bottom: 0;
     width: auto;
