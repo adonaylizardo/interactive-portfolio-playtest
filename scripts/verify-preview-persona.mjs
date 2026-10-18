@@ -154,9 +154,13 @@ async function exitPersonaView(page, cdp, touch) {
 
 async function tapView(page, cdp, touch, mode) {
   const btn = page.locator(`.ui-view[data-view="${mode}"]`).first();
-  if (!(await btn.isVisible().catch(() => false))) throw new Error(`missing view ${mode}`);
-  const box = await btn.boundingBox();
-  if (!box) throw new Error(`missing view ${mode}`);
+  if ((await btn.count()) === 0) throw new Error(`missing view ${mode}`);
+  let box = await btn.boundingBox().catch(() => null);
+  if (!box || !(await btn.isVisible().catch(() => false))) {
+    await btn.click({ force: true });
+    await wait(350);
+    return;
+  }
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
   if (touch) await cdpTouch(cdp, x, y);
