@@ -63,19 +63,19 @@ As a Design Leader, giving back to the design community is one of my top priorit
 
 The "why" behind my leadership comes from a deep commitment to my values and principles. These are the ideals I stand by that keep me focused on creating meaningful impact.
 
-### People before pixels
+### 👩‍🦰 People before pixels
 
 Relationships, empathy, collaboration, and trust will always have a greater impact on a product than the UI.
 
-### Outcomes over output
+### 📊 Outcomes over output
 
 Mockups, code, and roadmaps don’t matter if they're not making an impact on the users and the business
 
-### Begin with the end in mind
+### 🎯 Begin with the end in mind
 
 If everyone is rallied around the same vision, then you’re much more likely to achieve it together.
 
-### Lead with context, not control
+### 🤝 Lead with context, not control
 
 Teams don't need micromanaging. Focus on empowering them with guidance, trust, and autonomy.
 

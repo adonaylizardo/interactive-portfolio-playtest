@@ -42,6 +42,8 @@ const ACHIEVEMENT_KEYS: I18nKey[] = [
   'chrome.achievement4',
 ];
 
+const DEFAULT_DOC_TITLE = typeof document !== 'undefined' ? document.title : 'Playtest';
+
 const LIST_ROWS: { slug: string; section: I18nKey; labelKey?: I18nKey; label?: string }[] = [
   { slug: 'estudio', section: 'read.section.about', labelKey: 'read.section.about' },
   { slug: 'experiencia', section: 'read.section.experience', labelKey: 'read.section.experience' },
@@ -149,7 +151,10 @@ export class ReadingView {
     this.bind();
     onLangChange(() => {
       this.applyI18n();
-      if (!this.root.hidden) this.render();
+      if (!this.root.hidden) {
+        this.render();
+        this.syncDocumentTitle();
+      }
     });
   }
 
@@ -180,6 +185,7 @@ export class ReadingView {
     if (!route) {
       this.root.hidden = true;
       document.body.dataset.reading = '0';
+      this.syncDocumentTitle();
       return;
     }
     this.route = route;
@@ -187,9 +193,29 @@ export class ReadingView {
     document.body.dataset.reading = '1';
     this.applyI18n();
     this.render();
+    this.syncDocumentTitle();
     if (!(route.kind === 'detail' && route.slug === 'estudio' && parseReadingAnchor())) {
       this.scroll.scrollTop = 0;
     }
+  }
+
+  private syncDocumentTitle(): void {
+    if (this.root.hidden) {
+      document.title = DEFAULT_DOC_TITLE;
+      return;
+    }
+    if (this.route.kind === 'list') {
+      document.title = `${t('read.title')} — ${DEFAULT_DOC_TITLE}`;
+      return;
+    }
+    const route = this.route;
+    if (route.kind !== 'detail') return;
+    const row = LIST_ROWS.find((r) => r.slug === route.slug);
+    const page =
+      route.slug === 'estudio'
+        ? t('read.aboutTitle')
+        : row?.label ?? (row?.labelKey ? t(row.labelKey) : route.slug);
+    document.title = `${page} — ${t('read.title')}`;
   }
 
   private applyI18n(): void {

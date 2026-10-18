@@ -29,8 +29,12 @@ body.boot-welcome #ui-root .checklist {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgb(11 12 14 / 94%);
+  background: rgb(11 12 14 / 52%);
   transition: opacity 0.25s ease;
+}
+
+body.boot-loading #game-canvas {
+  visibility: visible;
 }
 
 .boot-flow__loading--out {

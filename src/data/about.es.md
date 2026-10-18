@@ -63,19 +63,19 @@ Como líder de diseño, devolver a la comunidad de diseño es una de mis priorid
 
 El “por qué” de mi liderazgo viene de un compromiso profundo con mis valores y principios. Estos son los ideales que defiendo y que me mantienen enfocado en crear impacto significativo.
 
-### Personas antes que píxeles
+### 👩‍🦰 Personas antes que píxeles
 
 Las relaciones, la empatía, la colaboración y la confianza siempre tendrán más impacto en un producto que la interfaz.
 
-### Resultados antes que entregables
+### 📊 Resultados antes que entregables
 
 Los mockups, el código y los roadmaps no importan si no generan impacto en los usuarios y el negocio.
 
-### Empezar con el fin en mente
+### 🎯 Empezar con el fin en mente
 
 Si todos comparten la misma visión, es mucho más probable lograrla juntos.
 
-### Liderar con contexto, no con control
+### 🤝 Liderar con contexto, no con control
 
 Los equipos no necesitan microgestión. Hay que empoderarlos con guía, confianza y autonomía.
 

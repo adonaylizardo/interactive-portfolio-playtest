@@ -181,6 +181,10 @@
   gap: 16px;
 }
 
+.reading-view__article--about {
+  padding-bottom: max(80px, calc(env(safe-area-inset-bottom) + 64px));
+}
+
 .reading-view__inline-back {
   min-height: 44px;
 }

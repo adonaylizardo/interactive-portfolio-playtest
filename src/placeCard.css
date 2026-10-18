@@ -33,7 +33,7 @@
   pointer-events: auto;
   display: flex;
   flex-direction: column;
-  max-height: min(72vh, 520px);
+  max-height: min(51vh, 414px);
 }
 
 .place-card__handle {
@@ -46,18 +46,19 @@
 
 .place-card__head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
-  padding: 4px 12px 12px 20px;
+  padding: 8px 8px 10px 20px;
+  min-height: 44px;
 }
 
 .place-card__title {
   flex: 1;
   margin: 0;
   font-family: Geist, Inter, system-ui, sans-serif;
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1.25;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 44px;
 }
 
 .place-card__close {
@@ -86,8 +87,8 @@
   overflow: hidden;
   background: #0b0c0e;
   border: 1px solid #2a2c31;
-  min-height: 120px;
-  max-height: 220px;
+  min-height: 96px;
+  max-height: 156px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -97,7 +98,7 @@
   display: block;
   width: 100%;
   height: auto;
-  max-height: 220px;
+  max-height: 156px;
   object-fit: contain;
   object-position: center bottom;
 }
@@ -117,11 +118,16 @@
   min-height: 44px;
   border: 0;
   border-radius: 999px;
-  background: #edeef0;
+  background: #ffffff;
   color: #0b0c0e;
   display: grid;
   place-items: center;
   cursor: pointer;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 8%);
+}
+
+.place-card__play .ui-icon {
+  color: #0b0c0e;
 }
 
 .place-card__play:focus-visible {
