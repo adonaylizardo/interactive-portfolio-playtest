@@ -35,7 +35,7 @@ const CASES_ROWS: { id: string; label: string; nda?: boolean }[] = [
   { id: 'pg', label: 'P&G' },
 ];
 
-const CV_HREF = 'https://adonaylizardo.com';
+const CV_HREF = `${import.meta.env.BASE_URL}cv/adonay-lizardo-cv.pdf`;
 const CONTACT_HREF = 'mailto:hello@adonaylizardo.com';
 
 function roundBtn(icon: IconName, label: string, extra = '', action?: string): string {
