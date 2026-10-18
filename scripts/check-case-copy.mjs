@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Public case-copy greps: the four new panels plus airline/landmarks in src/data/cases.ts
- * and the production build must not leak draft markers, Volaris, or placeholder Spanish,
+ * and the production build must not leak draft markers or placeholder Spanish,
  * and 9.5 must only appear in the Bain case.
  */
 import fs from 'node:fs';
@@ -24,12 +24,15 @@ const FORBIDDEN = [
   [/Change notes/, 'Change notes'],
   [/testimonial/i, 'testimonial'],
   [/Lorem ipsum/i, 'Lorem ipsum'],
-  [/\bVolaris\b/, 'Volaris'],
+  [/\bLatin American airline\b/i, 'Latin American airline'],
+  [/\bAirline\b/, 'Airline (anonymised label)'],
 ];
 
 for (const [re, label] of FORBIDDEN) {
   if (re.test(src)) errors.push(`src/data/cases.ts contains ${label}`);
 }
+
+if (!/\bVolaris\b/.test(src)) errors.push('Volaris case copy is missing the client name');
 
 const bainStart = src.indexOf('\n  bain: {');
 const pgStart = src.indexOf('\n  pg: {');
@@ -43,11 +46,17 @@ if (bainStart < 0 || pgStart < 0 || pgStart < bainStart) {
   if (leaked) errors.push(`9.5 appears outside Bain (${leaked.length} time(s) in the rest of cases.ts)`);
 }
 
-if (!src.includes('${name} — a landmark of the map. More coming soon.')) {
-  errors.push('landmark copy missing: <Name> — a landmark of the map. More coming soon.');
-}
-for (const id of ["sambil: landmarkPlaceholder('Sambil'", "catedral: landmarkPlaceholder('Catedral'", "flor: landmarkPlaceholder('Flor de Venezuela'"]) {
-  if (!src.includes(id)) errors.push(`landmark room missing: ${id})`);
+for (const [id, voiceKey] of [
+  ['sambil', '10-sambil'],
+  ['catedral', '09-cathedral'],
+  ['flor', '08-flor-de-venezuela'],
+]) {
+  if (!src.includes(`${id}: landmarkVoiceCopy(`)) {
+    errors.push(`landmark room missing: ${id}: landmarkVoiceCopy(`);
+  }
+  if (!src.includes(`'${voiceKey}'`)) {
+    errors.push(`landmark voice key missing: ${voiceKey}`);
+  }
 }
 
 function walk(dir, out = []) {
@@ -67,11 +76,11 @@ if (!fs.existsSync(path.join(DIST, 'index.html'))) {
   const distFiles = walk(DIST);
   const distText = distFiles.map((f) => fs.readFileSync(f, 'utf8')).join('\n');
   for (const [re, label] of FORBIDDEN) {
-    if (label === 'Volaris') continue;
     if (re.test(distText)) errors.push(`dist contains ${label}`);
   }
-  const volarisInCases = /Leading 9 designers[\s\S]{0,200}Volaris|Volaris[\s\S]{0,80}booking app/;
-  if (volarisInCases.test(distText)) errors.push('dist case copy names Volaris');
+  if (!/Volaris['’]s booking app/.test(distText)) {
+    errors.push('dist is missing Volaris booking-app problem line');
+  }
   if (!/8\.5 to 9\.5/.test(distText)) errors.push('dist is missing Bain CSAT 8.5 to 9.5');
   if (/9\.5\/10/.test(distText)) errors.push('dist still has the old Bain 9.5/10 line');
 }
@@ -80,4 +89,4 @@ if (errors.length) {
   for (const e of errors) console.error(`FAIL ${e}`);
   process.exit(1);
 }
-console.log('check-case-copy: cases.ts and dist have no [FALTA]/Volaris/placeholder leaks; 9.5 only in Bain');
+console.log('check-case-copy: cases.ts and dist have no draft/placeholder leaks; Volaris named; 9.5 only in Bain');
