@@ -79,6 +79,85 @@ async function realTap(page, cdp, x, y, touch) {
   return true;
 }
 
+async function realDrag(page, cdp, x0, y0, x1, y1, ms, touch) {
+  const steps = 8;
+  if (touch) {
+    await cdpTouch(cdp, 'touchStart', [{ x: x0, y: y0, id: 3 }]);
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      await cdpTouch(cdp, 'touchMove', [{ x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t, id: 3 }]);
+      await wait(Math.max(8, Math.round(ms / steps)));
+    }
+    await cdpTouch(cdp, 'touchEnd', []);
+  } else {
+    await page.mouse.move(x0, y0);
+    await page.mouse.down();
+    await page.mouse.move(x1, y1, { steps });
+    await wait(ms);
+    await page.mouse.up();
+  }
+  await wait(40);
+}
+
+function tapSafe(view) {
+  return {
+    x0: 28,
+    y0: Math.min(88, Math.round(view.height * 0.18)),
+    x1: view.width - 28,
+    y1: view.height - Math.min(96, Math.round(view.height * 0.22)),
+  };
+}
+
+function clampToSafe(pt, view) {
+  const s = tapSafe(view);
+  return {
+    x: Math.min(s.x1, Math.max(s.x0, pt.x)),
+    y: Math.min(s.y1, Math.max(s.y0, pt.y)),
+  };
+}
+
+async function hitAt(page, x, y) {
+  return page.evaluate((p) => {
+    const el = document.elementFromPoint(p.x, p.y);
+    const canvas = document.getElementById('game-canvas');
+    const pick = window.__playtestQa.pickAt(p.x, p.y);
+    return {
+      tag: el?.tagName ?? '',
+      id: el?.id ?? '',
+      cls: typeof el?.className === 'string' ? el.className.slice(0, 80) : '',
+      canvas: !!(el === canvas || el?.id === 'game-canvas' || el?.closest?.('#game-canvas')),
+      pick,
+    };
+  }, { x, y });
+}
+
+async function findCanvasDoorTap(page, name, raw) {
+  const view = page.viewportSize();
+  if (!raw || !view) return { pt: null, hit: null };
+  const offsets = [
+    [0, 0],
+    [0, -24],
+    [0, -48],
+    [0, -72],
+    [-24, -24],
+    [24, -24],
+    [0, 24],
+    [-36, 0],
+    [36, 0],
+  ];
+  for (const [dx, dy] of offsets) {
+    const pt = clampToSafe({ x: raw.x + dx, y: raw.y + dy }, view);
+    const hit = await hitAt(page, pt.x, pt.y);
+    if (hit.canvas && hit.pick?.door === name && !hit.pick.jac) return { pt, hit };
+  }
+  for (const [dx, dy] of offsets) {
+    const pt = clampToSafe({ x: raw.x + dx, y: raw.y + dy }, view);
+    const hit = await hitAt(page, pt.x, pt.y);
+    if (hit.canvas && hit.pick?.door === name) return { pt, hit };
+  }
+  return { pt: null, hit: await hitAt(page, raw.x, raw.y) };
+}
+
 async function boot(page) {
   await page.goto(bootUrl(), { waitUntil: 'domcontentloaded' });
   for (let i = 0; i < 80; i++) {
@@ -186,7 +265,9 @@ async function boardVan(page, cdp, touch) {
       await closePreview(page, cdp, touch, 'x');
       await wait(200);
     }
-    const pt = clampTap(await vanClient(page), page.viewportSize());
+    const raw = await vanClient(page);
+    const view = page.viewportSize();
+    const pt = raw && view ? clampToSafe(raw, view) : clampTap(raw, view);
     if (pt) await realTap(page, cdp, pt.x, pt.y, touch);
     for (let w = 0; w < 100; w++) {
       const now = await snap(page);
@@ -200,30 +281,42 @@ async function boardVan(page, cdp, touch) {
 async function tapDoor(page, cdp, name, touch) {
   const view = page.viewportSize();
   const accepts0 = (await snap(page)).accepts;
-  let pt = null;
-  let pick = null;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const raw = await page.evaluate((n) => window.__playtestQa.doorScreenPoint?.(n), name);
-    pt = clampTap(raw, view);
-    pick = pt ? await page.evaluate((p) => window.__playtestQa.pickAt(p.x, p.y), pt) : null;
-    if (pt && pick?.door === name && !pick.jac) break;
-    if (pt && pick?.door === name) {
-      pt = { x: pt.x, y: Math.max(12, pt.y - 18) };
-      pick = await page.evaluate((p) => window.__playtestQa.pickAt(p.x, p.y), pt);
-      if (pick?.door === name) break;
+  const raw = await page.evaluate((n) => window.__playtestQa.doorScreenPoint?.(n), name);
+  let found = await findCanvasDoorTap(page, name, raw);
+  if (!found.pt && raw && view) {
+    const toward = clampToSafe(raw, view);
+    const towardHit = await hitAt(page, toward.x, toward.y);
+    if (towardHit.canvas) {
+      log('nudge', name, toward, towardHit.pick);
+      await realTap(page, cdp, toward.x, toward.y, touch);
+      const t0 = Date.now();
+      while (Date.now() - t0 < 8000) {
+        const s = await snap(page);
+        if (s.preview || s.interior || s.panel) break;
+        if (s.mph < 0.4 && s.goal == null) break;
+        await wait(120);
+      }
+      found = await findCanvasDoorTap(
+        page,
+        name,
+        await page.evaluate((n) => window.__playtestQa.doorScreenPoint?.(n), name),
+      );
     }
-    await wait(160);
   }
-  if (!pt) return { tapped: false, accepted: false, pt, pick };
-  await realTap(page, cdp, pt.x, pt.y, touch);
-  await wait(160);
+  const pt = found.pt;
+  const pick = found.hit?.pick ?? null;
+  if (!pt) return { tapped: false, accepted: false, pt: raw, pick, hit: found.hit };
+  const tapped = await realTap(page, cdp, pt.x, pt.y, touch);
+  await wait(200);
   const after = await snap(page);
   return {
-    tapped: true,
-    accepted: after.accepts > accepts0 || after.preview || after.interior || after.panel,
+    tapped,
+    accepted: after.accepts > accepts0 || after.preview || after.interior || after.panel || !!after.goal,
     pt,
     pick,
+    hit: found.hit,
     accepts: after.accepts,
+    zoom: after.zoom,
   };
 }
 
@@ -293,42 +386,51 @@ async function backdropPoint(page) {
 async function closePreview(page, cdp, touch, how) {
   const before = await snap(page);
   if (!before.preview && !before.panel && !before.interior) return { ok: true, how: 'already-closed' };
-  if (how === 'escape') {
+  // Estudio / interiors: × [data-close] is a preview-only no-op. Leave via Salir or Escape.
+  const interiorOnly = before.interior && !before.preview;
+  const method = interiorOnly && how !== 'escape' ? 'salir' : how;
+  if (method === 'escape') {
     await page.keyboard.press('Escape');
-  } else if (how === 'backdrop') {
+  } else if (method === 'backdrop' && !interiorOnly) {
     const pt = await backdropPoint(page);
     await realTap(page, cdp, pt.x, pt.y, touch);
   } else {
-    const box = await visibleClose(page, how);
+    const box = await visibleClose(page, interiorOnly ? 'salir' : method);
     if (box) await realTap(page, cdp, box.x, box.y, touch);
-    else if (how === 'salir') await page.keyboard.press('Escape');
-    else {
-      const fb = await visibleClose(page);
-      if (fb) await realTap(page, cdp, fb.x, fb.y, touch);
-    }
+    else await page.keyboard.press('Escape');
   }
   const t0 = Date.now();
-  while (Date.now() - t0 < 2500) {
+  while (Date.now() - t0 < 4000) {
     const s = await snap(page);
-    if (!s.interior && !s.panel && !s.preview) return { ok: true, how, ms: Date.now() - t0 };
+    if (!s.interior && !s.panel && !s.preview) return { ok: true, how: method, ms: Date.now() - t0 };
     await wait(60);
   }
-  return { ok: false, how, ...(await snap(page)) };
+  return { ok: false, how: method, ...(await snap(page)) };
 }
 
 async function reboardWithin(page, cdp, touch, budgetMs = 3000) {
   const t0 = Date.now();
   const ready = await snap(page);
-  const pt = clampTap(await vanClient(page), page.viewportSize());
-  const pick = pt ? await page.evaluate((p) => window.__playtestQa.pickAt(p.x, p.y), pt) : null;
-  if (pt) await realTap(page, cdp, pt.x, pt.y, touch);
+  let pick = null;
+  let lastTap = null;
   while (Date.now() - t0 < budgetMs) {
-    const s = await snap(page);
-    if (s.driving) return { ok: true, ms: Date.now() - t0, pick, ready, toast: s.toast };
-    await wait(50);
+    const now = await snap(page);
+    if (now.driving) return { ok: true, ms: Date.now() - t0, pick, ready, toast: now.toast };
+    if (now.interior || now.preview || now.panel) {
+      await closePreview(page, cdp, touch, now.interior && !now.preview ? 'salir' : 'x');
+    }
+    const raw = await vanClient(page);
+    const view = page.viewportSize();
+    const pt = raw && view ? clampToSafe(raw, view) : clampTap(raw, view);
+    pick = pt ? (await hitAt(page, pt.x, pt.y)).pick : null;
+    if (pt && Date.now() - t0 < budgetMs - 80) {
+      lastTap = { pt, pick };
+      await realTap(page, cdp, pt.x, pt.y, touch);
+    }
+    await wait(80);
   }
   const last = await snap(page);
-  return { ok: !!last.driving, ms: Date.now() - t0, pick, ready, last, toast: last.toast };
+  return { ok: !!last.driving, ms: Date.now() - t0, pick, ready, last, lastTap, toast: last.toast };
 }
 
 async function openPage(spec) {
@@ -364,12 +466,19 @@ async function driveToDoor(page, cdp, spec, name) {
     const boarded = await boardVan(page, cdp, spec.touch);
     if (!boarded.ok) return { ok: false, why: 'reboard-failed', boarded };
   }
-  await pinchToward(page, cdp, 0.18, spec.touch);
-  const tap = await tapDoor(page, cdp, name, spec.touch);
-  if (!tap.accepted && !(await snap(page)).preview) {
+  const z = await pinchToward(page, cdp, 0.14, spec.touch);
+  let tap = await tapDoor(page, cdp, name, spec.touch);
+  log('tap', spec.tag, name, 'z', z, tap.accepted, tap.pick, tap.pt, tap.hit?.canvas, tap.hit?.tag);
+  if (!tap.accepted && !(await snap(page)).preview && !(await snap(page)).interior) {
+    await wait(240);
+    tap = await tapDoor(page, cdp, name, spec.touch);
+    log('tap-retry', spec.tag, name, tap.accepted, tap.pick, tap.pt, tap.hit?.canvas, tap.hit?.tag);
+  }
+  if (!tap.accepted && !(await snap(page)).preview && !(await snap(page)).interior && !(await snap(page)).goal) {
     return { ok: false, why: 'tap-miss', tap };
   }
   const entered = await waitEntered(page);
+  log('enter', spec.tag, name, entered.ok, entered.ms, entered.cx, entered.cy, entered.why);
   return { ok: entered.ok, entered, tap };
 }
 
@@ -405,10 +514,17 @@ async function runApproach(spec, approach) {
         report.errors.push(`${spec.tag}:${approach}: estudio failed`);
         return row;
       }
-      await closePreview(page, cdp, spec.touch, 'x');
-      const re = await reboardWithin(page, cdp, spec.touch, 8000);
+      const left = await closePreview(page, cdp, spec.touch, 'salir');
+      if (!left.ok) {
+        row.ok = false;
+        row.why = 'estudio-close-failed';
+        report.errors.push(`${spec.tag}:${approach}: estudio close failed`);
+        return row;
+      }
+      const re = await boardVan(page, cdp, spec.touch);
       if (!re.ok) {
         row.ok = false;
+        row.reboard = re;
         report.errors.push(`${spec.tag}:${approach}: reboard after estudio failed`);
         return row;
       }
@@ -431,8 +547,14 @@ async function runApproach(spec, approach) {
             report.errors.push(`${spec.tag}:${approach}:${how}: reopen estudio failed`);
             break;
           }
-          await closePreview(page, cdp, spec.touch, 'x');
-          const re = await reboardWithin(page, cdp, spec.touch, 8000);
+          const left = await closePreview(page, cdp, spec.touch, 'salir');
+          if (!left.ok) {
+            row.closes.push({ how, ok: false, stage: 'reopen-estudio-close', left });
+            row.ok = false;
+            report.errors.push(`${spec.tag}:${approach}:${how}: reopen estudio close failed`);
+            break;
+          }
+          const re = await boardVan(page, cdp, spec.touch);
           if (!re.ok) {
             row.closes.push({ how, ok: false, stage: 'reopen-reboard', re });
             row.ok = false;
@@ -484,7 +606,7 @@ async function runVisitor(spec) {
     for (const name of DOORS) {
       const start = await snap(page);
       if (!start.driving) {
-        const re = await reboardWithin(page, cdp, spec.touch, 8000);
+        const re = await boardVan(page, cdp, spec.touch);
         if (!re.ok) {
           row.doors.push({ name, ok: false, why: 'reboard-failed' });
           row.ok = false;
