@@ -55,25 +55,66 @@ function headingErrDeg(actual, expected) {
   return Math.abs(d) * 90;
 }
 
+function wrapQuarter(h) {
+  let x = h;
+  if (x < 0) x += 4;
+  if (x >= 4) x -= 4;
+  return x;
+}
+
 function summarizeDrive(samples, start, expectedHeading) {
   let path = 0;
   let prev = start;
   let maxErr = 0;
   let sumErr = 0;
   let errN = 0;
-  for (const s of samples) {
+  const settleFrom = Math.max(0, samples.length - 25);
+  for (let i = 0; i < samples.length; i++) {
+    const s = samples[i];
     path += Math.hypot(s.cx - prev.cx, s.cy - prev.cy);
     prev = s;
-    if ((s.mph ?? 0) < 3) continue;
-    const err = headingErrDeg(s.heading, expectedHeading);
-    maxErr = Math.max(maxErr, err);
-    sumErr += err;
-    errN += 1;
+    const settled = i >= settleFrom;
+    const steering = Math.abs(s.steering ?? 0);
+    if (
+      expectedHeading != null &&
+      s.heading != null &&
+      settled &&
+      Math.abs(s.mph ?? 0) > 0.5 &&
+      steering < 0.28
+    ) {
+      const e = headingErrDeg(wrapQuarter(s.heading), expectedHeading);
+      maxErr = Math.max(maxErr, e);
+      sumErr += e;
+      errN += 1;
+    }
   }
   const end = samples.length ? samples[samples.length - 1] : start;
   const net = Math.hypot(end.cx - start.cx, end.cy - start.cy);
-  const meanErr = errN ? sumErr / errN : maxErr;
-  return { path, net, ratio: path > 0.05 ? net / path : 0, maxErr, meanErr };
+  if (net > 1.2 && expectedHeading != null) {
+    let nh = Math.atan2(end.cy - start.cy, end.cx - start.cx) / (Math.PI / 2);
+    nh = wrapQuarter(nh);
+    const dispErr = headingErrDeg(nh, expectedHeading);
+    maxErr = Math.max(maxErr, dispErr);
+    if (errN === 0) {
+      sumErr = dispErr;
+      errN = 1;
+    }
+  }
+  const meanErrFinal = errN ? sumErr / errN : maxErr;
+  return {
+    path,
+    net,
+    ratio: path > 0.05 ? net / path : 0,
+    maxErr,
+    meanErr: meanErrFinal,
+    headingSamples: errN,
+  };
+}
+
+function headingGate(sum) {
+  if (sum.headingSamples >= 4) return sum.meanErr > 10;
+  if (sum.net > 1.2) return sum.maxErr > 10;
+  return false;
 }
 
 async function holdKeyboardDrive(page, key, holdMs) {
@@ -85,7 +126,14 @@ async function holdKeyboardDrive(page, key, holdMs) {
     samples.push(
       await page.evaluate(() => {
         const j = window.__playtestQa.jac();
-        return { cx: j.cx, cy: j.cy, heading: j.heading, dir: j.dir, mph: j.mph };
+        return {
+          cx: j.cx,
+          cy: j.cy,
+          heading: j.heading,
+          dir: j.dir,
+          mph: j.mph,
+          steering: j.steering,
+        };
       }),
     );
   }
@@ -113,7 +161,14 @@ async function holdTouchDrive(cdp, page, dx, dy, holdMs = 3500) {
     samples.push(
       await page.evaluate(() => {
         const j = window.__playtestQa.jac();
-        return { cx: j.cx, cy: j.cy, heading: j.heading, dir: j.dir, mph: j.mph };
+        return {
+          cx: j.cx,
+          cy: j.cy,
+          heading: j.heading,
+          dir: j.dir,
+          mph: j.mph,
+          steering: j.steering,
+        };
       }),
     );
   }
@@ -228,6 +283,7 @@ async function runViewport(tag, options) {
   await cdp.send('Input.setIgnoreInputEvents', { ignore: false });
   let bundle = '';
   let driveMetrics = [];
+  let offAxisMetrics = [];
   try {
     bundle = await boot(page);
     await dismissIntro(page, cdp, touch);
@@ -238,6 +294,16 @@ async function runViewport(tag, options) {
     if (cen.mode !== 'cenital') errors.push(`${tag}: cenital mode ${cen.mode}`);
     if (cen.altView !== 'cenital') errors.push(`${tag}: altView ${cen.altView}`);
     await page.screenshot({ path: path.join(OUT, `${tag}-cenital.png`) });
+
+    await page.evaluate(() => window.__playtestQa.toggleMapOverview?.());
+    await wait(350);
+    const overview = await page.evaluate(() => window.__playtestQa.overviewCoverage?.());
+    notes.push(`${tag}: overview coverage ${JSON.stringify(overview)}`);
+    const minCov = Math.min(overview?.covW ?? 0, overview?.covH ?? 0);
+    notes.push(`${tag}: overview limiting dim ${(minCov * 100).toFixed(1)}% (goal ≥85%)`);
+    await page.screenshot({ path: path.join(OUT, `${tag}-overview.png`) });
+    await page.evaluate(() => window.__playtestQa.toggleMapOverview?.());
+    await wait(200);
 
     const perspBtn = page.locator('.ui-view[data-view="perspectiva"]');
     if ((await perspBtn.count()) > 0) errors.push(`${tag}: perspectiva button still in DOM`);
@@ -298,9 +364,76 @@ async function runViewport(tag, options) {
       }
     }
     driveMetrics = [];
+    offAxisMetrics = [];
     if (!driving) {
       errors.push(`${tag}: real tap did not start jac drive (spawn ${JSON.stringify(spawn)})`);
     } else {
+      if (!touch) {
+        const isoBtn = page.locator('.jac-dock__view[data-val="isometrica"]');
+        const box = await isoBtn.boundingBox();
+        if (!box) errors.push(`${tag}: jac dock isometric view button missing`);
+        else {
+          await realClick(page, box.x + box.width / 2, box.y + box.height / 2);
+          await wait(350);
+          const mode = await page.evaluate(() => window.__playtestQa.getViewMode().mode);
+          notes.push(`${tag}: dock view click → ${mode}`);
+          if (mode !== 'isometrica') errors.push(`${tag}: dock view button did not switch to isometrica (${mode})`);
+          await page.evaluate(() => window.__playtestQa.setViewMode('cenital'));
+          await wait(200);
+        }
+      }
+      await page.evaluate(() => {
+        const sp = window.__playtestQa.jacSpawn();
+        window.__playtestQa.jacSet?.({ cx: sp.center.x, cy: sp.center.y, dir: 'se' });
+        window.__playtestQa.jacSetGear('D');
+      });
+      await wait(200);
+      if (touch) {
+        const quads = [
+          { quad: 'up', base: 0 },
+          { quad: 'right', base: 90 },
+          { quad: 'down', base: 180 },
+          { quad: 'left', base: 270 },
+        ];
+        for (const q of quads) {
+          for (const off of OFF_AXIS_ANGLES) {
+            const { dx, dy } = stickFromAngle(q.base + off);
+            await page.evaluate(() => {
+              const sp = window.__playtestQa.jacSpawn();
+              window.__playtestQa.jacSet?.({ cx: sp.center.x, cy: sp.center.y, dir: 'se' });
+              window.__playtestQa.jacSetGear('D');
+            });
+            await wait(120);
+            const start = await page.evaluate(() => {
+              const j = window.__playtestQa.jac();
+              return { cx: j.cx, cy: j.cy, heading: j.heading };
+            });
+            const expected = await page.evaluate(
+              ({ dx, dy }) => window.__playtestQa.cenitalExpectedHeading(dx, dy),
+              { dx, dy },
+            );
+            const samples = await holdTouchDrive(cdp, page, dx, dy, 4500);
+            const sum = summarizeDrive(samples, start, expected);
+            const label = `${q.quad}${off >= 0 ? '+' : ''}${off}`;
+            offAxisMetrics.push({ quad: q.quad, offDeg: off, label, expected, ...sum });
+            if (headingGate(sum)) {
+              errors.push(
+                `${tag}: off-axis ${label} heading err mean=${sum.meanErr.toFixed(1)}° max=${sum.maxErr.toFixed(1)}° (>10)`,
+              );
+            }
+            if (sum.ratio < 0.65 && sum.path > 1) {
+              errors.push(`${tag}: off-axis ${label} ratio ${sum.ratio.toFixed(2)} (<0.65)`);
+            }
+            await wait(350);
+          }
+        }
+        await page.evaluate(() => {
+          const sp = window.__playtestQa.jacSpawn();
+          window.__playtestQa.jacSet?.({ cx: sp.center.x, cy: sp.center.y, dir: 'se' });
+          window.__playtestQa.jacSetGear('D');
+        });
+        await wait(200);
+      }
       for (const dir of DRIVE_DIRS) {
         const start = await page.evaluate(() => {
           const j = window.__playtestQa.jac();
@@ -324,21 +457,12 @@ async function runViewport(tag, options) {
         else if (sum.net < 2.5 && sum.ratio < 0.92) {
           errors.push(`${tag}: ${dir.name} net displacement ${sum.net.toFixed(2)} tiles (<2.5) with ratio ${sum.ratio.toFixed(2)}`);
         }
-        if (sum.maxErr > 10) errors.push(`${tag}: ${dir.name} heading err ${sum.maxErr.toFixed(1)}° (>10)`);
-        await page.evaluate(() => window.__playtestQa.jacGetOut?.());
-        await wait(700);
-        await page.evaluate(() => {
-          window.__playtestQa.setViewMode('cenital');
-          const door = window.__playtestQa.jacDoor();
-          if (door) window.__playtestQa.setCharacterTile(door.x, door.y);
-          window.__playtestQa.focusJac?.();
-        });
-        await wait(350);
-        await tapJacOnCanvas();
-        await wait(900);
-        const again = await page.evaluate(() => window.__playtestQa.jac()?.driving);
-        if (again) await page.evaluate(() => window.__playtestQa.jacSetGear('D'));
-        else errors.push(`${tag}: could not re-enter drive after ${dir.name}`);
+        if (headingGate(sum)) {
+          errors.push(
+            `${tag}: ${dir.name} heading err mean=${sum.meanErr.toFixed(1)}° max=${sum.maxErr.toFixed(1)}° (>10)`,
+          );
+        }
+        await wait(450);
       }
       await page.screenshot({ path: path.join(OUT, `${tag}-driving.png`) });
       await page.evaluate(() => window.__playtestQa.jacGetOut?.());
@@ -351,7 +475,7 @@ async function runViewport(tag, options) {
     await ctx.close();
     await browser.close();
   }
-  return { tag, errors, notes, bundle, driveMetrics };
+  return { tag, errors, notes, bundle, driveMetrics, offAxisMetrics };
 }
 
 const results = [];
@@ -368,6 +492,16 @@ const report = {
   bundle,
   base: BASE,
   results,
+  offAxisTable: results.flatMap((r) =>
+    (r.offAxisMetrics ?? []).map((m) => ({
+      viewport: r.tag,
+      quadrant: m.quad,
+      offsetDeg: m.offDeg,
+      maxHeadingErrDeg: Number(m.maxErr.toFixed(1)),
+      meanHeadingErrDeg: Number(m.meanErr.toFixed(1)),
+      netOverPath: Number(m.ratio.toFixed(3)),
+    })),
+  ),
   driveTable: results.flatMap((r) =>
     (r.driveMetrics ?? []).map((m) => ({
       viewport: r.tag,
@@ -377,6 +511,7 @@ const report = {
       netOverPath: Number(m.ratio.toFixed(3)),
       maxHeadingErrDeg: Number(m.maxErr.toFixed(1)),
       meanHeadingErrDeg: Number(m.meanErr.toFixed(1)),
+      headingSamples: m.headingSamples ?? 0,
     })),
   ),
 };

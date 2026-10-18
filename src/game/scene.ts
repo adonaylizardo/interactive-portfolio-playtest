@@ -1460,6 +1460,51 @@ export class IsoScene {
     );
   }
 
+  private mapScreenRectOnCanvas(): { left: number; top: number; right: number; bottom: number } {
+    const pts = [
+      tileToWorld(0, 0),
+      tileToWorld(MAP_WIDTH - 1, 0),
+      tileToWorld(0, MAP_HEIGHT - 1),
+      tileToWorld(MAP_WIDTH - 1, MAP_HEIGHT - 1),
+    ];
+    let left = Infinity;
+    let right = -Infinity;
+    let top = Infinity;
+    let bottom = -Infinity;
+    for (const p of pts) {
+      const s = this.worldToScreen(p.x, p.y);
+      if (s.x < left) left = s.x;
+      if (s.x > right) right = s.x;
+      if (s.y < top) top = s.y;
+      if (s.y > bottom) bottom = s.y;
+    }
+    return { left, top, right, bottom };
+  }
+
+  private overviewFillFraction(): { covW: number; covH: number } {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const m = cameraFitMargins();
+    const freeW = Math.max(1, sw - m.left - m.right);
+    const freeH = Math.max(1, sh - m.top - m.bottom);
+    const r = this.mapScreenRectOnCanvas();
+    const iw = Math.max(0, Math.min(m.left + freeW, r.right) - Math.max(m.left, r.left));
+    const ih = Math.max(0, Math.min(m.top + freeH, r.bottom) - Math.max(m.top, r.top));
+    return { covW: iw / freeW, covH: ih / freeH };
+  }
+
+  private mapFitsOverviewMargins(): boolean {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const m = cameraFitMargins();
+    const ml = Math.max(MAP_FIT_MARGIN_PX, m.left);
+    const mr = Math.max(MAP_FIT_MARGIN_PX, m.right);
+    const mt = Math.max(MAP_FIT_MARGIN_PX, m.top);
+    const mb = Math.max(MAP_FIT_MARGIN_PX, m.bottom);
+    const r = this.mapScreenRectOnCanvas();
+    return r.left >= ml - 2 && r.right <= sw - mr + 2 && r.top >= mt - 2 && r.bottom <= sh - mb + 2;
+  }
+
   private frameMapOverview(): void {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
@@ -1469,9 +1514,29 @@ export class IsoScene {
     const aim = this.freeRectCenter();
     const wx = (b.minX + b.maxX) / 2;
     const wy = (b.minY + b.maxY) / 2;
-    let zoom = this.zoomMinForCurrentView(sw, sh);
-    for (let i = 0; i < 36; i++) {
-      this.zoom = zoom;
+    const zMin = this.zoomMinForCurrentView(sw, sh);
+    let zoom = zMin;
+    let best = { zoom: zMin, cameraX: this.cameraX, cameraY: this.cameraY, score: 0 };
+    for (let i = 0; i < 56; i++) {
+      this.zoom = clampZoom(zoom, sw, sh);
+      this.placeWorldAtScreen(wx, wy, aim.x, aim.y);
+      this.applyCamera(false);
+      if (!this.mapFitsOverviewMargins()) {
+        zoom *= 0.965;
+        if (zoom < zMin * 0.82) break;
+        continue;
+      }
+      const cov = this.overviewFillFraction();
+      const score = Math.min(cov.covW, cov.covH);
+      if (score >= best.score) {
+        best = { zoom: this.zoom, cameraX: this.cameraX, cameraY: this.cameraY, score };
+      }
+      if (score >= 0.85) break;
+      if (this.zoom >= clampZoom(zMin * 3.2, sw, sh) - 1e-4) break;
+      zoom *= 1.022;
+    }
+    if (best.score < 0.05) {
+      this.zoom = zMin;
       this.placeWorldAtScreen(wx, wy, aim.x, aim.y);
       const fitted = clampPanMapFullyInView(
         { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
@@ -1481,14 +1546,12 @@ export class IsoScene {
       this.cameraX = fitted.cameraX;
       this.cameraY = fitted.cameraY;
       this.zoom = fitted.zoom;
-      const cov = viewportMapCoverage(
-        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
-        sw,
-        sh,
-      );
-      if (Math.min(cov.covW, cov.covH) >= 0.85) break;
-      zoom *= 0.93;
+    } else {
+      this.zoom = best.zoom;
+      this.cameraX = best.cameraX;
+      this.cameraY = best.cameraY;
     }
+    this.applyCamera(false);
   }
 
   private leaveMapOverview(opts?: { restorePan?: boolean }): void {
@@ -5654,6 +5717,13 @@ export class IsoScene {
     const mag = Math.hypot(x, y);
     if (mag < 1e-6) return null;
     return headingFromTileStick(x / mag, y / mag, this.jac?.dir ?? 'se');
+  }
+
+  /** QA: map fill fraction in the viewport while overview is active. */
+  qaOverviewCoverage(): { covW: number; covH: number; overview: boolean } {
+    this.applyCamera(false);
+    const cov = this.overviewFillFraction();
+    return { covW: cov.covW, covH: cov.covH, overview: this.mapOverview };
   }
 
   /** QA: opaque-top client point vs the HTML pill's bottom (gap should stay ~NAME_PILL_GAP_PX). */

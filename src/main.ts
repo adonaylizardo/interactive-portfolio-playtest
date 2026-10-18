@@ -311,6 +311,7 @@ async function main(): Promise<void> {
     setViewMode: (m: Camera) => scene.setViewMode(m),
     rotateView: () => scene.rotateView(),
     toggleMapOverview: () => scene.toggleMapOverview(),
+    overviewCoverage: () => scene.qaOverviewCoverage(),
     cameraViews: () => scene.qaCameraViews(),
     cenitalExpectedHeading: (dx: number, dy: number) => scene.qaCenitalExpectedHeading(dx, dy),
     cenitalBuildingLabels: () => cenitalLabels.qa(),
