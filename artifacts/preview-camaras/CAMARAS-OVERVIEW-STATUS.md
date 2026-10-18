@@ -5,13 +5,15 @@ Harness (fixed):
 - Door-while-driving success requires **building panel or interior** from a **CDP touch only** (drive goals no longer count).
 - Overview reports **covW** and **covH** separately; **limitingFill = min(covW, covH)** (bottleneck axis).
 
-Local accept (Playwright + verify): `index-DUsehps8.js` @ `http://127.0.0.1:4175/.../preview-camaras/`
+Live bundle (gh-pages): **`index-BZ3ODSr2.js`** — confirm with cache-busted fetch (`?nocache=<ts>`); raw `gh-pages` HTML matches; CDN may lag minutes.
 
-| Viewport | covW | covH | limiting axis | limiting fill | mapFullyVisible |
-|----------|------|------|---------------|---------------|-----------------|
-| 390×844  | see accept-report.json overviewResults | | | ≥90% | yes |
-| 844×390  | | | | ≥90% | yes |
-| 1280×800 | | | | ≥90% | yes |
+Local accept (Playwright + verify): **`index-BZ3ODSr2.js`**
+
+| Viewport | covW | covH | limiting fill | mapFullyVisible | label overlaps |
+|----------|------|------|---------------|-----------------|----------------|
+| 390×844  | 100% | 100% | 100% (height) | yes | 0 |
+| 844×390  | 100% | 100% | 100% (height) | yes | 0 |
+| 1280×800 | 100% | 100% | 100% (height) | yes | 0 |
 
 Door tap while driving (cenital, 390): **5/5 ×2 rounds** — panel opens from cyan door touch (see `390-door-tap-log.json`).
 
