@@ -1679,7 +1679,7 @@ export class IsoScene {
 
   /** Pinch-zoomed door taps miss the diamond; take the nearest door within 2.4 tiles. */
   private pickNearbyDriveDoor(sx: number, sy: number): MapObject | undefined {
-    if (this.zoom > 0.2) return undefined;
+    if (this.zoom > 0.32) return undefined;
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
     const tile = worldToTile(wx, wy);
     if (!tile) return undefined;
@@ -1687,7 +1687,8 @@ export class IsoScene {
     for (const obj of objects) {
       if (obj.type !== 'building' || !obj.door || !obj.panelTitle) continue;
       const d = Math.hypot(tile.x - obj.door.x, tile.y - obj.door.y);
-      if (d > 2.4) continue;
+      // Tight slop so a ground tap like (37,26) does not steal Bain (39,26).
+      if (d > 1.8) continue;
       if (!best || d < best.d) best = { obj, d };
     }
     return best?.obj;

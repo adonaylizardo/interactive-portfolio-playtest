@@ -193,10 +193,12 @@ async function tapDoor(page, cdp, name, touch) {
   await wait(80);
   const hit = await page.evaluate((n) => {
     const j = window.__playtestQa.jac();
+    const r = window.__playtestQa.inputReady();
     const b = window.__playtestQa.getEnterableBuildings().find((o) => o.name === n);
     const g = j.driveGoal;
-    if (!b?.door || !g) return false;
-    return Math.hypot(g.x - b.door.x, g.y - b.door.y) < 8;
+    if (!b?.door) return false;
+    const near = g && Math.hypot(g.x - b.door.x, g.y - b.door.y) < 8;
+    return !!r.pendingDrive && !!near;
   }, name);
   if (!hit) {
     await page.evaluate((n) => window.__playtestQa.tapBuildingDoor?.(n), name);
