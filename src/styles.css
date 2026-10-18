@@ -1740,10 +1740,31 @@ body[data-layout='panel'] .checklist {
     gap: 12px;
   }
 
-  .building-panel--experience.building-panel--writings .experience__row-title {
-    font-size: 13px;
+  .building-panel--experience.building-panel--writings.building-panel--exp-list .experience__row-title {
+    font-size: 14px;
     line-height: 20px;
-    letter-spacing: -0.02em;
+  }
+
+  .building-panel--experience.building-panel--writings.building-panel--exp-list .experience__row-meta {
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  .building-panel--experience.building-panel--writings.building-panel--exp-detail .writings-reader {
+    gap: 12px;
+  }
+
+  .building-panel--experience.building-panel--writings.building-panel--exp-detail .writings-reader__hero {
+    height: 193px;
+  }
+
+  .building-panel--experience.building-panel--writings.building-panel--exp-detail .writings-reader__p {
+    line-height: 24px;
+    text-wrap: wrap;
+  }
+
+  .building-panel--experience.building-panel--writings.building-panel--exp-detail .writings-reader__substack {
+    height: 44px;
   }
 
   .building-panel--experience .talks-player {
@@ -3941,11 +3962,4 @@ body.jac-info[data-chrome='phone'] .chrome__dock {
     visibility: hidden;
   }
 }
-
-@media (max-width: 767px) {
-  .building-panel--experience.building-panel--writings.building-panel--exp-detail .writings-reader__p {
-    text-wrap: wrap;
-  }
-}
-
 

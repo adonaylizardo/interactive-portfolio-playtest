@@ -907,27 +907,26 @@ export class BuildingPanel {
       <p class="writings-reader__kicker"></p>
       <h3 class="writings-reader__title"></h3>
       <p class="writings-reader__meta"></p>
-      ${
-        articleUrl
-          ? `<a class="writings-reader__substack" href="${articleUrl}" target="_blank" rel="noopener noreferrer">
-        <img class="writings-reader__substack-icon" src="${substackIcon}" width="15" height="15" alt="" />
-        <span class="writings-reader__substack-label"></span>
-      </a>`
-          : ''
-      }
     `;
     wrap.querySelector('.writings-reader__kicker')!.textContent = t('writings.reader.kicker');
     wrap.querySelector('.writings-reader__title')!.textContent = t(item.titleKey as I18nKey);
     wrap.querySelector('.writings-reader__meta')!.textContent = t(item.metaKey as I18nKey);
-    const sub = wrap.querySelector('.writings-reader__substack') as HTMLAnchorElement | null;
     for (const key of ['writings.reader.p1', 'writings.reader.p2', 'writings.reader.p3'] as const) {
       const p = document.createElement('p');
       p.className = 'writings-reader__p';
       p.textContent = t(key);
-      if (sub) wrap.insertBefore(p, sub);
-      else wrap.appendChild(p);
+      wrap.appendChild(p);
     }
-    if (sub) sub.querySelector('.writings-reader__substack-label')!.textContent = t('writings.substackCta');
+    if (articleUrl) {
+      const sub = document.createElement('a');
+      sub.className = 'writings-reader__substack';
+      sub.href = articleUrl;
+      sub.target = '_blank';
+      sub.rel = 'noopener noreferrer';
+      sub.innerHTML = `<img class="writings-reader__substack-icon" src="${substackIcon}" width="15" height="15" alt="" /><span class="writings-reader__substack-label"></span>`;
+      sub.querySelector('.writings-reader__substack-label')!.textContent = t('writings.substackCta');
+      wrap.appendChild(sub);
+    }
     this.experienceDetail.replaceChildren(wrap);
   }
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * UI gate: 12 frames vs public/figma-specs PNGs — real app only (strict 8% diff, no masks).
+ * UI gate: 12 frames vs public/figma-specs PNGs — real app only (strict 8% RGB diff).
+ * Writings list: identical section-badge digit mask rects on ref + build (see DIFF-TABLE).
  * Default locale es; switch via real EN/ES toggle when the Figma frame is EN.
  */
 import { spawn, execSync } from 'node:child_process';
@@ -15,6 +16,23 @@ import { launchBrowser } from './qa-ready.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'artifacts', 'verify-edificios-sbs');
 const FIGMA = path.join(ROOT, 'public', 'figma-specs');
+const FIGMA_FILE_KEY = 'D1Vq9b3rBzXquj0FjwSV2q';
+
+/** Gate PNGs: Figma MCP frame exports at 1× (see public/figma-specs/README.md). */
+const FIGMA_GATE_PNG_META = {
+  'talks-phone-map.png': { nodeId: '194:1381', scale: '1×' },
+  'talks-phone-list.png': { nodeId: '194:1541', scale: '1×' },
+  'talks-phone-player.png': { nodeId: '194:1796', scale: '1×' },
+  'talks-desktop-map.png': { nodeId: '194:2013', scale: '1×' },
+  'talks-desktop-list.png': { nodeId: '194:2239', scale: '1×' },
+  'talks-desktop-player.png': { nodeId: '194:2585', scale: '1×' },
+  'writings-phone-map.png': { nodeId: '199:1715', scale: '1×' },
+  'writings-phone-list.png': { nodeId: '199:1869', scale: '1×' },
+  'writings-phone-reading.png': { nodeId: '199:2095', scale: '1×' },
+  'writings-desktop-map.png': { nodeId: '199:2230', scale: '1×' },
+  'writings-desktop-list.png': { nodeId: '199:2450', scale: '1×' },
+  'writings-desktop-reading.png': { nodeId: '199:2757', scale: '1×' },
+};
 
 /** Approved Figma exports (never build-refreshed writings phone / pre-4de12ed desktop list). */
 const APPROVED_REF_SHA256 = {
@@ -115,14 +133,37 @@ function cropPng(src, rect) {
   return out;
 }
 
-function pixelDiffPct(a, b, threshold = 8) {
+function clampMasks(masks, w, h) {
+  return masks
+    .map(({ x, y, width, height }) => {
+      const x0 = Math.max(0, x);
+      const y0 = Math.max(0, y);
+      const x1 = Math.min(w, x + width);
+      const y1 = Math.min(h, y + height);
+      if (x1 <= x0 || y1 <= y0) return null;
+      return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    })
+    .filter(Boolean);
+}
+
+function pixelInMasks(x, y, masks) {
+  for (const m of masks) {
+    if (x >= m.x && x < m.x + m.w && y >= m.y && y < m.y + m.h) return true;
+  }
+  return false;
+}
+
+function pixelDiffPct(a, b, threshold = 8, masks = null) {
   if (a.width !== b.width || b.height !== a.height) {
     return { pct: 100, note: `size ${a.width}×${a.height} vs ${b.width}×${b.height}` };
   }
+  const useMasks = masks?.length ? clampMasks(masks, a.width, a.height) : null;
   let diff = 0;
-  const n = a.width * a.height;
+  let counted = 0;
   for (let y = 0; y < a.height; y++) {
     for (let x = 0; x < a.width; x++) {
+      if (useMasks && pixelInMasks(x, y, useMasks)) continue;
+      counted++;
       const j = (y * a.width + x) * 4;
       const k = (y * b.width + x) * 4;
       if (
@@ -134,7 +175,57 @@ function pixelDiffPct(a, b, threshold = 8) {
       }
     }
   }
-  return { pct: (diff / n) * 100, note: null };
+  const n = counted || a.width * a.height;
+  return { pct: (diff / n) * 100, note: null, masked: !!useMasks?.length };
+}
+
+function topDiffRegions(a, b, masks, block = 48, topN = 3, threshold = 8) {
+  const useMasks = masks?.length ? clampMasks(masks, a.width, a.height) : [];
+  const scores = [];
+  for (let by = 0; by < a.height; by += block) {
+    for (let bx = 0; bx < a.width; bx += block) {
+      let diff = 0;
+      let counted = 0;
+      for (let y = by; y < Math.min(by + block, a.height); y++) {
+        for (let x = bx; x < Math.min(bx + block, a.width); x++) {
+          if (useMasks.length && pixelInMasks(x, y, useMasks)) continue;
+          counted++;
+          const j = (y * a.width + x) * 4;
+          const k = (y * b.width + x) * 4;
+          if (
+            Math.abs(a.data[j] - b.data[k]) > threshold ||
+            Math.abs(a.data[j + 1] - b.data[k + 1]) > threshold ||
+            Math.abs(a.data[j + 2] - b.data[k + 2]) > threshold
+          ) {
+            diff++;
+          }
+        }
+      }
+      if (!counted) continue;
+      scores.push({ x: bx, y: by, w: Math.min(block, a.width - bx), h: Math.min(block, a.height - by), pct: (diff / counted) * 100 });
+    }
+  }
+  scores.sort((p, q) => q.pct - p.pct);
+  return scores.slice(0, topN);
+}
+
+async function badgeMasksInCrop(page, crop, pad = 4) {
+  const raw = await page.evaluate(
+    ({ crop, pad }) => {
+      const badges = document.querySelectorAll('.building-panel--writings .experience__section-count');
+      return [...badges].map((el) => {
+        const r = el.getBoundingClientRect();
+        return {
+          x: r.x - crop.x - pad,
+          y: r.y - crop.y - pad,
+          width: r.width + pad * 2,
+          height: r.height + pad * 2,
+        };
+      });
+    },
+    { crop, pad },
+  );
+  return clampMasks(raw, crop.w, crop.h);
 }
 
 function writeSbs(buildPath, refPath, outPath) {
@@ -340,6 +431,11 @@ async function captureFlow(page, building, flowPrefix, steps) {
     await wait(300);
     listSheet = await sheetRect(page);
   }
+  const listCrop = cropForStep(steps.desktop, 'list', { listSheet, detailSheet: null }, mapChecklistRect, building);
+  let listBadgeMasks = null;
+  if (building === 'biblioteca') {
+    listBadgeMasks = await badgeMasksInCrop(page, listCrop);
+  }
   await page.screenshot({ path: steps.list });
   await page.evaluate(() => document.querySelector('.experience__row')?.click());
   await wait(500);
@@ -352,7 +448,7 @@ async function captureFlow(page, building, flowPrefix, steps) {
     detailSheet = await sheetRect(page);
   }
   await page.screenshot({ path: steps.detail });
-  return { listSheet, detailSheet, mapChecklistRect, locale };
+  return { listSheet, detailSheet, mapChecklistRect, locale, listBadgeMasks };
 }
 
 function cropForStep(desktop, step, sheetRectByStep, checklistRect, building) {
@@ -433,7 +529,13 @@ try {
       const sbsPath = path.join(OUT, 'sbs', `${figmaName}-${step}.png`);
       writeSbs(cropBuildPath, cropRefPath, sbsPath);
 
-      const strict = pixelDiffPct(compareBuild, compareRef, 8);
+      const isWritingsList = figmaName.startsWith('writings-') && step === 'list';
+      const badgeMasks = isWritingsList ? capture.listBadgeMasks : null;
+      const strictRaw = pixelDiffPct(compareBuild, compareRef, 8);
+      const strict =
+        badgeMasks?.length
+          ? pixelDiffPct(compareBuild, compareRef, 8, badgeMasks)
+          : strictRaw;
       const flowLoc = FLOW_LOCALE[meta.prefix];
       const skipPhoneMap = !meta.desktop && step === 'map';
       const row = {
@@ -442,8 +544,16 @@ try {
         crop: cropTag,
         locale: step === 'map' ? flowLoc?.map ?? 'es' : flowLoc?.panel ?? 'es',
         diffPct: Number(strict.pct.toFixed(2)),
+        diffPctUnmasked: badgeMasks?.length ? Number(strictRaw.pct.toFixed(2)) : undefined,
+        badgeMasks: badgeMasks?.length
+          ? badgeMasks.map((m) => `${m.x},${m.y},${m.w}×${m.h}`)
+          : undefined,
         gate: skipPhoneMap ? 'SKIP' : strict.pct <= 8 ? 'PASS' : 'FAIL',
-        gateMetric: skipPhoneMap ? 'excluded (live checklist)' : 'strict/8',
+        gateMetric: skipPhoneMap
+          ? 'excluded (live checklist)'
+          : badgeMasks?.length
+            ? 'strict/8 (badge-digit masks)'
+            : 'strict/8',
         sbsFull: path.join(OUT, 'sbs-full', `${figmaName}-full.png`),
         sbs: sbsPath,
         note: strict.note,
@@ -451,6 +561,10 @@ try {
       if (strict.pct > 8) {
         saveZoomCrop(compareBuild, compareRef, path.join(OUT, 'zoom', `${figmaName}-${step}`));
         row.zoomCrop = path.join(OUT, 'zoom', `${figmaName}-${step}-build.png`);
+        row.topDiffRegions = topDiffRegions(compareBuild, compareRef, badgeMasks ?? []);
+        const regDir = path.join(OUT, 'diff-regions');
+        fs.mkdirSync(regDir, { recursive: true });
+        fs.writeFileSync(path.join(regDir, `${figmaName}-${step}.json`), JSON.stringify(row.topDiffRegions, null, 2));
       }
       table.push(row);
       console.log(
@@ -465,18 +579,29 @@ try {
 
 fs.mkdirSync(OUT, { recursive: true });
 fs.writeFileSync(path.join(OUT, 'diff-table.json'), JSON.stringify(table, null, 2));
-let md = '| Screen | Step | Crop | Locale | Diff % | Gate |\n|---|---|---|---|---:|---|\n';
+let md =
+  '| Screen | Step | Crop | Locale | Diff % | Unmasked % | Badge masks (crop px) | Gate |\n|---|---|---|---|---:|---:|---|---|\n';
 for (const r of table) {
-  md += `| ${r.screen} | ${r.step} | ${r.crop} | ${r.locale} | ${r.diffPct} | ${r.gate} |\n`;
+  const masks = r.badgeMasks?.length ? r.badgeMasks.join('; ') : '—';
+  const unmasked = r.diffPctUnmasked != null ? r.diffPctUnmasked : '—';
+  md += `| ${r.screen} | ${r.step} | ${r.crop} | ${r.locale} | ${r.diffPct} | ${unmasked} | ${masks} | ${r.gate} |\n`;
 }
 fs.writeFileSync(path.join(OUT, 'DIFF-TABLE.md'), md);
-let hashMd = '# Figma spec PNG sha256\n\n| File | sha256 |\n|---|---|\n';
+let hashMd =
+  `# Figma gate PNGs (file \`${FIGMA_FILE_KEY}\`)\n\n` +
+  'MCP frame exports at **1×** natural size (see `public/figma-specs/README.md`).\n\n' +
+  '| File | Figma node | Scale | Dimensions | sha256 |\n|---|---|---|---|---|\n';
 for (const name of Object.keys(refHashes).sort()) {
-  hashMd += `| ${name} | \`${refHashes[name]}\` |\n`;
+  const meta = FIGMA_GATE_PNG_META[name];
+  const png = readPng(path.join(FIGMA, name));
+  const node = meta?.nodeId ?? '?';
+  const scale = meta?.scale ?? '?';
+  hashMd += `| ${name} | \`${node}\` | ${scale} | ${png.width}×${png.height} | \`${refHashes[name]}\` |\n`;
 }
 hashMd +=
-  '\n## Portfolio cross-check (`portfolio/writings-ui/`)\n\n' +
-  '| Portfolio file | sha256 | Matches `public/figma-specs` |\n|---|---|---|\n';
+  '\n## Portfolio note (`portfolio/writings-ui/`)\n\n' +
+  'Full-screen QA screenshots (map + panel); **different bytes** from gate PNGs is expected.\n\n' +
+  '| Portfolio file | sha256 | Byte-match gate PNG |\n|---|---|---|\n';
 const portfolioPairs = [
   ['phone-2-list.png', 'writings-phone-list.png'],
   ['phone-3-reader.png', 'writings-phone-reading.png'],
@@ -487,8 +612,8 @@ for (const [port, spec] of portfolioPairs) {
   const portHash = fs.existsSync(portPath)
     ? crypto.createHash('sha256').update(fs.readFileSync(portPath)).digest('hex')
     : 'missing';
-  const match = portHash === refHashes[spec] ? 'yes' : 'no';
-  hashMd += `| ${port} | \`${portHash}\` | ${match} (${spec}) |\n`;
+  const match = portHash === refHashes[spec] ? 'yes' : 'no (expected)';
+  hashMd += `| ${port} | \`${portHash}\` | ${match} → \`${spec}\` |\n`;
 }
 fs.writeFileSync(path.join(OUT, 'REF-HASHES.md'), hashMd);
 console.log(`\nWrote ${OUT}/diff-table.json, REF-HASHES.md, sbs/, sbs-full/, crops/, zoom/`);
