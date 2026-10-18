@@ -1531,9 +1531,11 @@ export class IsoScene {
       if (score >= best.score) {
         best = { zoom: this.zoom, cameraX: this.cameraX, cameraY: this.cameraY, score };
       }
-      if (score >= 0.85) break;
-      if (this.zoom >= clampZoom(zMin * 3.2, sw, sh) - 1e-4) break;
-      zoom *= 1.022;
+      const goal = sh < 500 && sw > sh ? 0.8 : 0.85;
+      if (score >= goal) break;
+      const zoomCap = sh < 500 && sw > sh ? 4.8 : 3.2;
+      if (this.zoom >= clampZoom(zMin * zoomCap, sw, sh) - 1e-4) break;
+      zoom *= sh < 500 && sw > sh ? 1.04 : 1.022;
     }
     if (best.score < 0.05) {
       this.zoom = zMin;
@@ -3427,7 +3429,7 @@ export class IsoScene {
             performance.now() >= this.suppressDriveTapUntil
           ) {
             const rect = canvas.getBoundingClientRect();
-            this.requestDriveToScreen(t.clientX - rect.left, t.clientY - rect.top);
+            this.handleScreenTap(t.clientX - rect.left, t.clientY - rect.top, false);
           }
         } else if (e.touches.length === 0) {
           driveTap = null;
