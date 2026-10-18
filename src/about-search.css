@@ -17,6 +17,17 @@
   background: rgba(11, 12, 14, 0.55);
 }
 
+@media (max-height: 500px) and (orientation: landscape) and (max-width: 900px) {
+  .about-panel--landscape .about-panel__backdrop {
+    inset: auto;
+    top: 12px;
+    right: 59px;
+    bottom: 12px;
+    width: 360px;
+    left: auto;
+  }
+}
+
 .about-panel__sheet {
   position: absolute;
   display: flex;
@@ -97,6 +108,7 @@
   margin: 16px 0 20px;
   padding: 0;
   scroll-margin-top: 80px;
+  scroll-margin-bottom: 20px;
 }
 
 .about-panel__contact--flash {
@@ -467,18 +479,37 @@ body.search-palette-open .chrome__column {
   visibility: hidden;
 }
 
-body.about-panel-open[data-chrome='desktop'] .chrome__subtitle {
-  left: calc(64px + 432px + (100% - 64px - 432px) / 2) !important;
-  width: min(480px, calc(100% - 64px - 432px - 32px)) !important;
-  transform: translateX(-50%);
+body.about-panel-open .chrome__subtitle:not(:empty) {
+  position: fixed !important;
+  z-index: 70 !important;
 }
 
-body.about-panel-open[data-chrome='phone'] .chrome__subtitle:not(:empty) {
-  left: 50% !important;
-  width: min(340px, calc(100vw - 32px)) !important;
+body.about-panel-open[data-chrome='desktop'] .chrome__subtitle:not(:empty) {
+  left: calc(64px + 432px + (100vw - 64px - 432px) / 2) !important;
+  width: min(480px, calc(100vw - 64px - 432px - 32px)) !important;
   transform: translateX(-50%) !important;
+  bottom: 28px !important;
   top: auto !important;
-  bottom: max(168px, calc(100dvh - 52vh)) !important;
+}
+
+@media (max-width: 767px) and (orientation: portrait) {
+  body.about-panel-open[data-chrome='phone'] .chrome__subtitle:not(:empty) {
+    left: 50% !important;
+    width: min(340px, calc(100vw - 32px)) !important;
+    transform: translateX(-50%) !important;
+    top: auto !important;
+    bottom: max(168px, calc(100dvh - 52vh)) !important;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) and (max-width: 900px) {
+  body.about-panel-open .chrome__subtitle:not(:empty) {
+    left: calc((100vw - 360px - 59px) / 2) !important;
+    width: min(316px, calc(100vw - 360px - 59px - 24px)) !important;
+    transform: translateX(-50%) !important;
+    bottom: 24px !important;
+    top: auto !important;
+  }
 }
 
 body.about-panel-open[data-chrome='desktop'] .playtest-toast {

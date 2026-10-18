@@ -140,6 +140,10 @@ export class ChromeUI {
     );
   }
 
+  private isPhonePortrait(): boolean {
+    return window.matchMedia('(max-width: 767px) and (orientation: portrait)').matches;
+  }
+
   layoutInsets(): { left: number; top: number; right: number; bottom: number } {
     if (this.interiorOpen) {
       return this.mobile ? { left: 0, top: 0, right: 0, bottom: 0 } : { left: 64, top: 0, right: 0, bottom: 0 };
@@ -645,6 +649,41 @@ export class ChromeUI {
   private placeSubtitle(): void {
     const sub = this.root.querySelector('.chrome__subtitle') as HTMLElement | null;
     if (!sub) return;
+    if (document.body.classList.contains('about-panel-open')) {
+      const sheet = document.querySelector('.about-panel__sheet')?.getBoundingClientRect();
+      if (sheet && sheet.width > 8) {
+        sub.style.position = 'fixed';
+        sub.style.zIndex = '70';
+        if (this.mobile && this.isLandscapeSideSheet()) {
+          const mapW = sheet.left;
+          sub.style.left = `${Math.max(16, mapW / 2)}px`;
+          sub.style.width = `${Math.max(160, mapW - 32)}px`;
+          sub.style.transform = 'translateX(-50%)';
+          sub.style.bottom = '24px';
+          sub.style.top = 'auto';
+          return;
+        }
+        if (this.mobile && this.isPhonePortrait()) {
+          sub.style.left = '50%';
+          sub.style.width = `${Math.min(340, window.innerWidth - 32)}px`;
+          sub.style.transform = 'translateX(-50%)';
+          sub.style.bottom = `${Math.max(24, window.innerHeight - sheet.top + 12)}px`;
+          sub.style.top = 'auto';
+          return;
+        }
+        const mapLeft = sheet.right;
+        const mapW = window.innerWidth - mapLeft;
+        sub.style.left = `${mapLeft + mapW / 2}px`;
+        sub.style.width = `${Math.min(480, mapW - 32)}px`;
+        sub.style.transform = 'translateX(-50%)';
+        sub.style.bottom = '28px';
+        sub.style.top = 'auto';
+        return;
+      }
+    } else {
+      sub.style.position = '';
+      sub.style.zIndex = '';
+    }
     if (this.mobile && this.mobileSheet && !this.interiorOpen) {
       const intro = this.root.querySelector('.chrome__intro') as HTMLElement | null;
       const r = intro?.getBoundingClientRect();

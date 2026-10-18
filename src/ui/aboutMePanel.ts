@@ -21,6 +21,7 @@ export class AboutMePanel {
   private contactEl!: HTMLElement;
   private opened = false;
   private onClose?: () => void;
+  private subtitleHome: { el: HTMLElement; parent: Node; next: ChildNode | null } | null = null;
 
   constructor(container: HTMLElement, opts?: { onClose?: () => void }) {
     this.onClose = opts?.onClose;
@@ -125,6 +126,7 @@ export class AboutMePanel {
     document.body.classList.add('about-panel-open');
     this.root.classList.toggle('about-panel--phone-portrait', this.isPhonePortrait());
     this.root.classList.toggle('about-panel--landscape', this.isSideSheet());
+    this.portalVoiceSubtitle();
 
     requestAnimationFrame(() => {
       if (opts.sectionId) {
@@ -133,12 +135,26 @@ export class AboutMePanel {
           this.scrollEl.querySelector(`[data-about-section="${CSS.escape(opts.sectionId)}"]`);
         target?.scrollIntoView({ block: 'start' });
       } else if (opts.highlightContact) {
-        this.contactEl.scrollIntoView({ block: 'center' });
+        this.scrollContactIntoView(() => this.flashContact());
       } else {
         this.scrollEl.scrollTop = 0;
       }
-      if (opts.highlightContact) this.flashContact();
     });
+  }
+
+  private scrollContactIntoView(after?: () => void): void {
+    const run = (): void => {
+      this.contactEl.scrollIntoView({ block: 'end', inline: 'nearest' });
+      const sheet = this.root.querySelector('.about-panel__sheet') as HTMLElement | null;
+      if (sheet) {
+        const sheetRect = sheet.getBoundingClientRect();
+        const contactRect = this.contactEl.getBoundingClientRect();
+        const overflow = contactRect.bottom - sheetRect.bottom + 12;
+        if (overflow > 0) this.scrollEl.scrollTop += overflow;
+      }
+      after?.();
+    };
+    requestAnimationFrame(() => requestAnimationFrame(run));
   }
 
   close(): void {
@@ -147,7 +163,24 @@ export class AboutMePanel {
     this.root.classList.remove('about-panel--open', 'about-panel--expanded', 'about-panel--phone-portrait', 'about-panel--landscape');
     this.root.hidden = true;
     document.body.classList.remove('about-panel-open');
+    this.restoreVoiceSubtitle();
     this.onClose?.();
+  }
+
+  /** Voice-line caption must sit above the About layer (chrome is z-index 10 vs panel 60). */
+  private portalVoiceSubtitle(): void {
+    const sub = document.querySelector('.chrome__subtitle') as HTMLElement | null;
+    if (!sub || this.subtitleHome) return;
+    this.subtitleHome = { el: sub, parent: sub.parentElement!, next: sub.nextSibling };
+    document.body.append(sub);
+  }
+
+  private restoreVoiceSubtitle(): void {
+    if (!this.subtitleHome) return;
+    const { el, parent, next } = this.subtitleHome;
+    if (next && next.parentNode === parent) parent.insertBefore(el, next);
+    else parent.append(el);
+    this.subtitleHome = null;
   }
 
   flashContact(): void {
