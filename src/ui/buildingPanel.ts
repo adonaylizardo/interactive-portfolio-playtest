@@ -711,35 +711,6 @@ export class BuildingPanel {
     this.experienceDetail.replaceChildren(wrap);
   }
 
-  private renderWritingsFilters(): void {
-    if (!this.experienceFilters) return;
-    type WritingsFilterId = 'all' | 'uxsc' | 'sinergia' | 'guest';
-    const filters: { id: WritingsFilterId; key: I18nKey }[] = [
-      { id: 'all', key: 'writings.filter.all' },
-      { id: 'uxsc', key: 'writings.filter.uxsc' },
-      { id: 'sinergia', key: 'writings.filter.sinergia' },
-      { id: 'guest', key: 'writings.filter.guest' },
-    ];
-    this.experienceFilters.replaceChildren(
-      ...filters.map(({ id, key }) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'experience__filter';
-        if (id === this.writingsFilter) btn.classList.add('is-active');
-        btn.textContent = t(key);
-        btn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (this.writingsFilter === id) return;
-          this.writingsFilter = id;
-          this.renderWritingsFilters();
-          this.renderWritingsList();
-        });
-        return btn;
-      }),
-    );
-  }
-
   private renderWritingsList(): void {
     if (!this.experienceList) return;
     const sections =

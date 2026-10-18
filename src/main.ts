@@ -16,7 +16,7 @@ import {
   isReadingHash,
   leaveReadingHash,
   navigateReading,
-  noteReadingPopstate,
+  syncReadingDepthFromHistory,
   parseReadingRoute,
   resetReadingNavigationForLoad,
 } from './ui/readingRoute';
@@ -309,7 +309,7 @@ async function main(): Promise<void> {
 
   window.addEventListener('hashchange', () => syncNavigationFromHistory());
   window.addEventListener('popstate', () => {
-    noteReadingPopstate();
+    syncReadingDepthFromHistory();
     syncNavigationFromHistory();
   });
 

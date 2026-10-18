@@ -3,7 +3,8 @@
  * Autoplay-safe: the graph starts on the first user gesture. Mute persists.
  */
 import { caseVoiceFile } from '../data/cases';
-import { VOICE_LINES } from '../data/voice-lines';
+import { VOICE_LINES, voiceSubtitleForLang } from '../data/voice-lines';
+import { getLang } from '../ui/i18n';
 
 const MUTE_KEY = 'studio-audio-muted';
 const VOICE_DIR = `${import.meta.env.BASE_URL}audio/voice/`;
@@ -256,7 +257,7 @@ export class StudioAudio {
     this.stopVoice();
     this.stopBark();
     this.played.add(id);
-    this.subtitleText = line.script_text;
+    this.subtitleText = voiceSubtitleForLang(line, getLang());
     this.emit();
     if (automatedWebKitPhone()) {
       window.setTimeout(() => this.finishVoice(), 80);
@@ -273,7 +274,7 @@ export class StudioAudio {
       if (this.voice === el) this.finishVoice();
     });
     this.voice = el;
-    this.subtitleText = line.script_text;
+    this.subtitleText = voiceSubtitleForLang(line, getLang());
     this.duckAmbience(true);
     this.emit();
     void el.play().catch(() => {

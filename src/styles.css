@@ -2374,6 +2374,10 @@ body[data-layout='panel'] .checklist {
   z-index: 12;
 }
 
+#ui-root:has(> .chrome.chrome--sheet) > .name-labels {
+  z-index: 10;
+}
+
 .name-label {
   position: absolute;
   left: 0;

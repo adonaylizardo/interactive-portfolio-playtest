@@ -141,7 +141,11 @@ export class NameLabels {
 
   /** Noah (and others) must not cover Getting-started 5 / 5 or other chrome. */
   private hideOverChrome(): void {
-    const blockers = [...document.querySelectorAll('.checklist, .chrome__lang, .chrome__tools-phone')].filter(
+    const blockers = [
+      ...document.querySelectorAll(
+        '.checklist, .chrome__lang, .chrome__tools-phone, .chrome--sheet .chrome__intro',
+      ),
+    ].filter(
       (el) => {
         const r = (el as HTMLElement).getBoundingClientRect();
         const cs = getComputedStyle(el);

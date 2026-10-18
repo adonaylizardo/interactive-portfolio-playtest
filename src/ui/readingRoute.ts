@@ -5,6 +5,8 @@ export type ReadingRoute =
 const PREFIX = '/leer';
 const OUTDOOR_HASH_KEY = 'portfolio-playtest-outdoor-hash';
 
+type ReadingNavState = { reading?: boolean; rDepth?: number; playtest?: boolean };
+
 /** In-memory only — reset on every full document load. */
 let readingDepthInDoc = 0;
 
@@ -38,12 +40,28 @@ function setReadingDepth(n: number): void {
   readingDepthInDoc = Math.max(0, n);
 }
 
-export function noteReadingPopstate(): void {
+function inferReadingDepthFromHash(): number {
+  const route = parseReadingRoute();
+  if (!route) return 0;
+  return route.kind === 'detail' ? 2 : 1;
+}
+
+/** Sync depth from history.state.rDepth after back/forward (not +/- counting). */
+export function syncReadingDepthFromHistory(): void {
   if (skipNextReadingPopstateDepth) {
     skipNextReadingPopstateDepth = false;
     return;
   }
-  setReadingDepth(readingDepth() - 1);
+  if (!isReadingHash()) {
+    setReadingDepth(0);
+    return;
+  }
+  const st = history.state as ReadingNavState | null;
+  if (typeof st?.rDepth === 'number') {
+    setReadingDepth(st.rDepth);
+    return;
+  }
+  setReadingDepth(inferReadingDepthFromHash());
 }
 
 export function canNavigateReadingBack(): boolean {
@@ -54,7 +72,6 @@ let skipNextReadingPopstateDepth = false;
 
 export function goBackToReadingList(onFallback: () => void): void {
   if (canNavigateReadingBack()) {
-    setReadingDepth(readingDepth() - 1);
     skipNextReadingPopstateDepth = true;
     window.history.back();
     return;
@@ -88,17 +105,20 @@ export function navigateReading(route: ReadingRoute, mode: 'push' | 'replace' = 
     route.kind === 'list' ? readingHash() : readingHash(route.slug);
   if (location.hash === next) return;
   if (mode === 'replace') {
-    setReadingDepth(0);
-    history.replaceState({ reading: true }, '', next);
+    const depth = route.kind === 'list' ? 0 : inferReadingDepthFromHash();
+    setReadingDepth(depth);
+    history.replaceState({ reading: true, rDepth: depth }, '', next);
     return;
   }
+  let depth: number;
   if (!isReadingHash()) {
     saveOutdoorHashIfNeeded();
-    setReadingDepth(1);
+    depth = 1;
   } else {
-    setReadingDepth(readingDepth() + 1);
+    depth = readingDepth() + 1;
   }
-  history.pushState({ reading: true }, '', next);
+  setReadingDepth(depth);
+  history.pushState({ reading: true, rDepth: depth }, '', next);
 }
 
 export function leaveReadingHash(): void {
@@ -107,13 +127,14 @@ export function leaveReadingHash(): void {
   const base = `${location.pathname}${location.search}`;
   const target = saved && saved.startsWith('#') ? `${base}${saved}` : base;
   const depth = readingDepth();
-  setReadingDepth(0);
 
   if (depth === 1 && saved) {
     skipNextReadingPopstateDepth = true;
+    setReadingDepth(0);
     history.back();
     return;
   }
 
+  setReadingDepth(0);
   history.replaceState({ reading: false, playtest: true }, '', target);
 }
