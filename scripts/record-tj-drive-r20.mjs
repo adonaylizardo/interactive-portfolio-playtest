@@ -113,12 +113,14 @@ async function readTapMetrics(page) {
   });
 }
 
-async function waitDoorDone(page, timeout = 25000) {
+async function waitDoorDone(page, timeout = 30000) {
   const t0 = Date.now();
   let last = null;
   while (Date.now() - t0 < timeout) {
     last = await page.evaluate(() => {
       const j = window.__playtestQa.jac();
+      const r = window.__playtestQa.inputReady();
+      const panel = window.__playtestQa.openPanelTitle?.() ?? '';
       return {
         driving: j.driving,
         goal: j.driveGoal,
@@ -127,9 +129,13 @@ async function waitDoorDone(page, timeout = 25000) {
         cy: j.cy,
         gear: j.gear,
         pathN: j.pathN,
+        interior: r.interior,
+        pendingWalk: r.pendingWalk,
+        panel,
+        preview: !!window.__playtestQa.isCasePreview?.(),
       };
     });
-    if (!last.driving) return { ...last, done: true, ms: Date.now() - t0 };
+    if (last.interior || last.preview || last.panel) return { ...last, done: true, ms: Date.now() - t0 };
     await wait(50);
   }
   return { ...last, done: false, ms: Date.now() - t0 };
@@ -254,15 +260,16 @@ async function measureCaseEs(page) {
   const row = await page.evaluate(() => {
     window.__playtestQa.setLang?.('es');
     window.__playtestQa.showCasePreview?.('finoa');
+    const title = document.querySelector('.case-preview__title')?.textContent ?? '';
     const sub = document.querySelector('.case-preview__subtitle')?.textContent ?? '';
     const teaser = document.querySelector('.case-preview__teaser')?.textContent ?? '';
     const pill = document.querySelector('.case-preview__read-meta')?.textContent ?? '';
-    return { sub, teaser, pill, lang: window.__playtestQa.getLang?.() };
+    return { title, sub, teaser, pill, lang: window.__playtestQa.getLang?.() };
   });
   report.caseEs = row;
-  notes.push(`case ES sub="${row.sub}" pill="${row.pill}"`);
-  const english = /Product strategist|Problem · What I did|institutional custody platform|What I did/;
-  if (english.test(`${row.sub} ${row.teaser} ${row.pill}`)) {
+  notes.push(`case ES title="${row.title}" sub="${row.sub}" teaser="${row.teaser}" pill="${row.pill}"`);
+  const english = /Product strategist|Problem · What I did|institutional custody platform|What I did|A custody platform/;
+  if (english.test(`${row.title} ${row.sub} ${row.teaser} ${row.pill}`)) {
     errors.push(`case ES still English: ${JSON.stringify(row)}`);
   }
   await page.evaluate(() => window.__playtestQa.dismissBuildingPanel?.());
