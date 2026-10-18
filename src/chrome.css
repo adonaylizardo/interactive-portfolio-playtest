@@ -516,6 +516,11 @@ body[data-interior='1'] .chrome__column {
   z-index: 5;
 }
 
+/* Lang sits above the map checklist pill (z-index 14) on phone map dock. */
+.chrome--mobile.chrome--dock {
+  z-index: 16;
+}
+
 .chrome--split .chrome__lang {
   right: 16px;
 }
@@ -675,6 +680,36 @@ body[data-layout='panel'] #game-canvas {
 
 .chrome--mobile .chrome__lang {
   left: auto;
+  z-index: 20;
+}
+
+body[data-layout='map'] .chrome--mobile .chrome__lang {
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
+  left: auto;
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  body[data-layout='map'] .chrome--mobile .chrome__lang {
+    top: max(12px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
+  }
+
+  body[data-layout='map'] .chrome--mobile .chrome__tools-phone {
+    top: max(12px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+  }
+
+  body[data-layout='map'] .checklist--mobile-closed {
+    top: auto;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: max(12px, env(safe-area-inset-left));
+    right: auto;
+  }
+
+  .chrome--mobile .chrome__dock {
+    display: none;
+  }
 }
 
 .chrome--mobile .chrome__intro {

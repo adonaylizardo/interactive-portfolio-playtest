@@ -45,7 +45,7 @@ function roundBtn(icon: IconName, label: string, extra = '', action?: string): s
 
 export class ChromeUI {
   readonly root: HTMLElement;
-  private layout: DesktopLayout = 'split';
+  private layout: DesktopLayout = 'map';
   private mobileSheet = true;
   private audience: Audience = 'recruiter';
   private lang: Lang = getLang();
@@ -531,22 +531,30 @@ export class ChromeUI {
     if (!lang) return;
     const shortLand = window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
     if (shortLand) {
-      lang.style.top = '12px';
-      lang.style.left = '16px';
-      lang.style.right = 'auto';
+      if (this.mobile && document.body.dataset.layout === 'map') {
+        lang.style.top = '12px';
+        lang.style.right = '12px';
+        lang.style.left = 'auto';
+      } else {
+        lang.style.top = '12px';
+        lang.style.left = '16px';
+        lang.style.right = 'auto';
+      }
       return;
     }
     lang.style.left = '';
-    const cl = document.querySelector('.checklist') as HTMLElement | null;
-    const ring = cl && !cl.hidden ? cl.getBoundingClientRect() : null;
-    if (ring && ring.width > 8) {
-      const top = Math.max(this.mobile ? 24 : 16, ring.top + (ring.height - 40) / 2);
-      const right = Math.max(16, window.innerWidth - ring.left + 8);
-      lang.style.top = `${top}px`;
-      lang.style.right = `${right}px`;
+    if (!this.mobile) {
+      lang.style.top = '20px';
+      lang.style.right = '16px';
       return;
     }
-    lang.style.top = this.mobile ? '24px' : '20px';
+    if (this.mobile && document.body.dataset.layout === 'map') {
+      lang.style.top = '';
+      lang.style.left = '';
+      lang.style.right = '';
+      return;
+    }
+    lang.style.top = '24px';
     lang.style.right = '16px';
   }
 
