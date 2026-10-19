@@ -483,10 +483,9 @@ export class IsoScene {
       stencil: true,
       failIfMajorPerformanceCaveat: false,
     };
-    const glContext =
-      canvas.getContext('webgl2', glAttrs) ??
+    const glContext = (canvas.getContext('webgl2', glAttrs) ??
       canvas.getContext('webgl', glAttrs) ??
-      canvas.getContext('experimental-webgl', glAttrs);
+      canvas.getContext('experimental-webgl', glAttrs)) as WebGL2RenderingContext | null;
     if (!glContext) throw new Error('WebGL context unavailable');
 
     await this.app.init({
