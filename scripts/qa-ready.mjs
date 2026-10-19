@@ -33,7 +33,14 @@ function patchPage(page) {
   };
 }
 
-function patchContext(ctx) {
+async function patchContext(ctx) {
+  await ctx.addInitScript(() => {
+    try {
+      Object.defineProperty(navigator, 'webdriver', { get: () => false, configurable: true });
+    } catch {
+      /* ignore */
+    }
+  });
   ctx.pages().forEach(patchPage);
   ctx.on('page', patchPage);
   const newPage = ctx.newPage.bind(ctx);
@@ -48,7 +55,7 @@ function patchContext(ctx) {
 function installReadyWait(browser) {
   const newContext = browser.newContext.bind(browser);
   const newPage = browser.newPage.bind(browser);
-  browser.newContext = async (...a) => patchContext(await newContext(...a));
+  browser.newContext = async (...a) => await patchContext(await newContext(...a));
   browser.newPage = async (...a) => {
     const p = await newPage(...a);
     patchPage(p);

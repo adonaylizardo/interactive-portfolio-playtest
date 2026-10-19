@@ -19,6 +19,7 @@
     "compress:sprites": "node scripts/compress-sprites.mjs",
     "check:logos": "node scripts/check-logos.mjs",
     "check:cases": "node scripts/check-case-copy.mjs",
+    "test:about-intro": "node scripts/test-about-intro-split.mjs",
     "deploy:gh-pages": "node scripts/deploy-gh-pages.mjs",
     "deploy:preview": "node scripts/deploy-gh-pages.mjs",
     "deploy:live": "DEPLOY_TARGET=live node scripts/deploy-gh-pages.mjs"
