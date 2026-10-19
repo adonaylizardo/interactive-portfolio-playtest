@@ -400,6 +400,8 @@ export class IsoScene {
   private zoomChanged = false;
   private lastChecklistZoom = 0;
   private canvasEl: HTMLCanvasElement | null = null;
+  private presentCanvas: HTMLCanvasElement | null = null;
+  private presentCtx: CanvasRenderingContext2D | null = null;
   private pointers = new Map<number, { x: number; y: number }>();
   private pinchSession: {
     startDist: number;
@@ -473,8 +475,23 @@ export class IsoScene {
     };
     reportLoad(2);
 
+    const glAttrs = {
+      alpha: false,
+      antialias: true,
+      premultipliedAlpha: false,
+      preserveDrawingBuffer: false,
+      stencil: true,
+      failIfMajorPerformanceCaveat: false,
+    };
+    const glContext =
+      canvas.getContext('webgl2', glAttrs) ??
+      canvas.getContext('webgl', glAttrs) ??
+      canvas.getContext('experimental-webgl', glAttrs);
+    if (!glContext) throw new Error('WebGL context unavailable');
+
     await this.app.init({
       canvas,
+      context: glContext,
       background: worldBackgroundColor(),
       backgroundAlpha: 1,
       antialias: true,
@@ -484,6 +501,7 @@ export class IsoScene {
       resizeTo: window,
       preference: 'webgl',
       webgl: {
+        context: glContext,
         preserveDrawingBuffer: false,
         premultipliedAlpha: false,
       },
@@ -3554,6 +3572,40 @@ export class IsoScene {
       gl.flush();
       gl.finish();
     }
+    this.syncPresentCanvasMirror();
+  }
+
+  /** SwiftShader/Vulkan: 2D mirror of the WebGL buffer avoids alpha-0 compositor holes above sheets. */
+  private syncPresentCanvasMirror(): void {
+    const expanded = !!this.events.buildingPanel?.isInteriorSheetExpanded?.();
+    if (!this.canvasEl || !expanded) {
+      this.presentCanvas?.classList.remove('is-active');
+      this.canvasEl?.classList.remove('game-canvas--present-hidden');
+      return;
+    }
+    if (!this.presentCanvas) {
+      const el = document.createElement('canvas');
+      el.id = 'game-canvas-present';
+      el.setAttribute('aria-hidden', 'true');
+      this.canvasEl.insertAdjacentElement('afterend', el);
+      this.presentCanvas = el;
+      this.presentCtx = el.getContext('2d');
+    }
+    const src = this.canvasEl;
+    const dst = this.presentCanvas;
+    const ctx = this.presentCtx;
+    if (!ctx || !dst) return;
+    if (dst.width !== src.width || dst.height !== src.height) {
+      dst.width = src.width;
+      dst.height = src.height;
+    }
+    try {
+      ctx.drawImage(src, 0, 0);
+    } catch {
+      return;
+    }
+    dst.classList.add('is-active');
+    src.classList.add('game-canvas--present-hidden');
   }
 
   onViewportLayoutChange(): void {

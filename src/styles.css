@@ -54,8 +54,8 @@ body {
   background: #0b0c0e;
 }
 
-body > canvas:not(#game-canvas),
-#app > canvas:not(#game-canvas) {
+body > canvas:not(#game-canvas, #game-canvas-present),
+#app > canvas:not(#game-canvas, #game-canvas-present) {
   display: none !important;
   pointer-events: none !important;
   opacity: 0 !important;
@@ -135,6 +135,25 @@ body > canvas:not(#game-canvas),
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+}
+
+#game-canvas-present {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  pointer-events: none;
+  z-index: 2;
+  background: #0b0c0e;
+}
+
+#game-canvas-present.is-active {
+  display: block;
+}
+
+#game-canvas.game-canvas--present-hidden {
+  opacity: 0;
 }
 
 body.is-canvas-dragging,

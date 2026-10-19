@@ -64,13 +64,21 @@ async function runViewport(page, label, width, height, dpr) {
   await page.evaluate(() => window.__playtestQa?.expandInteriorSheet?.());
   await page.waitForSelector('.building-panel--expanded', { timeout: 15000 });
 
-  const clip = await page.evaluate(() => {
-    const sheet = document.querySelector('.building-panel__sheet');
-    if (!sheet) return null;
-    const top = sheet.getBoundingClientRect().top;
-    return { x: 0, y: 0, width: Math.min(384, window.innerWidth), height: Math.max(8, top - 4) };
-  });
-  if (!clip || clip.height < 16) return { label, error: 'clip too small', clip };
+  const clip = await page.evaluate(({ roiW, roiH }) => {
+    const canvas =
+      document.getElementById('game-canvas-present')?.classList.contains('is-active')
+        ? document.getElementById('game-canvas-present')
+        : document.getElementById('game-canvas');
+    if (!canvas) return null;
+    const r = canvas.getBoundingClientRect();
+    return {
+      x: r.left,
+      y: r.top,
+      width: Math.min(roiW, r.width),
+      height: Math.min(roiH, r.height),
+    };
+  }, { roiW: Math.min(384, width), roiH: 334 });
+  if (!clip) return { label, error: 'missing canvas' };
 
   const samples = [];
   for (const waitMs of [900, 1100, 3000]) {
