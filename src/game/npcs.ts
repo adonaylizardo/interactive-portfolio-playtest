@@ -295,6 +295,10 @@ export class NpcCrowd {
     return { carts, benches, mirador, doors, ends, zones, owners: r.owners() };
   }
 
+  spritesForBillboard(): Sprite[] {
+    return [...this.sprites.values()];
+  }
+
   snapshot(): NpcSnapshot[] {
     const r = this.routines;
     if (!r) return [];

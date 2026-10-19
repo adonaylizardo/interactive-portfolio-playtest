@@ -1,0 +1,195 @@
+{
+  "base": "http://127.0.0.1:4182/interactive-portfolio-playtest/preview-persona/",
+  "expectBundle": "index-By5KgPBy.js",
+  "bundleOk": true,
+  "at": "2026-10-18T13:40:20.283Z",
+  "results": [
+    {
+      "tag": "390",
+      "bundle": "index-By5KgPBy.js",
+      "viewSwitch": {
+        "before": {
+          "x": 22,
+          "y": 22
+        },
+        "after": {
+          "x": 22,
+          "y": 22
+        },
+        "moved": 0,
+        "pass": true
+      },
+      "fps": {
+        "map": 15.310741577557716,
+        "persona": 6.214843686356037,
+        "ratio": 0.40591395621657367,
+        "pass": false
+      },
+      "leak": {
+        "labels": 0,
+        "cenitalLabels": 0,
+        "checklistBig": false,
+        "pass": true
+      },
+      "frameC": {
+        "ok": true,
+        "meanDiff": 16.20547049054158,
+        "pass": true
+      },
+      "metrics": {
+        "sw": 390,
+        "sh": 844,
+        "feetScale": 1.1722222222222223,
+        "feetY": 658.32,
+        "adonayHeightPx": 337.6,
+        "refAdonayHeightPx": 288,
+        "chromeTitleBottom": null,
+        "chromeSubtitleBottom": 487,
+        "dockTop": null,
+        "enterBtnTop": null,
+        "t9WidthFrac": 0.24,
+        "jacBoardTop": 112,
+        "jacBoardBottom": 156
+      },
+      "adonayScaleOk": true,
+      "t9Ok": true,
+      "legsClear": true,
+      "navOverlap": null,
+      "overlaps": {
+        "adonayVsEnter": null,
+        "adonayVsJac": false,
+        "adonayVsViews": null,
+        "adonayVsDock": null,
+        "adonayVsJoy": false,
+        "jacVsDock": null,
+        "viewsVsJacBoard": null
+      },
+      "uiOverlapPass": true
+    },
+    {
+      "tag": "844x390",
+      "bundle": "index-By5KgPBy.js",
+      "viewSwitch": {
+        "before": {
+          "x": 22,
+          "y": 22
+        },
+        "after": {
+          "x": 22,
+          "y": 22
+        },
+        "moved": 0,
+        "pass": true
+      },
+      "fps": {
+        "map": 17.186770432590226,
+        "persona": 2.838712184971959,
+        "ratio": 0.16516844721385712,
+        "pass": false
+      },
+      "leak": {
+        "labels": 0,
+        "cenitalLabels": 0,
+        "checklistBig": false,
+        "pass": true
+      },
+      "frameC": {
+        "ok": true,
+        "meanDiff": 17.27363425925926,
+        "pass": true
+      },
+      "metrics": {
+        "sw": 844,
+        "sh": 390,
+        "feetScale": 0.5416666666666666,
+        "feetY": 318,
+        "adonayHeightPx": 156,
+        "refAdonayHeightPx": 288,
+        "chromeTitleBottom": null,
+        "chromeSubtitleBottom": null,
+        "dockTop": 326,
+        "enterBtnTop": null,
+        "t9WidthFrac": 0.24000000000000005,
+        "jacBoardTop": null,
+        "jacBoardBottom": null
+      },
+      "adonayScaleOk": true,
+      "t9Ok": true,
+      "legsClear": true,
+      "navOverlap": false,
+      "overlaps": {
+        "adonayVsEnter": null,
+        "adonayVsJac": false,
+        "adonayVsViews": false,
+        "adonayVsDock": false,
+        "adonayVsJoy": false,
+        "jacVsDock": false,
+        "viewsVsJacBoard": false
+      },
+      "uiOverlapPass": true
+    },
+    {
+      "tag": "1280",
+      "bundle": "index-By5KgPBy.js",
+      "viewSwitch": {
+        "before": {
+          "x": 22,
+          "y": 22
+        },
+        "after": {
+          "x": 22,
+          "y": 22
+        },
+        "moved": 0,
+        "pass": true
+      },
+      "fps": {
+        "map": 6.044490026352107,
+        "persona": 1.5741887602802007,
+        "ratio": 0.2604336765247729,
+        "pass": false
+      },
+      "leak": {
+        "labels": 0,
+        "cenitalLabels": 0,
+        "checklistBig": false,
+        "pass": true
+      },
+      "frameC": {
+        "ok": true,
+        "meanDiff": 12.0842353515625,
+        "pass": true
+      },
+      "metrics": {
+        "sw": 1280,
+        "sh": 800,
+        "feetScale": 1.1111111111111112,
+        "feetY": 783.3333333333334,
+        "adonayHeightPx": 320,
+        "refAdonayHeightPx": 288,
+        "chromeTitleBottom": null,
+        "chromeSubtitleBottom": 772,
+        "dockTop": null,
+        "enterBtnTop": null,
+        "t9WidthFrac": 0.24,
+        "jacBoardTop": 108,
+        "jacBoardBottom": 152
+      },
+      "adonayScaleOk": true,
+      "t9Ok": true,
+      "legsClear": true,
+      "navOverlap": null,
+      "overlaps": {
+        "adonayVsEnter": null,
+        "adonayVsJac": false,
+        "adonayVsViews": false,
+        "adonayVsDock": null,
+        "adonayVsJoy": null,
+        "jacVsDock": null,
+        "viewsVsJacBoard": false
+      },
+      "uiOverlapPass": true
+    }
+  ],
+  "ok": true
+}

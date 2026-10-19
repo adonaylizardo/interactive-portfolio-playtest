@@ -10,7 +10,7 @@ export type StickVector = { x: number; y: number };
 const PAD = 112;
 const KNOB = 44;
 const MAX_RADIUS = 28;
-const DEADZONE = 8;
+const DEADZONE = 4;
 
 function isCoarse(): boolean {
   return window.matchMedia('(pointer: coarse)').matches;
@@ -26,6 +26,7 @@ export class Joystick {
   private touchSeen = false;
   private hidden = true;
   private touchActive = false;
+  private personaWalk = false;
   private onStart: (() => void) | null = null;
 
   constructor(container: HTMLElement) {
@@ -102,6 +103,11 @@ export class Joystick {
     this.hidden = hidden;
     if (hidden) this.release();
     this.syncVisible();
+  }
+
+  /** Persona walk uses stick deflection only (no pixel deadzone stacking). */
+  setPersonaWalk(on: boolean): void {
+    this.personaWalk = on;
   }
 
   onStickStart(fn: () => void): void {
@@ -241,11 +247,12 @@ export class Joystick {
     const ux = dist > 0 ? (dx / dist) * clamped : 0;
     const uy = dist > 0 ? (dy / dist) * clamped : 0;
     this.setKnob(ux, uy);
-    if (clamped < DEADZONE) {
+    const dead = this.personaWalk ? 0 : DEADZONE;
+    if (clamped < dead) {
       this.vec = { x: 0, y: 0 };
       return;
     }
-    const gain = (clamped - DEADZONE) / (MAX_RADIUS - DEADZONE);
+    const gain = dead >= MAX_RADIUS ? 1 : (clamped - dead) / (MAX_RADIUS - dead);
     this.vec = { x: (ux / clamped) * gain, y: (uy / clamped) * gain };
   }
 

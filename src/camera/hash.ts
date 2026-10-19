@@ -63,7 +63,29 @@ export function parseCameraFromHash(): CameraView | null {
 }
 
 export function parseInteriorFromHash(): string | null {
-  return interiorIdFromPublic(hashParams().get('in'));
+  const raw = hashParams().get('in');
+  if (!raw) return null;
+  if (!/^[\w-]+$/i.test(raw)) return null;
+  return interiorIdFromPublic(raw);
+}
+
+/** False when the hash is non-empty but not a supported playtest route shape. */
+export function isSupportedPlaytestHash(hash = location.hash): boolean {
+  const raw = hash.replace(/^#/, '').trim();
+  if (!raw) return true;
+  if (raw.startsWith('/') || raw.includes('<') || raw.includes('>')) return false;
+  if (/^caso=/i.test(raw) || /^\/caso\//i.test(raw) || /^edificio\//i.test(raw)) return false;
+  if (raw.startsWith(HASH_PREFIX)) {
+    const params = new URLSearchParams(raw.slice(HASH_PREFIX.length));
+    const inRaw = params.get('in');
+    if (inRaw != null && !/^[\w-]+$/i.test(inRaw)) return false;
+    return parseCameraFromHash() !== null || inRaw !== null;
+  }
+  if (/^in=/i.test(raw)) {
+    const m = raw.match(/^in=(.+)$/i);
+    return !!(m && /^[\w-]+$/i.test(m[1]));
+  }
+  return false;
 }
 
 let writeTimer: ReturnType<typeof setTimeout> | null = null;

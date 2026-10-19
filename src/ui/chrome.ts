@@ -4,7 +4,10 @@ import { tileToWorld } from '../iso/math';
 import { isMobileLayout } from '../checklist/ui';
 import { iconSvg, type IconName } from './icons';
 import type { Camera } from '../tokens';
+import { casePreviewCopy, isCaseHouse } from '../data/cases';
+import { personaEnabled } from '../game/persona/personaSpec';
 import { getLang, onLangChange, setLang, t, type Lang } from './i18n';
+export type MobileSheetPanel = 'intro' | 'cases' | 'achievements';
 
 export type DesktopLayout = 'split' | 'map' | 'panel';
 export type Audience = 'recruiter' | 'mentoria' | 'cliente';
@@ -47,6 +50,7 @@ export class ChromeUI {
   readonly root: HTMLElement;
   private layout: DesktopLayout = 'split';
   private mobileSheet = true;
+  private mobileSheetPanel: MobileSheetPanel = 'intro';
   private audience: Audience = 'recruiter';
   private lang: Lang = getLang();
   private interiorOpen = false;
@@ -71,6 +75,7 @@ export class ChromeUI {
     this.bind();
     this.applyI18n();
     onLangChange(() => this.applyI18n());
+    if (this.shortLandscape()) this.mobileSheet = false;
     this.sync();
     studio.onChange(() => {
       this.syncSound();
@@ -78,11 +83,17 @@ export class ChromeUI {
     });
     const onLayout = () => {
       this.mobile = isMobileLayout();
+      if (this.shortLandscape() && !this.mobileSheet) {
+        /* dock-only default; keep sheet open when the user opened Casos/Logros */
+      } else if (!this.mobile) {
+        /* desktop */
+      }
       this.sync();
       this.callbacks.onLayoutChange();
     };
     window.matchMedia('(max-width: 767px)').addEventListener('change', onLayout);
     window.matchMedia('(max-height: 500px)').addEventListener('change', onLayout);
+    window.matchMedia('(orientation: landscape)').addEventListener('change', onLayout);
     const draw = () => {
       this.drawMinimap();
       this.syncViewButtons();
@@ -107,6 +118,16 @@ export class ChromeUI {
 
   isMobileSheetOpen(): boolean {
     return this.mobile && this.mobileSheet && !this.interiorOpen;
+  }
+
+  getMobileSheetPanel(): MobileSheetPanel {
+    return this.mobileSheetPanel;
+  }
+
+  openMobileSheet(panel: MobileSheetPanel): void {
+    this.mobileSheetPanel = panel;
+    this.setLayout('split');
+    this.syncSheetPanel();
   }
 
   setInteriorOpen(open: boolean, opts?: { skipLayout?: boolean }): void {
@@ -134,7 +155,7 @@ export class ChromeUI {
     }
     if (this.mobile) {
       if (this.mobileSheet) {
-        const sheet = this.root.querySelector('.chrome__intro')?.getBoundingClientRect();
+        const sheet = this.root.querySelector('.chrome__sheet-stack')?.getBoundingClientRect();
         const bottom = sheet ? Math.ceil(window.innerHeight - sheet.top + 8) : 280;
         return { left: 0, top: 72, right: 0, bottom };
       }
@@ -150,7 +171,7 @@ export class ChromeUI {
       (row) => `
       <button type="button" class="chrome__exp-row" data-locate="${row.id}">
         <span class="chrome__exp-name">${row.label}${row.nda ? '<span class="chrome__nda">NDA</span>' : ''}</span>
-        <span class="chrome__exp-meta"><span class="chrome__skeleton chrome__skeleton--bar"></span>${iconSvg('locate', 16)}</span>
+        <span class="chrome__exp-meta">${iconSvg('locate', 16)}</span>
       </button>`,
     ).join('');
     const caseRows = CASES_ROWS.map((row) => {
@@ -159,7 +180,7 @@ export class ChromeUI {
         <span class="chrome__case-thumb">${iconSvg('map')}${row.nda ? '<span class="chrome__nda">NDA</span>' : ''}</span>
         <span class="chrome__case-copy">
           <span class="chrome__case-title">${row.label}</span>
-          <span class="chrome__skeleton-stack"><span class="chrome__skeleton"></span><span class="chrome__skeleton chrome__skeleton--short"></span></span>
+          <span class="chrome__case-teaser" data-case-teaser="${row.id}"></span>
         </span>
       </button>`;
     }).join('');
@@ -189,11 +210,6 @@ export class ChromeUI {
         <div class="chrome__intro-body">
           <div class="chrome__lede">
             <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
-            <div class="chrome__skeleton-stack" aria-hidden="true">
-              <span class="chrome__skeleton"></span>
-              <span class="chrome__skeleton"></span>
-              <span class="chrome__skeleton chrome__skeleton--half"></span>
-            </div>
           </div>
           <div class="chrome__ctas">
             <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer">${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
@@ -241,39 +257,61 @@ export class ChromeUI {
       <div class="chrome__tools-phone">
         ${roundBtn('search', 'Buscar', '', 'search')}
         ${roundBtn('sound', 'Sonido', '', 'sound')}
-        ${roundBtn('locate', 'Center on Adonay', '', 'center')}
+        ${roundBtn('locate', 'Center on Adonay', 'chrome__locate', 'center')}
       </div>
-      <div class="chrome__intro" data-intro>
+      <div class="chrome__sheet-stack" data-sheet-stack>
         <button type="button" class="chrome__intro-close" data-action="intro-close" aria-label="Close" data-i18n-aria="jac.close">${iconSvg('close')}</button>
-        <div class="chrome__lede">
-          <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
-          <div class="chrome__skeleton-stack" aria-hidden="true">
-            <span class="chrome__skeleton"></span>
-            <span class="chrome__skeleton chrome__skeleton--half"></span>
+        <div class="chrome__sheet-panel is-active" data-sheet-panel="intro" data-intro>
+          <div class="chrome__lede">
+            <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
+          </div>
+          <div class="chrome__audience">
+            <p class="chrome__label" data-i18n="chrome.who">¿Quién eres?</p>
+            <div class="ui-seg ui-seg--phone" role="tablist" aria-label="Audience" data-i18n-aria="chrome.audience">
+              <button type="button" class="ui-seg__opt is-active" data-audience="recruiter">Recruiter</button>
+              <button type="button" class="ui-seg__opt" data-audience="mentoria" data-i18n="chrome.mentorship">Mentoría</button>
+              <button type="button" class="ui-seg__opt" data-audience="cliente" data-i18n="chrome.client">Cliente</button>
+            </div>
+          </div>
+          <div class="chrome__ctas">
+            <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer">${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
+            <a class="ui-btn ui-btn--secondary" href="${CONTACT_HREF}">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></a>
+          </div>
+          <div class="chrome__card-row">
+            <div class="chrome__card-id">
+              <span class="chrome__mono">AL</span>
+              <span>
+                <strong>Adonay Lizardo</strong>
+                <small data-i18n="chrome.titleShort">Líder de diseño con IA</small>
+              </span>
+            </div>
+            <button type="button" class="ui-btn ui-btn--secondary" data-details data-i18n="chrome.details">Detalles</button>
           </div>
         </div>
-        <div class="chrome__audience">
-          <p class="chrome__label" data-i18n="chrome.who">¿Quién eres?</p>
-          <div class="ui-seg ui-seg--phone" role="tablist" aria-label="Audience" data-i18n-aria="chrome.audience">
-            <button type="button" class="ui-seg__opt is-active" data-audience="recruiter">Recruiter</button>
-            <button type="button" class="ui-seg__opt" data-audience="mentoria" data-i18n="chrome.mentorship">Mentoría</button>
-            <button type="button" class="ui-seg__opt" data-audience="cliente" data-i18n="chrome.client">Cliente</button>
+        <section class="chrome__sheet-panel" data-sheet-panel="cases" id="chrome-casos-mobile">
+          <h2 class="chrome__sheet-heading" data-i18n="chrome.cases">Casos</h2>
+          <div class="chrome__cases">${caseRows}</div>
+        </section>
+        <section class="chrome__sheet-panel" data-sheet-panel="achievements" id="chrome-logros-mobile">
+          <div class="chrome__section-head">
+            <h2 class="chrome__sheet-heading" data-i18n="chrome.achievements">Logros</h2>
+            <button type="button" class="ui-btn ui-btn--secondary ui-btn--small" data-i18n="chrome.seeAll">Ver todos</button>
           </div>
-        </div>
-        <div class="chrome__ctas">
-          <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer">${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
-          <a class="ui-btn ui-btn--secondary" href="${CONTACT_HREF}">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></a>
-        </div>
-        <div class="chrome__card-row">
-          <div class="chrome__card-id">
-            <span class="chrome__mono">AL</span>
-            <span>
-              <strong>Adonay Lizardo</strong>
-              <small data-i18n="chrome.titleShort">Líder de diseño con IA</small>
-            </span>
+          <div class="chrome__logros">
+            <div class="chrome__logro">
+              <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
+              <p data-i18n="chrome.mentorshipStat">Mentoría: 30+ personas</p>
+            </div>
+            <div class="chrome__logro chrome__logro--empty">
+              <div class="chrome__logro-art">?</div>
+              <p data-i18n="chrome.comingSoon">Coming soon</p>
+            </div>
+            <div class="chrome__logro chrome__logro--empty">
+              <div class="chrome__logro-art">?</div>
+              <p data-i18n="chrome.comingSoon">Coming soon</p>
+            </div>
           </div>
-          <button type="button" class="ui-btn ui-btn--secondary" data-details data-i18n="chrome.details">Detalles</button>
-        </div>
+        </section>
       </div>
       <nav class="chrome__dock" aria-label="Dock" data-i18n-aria="chrome.dock">
         <button type="button" class="ui-round ui-round--lg ui-round--avatar" data-dock="intro" aria-label="Adonay">AL</button>
@@ -300,7 +338,11 @@ export class ChromeUI {
           <button type="button" class="ui-view" data-view="rotate" aria-label="Rotate" data-i18n-aria="chrome.rotate">${iconSvg('rotate')}</button>
           <button type="button" class="ui-view is-active" data-view="isometrica" aria-label="Isometric" data-i18n-aria="chrome.isometric">${iconSvg('cube')}</button>
           <button type="button" class="ui-view" data-view="cenital" aria-label="Top-down" data-i18n-aria="chrome.topdown">${iconSvg('grid')}</button>
-          <button type="button" class="ui-view" data-view="perspectiva" aria-label="Perspective" data-i18n-aria="chrome.perspective">${iconSvg('persp')}</button>
+          ${
+            personaEnabled()
+              ? `<button type="button" class="ui-view" data-view="persona" aria-label="Over-the-shoulder" data-i18n-aria="chrome.persona">${iconSvg('persp')}</button>`
+              : ''
+          }
           <button type="button" class="ui-view" data-view="map" aria-label="Map overview" data-i18n-aria="chrome.map">${iconSvg('map')}</button>
         </div>
       </div>
@@ -313,7 +355,15 @@ export class ChromeUI {
     this.root.querySelector('[data-action="show-panel"]')?.addEventListener('click', () => this.setLayout('split'));
     this.root.querySelector('[data-action="intro-close"]')?.addEventListener('click', () => this.setLayout('map'));
     this.root.querySelector('[data-details]')?.addEventListener('click', () => {
-      this.root.querySelector('.chrome__intro')?.classList.toggle('chrome__intro--expanded');
+      const intro = this.root.querySelector('[data-sheet-panel="intro"]');
+      const btn = this.root.querySelector('[data-details]') as HTMLButtonElement | null;
+      if (!intro || !btn) return;
+      const next = !intro.classList.contains('chrome__intro--expanded');
+      intro.classList.toggle('chrome__intro--expanded', next);
+      btn.setAttribute('aria-expanded', next ? 'true' : 'false');
+      if (next) {
+        intro.querySelector('.chrome__card-row')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
     });
     this.root.querySelector('[data-action="home"]')?.addEventListener('click', () => {
       this.setLayout('split');
@@ -338,22 +388,28 @@ export class ChromeUI {
       });
     });
     this.root.querySelectorAll('[data-view]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const v = (btn as HTMLElement).dataset.view;
+      btn.addEventListener('click', (e) => {
+        const el = btn as HTMLElement;
+        el.blur();
+        const v = el.dataset.view;
         if (v === 'rotate') this.callbacks.onRotate();
         else if (v === 'map') this.callbacks.onMapOverview();
         else this.callbacks.onView(v as Camera);
+        requestAnimationFrame(() => {
+          if (document.activeElement === el) el.blur();
+        });
+        e.preventDefault();
       });
     });
     this.root.querySelectorAll('[data-action="center"]').forEach((btn) => {
       btn.addEventListener('click', () => this.callbacks.onCenter());
     });
-    this.root.querySelector('[data-dock="intro"]')?.addEventListener('click', () => this.setLayout('split'));
+    this.root.querySelector('[data-dock="intro"]')?.addEventListener('click', () => this.openMobileSheet('intro'));
     this.root.querySelector('.chrome__dock [data-action="cases"]')?.addEventListener('click', () => {
-      this.setLayout('split');
+      this.openMobileSheet('cases');
     });
     this.root.querySelector('.chrome__dock [data-action="achievements"]')?.addEventListener('click', () => {
-      this.setLayout('split');
+      this.openMobileSheet('achievements');
     });
     this.root.querySelector('.chrome__dock [data-action="contact"]')?.addEventListener('click', () => {
       studio.playLine('11-contact');
@@ -392,7 +448,28 @@ export class ChromeUI {
   private syncSubtitle(): void {
     const sub = this.root.querySelector('.chrome__subtitle') as HTMLElement | null;
     if (!sub) return;
-    sub.textContent = studio.subtitle();
+    const text = studio.subtitle();
+    const personaControlsOpen =
+      !!document.querySelector('.persona-kit__overlay:not([hidden])');
+    const hideIntroOnPersonaPhone =
+      this.mobile &&
+      document.body.classList.contains('persona-kit') &&
+      personaControlsOpen &&
+      (text.startsWith('Hey, welcome') || text.startsWith('Hola, bienvenido'));
+    if (hideIntroOnPersonaPhone) {
+      sub.textContent = '';
+      sub.style.visibility = 'hidden';
+      return;
+    }
+    const personaPhone =
+      this.mobile && document.body.classList.contains('persona-kit') && !this.mobileSheet;
+    if (personaPhone && text && (text.startsWith('Nice, you found') || text.startsWith('Bien, encontraste'))) {
+      sub.style.visibility = 'hidden';
+      sub.textContent = '';
+      return;
+    }
+    sub.style.visibility = text ? 'visible' : 'hidden';
+    sub.textContent = text;
   }
 
   /** 'No sound? Check silent mode' is a boot hint — fade out after ~4s, then stay gone. */
@@ -463,10 +540,24 @@ export class ChromeUI {
       const key = ariaByAction[(el as HTMLElement).dataset.action ?? ''];
       if (key) el.setAttribute('aria-label', t(key));
     });
+    this.root.querySelectorAll('[data-case-teaser]').forEach((el) => {
+      const id = (el as HTMLElement).dataset.caseTeaser;
+      if (!id || !isCaseHouse(id)) return;
+      const copy = casePreviewCopy(id, this.lang);
+      (el as HTMLElement).textContent = copy?.teaser ?? '';
+    });
   }
 
   private scrollTo(sel: string): void {
     this.root.querySelector(sel)?.scrollIntoView({ block: 'start' });
+  }
+
+  private syncSheetPanel(): void {
+    this.root.dataset.mobileSheet = this.mobileSheetPanel;
+    this.root.querySelectorAll('[data-sheet-panel]').forEach((el) => {
+      const key = (el as HTMLElement).dataset.sheetPanel as MobileSheetPanel | undefined;
+      el.classList.toggle('is-active', key === this.mobileSheetPanel);
+    });
   }
 
   private syncAudience(): void {
@@ -485,7 +576,8 @@ export class ChromeUI {
     this.root.classList.toggle('chrome--mobile', this.mobile);
     this.root.classList.toggle('chrome--interior', this.interiorOpen);
     this.root.classList.toggle('chrome--sheet', this.mobile && this.mobileSheet && !this.interiorOpen);
-    this.root.classList.toggle('chrome--dock', this.mobile && !this.mobileSheet && !this.interiorOpen);
+    this.root.classList.toggle('chrome--dock', this.mobile && !this.interiorOpen);
+    this.syncSheetPanel();
     this.root.classList.toggle('chrome--map', !this.mobile && this.layout === 'map');
     this.root.classList.toggle('chrome--panel', !this.mobile && this.layout === 'panel');
     this.root.classList.toggle('chrome--split', !this.mobile && this.layout === 'split');
@@ -508,32 +600,122 @@ export class ChromeUI {
       if (key !== 'rotate' && key !== 'map') btn.classList.toggle('is-active', key === v.mode);
       if (key === 'map') btn.classList.toggle('is-active', v.overview);
     });
+    this.root.classList.toggle('chrome--alt-view', v.mode !== 'isometrica');
+    const hint = this.root.querySelector('.chrome__sound') as HTMLElement | null;
+    if (hint && v.mode !== 'isometrica' && !hint.hidden) {
+      hint.hidden = true;
+      hint.dataset.hint = '0';
+      hint.setAttribute('aria-hidden', 'true');
+      hint.classList.remove('chrome__sound--fade');
+    }
   }
 
   private placeSubtitle(): void {
     const sub = this.root.querySelector('.chrome__subtitle') as HTMLElement | null;
     if (!sub) return;
+    const personaThird =
+      document.body.classList.contains('persona-kit') &&
+      document.body.dataset.view === 'persona' &&
+      !this.interiorOpen;
+    if (this.mobile && personaThird && !this.mobileSheet) {
+      this.placePersonaVoiceSubtitle(sub);
+      return;
+    }
     if (this.mobile && this.mobileSheet && !this.interiorOpen) {
-      const intro = this.root.querySelector('.chrome__intro') as HTMLElement | null;
+      const intro = this.root.querySelector('.chrome__sheet-stack') as HTMLElement | null;
       const r = intro?.getBoundingClientRect();
       if (r && r.height > 8) {
         sub.style.bottom = `${Math.max(12, window.innerHeight - r.top + 8)}px`;
         sub.style.top = 'auto';
+        sub.style.left = '';
+        sub.style.transform = 'translateX(-50%)';
         return;
       }
     }
     sub.style.bottom = '';
     sub.style.top = '';
+    sub.style.left = '';
+    sub.style.transform = 'translateX(-50%)';
+    sub.style.width = '';
+    sub.style.maxWidth = '';
+  }
+
+  private placePersonaVoiceSubtitle(sub: HTMLElement): void {
+    type Rect = { left: number; top: number; right: number; bottom: number };
+    const pad = 10;
+    const overlaps = (a: Rect, b: Rect) =>
+      !(a.right + pad < b.left || a.left - pad > b.right || a.bottom + pad < b.top || a.top - pad > b.bottom);
+
+    const obstacles: Rect[] = [];
+    const joy = document.querySelector('.joystick:not([hidden])')?.getBoundingClientRect();
+    if (joy && joy.height > 8) obstacles.push(joy);
+    const dock = this.root.querySelector('.chrome__dock')?.getBoundingClientRect();
+    if (dock && dock.height > 8) obstacles.push(dock);
+    const cam = document.querySelector('.persona-kit__cam')?.getBoundingClientRect();
+    if (cam && cam.height > 8) obstacles.push(cam);
+    this.root.querySelectorAll('.chrome__tools-phone .ui-round, .persona-kit__help, .persona-kit__lang').forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.width > 8) obstacles.push(r);
+    });
+
+    const canvas = document.getElementById('game-canvas');
+    const canvasRect = canvas?.getBoundingClientRect();
+    const raw = canvas?.dataset.charScreen;
+    if (canvasRect && raw) {
+      try {
+        const { x, y } = JSON.parse(raw) as { x: number; y: number };
+        obstacles.push({
+          left: canvasRect.left + x - 52,
+          top: canvasRect.top + y - 96,
+          right: canvasRect.left + x + 52,
+          bottom: canvasRect.top + y + 24,
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+
+    const subW = Math.min(220, Math.max(160, window.innerWidth * 0.42));
+    const subH = Math.max(sub.offsetHeight || 36, 36);
+    const safeTop = Math.max(72, (cam?.bottom ?? 56) + 8);
+    const safeBottom = dock ? window.innerHeight - dock.top + 10 : 88;
+
+    const candidates: { top: number; left: number }[] = [
+      { top: safeTop, left: 16 },
+      { top: safeTop, left: Math.max(16, window.innerWidth - subW - 16) },
+      { top: Math.max(safeTop, window.innerHeight - safeBottom - subH), left: 16 },
+    ];
+
+    let placed = candidates[0];
+    for (const c of candidates) {
+      const box: Rect = { left: c.left, top: c.top, right: c.left + subW, bottom: c.top + subH };
+      if (!obstacles.some((o) => overlaps(box, o))) {
+        placed = c;
+        break;
+      }
+    }
+
+    sub.style.top = `${placed.top}px`;
+    sub.style.bottom = 'auto';
+    sub.style.left = `${placed.left}px`;
+    sub.style.right = 'auto';
+    sub.style.transform = 'none';
+    sub.style.width = `${subW}px`;
+    sub.style.maxWidth = `min(240px, calc(100vw - 32px))`;
+    sub.style.display = sub.textContent ? 'block' : '';
+  }
+
+  private shortLandscape(): boolean {
+    return window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
   }
 
   private placeLang(): void {
     const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
     if (!lang) return;
-    const shortLand = window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
-    if (shortLand) {
+    if (this.shortLandscape() || (this.mobile && window.innerWidth > window.innerHeight)) {
       lang.style.top = '12px';
-      lang.style.left = '16px';
-      lang.style.right = 'auto';
+      lang.style.right = '16px';
+      lang.style.left = 'auto';
       return;
     }
     lang.style.left = '';
@@ -555,17 +737,25 @@ export class ChromeUI {
     if (!ctx) return;
     const w = this.minimap.width;
     const h = this.minimap.height;
+    const view = this.getView();
+    const cenital = view.mode === 'cenital';
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = '#0B0C0E';
-    ctx.beginPath();
-    ctx.moveTo(w / 2, 4);
-    ctx.lineTo(w - 4, h / 2);
-    ctx.lineTo(w / 2, h - 4);
-    ctx.lineTo(4, h / 2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = '#2A2C31';
-    ctx.stroke();
+    if (cenital) {
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = '#2A2C31';
+      ctx.strokeRect(2, 2, w - 4, h - 4);
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(w / 2, 4);
+      ctx.lineTo(w - 4, h / 2);
+      ctx.lineTo(w / 2, h - 4);
+      ctx.lineTo(4, h / 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#2A2C31';
+      ctx.stroke();
+    }
 
     const buildings = getEnterableBuildings();
     let minX = Infinity;
@@ -592,7 +782,8 @@ export class ChromeUI {
     ctx.fillStyle = '#24262B';
     for (const { p } of pts) {
       const s = map(p.x, p.y);
-      ctx.fillRect(s.x - 4, s.y - 3, 8, 6);
+      if (cenital) ctx.fillRect(s.x - 5, s.y - 4, 10, 8);
+      else ctx.fillRect(s.x - 4, s.y - 3, 8, 6);
     }
     const t = this.getCharTile();
     const c = map(tileToWorld(t.x, t.y).x, tileToWorld(t.x, t.y).y);

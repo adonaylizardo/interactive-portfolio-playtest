@@ -4,6 +4,7 @@
  */
 import { caseVoiceFile } from '../data/cases';
 import { VOICE_LINES } from '../data/voice-lines';
+import { t } from '../ui/i18n';
 
 const MUTE_KEY = 'studio-audio-muted';
 const VOICE_DIR = `${import.meta.env.BASE_URL}audio/voice/`;
@@ -65,6 +66,8 @@ export class StudioAudio {
   private preferOgg: boolean | null = null;
   /** First gesture owns the intro; other lines wait until it has finished. */
   private introLock = false;
+  /** Persona controls card blocks the welcome line until the user dismisses it. */
+  private deferIntroForPersonaOverlay = false;
   private pending: string | null = null;
   private bark: HTMLAudioElement | null = null;
   private barkLines: BarkLine[] = [];
@@ -144,10 +147,30 @@ export class StudioAudio {
     window.setTimeout(() => this.startGraphAndIntro(), phone ? 900 : 80);
   }
 
+  private personaControlsBlockingIntro(): boolean {
+    if (typeof document === 'undefined') return false;
+    return !!document.querySelector('.persona-kit__overlay:not([hidden])');
+  }
+
+  /** Call when the persona intro card closes so the welcome line can play. */
+  playIntroWhenPersonaReady(): void {
+    if (!this.unlocked || this.muted || this.played.has('01-intro')) return;
+    this.deferIntroForPersonaOverlay = false;
+    this.introLock = true;
+    this.playLine('01-intro');
+    if (!this.played.has('01-intro')) this.introLock = false;
+  }
+
   private startGraphAndIntro(): void {
+    if (this.personaControlsBlockingIntro()) {
+      this.deferIntroForPersonaOverlay = true;
+      this.introLock = true;
+    }
     if (automatedWebKitPhone()) {
-      this.playLine('01-intro');
-      if (this.muted || !this.played.has('01-intro')) this.introLock = false;
+      if (!this.deferIntroForPersonaOverlay) {
+        this.playLine('01-intro');
+        if (this.muted || !this.played.has('01-intro')) this.introLock = false;
+      }
       return;
     }
     try {
@@ -166,8 +189,10 @@ export class StudioAudio {
     } catch {
       /* autoplay / context limits: mute state still flips */
     }
-    this.playLine('01-intro');
-    if (this.muted || !this.played.has('01-intro')) this.introLock = false;
+    if (!this.deferIntroForPersonaOverlay) {
+      this.playLine('01-intro');
+      if (this.muted || !this.played.has('01-intro')) this.introLock = false;
+    }
   }
 
   setInterior(open: boolean): void {
@@ -209,6 +234,14 @@ export class StudioAudio {
   /** Move command: a random bark ≠ last, ~6 s cooldown, never over a case line. */
   noteMoveCommand(): void {
     if (this.muted || !this.unlocked || this.voice) return;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const lang = document.documentElement.lang || 'es';
+        if (lang.startsWith('es')) return;
+      }
+    } catch {
+      /* ignore */
+    }
     if (automatedWebKitPhone()) return;
     const now = performance.now();
     if (now - this.lastBarkAt < BARK_COOLDOWN_MS) return;
@@ -239,6 +272,12 @@ export class StudioAudio {
     });
   }
 
+  private localizedScript(id: string, fallback: string): string {
+    const key = `voice.${id}` as Parameters<typeof t>[0];
+    const tr = t(key);
+    return tr === key ? fallback : tr;
+  }
+
   playLine(id: string): void {
     const line = VOICE_LINES[id];
     if (!line || this.played.has(id) || this.muted) return;
@@ -250,7 +289,7 @@ export class StudioAudio {
     this.stopVoice();
     this.stopBark();
     this.played.add(id);
-    this.subtitleText = line.script_text;
+    this.subtitleText = this.localizedScript(id, line.script_text);
     this.emit();
     if (automatedWebKitPhone()) {
       window.setTimeout(() => this.finishVoice(), 80);
@@ -267,7 +306,7 @@ export class StudioAudio {
       if (this.voice === el) this.finishVoice();
     });
     this.voice = el;
-    this.subtitleText = line.script_text;
+    this.subtitleText = this.localizedScript(id, line.script_text);
     this.duckAmbience(true);
     this.emit();
     void el.play().catch(() => {

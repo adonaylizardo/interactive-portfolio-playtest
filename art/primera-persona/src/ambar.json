@@ -1,0 +1,97 @@
+{
+ "frame-a-a-pie": 0.25,
+ "frame-b-jac-t9": 0.23,
+ "jac-t9-cabina__luces-on (opacos)": 0.01,
+ "piezas": {
+  "fachada-teresa-carreno__luz-encendida": {
+   "w": 1040,
+   "h": 614,
+   "ancla": [
+    608,
+    613
+   ],
+   "ambar_pct": 2.87
+  },
+  "fachada-teresa-carreno__luz-apagada": {
+   "w": 1040,
+   "h": 614,
+   "ancla": [
+    608,
+    613
+   ],
+   "ambar_pct": 0.0
+  },
+  "fachada-biblioteca-ingenieria__luz-encendida": {
+   "w": 468,
+   "h": 185,
+   "ancla": [
+    234,
+    184
+   ],
+   "ambar_pct": 1.81
+  },
+  "fachada-biblioteca-ingenieria__luz-apagada": {
+   "w": 468,
+   "h": 185,
+   "ancla": [
+    234,
+    184
+   ],
+   "ambar_pct": 0.03
+  },
+  "fachada-catedral-de-barquisimeto__luz-encendida": {
+   "w": 736,
+   "h": 588,
+   "ancla": [
+    368,
+    587
+   ],
+   "ambar_pct": 1.76
+  },
+  "fachada-catedral-de-barquisimeto__luz-apagada": {
+   "w": 736,
+   "h": 588,
+   "ancla": [
+    368,
+    587
+   ],
+   "ambar_pct": 0.0
+  },
+  "farol-frente__estado-encendido": {
+   "w": 24,
+   "h": 76,
+   "ancla": [
+    6,
+    75
+   ],
+   "ambar_pct": 2.67
+  },
+  "cielo-noche__tile": {
+   "w": 2048,
+   "h": 400,
+   "ancla": [
+    0,
+    360
+   ],
+   "ambar_pct": 0.0
+  },
+  "suelo-avenida__fase-a": {
+   "w": 512,
+   "h": 8,
+   "ancla": [
+    256,
+    0
+   ],
+   "ambar_pct": 0.0
+  },
+  "suelo-avenida__fase-b": {
+   "w": 512,
+   "h": 8,
+   "ancla": [
+    256,
+    0
+   ],
+   "ambar_pct": 0.0
+  }
+ }
+}

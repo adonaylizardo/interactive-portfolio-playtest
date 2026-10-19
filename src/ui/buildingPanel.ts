@@ -3,7 +3,7 @@ import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
 import { CASES, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
 import { iconSvg } from './icons';
-import { onLangChange, t } from './i18n';
+import { getLang, onLangChange, t } from './i18n';
 
 function aboutBlockNode(block: AboutBlock): HTMLElement {
   if (block.kind === 'heading') {
@@ -114,6 +114,7 @@ export class BuildingPanel {
   private interiorId: string | null = null;
   private onVisibilityChange: () => void;
   private onSalir: () => void;
+  private onCasePreviewClosed: () => void;
   private mode: 'hidden' | 'interior' | 'preview' = 'hidden';
   private previewEl: HTMLElement | null = null;
   private previewTitle: HTMLElement | null = null;
@@ -138,9 +139,11 @@ export class BuildingPanel {
     container: HTMLElement,
     onVisibilityChange: () => void,
     onSalir: () => void,
+    onCasePreviewClosed: () => void = () => {},
   ) {
     this.onVisibilityChange = onVisibilityChange;
     this.onSalir = onSalir;
+    this.onCasePreviewClosed = onCasePreviewClosed;
     this.el = document.createElement('div');
     this.el.className = 'building-panel building-panel--interior-only';
     this.el.hidden = true;
@@ -431,31 +434,8 @@ export class BuildingPanel {
     this.aboutEl.style.contentVisibility = '';
     this.el.removeAttribute('inert');
     this.el.classList.remove('building-panel--snap');
-    const preview = casePreviewCopy(interiorId);
     const shown = this.renderCase();
-    const title = preview?.title ?? shown ?? interiorId;
-    const subtitle = preview?.subtitle ?? '';
-    const teaser = this.isMobile()
-      ? (preview?.teaser ?? '')
-      : (preview?.teaserFull ?? preview?.teaser ?? '');
-    if (this.previewTitle) this.previewTitle.textContent = title;
-    if (this.previewSubtitle) this.previewSubtitle.textContent = subtitle;
-    if (this.previewTeaser) this.previewTeaser.textContent = teaser;
-    const meta = this.el.querySelector('.case-preview__read-meta');
-    if (meta) meta.textContent = preview?.pillMeta ?? 'Problem · What I did · Result';
-    if (this.readBarTitle) {
-      this.readBarTitle.textContent = this.isMobile() || !subtitle
-        ? title
-        : `${title}: ${subtitle.charAt(0).toLowerCase()}${subtitle.slice(1)}`;
-    }
-    if (this.readKicker) this.readKicker.textContent = preview?.kicker ?? 'CASE';
-    if (this.readHeadline) {
-      this.readHeadline.textContent = this.isMobile()
-        ? (preview?.teaser ?? title).replace(/[.]$/, '')
-        : (preview?.teaserFull ?? preview?.teaser ?? title);
-    }
-    if (this.readLede) this.readLede.textContent = subtitle;
-    if (this.readHeroLabel) this.readHeroLabel.textContent = preview?.placeholder ?? 'IMAGE PLACEHOLDER';
+    const title = this.fillPreviewCopy(interiorId) ?? shown ?? interiorId;
     this.setTitle(interiorId, title);
     this.renderWorkedWith();
     this.renderAbout();
@@ -480,6 +460,34 @@ export class BuildingPanel {
     this.peekOnly = false;
     this.el.hidden = false;
     this.el.classList.add('building-panel--open');
+  }
+
+  private fillPreviewCopy(interiorId: string): string | null {
+    const preview = casePreviewCopy(interiorId, getLang());
+    const title = preview?.title ?? null;
+    const subtitle = preview?.subtitle ?? '';
+    const teaser = this.isMobile()
+      ? (preview?.teaser ?? '')
+      : (preview?.teaserFull ?? preview?.teaser ?? '');
+    if (this.previewTitle) this.previewTitle.textContent = title ?? interiorId;
+    if (this.previewSubtitle) this.previewSubtitle.textContent = subtitle;
+    if (this.previewTeaser) this.previewTeaser.textContent = teaser;
+    const meta = this.el.querySelector('.case-preview__read-meta');
+    if (meta) meta.textContent = preview?.pillMeta ?? 'Problem · What I did · Result';
+    if (this.readBarTitle) {
+      this.readBarTitle.textContent = this.isMobile() || !subtitle
+        ? (title ?? interiorId)
+        : `${title}: ${subtitle.charAt(0).toLowerCase()}${subtitle.slice(1)}`;
+    }
+    if (this.readKicker) this.readKicker.textContent = preview?.kicker ?? 'CASE';
+    if (this.readHeadline) {
+      this.readHeadline.textContent = this.isMobile()
+        ? (preview?.teaser ?? title ?? interiorId).replace(/[.]$/, '')
+        : (preview?.teaserFull ?? preview?.teaser ?? title ?? interiorId);
+    }
+    if (this.readLede) this.readLede.textContent = subtitle;
+    if (this.readHeroLabel) this.readHeroLabel.textContent = preview?.placeholder ?? 'IMAGE PLACEHOLDER';
+    return title;
   }
 
   private setTitle(key: string, shown: string | null): void {
@@ -541,6 +549,7 @@ export class BuildingPanel {
   }
 
   hide(opts?: { snap?: boolean; silent?: boolean }): void {
+    const closingPreview = this.mode === 'preview';
     // Snap out of the hit tree on this frame (same as the mat). A transforming sheet still
     // intercepts iOS taps even with pointer-events:none, so Salir waited ~250 ms for map input.
     this.el.classList.add('building-panel--snap');
@@ -561,7 +570,10 @@ export class BuildingPanel {
     if (this.readEl) this.readEl.hidden = true;
     if (this.readBar) this.readBar.hidden = true;
     this.el.classList.remove('building-panel--snap');
-    if (!opts?.silent) this.onVisibilityChange();
+    if (!opts?.silent) {
+      if (closingPreview) this.onCasePreviewClosed();
+      this.onVisibilityChange();
+    }
     if (opts?.snap) requestAnimationFrame(() => this.releaseCaseDom());
   }
 
@@ -675,5 +687,6 @@ export class BuildingPanel {
     });
     const read = this.el.querySelector('.case-preview__read-label');
     if (read) read.textContent = t('panel.readCase');
+    if (this.mode === 'preview' && this.interiorId) this.fillPreviewCopy(this.interiorId);
   }
 }
