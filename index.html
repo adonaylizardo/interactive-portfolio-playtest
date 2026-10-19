@@ -9,27 +9,25 @@
     <meta name="theme-color" content="#0B0C0E" />
     <title>Playtest — portafolio interactivo</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="preload" as="image" type="image/webp" href="sprites/atlas/boot-1x.webp" />
-    <link rel="preload" as="image" type="image/webp" href="sprites/atlas/player-1x.webp" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@500&family=Inter+Tight:wght@600&family=Inter:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@500&family=Geist:wght@400;500;600&family=Inter+Tight:wght@600&family=Inter:wght@400;500;600&family=Noto+Color+Emoji&display=swap"
       rel="stylesheet"
       media="print"
       onload="this.media='all'"
     />
     <link rel="stylesheet" href="/src/styles.css" />
     <link rel="stylesheet" href="/src/chrome.css" />
+    <link rel="stylesheet" href="/src/reading.css" />
+    <link rel="stylesheet" href="/src/boot.css" />
+    <link rel="stylesheet" href="/src/placeCard.css" />
+    <link rel="stylesheet" href="/src/estados.css" />
   </head>
   <body>
     <div id="app">
       <canvas id="game-canvas" tabindex="0" aria-label="Mundo isométrico de prueba"></canvas>
       <div id="ui-root"></div>
-      <div id="boot" class="boot" aria-live="polite">
-        <p class="boot__label">Cargando el mapa</p>
-        <div class="boot__bar" aria-hidden="true"><i></i></div>
-      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

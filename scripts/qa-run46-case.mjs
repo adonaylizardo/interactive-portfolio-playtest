@@ -1,6 +1,6 @@
 /**
  * Run #46 airline case panel (deploy gate). Opens the case building's panel and checks:
- *  - the title is the headline; the client is never named (page text, panel, URL hash)
+ *  - the title is the headline; the client is named Volaris in copy and URL hash
  *  - desktop (>= 768 px) shows the full English text, line for line; phone shows the short version
  *  - the text is readable (font sizes, no sideways scroll) and the panel scrolls to the closing line
  * Usage: imported by qa-smoke.mjs; `node scripts/qa-run46-case.mjs [--shots] [url]` runs it alone.
@@ -28,7 +28,7 @@ export const RUN46_KINDS = {
 
 const HEADLINE = "A contract engineering couldn't misread";
 const PROBLEM =
-  "On a Latin American airline's booking app (Android and iOS), Figma, specs, and code each told a different story about the same component in a booking flow. Several design systems overlapped, so nobody could tell which one was the source of truth. Every gap got reinterpreted downstream, and reworked.";
+  "On Volaris's booking app (Android and iOS), Figma, specs, and code each told a different story about the same component in a booking flow. Several design systems overlapped, so nobody could tell which one was the source of truth. Every gap got reinterpreted downstream, and reworked.";
 const DID =
   'As Product Strategist (Q4 2026), I was the sole approver: I cleaned up the Figma file, verified it against the existing booking flow implementation, and turned each component into an explicit sealed contract between design and code. AI agents helped draft and audit; I reviewed and sealed every one myself.';
 const DELIVERED = 'No code was delivered. The deliverables: sealed contracts, markdown verification reports, and a Figma handoff.';
@@ -146,10 +146,8 @@ export async function runRun46CaseSuite({ kind, base, errors, notes, shots }) {
     const m = await readPanel(page);
     if (m.title !== HEADLINE) errors.push(`${tag}: title is "${m.title}", want the headline`);
     if (m.key !== 'Volaris') errors.push(`${tag}: panel key is "${m.key}"`);
-    for (const [where, text] of [['page text', m.bodyText], ['URL hash', m.hash]]) {
-      if (/volaris/i.test(text)) errors.push(`${tag}: the client name shows in the ${where}`);
-    }
-    if (!/in=airline/.test(m.hash)) errors.push(`${tag}: URL hash is "${m.hash}", want in=airline`);
+    if (!/Volaris/.test(m.bodyText)) errors.push(`${tag}: panel body is missing Volaris`);
+    if (!/in=volaris/.test(m.hash)) errors.push(`${tag}: URL hash is "${m.hash}", want in=volaris`);
     if (m.placeholders) errors.push(`${tag}: placeholder copy still visible`);
     const okText = compare(tag, m.lines, spec.phone ? SHORT : FULL, errors);
     if (spec.phone && m.lines.some(([, t]) => t.includes('No code was delivered'))) errors.push(`${tag}: phone shows the deliverables sentences`);

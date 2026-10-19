@@ -1,6 +1,7 @@
 import { studio } from './audio/studio';
 import { ChecklistUI } from './checklist/ui';
 import { isCaseHouse } from './data/cases';
+import { isPlaceCard } from './data/placeCards';
 import {
   doorInwardStep,
   getBuildingByName,
@@ -10,46 +11,163 @@ import {
   MAP_TRAMOS,
   validateWalkGridFootprint,
 } from './data/map';
-import { parseInteriorFromHash } from './camera/hash';
+import { parseInteriorFromHash, setHashWriteSuppressed } from './camera/hash';
+import { isMobileLayout } from './checklist/ui';
+import {
+  isReadingHash,
+  leaveReadingHash,
+  navigateReading,
+  readingDepth,
+  syncReadingDepthFromHistory,
+  parseReadingRoute,
+  resetReadingNavigationForLoad,
+} from './ui/readingRoute';
+import { ReadingView } from './ui/readingView';
 import { getInteriorDef, interiorBlockedTilesHaveProps } from './game/interior';
 import { IsoScene } from './game/scene';
 import { findPath } from './iso/pathfinding';
 import { BuildingPanel } from './ui/buildingPanel';
+import { PlaceCardPanel } from './ui/placeCardPanel';
 import { ChromeUI, type DesktopLayout } from './ui/chrome';
 import { JacHud } from './ui/jacHud';
 import { Joystick } from './ui/joystick';
 import { BuildingMapLabels } from './ui/buildingMapLabels';
 import { NameLabels } from './ui/nameLabels';
 import { hideToast, showToast } from './ui/toast';
+import { formatContentDate } from './ui/contentLabels';
+import {
+  BootFlow,
+  enterReadingFromWelcome,
+  markWelcomeDone,
+  shouldSkipWelcomeFlow,
+} from './ui/bootFlow';
+import { armBootAssetGuard, disarmBootAssetGuard } from './ui/bootAssetGuard';
+import { showFatalState, setOnFatalReadInstead } from './ui/fatalState';
+import { startOfflineMonitor, isOfflineBannerVisible } from './ui/offlineBanner';
+import { canUseWebGL } from './ui/webglCheck';
 import { getLang, onLangChange, setLang, t } from './ui/i18n';
 import type { Camera } from './tokens';
 
 async function main(): Promise<void> {
+  resetReadingNavigationForLoad();
   const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
   const uiRoot = document.getElementById('ui-root')!;
   const applyCanvasLabel = () => canvas.setAttribute('aria-label', t('canvas.label'));
   applyCanvasLabel();
+  document.documentElement.lang = getLang();
   onLangChange(applyCanvasLabel);
 
   const checklist = new ChecklistUI(uiRoot, { onSkip: () => {}, onDismiss: () => {} });
+  const bootFlow = new BootFlow();
+  bootFlow.mount();
+  const skipWelcome = shouldSkipWelcomeFlow();
 
   let scene!: IsoScene;
+
+  const syncReadingFromHash = (): void => {
+    const route = parseReadingRoute();
+    if (route) {
+      if (isMobileLayout() && !reading.isActive()) {
+        chrome.rememberMobileSheetBeforeReading();
+      }
+      setHashWriteSuppressed(true);
+      reading.syncRoute(route);
+      checklist.setCollapsed(true);
+      if (!isMobileLayout()) chrome.setLayout('panel');
+      else chrome.setLayout('map');
+      panel.hide({ snap: true, silent: true });
+      scene?.setReadingPaused(true);
+      mapLabels.setHidden(true);
+      scene?.applyCameraFromUi();
+      return;
+    }
+    setHashWriteSuppressed(false);
+    reading.syncRoute(null);
+    scene?.setReadingPaused(false);
+    mapLabels.setHidden(false);
+    if (!isMobileLayout()) chrome.setLayout('split');
+    else chrome.restoreMobileSheetAfterReading();
+    scene?.applyCameraFromUi();
+  };
+
+  /** Keep chrome, reading, and map panel aligned with history (incl. back/forward). */
+  const syncNavigationFromHistory = (): void => {
+    const route = parseReadingRoute();
+    if (route) {
+      syncReadingFromHash();
+      return;
+    }
+    setHashWriteSuppressed(false);
+    reading.syncRoute(null);
+    scene?.setReadingPaused(false);
+    mapLabels.setHidden(false);
+    const interiorId = parseInteriorFromHash();
+    if (interiorId) {
+      syncInteriorPanel(interiorId);
+    } else {
+      panel.hide({ snap: true, silent: true });
+      chrome.setInteriorOpen(false, { skipLayout: true });
+      if (!isMobileLayout()) {
+        if (chrome.getLayout() === 'panel') chrome.setLayout('split');
+      } else {
+        chrome.restoreMobileSheetAfterReading();
+      }
+    }
+    scene?.applyCameraFromUi();
+  };
+
+  const closeReading = (): void => {
+    const depthBeforeLeave = readingDepth();
+    leaveReadingHash();
+    if (depthBeforeLeave < 1) syncReadingFromHash();
+  };
+
+  const reading = new ReadingView(uiRoot, closeReading);
+
+  setOnFatalReadInstead(() => {
+    bootFlow.dismiss();
+    const route = parseReadingRoute();
+    if (!canUseWebGL()) {
+      if (route) {
+        if (isMobileLayout()) chrome.rememberMobileSheetBeforeReading();
+        reading.syncRoute(route);
+        checklist.setCollapsed(true);
+        if (!isMobileLayout()) chrome.setLayout('panel');
+        else chrome.setLayout('map');
+      }
+      return;
+    }
+    syncReadingFromHash();
+  });
+
   const chrome = new ChromeUI(uiRoot, {
     onLayoutChange: () => {
       const layout = chrome.getLayout();
-      checklist.setCollapsed(layout === 'map' || layout === 'panel');
+      checklist.setCollapsed(layout === 'map' || layout === 'panel' || isReadingHash());
       scene?.applyCameraFromUi();
     },
     onView: (mode: Camera) => scene?.setViewMode(mode),
     onRotate: () => scene?.rotateView(),
     onMapOverview: () => scene?.toggleMapOverview(),
     onCenter: () => scene?.recenterOnCharacter(),
-    onLocate: (id) => scene?.walkToBuildingForQa(id),
+    onLocate: (id) => {
+      if (isReadingHash()) return;
+      scene?.walkToBuildingForQa(id);
+    },
+    onReadingOpen: () => {
+      if (isMobileLayout()) chrome.rememberMobileSheetBeforeReading();
+      navigateReading({ kind: 'list' });
+      syncReadingFromHash();
+    },
+    onReadingClose: closeReading,
   });
 
   const joystick = new Joystick(uiRoot);
   const labels = new NameLabels(uiRoot, { onJacInfo: () => scene.jacOpenInfo() });
-  const mapLabels = new BuildingMapLabels(uiRoot);
+  const mapLabels = new BuildingMapLabels(uiRoot, (id) => {
+    if (isReadingHash()) return;
+    scene?.walkToBuildingForQa(id);
+  });
   const jacHud = new JacHud(uiRoot, {
     onInfo: () => scene.jacOpenInfo(),
     onGetIn: () => scene.jacGetIn(),
@@ -60,6 +178,21 @@ async function main(): Promise<void> {
     onToggle: (id) => scene.jacSetToggle(id),
     onEngine: () => scene.jacSetEngine(),
   });
+  const placeCard = new PlaceCardPanel(uiRoot, () => {
+    chrome.setPlaceCardOpen(placeCard.isOpen());
+    scene?.applyCameraFromUi();
+  });
+
+  const bootReading = parseReadingRoute();
+  if (bootReading) setHashWriteSuppressed(true);
+
+  if (!canUseWebGL()) {
+    bootFlow.dismiss();
+    showFatalState('webgl');
+    startOfflineMonitor();
+    return;
+  }
+
   const panel = new BuildingPanel(
     uiRoot,
     () => {
@@ -69,11 +202,17 @@ async function main(): Promise<void> {
       joystick.setHidden(open || panel.isPreviewExpanded());
       if (panel.isPreviewExpanded()) checklist.setCollapsed(true);
       scene?.applyCameraFromUi();
+      scene?.schedulePresentationRefresh(420);
     },
     () => scene.leaveInteriorNow(),
+    () => {
+      scene?.refreshCanvasPresentation(true);
+      scene?.schedulePresentationRefresh(420);
+    },
   );
   joystick.onStickStart(() => {
     if (panel.isPreviewMode()) panel.hide();
+    if (placeCard.isOpen()) placeCard.hide();
     studio.noteMoveCommand();
   });
 
@@ -81,15 +220,19 @@ async function main(): Promise<void> {
     if (interiorId) {
       const b = getBuildingByName(interiorId);
       if (b?.panelTitle) {
+        if (reading.isActive() || isReadingHash()) {
+          reading.syncRoute(null);
+          scene.setReadingPaused(false);
+        }
         checklist.setBuildingPanelOpen(true);
         if (interiorId === 'teresa') {
           studio.clearSubtitle();
-          chrome.setInteriorOpen(false, { skipLayout: true });
-          panel.showTalks(b.panelTitle, interiorId);
+          chrome.setInteriorOpen(true, { skipLayout: true });
+          panel.showTalks(t('panel.talks'), interiorId);
         } else if (interiorId === 'biblioteca') {
           studio.clearSubtitle();
-          chrome.setInteriorOpen(false, { skipLayout: true });
-          panel.showWritings(b.panelTitle, interiorId);
+          chrome.setInteriorOpen(true, { skipLayout: true });
+          panel.showWritings(t('panel.writings'), interiorId);
         } else {
           chrome.setInteriorOpen(true);
           panel.showInterior(b.panelTitle, interiorId);
@@ -104,9 +247,17 @@ async function main(): Promise<void> {
   };
 
   scene = new IsoScene({
+    onInteriorLoadFailed: () => {
+      showToast(t('state.loadFailed.sub'));
+    },
     onChecklist: (step) => checklist.complete(step),
     onEnterBuilding: (buildingId) => {
       checklist.complete('enter-building');
+      if (isPlaceCard(buildingId)) {
+        if (chrome.isMobileSheetOpen()) chrome.setLayout('map');
+        placeCard.open(buildingId);
+        return;
+      }
       if (isCaseHouse(buildingId)) {
         if (chrome.isMobileSheetOpen()) chrome.setLayout('map');
         panel.showPreview(buildingId);
@@ -117,6 +268,7 @@ async function main(): Promise<void> {
     onMoveCommand: () => studio.noteMoveCommand(),
     onFrame: () => {
       labels.update(scene.nameLabelAnchors());
+      labels.setHidden(!!scene.isInInterior());
       mapLabels.setHidden(!!scene.isInInterior());
       mapLabels.update(
         scene.buildingMapLabelAnchors().map((a) => ({
@@ -137,8 +289,10 @@ async function main(): Promise<void> {
         !scene.jacSnapshot()?.driving ||
           !!scene.isInInterior() ||
           panel.isPreviewExpanded() ||
+          placeCard.isOpen() ||
           scene.jacInfoOpen(),
       );
+      placeCard.tickUi();
     },
     stick: () => joystick.vector(),
     stickActive: () => joystick.isActive(),
@@ -164,6 +318,11 @@ async function main(): Promise<void> {
       layoutInsets: () => panel.layoutInsets(),
       consumeInteriorCanvasTap: (x, y) => panel.consumeInteriorCanvasTap(x, y),
       expandInteriorSheetForQa: () => panel.expandInteriorSheetForQa(),
+      isInteriorSheetExpanded: () => panel.isInteriorSheetExpanded(),
+    },
+    placeCard: {
+      isOpen: () => placeCard.isOpen(),
+      layoutInsets: () => placeCard.layoutInsets(),
     },
     checklist: {
       isMobileExpanded: () => checklist.isMobileExpanded(),
@@ -176,12 +335,9 @@ async function main(): Promise<void> {
       },
       onJacHud: () => chrome.setLayout('map'),
     },
+    onLoadProgress: (pct) => bootFlow.setProgress(pct),
   });
 
-  chrome.bindScene({
-    getCharTile: () => scene.getCharacterTile(),
-    getView: () => scene.getViewMode(),
-  });
   const lockViewport = () => {
     if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
   };
@@ -209,7 +365,54 @@ async function main(): Promise<void> {
     },
     { passive: false, capture: true },
   );
-  await scene.init(canvas);
+  armBootAssetGuard(() => showFatalState('load-failed'));
+
+  try {
+    await scene.init(canvas);
+  } catch (err) {
+    console.error(err);
+    disarmBootAssetGuard();
+    showFatalState('load-failed');
+    return;
+  }
+  disarmBootAssetGuard();
+
+  chrome.bindScene({
+    getCharTile: () => scene.getCharacterTile(),
+    getView: () => scene.getViewMode(),
+  });
+
+  startOfflineMonitor();
+
+  window.addEventListener('unhandledrejection', (ev) => {
+    const msg =
+      ev.reason instanceof Error
+        ? ev.reason.message
+        : typeof ev.reason === 'string'
+          ? ev.reason
+          : String(ev.reason ?? '');
+    if (/(\[Loader\.load\]|Failed to fetch|sprite load failed|deferred load failed)/i.test(msg)) {
+      ev.preventDefault();
+      console.warn(ev.reason);
+    }
+  });
+
+  let enteredViaWelcomeRead = false;
+  if (skipWelcome) {
+    await bootFlow.finishLoading(true);
+  } else {
+    const choice = await bootFlow.finishLoading(false);
+    markWelcomeDone();
+    if (choice === 'read') {
+      enteredViaWelcomeRead = true;
+      enterReadingFromWelcome();
+    } else {
+      if (isMobileLayout()) chrome.setLayout('map');
+      else chrome.setLayout('split');
+    }
+    bootFlow.dismiss();
+  }
+
   chrome.beginSoundHint();
   const bootFocus = new URLSearchParams(location.search).get('focus');
   if (bootFocus === 'jac') {
@@ -217,10 +420,20 @@ async function main(): Promise<void> {
     scene.focusJac();
   }
 
-  const bootInterior = parseInteriorFromHash();
-  if (bootInterior) {
-    syncInteriorPanel(bootInterior);
+  if (bootReading || enteredViaWelcomeRead) {
+    syncReadingFromHash();
+  } else {
+    const bootInterior = parseInteriorFromHash();
+    if (bootInterior) {
+      syncInteriorPanel(bootInterior);
+    }
   }
+
+  window.addEventListener('hashchange', () => syncNavigationFromHistory());
+  window.addEventListener('popstate', () => {
+    syncReadingDepthFromHistory();
+    syncNavigationFromHistory();
+  });
 
   (window as unknown as { __playtestQa?: Record<string, unknown> }).__playtestQa = {
     validateWalkGridFootprint,
@@ -253,6 +466,13 @@ async function main(): Promise<void> {
     enterInterior: (name: string) => scene.enterInterior(name),
     exitInterior: () => scene.exitInterior(),
     dismissBuildingPanel: () => panel.hide(),
+    openPlaceCard: (id: string) => {
+      if (isPlaceCard(id)) placeCard.open(id);
+    },
+    closePlaceCard: () => placeCard.hide(),
+    isPlaceCardOpen: () => placeCard.isOpen(),
+    placeVoiceProgress: () => studio.getPlaceVoiceProgress(),
+    qaPlayPlaceVoice: (voiceId: string) => studio.qaPlayPlaceVoice(voiceId),
     showPanelOverlayForQa: (title: string) => {
       checklist.setBuildingPanelOpen(true);
       panel.showOverlayForQa(title);
@@ -274,6 +494,7 @@ async function main(): Promise<void> {
     interiorPixelProbes: () => scene.getInteriorPixelProbesClient(),
     tapInteriorTile: (tx: number, ty: number) => scene.tapInteriorTileForQa(tx, ty),
     expandInteriorSheet: () => panel.expandInteriorSheetForQa(),
+    expandInteriorSheetForQa: () => panel.expandInteriorSheetForQa(),
     leaveInteriorNow: () => scene.leaveInteriorNow(),
     collapseInteriorSheetToPeek: () => panel.collapseToPeekOnly(),
     reframeMobileDefault: () => scene.reframeMobileDefaultViewForQa(),
@@ -317,6 +538,7 @@ async function main(): Promise<void> {
     audioMuted: () => studio.isMuted(),
     audioUnlocked: () => studio.isUnlocked(),
     setAudioMuted: (muted: boolean) => studio.setMuted(muted),
+    formatContentDate: (raw: string) => formatContentDate(raw),
     soundHint: () => {
       const el = document.querySelector('.chrome__sound') as HTMLElement | null;
       if (!el) return { present: false, visible: false, opacity: 0, hint: '' };
@@ -340,6 +562,7 @@ async function main(): Promise<void> {
     openPanelTitle: () => panel.openTitle(),
     isCasePreviewExpanded: () => panel.isPreviewExpanded(),
     showCasePreview: (id: string) => panel.showPreview(id),
+    showTalksEmptyForQa: () => panel.showTalksEmptyForQa(),
     expandCasePreview: () => panel.expandPreviewForQa(),
     collapseCasePreview: () => panel.collapsePreviewForQa(),
     jac: () => scene.qaJac(),
@@ -385,13 +608,12 @@ async function main(): Promise<void> {
     setLang: (lang: 'en' | 'es') => setLang(lang),
     getLang: () => getLang(),
     t: (key: Parameters<typeof t>[0]) => t(key),
+    showFatalState: (kind: 'webgl' | 'load-failed') => showFatalState(kind),
+    isOfflineBannerVisible: () => isOfflineBannerVisible(),
   };
 }
 
 main().catch((err) => {
   console.error(err);
-  document.body.insertAdjacentHTML(
-    'beforeend',
-    `<p style="padding:16px;color:red">${t('boot.error')} ${String(err)}</p>`,
-  );
+  showFatalState('load-failed');
 });

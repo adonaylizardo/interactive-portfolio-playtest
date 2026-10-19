@@ -2,8 +2,17 @@
 export type VoiceLine = {
   id: string;
   script_text: string;
+  /** Optional ES subtitle when audio is still EN-only. */
+  script_text_es?: string;
   files: { mp3: string; ogg: string };
 };
+
+export function voiceSubtitleForLang(line: VoiceLine, lang: string): string {
+  if (lang === 'es' || lang.startsWith('es')) {
+    return line.script_text_es ?? '';
+  }
+  return line.script_text;
+}
 
 export const VOICE_LINES: Record<string, VoiceLine> = {
   '01-intro': {
@@ -13,7 +22,7 @@ export const VOICE_LINES: Record<string, VoiceLine> = {
   },
   '02-volaris': {
     id: '02-volaris',
-    script_text: 'A Latin American airline. Where we brought AI into the design-to-code flow.',
+    script_text: 'Volaris. Where we brought AI into the design-to-code flow.',
     files: { mp3: '02-volaris.mp3', ogg: '02-volaris.ogg' },
   },
   '03-bain': {

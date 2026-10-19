@@ -11,17 +11,24 @@ export type BuildingMapLabelTarget = {
 export class BuildingMapLabels {
   readonly root: HTMLElement;
   private pills = new Map<string, HTMLElement>();
+  private onPillTap?: (id: 'teresa' | 'biblioteca') => void;
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, onPillTap?: (id: 'teresa' | 'biblioteca') => void) {
+    this.onPillTap = onPillTap;
     this.root = document.createElement('div');
     this.root.className = 'building-map-labels';
-    this.root.setAttribute('aria-hidden', 'true');
     for (const id of ['teresa', 'biblioteca'] as const) {
-      const pill = document.createElement('div');
+      const pill = document.createElement('button');
+      pill.type = 'button';
       pill.className = 'building-map-label';
       pill.dataset.id = id;
       pill.hidden = true;
       pill.innerHTML = '<span class="building-map-label__text"></span>';
+      pill.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.onPillTap?.(id);
+      });
       this.root.appendChild(pill);
       this.pills.set(id, pill);
     }

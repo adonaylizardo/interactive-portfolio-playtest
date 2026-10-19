@@ -63,24 +63,24 @@ As a Design Leader, giving back to the design community is one of my top priorit
 
 The "why" behind my leadership comes from a deep commitment to my values and principles. These are the ideals I stand by that keep me focused on creating meaningful impact.
 
-### People before pixels
+### 👩‍🦰 People before pixels
 
 Relationships, empathy, collaboration, and trust will always have a greater impact on a product than the UI.
 
-### Outcomes over output
+### 📊 Outcomes over output
 
 Mockups, code, and roadmaps don’t matter if they're not making an impact on the users and the business
 
-### Begin with the end in mind
+### 🎯 Begin with the end in mind
 
 If everyone is rallied around the same vision, then you’re much more likely to achieve it together.
 
-### Lead with context, not control
+### 🤝 Lead with context, not control
 
 Teams don't need micromanaging. Focus on empowering them with guidance, trust, and autonomy.
 
 ### And above all, treat others with kindness and respect ✨.
 
-If you read to this point, I’m gonna mention some fun facts 😛: I am also an enthusiast of [rock climbing](https://www.instagram.com/p/CYHF6WjFF8J/), [meditation](https://www.instagram.com/p/Bfv0j-QnIv5/), [stock market investing](https://adonay.design/projects-database/earning-wealth-without-working-too-hard), and [pro-bono activities](https://adplist.org/mentors/adonay-lizardo) for the design community.
+If you read to this point, I’m gonna mention some fun facts 😛: I am also an enthusiast of [rock climbing](https://www.instagram.com/p/CYHF6WjFF8J/), [meditation](https://www.instagram.com/p/Bfv0j-QnIv5/), [stock market investing](https://adonaylizardo.com/projects-database/earning-wealth-without-working-too-hard), and [pro-bono activities](https://adplist.org/mentors/adonay-lizardo) for the design community.
 
 Ps.[ Design is so noble that eventually I was able to reach space and fulfill my childhood dream 🧑‍🚀🔭](https://adonaylizardo.com/writing-database/pixels-in-orbit-a-short-story-about-how-my-designs-made-it-to-space)

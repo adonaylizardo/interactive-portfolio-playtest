@@ -1,4 +1,5 @@
 import { studio } from '../audio/studio';
+import { CASES, CASE_CARD_TITLES, type CaseHouseId } from '../data/cases';
 import { getEnterableBuildings } from '../data/map';
 import { tileToWorld } from '../iso/math';
 import { isMobileLayout } from '../checklist/ui';
@@ -17,26 +18,42 @@ export type ChromeCallbacks = {
   onMapOverview: () => void;
   onCenter: () => void;
   onLocate: (buildingId: string) => void;
+  onReadingOpen?: () => void;
+  onReadingClose?: () => void;
 };
 
-const EXPERIENCE: { id: string; label: string; nda?: boolean }[] = [
-  { id: 'volaris', label: 'Airline', nda: true },
-  { id: 'bain', label: 'Bain' },
-  { id: 'mentoria', label: 'Mentoría en Applaudo' },
-  { id: 'finoa', label: 'Finoa' },
-  { id: 'pg', label: 'P&G' },
+const EXPERIENCE: { id: CaseHouseId; label: string }[] = [
+  { id: 'volaris', label: CASE_CARD_TITLES.volaris },
+  { id: 'bain', label: CASE_CARD_TITLES.bain },
+  { id: 'mentoria', label: 'Mentoring at Applaudo' },
+  { id: 'finoa', label: CASE_CARD_TITLES.finoa },
+  { id: 'pg', label: CASE_CARD_TITLES.pg },
 ];
 
-const CASES_ROWS: { id: string; label: string; nda?: boolean }[] = [
-  { id: 'volaris', label: 'Airline', nda: true },
-  { id: 'bain', label: 'Bain' },
-  { id: 'mentoria', label: 'Mentoría en Applaudo' },
-  { id: 'finoa', label: 'Finoa' },
-  { id: 'pg', label: 'P&G' },
+const CASES_ROWS: { id: CaseHouseId; label: string }[] = [
+  { id: 'volaris', label: CASE_CARD_TITLES.volaris },
+  { id: 'bain', label: CASE_CARD_TITLES.bain },
+  { id: 'mentoria', label: 'Mentoring at Applaudo' },
+  { id: 'finoa', label: CASE_CARD_TITLES.finoa },
+  { id: 'pg', label: CASE_CARD_TITLES.pg },
 ];
 
-const CV_HREF = 'https://adonaylizardo.com';
-const CONTACT_HREF = 'mailto:hello@adonaylizardo.com';
+function caseRowSummary(id: CaseHouseId): string {
+  const content = CASES[id];
+  return content?.subtitle ?? content?.shortHeadline ?? '';
+}
+
+import { CONTACT_MAILTO, CV_HREF } from '../data/contactLinks';
+
+const CONTACT_HREF = CONTACT_MAILTO;
+const MOBILE_SHEET_STORAGE_KEY = 'portfolio-playtest-mobile-sheet';
+
+function isLandscapePhone(): boolean {
+  return (
+    isMobileLayout() &&
+    window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches
+  );
+}
 
 function roundBtn(icon: IconName, label: string, extra = '', action?: string): string {
   const act = action ? ` data-action="${action}"` : '';
@@ -50,6 +67,7 @@ export class ChromeUI {
   private audience: Audience = 'recruiter';
   private lang: Lang = getLang();
   private interiorOpen = false;
+  private placeCardOpen = false;
   private mobile = isMobileLayout();
   private callbacks: ChromeCallbacks;
   private minimap: HTMLCanvasElement;
@@ -106,7 +124,42 @@ export class ChromeUI {
   }
 
   isMobileSheetOpen(): boolean {
-    return this.mobile && this.mobileSheet && !this.interiorOpen;
+    return this.mobile && this.mobileSheet && !this.interiorOpen && !isLandscapePhone();
+  }
+
+  rememberMobileSheetBeforeReading(): void {
+    try {
+      sessionStorage.setItem(MOBILE_SHEET_STORAGE_KEY, this.mobileSheet ? '1' : '0');
+    } catch {
+      /* private mode */
+    }
+  }
+
+  restoreMobileSheetAfterReading(): void {
+    try {
+      const v = sessionStorage.getItem(MOBILE_SHEET_STORAGE_KEY);
+      if (v === '0') this.mobileSheet = false;
+      else if (v === '1') this.mobileSheet = true;
+      sessionStorage.removeItem(MOBILE_SHEET_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+    this.sync();
+  }
+
+  expandIntroDetail(scrollTarget?: string): void {
+    const intro = this.root.querySelector('.chrome__intro') as HTMLElement | null;
+    const detail = this.root.querySelector('[data-intro-detail]') as HTMLElement | null;
+    if (detail) detail.hidden = false;
+    intro?.classList.add('chrome__intro--expanded');
+    if (scrollTarget) this.scrollTo(scrollTarget);
+  }
+
+  setPlaceCardOpen(open: boolean, opts?: { skipLayout?: boolean }): void {
+    this.placeCardOpen = open;
+    if (open) document.body.dataset.placeCard = '1';
+    else delete document.body.dataset.placeCard;
+    if (!opts?.skipLayout) this.callbacks.onLayoutChange();
   }
 
   setInteriorOpen(open: boolean, opts?: { skipLayout?: boolean }): void {
@@ -133,6 +186,11 @@ export class ChromeUI {
       return this.mobile ? { left: 0, top: 0, right: 0, bottom: 0 } : { left: 64, top: 0, right: 0, bottom: 0 };
     }
     if (this.mobile) {
+      if (isLandscapePhone() && this.mobileSheet) {
+        const col = this.root.querySelector('.chrome__column')?.getBoundingClientRect();
+        const left = col && col.width > 8 ? Math.ceil(col.right + 8) : 320;
+        return { left, top: 16, right: 16, bottom: 24 };
+      }
       if (this.mobileSheet) {
         const sheet = this.root.querySelector('.chrome__intro')?.getBoundingClientRect();
         const bottom = sheet ? Math.ceil(window.innerHeight - sheet.top + 8) : 280;
@@ -149,17 +207,17 @@ export class ChromeUI {
     const expRows = EXPERIENCE.map(
       (row) => `
       <button type="button" class="chrome__exp-row" data-locate="${row.id}">
-        <span class="chrome__exp-name">${row.label}${row.nda ? '<span class="chrome__nda">NDA</span>' : ''}</span>
-        <span class="chrome__exp-meta"><span class="chrome__skeleton chrome__skeleton--bar"></span>${iconSvg('locate', 16)}</span>
+        <span class="chrome__exp-name"${row.id === 'mentoria' ? ' data-i18n="chrome.expRow.mentoria"' : ''}>${row.id === 'mentoria' ? 'Mentoring at Applaudo' : row.label}</span>
+        <span class="chrome__exp-meta"><span data-i18n="chrome.exp.${row.id}"></span>${iconSvg('locate', 16)}</span>
       </button>`,
     ).join('');
     const caseRows = CASES_ROWS.map((row) => {
       return `
       <button type="button" class="chrome__case-row" data-locate="${row.id}">
-        <span class="chrome__case-thumb">${iconSvg('map')}${row.nda ? '<span class="chrome__nda">NDA</span>' : ''}</span>
+        <span class="chrome__case-thumb">${iconSvg('map')}</span>
         <span class="chrome__case-copy">
-          <span class="chrome__case-title">${row.label}</span>
-          <span class="chrome__skeleton-stack"><span class="chrome__skeleton"></span><span class="chrome__skeleton chrome__skeleton--short"></span></span>
+          <span class="chrome__case-title"${row.id === 'mentoria' ? ' data-i18n="chrome.expRow.mentoria"' : ''}>${row.id === 'mentoria' ? 'Mentoring at Applaudo' : row.label}</span>
+          <span class="chrome__case-subtitle" data-i18n="chrome.caseSub.${row.id}">${caseRowSummary(row.id)}</span>
         </span>
       </button>`;
     }).join('');
@@ -189,15 +247,11 @@ export class ChromeUI {
         <div class="chrome__intro-body">
           <div class="chrome__lede">
             <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
-            <div class="chrome__skeleton-stack" aria-hidden="true">
-              <span class="chrome__skeleton"></span>
-              <span class="chrome__skeleton"></span>
-              <span class="chrome__skeleton chrome__skeleton--half"></span>
-            </div>
           </div>
           <div class="chrome__ctas">
             <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer">${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
             <a class="ui-btn ui-btn--secondary" href="${CONTACT_HREF}">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></a>
+            <button type="button" class="ui-btn ui-btn--secondary" data-action="reading">${iconSvg('page')} <span data-i18n="read.title">Leer</span></button>
           </div>
           <div class="chrome__audience">
             <p class="chrome__label" data-i18n="chrome.who">¿Quién eres?</p>
@@ -219,15 +273,19 @@ export class ChromeUI {
             <div class="chrome__logros">
               <div class="chrome__logro">
                 <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
-                <p data-i18n="chrome.mentorshipStat">Mentoría: 30+ personas</p>
+                <p data-i18n="chrome.achievement1">Main speaker at Innova360, 200+ students</p>
               </div>
-              <div class="chrome__logro chrome__logro--empty">
-                <div class="chrome__logro-art">?</div>
-                <p data-i18n="chrome.comingSoon">Coming soon</p>
+              <div class="chrome__logro">
+                <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
+                <p data-i18n="chrome.achievement2">Proposed and lead the Bain Designers Guild</p>
               </div>
-              <div class="chrome__logro chrome__logro--empty">
-                <div class="chrome__logro-art">?</div>
-                <p data-i18n="chrome.comingSoon">Coming soon</p>
+              <div class="chrome__logro">
+                <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
+                <p data-i18n="chrome.achievement3">AI Transformation Lead, 5/7 phases</p>
+              </div>
+              <div class="chrome__logro">
+                <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
+                <p data-i18n="chrome.achievement4">ADPList 2023: 31 sessions, 15 countries</p>
               </div>
             </div>
           </section>
@@ -247,10 +305,6 @@ export class ChromeUI {
         <button type="button" class="chrome__intro-close" data-action="intro-close" aria-label="Close" data-i18n-aria="jac.close">${iconSvg('close')}</button>
         <div class="chrome__lede">
           <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
-          <div class="chrome__skeleton-stack" aria-hidden="true">
-            <span class="chrome__skeleton"></span>
-            <span class="chrome__skeleton chrome__skeleton--half"></span>
-          </div>
         </div>
         <div class="chrome__audience">
           <p class="chrome__label" data-i18n="chrome.who">¿Quién eres?</p>
@@ -263,6 +317,7 @@ export class ChromeUI {
         <div class="chrome__ctas">
           <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer">${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
           <a class="ui-btn ui-btn--secondary" href="${CONTACT_HREF}">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></a>
+          <button type="button" class="ui-btn ui-btn--secondary" data-action="reading">${iconSvg('page')} <span data-i18n="read.title">Leer</span></button>
         </div>
         <div class="chrome__card-row">
           <div class="chrome__card-id">
@@ -273,6 +328,39 @@ export class ChromeUI {
             </span>
           </div>
           <button type="button" class="ui-btn ui-btn--secondary" data-details data-i18n="chrome.details">Detalles</button>
+        </div>
+        <div class="chrome__intro-detail" data-intro-detail hidden>
+          <section class="chrome__section" id="chrome-experiencia-mobile">
+            <h2 data-i18n="chrome.experience">Experiencia</h2>
+            <div class="chrome__exp">${expRows}</div>
+          </section>
+          <section class="chrome__section" id="chrome-logros-mobile">
+            <div class="chrome__section-head">
+              <h2 data-i18n="chrome.achievements">Logros</h2>
+            </div>
+            <div class="chrome__logros">
+              <div class="chrome__logro">
+                <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
+                <p data-i18n="chrome.achievement1">Speaker principal de Innova360, 200+ estudiantes</p>
+              </div>
+              <div class="chrome__logro">
+                <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
+                <p data-i18n="chrome.achievement2">Propuse y lidero el Bain Designers Guild</p>
+              </div>
+              <div class="chrome__logro">
+                <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
+                <p data-i18n="chrome.achievement3">AI Transformation Lead, 5/7 fases</p>
+              </div>
+              <div class="chrome__logro">
+                <div class="chrome__logro-art">${iconSvg('trophy', 22)}</div>
+                <p data-i18n="chrome.achievement4">ADPList 2023: 31 sesiones, 15 países</p>
+              </div>
+            </div>
+          </section>
+          <section class="chrome__section" id="chrome-casos-mobile">
+            <h2 data-i18n="chrome.cases">Casos</h2>
+            <div class="chrome__cases">${caseRows}</div>
+          </section>
         </div>
       </div>
       <nav class="chrome__dock" aria-label="Dock" data-i18n-aria="chrome.dock">
@@ -308,12 +396,21 @@ export class ChromeUI {
   }
 
   private bind(): void {
-    this.root.querySelector('[data-action="panel-only"]')?.addEventListener('click', () => this.setLayout('panel'));
+    this.root.querySelectorAll('[data-action="reading"]').forEach((btn) => {
+      btn.addEventListener('click', () => this.callbacks.onReadingOpen?.());
+    });
+    this.root.querySelector('[data-action="panel-only"]')?.addEventListener('click', () => {
+      if (this.callbacks.onReadingOpen) this.callbacks.onReadingOpen();
+      else this.setLayout('panel');
+    });
     this.root.querySelector('[data-action="hide-panel"]')?.addEventListener('click', () => this.setLayout('map'));
     this.root.querySelector('[data-action="show-panel"]')?.addEventListener('click', () => this.setLayout('split'));
     this.root.querySelector('[data-action="intro-close"]')?.addEventListener('click', () => this.setLayout('map'));
     this.root.querySelector('[data-details]')?.addEventListener('click', () => {
-      this.root.querySelector('.chrome__intro')?.classList.toggle('chrome__intro--expanded');
+      const intro = this.root.querySelector('.chrome__intro');
+      const detail = this.root.querySelector('[data-intro-detail]') as HTMLElement | null;
+      const expanded = intro?.classList.toggle('chrome__intro--expanded');
+      if (detail) detail.hidden = !expanded;
     });
     this.root.querySelector('[data-action="home"]')?.addEventListener('click', () => {
       this.setLayout('split');
@@ -351,9 +448,11 @@ export class ChromeUI {
     this.root.querySelector('[data-dock="intro"]')?.addEventListener('click', () => this.setLayout('split'));
     this.root.querySelector('.chrome__dock [data-action="cases"]')?.addEventListener('click', () => {
       this.setLayout('split');
+      this.expandIntroDetail('#chrome-casos-mobile');
     });
     this.root.querySelector('.chrome__dock [data-action="achievements"]')?.addEventListener('click', () => {
       this.setLayout('split');
+      this.expandIntroDetail('#chrome-logros-mobile');
     });
     this.root.querySelector('.chrome__dock [data-action="contact"]')?.addEventListener('click', () => {
       studio.playLine('11-contact');
@@ -373,8 +472,16 @@ export class ChromeUI {
       this.callbacks.onLocate('contacto');
     });
     this.root.querySelector('[data-action="fullpage"]')?.addEventListener('click', () => {
+      if (this.callbacks.onReadingOpen && this.callbacks.onReadingClose) {
+        if (document.body.dataset.reading === '1') this.callbacks.onReadingClose();
+        else this.callbacks.onReadingOpen();
+        return;
+      }
       if (this.layout === 'panel') this.setLayout('split');
       else this.setLayout('panel');
+    });
+    this.root.querySelector('[data-action="download"]')?.addEventListener('click', () => {
+      window.open(CV_HREF, '_blank', 'noopener,noreferrer');
     });
     this.root.querySelectorAll('[data-action="sound"]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
@@ -477,6 +584,7 @@ export class ChromeUI {
 
   sync(opts?: { deferColumn?: boolean }): void {
     this.mobile = isMobileLayout();
+    const landscapeSide = this.mobile && isLandscapePhone() && this.mobileSheet && !this.interiorOpen;
     const layout = this.mobile ? (this.mobileSheet ? 'split' : 'map') : this.layout;
     document.body.dataset.layout = layout;
     document.body.dataset.chrome = this.mobile ? 'phone' : 'desktop';
@@ -484,7 +592,15 @@ export class ChromeUI {
     this.root.dataset.layout = layout;
     this.root.classList.toggle('chrome--mobile', this.mobile);
     this.root.classList.toggle('chrome--interior', this.interiorOpen);
-    this.root.classList.toggle('chrome--sheet', this.mobile && this.mobileSheet && !this.interiorOpen);
+    this.root.classList.toggle('chrome--place-card', this.placeCardOpen);
+    this.root.classList.toggle(
+      'chrome--landscape-side',
+      landscapeSide,
+    );
+    this.root.classList.toggle(
+      'chrome--sheet',
+      this.mobile && this.mobileSheet && !this.interiorOpen && !landscapeSide,
+    );
     this.root.classList.toggle('chrome--dock', this.mobile && !this.mobileSheet && !this.interiorOpen);
     this.root.classList.toggle('chrome--map', !this.mobile && this.layout === 'map');
     this.root.classList.toggle('chrome--panel', !this.mobile && this.layout === 'panel');
@@ -494,10 +610,17 @@ export class ChromeUI {
     const col = this.root.querySelector('.chrome__column') as HTMLElement | null;
     if (col) {
       // Inline display wins over `.chrome--split { display:block }`, so innerText
-      // cannot leak the airline's name from the intro list while a case is open.
-      col.style.display = this.interiorOpen ? 'none' : '';
-      col.hidden = this.interiorOpen;
-      col.setAttribute('aria-hidden', this.interiorOpen ? 'true' : 'false');
+      // Hide the intro column while a case interior is open.
+      const showCol = !this.interiorOpen && (!this.mobile || landscapeSide);
+      col.style.display = showCol ? '' : 'none';
+      col.hidden = !showCol;
+      col.setAttribute('aria-hidden', showCol ? 'false' : 'true');
+    }
+    const rail = this.root.querySelector('.chrome__rail') as HTMLElement | null;
+    if (rail && landscapeSide) {
+      rail.style.display = 'flex';
+    } else if (rail && this.mobile) {
+      rail.style.display = '';
     }
   }
 
@@ -529,25 +652,99 @@ export class ChromeUI {
   private placeLang(): void {
     const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
     if (!lang) return;
+    const pad = 8;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
     const shortLand = window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
-    if (shortLand) {
-      lang.style.top = '12px';
-      lang.style.left = '16px';
-      lang.style.right = 'auto';
-      return;
-    }
-    lang.style.left = '';
-    const cl = document.querySelector('.checklist') as HTMLElement | null;
-    const ring = cl && !cl.hidden ? cl.getBoundingClientRect() : null;
-    if (ring && ring.width > 8) {
-      const top = Math.max(this.mobile ? 24 : 16, ring.top + (ring.height - 40) / 2);
-      const right = Math.max(16, window.innerWidth - ring.left + 8);
+    const landscapeSide = this.root.classList.contains('chrome--landscape-side');
+
+    const blockers: DOMRect[] = [];
+    const pushBlocker = (el: Element | null) => {
+      if (!el || (el as HTMLElement).hidden) return;
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el as HTMLElement);
+      if (r.width > 8 && r.height > 8 && cs.display !== 'none' && cs.visibility !== 'hidden') {
+        blockers.push(r);
+      }
+    };
+    pushBlocker(this.root.querySelector('.chrome__tools-phone'));
+    pushBlocker(document.querySelector('.checklist'));
+    pushBlocker(this.root.querySelector('.chrome__rail'));
+    pushBlocker(this.root.querySelector('.chrome__column'));
+    pushBlocker(this.root.querySelector('.chrome__intro'));
+    pushBlocker(this.root.querySelector('.chrome__dock'));
+
+    const overlaps = (lr: DOMRect) =>
+      blockers.some((b) => {
+        const ox = Math.max(0, Math.min(lr.right, b.right) - Math.max(lr.left, b.left));
+        const oy = Math.max(0, Math.min(lr.bottom, b.bottom) - Math.max(lr.top, b.top));
+        return ox > pad && oy > pad;
+      });
+
+    const apply = (top: number, left: number | null, right: number | null) => {
       lang.style.top = `${top}px`;
-      lang.style.right = `${right}px`;
-      return;
+      if (left != null) {
+        lang.style.left = `${left}px`;
+        lang.style.right = 'auto';
+      } else {
+        lang.style.left = 'auto';
+        lang.style.right = `${right ?? 16}px`;
+      }
+    };
+
+    const measureAt = (top: number, left: number | null, right: number | null): DOMRect => {
+      apply(top, left, right);
+      return lang.getBoundingClientRect();
+    };
+
+    const langH = 48;
+    const candidates: { top: number; left: number | null; right: number | null }[] = [];
+
+    if (this.mobile) {
+      if (shortLand && landscapeSide) {
+        candidates.push(
+          { top: 12, left: null, right: 16 },
+          { top: 68, left: null, right: 16 },
+          { top: 12, left: Math.max(72, Math.round(vw * 0.42) + 12), right: null },
+          { top: vh - langH - 12, left: null, right: 16 },
+        );
+      } else if (shortLand) {
+        candidates.push(
+          { top: 12, left: null, right: 16 },
+          { top: 68, left: null, right: 16 },
+          { top: 12, left: null, right: 80 },
+          { top: vh - langH - 12, left: null, right: 16 },
+        );
+      } else {
+        candidates.push(
+          { top: 24, left: null, right: 16 },
+          { top: 84, left: null, right: 16 },
+          { top: 24, left: 16, right: null },
+          { top: vh - langH - 16, left: null, right: 16 },
+        );
+      }
+    } else {
+      const cl = document.querySelector('.checklist');
+      const ring = cl?.getBoundingClientRect();
+      if (ring && ring.width > 8) {
+        candidates.push({
+          top: Math.max(16, ring.top + (ring.height - 44) / 2),
+          left: null,
+          right: Math.max(16, vw - ring.left + pad),
+        });
+      }
+      candidates.push(
+        { top: 20, left: null, right: 16 },
+        { top: 72, left: null, right: 16 },
+        { top: 20, left: 16, right: null },
+      );
     }
-    lang.style.top = this.mobile ? '24px' : '20px';
-    lang.style.right = '16px';
+
+    for (const c of candidates) {
+      const r = measureAt(c.top, c.left, c.right);
+      if (r.width > 8 && !overlaps(r)) return;
+    }
+    apply(candidates[0]!.top, candidates[0]!.left, candidates[0]!.right);
   }
 
   private drawMinimap(): void {

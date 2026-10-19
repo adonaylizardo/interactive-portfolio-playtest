@@ -1,4 +1,6 @@
-import source from './about.md?raw';
+import sourceEn from './about.md?raw';
+import sourceEs from './about.es.md?raw';
+import type { Lang } from '../ui/i18n';
 
 /**
  * "About me" section of the Estudio panel, rendered from about.md (the text of adonaylizardo.com/about,
@@ -8,7 +10,7 @@ import source from './about.md?raw';
 export type AboutInline = { text: string; href?: string };
 
 export type AboutBlock =
-  | { kind: 'heading'; level: 1 | 2 | 3; text: string }
+  | { kind: 'heading'; level: 1 | 2 | 3; text: string; id: string }
   | { kind: 'paragraph'; lines: AboutInline[][] }
   | { kind: 'image'; name: string; fallback: string; width: number; height: number; alt: string };
 
@@ -28,6 +30,18 @@ const PHOTOS: Record<string, { width: number; height: number; alt: string }> = {
   },
   '05': { width: 800, height: 1317, alt: 'Collage: Adonay teaching a workshop, with course screens on a tablet and a phone' },
 };
+
+/** Stable fragment ids for `#/leer/estudio#<id>` (search deep-links). */
+export function slugifyAboutHeading(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+}
 
 function parseInline(line: string): AboutInline[] {
   const out: AboutInline[] = [];
@@ -51,7 +65,13 @@ export function parseAbout(md: string): AboutBlock[] {
     if (!lines.length) continue;
     const heading = /^(#{1,3})\s+(.*)$/.exec(lines[0]);
     if (heading && lines.length === 1) {
-      blocks.push({ kind: 'heading', level: heading[1].length as 1 | 2 | 3, text: heading[2] });
+      const text = heading[2];
+      blocks.push({
+        kind: 'heading',
+        level: heading[1].length as 1 | 2 | 3,
+        text,
+        id: slugifyAboutHeading(text),
+      });
       continue;
     }
     const image = /^!\[[^\]]*\]\(photos\/(\d+)\.(png|jpg)\)$/.exec(lines[0]);
@@ -66,7 +86,31 @@ export function parseAbout(md: string): AboutBlock[] {
   return blocks;
 }
 
-export const ABOUT: AboutBlock[] = parseAbout(source);
+export function aboutForLang(lang: Lang): AboutBlock[] {
+  const en = parseAbout(sourceEn);
+  const blocks = parseAbout(lang === 'es' ? sourceEs : sourceEn);
+  if (lang === 'es') {
+    const enHeadings = en.filter((b): b is Extract<AboutBlock, { kind: 'heading' }> => b.kind === 'heading');
+    let i = 0;
+    for (const b of blocks) {
+      if (b.kind === 'heading' && enHeadings[i]) {
+        b.id = enHeadings[i].id;
+        i += 1;
+      }
+    }
+  }
+  return blocks;
+}
+
+/** Stable `#/leer/estudio#<id>` fragments for h2/h3 sections (both langs, same slug rules). */
+export function aboutSectionAnchorIds(lang: Lang = 'en'): string[] {
+  return aboutForLang(lang)
+    .filter((b): b is Extract<AboutBlock, { kind: 'heading' }> => b.kind === 'heading' && b.level >= 2)
+    .map((b) => b.id);
+}
+
+/** @deprecated use aboutForLang(getLang()) */
+export const ABOUT: AboutBlock[] = parseAbout(sourceEn);
 
 /** Interiors whose panel shows the section (Adonay's own studio). */
 export const ABOUT_PANELS = new Set(['estudio']);

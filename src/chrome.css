@@ -326,6 +326,7 @@ body[data-interior='1'] .chrome__column {
 
 .chrome__ctas {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -377,6 +378,14 @@ body[data-interior='1'] .chrome__column {
   text-align: left;
 }
 
+.chrome__exp-meta span:first-child {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: #8a8f98;
+}
+
 .chrome__exp-name,
 .chrome__case-title {
   display: flex;
@@ -407,12 +416,13 @@ body[data-interior='1'] .chrome__column {
 
 .chrome__logros {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .chrome__logro {
-  flex: 1;
-  min-width: 0;
+  flex: 1 1 calc(50% - 4px);
+  min-width: 120px;
 }
 
 .chrome__logro-art {
@@ -426,6 +436,19 @@ body[data-interior='1'] .chrome__column {
   color: #8a8f98;
   font-family: 'Geist Mono', ui-monospace, monospace;
   font-size: 22px;
+}
+
+.chrome--split .chrome__logro-art {
+  display: none;
+}
+
+.chrome--split .chrome__logro p {
+  margin-top: 0;
+  padding: 12px;
+  border: 1px solid #2a2c31;
+  border-radius: 8px;
+  background: #1a1c20;
+  min-height: 0;
 }
 
 .chrome__logro p {
@@ -467,6 +490,13 @@ body[data-interior='1'] .chrome__column {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.chrome__case-subtitle {
+  display: block;
+  font-size: 14px;
+  line-height: 1.35;
+  color: #888;
 }
 
 .chrome__case-title {
@@ -512,7 +542,9 @@ body[data-interior='1'] .chrome__column {
   gap: 4px;
   padding: 5px;
   border-radius: 999px;
-  background: rgba(237, 238, 240, 0.08);
+  background: rgba(20, 21, 24, 0.94);
+  border: 1px solid #2a2c31;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
   z-index: 5;
 }
 
@@ -521,8 +553,10 @@ body[data-interior='1'] .chrome__column {
 }
 
 .chrome__lang-opt {
-  height: 30px;
-  padding: 0 12px;
+  min-width: 44px;
+  min-height: 44px;
+  height: 44px;
+  padding: 0 14px;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -659,6 +693,15 @@ body[data-layout='panel'] #game-canvas {
   display: none;
 }
 
+.chrome--mobile .chrome__tools-phone .ui-round,
+.chrome__locate {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 22px;
+}
+
 .chrome--mobile .chrome__tools-phone {
   display: flex;
   position: absolute;
@@ -675,10 +718,70 @@ body[data-layout='panel'] #game-canvas {
 
 .chrome--mobile .chrome__lang {
   left: auto;
+  z-index: 16;
+}
+
+.chrome [data-action='search'] {
+  display: none !important;
+}
+
+#ui-root:has(> .chrome.chrome--mobile) > .checklist {
+  top: 84px;
 }
 
 .chrome--mobile .chrome__intro {
   display: none;
+}
+
+.chrome__intro-detail {
+  margin-top: 16px;
+}
+
+.chrome__intro-detail[hidden] {
+  display: none !important;
+}
+
+.chrome--intro-expanded .chrome__intro,
+.chrome__intro.chrome__intro--expanded {
+  max-height: min(85vh, 720px);
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .chrome--mobile.chrome--landscape-side .chrome__tools-phone {
+    top: 12px;
+    left: auto;
+    right: 16px;
+  }
+
+  .chrome--mobile.chrome--landscape-side .chrome__lang {
+    top: 12px;
+    right: 16px;
+    left: auto;
+  }
+
+  .chrome--mobile.chrome--landscape-side .chrome__sound {
+    display: none !important;
+  }
+
+  .chrome--mobile.chrome--landscape-side .chrome__rail {
+    display: flex !important;
+    background: #141518;
+    border-right: 1px solid #2a2c31;
+  }
+
+  .chrome--mobile.chrome--landscape-side .chrome__column {
+    display: block !important;
+    width: min(320px, 42vw);
+    left: 64px;
+  }
+
+  .chrome--mobile.chrome--landscape-side .chrome__intro {
+    display: none !important;
+  }
+
+  .chrome--mobile.chrome--landscape-side .chrome__dock {
+    display: none;
+  }
 }
 
 .chrome--sheet .chrome__intro {
@@ -723,7 +826,9 @@ body[data-layout='panel'] #game-canvas {
 }
 
 .chrome--sheet .chrome__ctas .ui-btn {
-  flex: 1;
+  flex: 1 1 calc(50% - 4px);
+  min-width: 0;
+  max-width: 100%;
   height: 44px;
 }
 
@@ -784,18 +889,18 @@ body[data-layout='panel'] #game-canvas {
 .chrome--mobile .chrome__sound {
   left: 50%;
   transform: translateX(-50%);
-  top: 80px;
+  top: 132px;
   bottom: auto;
   width: 240px;
   max-width: calc(100vw - 32px);
 }
 
 .chrome--dock .chrome__sound {
-  top: 80px;
+  top: 132px;
 }
 
 .chrome--sheet .chrome__sound {
-  top: 80px;
+  top: 132px;
 }
 
 .chrome--mobile .chrome__subtitle {

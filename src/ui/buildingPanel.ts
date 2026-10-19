@@ -1,16 +1,34 @@
 import { studio } from '../audio/studio';
-import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
-import { CASES, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
-import { TALKS, WRITINGS, type TalkItem, type WritingSection } from '../data/experiences';
+import { aboutForLang, ABOUT_PANELS, type AboutBlock } from '../data/about';
+import { caseForLang, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
+import {
+  TALK_SECTIONS,
+  TALKS,
+  TALKS_COMING_SOON,
+  WRITINGS,
+  type TalkItem,
+  type WritingItem,
+  type WritingSection,
+} from '../data/experiences';
+import {
+  talkMeta,
+  talkSectionTitle,
+  talkThumbnailUrl,
+  talkTitle,
+  writingMeta,
+  writingSourceLabel,
+  writingTitle,
+} from './contentLabels';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
 import { iconSvg } from './icons';
-import { onLangChange, t, type I18nKey } from './i18n';
+import { getLang, onLangChange, t, type I18nKey } from './i18n';
 
 function aboutBlockNode(block: AboutBlock): HTMLElement {
   if (block.kind === 'heading') {
     const h = document.createElement(`h${block.level + 3}`);
     h.className = `about__h${block.level}`;
     h.textContent = block.text;
+    if (block.level >= 2) h.id = `panel-${block.id}`;
     return h;
   }
   if (block.kind === 'image') {
@@ -114,6 +132,7 @@ export class BuildingPanel {
   private workedWithLogos: WorkedWithLogo[] = WORKED_WITH;
   private interiorId: string | null = null;
   private onVisibilityChange: () => void;
+  private onSheetTransitionEnd: () => void;
   private onSalir: () => void;
   private mode: 'hidden' | 'interior' | 'preview' | 'talks' | 'writings' = 'hidden';
   private experienceEl: HTMLElement | null = null;
@@ -126,6 +145,7 @@ export class BuildingPanel {
   private experienceView: 'list' | 'detail' = 'list';
   private experiencePanelTitle = '';
   private writingsFilter: 'all' | 'uxsc' | 'sinergia' | 'guest' = 'all';
+  private writingsShowAll = false;
   private activeTalkId: string | null = null;
   private activeWriting: { sectionId: string; itemId: string } | null = null;
   private previewEl: HTMLElement | null = null;
@@ -146,14 +166,17 @@ export class BuildingPanel {
   /** Press on Salir: leave only on lift, and only if the finger stayed within ~10 px. */
   private exitPress: { x: number; y: number; drift: number } | null = null;
   private exitFromPointer = false;
+  private visibilitySyncQueued = false;
 
   constructor(
     container: HTMLElement,
     onVisibilityChange: () => void,
     onSalir: () => void,
+    onSheetTransitionEnd?: () => void,
   ) {
     this.onVisibilityChange = onVisibilityChange;
     this.onSalir = onSalir;
+    this.onSheetTransitionEnd = onSheetTransitionEnd ?? onVisibilityChange;
     this.el = document.createElement('div');
     this.el.className = 'building-panel building-panel--interior-only';
     this.el.hidden = true;
@@ -165,7 +188,7 @@ export class BuildingPanel {
           <button type="button" class="exp-header__btn exp-header__back" data-exp-back aria-label="">‹</button>
           <h2 class="exp-header__title"></h2>
           <div class="exp-header__actions">
-            <button type="button" class="exp-header__btn" data-exp-expand aria-label="">${iconSvg('expand')}</button>
+            <button type="button" class="exp-header__btn" data-exp-expand data-i18n-aria="panel.expandSheet" aria-label="">${iconSvg('expand')}</button>
             <button type="button" class="exp-header__btn exp-header__close" data-close aria-label="">×</button>
           </div>
         </header>
@@ -217,11 +240,11 @@ export class BuildingPanel {
             <div class="case__version case__version--short"></div>
           </article>
           <section class="worked-with" aria-labelledby="worked-with-title" hidden>
-            <h3 class="worked-with__title" id="worked-with-title">Worked with</h3>
+            <h3 class="worked-with__title" id="worked-with-title" data-i18n="panel.workedWith">Worked with</h3>
             <ul class="worked-with__logos"></ul>
           </section>
           <section class="about" lang="en" aria-labelledby="about-title" hidden>
-            <h3 class="about__title" id="about-title">About me</h3>
+            <h3 class="about__title" id="about-title" data-i18n="panel.aboutMe">About me</h3>
           </section>
           <section class="experience" data-experience hidden>
             <p class="experience__intro"></p>
@@ -234,6 +257,20 @@ export class BuildingPanel {
     `;
     container.appendChild(this.el);
     this.sheet = this.el.querySelector('.building-panel__sheet')!;
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => {
+        if (this.isOpen() && this.isMobile() && this.isInteriorMode()) this.queueVisibilitySync();
+      });
+      ro.observe(this.sheet);
+    }
+    this.sheet.addEventListener('transitionend', (ev) => {
+      if (ev.target !== this.sheet || ev.propertyName !== 'transform') return;
+      if (!this.isOpen() || !this.isMobile()) return;
+      if (!this.isInteriorMode() && !this.isPreviewMode()) return;
+      this.sheet.scrollTop = 0;
+      this.syncScrolled();
+      this.onSheetTransitionEnd();
+    });
     this.titleEl = this.el.querySelector('.building-panel__title')!;
     this.workedWithEl = this.el.querySelector('.worked-with')!;
     this.caseEl = this.el.querySelector('.case')!;
@@ -249,7 +286,7 @@ export class BuildingPanel {
     this.readHeadline = this.el.querySelector('.case-read__headline');
     this.readLede = this.el.querySelector('.case-read__lede');
     this.readHeroLabel = this.el.querySelector('.case-read__hero-label');
-    this.aboutEl.append(...ABOUT.map(aboutBlockNode));
+    this.aboutEl.append(...aboutForLang(getLang()).map(aboutBlockNode));
     this.experienceEl = this.el.querySelector('[data-experience]');
     this.experienceIntro = this.el.querySelector('.experience__intro');
     this.experienceFilters = this.el.querySelector('[data-exp-filters]');
@@ -272,6 +309,15 @@ export class BuildingPanel {
     onLangChange(() => {
       this.applyI18n();
       this.refreshExperienceCopy();
+      if (this.interiorId && this.mode === 'interior' && ABOUT_PANELS.has(this.interiorId)) {
+        this.aboutEl.replaceChildren(...aboutForLang(getLang()).map(aboutBlockNode));
+      }
+      if (this.interiorId && this.mode === 'interior') {
+        this.setTitle(this.openKey, this.renderCase());
+      }
+      if (this.isPreviewMode() && this.interiorId) {
+        this.syncCasePreview(this.interiorId);
+      }
     });
     // Touch has no hover: a tap shows that logo's colours until another logo (or the same one) is tapped.
     this.workedWithEl.addEventListener('click', (e) => {
@@ -351,7 +397,17 @@ export class BuildingPanel {
     this.sheet.addEventListener('click', (e) => {
       e.stopPropagation();
     });
-    this.sheet.addEventListener('pointerdown', (e) => e.stopPropagation());
+    this.sheet.addEventListener('pointerdown', (e) => {
+      if (
+        this.isMobile() &&
+        this.mode === 'interior' &&
+        this.peekOnly &&
+        (e.target as HTMLElement).closest('[data-drag], .building-panel__title, .building-panel__bar')
+      ) {
+        this.onDragStart(e);
+      }
+      e.stopPropagation();
+    });
 
     const drag = this.el.querySelector('[data-drag]') as HTMLElement;
     drag.addEventListener('pointerdown', (e) => this.onDragStart(e));
@@ -389,12 +445,28 @@ export class BuildingPanel {
     return window.matchMedia('(max-width: 767px)').matches;
   }
 
+  private queueVisibilitySync(): void {
+    if (this.visibilitySyncQueued) return;
+    this.visibilitySyncQueued = true;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        this.visibilitySyncQueued = false;
+        this.sheet.scrollTop = 0;
+        this.syncScrolled();
+        this.onVisibilityChange();
+      });
+    });
+  }
+
   private setPeek(peek: boolean): void {
     this.peekOnly = peek;
     this.dragStartY = 0;
     this.ignoreDragUntil = performance.now() + 400;
     this.syncPeekClass();
-    this.onVisibilityChange();
+    this.queueVisibilitySync();
+    if (this.isMobile() && this.isOpen() && (this.isInteriorMode() || this.isPreviewMode())) {
+      window.setTimeout(() => this.onSheetTransitionEnd(), 280);
+    }
   }
 
   private syncPeekClass(): void {
@@ -456,6 +528,17 @@ export class BuildingPanel {
     this.renderTalksList();
   }
 
+  /** QA / gate: Talks shell with empty list copy (refs `talks-vacio`). */
+  showTalksEmptyForQa(): void {
+    this.showTalks(t('panel.talks'), 'teresa');
+    if (!this.experienceList) return;
+    const p = document.createElement('p');
+    p.className = 'experience__empty';
+    p.textContent = t('talks.comingSoon');
+    this.experienceList.replaceChildren(p);
+    if (this.isMobile() && this.peekOnly) this.setPeek(false);
+  }
+
   showWritings(title: string, interiorId: string | null = 'biblioteca'): void {
     this.openExperience('writings', title, interiorId);
     this.renderWritingsList();
@@ -468,6 +551,7 @@ export class BuildingPanel {
     this.mode = mode;
     this.interiorId = interiorId;
     this.writingsFilter = 'all';
+    this.writingsShowAll = false;
     this.activeTalkId = null;
     this.activeWriting = null;
     this.peekOnly = this.isMobile();
@@ -496,25 +580,25 @@ export class BuildingPanel {
     this.setExperienceView('list');
     if (mode === 'talks') this.renderTalksList();
     else {
-      this.renderWritingsFilters();
+      if (this.experienceFilters) {
+        this.experienceFilters.replaceChildren();
+        this.experienceFilters.hidden = true;
+      }
       this.renderWritingsList();
     }
-    this.onVisibilityChange();
+    this.queueVisibilitySync();
     studio.playClick();
   }
 
   private syncExperienceIntro(): void {
     if (!this.experienceIntro) return;
-    const showTalksIntro = this.mode === 'talks';
-    this.experienceIntro.hidden = !showTalksIntro;
-    if (showTalksIntro) this.experienceIntro.textContent = t('talks.intro');
+    this.experienceIntro.hidden = true;
   }
 
   private refreshExperienceCopy(): void {
     if (!this.isExperienceMode()) return;
     this.syncExperienceIntro();
     if (this.expHeaderTitle) this.expHeaderTitle.textContent = this.experiencePanelTitle;
-    if (this.mode === 'writings') this.renderWritingsFilters();
     if (this.experienceView === 'list') {
       if (this.mode === 'talks') this.renderTalksList();
       else this.renderWritingsList();
@@ -536,8 +620,7 @@ export class BuildingPanel {
     this.experienceView = view;
     this.experienceList.hidden = view !== 'list';
     this.experienceDetail.hidden = view !== 'detail';
-    const showFilters = this.mode === 'writings' && view === 'list';
-    this.experienceFilters.hidden = !showFilters;
+    this.experienceFilters.hidden = true;
     if (this.experienceIntro) {
       this.experienceIntro.hidden = this.mode !== 'talks' || view !== 'list';
     }
@@ -552,13 +635,31 @@ export class BuildingPanel {
 
   private renderTalksList(): void {
     if (!this.experienceList) return;
-    this.experienceList.replaceChildren(
-      ...TALKS.slice(0, 5).map((item) => this.talkRow(item, () => this.openTalk(item))),
-    );
+    if (TALKS_COMING_SOON || TALKS.length === 0) {
+      const p = document.createElement('p');
+      p.className = 'experience__empty';
+      p.textContent = t('talks.comingSoon');
+      this.experienceList.replaceChildren(p);
+      return;
+    }
+    const nodes: HTMLElement[] = [];
+    for (const section of TALK_SECTIONS) {
+      const heading = talkSectionTitle(section);
+      if (heading) {
+        const h = document.createElement('h3');
+        h.className = 'experience__section-title';
+        h.textContent = heading;
+        nodes.push(h);
+      }
+      for (const item of section.items) {
+        nodes.push(this.talkRow(item, () => this.openTalk(item)));
+      }
+    }
+    this.experienceList.replaceChildren(...nodes);
   }
 
   private talkRow(
-    item: TalkItem,
+    item: TalkItem | WritingItem,
     onOpen: () => void,
     opts?: { compact?: boolean; kind?: 'talk' | 'writing' },
   ): HTMLElement {
@@ -576,16 +677,32 @@ export class BuildingPanel {
     if (kind === 'writing') {
       thumb.innerHTML = iconSvg('page', compact ? 14 : 18);
     } else {
-      thumb.innerHTML = '<span class="experience__play" aria-hidden="true">▶</span>';
+      const talk = item as TalkItem;
+      const src = talkThumbnailUrl(talk);
+      if (src) {
+        const img = document.createElement('img');
+        img.className = 'experience__thumb-img';
+        img.src = src;
+        img.alt = '';
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        thumb.appendChild(img);
+      } else {
+        thumb.innerHTML = '<span class="experience__play" aria-hidden="true">▶</span>';
+      }
     }
     const copy = document.createElement('span');
     copy.className = 'experience__copy';
     const title = document.createElement('span');
     title.className = 'experience__row-title';
-    title.textContent = t(item.titleKey as I18nKey);
+    title.textContent =
+      kind === 'writing' ? writingTitle(item as WritingItem) : talkTitle(item as TalkItem);
     const meta = document.createElement('span');
     meta.className = 'experience__row-meta';
-    meta.textContent = t(item.metaKey as I18nKey);
+    const metaText =
+      kind === 'writing' ? writingMeta(item as WritingItem) : talkMeta(item as TalkItem);
+    meta.textContent = metaText;
+    meta.hidden = !metaText;
     copy.append(title, meta);
     btn.append(thumb, copy);
     btn.addEventListener('click', (e) => {
@@ -596,7 +713,7 @@ export class BuildingPanel {
     return btn;
   }
 
-  private writingRow(item: TalkItem, section: WritingSection, compact = false): HTMLElement {
+  private writingRow(item: WritingItem, section: WritingSection, compact = false): HTMLElement {
     return this.talkRow(item, () => this.openWriting(section, item), { compact, kind: 'writing' });
   }
 
@@ -608,66 +725,66 @@ export class BuildingPanel {
     if (this.isMobile() && this.peekOnly) this.setPeek(false);
   }
 
+  private openTalkUrl(url: string): void {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
   private renderTalkPlayer(item: TalkItem): void {
     if (!this.experienceDetail) return;
-    const title = t(item.titleKey as I18nKey);
-    const meta = t(item.metaKey as I18nKey);
+    const title = talkTitle(item);
+    const meta = talkMeta(item);
     const upNext = TALKS.filter((x) => x.id !== item.id).slice(0, 3);
+    const thumb = talkThumbnailUrl(item);
     const wrap = document.createElement('div');
     wrap.className = 'talks-player';
-    wrap.innerHTML = `
-      <div class="talks-player__stage">
-        <p class="talks-player__label">${t('talks.videoLabel')}</p>
-        <button type="button" class="talks-player__pause" aria-label="">
-          <svg class="talks-player__pause-icon" viewBox="0 0 14 14" width="14" height="14" fill="currentColor" aria-hidden="true">
-            <rect x="3" y="2" width="3" height="10" rx="1"/><rect x="8" y="2" width="3" height="10" rx="1"/>
-          </svg>
-        </button>
-        <div class="talks-player__progress" aria-hidden="true"><span class="talks-player__progress-fill"></span></div>
-        <p class="talks-player__time">0:00 / 0:00</p>
-      </div>
-      <h3 class="talks-player__title"></h3>
-      <p class="talks-player__meta"></p>
-      <hr class="experience__divider" />
-      <h4 class="experience__up-next">${t('talks.upNext')}</h4>
-      <div class="experience__up-next-list" data-up-next></div>
-    `;
-    wrap.querySelector('.talks-player__title')!.textContent = title;
-    wrap.querySelector('.talks-player__meta')!.textContent = meta;
-    const list = wrap.querySelector('[data-up-next]')!;
+    const media = document.createElement('div');
+    media.className = 'talks-player__media';
+    if (thumb) {
+      const img = document.createElement('img');
+      img.className = 'talks-player__thumb';
+      img.src = thumb;
+      img.alt = '';
+      img.tabIndex = 0;
+      img.role = 'button';
+      img.addEventListener('click', () => this.openTalkUrl(item.url));
+      img.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          this.openTalkUrl(item.url);
+        }
+      });
+      media.appendChild(img);
+    }
+    const open = document.createElement('a');
+    open.className = 'ui-btn ui-btn--primary talks-player__open';
+    open.href = item.url;
+    open.target = '_blank';
+    open.rel = 'noopener noreferrer';
+    open.textContent = t('talks.openVideo');
+    wrap.append(media, open);
+    requestAnimationFrame(() => {
+      open.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+    const h3 = document.createElement('h3');
+    h3.className = 'talks-player__title';
+    h3.textContent = title;
+    wrap.appendChild(h3);
+    const pMeta = document.createElement('p');
+    pMeta.className = 'talks-player__meta';
+    pMeta.textContent = meta;
+    wrap.appendChild(pMeta);
+    wrap.appendChild(Object.assign(document.createElement('hr'), { className: 'experience__divider' }));
+    const h4 = document.createElement('h4');
+    h4.className = 'experience__up-next';
+    h4.textContent = t('talks.upNext');
+    wrap.appendChild(h4);
+    const list = document.createElement('div');
+    list.className = 'experience__up-next-list';
     list.replaceChildren(
       ...upNext.map((talk) => this.talkRow(talk, () => this.openTalk(talk), { compact: true })),
     );
+    wrap.appendChild(list);
     this.experienceDetail.replaceChildren(wrap);
-  }
-
-  private renderWritingsFilters(): void {
-    if (!this.experienceFilters) return;
-    type WritingsFilterId = 'all' | 'uxsc' | 'sinergia' | 'guest';
-    const filters: { id: WritingsFilterId; key: I18nKey }[] = [
-      { id: 'all', key: 'writings.filter.all' },
-      { id: 'uxsc', key: 'writings.filter.uxsc' },
-      { id: 'sinergia', key: 'writings.filter.sinergia' },
-      { id: 'guest', key: 'writings.filter.guest' },
-    ];
-    this.experienceFilters.replaceChildren(
-      ...filters.map(({ id, key }) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'experience__filter';
-        if (id === this.writingsFilter) btn.classList.add('is-active');
-        btn.textContent = t(key);
-        btn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (this.writingsFilter === id) return;
-          this.writingsFilter = id;
-          this.renderWritingsFilters();
-          this.renderWritingsList();
-        });
-        return btn;
-      }),
-    );
   }
 
   private renderWritingsList(): void {
@@ -687,25 +804,36 @@ export class BuildingPanel {
       h.textContent = t(section.titleKey as I18nKey);
       const badge = document.createElement('span');
       badge.className = 'experience__section-count';
-      badge.textContent = '0';
+      badge.textContent = String(section.items.length);
       const seeAll = document.createElement('button');
       seeAll.type = 'button';
       seeAll.className = 'experience__see-all';
       seeAll.textContent = t('chrome.seeAll');
+      seeAll.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.writingsShowAll = true;
+        this.renderWritingsList();
+      });
       row.append(h, badge, seeAll);
-      const p = document.createElement('p');
-      p.className = 'experience__section-desc';
-      p.textContent = t(section.descKey as I18nKey);
-      head.append(row, p);
+      if (section.descKey) {
+        const p = document.createElement('p');
+        p.className = 'experience__section-desc';
+        p.textContent = t(section.descKey as I18nKey);
+        head.append(row, p);
+      } else {
+        head.append(row);
+      }
       frag.appendChild(head);
-      for (const item of section.items.slice(0, 3)) {
+      const items = this.writingsShowAll ? section.items : section.items.slice(0, 3);
+      for (const item of items) {
         frag.appendChild(this.writingRow(item, section));
       }
     }
     this.experienceList.replaceChildren(frag);
   }
 
-  private openWriting(section: WritingSection, item: TalkItem): void {
+  private openWriting(section: WritingSection, item: WritingItem): void {
     this.activeWriting = { sectionId: section.id, itemId: item.id };
     this.activeTalkId = null;
     this.renderWritingReader(section, item);
@@ -713,8 +841,10 @@ export class BuildingPanel {
     if (this.isMobile() && this.peekOnly) this.setPeek(false);
   }
 
-  private renderWritingReader(_section: WritingSection, item: TalkItem): void {
+  private renderWritingReader(_section: WritingSection, item: WritingItem): void {
     if (!this.experienceDetail) return;
+    const title = writingTitle(item);
+    const meta = writingMeta(item);
     const wrap = document.createElement('article');
     wrap.className = 'writings-reader';
     wrap.innerHTML = `
@@ -722,23 +852,23 @@ export class BuildingPanel {
       <p class="writings-reader__kicker"></p>
       <h3 class="writings-reader__title"></h3>
       <p class="writings-reader__meta"></p>
-      <div class="writings-reader__body">
-        <p class="writings-reader__p"></p>
-        <p class="writings-reader__p"></p>
-        <p class="writings-reader__p"></p>
-      </div>
       <a class="writings-reader__substack" href="#" rel="noopener noreferrer"></a>
     `;
-    wrap.querySelector('.writings-reader__kicker')!.textContent = t('writings.reader.kicker');
-    wrap.querySelector('.writings-reader__title')!.textContent = t(item.titleKey as I18nKey);
-    wrap.querySelector('.writings-reader__meta')!.textContent = t(item.metaKey as I18nKey);
-    const paras = wrap.querySelectorAll('.writings-reader__p');
-    paras[0]!.textContent = t('writings.reader.p1');
-    paras[1]!.textContent = t('writings.reader.p2');
-    paras[2]!.textContent = t('writings.reader.p3');
+    wrap.querySelector('.writings-reader__kicker')!.textContent = writingSourceLabel(item);
+    wrap.querySelector('.writings-reader__title')!.textContent = title;
+    const metaEl = wrap.querySelector('.writings-reader__meta') as HTMLElement;
+    metaEl.textContent = meta;
+    metaEl.hidden = !meta;
+    const articleUrl = item.url;
     const sub = wrap.querySelector('.writings-reader__substack') as HTMLAnchorElement;
-    sub.textContent = t('writings.substack');
-    sub.addEventListener('click', (e) => e.preventDefault());
+    if (articleUrl) {
+      sub.textContent = t('writings.openArticle');
+      sub.href = articleUrl;
+      sub.target = '_blank';
+      sub.hidden = false;
+    } else {
+      sub.hidden = true;
+    }
     this.experienceDetail.replaceChildren(wrap);
   }
 
@@ -784,7 +914,7 @@ export class BuildingPanel {
     this.aboutEl.style.contentVisibility = '';
     this.el.removeAttribute('inert');
     this.el.classList.remove('building-panel--snap');
-    const preview = casePreviewCopy(interiorId);
+    const preview = casePreviewCopy(interiorId, getLang());
     const shown = this.renderCase();
     const title = preview?.title ?? shown ?? interiorId;
     const subtitle = preview?.subtitle ?? '';
@@ -801,14 +931,23 @@ export class BuildingPanel {
         ? title
         : `${title}: ${subtitle.charAt(0).toLowerCase()}${subtitle.slice(1)}`;
     }
-    if (this.readKicker) this.readKicker.textContent = preview?.kicker ?? 'CASE';
+    if (this.readKicker) {
+      const tag = t('panel.caseTag');
+      const raw = preview?.kicker ?? tag;
+      this.readKicker.textContent = raw.replace(/^CASE\b/, tag);
+    }
     if (this.readHeadline) {
       this.readHeadline.textContent = this.isMobile()
         ? (preview?.teaser ?? title).replace(/[.]$/, '')
         : (preview?.teaserFull ?? preview?.teaser ?? title);
     }
     if (this.readLede) this.readLede.textContent = subtitle;
-    if (this.readHeroLabel) this.readHeroLabel.textContent = preview?.placeholder ?? 'IMAGE PLACEHOLDER';
+    const hero = this.el.querySelector('.case-read__hero');
+    if (hero) hero.classList.add('case-read__hero--neutral');
+    if (this.readHeroLabel) {
+      this.readHeroLabel.textContent = '';
+      this.readHeroLabel.hidden = true;
+    }
     this.setTitle(interiorId, title);
     this.renderWorkedWith();
     this.renderAbout();
@@ -849,8 +988,10 @@ export class BuildingPanel {
 
   /** Fills the case article for the current interior; returns its headline, or null when there is no case. */
   private renderCase(): string | null {
-    const content = this.interiorId ? CASES[this.interiorId] : undefined;
+    const lang = getLang();
+    const content = this.interiorId ? caseForLang(this.interiorId, lang) : undefined;
     this.caseEl.hidden = !content;
+    this.caseEl.lang = lang;
     this.el.classList.toggle('building-panel--case', !!content);
     const full = this.caseEl.querySelector('.case__version--full')!;
     const short = this.caseEl.querySelector('.case__version--short')!;
@@ -858,6 +999,15 @@ export class BuildingPanel {
     short.replaceChildren(...(content ? content.short.map(caseBlockNode) : []));
     if (!content) return null;
     return this.isMobile() ? (content.shortHeadline ?? content.headline) : content.headline;
+  }
+
+  private syncCasePreview(interiorId: string): void {
+    const preview = casePreviewCopy(interiorId, getLang());
+    if (!preview) return;
+    const teaser = this.isMobile() ? preview.teaser : (preview.teaserFull ?? preview.teaser);
+    if (this.previewTitle) this.previewTitle.textContent = preview.title;
+    if (this.previewSubtitle) this.previewSubtitle.textContent = preview.subtitle;
+    if (this.previewTeaser) this.previewTeaser.textContent = teaser;
   }
 
   private renderAbout(): void {
@@ -969,6 +1119,17 @@ export class BuildingPanel {
     return this.isOpen() ? this.openKey : '';
   }
 
+  /** Mobile interior / experience sheet fully expanded (not peek). */
+  isInteriorSheetExpanded(): boolean {
+    if (!this.isOpen() || !this.isMobile() || this.peekOnly) return false;
+    return (
+      this.mode === 'interior' ||
+      this.mode === 'talks' ||
+      this.mode === 'writings' ||
+      this.mode === 'preview'
+    );
+  }
+
   /** Peek / sheet inset for interior camera fit. */
   layoutInsets(): { left: number; top: number; right: number; bottom: number } {
     if (
@@ -992,6 +1153,11 @@ export class BuildingPanel {
     const sheet = this.sheet.getBoundingClientRect();
     if (this.isMobile()) {
       const peek = this.el.classList.contains('building-panel--peek');
+      if (this.isExperienceMode() && !peek) {
+        const cap = Math.min(window.innerHeight * 0.42, 340);
+        const bottom = Math.min(sheet.height, cap, window.innerHeight - 120);
+        return { left: 0, top: 0, right: 0, bottom: Math.ceil(Math.max(88, bottom) + 8) };
+      }
       const bottom = peek ? Math.min(88, sheet.height) : sheet.height;
       return { left: 0, top: 0, right: 0, bottom: Math.ceil(bottom + 8) };
     }
@@ -1011,10 +1177,8 @@ export class BuildingPanel {
 
   /** Mobile interior: outside sheet tap collapses expanded sheet or consumes (no map walk). */
   expandInteriorSheetForQa(): void {
-    if (!this.isMobile()) return;
-    this.peekOnly = false;
-    this.syncPeekClass();
-    this.onVisibilityChange();
+    if (!this.isMobile() || !this.isOpen()) return;
+    this.setPeek(false);
   }
 
   collapseToPeekOnly(): void {
@@ -1031,6 +1195,10 @@ export class BuildingPanel {
   }
 
   private applyI18n(): void {
+    this.el.querySelectorAll('[data-i18n]').forEach((el) => {
+      const key = (el as HTMLElement).dataset.i18n as Parameters<typeof t>[0];
+      if (key) el.textContent = t(key);
+    });
     const exit = this.el.querySelector('[data-exit]') as HTMLElement | null;
     if (exit) exit.textContent = t('panel.exit');
     this.el.querySelectorAll('[data-close]').forEach((el) => {
@@ -1040,5 +1208,8 @@ export class BuildingPanel {
     if (read) read.textContent = t('panel.readCase');
     const back = this.el.querySelector('[data-exp-back]') as HTMLElement | null;
     if (back) back.setAttribute('aria-label', t('experience.back'));
+    this.el.querySelectorAll('[data-exp-expand]').forEach((el) => {
+      el.setAttribute('aria-label', t('panel.expandSheet'));
+    });
   }
 }

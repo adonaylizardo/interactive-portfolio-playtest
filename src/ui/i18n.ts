@@ -1,5 +1,17 @@
 export type Lang = 'en' | 'es';
 
+const LANG_STORAGE_KEY = 'portfolio-playtest-lang';
+
+function readStoredLang(): Lang | null {
+  try {
+    const v = localStorage.getItem(LANG_STORAGE_KEY);
+    if (v === 'en' || v === 'es') return v;
+  } catch {
+    /* private mode */
+  }
+  return null;
+}
+
 const DICT = {
   en: {
     'check.label': 'Getting started',
@@ -48,8 +60,13 @@ const DICT = {
     'panel.exit': 'Exit',
     'panel.close': 'Close',
     'panel.readCase': 'Read case',
+    'panel.workedWith': 'Worked with',
+    'panel.aboutMe': 'About me',
+    'panel.caseTag': 'CASE',
+    'panel.expandSheet': 'Expand panel',
     'panel.talks': 'Talks',
-    'panel.writings': 'Writings',
+    'panel.writings': 'Articles',
+    'writings.openArticle': '↗ Read on adonaylizardo.com',
 
     'experience.back': 'Back to list',
     'experience.example': 'Example data',
@@ -69,6 +86,29 @@ const DICT = {
     'talks.item5.meta': 'Conference · Date',
     'talks.videoLabel': 'VIDEO · PLACEHOLDER',
     'talks.upNext': 'More talks',
+    'talks.comingSoon': 'Coming soon',
+    'talks.section.videoPodcast': 'Video podcast',
+    'talks.section.innova360': 'Innova360',
+    'talks.section.sinergia': 'Academia Sinergia',
+    'talks.openVideo': 'Open video in new tab',
+
+    'read.title': 'Read',
+    'read.listIntro':
+      'Portfolio content without the map — studio, experience, achievements, cases, talks, articles, and landmarks.',
+    'read.backToMap': 'Back to map',
+    'read.backToList': 'Back to list',
+    'read.aboutTitle': 'About me',
+    'read.about.email': 'Email',
+    'read.about.linkedin': 'Linked In',
+    'read.about.medium': 'Medium',
+    'read.section.about': 'Studio',
+    'read.section.cases': 'Cases',
+    'read.section.talks': 'Talks',
+    'read.section.writings': 'Articles',
+    'read.section.landmarks': 'Landmarks',
+    'read.section.achievements': 'Achievements',
+    'read.section.experience': 'Experience',
+    'read.notFound': 'This section is not available.',
 
     'writings.intro': 'Articles and notes (placeholder).',
     'writings.filter.all': 'All',
@@ -85,6 +125,7 @@ const DICT = {
     'writings.readerPlaceholder':
       'Reader placeholder — full article body will load here from JSON later.',
     'writings.section.uxsc': 'UX Sidekick Chronicles',
+    'writings.section.articles': 'Articles',
     'writings.section.uxscDesc': 'One-line description (placeholder).',
     'writings.section.sinergia': 'Academia Sinergia',
     'writings.section.sinergiaDesc': 'One-line description (placeholder).',
@@ -123,7 +164,21 @@ const DICT = {
     'chrome.client': 'Client',
     'chrome.experience': 'Experience',
     'chrome.seeAll': 'See all',
-    'chrome.mentorshipStat': 'Mentorship: 30+ people',
+    'chrome.achievement1': 'Main speaker at Innova360, 200+ students',
+    'chrome.achievement2': 'Proposed and lead the Bain Designers Guild',
+    'chrome.achievement3': 'AI Transformation Lead, 5/7 phases',
+    'chrome.achievement4': 'ADPList 2023: 31 sessions, 15 countries',
+    'chrome.exp.volaris': 'Senior UX/UI Designer & Mentoring Program Lead · Applaudo · 2024–present',
+    'chrome.exp.bain': 'Squad lead · Bain · 2024–present',
+    'chrome.exp.mentoria': 'Mentoring lead · Applaudo · 2024–present',
+    'chrome.exp.finoa': 'UX Consultant · talPor · 2019–2024',
+    'chrome.exp.pg': 'UX Consultant · talPor · 2019–2024',
+    'chrome.expRow.mentoria': 'Mentoring at Applaudo',
+    'chrome.caseSub.volaris': 'Product strategist and sole approver',
+    'chrome.caseSub.bain': 'Squad lead, mentor, and hands-on designer',
+    'chrome.caseSub.mentoria': 'Mentoring lead and Design Senior Council',
+    'chrome.caseSub.finoa': 'UX designer, institutional custody platform',
+    'chrome.caseSub.pg': 'UX/UI designer, panelist health app',
     'chrome.comingSoon': 'Coming soon',
     'chrome.details': 'Details',
     'chrome.showPanel': 'Show panel',
@@ -141,7 +196,18 @@ const DICT = {
     'chrome.dock': 'Dock',
     'chrome.audience': 'Audience',
 
+    'state.webgl.title': "The map can't run in this browser",
+    'state.loadFailed.title': "Couldn't load the map",
+    'state.loadFailed.sub': 'Check your connection and try again.',
+    'state.tryAgain': 'Try again',
+    'state.readInstead': 'Read instead',
+    'state.offline': "You're offline. Some places may not load.",
+
     'boot.error': 'Failed to load:',
+    'boot.loading': 'Loading the map',
+    'welcome.headline': 'Hey there, my name is Adonay Lizardo 👋',
+    'welcome.start': 'Get started',
+    'welcome.readOnly': 'Read only',
   },
   es: {
     'check.label': 'Primeros pasos',
@@ -190,8 +256,13 @@ const DICT = {
     'panel.exit': 'Salir',
     'panel.close': 'Cerrar',
     'panel.readCase': 'Leer caso',
-    'panel.talks': 'Talks',
-    'panel.writings': 'Writings',
+    'panel.workedWith': 'Trabajé con',
+    'panel.aboutMe': 'Sobre mí',
+    'panel.caseTag': 'CASO',
+    'panel.expandSheet': 'Expandir panel',
+    'panel.talks': 'Charlas',
+    'panel.writings': 'Artículos',
+    'writings.openArticle': '↗ Leer en adonaylizardo.com',
 
     'experience.back': 'Volver a la lista',
     'experience.example': 'Datos de ejemplo',
@@ -211,6 +282,29 @@ const DICT = {
     'talks.item5.meta': 'Conferencia · Fecha',
     'talks.videoLabel': 'VIDEO · PLACEHOLDER',
     'talks.upNext': 'Más charlas',
+    'talks.comingSoon': 'Próximamente',
+    'talks.section.videoPodcast': 'Video podcast',
+    'talks.section.innova360': 'Innova360',
+    'talks.section.sinergia': 'Academia Sinergia',
+    'talks.openVideo': 'Abrir video en una pestaña nueva',
+
+    'read.title': 'Leer',
+    'read.listIntro':
+      'Contenido del portafolio sin el mapa: estudio, experiencia, logros, casos, charlas, artículos y lugares.',
+    'read.backToMap': 'Volver al mapa',
+    'read.backToList': 'Volver a la lista',
+    'read.aboutTitle': 'Sobre mí',
+    'read.about.email': 'Email',
+    'read.about.linkedin': 'Linked In',
+    'read.about.medium': 'Medium',
+    'read.section.about': 'Estudio',
+    'read.section.cases': 'Casos',
+    'read.section.talks': 'Charlas',
+    'read.section.writings': 'Artículos',
+    'read.section.landmarks': 'Lugares',
+    'read.section.achievements': 'Logros',
+    'read.section.experience': 'Experiencia',
+    'read.notFound': 'Esta sección no está disponible.',
 
     'writings.intro': 'Artículos y notas (placeholder).',
     'writings.filter.all': 'Todos',
@@ -227,6 +321,7 @@ const DICT = {
     'writings.readerPlaceholder':
       'Placeholder del lector — el cuerpo del artículo vendrá de un JSON más adelante.',
     'writings.section.uxsc': 'UX Sidekick Chronicles',
+    'writings.section.articles': 'Artículos',
     'writings.section.uxscDesc': 'Descripción de una línea (placeholder).',
     'writings.section.sinergia': 'Academia Sinergia',
     'writings.section.sinergiaDesc': 'Descripción de una línea (placeholder).',
@@ -265,7 +360,22 @@ const DICT = {
     'chrome.client': 'Cliente',
     'chrome.experience': 'Experiencia',
     'chrome.seeAll': 'Ver todos',
-    'chrome.mentorshipStat': 'Mentoría: 30+ personas',
+    'chrome.achievement1': 'Speaker principal de Innova360, 200+ estudiantes',
+    'chrome.achievement2': 'Propuse y lidero el Bain Designers Guild',
+    'chrome.achievement3': 'AI Transformation Lead, 5/7 fases',
+    'chrome.achievement4': 'ADPList 2023: 31 sesiones, 15 países',
+    'chrome.exp.volaris':
+      'Senior UX/UI Designer & Mentoring Program Lead · Applaudo · 2024–presente',
+    'chrome.exp.bain': 'Squad lead · Bain · 2024–presente',
+    'chrome.exp.mentoria': 'Líder de mentoría · Applaudo · 2024–presente',
+    'chrome.exp.finoa': 'Consultor UX · talPor · 2019–2024',
+    'chrome.exp.pg': 'Consultor UX · talPor · 2019–2024',
+    'chrome.expRow.mentoria': 'Mentoría en Applaudo',
+    'chrome.caseSub.volaris': 'Product Strategist y único aprobador',
+    'chrome.caseSub.bain': 'Squad lead, mentor y diseñador hands-on',
+    'chrome.caseSub.mentoria': 'Líder de mentoría y Design Senior Council',
+    'chrome.caseSub.finoa': 'Diseñador UX, plataforma de custodia institucional',
+    'chrome.caseSub.pg': 'Diseñador UX/UI, app de salud para panelistas',
     'chrome.comingSoon': 'Próximamente',
     'chrome.details': 'Detalles',
     'chrome.showPanel': 'Mostrar panel',
@@ -283,13 +393,24 @@ const DICT = {
     'chrome.dock': 'Barra',
     'chrome.audience': 'Audiencia',
 
+    'state.webgl.title': 'El mapa no puede ejecutarse en este navegador',
+    'state.loadFailed.title': 'No se pudo cargar el mapa',
+    'state.loadFailed.sub': 'Comprueba tu conexión e inténtalo de nuevo.',
+    'state.tryAgain': 'Reintentar',
+    'state.readInstead': 'Solo leer',
+    'state.offline': 'Estás sin conexión. Es posible que algunos lugares no carguen.',
+
     'boot.error': 'Error al cargar:',
+    'boot.loading': 'Cargando el mapa',
+    'welcome.headline': 'Hola, me llamo Adonay Lizardo 👋',
+    'welcome.start': 'Empezar',
+    'welcome.readOnly': 'Solo leer',
   },
 } as const;
 
 export type I18nKey = keyof typeof DICT.en;
 
-let lang: Lang = 'es';
+let lang: Lang = readStoredLang() ?? 'es';
 const listeners = new Set<() => void>();
 
 export function getLang(): Lang {
@@ -304,6 +425,11 @@ export function setLang(next: Lang): void {
   }
   lang = next;
   document.documentElement.lang = next;
+  try {
+    localStorage.setItem(LANG_STORAGE_KEY, next);
+  } catch {
+    /* private mode */
+  }
   for (const fn of listeners) fn();
 }
 
