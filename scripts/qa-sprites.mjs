@@ -188,9 +188,17 @@ function allConnected(free, start) {
 const dist = (c, e) => (c ? Math.abs(c.r - e[2]) + Math.abs(c.g - e[3]) + Math.abs(c.b - e[4]) : 999);
 
 async function openMap(page) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.reload({ waitUntil: 'networkidle' });
-  await wait(700);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await page.goto(BASE, { waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'networkidle' });
+      await wait(700);
+      return;
+    } catch (err) {
+      if (attempt === 0 && /crashed|closed/i.test(String(err))) continue;
+      throw err;
+    }
+  }
 }
 
 async function diffSprite(page, { key, tlx, tly, zoom, id, state, scale = 1 }) {
@@ -1055,7 +1063,7 @@ async function part(name, fn) {
   console.log(`qa-sprites: ${name} ${((Date.now() - t) / 1000).toFixed(0)} s`);
 }
 
-const browser = await launchBrowser(chromium);
+let browser = await launchBrowser(chromium);
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
   await openMap(page);
@@ -1070,6 +1078,11 @@ try {
   if (want('map')) await part('map', () => mapChecks(page));
   if (want('diff')) await part('pixel-diff', () => pixelDiffMap(page));
   await page.close();
+  const needsFreshBrowser = want('diff') || want('interiors') || (SHOTS && want('shots'));
+  if (needsFreshBrowser) {
+    await browser.close();
+    browser = await launchBrowser(chromium);
+  }
   if (want('diff')) await part('full-frame diff', () => fullFrameDiff(browser));
   if (want('interiors')) await part('interiors', () => interiorChecks(browser));
   if (SHOTS && want('shots')) await part('shots', () => shots(browser));
