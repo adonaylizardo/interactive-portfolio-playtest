@@ -190,8 +190,8 @@ const dist = (c, e) => (c ? Math.abs(c.r - e[2]) + Math.abs(c.g - e[3]) + Math.a
 async function openMap(page) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      await page.goto(BASE, { waitUntil: 'networkidle' });
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.goto(BASE, { waitUntil: 'load' });
+      await page.reload({ waitUntil: 'load' });
       await wait(700);
       return;
     } catch (err) {
@@ -783,7 +783,9 @@ async function fullFrameDiff(browser) {
     const page = await ctx.newPage();
     try {
       await openMap(page);
-      await page.addStyleTag({ content: '#ui-root{visibility:hidden !important}' });
+      await page.evaluate(() => {
+        document.getElementById('ui-root')?.style.setProperty('visibility', 'hidden', 'important');
+      });
       await page.evaluate(async () => {
         await window.__playtestQa.loadAllSprites();
         await window.__playtestQa.forceBuildingState('default');
