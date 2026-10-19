@@ -1,0 +1,196 @@
+{
+  "pass": true,
+  "results": [
+    {
+      "viewport": "1280x800",
+      "probe": {
+        "viewport": "1280x800",
+        "rows": [
+          {
+            "label": "rail-avatar",
+            "at": "32,32",
+            "hit": {
+              "tag": "BUTTON",
+              "cls": "ui-round ui-round--avatar chrome__nav",
+              "id": "",
+              "action": "home",
+              "x": 12,
+              "y": 12,
+              "w": 40,
+              "h": 40
+            }
+          },
+          {
+            "label": "rail-casos",
+            "at": "32,80",
+            "hit": {
+              "tag": "BUTTON",
+              "cls": "ui-round chrome__nav",
+              "id": "",
+              "action": "cases",
+              "x": 12,
+              "y": 60,
+              "w": 40,
+              "h": 40
+            }
+          }
+        ]
+      },
+      "casosClick": {
+        "ok": true,
+        "before": "split",
+        "after": "split",
+        "colVisible": true,
+        "realClickAt32x80": true
+      },
+      "railHitsClear": true,
+      "landscapeClosed": null,
+      "landscape": null,
+      "pass": true
+    },
+    {
+      "viewport": "1440x900",
+      "probe": {
+        "viewport": "1440x900",
+        "rows": [
+          {
+            "label": "rail-avatar",
+            "at": "32,32",
+            "hit": {
+              "tag": "BUTTON",
+              "cls": "ui-round ui-round--avatar chrome__nav",
+              "id": "",
+              "action": "home",
+              "x": 12,
+              "y": 12,
+              "w": 40,
+              "h": 40
+            }
+          },
+          {
+            "label": "rail-casos",
+            "at": "32,80",
+            "hit": {
+              "tag": "BUTTON",
+              "cls": "ui-round chrome__nav",
+              "id": "",
+              "action": "cases",
+              "x": 12,
+              "y": 60,
+              "w": 40,
+              "h": 40
+            }
+          }
+        ]
+      },
+      "casosClick": {
+        "ok": true,
+        "before": "split",
+        "after": "split",
+        "colVisible": true,
+        "realClickAt32x80": true
+      },
+      "railHitsClear": true,
+      "landscapeClosed": null,
+      "landscape": null,
+      "pass": true
+    },
+    {
+      "viewport": "844x390",
+      "probe": {
+        "viewport": "844x390",
+        "rows": [
+          {
+            "label": "rail-avatar",
+            "at": "32,32",
+            "hit": {
+              "tag": "circle",
+              "cls": "[object SVGAnimatedString]",
+              "id": "",
+              "action": "",
+              "x": 32,
+              "y": 28,
+              "w": 8,
+              "h": 8
+            }
+          },
+          {
+            "label": "rail-casos",
+            "at": "32,80",
+            "hit": {
+              "tag": "DIV",
+              "cls": "checklist__header-text",
+              "id": "",
+              "x": 29,
+              "y": 59.5,
+              "w": 59,
+              "h": 94.5
+            }
+          }
+        ]
+      },
+      "casosClick": {
+        "ok": true,
+        "skipped": "compact/phone layout (no desktop rail Casos)"
+      },
+      "railHitsClear": false,
+      "landscapeClosed": {
+        "checklist": {
+          "x": 12,
+          "y": 46.5,
+          "w": 279,
+          "h": 331.5
+        },
+        "ringBtn": {
+          "x": 131,
+          "y": 84.75,
+          "w": 143,
+          "h": 44
+        },
+        "skip": {
+          "x": 29,
+          "y": 409.6875,
+          "w": 80,
+          "h": 24
+        },
+        "lang": {
+          "x": 736,
+          "y": 12,
+          "w": 96,
+          "h": 40
+        },
+        "ringOnScreen": true,
+        "skipOnScreen": true
+      },
+      "landscape": {
+        "checklist": {
+          "x": 568,
+          "y": 16,
+          "w": 260,
+          "h": 220
+        },
+        "ringBtn": {
+          "x": 668,
+          "y": 63,
+          "w": 143,
+          "h": 44
+        },
+        "skip": {
+          "x": 585,
+          "y": 396.6875,
+          "w": 80,
+          "h": 24
+        },
+        "lang": {
+          "x": 736,
+          "y": 12,
+          "w": 96,
+          "h": 40
+        },
+        "ringOnScreen": true,
+        "skipOnScreen": true
+      },
+      "pass": true
+    }
+  ]
+}

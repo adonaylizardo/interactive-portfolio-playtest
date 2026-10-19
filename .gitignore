@@ -8,3 +8,5 @@ artifacts/qa-screenshots/*
 *.local
 .env
 artifacts/
+!artifacts/verify-edificios-sbs/
+!artifacts/verify-edificios-sbs/**

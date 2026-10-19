@@ -57,6 +57,25 @@ export type CameraState = {
 };
 
 /** Smallest zoom (most zoomed out) so the full 64×64 map bbox fits in the viewport with margin. */
+export function zoomToFitWorldBounds(
+  screenW: number,
+  screenH: number,
+  bounds: { minX: number; maxX: number; minY: number; maxY: number },
+  margin = MAP_FIT_MARGIN_PX,
+): number {
+  const mapW = Math.max(1, bounds.maxX - bounds.minX);
+  const mapH = Math.max(1, bounds.maxY - bounds.minY);
+  if (screenW <= 0 || screenH <= 0) return ZOOM_MIN;
+  const ml = Math.max(margin, fitMarginLeft);
+  const mr = Math.max(margin, fitMarginRight);
+  const mt = Math.max(margin, fitMarginTop);
+  const mb = Math.max(margin, fitMarginBottom);
+  const innerW = Math.max(1, screenW - ml - mr);
+  const innerH = Math.max(1, screenH - mt - mb);
+  const fit = Math.min(innerW / mapW, innerH / mapH);
+  return Math.min(ZOOM_MAX, Math.max(0.04, fit));
+}
+
 export function zoomMinForViewport(
   screenW: number,
   screenH: number,

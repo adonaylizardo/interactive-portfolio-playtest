@@ -181,6 +181,17 @@
   z-index: 3;
 }
 
+.chrome--map .chrome__rail {
+  background: #141518;
+  border-right: 1px solid #2a2c31;
+}
+
+.chrome--map .chrome__rail .ui-round--avatar {
+  border: 2px solid #edeef0;
+  background: #141518;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
 .chrome--split .chrome__rail,
 .chrome--panel .chrome__rail {
   background: #141518;
@@ -504,6 +515,26 @@ body[data-interior='1'] .chrome__column {
   display: none;
 }
 
+.chrome__skeleton-stack,
+.chrome__skeleton {
+  display: none !important;
+}
+
+.chrome__blurb {
+  margin: 8px 0 0;
+  font-size: 15px;
+  line-height: 22px;
+  color: #b4b6bc;
+  max-width: 36em;
+}
+
+.chrome__case-meta {
+  display: block;
+  font-size: 13px;
+  line-height: 18px;
+  color: #8b8d94;
+}
+
 .chrome__lang {
   position: absolute;
   top: 20px;
@@ -514,6 +545,17 @@ body[data-interior='1'] .chrome__column {
   border-radius: 999px;
   background: rgba(237, 238, 240, 0.08);
   z-index: 5;
+}
+
+@media (min-width: 768px) {
+  .chrome__lang {
+    z-index: 18;
+  }
+}
+
+/* Lang sits above the map checklist pill (z-index 14) on phone map dock. */
+.chrome--mobile.chrome--dock {
+  z-index: 16;
 }
 
 .chrome--split .chrome__lang {
@@ -594,8 +636,63 @@ body[data-interior='1'] .chrome__column {
   pointer-events: none;
 }
 
+.chrome--sheet .chrome__subtitle:not(:empty) {
+  display: none;
+}
+
+body[data-voice-contact='1'] .chrome--sheet .chrome__subtitle:not(:empty) {
+  display: block;
+}
+
 .chrome__subtitle:empty {
   visibility: hidden;
+}
+
+#chrome-contact,
+#chrome-mobile-contact {
+  scroll-margin-top: 72px;
+}
+
+#chrome-contact.chrome__contact--flash,
+#chrome-mobile-contact.chrome__contact--flash,
+.chrome__intro .chrome__ctas.chrome__contact--flash {
+  outline: 2px solid #5b8def;
+  outline-offset: 4px;
+  border-radius: 12px;
+  background: rgba(91, 141, 239, 0.08);
+}
+
+.chrome--sheet .chrome__intro--expanded {
+  max-height: min(calc(100dvh - 72px), 92vh);
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+.chrome__sheet-body--collapsed {
+  visibility: hidden;
+  height: 0;
+  overflow: hidden;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: none;
+}
+
+.chrome--sheet .chrome__intro--expanded .chrome__sheet-body {
+  display: block;
+  margin-top: 4px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chrome__sheet-body .chrome__case-row,
+.chrome__sheet-body .chrome__logro {
+  pointer-events: auto;
+}
+
+.chrome__sheet-contact {
+  margin-top: 16px;
+  padding-bottom: 8px;
 }
 
 .chrome--split .chrome__subtitle {
@@ -675,6 +772,65 @@ body[data-layout='panel'] #game-canvas {
 
 .chrome--mobile .chrome__lang {
   left: auto;
+  z-index: 25;
+}
+
+body[data-layout='map'] .chrome--mobile .chrome__lang {
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
+  left: auto;
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .chrome--sheet .chrome__intro {
+    top: 12px;
+    bottom: 12px;
+    left: auto;
+    right: 59px;
+    width: 360px;
+    max-width: calc(100vw - 80px);
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+    z-index: 5;
+  }
+
+  .chrome--sheet .chrome__intro-close {
+    z-index: 12;
+    top: 8px;
+    right: 8px;
+  }
+
+  .chrome--sheet .chrome__lang {
+    z-index: 11;
+    top: 12px;
+    right: 12px;
+  }
+
+  .chrome--sheet .chrome__tools-phone {
+    z-index: 12;
+    display: flex !important;
+  }
+
+  body[data-layout='map'] .chrome--mobile .chrome__lang {
+    top: max(12px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
+  }
+
+  body[data-layout='map'] .chrome--mobile .chrome__tools-phone {
+    top: max(12px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+  }
+
+  body[data-layout='map'] .checklist--mobile-closed {
+    top: auto;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: max(12px, env(safe-area-inset-left));
+    right: auto;
+  }
+
+  .chrome--mobile .chrome__dock {
+    display: none;
+  }
 }
 
 .chrome--mobile .chrome__intro {
@@ -690,7 +846,8 @@ body[data-layout='panel'] #game-canvas {
   bottom: 0;
   width: auto;
   max-height: min(72vh, 620px);
-  overflow: auto;
+  box-sizing: border-box;
+  overflow: hidden;
   padding: 16px 16px 12px;
   border: 1px solid #2a2c31;
   border-bottom: 0;
@@ -808,13 +965,13 @@ body[data-layout='panel'] #game-canvas {
 
 .chrome--dock .chrome__subtitle {
   top: auto;
-  bottom: 132px;
+  bottom: 200px;
+  z-index: 10;
 }
 
 .chrome--sheet .chrome__subtitle {
-  display: block;
   top: auto;
-  bottom: 280px;
+  bottom: auto;
 }
 
 .chrome--mobile .chrome__views {
@@ -831,16 +988,16 @@ body[data-layout='panel'] #game-canvas {
   display: block;
   width: auto;
   right: 16px;
-  bottom: 80px;
+  bottom: 148px;
   left: auto;
+  z-index: 5;
 }
 
 .chrome--dock .chrome__minimap-wrap {
   display: none;
 }
 
-.chrome--dock .chrome__view-btns [data-view='rotate'],
-.chrome--dock .chrome__view-btns [data-view='map'] {
+.chrome--dock .chrome__view-btns [data-view='rotate'] {
   display: none;
 }
 
@@ -863,4 +1020,53 @@ body[data-layout='panel'] #game-canvas {
   visibility: visible;
   bottom: 24px;
   top: auto;
+}
+
+/* Landscape phone/tablet: side intro rail (must follow .chrome--sheet .chrome__intro). */
+@media (max-height: 500px) and (orientation: landscape) {
+  .chrome--sheet .chrome__intro {
+    top: 12px !important;
+    bottom: 12px !important;
+    left: auto !important;
+    right: 59px !important;
+    width: 360px !important;
+    max-width: calc(100vw - 80px) !important;
+    max-height: calc(100dvh - 30px) !important;
+    height: auto !important;
+    overflow-x: hidden;
+    overflow-y: auto;
+    border-radius: 12px;
+    border: 1px solid #2a2c31;
+    border-bottom: 1px solid #2a2c31;
+    z-index: 18;
+    pointer-events: auto;
+  }
+
+  .chrome--sheet .chrome__intro-close {
+    z-index: 4;
+    top: 8px;
+    right: 8px;
+  }
+
+  .chrome--sheet .chrome__card-row,
+  .chrome--sheet .chrome__ctas,
+  .chrome--sheet .chrome__audience,
+  .chrome--sheet [data-details] {
+    position: relative;
+    z-index: 2;
+    pointer-events: auto;
+  }
+
+  body[data-chrome='phone'][data-layout='split'] .checklist.checklist--mobile-closed {
+    top: auto !important;
+    bottom: max(12px, env(safe-area-inset-bottom)) !important;
+    left: max(12px, env(safe-area-inset-left)) !important;
+    right: auto !important;
+  }
+}
+
+body.checklist-mobile-expanded[data-chrome='phone'] .chrome__views,
+body.checklist-mobile-expanded[data-chrome='phone'] .chrome__locate {
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
