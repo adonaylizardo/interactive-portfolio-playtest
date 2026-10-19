@@ -126,6 +126,17 @@ async function main(): Promise<void> {
 
   setOnFatalReadInstead(() => {
     bootFlow.dismiss();
+    const route = parseReadingRoute();
+    if (!canUseWebGL()) {
+      if (route) {
+        if (isMobileLayout()) chrome.rememberMobileSheetBeforeReading();
+        reading.syncRoute(route);
+        checklist.setCollapsed(true);
+        if (!isMobileLayout()) chrome.setLayout('panel');
+        else chrome.setLayout('map');
+      }
+      return;
+    }
     syncReadingFromHash();
   });
 

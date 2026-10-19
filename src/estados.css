@@ -10,14 +10,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgb(11 12 14 / 94%);
+  background: rgb(11 12 14 / 55%);
   color: #edeef0;
   pointer-events: auto;
 }
 
 .fatal-state__lang {
   position: absolute;
-  top: max(16px, env(safe-area-inset-top));
+  top: max(86px, calc(env(safe-area-inset-top) + 70px));
   left: 16px;
   width: 44px;
   height: 44px;
@@ -68,7 +68,7 @@
   margin: 8px 0 0;
   font-family: Geist, Inter, system-ui, sans-serif;
   font-size: 22px;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1.25;
   max-width: 320px;
   white-space: nowrap;
@@ -90,14 +90,12 @@
   width: 100%;
   max-width: 320px;
   margin-top: 12px;
-  align-items: center;
+  align-items: stretch;
 }
 
 .fatal-state__btn {
   min-height: 44px;
-  width: auto;
-  min-width: 140px;
-  max-width: 100%;
+  width: 100%;
   border-radius: 999px;
   font-family: Geist, Inter, system-ui, sans-serif;
   font-size: 15px;
@@ -105,6 +103,7 @@
   cursor: pointer;
   border: 1px solid transparent;
   padding: 10px 20px;
+  box-sizing: border-box;
 }
 
 .fatal-state__btn--primary {
@@ -117,6 +116,49 @@
   background: transparent;
   color: #edeef0;
   border-color: #3a3d44;
+}
+
+@media (min-width: 768px) {
+  .fatal-state__lang {
+    top: max(16px, env(safe-area-inset-top));
+    left: auto;
+    right: 16px;
+  }
+
+  .fatal-state__lede {
+    max-width: 420px;
+  }
+
+  .fatal-state__actions {
+    flex-direction: row;
+    max-width: 420px;
+    gap: 12px;
+  }
+
+  .fatal-state__btn {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .fatal-state__monogram,
+  .fatal-state__name {
+    display: none;
+  }
+
+  .fatal-state__title {
+    font-size: 20px;
+  }
+
+  .fatal-state__lede {
+    max-width: min(520px, calc(100vw - 120px));
+  }
+
+  .fatal-state__actions {
+    flex-direction: row;
+    max-width: min(520px, calc(100vw - 48px));
+  }
 }
 
 .playtest-toast--offline {
@@ -162,16 +204,5 @@
 @media (max-width: 767px) {
   body[data-offline='1'] .playtest-toast--offline.playtest-toast--visible {
     bottom: max(188px, calc(env(safe-area-inset-bottom) + 172px));
-  }
-}
-
-@media (orientation: landscape) and (max-height: 500px) {
-  .fatal-state__monogram,
-  .fatal-state__name {
-    display: none;
-  }
-
-  .fatal-state__title {
-    font-size: 20px;
   }
 }

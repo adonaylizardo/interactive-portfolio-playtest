@@ -12,6 +12,7 @@ import {
   UPDATE_PRIORITY,
   getCanvasTexture,
 } from 'pixi.js';
+import { isFatalStateVisible } from '../ui/fatalState';
 import {
   cells,
   doorInwardStep,
@@ -483,7 +484,7 @@ export class IsoScene {
       resizeTo: window,
       preference: 'webgl',
       webgl: {
-        preserveDrawingBuffer: true,
+        preserveDrawingBuffer: false,
         premultipliedAlpha: false,
       },
     });
@@ -616,6 +617,7 @@ export class IsoScene {
     requestAnimationFrame(focusCanvas);
     this.app.ticker.add(() => this.update(), undefined, UPDATE_PRIORITY.NORMAL);
     this.app.ticker.add(() => this.composeRearPass(), undefined, UPDATE_PRIORITY.NORMAL);
+    this.app.ticker.add(() => this.afterPresentFrame(), undefined, UPDATE_PRIORITY.UTILITY);
     this.app.ticker.add(() => this.events.onFrame?.(), undefined, UPDATE_PRIORITY.UTILITY);
     window.addEventListener('resize', () => this.onWindowViewportChange());
     window.addEventListener('orientationchange', () => this.onWindowViewportChange());
@@ -845,15 +847,26 @@ export class IsoScene {
     };
   }
 
+  private tileLoadWarned = new Set<string>();
+
   private ensureTile(tx: number, ty: number): Sprite | null {
+    if (isFatalStateVisible()) return null;
     const id = `${tx},${ty}`;
     const existing = this.tileByCell.get(id);
     if (existing) return existing.g;
     const key = tileSpriteKey(cells, tx, ty);
     if (!spritesLoaded(key)) {
       void loadKeys([key])
-        .then(() => this.ensureTile(tx, ty))
-        .catch((err) => console.warn('[sprites] tile load failed', err));
+        .then(() => {
+          if (!isFatalStateVisible()) this.ensureTile(tx, ty);
+        })
+        .catch((err) => {
+          if (isFatalStateVisible()) return;
+          if (!this.tileLoadWarned.has(key)) {
+            this.tileLoadWarned.add(key);
+            console.warn('[sprites] tile load failed', err);
+          }
+        });
       return null;
     }
     const cell = cells[ty][tx];
@@ -916,10 +929,15 @@ export class IsoScene {
   }
 
   private deferSpriteLoad(keys: string[] | (() => Promise<void>), then?: () => void): void {
+    if (isFatalStateVisible()) return;
     const run = typeof keys === 'function' ? keys : () => loadKeys(keys);
     void run().then(
-      () => then?.(),
-      (err) => console.warn('[sprites] deferred load failed', err),
+      () => {
+        if (!isFatalStateVisible()) then?.();
+      },
+      (err) => {
+        if (!isFatalStateVisible()) console.warn('[sprites] deferred load failed', err);
+      },
     );
   }
 
@@ -3266,9 +3284,6 @@ export class IsoScene {
     }
     if (this.presentationHoldFrames > 0) {
       this.presentationHoldFrames -= 1;
-      this.refreshCanvasPresentation(true);
-    } else if (this.interiorActive && this.events.buildingPanel?.isInteriorSheetExpanded?.()) {
-      this.refreshCanvasPresentation(false);
     }
   }
 
@@ -3513,8 +3528,32 @@ export class IsoScene {
     }
     this.ensureMainRenderSurface(false);
     this.resetCanvasTextureFrame();
+    this.sealCanvasForCompositor();
+  }
+
+  /** Runs after Pixi's default frame render — SwiftShader/Vulkan can present alpha-0 outside the last scissor. */
+  private afterPresentFrame(): void {
+    if (this.readingPaused) return;
+    const expanded = !!this.events.buildingPanel?.isInteriorSheetExpanded?.();
+    if (this.presentationHoldFrames > 0 || (this.interiorActive && expanded)) {
+      this.refreshCanvasPresentation(true);
+    } else if (this.presentationBurst > 0 || this.interiorActive) {
+      this.sealCanvasForCompositor();
+    }
+  }
+
+  private sealCanvasForCompositor(): void {
+    if (!this.app || !this.canvasEl) return;
     const gl = (this.app.renderer as { gl?: WebGL2RenderingContext }).gl;
-    gl?.finish();
+    const pw = this.canvasEl.width;
+    const ph = this.canvasEl.height;
+    if (gl && pw > 0 && ph > 0) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.disable(gl.SCISSOR_TEST);
+      gl.viewport(0, 0, pw, ph);
+      gl.flush();
+      gl.finish();
+    }
   }
 
   onViewportLayoutChange(): void {
