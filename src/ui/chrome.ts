@@ -355,7 +355,15 @@ export class ChromeUI {
     this.root.querySelector('[data-action="show-panel"]')?.addEventListener('click', () => this.setLayout('split'));
     this.root.querySelector('[data-action="intro-close"]')?.addEventListener('click', () => this.setLayout('map'));
     this.root.querySelector('[data-details]')?.addEventListener('click', () => {
-      this.root.querySelector('[data-sheet-panel="intro"]')?.classList.toggle('chrome__intro--expanded');
+      const intro = this.root.querySelector('[data-sheet-panel="intro"]');
+      const btn = this.root.querySelector('[data-details]') as HTMLButtonElement | null;
+      if (!intro || !btn) return;
+      const next = !intro.classList.contains('chrome__intro--expanded');
+      intro.classList.toggle('chrome__intro--expanded', next);
+      btn.setAttribute('aria-expanded', next ? 'true' : 'false');
+      if (next) {
+        intro.querySelector('.chrome__card-row')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
     });
     this.root.querySelector('[data-action="home"]')?.addEventListener('click', () => {
       this.setLayout('split');
@@ -610,31 +618,8 @@ export class ChromeUI {
       document.body.dataset.view === 'persona' &&
       !this.interiorOpen;
     if (this.mobile && personaThird && !this.mobileSheet) {
-      const dock = this.root.querySelector('.chrome__dock')?.getBoundingClientRect();
-      const joy = document.querySelector('.joystick:not([hidden])')?.getBoundingClientRect();
-      if (dock && dock.height > 8) {
-        sub.style.top = 'auto';
-        sub.style.left = `${Math.max(16, dock.left - 8)}px`;
-        sub.style.right = 'auto';
-        sub.style.transform = 'none';
-        sub.style.width = 'min(240px, calc(50vw - 24px))';
-        sub.style.maxWidth = 'min(280px, calc(100vw - 120px))';
-        let bottom = Math.max(16, window.innerHeight - dock.top + 10);
-        if (joy && joy.height > 8) {
-          const subH = sub.offsetHeight || 44;
-          const topEdge = window.innerHeight - bottom - subH;
-          if (topEdge < joy.bottom + 8) {
-            bottom = Math.max(16, window.innerHeight - joy.top + 14);
-            sub.style.left = '50%';
-            sub.style.transform = 'translateX(-50%)';
-            sub.style.width = 'min(220px, calc(100vw - 140px))';
-            sub.style.maxWidth = '';
-          }
-        }
-        sub.style.bottom = `${bottom}px`;
-        sub.style.display = sub.textContent ? 'block' : '';
-        return;
-      }
+      this.placePersonaVoiceSubtitle(sub);
+      return;
     }
     if (this.mobile && this.mobileSheet && !this.interiorOpen) {
       const intro = this.root.querySelector('.chrome__sheet-stack') as HTMLElement | null;
@@ -652,6 +637,72 @@ export class ChromeUI {
     sub.style.left = '';
     sub.style.transform = 'translateX(-50%)';
     sub.style.width = '';
+    sub.style.maxWidth = '';
+  }
+
+  private placePersonaVoiceSubtitle(sub: HTMLElement): void {
+    type Rect = { left: number; top: number; right: number; bottom: number };
+    const pad = 10;
+    const overlaps = (a: Rect, b: Rect) =>
+      !(a.right + pad < b.left || a.left - pad > b.right || a.bottom + pad < b.top || a.top - pad > b.bottom);
+
+    const obstacles: Rect[] = [];
+    const joy = document.querySelector('.joystick:not([hidden])')?.getBoundingClientRect();
+    if (joy && joy.height > 8) obstacles.push(joy);
+    const dock = this.root.querySelector('.chrome__dock')?.getBoundingClientRect();
+    if (dock && dock.height > 8) obstacles.push(dock);
+    const cam = document.querySelector('.persona-kit__cam')?.getBoundingClientRect();
+    if (cam && cam.height > 8) obstacles.push(cam);
+    this.root.querySelectorAll('.chrome__tools-phone .ui-round, .persona-kit__help, .persona-kit__lang').forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.width > 8) obstacles.push(r);
+    });
+
+    const canvas = document.getElementById('game-canvas');
+    const canvasRect = canvas?.getBoundingClientRect();
+    const raw = canvas?.dataset.charScreen;
+    if (canvasRect && raw) {
+      try {
+        const { x, y } = JSON.parse(raw) as { x: number; y: number };
+        obstacles.push({
+          left: canvasRect.left + x - 52,
+          top: canvasRect.top + y - 96,
+          right: canvasRect.left + x + 52,
+          bottom: canvasRect.top + y + 24,
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+
+    const subW = Math.min(220, Math.max(160, window.innerWidth * 0.42));
+    const subH = Math.max(sub.offsetHeight || 36, 36);
+    const safeTop = Math.max(72, (cam?.bottom ?? 56) + 8);
+    const safeBottom = dock ? window.innerHeight - dock.top + 10 : 88;
+
+    const candidates: { top: number; left: number }[] = [
+      { top: safeTop, left: 16 },
+      { top: safeTop, left: Math.max(16, window.innerWidth - subW - 16) },
+      { top: Math.max(safeTop, window.innerHeight - safeBottom - subH), left: 16 },
+    ];
+
+    let placed = candidates[0];
+    for (const c of candidates) {
+      const box: Rect = { left: c.left, top: c.top, right: c.left + subW, bottom: c.top + subH };
+      if (!obstacles.some((o) => overlaps(box, o))) {
+        placed = c;
+        break;
+      }
+    }
+
+    sub.style.top = `${placed.top}px`;
+    sub.style.bottom = 'auto';
+    sub.style.left = `${placed.left}px`;
+    sub.style.right = 'auto';
+    sub.style.transform = 'none';
+    sub.style.width = `${subW}px`;
+    sub.style.maxWidth = `min(240px, calc(100vw - 32px))`;
+    sub.style.display = sub.textContent ? 'block' : '';
   }
 
   private shortLandscape(): boolean {

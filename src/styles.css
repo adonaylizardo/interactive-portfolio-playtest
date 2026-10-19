@@ -518,16 +518,11 @@ body[data-layout='panel'] .checklist {
     transform: translateX(-50%) translateY(0);
   }
 
-  body.persona-kit:has(.persona-kit__overlay:not([hidden])) .playtest-toast {
-    top: max(20px, env(safe-area-inset-top, 0px) + 12px);
-    bottom: auto;
-  }
-
-  /* Unknown-route toast must not cover the cenital / tercera switch (top center). */
+  /* Persona desktop: keep bogus-route toast off the left rail / column (fresh load + hash). */
   body.persona-kit .playtest-toast {
     top: auto;
-    left: max(16px, env(safe-area-inset-left, 0px) + 16px);
-    right: auto;
+    left: auto;
+    right: max(16px, env(safe-area-inset-right, 0px) + 16px);
     bottom: max(24px, env(safe-area-inset-bottom, 0px) + 16px);
     transform: translateY(8px);
   }
@@ -535,6 +530,12 @@ body[data-layout='panel'] .checklist {
   body.persona-kit .playtest-toast--visible {
     transform: translateY(0);
   }
+}
+
+body:has(.building-panel--open) .chrome__lang,
+body:has(.building-panel--open) .persona-kit__lang {
+  z-index: 220;
+  pointer-events: auto;
 }
 
 @media (max-width: 767px) {

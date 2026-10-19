@@ -778,6 +778,18 @@ body[data-layout='panel'] #game-canvas {
   margin-top: 8px;
 }
 
+.chrome__sheet-panel[data-sheet-panel='intro']:not(.chrome__intro--expanded) .chrome__card-id {
+  display: none;
+}
+
+.chrome__sheet-panel[data-sheet-panel='intro'].chrome__intro--expanded .chrome__card-id {
+  display: flex;
+}
+
+.chrome__sheet-panel[data-sheet-panel='intro'].chrome__intro--expanded [data-details] {
+  opacity: 0.72;
+}
+
 .chrome__card-id {
   display: flex;
   align-items: center;
