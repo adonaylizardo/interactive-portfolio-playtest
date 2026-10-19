@@ -2391,6 +2391,13 @@ export class IsoScene {
     this.applyCamera(false);
   }
 
+  /** QA / boot: desktop split chrome with Estudio–Volaris first-load framing. */
+  reframeDesktopFirstLoadForQa(): void {
+    if (this.shouldUseMobileFraming()) return;
+    this.frameDesktopFirstLoadView();
+    this.applyCamera(false);
+  }
+
   /**
    * Desktop first load: centred on the character, zoomed so the Estudio and the nearest houses
    * (Volaris, Mentoría, P&G, roofs included) fit around it.

@@ -338,6 +338,14 @@ async function main(): Promise<void> {
   );
   const bootInteriorFromUrl = parseInteriorFromHash();
   await scene.init(canvas);
+  if (!bootInteriorFromUrl) {
+    if (isMobileLayout()) {
+      scene.reframeMobileDefaultViewForQa();
+    } else {
+      chrome.setLayout('split');
+      scene.reframeDesktopFirstLoadForQa();
+    }
+  }
   chrome.beginSoundHint();
   const bootFocus = new URLSearchParams(location.search).get('focus');
   if (bootFocus === 'jac') {
