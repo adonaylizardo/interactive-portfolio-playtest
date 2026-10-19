@@ -1031,8 +1031,9 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
     right: 59px !important;
     width: 360px !important;
     max-width: calc(100vw - 80px) !important;
-    max-height: calc(100dvh - 30px) !important;
-    height: auto !important;
+    height: calc(100dvh - 24px) !important;
+    max-height: none !important;
+    box-sizing: border-box;
     overflow-x: hidden;
     overflow-y: auto;
     border-radius: 12px;
@@ -1046,6 +1047,20 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
     z-index: 4;
     top: 8px;
     right: 8px;
+  }
+
+  .chrome--sheet .chrome__intro .chrome__blurb {
+    margin-top: 4px;
+    font-size: 14px;
+    line-height: 20px;
+  }
+
+  .chrome--sheet .chrome__intro .chrome__audience {
+    margin-top: 0;
+  }
+
+  .chrome--sheet .chrome__intro .chrome__card-row {
+    margin-top: 0;
   }
 
   .chrome--sheet .chrome__card-row,

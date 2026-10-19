@@ -128,7 +128,7 @@ export class AboutMePanel {
     this.root.classList.toggle('about-panel--phone-portrait', this.isPhonePortrait());
     this.root.classList.toggle('about-panel--landscape', this.isSideSheet());
     this.portalVoiceSubtitle();
-    this.portalLangPill();
+    if (this.shouldPortalLangPill()) this.portalLangPill();
 
     requestAnimationFrame(() => {
       if (opts.sectionId) {
@@ -184,6 +184,11 @@ export class AboutMePanel {
     if (next && next.parentNode === parent) parent.insertBefore(el, next);
     else parent.appendChild(el);
     this.subtitleHome = null;
+  }
+
+  /** Desktop only — portaling on 844 landscape covers About × (e15). */
+  private shouldPortalLangPill(): boolean {
+    return !this.isSideSheet();
   }
 
   private portalLangPill(): void {

@@ -914,6 +914,69 @@ body[data-layout='panel'] .checklist {
     bottom: auto;
   }
 
+  body[data-chrome='phone'][data-layout='split'] .chrome--sheet .checklist.checklist--mobile-closed {
+    top: auto;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: max(12px, env(safe-area-inset-left));
+    right: auto;
+    width: min(279px, calc(100vw - 360px - 80px));
+    min-width: 0;
+    max-width: min(279px, calc(100vw - 360px - 80px));
+    height: auto;
+    max-height: 52px;
+    overflow: hidden;
+    border-radius: 26px;
+    pointer-events: none;
+  }
+
+  body[data-chrome='phone'][data-layout='split'] .chrome--sheet .checklist.checklist--mobile-closed .checklist__header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 0 8px 0 18px;
+    min-height: 52px;
+    height: 52px;
+    border-bottom: 0;
+  }
+
+  body[data-chrome='phone'][data-layout='split'] .chrome--sheet .checklist.checklist--mobile-closed .checklist__header-text,
+  body[data-chrome='phone'][data-layout='split'] .chrome--sheet .checklist.checklist--mobile-closed .checklist__counter--label {
+    display: flex !important;
+  }
+
+  body[data-chrome='phone'][data-layout='split'] .chrome--sheet .checklist.checklist--mobile-closed .checklist__header-text {
+    flex: 1 1 0;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  body[data-chrome='phone'][data-layout='split'] .chrome--sheet .checklist.checklist--mobile-closed .checklist__progress-wrap {
+    display: contents;
+  }
+
+  body[data-chrome='phone'][data-layout='split'] .chrome--sheet .checklist.checklist--mobile-closed .checklist__ring,
+  body[data-chrome='phone'][data-layout='split'] .chrome--sheet .checklist.checklist--mobile-closed .checklist__counter--in-ring,
+  body[data-chrome='phone'][data-layout='split'] .chrome--sheet .checklist.checklist--mobile-closed .checklist__map-arc,
+  body[data-chrome='phone'][data-layout='split'] .chrome--sheet .checklist.checklist--mobile-closed .checklist__clipboard-figma {
+    display: none !important;
+  }
+
+  body[data-chrome='phone'][data-layout='split'] .chrome--sheet .checklist.checklist--mobile-closed .checklist__ring-figma {
+    display: block;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    pointer-events: none;
+  }
+
+  body[data-chrome='phone'][data-layout='split'] .chrome--sheet .checklist.checklist--mobile-closed .checklist__ring-btn {
+    width: 44px;
+    height: 44px;
+    pointer-events: auto;
+  }
+
   .checklist--mobile-closed .checklist__list,
   .checklist--mobile-closed .checklist__footer {
     display: none !important;

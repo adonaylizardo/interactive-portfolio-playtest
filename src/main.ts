@@ -114,7 +114,10 @@ async function main(): Promise<void> {
 
   labels = new NameLabels(uiRoot, { onJacInfo: () => scene.jacOpenInfo() });
   aboutPanel = new AboutMePanel(uiRoot, {
-    onClose: () => syncMapOverlays(),
+    onClose: () => {
+      syncMapOverlays();
+      chrome?.sync();
+    },
   });
   searchPalette = new SearchPalette(uiRoot, {
     onSelect: (result) => routeSearchResult(result),
@@ -137,6 +140,7 @@ async function main(): Promise<void> {
     onOpenAbout: (opts) => {
       aboutPanel.open(opts);
       syncMapOverlays();
+      chrome.sync();
     },
     onOpenSearch: () => searchPalette.open(),
   });

@@ -695,9 +695,9 @@ export class ChromeUI {
         const mapW = window.innerWidth - mapLeft - 16;
         sub.style.left = `${mapLeft + mapW / 2}px`;
         sub.style.transform = 'translateX(-50%)';
-        sub.style.width = 'max-content';
-        sub.style.maxWidth = `${Math.min(360, mapW - 32)}px`;
-        sub.style.bottom = '28px';
+        sub.style.width = 'fit-content';
+        sub.style.maxWidth = '';
+        sub.style.bottom = '96px';
         sub.style.top = 'auto';
         return;
       }
@@ -774,6 +774,12 @@ export class ChromeUI {
     if (!lang) return;
     const shortLand = window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
     if (shortLand && this.mobile) {
+      if (document.body.classList.contains('about-panel-open')) {
+        lang.style.top = '12px';
+        lang.style.left = '12px';
+        lang.style.right = 'auto';
+        return;
+      }
       if (this.mobileSheet && !this.interiorOpen) {
         lang.style.top = '68px';
         lang.style.left = '12px';

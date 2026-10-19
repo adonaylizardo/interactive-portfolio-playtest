@@ -17,6 +17,12 @@ body.about-panel-open .chrome__lang {
   pointer-events: auto;
 }
 
+@media (max-height: 500px) and (orientation: landscape) and (max-width: 900px) {
+  body.about-panel-open .chrome__lang {
+    z-index: 55;
+  }
+}
+
 .about-panel__backdrop {
   position: absolute;
   inset: 0;
@@ -384,12 +390,28 @@ body[data-chrome='desktop'] .search-palette__hint-key {
   cursor: pointer;
 }
 
-body[data-chrome='phone'] .search-palette__chip {
+body[data-chrome='phone'] .search-palette__chip,
+body[data-chrome='desktop'] .search-palette__chip {
   min-height: 44px;
   height: 44px;
   padding: 0 16px;
   font: 500 16px/20px Inter, system-ui, sans-serif;
   gap: 8px;
+}
+
+body[data-chrome='desktop'][data-voice-contact='1'] .chrome__subtitle:not(:empty) {
+  position: fixed !important;
+  left: calc(496px + (100vw - 496px) / 2) !important;
+  display: inline-block !important;
+  width: fit-content !important;
+  max-width: min(280px, calc(100vw - 496px - 96px)) !important;
+  min-width: 0 !important;
+  transform: translateX(-50%) !important;
+  bottom: 96px !important;
+  top: auto !important;
+  padding: 8px 14px !important;
+  box-sizing: border-box;
+  white-space: nowrap;
 }
 
 .search-palette__input {
