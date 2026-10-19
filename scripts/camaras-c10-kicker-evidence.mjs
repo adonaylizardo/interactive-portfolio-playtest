@@ -19,16 +19,15 @@ async function main() {
   const page = await browser.newPage();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(BASE, { waitUntil: 'networkidle', timeout: 120000 });
-  await page.waitForFunction(() => window.__playtestQa?.openCasePreview);
+  await page.waitForFunction(() => window.__playtestQa?.showCasePreview);
   await wait(2000);
 
   await page.evaluate(() => {
-    document.documentElement.lang = 'es';
     document.querySelector('.chrome__lang-opt[data-lang="es"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
   await wait(400);
 
-  await page.evaluate(() => window.__playtestQa.openCasePreview('bain'));
+  await page.evaluate(() => window.__playtestQa.showCasePreview('bain'));
   await wait(600);
 
   const data = await page.evaluate(() => {
