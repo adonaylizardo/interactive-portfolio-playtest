@@ -418,13 +418,13 @@ export class BuildingPanel {
     studio.playCaseVoice(interiorId);
   }
 
-  /** Map peek for non-case enterable buildings (e.g. estudio) while still driving. */
+  /** Map peek for non-case enterable buildings (e.g. estudio) while still on the map. */
   showBuildingPeek(buildingId: string, panelTitle?: string): void {
     const title = panelTitle ?? buildingId;
     this.leaveArmed = false;
     this.exitPress = null;
     this.exitFromPointer = false;
-    this.mode = 'preview';
+    this.mode = 'interior';
     this.interiorId = buildingId;
     this.peekOnly = true;
     this.el.hidden = false;
@@ -433,6 +433,9 @@ export class BuildingPanel {
     this.aboutEl.style.contentVisibility = '';
     this.el.removeAttribute('inert');
     this.el.classList.remove('building-panel--snap');
+    this.el.classList.remove('building-panel--preview');
+    this.titleEl.hidden = false;
+    if (this.previewEl) this.previewEl.hidden = true;
     this.setTitle(buildingId, title);
     this.renderWorkedWith();
     this.renderAbout();
@@ -444,7 +447,7 @@ export class BuildingPanel {
 
   /** Stay on the map: lower-third card, then a full-copy expand. */
   showPreview(interiorId: string): void {
-    if (!isCaseHouse(interiorId) && !CASES[interiorId as keyof typeof CASES]) return;
+    if (!isCaseHouse(interiorId)) return;
     this.leaveArmed = false;
     this.exitPress = null;
     this.exitFromPointer = false;
@@ -499,7 +502,9 @@ export class BuildingPanel {
     if (this.previewSubtitle) this.previewSubtitle.textContent = subtitle;
     if (this.previewTeaser) this.previewTeaser.textContent = teaser;
     const meta = this.el.querySelector('.case-preview__read-meta');
-    if (meta) meta.textContent = preview?.pillMeta ?? 'Problem · What I did · Result';
+    const pillDefault =
+      getLang() === 'es' ? 'Problema · Lo que hice · Resultado' : 'Problem · What I did · Result';
+    if (meta) meta.textContent = preview?.pillMeta ?? pillDefault;
     if (this.readBarTitle) {
       this.readBarTitle.textContent = this.isMobile() || !subtitle
         ? (title ?? interiorId)

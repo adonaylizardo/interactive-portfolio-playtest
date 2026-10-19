@@ -1,6 +1,6 @@
 import { studio } from './audio/studio';
 import { ChecklistUI } from './checklist/ui';
-import { CASES, isCaseHouse } from './data/cases';
+import { isCaseHouse } from './data/cases';
 import {
   doorInwardStep,
   getBuildingByName,
@@ -112,7 +112,7 @@ async function main(): Promise<void> {
       scene.enterInterior(buildingId);
     },
     onDriveBuildingDoor: (buildingId, panelTitle) => {
-      if (isCaseHouse(buildingId) || CASES[buildingId as keyof typeof CASES]) {
+      if (isCaseHouse(buildingId)) {
         if (chrome.isMobileSheetOpen()) chrome.setLayout('map');
         panel.showPreview(buildingId);
         return;
@@ -403,6 +403,7 @@ async function main(): Promise<void> {
     openPanelTitle: () => panel.openTitle(),
     isCasePreviewExpanded: () => panel.isPreviewExpanded(),
     showCasePreview: (id: string) => panel.showPreview(id),
+    showBuildingPeek: (id: string, title?: string) => panel.showBuildingPeek(id, title),
     expandCasePreview: () => panel.expandPreviewForQa(),
     collapseCasePreview: () => panel.collapsePreviewForQa(),
     jac: () => scene.qaJac(),
