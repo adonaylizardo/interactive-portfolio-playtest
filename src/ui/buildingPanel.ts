@@ -117,6 +117,7 @@ export class BuildingPanel {
   private mode: 'hidden' | 'interior' | 'preview' = 'hidden';
   private previewEl: HTMLElement | null = null;
   private previewTitle: HTMLElement | null = null;
+  private previewKicker: HTMLElement | null = null;
   private previewSubtitle: HTMLElement | null = null;
   private previewTeaser: HTMLElement | null = null;
   private readEl: HTMLElement | null = null;
@@ -156,7 +157,7 @@ export class BuildingPanel {
           <div class="case-preview__handle" aria-hidden="true"></div>
           <div class="case-preview__head">
             <div class="case-preview__titles">
-              <p class="case-preview__kicker">CASE</p>
+              <p class="case-preview__kicker"></p>
               <h2 class="case-preview__title"></h2>
             </div>
             <button type="button" class="case-preview__x" data-close aria-label="">${iconSvg('close')}</button>
@@ -213,6 +214,7 @@ export class BuildingPanel {
     this.aboutEl = this.el.querySelector('.about')!;
     this.previewEl = this.el.querySelector('[data-preview]') as HTMLElement;
     this.previewTitle = this.el.querySelector('.case-preview__title');
+    this.previewKicker = this.el.querySelector('.case-preview__kicker');
     this.previewSubtitle = this.el.querySelector('.case-preview__subtitle');
     this.previewTeaser = this.el.querySelector('.case-preview__teaser');
     this.readEl = this.el.querySelector('[data-read-view]') as HTMLElement;
@@ -491,6 +493,9 @@ export class BuildingPanel {
       ? (preview?.teaser ?? '')
       : (preview?.teaserFull ?? preview?.teaser ?? '');
     if (this.previewTitle) this.previewTitle.textContent = title ?? interiorId;
+    const kickerLabel =
+      preview?.kicker?.split(' · ')[0] ?? (getLang() === 'es' ? 'CASO' : 'CASE');
+    if (this.previewKicker) this.previewKicker.textContent = kickerLabel;
     if (this.previewSubtitle) this.previewSubtitle.textContent = subtitle;
     if (this.previewTeaser) this.previewTeaser.textContent = teaser;
     const meta = this.el.querySelector('.case-preview__read-meta');
