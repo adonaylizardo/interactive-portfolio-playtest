@@ -11,6 +11,11 @@
   pointer-events: auto;
 }
 
+body.about-panel-open .chrome__lang {
+  z-index: 90;
+  pointer-events: auto;
+}
+
 .about-panel__backdrop {
   position: absolute;
   inset: 0;
@@ -522,6 +527,11 @@ body.about-panel-open[data-chrome='phone'] .chrome__subtitle:not(:empty) {
     transform: translateX(-50%) !important;
     top: auto !important;
     bottom: max(168px, calc(100dvh - 52vh)) !important;
+  }
+
+  body.about-panel-open[data-chrome='phone'][data-voice-contact='1'] .chrome__subtitle:not(:empty) {
+    top: 118px !important;
+    bottom: auto !important;
   }
 }
 

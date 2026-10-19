@@ -62,6 +62,9 @@ export class StudioAudio {
   private voice: HTMLAudioElement | null = null;
   private activeLineId: string | null = null;
   private subtitleText = '';
+  private subtitleLineId: string | null = null;
+  private subtitleHideTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly subtitleVisibleMs = 4000;
   private readonly played = new Set<string>();
   private readonly listeners = new Set<() => void>();
   private preferOgg: boolean | null = null;
@@ -88,8 +91,7 @@ export class StudioAudio {
       if (!this.activeLineId) return;
       const line = VOICE_LINES[this.activeLineId];
       if (line) {
-        this.subtitleText = this.lineSubtitle(line);
-        this.emit();
+        this.setSubtitle(this.activeLineId, this.lineSubtitle(line));
       }
     });
   }
@@ -136,6 +138,28 @@ export class StudioAudio {
 
   subtitle(): string {
     return this.subtitleText;
+  }
+
+  subtitleVoiceId(): string | null {
+    return this.subtitleLineId;
+  }
+
+  private setSubtitle(id: string | null, text: string): void {
+    this.subtitleLineId = id;
+    this.subtitleText = text;
+    if (this.subtitleHideTimer) {
+      clearTimeout(this.subtitleHideTimer);
+      this.subtitleHideTimer = null;
+    }
+    if (text) {
+      this.subtitleHideTimer = window.setTimeout(() => {
+        this.subtitleHideTimer = null;
+        this.subtitleText = '';
+        this.subtitleLineId = null;
+        this.emit();
+      }, this.subtitleVisibleMs);
+    }
+    this.emit();
   }
 
   /** Clear chrome subtitle (e.g. experience rooms without a case voice line). */
@@ -195,6 +219,7 @@ export class StudioAudio {
       '#ui-root > .building-panel.building-panel--open',
     );
     if (panel) return true;
+    if (document.body.classList.contains('about-panel-open')) return true;
     return false;
   }
 
@@ -208,8 +233,7 @@ export class StudioAudio {
     if (this.activeLineId === '01-intro') this.stopVoice({ preserveQueue: true });
     const line = VOICE_LINES[id];
     if (line) {
-      this.subtitleText = this.lineSubtitle(line);
-      this.emit();
+      this.setSubtitle(id, this.lineSubtitle(line));
     }
     this.playLine(id, { force: true });
   }
@@ -380,8 +404,7 @@ export class StudioAudio {
     this.stopBark();
     if (id !== '01-intro') this.played.add(id);
     this.activeLineId = id;
-    this.subtitleText = this.lineSubtitle(line);
-    this.emit();
+    this.setSubtitle(id, this.lineSubtitle(line));
     if (automatedWebKitPhone()) {
       window.setTimeout(() => this.finishVoice(true), 80);
       return;
@@ -397,9 +420,7 @@ export class StudioAudio {
       if (this.voice === el) this.finishVoice(true);
     });
     this.voice = el;
-    this.subtitleText = this.lineSubtitle(line);
     this.duckAmbience(true);
-    this.emit();
     void el.play().catch(() => {
       if (this.voice === el) this.finishVoice(false);
     });
@@ -428,7 +449,14 @@ export class StudioAudio {
       this.introDeferred = true;
       this.activeLineId = null;
     }
-    if (opts.clearCaption !== false) this.subtitleText = '';
+    if (opts.clearCaption !== false) {
+      if (this.subtitleHideTimer) {
+        clearTimeout(this.subtitleHideTimer);
+        this.subtitleHideTimer = null;
+      }
+      this.subtitleText = '';
+      this.subtitleLineId = null;
+    }
     if (hadVoice || this.introLock) {
       this.introLock = false;
       if (!opts.preserveQueue) this.pending = null;

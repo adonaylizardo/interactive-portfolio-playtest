@@ -16,8 +16,13 @@ export type DesktopLayout = 'split' | 'map' | 'panel';
 export type Audience = 'recruiter' | 'mentoria' | 'cliente';
 export type { Lang };
 
+export type ChromeLayoutChangeOpts = {
+  /** Keep map camera when the phone sheet opens (Logros/Casos). */
+  preserveMapCamera?: boolean;
+};
+
 export type ChromeCallbacks = {
-  onLayoutChange: () => void;
+  onLayoutChange: (opts?: ChromeLayoutChangeOpts) => void;
   onView: (mode: Camera) => void;
   onRotate: () => void;
   onMapOverview: () => void;
@@ -125,7 +130,7 @@ export class ChromeUI {
     if (!opts?.skipLayout) this.callbacks.onLayoutChange();
   }
 
-  setLayout(next: DesktopLayout): void {
+  setLayout(next: DesktopLayout, opts?: ChromeLayoutChangeOpts): void {
     if (this.mobile) {
       this.mobileSheet = next !== 'map';
     } else {
@@ -133,7 +138,7 @@ export class ChromeUI {
     }
     this.sync();
     studio.playClick();
-    this.callbacks.onLayoutChange();
+    this.callbacks.onLayoutChange(opts);
   }
 
   private isLandscapeSideSheet(): boolean {
@@ -294,7 +299,7 @@ export class ChromeUI {
           </div>
           <button type="button" class="ui-btn ui-btn--secondary" data-details data-i18n="chrome.details">Detalles</button>
         </div>
-        <div class="chrome__sheet-body" data-sheet-body hidden>
+        <div class="chrome__sheet-body chrome__sheet-body--collapsed" data-sheet-body>
           <section class="chrome__section" id="chrome-mobile-logros">
             <div class="chrome__section-head">
               <h2 data-i18n="chrome.achievements">Logros</h2>
@@ -464,6 +469,7 @@ export class ChromeUI {
     const text = studio.subtitle();
     sub.textContent = text;
     sub.hidden = !text;
+    document.body.dataset.voiceContact = studio.subtitleVoiceId() === '11-contact' ? '1' : '0';
   }
 
   /** 'No sound? Check silent mode' is a boot hint — fade out after ~4s, then stay gone. */
@@ -555,7 +561,7 @@ export class ChromeUI {
     const body = this.root.querySelector('[data-sheet-body]') as HTMLElement | null;
     if (!intro) return;
     intro.classList.toggle('chrome__intro--expanded', expanded);
-    if (body) body.hidden = !expanded;
+    if (body) body.classList.toggle('chrome__sheet-body--collapsed', !expanded);
     this.sync();
     this.callbacks.onLayoutChange();
   }
@@ -663,6 +669,39 @@ export class ChromeUI {
   private placeSubtitle(): void {
     const sub = this.subtitleElement();
     if (!sub) return;
+    if (studio.subtitleVoiceId() === '11-contact') {
+      sub.style.position = 'fixed';
+      sub.style.zIndex = '70';
+      if (this.mobile && this.isLandscapeSideSheet()) {
+        const sheet = document.querySelector('.about-panel__sheet')?.getBoundingClientRect();
+        const mapW = sheet?.width ? sheet.left : window.innerWidth * 0.55;
+        sub.style.left = `${Math.max(80, mapW / 2)}px`;
+        sub.style.width = `${Math.min(280, Math.max(160, mapW - 48))}px`;
+        sub.style.transform = 'translateX(-50%)';
+        sub.style.top = `${Math.min(340, Math.max(300, window.innerHeight - 56))}px`;
+        sub.style.bottom = 'auto';
+        return;
+      }
+      if (this.mobile && this.isPhonePortrait()) {
+        sub.style.left = '50%';
+        sub.style.width = `${Math.min(340, window.innerWidth - 48)}px`;
+        sub.style.transform = 'translateX(-50%)';
+        sub.style.top = '118px';
+        sub.style.bottom = 'auto';
+        return;
+      }
+      if (!this.mobile) {
+        const mapLeft = this.layout === 'split' ? 496 : 72;
+        const mapW = window.innerWidth - mapLeft - 16;
+        sub.style.left = `${mapLeft + mapW / 2}px`;
+        sub.style.transform = 'translateX(-50%)';
+        sub.style.width = 'max-content';
+        sub.style.maxWidth = `${Math.min(360, mapW - 32)}px`;
+        sub.style.bottom = '28px';
+        sub.style.top = 'auto';
+        return;
+      }
+    }
     if (document.body.classList.contains('about-panel-open')) {
       const sheet = document.querySelector('.about-panel__sheet')?.getBoundingClientRect();
       if (sheet && sheet.width > 8) {
@@ -702,20 +741,25 @@ export class ChromeUI {
       const intro = this.root.querySelector('.chrome__intro') as HTMLElement | null;
       const r = intro?.getBoundingClientRect();
       if (r && r.height > 8) {
+        sub.style.position = 'fixed';
+        sub.style.zIndex = '70';
         if (this.isLandscapeSideSheet()) {
-          sub.style.left = `${Math.max(12, r.left / 2)}px`;
-          sub.style.width = `${Math.max(160, r.left - 24)}px`;
+          const mapW = r.left;
+          sub.style.left = `${Math.max(80, mapW / 2)}px`;
+          sub.style.width = `${Math.min(280, Math.max(160, mapW - 48))}px`;
           sub.style.transform = 'translateX(-50%)';
-          sub.style.bottom = '12px';
-          sub.style.top = 'auto';
+          sub.style.top = `${Math.min(340, Math.max(300, r.top - 56))}px`;
+          sub.style.bottom = 'auto';
           return;
         }
-        sub.style.left = '';
-        sub.style.width = '';
-        sub.style.transform = '';
-        sub.style.bottom = `${Math.max(12, window.innerHeight - r.top + 8)}px`;
-        sub.style.top = 'auto';
-        return;
+        if (this.isPhonePortrait()) {
+          sub.style.left = '50%';
+          sub.style.width = `${Math.min(340, window.innerWidth - 48)}px`;
+          sub.style.transform = 'translateX(-50%)';
+          sub.style.top = `${Math.max(110, Math.min(130, r.top - 120))}px`;
+          sub.style.bottom = 'auto';
+          return;
+        }
       }
     }
     sub.style.bottom = '';

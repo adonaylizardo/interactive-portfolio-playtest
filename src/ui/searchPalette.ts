@@ -53,8 +53,8 @@ export class SearchPalette {
             <input type="text" class="search-palette__input" autocomplete="off" spellcheck="false" enterkeyhint="search" />
             <button type="button" class="search-palette__clear" data-search-clear hidden aria-label="Clear">${iconSvg('close')}</button>
           </label>
-          <button type="button" class="search-palette__close" data-search-close aria-label="Close">${iconSvg('close')}</button>
           <span class="search-palette__hint-key" aria-hidden="true">ESC</span>
+          <button type="button" class="search-palette__close" data-search-close aria-label="Close">${iconSvg('close')}</button>
         </div>
         <div class="search-palette__chips" data-chips></div>
         <div class="search-palette__results" data-results></div>

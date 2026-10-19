@@ -465,16 +465,17 @@ export class IsoScene {
       backgroundAlpha: 1,
       antialias: true,
       autoDensity: true,
-      premultipliedAlpha: true,
+      premultipliedAlpha: false,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
-      resizeTo: window,
       preference: 'webgl',
     });
+    this.syncRendererBackground();
+    this.reflowViewport();
 
     this.screenFill = new Graphics();
     this.screenFill.eventMode = 'none';
     this.screenFill.label = 'screen-fill';
-    this.app.stage.addChild(this.screenFill);
+    this.app.stage.addChildAt(this.screenFill, 0);
     this.rearLayer = new Container();
     this.rearLayer.eventMode = 'none';
     this.rearLayer.label = 'jac-rear';
@@ -587,6 +588,7 @@ export class IsoScene {
     const focusCanvas = () => canvas.focus({ preventScroll: true });
     focusCanvas();
     requestAnimationFrame(focusCanvas);
+    this.app.ticker.add(() => this.paintScreenFill(), undefined, UPDATE_PRIORITY.HIGH);
     this.app.ticker.add(() => this.update(), undefined, UPDATE_PRIORITY.NORMAL);
     this.app.ticker.add(() => this.composeRearPass(), undefined, UPDATE_PRIORITY.NORMAL);
     this.app.ticker.add(() => this.events.onFrame?.(), undefined, UPDATE_PRIORITY.UTILITY);
@@ -724,15 +726,23 @@ export class IsoScene {
    * Hidden while the town covers the whole screen: a full-screen blended quad costs software-GL
    * phones ~4 ms a frame.
    */
+  private syncRendererBackground(): void {
+    if (!this.app) return;
+    const c = worldBackgroundColor();
+    this.app.renderer.background.color = c;
+    this.app.renderer.background.alpha = 1;
+  }
+
   private paintScreenFill(): void {
     const g = this.screenFill;
     if (!g || !this.app) return;
+    this.syncRendererBackground();
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     const c = worldBackgroundColor();
     g.clear();
     g.rect(0, 0, sw, sh);
-    g.fill(c);
+    g.fill({ color: c, alpha: 1 });
   }
 
   private fitOutskirts(sw: number, sh: number): void {
@@ -2599,7 +2609,10 @@ export class IsoScene {
     const vv = window.visualViewport;
     const w = Math.max(1, Math.round(vv?.width ?? window.innerWidth));
     const h = Math.max(1, Math.round(vv?.height ?? window.innerHeight));
-    this.app.renderer.resize(w, h);
+    if (this.app.screen.width !== w || this.app.screen.height !== h) {
+      this.app.renderer.resize(w, h);
+    }
+    this.syncRendererBackground();
     this.paintScreenFill();
     this.updateCameraFitMargins();
     if (this.interiorActive && this.interiorDef) {
@@ -4075,6 +4088,18 @@ export class IsoScene {
   }
 
   /** Refit camera when chrome/panel insets change (preview dismiss, map dock, sheet peek). */
+  /** Full map redraw after phone chrome sheet DOM updates (WebGL band can stale). */
+  repaintMapFrame(): void {
+    if (!this.app) return;
+    this.paintScreenFill();
+    this.applyCamera(false);
+    try {
+      this.app.render();
+    } catch {
+      /* first frame */
+    }
+  }
+
   applyCameraFromUi(): void {
     this.updateCameraFitMargins();
     if (this.interiorActive && this.interiorDef) {

@@ -660,6 +660,16 @@ body[data-layout='panel'] .checklist {
     display: none !important;
   }
 
+  body[data-chrome='phone'] .chrome--sheet .chrome__intro,
+  body[data-chrome='phone'] .chrome--sheet .chrome__intro--expanded {
+    top: 237px;
+    bottom: max(64px, calc(env(safe-area-inset-bottom) + 48px));
+    height: auto;
+    max-height: none;
+    border-radius: 12px 12px 0 0;
+    border-bottom: 0;
+  }
+
   body[data-chrome='phone'] .checklist--mobile:not(.checklist--mobile-closed):not(.checklist--anchored) {
     position: fixed;
     top: auto;
@@ -902,15 +912,6 @@ body[data-layout='panel'] .checklist {
   body[data-chrome='phone'][data-layout='split'] .checklist.checklist--mobile-closed {
     top: max(48px, calc(env(safe-area-inset-top) + 36px));
     bottom: auto;
-  }
-
-  .chrome--sheet .chrome__intro,
-  .chrome--sheet .chrome__intro--expanded {
-    top: max(8px, env(safe-area-inset-top));
-    bottom: max(64px, calc(env(safe-area-inset-bottom) + 48px));
-    max-height: none;
-    border-radius: 12px;
-    border-bottom: 1px solid #2a2c31;
   }
 
   .checklist--mobile-closed .checklist__list,

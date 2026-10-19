@@ -625,6 +625,14 @@ body[data-interior='1'] .chrome__column {
   pointer-events: none;
 }
 
+.chrome--sheet .chrome__subtitle:not(:empty) {
+  display: none;
+}
+
+body[data-voice-contact='1'] .chrome--sheet .chrome__subtitle:not(:empty) {
+  display: block;
+}
+
 .chrome__subtitle:empty {
   visibility: hidden;
 }
@@ -648,9 +656,22 @@ body[data-interior='1'] .chrome__column {
   padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
 
+.chrome__sheet-body--collapsed {
+  visibility: hidden;
+  height: 0;
+  overflow: hidden;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: none;
+}
+
 .chrome--sheet .chrome__intro--expanded .chrome__sheet-body {
   display: block;
   margin-top: 4px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .chrome__sheet-body .chrome__case-row,
@@ -814,7 +835,8 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
   bottom: 0;
   width: auto;
   max-height: min(72vh, 620px);
-  overflow: auto;
+  box-sizing: border-box;
+  overflow: hidden;
   padding: 16px 16px 12px;
   border: 1px solid #2a2c31;
   border-bottom: 0;
@@ -932,13 +954,13 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
 
 .chrome--dock .chrome__subtitle {
   top: auto;
-  bottom: 132px;
+  bottom: 200px;
+  z-index: 10;
 }
 
 .chrome--sheet .chrome__subtitle {
-  display: block;
   top: auto;
-  bottom: 280px;
+  bottom: auto;
 }
 
 .chrome--mobile .chrome__views {
