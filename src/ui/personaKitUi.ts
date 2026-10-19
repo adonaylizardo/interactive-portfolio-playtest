@@ -2,6 +2,7 @@ import { isMobileLayout } from '../checklist/ui';
 import { personaEnabled } from '../game/persona/personaSpec';
 import type { Camera } from '../tokens';
 import { getLang, onLangChange, setLang, t } from './i18n';
+import { studio } from '../audio/studio';
 import { iconSvg } from './icons';
 
 const STORAGE_KEY = 'portfolio-persona-controls-v1';
@@ -241,6 +242,7 @@ export class PersonaKitUI {
   closeOverlay(persist = false): void {
     this.overlay.hidden = true;
     this.overlay.setAttribute('inert', '');
+    studio.playIntroWhenPersonaReady();
     if (persist) {
       try {
         localStorage.setItem(STORAGE_KEY, '1');

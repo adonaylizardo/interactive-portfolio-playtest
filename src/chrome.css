@@ -705,7 +705,7 @@ body[data-layout='panel'] #game-canvas {
   width: auto;
   max-height: min(72vh, 620px);
   overflow: hidden;
-  padding: 16px 16px 12px;
+  padding: 16px 16px calc(12px + 48px + 16px);
   border: 1px solid #2a2c31;
   border-bottom: 0;
   border-radius: 12px 12px 0 0;

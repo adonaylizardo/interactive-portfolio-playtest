@@ -7,8 +7,6 @@ import type { Camera } from '../tokens';
 import { casePreviewCopy, isCaseHouse } from '../data/cases';
 import { personaEnabled } from '../game/persona/personaSpec';
 import { getLang, onLangChange, setLang, t, type Lang } from './i18n';
-import { showToast } from './toast';
-
 export type MobileSheetPanel = 'intro' | 'cases' | 'achievements';
 
 export type DesktopLayout = 'split' | 'map' | 'panel';
@@ -173,7 +171,7 @@ export class ChromeUI {
       (row) => `
       <button type="button" class="chrome__exp-row" data-locate="${row.id}">
         <span class="chrome__exp-name">${row.label}${row.nda ? '<span class="chrome__nda">NDA</span>' : ''}</span>
-        <span class="chrome__exp-meta"><span class="chrome__skeleton chrome__skeleton--bar"></span>${iconSvg('locate', 16)}</span>
+        <span class="chrome__exp-meta">${iconSvg('locate', 16)}</span>
       </button>`,
     ).join('');
     const caseRows = CASES_ROWS.map((row) => {
@@ -212,11 +210,6 @@ export class ChromeUI {
         <div class="chrome__intro-body">
           <div class="chrome__lede">
             <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
-            <div class="chrome__skeleton-stack" aria-hidden="true">
-              <span class="chrome__skeleton"></span>
-              <span class="chrome__skeleton"></span>
-              <span class="chrome__skeleton chrome__skeleton--half"></span>
-            </div>
           </div>
           <div class="chrome__ctas">
             <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer">${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
@@ -271,10 +264,6 @@ export class ChromeUI {
         <div class="chrome__sheet-panel is-active" data-sheet-panel="intro" data-intro>
           <div class="chrome__lede">
             <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
-            <div class="chrome__skeleton-stack" aria-hidden="true">
-              <span class="chrome__skeleton"></span>
-              <span class="chrome__skeleton chrome__skeleton--half"></span>
-            </div>
           </div>
           <div class="chrome__audience">
             <p class="chrome__label" data-i18n="chrome.who">¿Quién eres?</p>
@@ -415,7 +404,6 @@ export class ChromeUI {
       this.openMobileSheet('achievements');
     });
     this.root.querySelector('.chrome__dock [data-action="contact"]')?.addEventListener('click', () => {
-      showToast(t('voice.11-contact'), 3200);
       studio.playLine('11-contact');
       this.callbacks.onLocate('contacto');
     });
@@ -429,7 +417,6 @@ export class ChromeUI {
       this.scrollTo('#chrome-logros');
     });
     this.root.querySelector('.chrome__rail [data-action="contact"]')?.addEventListener('click', () => {
-      showToast(t('voice.11-contact'), 3200);
       studio.playLine('11-contact');
       this.callbacks.onLocate('contacto');
     });
@@ -454,9 +441,12 @@ export class ChromeUI {
     const sub = this.root.querySelector('.chrome__subtitle') as HTMLElement | null;
     if (!sub) return;
     const text = studio.subtitle();
+    const personaControlsOpen =
+      !!document.querySelector('.persona-kit__overlay:not([hidden])');
     const hideIntroOnPersonaPhone =
       this.mobile &&
       document.body.classList.contains('persona-kit') &&
+      personaControlsOpen &&
       (text.startsWith('Hey, welcome') || text.startsWith('Hola, bienvenido'));
     if (hideIntroOnPersonaPhone) {
       sub.textContent = '';
@@ -615,17 +605,37 @@ export class ChromeUI {
   private placeSubtitle(): void {
     const sub = this.root.querySelector('.chrome__subtitle') as HTMLElement | null;
     if (!sub) return;
+    const personaThird =
+      document.body.classList.contains('persona-kit') &&
+      document.body.dataset.view === 'persona' &&
+      !this.interiorOpen;
+    if (this.mobile && personaThird && !this.mobileSheet) {
+      const joy = document.querySelector('.joystick:not([hidden])')?.getBoundingClientRect();
+      if (joy && joy.height > 8) {
+        sub.style.top = 'auto';
+        sub.style.left = '50%';
+        sub.style.transform = 'translateX(-50%)';
+        sub.style.width = `min(343px, calc(100vw - 32px))`;
+        sub.style.bottom = `${Math.max(16, window.innerHeight - joy.top + 14)}px`;
+        return;
+      }
+    }
     if (this.mobile && this.mobileSheet && !this.interiorOpen) {
       const intro = this.root.querySelector('.chrome__sheet-stack') as HTMLElement | null;
       const r = intro?.getBoundingClientRect();
       if (r && r.height > 8) {
         sub.style.bottom = `${Math.max(12, window.innerHeight - r.top + 8)}px`;
         sub.style.top = 'auto';
+        sub.style.left = '';
+        sub.style.transform = 'translateX(-50%)';
         return;
       }
     }
     sub.style.bottom = '';
     sub.style.top = '';
+    sub.style.left = '';
+    sub.style.transform = 'translateX(-50%)';
+    sub.style.width = '';
   }
 
   private shortLandscape(): boolean {

@@ -517,6 +517,11 @@ body[data-layout='panel'] .checklist {
   .playtest-toast--visible {
     transform: translateX(-50%) translateY(0);
   }
+
+  body.persona-kit:has(.persona-kit__overlay:not([hidden])) .playtest-toast {
+    top: max(20px, env(safe-area-inset-top, 0px) + 12px);
+    bottom: auto;
+  }
 }
 
 @media (max-width: 767px) {

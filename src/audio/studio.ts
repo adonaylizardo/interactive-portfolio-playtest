@@ -66,6 +66,8 @@ export class StudioAudio {
   private preferOgg: boolean | null = null;
   /** First gesture owns the intro; other lines wait until it has finished. */
   private introLock = false;
+  /** Persona controls card blocks the welcome line until the user dismisses it. */
+  private deferIntroForPersonaOverlay = false;
   private pending: string | null = null;
   private bark: HTMLAudioElement | null = null;
   private barkLines: BarkLine[] = [];
@@ -145,10 +147,30 @@ export class StudioAudio {
     window.setTimeout(() => this.startGraphAndIntro(), phone ? 900 : 80);
   }
 
+  private personaControlsBlockingIntro(): boolean {
+    if (typeof document === 'undefined') return false;
+    return !!document.querySelector('.persona-kit__overlay:not([hidden])');
+  }
+
+  /** Call when the persona intro card closes so the welcome line can play. */
+  playIntroWhenPersonaReady(): void {
+    if (!this.unlocked || this.muted || this.played.has('01-intro')) return;
+    this.deferIntroForPersonaOverlay = false;
+    this.introLock = true;
+    this.playLine('01-intro');
+    if (!this.played.has('01-intro')) this.introLock = false;
+  }
+
   private startGraphAndIntro(): void {
+    if (this.personaControlsBlockingIntro()) {
+      this.deferIntroForPersonaOverlay = true;
+      this.introLock = true;
+    }
     if (automatedWebKitPhone()) {
-      this.playLine('01-intro');
-      if (this.muted || !this.played.has('01-intro')) this.introLock = false;
+      if (!this.deferIntroForPersonaOverlay) {
+        this.playLine('01-intro');
+        if (this.muted || !this.played.has('01-intro')) this.introLock = false;
+      }
       return;
     }
     try {
@@ -167,8 +189,10 @@ export class StudioAudio {
     } catch {
       /* autoplay / context limits: mute state still flips */
     }
-    this.playLine('01-intro');
-    if (this.muted || !this.played.has('01-intro')) this.introLock = false;
+    if (!this.deferIntroForPersonaOverlay) {
+      this.playLine('01-intro');
+      if (this.muted || !this.played.has('01-intro')) this.introLock = false;
+    }
   }
 
   setInterior(open: boolean): void {
