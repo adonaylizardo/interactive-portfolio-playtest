@@ -522,6 +522,19 @@ body[data-layout='panel'] .checklist {
     top: max(20px, env(safe-area-inset-top, 0px) + 12px);
     bottom: auto;
   }
+
+  /* Unknown-route toast must not cover the cenital / tercera switch (top center). */
+  body.persona-kit .playtest-toast {
+    top: auto;
+    left: max(16px, env(safe-area-inset-left, 0px) + 16px);
+    right: auto;
+    bottom: max(24px, env(safe-area-inset-bottom, 0px) + 16px);
+    transform: translateY(8px);
+  }
+
+  body.persona-kit .playtest-toast--visible {
+    transform: translateY(0);
+  }
 }
 
 @media (max-width: 767px) {
@@ -643,10 +656,6 @@ body[data-layout='panel'] .checklist {
 }
 
 @media (max-height: 500px) and (orientation: landscape) {
-  body[data-view='persona'] .chrome__subtitle {
-    display: none;
-  }
-
   body[data-view='persona'] .chrome__title {
     font-size: 13px;
     line-height: 1.15;

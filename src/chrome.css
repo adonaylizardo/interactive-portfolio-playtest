@@ -705,6 +705,7 @@ body[data-layout='panel'] #game-canvas {
   width: auto;
   max-height: min(72vh, 620px);
   overflow: hidden;
+  pointer-events: auto;
   padding: 16px 16px calc(12px + 48px + 16px);
   border: 1px solid #2a2c31;
   border-bottom: 0;
@@ -725,6 +726,13 @@ body[data-layout='panel'] #game-canvas {
 
 .chrome__sheet-panel.is-active {
   display: flex;
+}
+
+.chrome--sheet .chrome__sheet-panel.is-active {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .chrome__sheet-heading {
@@ -923,15 +931,15 @@ body[data-layout='panel'] #game-canvas {
     display: flex;
     max-height: min(78vh, 300px);
     z-index: 26;
+    pointer-events: auto;
+    overflow: hidden;
   }
 
-  .chrome__sheet-stack {
-    pointer-events: none;
-    max-height: min(36vh, 140px);
-  }
-
-  .chrome__sheet-stack button,
-  .chrome__sheet-stack a {
+  .chrome--sheet .chrome__sheet-panel.is-active {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
     pointer-events: auto;
   }
 

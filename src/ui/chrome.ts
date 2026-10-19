@@ -610,13 +610,29 @@ export class ChromeUI {
       document.body.dataset.view === 'persona' &&
       !this.interiorOpen;
     if (this.mobile && personaThird && !this.mobileSheet) {
+      const dock = this.root.querySelector('.chrome__dock')?.getBoundingClientRect();
       const joy = document.querySelector('.joystick:not([hidden])')?.getBoundingClientRect();
-      if (joy && joy.height > 8) {
+      if (dock && dock.height > 8) {
         sub.style.top = 'auto';
-        sub.style.left = '50%';
-        sub.style.transform = 'translateX(-50%)';
-        sub.style.width = `min(343px, calc(100vw - 32px))`;
-        sub.style.bottom = `${Math.max(16, window.innerHeight - joy.top + 14)}px`;
+        sub.style.left = `${Math.max(16, dock.left - 8)}px`;
+        sub.style.right = 'auto';
+        sub.style.transform = 'none';
+        sub.style.width = 'min(240px, calc(50vw - 24px))';
+        sub.style.maxWidth = 'min(280px, calc(100vw - 120px))';
+        let bottom = Math.max(16, window.innerHeight - dock.top + 10);
+        if (joy && joy.height > 8) {
+          const subH = sub.offsetHeight || 44;
+          const topEdge = window.innerHeight - bottom - subH;
+          if (topEdge < joy.bottom + 8) {
+            bottom = Math.max(16, window.innerHeight - joy.top + 14);
+            sub.style.left = '50%';
+            sub.style.transform = 'translateX(-50%)';
+            sub.style.width = 'min(220px, calc(100vw - 140px))';
+            sub.style.maxWidth = '';
+          }
+        }
+        sub.style.bottom = `${bottom}px`;
+        sub.style.display = sub.textContent ? 'block' : '';
         return;
       }
     }
