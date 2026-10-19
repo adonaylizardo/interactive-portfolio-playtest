@@ -22,6 +22,7 @@ export class AboutMePanel {
   private opened = false;
   private onClose?: () => void;
   private subtitleHome: { el: HTMLElement; parent: Node; next: ChildNode | null } | null = null;
+  private langHome: { el: HTMLElement; parent: Node; next: ChildNode | null } | null = null;
 
   constructor(container: HTMLElement, opts?: { onClose?: () => void }) {
     this.onClose = opts?.onClose;
@@ -127,6 +128,7 @@ export class AboutMePanel {
     this.root.classList.toggle('about-panel--phone-portrait', this.isPhonePortrait());
     this.root.classList.toggle('about-panel--landscape', this.isSideSheet());
     this.portalVoiceSubtitle();
+    this.portalLangPill();
 
     requestAnimationFrame(() => {
       if (opts.sectionId) {
@@ -164,6 +166,7 @@ export class AboutMePanel {
     this.root.hidden = true;
     document.body.classList.remove('about-panel-open');
     this.restoreVoiceSubtitle();
+    this.restoreLangPill();
     this.onClose?.();
   }
 
@@ -181,6 +184,25 @@ export class AboutMePanel {
     if (next && next.parentNode === parent) parent.insertBefore(el, next);
     else parent.appendChild(el);
     this.subtitleHome = null;
+  }
+
+  private portalLangPill(): void {
+    const lang = document.querySelector('.chrome__lang') as HTMLElement | null;
+    if (!lang || this.langHome) return;
+    this.langHome = { el: lang, parent: lang.parentElement!, next: lang.nextSibling };
+    document.body.append(lang);
+    lang.style.zIndex = '100';
+    lang.style.pointerEvents = 'auto';
+  }
+
+  private restoreLangPill(): void {
+    if (!this.langHome) return;
+    const { el, parent, next } = this.langHome;
+    el.style.zIndex = '';
+    el.style.pointerEvents = '';
+    if (next && next.parentNode === parent) parent.insertBefore(el, next);
+    else parent.appendChild(el);
+    this.langHome = null;
   }
 
   flashContact(): void {

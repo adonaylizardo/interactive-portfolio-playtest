@@ -217,14 +217,9 @@ export class SearchPalette {
     if (!groups.length) {
       const empty = document.createElement('div');
       empty.className = 'search-palette__empty';
-      const row = document.createElement('div');
-      row.className = 'search-palette__empty-row';
-      row.innerHTML = `<span class="search-palette__hit-icon search-palette__hit-icon--tile">${iconSvg('search')}</span>
-        <div class="search-palette__empty-copy">
-          <p class="search-palette__empty-title">${escapeHtml(truncateQueryDisplay(query))}</p>
-          <p class="search-palette__empty-hint">${escapeHtml(t('search.tryAnother'))}</p>
-        </div>`;
-      empty.append(row);
+      empty.innerHTML = `<span class="search-palette__hit-icon search-palette__hit-icon--tile search-palette__empty-icon">${iconSvg('search')}</span>
+        <p class="search-palette__empty-title">${escapeHtml(truncateQueryDisplay(query))}</p>
+        <p class="search-palette__empty-hint">${escapeHtml(t('search.tryAnother'))}</p>`;
       this.resultsEl.append(empty);
       this.chipsEl.hidden = false;
       return;
