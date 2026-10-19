@@ -91,8 +91,62 @@ const GROUPS = [
 
 const spritesJson = JSON.parse(readFileSync(path.join(root, 'src', 'data', 'sprites.json'), 'utf8'));
 const alphaJson = JSON.parse(readFileSync(path.join(root, 'src', 'data', 'sprite-alpha.json'), 'utf8'));
+const artRooms = JSON.parse(readFileSync(path.join(root, 'src', 'data', 'interior-rooms.json'), 'utf8'));
 const probesPath = path.join(outDir, 'probes.json');
 const probes = existsSync(probesPath) ? JSON.parse(readFileSync(probesPath, 'utf8')) : {};
+
+function uniformProbes(png, count, skip) {
+  const r = 3;
+  const cand = [];
+  for (let y = r; y < png.height - r; y += 6) {
+    for (let x = r; x < png.width - r; x += 6) {
+      if (skip?.(x, y)) continue;
+      const i0 = (y * png.width + x) * 4;
+      const c = [png.data[i0], png.data[i0 + 1], png.data[i0 + 2], png.data[i0 + 3]];
+      if (c[3] !== 255) continue;
+      let ok = true;
+      for (let dy = -r; dy <= r && ok; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          const i = ((y + dy) * png.width + (x + dx)) * 4;
+          const n = [png.data[i], png.data[i + 1], png.data[i + 2], png.data[i + 3]];
+          if (n[3] !== 255 || Math.abs(n[0] - c[0]) + Math.abs(n[1] - c[1]) + Math.abs(n[2] - c[2]) > 8) {
+            ok = false;
+            break;
+          }
+        }
+      }
+      if (ok) cand.push({ x, y, c });
+    }
+  }
+  const seen = new Map();
+  const picked = [];
+  for (const p of cand) {
+    const k = p.c.join(',');
+    if (!seen.has(k)) {
+      seen.set(k, true);
+      picked.push(p);
+    }
+  }
+  const step = Math.max(1, Math.floor(cand.length / count));
+  for (let i = 0; i < cand.length && picked.length < count * 2; i += step) picked.push(cand[i]);
+  const out = [];
+  const stride = Math.max(1, Math.floor(picked.length / count));
+  for (let i = 0; i < picked.length && out.length < count; i += stride) out.push(picked[i]);
+  return out.map((p) => [p.x, p.y, p.c[0], p.c[1], p.c[2]]);
+}
+
+function artRoomSkip(room, vfs) {
+  const h = room.mask.length;
+  const w = room.mask[0].length;
+  const cells = [];
+  room.mask.forEach((row, y) => [...row].forEach((c, x) => (c === 'E' || c === 'S') && cells.push({ x, y })));
+  const rects = cells.map(({ x, y }) => {
+    const fx = vfs.x + ((x - y - (w - h)) * 64) / room.scale;
+    const fy = vfs.y + ((x + y - (w - 1 + h - 1)) * 32 - room.lift) / room.scale;
+    return { x0: fx - 80 / room.scale, x1: fx + 80 / room.scale, y0: fy - 120 / room.scale, y1: fy + 16 / room.scale };
+  });
+  return (x, y) => rects.some((r) => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1);
+}
 
 const masks = {};
 for (const [k, raw] of Object.entries(alphaJson)) {
@@ -130,6 +184,13 @@ for (const g of GROUPS) {
       f1: `${g.dir}/${v.archivos.png1x}`,
       f2: `${g.dir}/${v.archivos.png2x}`,
     };
+    const artRoom = artRooms[key.split('/')[1]];
+    const skip = artRoom
+      ? artRoomSkip(artRoom, vfs)
+      : key.startsWith('int/')
+        ? (x, y) => Math.abs(x - 300) < 90 && y > 380
+        : undefined;
+    probes[key] = uniformProbes(png1, 12, skip);
     added++;
     if (key.startsWith('ext/')) orAlphaMask(masks, maskBase(key), png1);
   }
@@ -151,5 +212,6 @@ for (const [k, m] of Object.entries(masks)) {
   maskOut[k] = { w: m.w, h: m.h, cell: m.cell, bits: Buffer.from(m.bits).toString('base64') };
 }
 await writeFile(path.join(root, 'src', 'data', 'sprite-alpha.json'), JSON.stringify(maskOut) + '\n');
+await writeFile(probesPath, JSON.stringify(probes));
 
-console.log(`import-teatro-biblioteca: ${added} sprite variants merged`);
+console.log(`import-teatro-biblioteca: ${added} sprite variants merged; probes.json updated`);

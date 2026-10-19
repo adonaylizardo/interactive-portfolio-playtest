@@ -69,7 +69,13 @@ function installReadyWait(browser) {
  * ANGLE's EGL backend (works without an X display; needs Mesa's EGL/GL drivers): about 3x the
  * average frame rate, but it stalls for hundreds of ms now and then, which skews walk timings.
  */
-const CHROMIUM_GL_ARGS = process.env.QA_GL === 'llvmpipe' ? ['--use-angle=gl-egl', '--ignore-gpu-blocklist'] : [];
+const CHROMIUM_GL_ARGS = [
+  '--disable-dev-shm-usage',
+  '--no-sandbox',
+  ...(process.env.QA_GL === 'llvmpipe'
+    ? ['--use-angle=gl-egl', '--ignore-gpu-blocklist']
+    : ['--disable-gpu-compositing']),
+];
 
 /**
  * Pixi caps a frame's game time at 100 ms, so once frames take longer than that game time runs slow.

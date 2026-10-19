@@ -378,6 +378,10 @@ export class IsoScene {
   private lodLejos = false;
   private qaIsolation: Set<string> | null = null;
   private qaForcedState: BuildingSpriteState | null = null;
+  /** When set, map buildings use encendida frames regardless of JAC lights (sprite pixel-diff). */
+  private qaMapLightsOn: boolean | null = null;
+  private qaIgnoreJacPick = false;
+  private qaIgnoreVanBlock = false;
   private qaPreview: Sprite | null = null;
   private interiorSprite: Sprite | null = null;
   private lastPanPos: { x: number; y: number } | null = null;
@@ -1077,7 +1081,7 @@ export class IsoScene {
         continue;
       }
       const state = v.obj.type === 'building' ? this.buildingSpriteState(v.obj) : 'default';
-      const lightsOn = this.jac?.lightsOn ?? true;
+      const lightsOn = this.qaMapLightsOn ?? this.jac?.lightsOn ?? true;
       if (!force && !lodChanged && state === v.state && v.lightsOn === lightsOn) continue;
       let key = objectSpriteKey(v.obj, state, lejos, lightsOn);
       if (key && !hasSprite(key) && v.obj.type === 'building') {
@@ -1797,14 +1801,14 @@ export class IsoScene {
       return;
     }
     if (this.jac && (this.jac.mode === 'menu' || this.jac.mode === 'info')) {
-      if (this.pickJacAtScreen(sx, sy)) {
+      if (!this.qaIgnoreJacPick && this.pickJacAtScreen(sx, sy)) {
         this.tapJac();
         return;
       }
       this.jacClose();
       return;
     }
-    if (this.pickJacAtScreen(sx, sy)) {
+    if (!this.qaIgnoreJacPick && this.pickJacAtScreen(sx, sy)) {
       this.tapJac();
       return;
     }
@@ -1891,7 +1895,7 @@ export class IsoScene {
   }
 
   private vanWalkBlock(): Set<string> {
-    if (!this.jac || this.jac.driving) return new Set();
+    if (this.qaIgnoreVanBlock || !this.jac || this.jac.driving) return new Set();
     return this.jac.parkedFootprintKeys();
   }
 
@@ -5148,6 +5152,65 @@ export class IsoScene {
     return out;
   }
 
+  /** QA: atlas keys + world top-lefts for map pixel-diff (matches objectSpriteKey, incl. luz buildings). */
+  qaSpritePixelDiffPlan(): {
+    id: string;
+    probeKey: string;
+    state: 'default' | 'hover' | 'resaltado';
+    lod: 'cerca' | 'lejos';
+    tl: { x: number; y: number };
+    scale: number;
+  }[] {
+    const out: {
+      id: string;
+      probeKey: string;
+      state: 'default' | 'hover' | 'resaltado';
+      lod: 'cerca' | 'lejos';
+      tl: { x: number; y: number };
+      scale: number;
+    }[] = [];
+    const seenBase = new Set<string>();
+    for (const inst of this.qaSpriteInstances()) {
+      if (inst.kind === 'tile') {
+        if (seenBase.has(inst.key)) continue;
+        seenBase.add(inst.key);
+        out.push({
+          id: inst.id,
+          probeKey: inst.key,
+          state: 'default',
+          lod: 'cerca',
+          tl: inst.tl,
+          scale: 1,
+        });
+        continue;
+      }
+      const visual = [...this.objectVisuals.values()].find((v) => v.obj.id === inst.id);
+      if (!visual) continue;
+      const obj = visual.obj;
+      if (seenBase.has(inst.key)) continue;
+      seenBase.add(inst.key);
+      const states: ('default' | 'hover' | 'resaltado')[] =
+        obj.type === 'building' ? ['default', 'hover', 'resaltado'] : ['default'];
+      const lods: ('cerca' | 'lejos')[] = ['cerca', 'lejos'];
+      const sc = objectSpriteScale(obj);
+      for (const state of states) {
+        for (const lod of lods) {
+          const probeKey = objectSpriteKey(obj, state, lod === 'lejos', true);
+          if (!probeKey) continue;
+          out.push({
+            id: inst.id,
+            probeKey,
+            state,
+            lod,
+            tl: objectSpriteTopLeft(obj, probeKey),
+            scale: sc,
+          });
+        }
+      }
+    }
+    return out;
+  }
+
   /** QA: draw only the given sprite ids (objects by id, tiles as `tile:x,y`), no character. */
   qaIsolateSprites(ids: string[] | null): void {
     if (ids) {
@@ -5161,10 +5224,15 @@ export class IsoScene {
   }
 
   /** QA: show one sprite key on its own with its front vertex at world (sx, sy); null removes it. */
-  qaPreviewSprite(key: string | null, sx = 0, sy = 0): { tl: { x: number; y: number }; w: number; h: number } | null {
+  async qaPreviewSprite(
+    key: string | null,
+    sx = 0,
+    sy = 0,
+  ): Promise<{ tl: { x: number; y: number }; w: number; h: number } | null> {
     this.qaPreview?.destroy();
     this.qaPreview = null;
     if (!key) return null;
+    await loadKeys([key]);
     const a = spriteAsset(key);
     const sp = new Sprite(spriteTexture(key));
     sp.position.set(sx - a.vfs.x, sy - a.vfs.y);
@@ -5172,7 +5240,19 @@ export class IsoScene {
     sp.eventMode = 'none';
     this.objectsLayer.addChild(sp);
     this.qaPreview = sp;
+    this.app.render();
     return { tl: { x: sx - a.vfs.x, y: sy - a.vfs.y }, w: a.w, h: a.h };
+  }
+
+  qaSetMapLightsForQa(on: boolean): void {
+    this.qaMapLightsOn = on ? true : null;
+    this.syncObjectSprites(true);
+    this.app.render();
+  }
+
+  qaSetIgnoreJacPick(ignore: boolean): void {
+    this.qaIgnoreJacPick = ignore;
+    this.qaIgnoreVanBlock = ignore;
   }
 
   /** QA: force every building sprite into one state (default | hover | resaltado), or null to release. */

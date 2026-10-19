@@ -437,9 +437,12 @@ async function main(): Promise<void> {
     sampleCanvasColors: (points: { x: number; y: number }[]) =>
       scene.sampleCanvasColorsAtClient(points),
     spriteInstances: () => scene.qaSpriteInstances(),
+    spritePixelDiffPlan: () => scene.qaSpritePixelDiffPlan(),
     forceBuildingState: (s: 'default' | 'hover' | 'resaltado' | null) => scene.qaForceBuildingState(s),
     previewSprite: (k: string | null, x?: number, y?: number) => scene.qaPreviewSprite(k, x, y),
     loadAllSprites: () => scene.qaLoadAllSprites(),
+    setMapLightsForQa: (on: boolean) => scene.qaSetMapLightsForQa(on),
+    setIgnoreJacPick: (ignore: boolean) => scene.qaSetIgnoreJacPick(ignore),
     isolateSprites: (ids: string[] | null) => scene.qaIsolateSprites(ids),
     frameWorld: (x: number, y: number, zoom: number) => scene.qaFrameWorld(x, y, zoom),
     worldToClient: (x: number, y: number) => scene.qaWorldToClient(x, y),

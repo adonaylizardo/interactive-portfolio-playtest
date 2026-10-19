@@ -193,9 +193,10 @@ async function openMap(page) {
   await wait(700);
 }
 
-async function diffSprite(page, { key, tlx, tly, zoom, id, state }) {
+async function diffSprite(page, { key, tlx, tly, zoom, id, state, scale = 1 }) {
   const a = A[key];
   const pr = probeList(key);
+  const sc = scale ?? 1;
   if (!a || !pr.length) {
     fail(`pixel: ${key} not in sprites.json or no probes`);
     return;
@@ -208,16 +209,16 @@ async function diffSprite(page, { key, tlx, tly, zoom, id, state }) {
         q.isolateSprites([o.id]);
       } else {
         q.isolateSprites([]);
-        q.previewSprite(o.key, 0, 0);
+        await q.previewSprite(o.key, 0, 0);
       }
       q.frameWorld(o.cx, o.cy, o.zoom);
     },
-    { id, state, key, cx: tlx + a.w / 2, cy: tly + a.h / 2, zoom },
+    { id, state, key, cx: tlx + (a.w * sc) / 2, cy: tly + (a.h * sc) / 2, zoom },
   );
-  await wait(60);
+  await wait(120);
   const pts = await page.evaluate(
     (list) => list.map(([wx, wy]) => window.__playtestQa.worldToClient(wx, wy)),
-    pr.map((p) => [tlx + p[0], tly + p[1]]),
+    pr.map((p) => [tlx + p[0] * sc, tly + p[1] * sc]),
   );
   const cols = await page.evaluate((p) => window.__playtestQa.sampleCanvasColors(p), pts);
   const thin = !probes[key]?.length;
@@ -255,44 +256,36 @@ async function lejosZoom(page) {
 }
 
 async function pixelDiffMap(page) {
-  await page.evaluate(() => window.__playtestQa.loadAllSprites());
+  await page.evaluate(async () => {
+    await window.__playtestQa.loadAllSprites();
+    window.__playtestQa.setMapLightsForQa(true);
+  });
   const LEJOS_Z = await lejosZoom(page);
-  const instances = await page.evaluate(() => window.__playtestQa.spriteInstances());
+  const plan = await page.evaluate(() => window.__playtestQa.spritePixelDiffPlan());
   const covered = new Set();
-  const seenKey = new Set();
   const fullCoverage = new Set(Object.keys(A).filter((k) => !k.startsWith('int/')));
 
-  for (const inst of instances) {
-    const isTile = inst.kind === 'tile';
-    const isBuilding = inst.key.startsWith('ext/');
-    const baseKey = inst.key;
-    if (seenKey.has(baseKey)) continue;
-    seenKey.add(baseKey);
-    const sc = inst.scale ?? 1;
-    const sx = inst.tl.x + A[baseKey].vfs.x * sc;
-    const sy = inst.tl.y + A[baseKey].vfs.y * sc;
-    const states = isBuilding ? ['default', 'hover', 'resaltado'] : ['default'];
-    const lods = isTile ? ['cerca'] : ['cerca', 'lejos'];
-    for (const state of states) {
-      for (const lod of lods) {
-        let key = baseKey;
-        if (isBuilding) key = key.replace('/default/', `/${state}/`);
-        if (!isTile) key = key.replace(/\/(cerca|lejos)$/, `/${lod}`);
-        covered.add(key);
-        await diffSprite(page, {
-          key,
-          tlx: sx - A[key].vfs.x,
-          tly: sy - A[key].vfs.y,
-          zoom: lod === 'cerca' || !probes[key]?.length ? 1 : LEJOS_Z,
-          id: inst.id,
-          state,
-        });
-      }
+  for (const item of plan) {
+    const key = item.probeKey;
+    if (!A[key]) {
+      fail(`pixel: atlas missing key ${key} (from ${item.id} ${item.state}/${item.lod})`);
+      continue;
     }
+    covered.add(key);
+    await diffSprite(page, {
+      key,
+      tlx: item.tl.x,
+      tly: item.tl.y,
+      scale: item.scale,
+      zoom: item.lod === 'cerca' || !probes[key]?.length ? 1 : LEJOS_Z,
+      id: item.id,
+      state: item.state,
+    });
   }
   await page.evaluate(async () => {
     window.__playtestQa.isolateSprites(null);
     await window.__playtestQa.forceBuildingState(null);
+    window.__playtestQa.setMapLightsForQa(false);
   });
 
   const unplaced = [...fullCoverage].filter((k) => !covered.has(k));
@@ -417,38 +410,72 @@ async function groundTapChecks(page, solidKeys, front) {
   };
   const onMonument = (x, y) => sil.some((h) => inPoly(x, y, h));
   const centre = (x, y) => [(x - y) * 64, (x + y) * 32];
-  const tapGoal = (wx, wy, via) =>
+  const tapGoal = (wx, wy, via, tileX, tileY) =>
     page.evaluate(
-      async ([x, y, mode]) => {
+      async ([x, y, mode, tx, ty]) => {
         const q = window.__playtestQa;
         const c = document.getElementById('game-canvas');
-        q.setCharacterTile(24, 40);
+        q.releaseMapTapGestureForQa?.();
+        const stand = (stx, sty) => {
+          q.setCharacterTile(stx, sty);
+          const pos = q.getCharacterTile();
+          return pos.x === stx && pos.y === sty;
+        };
+        const candidates = [
+          [tx - 1, ty],
+          [tx + 1, ty],
+          [tx, ty - 1],
+          [tx, ty + 1],
+          [tx - 2, ty],
+          [tx + 2, ty],
+          [17, 36],
+        ];
+        for (const [stx, sty] of candidates) {
+          if (stand(stx, sty)) break;
+        }
         q.frameWorld(x, y, 1);
-        await new Promise((r) => setTimeout(r, 30));
+        await new Promise((r) => setTimeout(r, 40));
         c.dataset.walkGoal = '';
         const p = q.worldToClient(x, y);
         if (mode === 'touch') q.tapScreen(p.x, p.y);
-        return mode === 'touch' ? JSON.parse(c.dataset.walkGoal || 'null') : p;
+        if (mode === 'touch') {
+          for (let i = 0; i < 16; i++) {
+            await new Promise((r) => setTimeout(r, 30));
+            const g = c.dataset.walkGoal;
+            if (g) return JSON.parse(g);
+          }
+          return JSON.parse(c.dataset.walkGoal || 'null');
+        }
+        return p;
       },
-      [wx, wy, via],
+      [wx, wy, via, tileX, tileY],
     );
-  const goalAt = async (wx, wy) => {
+  const goalAt = async (wx, wy, tileX, tileY) => {
     const out = {};
-    out.touch = await tapGoal(wx, wy, 'touch');
-    const p = await tapGoal(wx, wy, 'mouse');
+    out.touch = await tapGoal(wx, wy, 'touch', tileX, tileY);
+    const p = await tapGoal(wx, wy, 'mouse', tileX, tileY);
     await page.mouse.click(p.x, p.y);
-    await wait(60);
-    out.mouse = await page.evaluate(() => JSON.parse(document.getElementById('game-canvas').dataset.walkGoal || 'null'));
+    for (let i = 0; i < 12; i++) {
+      await wait(25);
+      out.mouse = await page.evaluate(() =>
+        JSON.parse(document.getElementById('game-canvas').dataset.walkGoal || 'null'),
+      );
+      if (out.mouse) break;
+    }
     return out;
   };
   const same = (g, x, y) => g && g.x === x && g.y === y;
+  await page.evaluate(() => {
+    window.__playtestQa.setIgnoreJacPick(true);
+    window.__playtestQa.jacSet({ cx: 52, cy: 52, mode: 'parked', lights: 'on' });
+  });
   let behind = 0;
   for (let y = 30; y <= 37; y++) {
     for (let x = 9; x <= 16; x++) {
       if (solidKeys.has(`${x},${y}`) || x + y >= 51) continue;
       const [cx, cy] = centre(x, y);
       if (!onMonument(cx, cy)) continue;
-      const g = await goalAt(cx, cy);
+      const g = await goalAt(cx, cy, x, y);
       behind++;
       for (const via of ['touch', 'mouse']) {
         if (!same(g[via], x, y)) fail(`ground tap (${via}): centre of (${x},${y}) behind the obelisco shaft went to ${JSON.stringify(g[via])}`);
@@ -516,6 +543,7 @@ async function groundTapChecks(page, solidKeys, front) {
     }
   }
   notes.push(`ground taps (mouse + touch): ${behind} tiles behind the obelisco shaft, ${monument} monument points -> stair foot, ${bare} bare-plaza points on solid cells -> open neighbour, ${propTaps} tiles behind trees/lamps`);
+  await page.evaluate(() => window.__playtestQa.setIgnoreJacPick(false));
 }
 
 /**
