@@ -15,7 +15,7 @@ const BASE =
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
-  const spriteUrl = `${BASE}sprites/v3/jac-t9-v3__hoja_se@2x.png`;
+  const spriteUrl = `${BASE}sprites/jac-t9-v3/jac-t9-v3__hoja_se@2x.png`;
   const heads = await Promise.all(
     [1, 2, 3, 4, 5, 6].map(() =>
       fetch(spriteUrl, { method: 'HEAD' }).then((r) => r.status).catch(() => 0),
