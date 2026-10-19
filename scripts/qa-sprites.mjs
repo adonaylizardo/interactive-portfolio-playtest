@@ -1085,7 +1085,25 @@ try {
     await browser.close();
     browser = await launchBrowser(chromium);
   }
-  if (want('diff')) await part('full-frame diff', () => fullFrameDiff(browser));
+  if (want('diff')) {
+    await part('full-frame diff', async () => {
+      let lastErr;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          if (attempt > 0) {
+            await browser.close();
+            browser = await launchBrowser(chromium);
+          }
+          await fullFrameDiff(browser);
+          return;
+        } catch (err) {
+          lastErr = err;
+          if (!/crashed|closed/i.test(String(err))) throw err;
+        }
+      }
+      throw lastErr;
+    });
+  }
   if (want('interiors')) await part('interiors', () => interiorChecks(browser));
   if (SHOTS && want('shots')) await part('shots', () => shots(browser));
 } finally {
