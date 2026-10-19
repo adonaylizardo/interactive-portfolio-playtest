@@ -82,8 +82,6 @@ function run(cmd, cwd = root) {
   execSync(cmd, { cwd, stdio: 'inherit' });
 }
 
-if (target === 'preview-persona') run('node scripts/copy-persona-art.mjs');
-
 if (process.env.DEPLOY_GATE_PASSED === '1') {
   run('npx tsc --pretty false');
   run(`npx vite build --base ${base}`);
@@ -92,15 +90,6 @@ if (process.env.DEPLOY_GATE_PASSED === '1') {
   if (target === 'preview' || target === 'preview-camaras' || target === 'preview-persona') {
     run(`npx vite build --base ${base}`);
   }
-}
-
-run('node scripts/copy-persona-art.mjs');
-
-if (target === 'preview-persona') {
-  writeFileSync(
-    path.join(dist, 'deploy-rev.txt'),
-    `${new Date().toISOString()} cursor/persona-camaras @ ${execSync('git rev-parse --short HEAD', { cwd: root, encoding: 'utf8' }).trim()}\n`,
-  );
 }
 
 if (!existsSync(path.join(dist, 'index.html'))) {
@@ -152,7 +141,7 @@ try {
         : target === 'preview-camaras'
           ? 'Deploy top-down camera candidate to /preview-camaras/'
           : target === 'preview-persona'
-            ? 'Deploy primera-persona camera candidate to /preview-persona/'
+            ? 'Deploy first-person persona candidate to /preview-persona/'
             : 'Promote approved candidate to live gh-pages root';
     run('git -c user.email=agent@cursor.com -c user.name="Cursor Agent" commit -m "' + msg + '"', pushDir);
     run('git push origin HEAD:gh-pages', pushDir);
