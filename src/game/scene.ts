@@ -1469,6 +1469,61 @@ export class IsoScene {
     );
   }
 
+  /** Smallest zoom so the playable building cluster (incl. Estudio door) fits the free rect. */
+  private boundsZoomMin(
+    b: { minX: number; minY: number; maxX: number; maxY: number },
+    innerW: number,
+    innerH: number,
+  ): number {
+    this.syncViewTransform();
+    const cos = Math.cos(this.viewRot);
+    const sin = Math.sin(this.viewRot);
+    const sx = this.viewSx || 1;
+    const sy = this.viewSy || 1;
+    const corners: [number, number][] = [
+      [b.minX, b.minY],
+      [b.maxX, b.minY],
+      [b.minX, b.maxY],
+      [b.maxX, b.maxY],
+    ];
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const [wx, wy] of corners) {
+      const px = wx * sx;
+      const py = wy * sy;
+      const x = px * cos - py * sin;
+      const y = px * sin + py * cos;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    const mapW = Math.max(1, maxX - minX);
+    const mapH = Math.max(1, maxY - minY);
+    const fit = Math.min(Math.max(1, innerW) / mapW, Math.max(1, innerH) / mapH);
+    return Math.min(1.5, Math.max(0.04, fit));
+  }
+
+  private mobilePlayBoundsZoomMin(): number {
+    if (!this.shouldUseMobileFraming() || this.interiorActive || this.mapOverview) return 0;
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const m = cameraFitMargins();
+    const innerW = Math.max(1, sw - m.left - m.right);
+    const innerH = Math.max(1, sh - m.top - m.bottom);
+    return this.boundsZoomMin(this.overviewPlayBounds(), innerW, innerH);
+  }
+
+  private centerCameraOnPlayBounds(): void {
+    const b = this.overviewPlayBounds();
+    const wx = (b.minX + b.maxX) / 2;
+    const wy = (b.minY + b.maxY) / 2;
+    const aim = this.freeRectCenter();
+    this.placeWorldAtScreen(wx, wy, aim.x, aim.y);
+  }
+
   /** Playable core for overview framing (enterable buildings + padding). */
   private overviewPlayBounds(): { minX: number; minY: number; maxX: number; maxY: number } {
     const pad = TILE_W * 1.1;
@@ -2570,7 +2625,11 @@ export class IsoScene {
         this.cameraY = hardened.cameraY;
         this.zoom = hardened.zoom;
       } else {
-        this.zoom = Math.min(1.5, Math.max(zFloor, this.zoom));
+        let floor = zFloor;
+        const playMin = this.mobilePlayBoundsZoomMin();
+        if (playMin > 0) floor = Math.max(floor, playMin);
+        this.zoom = Math.min(1.5, Math.max(floor, this.zoom));
+        if (playMin > 0 && this.zoom <= playMin * 1.02) this.centerCameraOnPlayBounds();
       }
       const zMin = zoomMinForViewport(sw, sh);
       // Snap to full-map fit at min zoom (overview uses frameMapOverview + view-aware bounds).
@@ -3122,6 +3181,18 @@ export class IsoScene {
     this.cameraX = softened.cameraX;
     this.cameraY = softened.cameraY;
     this.zoom = softened.zoom;
+    const playMin = this.mobilePlayBoundsZoomMin();
+    if (playMin > 0 && this.zoom <= playMin * 1.02) {
+      this.centerCameraOnPlayBounds();
+      const refit = stabilizeCameraAfterGesture(
+        { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
+        sw,
+        sh,
+      );
+      this.cameraX = refit.cameraX;
+      this.cameraY = refit.cameraY;
+      this.zoom = refit.zoom;
+    }
     this.zoomChanged = true;
     this.applyCamera();
   }

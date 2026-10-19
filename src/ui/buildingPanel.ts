@@ -197,11 +197,11 @@ export class BuildingPanel {
             <div class="case__version case__version--short"></div>
           </article>
           <section class="worked-with" aria-labelledby="worked-with-title" hidden>
-            <h3 class="worked-with__title" id="worked-with-title">Worked with</h3>
+            <h3 class="worked-with__title" id="worked-with-title" data-i18n="panel.workedWith">Worked with</h3>
             <ul class="worked-with__logos"></ul>
           </section>
           <section class="about" lang="en" aria-labelledby="about-title" hidden>
-            <h3 class="about__title" id="about-title">About me</h3>
+            <h3 class="about__title" id="about-title" data-i18n="panel.aboutMe">About me</h3>
           </section>
         </div>
       </div>
@@ -442,6 +442,7 @@ export class BuildingPanel {
     this.el.classList.add('building-panel--open');
     this.syncPeekClass();
     this.onVisibilityChange();
+    this.applyI18n();
     studio.playClick();
   }
 
@@ -714,6 +715,10 @@ export class BuildingPanel {
     });
     const read = this.el.querySelector('.case-preview__read-label');
     if (read) read.textContent = t('panel.readCase');
+    const workedWithTitle = this.el.querySelector('#worked-with-title');
+    if (workedWithTitle) workedWithTitle.textContent = t('panel.workedWith');
+    const aboutTitle = this.el.querySelector('#about-title');
+    if (aboutTitle) aboutTitle.textContent = t('panel.aboutMe');
     if (this.mode === 'preview' && this.interiorId) this.fillPreviewCopy(this.interiorId);
   }
 }

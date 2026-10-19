@@ -68,7 +68,7 @@ export type CasePreviewCopy = {
 
 const CASE_PREVIEW_ES: Record<CaseHouseId, { subtitle: string; headline: string; shortHeadline?: string }> = {
   volaris: {
-    subtitle: 'Product strategist y único aprobador',
+    subtitle: 'Product Strategist y único aprobador',
     headline: 'Un contrato que ingeniería no podía malinterpretar',
   },
   bain: {

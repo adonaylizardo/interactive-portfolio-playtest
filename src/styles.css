@@ -502,6 +502,11 @@ body[data-layout='panel'] .checklist {
   }
 }
 
+body:has(.building-panel--open) .chrome__lang {
+  z-index: 220;
+  pointer-events: auto;
+}
+
 @media (max-width: 767px) {
   .checklist--mobile {
     top: max(24px, env(safe-area-inset-top));

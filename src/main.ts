@@ -275,6 +275,7 @@ async function main(): Promise<void> {
       return raw ? JSON.parse(raw) : null;
     },
     setZoom: (z: number) => scene.setZoomLevel(z),
+    setZoomLevel: (z: number, anchor?: { x: number; y: number }) => scene.setZoomLevel(z, anchor),
     getZoom: () => scene.getZoom(),
     interiorTileScreenPoint: (tx: number, ty: number, liftPx = 0) =>
       scene.getInteriorTileScreenClientPoint(tx, ty, liftPx),

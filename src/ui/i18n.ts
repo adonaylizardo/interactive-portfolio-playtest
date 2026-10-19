@@ -48,6 +48,8 @@ const DICT = {
     'panel.exit': 'Exit',
     'panel.close': 'Close',
     'panel.readCase': 'Read case',
+    'panel.workedWith': 'Worked with',
+    'panel.aboutMe': 'About me',
 
     'chrome.cases': 'Cases',
     'chrome.achievements': 'Achievements',
@@ -130,6 +132,8 @@ const DICT = {
     'panel.exit': 'Salir',
     'panel.close': 'Cerrar',
     'panel.readCase': 'Leer caso',
+    'panel.workedWith': 'Trabajé con',
+    'panel.aboutMe': 'Sobre mí',
 
     'chrome.cases': 'Casos',
     'chrome.achievements': 'Logros',
