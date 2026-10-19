@@ -19,6 +19,7 @@ import { ChromeUI, type DesktopLayout } from './ui/chrome';
 import { JacHud } from './ui/jacHud';
 import { Joystick } from './ui/joystick';
 import { NameLabels } from './ui/nameLabels';
+import { CenitalBuildingLabels } from './ui/cenitalBuildingLabels';
 import { hideToast, showToast } from './ui/toast';
 import { getLang, onLangChange, setLang, t } from './ui/i18n';
 import type { Camera } from './tokens';
@@ -48,6 +49,7 @@ async function main(): Promise<void> {
 
   const joystick = new Joystick(uiRoot);
   const labels = new NameLabels(uiRoot, { onJacInfo: () => scene.jacOpenInfo() });
+  const cenitalLabels = new CenitalBuildingLabels(uiRoot);
   const jacHud = new JacHud(uiRoot, {
     onInfo: () => scene.jacOpenInfo(),
     onGetIn: () => scene.jacGetIn(),
@@ -57,6 +59,13 @@ async function main(): Promise<void> {
     onGear: (gear) => scene.jacSetGear(gear),
     onToggle: (id) => scene.jacSetToggle(id),
     onEngine: () => scene.jacSetEngine(),
+    onView: (mode) => scene.setViewMode(mode),
+    onRotate: () => scene.rotateView(),
+    onMapOverview: () => scene.toggleMapOverview(),
+    getView: () => {
+      const v = scene.getViewMode();
+      return { mode: v.mode, overview: v.overview };
+    },
   });
   const panel = new BuildingPanel(
     uiRoot,
@@ -64,7 +73,7 @@ async function main(): Promise<void> {
       const open = panel.isInteriorMode();
       checklist.setBuildingPanelOpen(open);
       chrome.setInteriorOpen(open);
-      joystick.setHidden(open || panel.isPreviewExpanded());
+      joystick.setHidden(open || panel.isPreviewMode() || panel.isPreviewExpanded());
       if (panel.isPreviewExpanded()) checklist.setCollapsed(true);
       scene?.applyCameraFromUi();
     },
@@ -102,21 +111,37 @@ async function main(): Promise<void> {
       }
       scene.enterInterior(buildingId);
     },
+    onDriveBuildingDoor: (buildingId, panelTitle) => {
+      if (isCaseHouse(buildingId)) {
+        if (chrome.isMobileSheetOpen()) chrome.setLayout('map');
+        panel.showPreview(buildingId);
+        return;
+      }
+      panel.showBuildingPeek(buildingId, panelTitle);
+    },
     onMoveCommand: () => studio.noteMoveCommand(),
     onFrame: () => {
-      labels.update(scene.nameLabelAnchors());
+      const view = scene.getViewMode();
+      const hidePills = view.overview || scene.isInInterior();
+      labels.setHidden(hidePills);
+      if (!hidePills) labels.update(scene.nameLabelAnchors());
+      if (view.mode === 'cenital' && !scene.isInInterior()) {
+        cenitalLabels.setHidden(false);
+        cenitalLabels.update(scene.cenitalBuildingLabelAnchors());
+      } else {
+        cenitalLabels.setHidden(true);
+      }
       if (scene.jacHudActive()) {
         const snap = scene.jacSnapshot();
         const anchors = scene.jacHudAnchors();
         jacHud.update(snap, anchors, anchors.rear);
-        labels.setHidden(false);
       } else {
         jacHud.park();
-        labels.setHidden(false);
       }
       joystick.setHidden(
         !scene.jacSnapshot()?.driving ||
           !!scene.isInInterior() ||
+          panel.isPreviewMode() ||
           panel.isPreviewExpanded() ||
           scene.jacInfoOpen(),
       );
@@ -175,9 +200,11 @@ async function main(): Promise<void> {
       const t = e.target as HTMLElement | null;
       if (!t) return;
       if (t.closest('.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock')) return;
-      if (t === canvas || t.closest('#app, .joystick, #game-canvas, #ui-root')) {
-        if (joystick.isActive() || scene?.jacSnapshot()?.driving) e.preventDefault();
+      if (t === canvas || t.closest('#game-canvas')) {
+        if (joystick.isActive()) e.preventDefault();
+        return;
       }
+      if (t.closest('#app, .joystick, #ui-root') && joystick.isActive()) e.preventDefault();
     },
     { passive: false, capture: true },
   );
@@ -221,12 +248,15 @@ async function main(): Promise<void> {
     findPath,
     getCharacterTile: () => scene.getCharacterTile(),
     getCharacterPos: () => scene.getCharacterPosForQa(),
+    walk: (dx: number, dy: number, sprint = false) => scene.qaWalk(dx, dy, sprint),
     setCharacterTile: (x: number, y: number) => scene.setCharacterTileForQa(x, y),
     walkToBuilding: (name: string) => scene.walkToBuildingForQa(name),
     doorScreenPoint: (name: string) => scene.getDoorScreenClientPoint(name),
     frameDoorForQa: (name: string) => scene.frameBuildingDoorForQa(name),
     tapBuildingDoor: (name: string) => scene.tapBuildingDoor(name),
+    driveEnter: (name: string) => scene.qaDriveEnter(name),
     setSuppressTap: (ms: number) => scene.setSuppressTapForQa(ms),
+    clearDriveTapSuppress: () => scene.clearDriveTapSuppressForQa(),
     tapMapTile: (tx: number, ty: number) => scene.tapMapTileForQa(tx, ty),
     tapScreen: (sx: number, sy: number) => scene.tapScreenForQa(sx, sy),
     isInInterior: () => scene.isInInterior(),
@@ -245,6 +275,7 @@ async function main(): Promise<void> {
       return raw ? JSON.parse(raw) : null;
     },
     setZoom: (z: number) => scene.setZoomLevel(z),
+    setZoomLevel: (z: number, anchor?: { x: number; y: number }) => scene.setZoomLevel(z, anchor),
     getZoom: () => scene.getZoom(),
     interiorTileScreenPoint: (tx: number, ty: number, liftPx = 0) =>
       scene.getInteriorTileScreenClientPoint(tx, ty, liftPx),
@@ -294,6 +325,58 @@ async function main(): Promise<void> {
     setViewMode: (m: Camera) => scene.setViewMode(m),
     rotateView: () => scene.rotateView(),
     toggleMapOverview: () => scene.toggleMapOverview(),
+    overviewCoverage: () => scene.qaOverviewCoverage(),
+    cenitalDoorGlyphScreen: (name: string) => scene.qaCenitalDoorGlyphScreen(name),
+    pickDrivingEnterAtScreen: (sx: number, sy: number) =>
+      scene.qaPickDrivingEnterAtScreen(sx, sy),
+    cameraViews: () => scene.qaCameraViews(),
+    cenitalExpectedHeading: (dx: number, dy: number) => scene.qaCenitalExpectedHeading(dx, dy),
+    cenitalBuildingLabels: () => {
+      const base = cenitalLabels.qa();
+      const visibleBox = (el: HTMLElement) => {
+        if (el.hidden) return null;
+        const st = getComputedStyle(el);
+        if (st.display === 'none' || st.visibility === 'hidden' || Number(st.opacity) < 0.08) {
+          return null;
+        }
+        const r = el.getBoundingClientRect();
+        if (r.width < 2 || r.height < 2) return null;
+        return { x: r.left, y: r.top, w: r.width, h: r.height };
+      };
+      const boxes: { x: number; y: number; w: number; h: number }[] = [];
+      for (const pill of document.querySelectorAll('.cenital-building-label')) {
+        const box = visibleBox(pill as HTMLElement);
+        if (box) boxes.push(box);
+      }
+      for (const pill of document.querySelectorAll('.name-label')) {
+        const box = visibleBox(pill as HTMLElement);
+        if (box) boxes.push(box);
+      }
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const clip = (r: { x: number; y: number; w: number; h: number }) => {
+        const left = Math.max(r.x, 0);
+        const top = Math.max(r.y, 0);
+        const right = Math.min(r.x + r.w, vw);
+        const bottom = Math.min(r.y + r.h, vh);
+        const w = right - left;
+        const h = bottom - top;
+        if (w <= 0 || h <= 0) return null;
+        return { x: left, y: top, w, h };
+      };
+      const clipped = boxes.map(clip).filter(Boolean) as { x: number; y: number; w: number; h: number }[];
+      let overlaps = base.overlaps;
+      for (let i = 0; i < clipped.length; i++) {
+        for (let j = i + 1; j < clipped.length; j++) {
+          const a = clipped[i];
+          const b = clipped[j];
+          const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+          const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+          if (ox > 0 && oy > 0) overlaps += 1;
+        }
+      }
+      return { ...base, overlaps };
+    },
     isMobileSheetOpen: () => chrome.isMobileSheetOpen(),
     audioMuted: () => studio.isMuted(),
     audioUnlocked: () => studio.isUnlocked(),
@@ -321,6 +404,7 @@ async function main(): Promise<void> {
     openPanelTitle: () => panel.openTitle(),
     isCasePreviewExpanded: () => panel.isPreviewExpanded(),
     showCasePreview: (id: string) => panel.showPreview(id),
+    showBuildingPeek: (id: string, title?: string) => panel.showBuildingPeek(id, title),
     expandCasePreview: () => panel.expandPreviewForQa(),
     collapseCasePreview: () => panel.collapsePreviewForQa(),
     jac: () => scene.qaJac(),
@@ -330,7 +414,7 @@ async function main(): Promise<void> {
     tapJac: () => scene.tapJac(),
     jacInfo: () => scene.jacOpenInfo(),
     jacGetIn: () => scene.jacGetIn(),
-    jacGetOut: () => scene.jacGetOut(),
+    jacGetOut: (opts?: { thenEnter?: boolean }) => scene.jacGetOut(opts),
     jacDriveTo: (tx: number, ty: number) => scene.qaDriveTo(tx, ty),
     jacFindDrivePath: (tx: number, ty: number) => scene.qaFindDrivePath(tx, ty),
     lastDriveTap: () => scene.qaLastDriveTap,
@@ -346,7 +430,8 @@ async function main(): Promise<void> {
     inputReady: () => scene.qaInputReady(),
     parkedFootprint: () => scene.qaParkedFootprint(),
     jacStick: (vec: { x: number; y: number } | null) => scene.qaJacStick(vec),
-    jacDriveStep: (dt: number, dx: number, dy: number) => scene.qaJacDriveStep(dt, dx, dy),
+    jacDriveStep: (dt: number, dx: number, dy: number, opts?: { render?: boolean }) =>
+      scene.qaJacDriveStep(dt, dx, dy, opts),
     viewportLock: () => ({
       scrollX: window.scrollX,
       scrollY: window.scrollY,

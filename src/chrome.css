@@ -119,10 +119,16 @@
   color: #0b0c0e;
 }
 
+.chrome__nav--hidden {
+  display: none !important;
+}
+
 .ui-view {
   box-sizing: border-box;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0;
   border: 1px solid #2a2c31;
   border-radius: 20px;
@@ -565,6 +571,10 @@ body[data-interior='1'] .chrome__column {
   display: none;
 }
 
+.chrome--alt-view .chrome__sound {
+  display: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .chrome__sound {
     transition: none;
@@ -596,6 +606,26 @@ body[data-interior='1'] .chrome__column {
 
 .chrome__subtitle:empty {
   visibility: hidden;
+}
+
+.chrome__subtitle.chrome__subtitle--compact {
+  top: max(12px, env(safe-area-inset-top, 0px));
+  bottom: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, calc(100vw - 32px));
+  padding: 6px 10px;
+  font-size: 13px;
+  line-height: 1.25;
+  border-radius: 999px;
+  background: rgba(11, 12, 14, 0.82);
+  z-index: 24;
+}
+
+.chrome--alt-view .chrome__lang-opt {
+  text-shadow: none;
+  background: rgba(11, 12, 14, 0.92);
+  box-shadow: 0 0 0 1px rgba(11, 12, 14, 0.35);
 }
 
 .chrome--split .chrome__subtitle {
@@ -839,9 +869,22 @@ body[data-layout='panel'] #game-canvas {
   display: none;
 }
 
-.chrome--dock .chrome__view-btns [data-view='rotate'],
-.chrome--dock .chrome__view-btns [data-view='map'] {
+.chrome--dock .chrome__view-btns [data-view='rotate'] {
   display: none;
+}
+
+/* Phone dock: keep Mapa in its own slot so Cenital double-taps do not hit Mapa. */
+.chrome--dock .chrome__view-btns [data-view='map'] {
+  display: inline-flex;
+}
+
+.chrome--overview .chrome__minimap-wrap {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.chrome--overview .chrome__view-btns {
+  pointer-events: auto;
 }
 
 .chrome--dock .chrome__view-btns {
@@ -863,4 +906,43 @@ body[data-layout='panel'] #game-canvas {
   visibility: visible;
   bottom: 24px;
   top: auto;
+}
+
+@media (max-width: 900px), (pointer: coarse) {
+  .chrome__view-btns .ui-view[data-view='map'],
+  .chrome__view-btns .ui-view {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .chrome__lang-opt {
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .chrome__intro {
+    pointer-events: none;
+    max-height: min(36vh, 140px);
+  }
+
+  .chrome__intro button,
+  .chrome__intro a {
+    pointer-events: auto;
+  }
+
+  .chrome__lang,
+  .chrome--mobile .chrome__lang,
+  .chrome--split .chrome__lang {
+    left: auto !important;
+    right: 72px !important;
+    top: 12px !important;
+  }
 }

@@ -66,21 +66,93 @@ export type CasePreviewCopy = {
   pillMeta: string;
 };
 
+const CASE_PREVIEW_ES: Record<CaseHouseId, { subtitle: string; headline: string; shortHeadline?: string }> = {
+  volaris: {
+    subtitle: 'Product Strategist y único aprobador',
+    headline: 'Un contrato que ingeniería no podía malinterpretar',
+  },
+  bain: {
+    subtitle: 'Líder de squad, mentor y diseñador hands-on',
+    headline: 'Lideré a 9 diseñadores en Bain, y seguí entregando el trabajo',
+    shortHeadline: 'Lideré a 9 diseñadores en Bain',
+  },
+  mentoria: {
+    subtitle: 'Lead de mentoría y Design Senior Council',
+    headline: 'Mentoré con el mismo rigor que el trabajo de cliente',
+    shortHeadline: 'La mentoría como sistema',
+  },
+  finoa: {
+    subtitle: 'UX designer, plataforma de custodia institucional',
+    headline: 'Una plataforma de custodia que las instituciones leen de un vistazo',
+    shortHeadline: 'Custodia que las instituciones pueden confiar',
+  },
+  pg: {
+    subtitle: 'Diseñador UX/UI, app de salud para panelistas',
+    headline: 'Una app que las panelistas sí quieren abrir',
+  },
+};
+
 /** Door-step card: CASE label, name, one-line role, headline teaser. */
-export function casePreviewCopy(id: string): CasePreviewCopy | null {
-  if (!isCaseHouse(id)) return null;
-  const content = CASES[id];
+const CASE_CARD_TITLES_ES: Record<CaseHouseId, string> = {
+  volaris: 'Aerolínea',
+  bain: 'Bain',
+  mentoria: 'Mentoría',
+  finoa: 'Finoa',
+  pg: 'P&G',
+};
+
+export function casePreviewCopy(id: string, lang: 'en' | 'es' = 'en'): CasePreviewCopy | null {
+  const content = CASES[id as keyof typeof CASES];
   if (!content) return null;
-  const title = CASE_CARD_TITLES[id];
-  const headings = sectionHeadings(content.full).slice(0, 3);
+  if (!isCaseHouse(id)) {
+    const title =
+      content.headline?.replace(/\s—.*$/, '') ??
+      id.charAt(0).toUpperCase() + id.slice(1);
+    const headings =
+      lang === 'es'
+        ? ['Problema', 'Lo que hice', 'Resultado']
+        : ['Problem', 'What I did', 'Result'];
+    return {
+      title,
+      subtitle: content.subtitle ?? '',
+      teaser: endSentence(content.shortHeadline ?? content.headline),
+      teaserFull: content.headline,
+      kicker: lang === 'es' ? `CASO · ${title.toUpperCase()}` : `CASE · ${title.toUpperCase()}`,
+      placeholder: `${title.toUpperCase()} · IMAGE PLACEHOLDER`,
+      pillMeta: headings.join(' · '),
+    };
+  }
+  const title = lang === 'es' ? CASE_CARD_TITLES_ES[id] ?? content.headline : CASE_CARD_TITLES[id] ?? content.headline;
+  const es = lang === 'es' ? CASE_PREVIEW_ES[id] : null;
+  const landmarkIds = new Set(['sambil', 'catedral', 'flor']);
+  const landmarkEs =
+    lang === 'es' && !es && landmarkIds.has(id)
+      ? {
+          subtitle: `${title} — hito del mapa`,
+          headline: `${title} — próximamente`,
+          shortHeadline: 'Próximamente en el mapa.',
+        }
+      : null;
+  const headline = es?.headline ?? landmarkEs?.headline ?? content.headline;
+  const shortHeadline = es?.shortHeadline ?? landmarkEs?.shortHeadline ?? content.shortHeadline;
+  const headings = es
+    ? ['Problema', 'Lo que hice', 'Resultado']
+    : sectionHeadings(content.full).slice(0, 3);
   return {
     title,
-    subtitle: content.subtitle,
-    teaser: endSentence(content.shortHeadline ?? content.headline),
-    teaserFull: content.headline,
-    kicker: `CASE · ${title.toUpperCase()}`,
+    subtitle: es?.subtitle ?? landmarkEs?.subtitle ?? content.subtitle,
+    teaser: endSentence(shortHeadline ?? headline),
+    teaserFull: headline,
+    kicker: lang === 'es' ? `CASO · ${title.toUpperCase()}` : `CASE · ${title.toUpperCase()}`,
     placeholder: `${title.toUpperCase()} · IMAGE PLACEHOLDER`,
-    pillMeta: headings.length ? headings.join(' · ') : 'Problem · What I did · Result',
+    pillMeta:
+      lang === 'es'
+        ? headings.length
+          ? headings.join(' · ')
+          : 'Problema · Lo que hice · Resultado'
+        : headings.length
+          ? headings.join(' · ')
+          : 'Problem · What I did · Result',
   };
 }
 

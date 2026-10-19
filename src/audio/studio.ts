@@ -168,6 +168,7 @@ export class StudioAudio {
     }
     this.playLine('01-intro');
     if (this.muted || !this.played.has('01-intro')) this.introLock = false;
+    window.setTimeout(() => this.dismissIntroSubtitle(), 6500);
   }
 
   setInterior(open: boolean): void {
@@ -207,7 +208,16 @@ export class StudioAudio {
   }
 
   /** Move command: a random bark ≠ last, ~6 s cooldown, never over a case line. */
+  dismissIntroSubtitle(): void {
+    if (!this.subtitleText) return;
+    this.stopVoice();
+    this.subtitleText = '';
+    this.introLock = false;
+    this.emit();
+  }
+
   noteMoveCommand(): void {
+    this.dismissIntroSubtitle();
     if (this.muted || !this.unlocked || this.voice) return;
     if (automatedWebKitPhone()) return;
     const now = performance.now();

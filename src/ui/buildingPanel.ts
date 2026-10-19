@@ -3,7 +3,7 @@ import { ABOUT, ABOUT_PANELS, type AboutBlock } from '../data/about';
 import { CASES, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
 import { iconSvg } from './icons';
-import { onLangChange, t } from './i18n';
+import { getLang, onLangChange, t } from './i18n';
 
 function aboutBlockNode(block: AboutBlock): HTMLElement {
   if (block.kind === 'heading') {
@@ -117,6 +117,7 @@ export class BuildingPanel {
   private mode: 'hidden' | 'interior' | 'preview' = 'hidden';
   private previewEl: HTMLElement | null = null;
   private previewTitle: HTMLElement | null = null;
+  private previewKicker: HTMLElement | null = null;
   private previewSubtitle: HTMLElement | null = null;
   private previewTeaser: HTMLElement | null = null;
   private readEl: HTMLElement | null = null;
@@ -156,7 +157,7 @@ export class BuildingPanel {
           <div class="case-preview__handle" aria-hidden="true"></div>
           <div class="case-preview__head">
             <div class="case-preview__titles">
-              <p class="case-preview__kicker">CASE</p>
+              <p class="case-preview__kicker"></p>
               <h2 class="case-preview__title"></h2>
             </div>
             <button type="button" class="case-preview__x" data-close aria-label="">${iconSvg('close')}</button>
@@ -196,11 +197,11 @@ export class BuildingPanel {
             <div class="case__version case__version--short"></div>
           </article>
           <section class="worked-with" aria-labelledby="worked-with-title" hidden>
-            <h3 class="worked-with__title" id="worked-with-title">Worked with</h3>
+            <h3 class="worked-with__title" id="worked-with-title" data-i18n="panel.workedWith">Worked with</h3>
             <ul class="worked-with__logos"></ul>
           </section>
           <section class="about" lang="en" aria-labelledby="about-title" hidden>
-            <h3 class="about__title" id="about-title">About me</h3>
+            <h3 class="about__title" id="about-title" data-i18n="panel.aboutMe">About me</h3>
           </section>
         </div>
       </div>
@@ -213,6 +214,7 @@ export class BuildingPanel {
     this.aboutEl = this.el.querySelector('.about')!;
     this.previewEl = this.el.querySelector('[data-preview]') as HTMLElement;
     this.previewTitle = this.el.querySelector('.case-preview__title');
+    this.previewKicker = this.el.querySelector('.case-preview__kicker');
     this.previewSubtitle = this.el.querySelector('.case-preview__subtitle');
     this.previewTeaser = this.el.querySelector('.case-preview__teaser');
     this.readEl = this.el.querySelector('[data-read-view]') as HTMLElement;
@@ -416,6 +418,34 @@ export class BuildingPanel {
     studio.playCaseVoice(interiorId);
   }
 
+  /** Map peek for non-case enterable buildings (e.g. estudio) while still on the map. */
+  showBuildingPeek(buildingId: string, panelTitle?: string): void {
+    const title = panelTitle ?? buildingId;
+    this.leaveArmed = false;
+    this.exitPress = null;
+    this.exitFromPointer = false;
+    this.mode = 'interior';
+    this.interiorId = buildingId;
+    this.peekOnly = true;
+    this.el.hidden = false;
+    this.el.style.visibility = '';
+    this.el.style.pointerEvents = '';
+    this.aboutEl.style.contentVisibility = '';
+    this.el.removeAttribute('inert');
+    this.el.classList.remove('building-panel--snap');
+    this.el.classList.remove('building-panel--preview');
+    this.titleEl.hidden = false;
+    if (this.previewEl) this.previewEl.hidden = true;
+    this.setTitle(buildingId, title);
+    this.renderWorkedWith();
+    this.renderAbout();
+    this.el.classList.add('building-panel--open');
+    this.syncPeekClass();
+    this.onVisibilityChange();
+    this.applyI18n();
+    studio.playClick();
+  }
+
   /** Stay on the map: lower-third card, then a full-copy expand. */
   showPreview(interiorId: string): void {
     if (!isCaseHouse(interiorId)) return;
@@ -431,31 +461,8 @@ export class BuildingPanel {
     this.aboutEl.style.contentVisibility = '';
     this.el.removeAttribute('inert');
     this.el.classList.remove('building-panel--snap');
-    const preview = casePreviewCopy(interiorId);
     const shown = this.renderCase();
-    const title = preview?.title ?? shown ?? interiorId;
-    const subtitle = preview?.subtitle ?? '';
-    const teaser = this.isMobile()
-      ? (preview?.teaser ?? '')
-      : (preview?.teaserFull ?? preview?.teaser ?? '');
-    if (this.previewTitle) this.previewTitle.textContent = title;
-    if (this.previewSubtitle) this.previewSubtitle.textContent = subtitle;
-    if (this.previewTeaser) this.previewTeaser.textContent = teaser;
-    const meta = this.el.querySelector('.case-preview__read-meta');
-    if (meta) meta.textContent = preview?.pillMeta ?? 'Problem · What I did · Result';
-    if (this.readBarTitle) {
-      this.readBarTitle.textContent = this.isMobile() || !subtitle
-        ? title
-        : `${title}: ${subtitle.charAt(0).toLowerCase()}${subtitle.slice(1)}`;
-    }
-    if (this.readKicker) this.readKicker.textContent = preview?.kicker ?? 'CASE';
-    if (this.readHeadline) {
-      this.readHeadline.textContent = this.isMobile()
-        ? (preview?.teaser ?? title).replace(/[.]$/, '')
-        : (preview?.teaserFull ?? preview?.teaser ?? title);
-    }
-    if (this.readLede) this.readLede.textContent = subtitle;
-    if (this.readHeroLabel) this.readHeroLabel.textContent = preview?.placeholder ?? 'IMAGE PLACEHOLDER';
+    const title = this.fillPreviewCopy(interiorId) ?? shown ?? interiorId;
     this.setTitle(interiorId, title);
     this.renderWorkedWith();
     this.renderAbout();
@@ -480,6 +487,39 @@ export class BuildingPanel {
     this.peekOnly = false;
     this.el.hidden = false;
     this.el.classList.add('building-panel--open');
+  }
+
+  private fillPreviewCopy(interiorId: string): string | null {
+    const preview = casePreviewCopy(interiorId, getLang());
+    const title = preview?.title ?? null;
+    const subtitle = preview?.subtitle ?? '';
+    const teaser = this.isMobile()
+      ? (preview?.teaser ?? '')
+      : (preview?.teaserFull ?? preview?.teaser ?? '');
+    if (this.previewTitle) this.previewTitle.textContent = title ?? interiorId;
+    const kickerLabel =
+      preview?.kicker?.split(' · ')[0] ?? (getLang() === 'es' ? 'CASO' : 'CASE');
+    if (this.previewKicker) this.previewKicker.textContent = kickerLabel;
+    if (this.previewSubtitle) this.previewSubtitle.textContent = subtitle;
+    if (this.previewTeaser) this.previewTeaser.textContent = teaser;
+    const meta = this.el.querySelector('.case-preview__read-meta');
+    const pillDefault =
+      getLang() === 'es' ? 'Problema · Lo que hice · Resultado' : 'Problem · What I did · Result';
+    if (meta) meta.textContent = preview?.pillMeta ?? pillDefault;
+    if (this.readBarTitle) {
+      this.readBarTitle.textContent = this.isMobile() || !subtitle
+        ? (title ?? interiorId)
+        : `${title}: ${subtitle.charAt(0).toLowerCase()}${subtitle.slice(1)}`;
+    }
+    if (this.readKicker) this.readKicker.textContent = preview?.kicker ?? 'CASE';
+    if (this.readHeadline) {
+      this.readHeadline.textContent = this.isMobile()
+        ? (preview?.teaser ?? title ?? interiorId).replace(/[.]$/, '')
+        : (preview?.teaserFull ?? preview?.teaser ?? title ?? interiorId);
+    }
+    if (this.readLede) this.readLede.textContent = subtitle;
+    if (this.readHeroLabel) this.readHeroLabel.textContent = preview?.placeholder ?? 'IMAGE PLACEHOLDER';
+    return title;
   }
 
   private setTitle(key: string, shown: string | null): void {
@@ -675,5 +715,10 @@ export class BuildingPanel {
     });
     const read = this.el.querySelector('.case-preview__read-label');
     if (read) read.textContent = t('panel.readCase');
+    const workedWithTitle = this.el.querySelector('#worked-with-title');
+    if (workedWithTitle) workedWithTitle.textContent = t('panel.workedWith');
+    const aboutTitle = this.el.querySelector('#about-title');
+    if (aboutTitle) aboutTitle.textContent = t('panel.aboutMe');
+    if (this.mode === 'preview' && this.interiorId) this.fillPreviewCopy(this.interiorId);
   }
 }
