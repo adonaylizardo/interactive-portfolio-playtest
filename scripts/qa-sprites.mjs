@@ -28,6 +28,13 @@ const SHOTS = process.argv.includes('--shots');
 /** QA_SPRITES_ONLY=map,picks runs a subset (placement, picks, map, diff, interiors, shots with --shots); unset runs all. */
 const ONLY = process.env.QA_SPRITES_ONLY?.split(',');
 const want = (part) => !ONLY || ONLY.includes(part);
+/**
+ * Preview deploys only (`QA_GATE_PREVIEW=1`). The full-frame visual diff still runs and
+ * writes a report plus screenshots, but a pixel miss or a SwiftShader crash does not fail
+ * the gate. Unset (live root) keeps that diff blocking.
+ */
+const PREVIEW_GATE = process.env.QA_GATE_PREVIEW === '1';
+const fullFrameWarnings = [];
 const OUT = path.join(ROOT, 'artifacts', 'run39');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -776,6 +783,36 @@ const DIFF_VIEWS = [
 ];
 const diffTable = [];
 
+const FULL_FRAME_DIR = path.join(OUT, 'full-frame');
+
+function writeFullFrameReport() {
+  fs.mkdirSync(FULL_FRAME_DIR, { recursive: true });
+  const report = {
+    mode: PREVIEW_GATE ? 'warn' : 'block',
+    warnings: fullFrameWarnings,
+    rows: diffTable,
+  };
+  fs.writeFileSync(path.join(FULL_FRAME_DIR, 'report.json'), JSON.stringify(report, null, 1) + '\n');
+  const summary = [
+    `full-frame diff (${report.mode})`,
+    ...fullFrameWarnings.map((w) => `WARN ${w}`),
+    ...diffTable.map(
+      (r) =>
+        `${r.view} ${r.item} mean ${r.mean.toFixed(2)}/255 off>60 ${r.offPct.toFixed(2)}% in-map ${r.inSitu.toFixed(1)}/255`,
+    ),
+  ].join('\n');
+  fs.writeFileSync(path.join(FULL_FRAME_DIR, 'report.txt'), summary + '\n');
+}
+
+function fullFrameFail(message) {
+  if (PREVIEW_GATE) {
+    fullFrameWarnings.push(message);
+    console.warn(`WARN ${message}`);
+    return;
+  }
+  fail(message);
+}
+
 /** Each item drawn alone vs its @1x export (1 device px = 1 export px in both views), masked by alpha > 128. */
 async function fullFrameDiff(browser) {
   for (const vp of DIFF_VIEWS) {
@@ -857,11 +894,20 @@ async function fullFrameDiff(browser) {
         diffTable.push(row);
         const offLimit = row.subpx ? 2 : 1;
         if (!(row.mean < 6) || !(row.offPct < offLimit)) {
-          fail(
-            `diff ${vp.tag}: ${row.item} mean ${row.mean.toFixed(2)}/255, ${row.offPct.toFixed(2)}% px off by >60 (need <6 and <${offLimit}%${row.subpx ? ', sub-pixel origin' : ''})`,
+          fs.mkdirSync(FULL_FRAME_DIR, { recursive: true });
+          const shot = path.join(FULL_FRAME_DIR, `${vp.tag.replace(/[^a-z0-9]+/gi, '-')}-${row.item}.png`);
+          fs.writeFileSync(shot, PNG.sync.write(drawn.png));
+          fullFrameFail(
+            `diff ${vp.tag}: ${row.item} mean ${row.mean.toFixed(2)}/255, ${row.offPct.toFixed(2)}% px off by >60 (need <6 and <${offLimit}%${row.subpx ? ', sub-pixel origin' : ''}); shot ${shot}`,
           );
         }
       }
+    } catch (err) {
+      fs.mkdirSync(FULL_FRAME_DIR, { recursive: true });
+      const shot = path.join(FULL_FRAME_DIR, `crash-${vp.tag.replace(/[^a-z0-9]+/gi, '-')}.png`);
+      await page.screenshot({ path: shot, fullPage: true }).catch(() => {});
+      if (isBrowserCrash(err)) err.fullFrameShot = shot;
+      throw err;
     } finally {
       await page.evaluate(async () => {
         window.__playtestQa.isolateSprites(null);
@@ -877,6 +923,7 @@ async function fullFrameDiff(browser) {
   notes.push(`full-frame alpha-masked diff vs @1x export (pass: mean < 6/255 and < 1% px off by > 60, 2% when the origin is sub-pixel):\n${lines.join('\n')}`);
   fs.mkdirSync(OUT, { recursive: true });
   fs.writeFileSync(path.join(OUT, 'pixel-diff.json'), JSON.stringify(diffTable, null, 1) + '\n');
+  writeFullFrameReport();
 }
 
 async function enterRoom(page, name) {
@@ -1078,7 +1125,15 @@ async function runFullFrameDiffWithRetry(initialBrowser) {
       return browser;
     } catch (err) {
       lastErr = err;
-      if (!isBrowserCrash(err) || attempt === 2) throw err;
+      if (!isBrowserCrash(err) || attempt === 2) {
+        if (PREVIEW_GATE && isBrowserCrash(err)) {
+          fullFrameWarnings.push(`full-frame diff renderer crash after ${attempt + 1} attempt(s): ${err}`);
+          console.warn('WARN full-frame diff: SwiftShader crash (QA_GATE_PREVIEW=1, not blocking)');
+          writeFullFrameReport();
+          return browser;
+        }
+        throw err;
+      }
       console.log(`qa-sprites: full-frame diff renderer crash, retry ${attempt + 2}/3`);
     }
   }
@@ -1095,6 +1150,12 @@ function runFullFrameDiffSubprocess() {
 
 function finishSprites(exitOnFail = true) {
   for (const n of notes) console.log(`note: ${n}`);
+  for (const w of fullFrameWarnings) console.warn(`WARN ${w}`);
+  if (PREVIEW_GATE && fullFrameWarnings.length) {
+    console.warn(
+      `qa-sprites: full-frame diff ${fullFrameWarnings.length} warning(s) under QA_GATE_PREVIEW=1 (not blocking). Report: ${path.join(FULL_FRAME_DIR, 'report.json')}`,
+    );
+  }
   if (errors.length) {
     for (const e of errors) console.error(`FAIL ${e}`);
     console.error(`\n${errors.length} sprite check(s) failed`);
@@ -1141,7 +1202,14 @@ try {
   }
   if (want('diff')) {
     await part('full-frame diff', () => {
-      runFullFrameDiffSubprocess();
+      try {
+        runFullFrameDiffSubprocess();
+      } catch (err) {
+        if (!PREVIEW_GATE) throw err;
+        const msg = `full-frame diff subprocess exited ${err.status ?? 1} (preview warn, not blocking)`;
+        fullFrameWarnings.push(msg);
+        console.warn(`WARN ${msg}`);
+      }
     });
   }
   if (want('interiors')) await part('interiors', () => interiorChecks(browser));
