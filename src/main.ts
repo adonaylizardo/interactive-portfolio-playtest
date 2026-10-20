@@ -942,6 +942,7 @@ async function main(): Promise<void> {
     showFatalState: (kind: 'webgl' | 'load-failed') => showFatalState(kind),
     isOfflineBannerVisible: () => isOfflineBannerVisible(),
   };
+  scene.scheduleNpcLoad();
 }
 
 main().catch((err) => {

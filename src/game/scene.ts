@@ -1139,16 +1139,6 @@ export class IsoScene {
       this.deferSpriteLoad(() => loadBuildingStateSprites(), () => this.syncObjectSprites(true));
     }, 2500);
     void loadSpriteProbes().catch((err) => console.warn('[sprites] probes failed', err));
-    // NPC strips wait until the player sheet is on screen so the spawn view stays light.
-    const armNpcs = () => {
-      if (!this.npcs.isEnabled()) return;
-      if (!this.avatar.snapshot().loaded) {
-        window.setTimeout(armNpcs, 50);
-        return;
-      }
-      window.setTimeout(() => this.loadNpcs(), 200);
-    };
-    armNpcs();
     const fillLoad = this.fillActors.load(hi).then(
       () => this.cullVisibleTiles(),
       (err) => {
@@ -7876,6 +7866,19 @@ export class IsoScene {
   qaSetNpcs(on: boolean): void {
     this.npcs.setEnabled(on);
     if (on) this.loadNpcs();
+  }
+
+  /** NPC strips start after welcome, so the spawn view does not fetch them. */
+  scheduleNpcLoad(): void {
+    const arm = () => {
+      if (!this.npcs.isEnabled()) return;
+      if (!this.avatar.snapshot().loaded) {
+        window.setTimeout(arm, 50);
+        return;
+      }
+      window.setTimeout(() => this.loadNpcs(), 400);
+    };
+    arm();
   }
 
   private loadNpcs(): void {
