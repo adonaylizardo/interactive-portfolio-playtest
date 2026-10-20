@@ -1130,14 +1130,6 @@ export class IsoScene {
         console.warn('[hydrate] map expansion failed', err);
       }
     })();
-    window.setTimeout(() => {
-      this.deferSpriteLoad(allSpriteKeys().filter((k) => k.endsWith('/lejos')), () =>
-        this.syncObjectSprites(true),
-      );
-    }, 800);
-    window.setTimeout(() => {
-      this.deferSpriteLoad(() => loadBuildingStateSprites(), () => this.syncObjectSprites(true));
-    }, 2500);
     void loadSpriteProbes().catch((err) => console.warn('[sprites] probes failed', err));
     const fillLoad = this.fillActors.load(hi).then(
       () => this.cullVisibleTiles(),
@@ -7868,8 +7860,16 @@ export class IsoScene {
     if (on) this.loadNpcs();
   }
 
-  /** NPC strips start after welcome, so the spawn view does not fetch them. */
+  /** Far zoom, hover states, and NPC strips start after welcome, so the spawn view stays light. */
   scheduleNpcLoad(): void {
+    window.setTimeout(() => {
+      this.deferSpriteLoad(allSpriteKeys().filter((k) => k.endsWith('/lejos')), () =>
+        this.syncObjectSprites(true),
+      );
+    }, 800);
+    window.setTimeout(() => {
+      this.deferSpriteLoad(() => loadBuildingStateSprites(), () => this.syncObjectSprites(true));
+    }, 2500);
     const arm = () => {
       if (!this.npcs.isEnabled()) return;
       if (!this.avatar.snapshot().loaded) {
