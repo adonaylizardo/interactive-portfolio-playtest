@@ -214,9 +214,9 @@ const CASES = {
 };
 
 const LANDMARKS = {
-  sambil: 'Sambil',
-  catedral: 'Catedral',
-  flor: 'Flor de Venezuela',
+  sambil: ['Sambil', 'Sambil, Barquisimeto. A mall shaped like a cuatro, our little guitar.'],
+  catedral: ['Catedral', "Barquisimeto's Cathedral. My city has a thing for bold shapes."],
+  flor: ['Flor de Venezuela', "Flor de Venezuela. A piece of Barquisimeto, where I'm from."],
 };
 
 async function readPanel(page) {
@@ -333,7 +333,7 @@ export async function runRun55CaseSuite({ kind, base, errors, notes, shots }) {
       notes.push(`${tag}: "${m.title}", ${m.lines.length} lines`);
     }
 
-    for (const [id, name] of Object.entries(LANDMARKS)) {
+    for (const [id, [name, line]] of Object.entries(LANDMARKS)) {
       const tag = `run55-${kind}-landmark-${id}`;
       await qa(page, (n) => window.__playtestQa.enterInterior(n), id);
       await page.waitForFunction(() => window.__playtestQa.isBuildingPanelOpen(), null, { timeout: 15000 });
@@ -343,9 +343,8 @@ export async function runRun55CaseSuite({ kind, base, errors, notes, shots }) {
         await wait(300);
       }
       const m = await readPanel(page);
-      const want = `${name} — a landmark of the map. More coming soon.`;
       if (m.title !== name) errors.push(`${tag}: title is "${m.title}"`);
-      if (!m.lines.some(([, t]) => t === want)) errors.push(`${tag}: missing "${want}" (got ${JSON.stringify(m.lines)})`);
+      if (!m.lines.some(([, t]) => t === line)) errors.push(`${tag}: missing "${line}" (got ${JSON.stringify(m.lines)})`);
       if (/volaris|\[falta\]|Caso de ejemplo/i.test(m.articleText)) errors.push(`${tag}: forbidden string in landmark panel`);
       await qa(page, () => window.__playtestQa.leaveInteriorNow());
       await wait(200);

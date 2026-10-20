@@ -6,7 +6,7 @@
  *  - photos 01-05 in page order, lazy-loaded WebP (transparent PNGs keep their alpha), never wider
  *    than the panel; links open the absolute URLs in a new tab
  *  - readable at 390 and 1280 (font sizes, no sideways scroll) and the panel scrolls to the last line
- *  - one close control ("Salir") on desktop and phones, at the sheet's top and uncovered both before
+ *  - one close control ("Exit") on desktop and phones, at the sheet's top and uncovered both before
  *    and after scrolling to the end; a real click / tap on it there leaves the room
  *  - the section only shows in the Estudio
  *  - phones: Noah's tap box is 1.5x his frame (plus padding), and a tap in the added margin reaches him
@@ -180,10 +180,10 @@ async function exitControl(page) {
 }
 
 function exitControlErrors(tag, where, c, errors) {
-  if (c.labels.length !== 1 || c.labels[0] !== 'Salir') errors.push(`${tag}: ${where}: visible panel controls ${JSON.stringify(c.labels)}, want just "Salir"`);
-  if (c.fromTop == null || c.fromTop < 0 || c.fromTop > 48) errors.push(`${tag}: ${where}: Salir is ${c.fromTop}px below the sheet top, want it at the top`);
-  if (!c.inSheet) errors.push(`${tag}: ${where}: Salir is outside the sheet`);
-  if (!c.onTop) errors.push(`${tag}: ${where}: something covers Salir`);
+  if (c.labels.length !== 1 || c.labels[0] !== 'Exit') errors.push(`${tag}: ${where}: visible panel controls ${JSON.stringify(c.labels)}, want just "Exit"`);
+  if (c.fromTop == null || c.fromTop < 0 || c.fromTop > 48) errors.push(`${tag}: ${where}: Exit is ${c.fromTop}px below the sheet top, want it at the top`);
+  if (!c.inSheet) errors.push(`${tag}: ${where}: Exit is outside the sheet`);
+  if (!c.onTop) errors.push(`${tag}: ${where}: something covers Exit`);
 }
 
 async function noahTapCheck(page, spec, tag, errors) {
@@ -405,7 +405,7 @@ export async function runRun47AboutSuite({ kind, base, errors, notes, shots }) {
         .then(() => true)
         .catch(() => false));
     if (!left) {
-      errors.push(`${tag}: ${spec.phone ? 'tapping' : 'clicking'} Salir at the end of the text did not leave the Estudio`);
+      errors.push(`${tag}: ${spec.phone ? 'tapping' : 'clicking'} Exit at the end of the text did not leave the Estudio`);
       await qa(page, () => window.__playtestQa.exitInterior());
     }
     await wait(500);
@@ -418,7 +418,7 @@ export async function runRun47AboutSuite({ kind, base, errors, notes, shots }) {
     notes.push(
       `${tag}: after the logo strip (${m.stripLogos} logos), ${m.lines.length} lines ${okText ? 'match about.md' : 'DIFFER'}, ` +
         `${loaded.filter((p) => p.natural).length}/5 lazy WebP photos <= ${m.contentW}px, body ${m.minFont}px, scrolls to the last line ` +
-        `with the one Salir still at the top and working; ${noah}` +
+        `with the one Exit still at the top and working; ${noah}` +
         (files ? `; files ${files}` : ''),
     );
   } finally {
