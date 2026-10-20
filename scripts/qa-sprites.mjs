@@ -1177,7 +1177,8 @@ if (ONLY?.length === 1 && ONLY[0] === 'fullframe') {
     await browser.close().catch(() => {});
     preview?.kill('SIGKILL');
   }
-  finishSprites(true);
+  const ok = finishSprites(true);
+  process.exit(ok ? 0 : 1);
 }
 
 let browser = await launchBrowser(chromium);
