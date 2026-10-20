@@ -61,8 +61,10 @@ async function firstPaintBudget({ tag, type, options }) {
   try {
     page.on('request', onReq);
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, { timeout: 45000 });
+    // goto already waited until Start installed the play hooks. The budget
+    // covers that welcome, and the town/audio fetches begin after it.
     page.off('request', onReq);
+    await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, { timeout: 45000 });
     if (early.length) {
       errors.push(`load-${tag}: fetched ${early.length} deferred asset(s) before interactive (${early.slice(0, 3).join(' | ')})`);
     } else {
