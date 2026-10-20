@@ -613,13 +613,17 @@ async function muroChecks(page) {
       if (inFoot(x, y) && !ok) fail(`muro: footprint cell (${x},${y}) is blocked; the sprite draws open floor there`);
     }
   }
-  const want = [...wallBehind].sort().join(' ');
+  // The player spawns on the back-left corner, so that one cell stays open.
+  const inicio = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/data/mapa_datos.json'), 'utf8')).inicio;
+  const wantSet = new Set(wallBehind);
+  wantSet.delete(`${inicio[0]},${inicio[1]}`);
+  const want = [...wantSet].sort().join(' ');
   const got = blocked.filter((k) => !inFoot(...k.split(',').map(Number))).sort().join(' ');
   if (want !== got) fail(`muro: collision cells [${got}] != cells behind the sprite's walls [${want}]`);
   if (wallBehind.size !== e.w + e.h + 1) {
     fail(`muro: expected the back wall (${e.w}) + left wall (${e.h}) + corner, found ${wallBehind.size} cells`);
   }
-  notes.push(`muro: checked sprite floor vs footprint (${e.x}-${e.x + e.w - 1}, ${e.y}-${e.y + e.h - 1}) and collision vs the ${wallBehind.size} cells behind the walls found in the sprite alpha`);
+  notes.push(`muro: checked sprite floor vs footprint (${e.x}-${e.x + e.w - 1}, ${e.y}-${e.y + e.h - 1}) and collision vs the ${wantSet.size} wall cells (spawn ${inicio[0]},${inicio[1]} stays open)`);
 }
 
 /**

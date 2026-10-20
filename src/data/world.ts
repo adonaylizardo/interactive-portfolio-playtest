@@ -411,8 +411,7 @@ export function buildWorld(): {
   objects.push(...fill.objects);
 
   const [ix, iy] = INICIO;
-  // Spawn is the muro's back-left corner. Opening it for the player punched a hole in the wall.
-  if (!borderKind(ix, iy) && !muroWallTiles().has(`${ix},${iy}`)) {
+  if (!borderKind(ix, iy)) {
     cells[iy][ix].walkable = true;
     carveStreet(ix, iy);
   }
