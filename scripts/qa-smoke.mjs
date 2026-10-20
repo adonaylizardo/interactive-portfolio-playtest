@@ -141,9 +141,10 @@ async function firstLoad({ tag, type, options, minZoom, centred }) {
       errors.push(`firstload-${tag}: lejos threshold ${m.lodBelow} is not within the last ×2 of zoom-out (min ${m.zoomMin})`);
     }
     const lodAt = async (z) => {
-      await page.evaluate(async (zz) => {
+      // setZoom updates data-lod. A full texture upload here crashes software GL
+      // once the whole town is on screen (phone @2x); it is not part of the assertion.
+      await page.evaluate((zz) => {
         window.__playtestQa.setZoom(zz);
-        await window.__playtestQa.loadAllSprites();
       }, z);
       await wait(400);
       return page.evaluate(() => document.getElementById('game-canvas')?.dataset.lod);

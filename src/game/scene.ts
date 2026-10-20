@@ -5578,19 +5578,39 @@ export class IsoScene {
     this.qaIgnoreVanBlock = ignore;
   }
 
+/**
+   * Bulk texture uploads must not interleave with a full-map draw. Software GL crashes
+   * (Target crashed) when hundreds of texImage2D calls share the frame with every tile.
+   */
+  private async withRendererPaused<T>(fn: () => Promise<T>): Promise<T> {
+    const ticker = this.app.ticker;
+    const wasStarted = ticker.started;
+    if (wasStarted) ticker.stop();
+    try {
+      return await fn();
+    } finally {
+      if (wasStarted) ticker.start();
+    }
+  }
+
   /** QA: force every building sprite into one state (default | hover | resaltado), or null to release. */
   async qaForceBuildingState(state: BuildingSpriteState | null): Promise<void> {
     this.qaForcedState = state;
-    await loadAllSprites();
-    this.syncObjectSprites(true);
-    this.app.render();
+    await this.withRendererPaused(async () => {
+      await loadAllSprites();
+      this.syncObjectSprites(true);
+      this.app.render();
+    });
   }
 
   async qaLoadAllSprites(): Promise<void> {
-    await loadAllSprites();
-    this.ensureAllTiles();
-    this.syncObjectSprites(true);
-    this.refreshTileTextures();
+    await this.withRendererPaused(async () => {
+      await loadAllSprites();
+      this.ensureAllTiles();
+      this.syncObjectSprites(true);
+      this.refreshTileTextures();
+      this.app.render();
+    });
   }
 
   /** QA: put a world point at the canvas centre at an exact zoom. */
