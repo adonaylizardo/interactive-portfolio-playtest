@@ -8000,26 +8000,45 @@ export class IsoScene {
     return out;
   }
 
-  sampleCanvasColorsAtClient(
+  /**
+   * One still frame, then 1×1 readbacks. Copying the whole WebGL canvas
+   * deadlocks SwiftShader while the ticker keeps submitting frames.
+   */
+  private readCanvasPixelsStill(
     points: { x: number; y: number }[],
   ): ({ r: number; g: number; b: number; a: number } | null)[] {
     const canvas = this.canvasEl;
     if (!canvas) return points.map(() => null);
-    this.app.render();
-    const rect = canvas.getBoundingClientRect();
-    const tmp = document.createElement('canvas');
-    tmp.width = canvas.width;
-    tmp.height = canvas.height;
-    const ctx = tmp.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return points.map(() => null);
-    ctx.drawImage(canvas, 0, 0);
-    return points.map((p) => {
-      const sx = Math.floor((p.x - rect.left) * (canvas.width / rect.width));
-      const sy = Math.floor((p.y - rect.top) * (canvas.height / rect.height));
-      if (sx < 0 || sy < 0 || sx >= canvas.width || sy >= canvas.height) return null;
-      const d = ctx.getImageData(sx, sy, 1, 1).data;
-      return { r: d[0], g: d[1], b: d[2], a: d[3] };
-    });
+    const ticker = this.app.ticker;
+    const wasStarted = ticker.started;
+    if (wasStarted) ticker.stop();
+    try {
+      this.app.render();
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return points.map(() => null);
+      const tmp = document.createElement('canvas');
+      tmp.width = 1;
+      tmp.height = 1;
+      const ctx = tmp.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return points.map(() => null);
+      return points.map((p) => {
+        const sx = Math.floor((p.x - rect.left) * (canvas.width / rect.width));
+        const sy = Math.floor((p.y - rect.top) * (canvas.height / rect.height));
+        if (sx < 0 || sy < 0 || sx >= canvas.width || sy >= canvas.height) return null;
+        ctx.clearRect(0, 0, 1, 1);
+        ctx.drawImage(canvas, sx, sy, 1, 1, 0, 0, 1, 1);
+        const d = ctx.getImageData(0, 0, 1, 1).data;
+        return { r: d[0], g: d[1], b: d[2], a: d[3] };
+      });
+    } finally {
+      if (wasStarted) ticker.start();
+    }
+  }
+
+  sampleCanvasColorsAtClient(
+    points: { x: number; y: number }[],
+  ): ({ r: number; g: number; b: number; a: number } | null)[] {
+    return this.readCanvasPixelsStill(points);
   }
 
   sampleCanvasColorAtClient(clientX: number, clientY: number): {
@@ -8028,20 +8047,6 @@ export class IsoScene {
     b: number;
     a: number;
   } | null {
-    const canvas = this.canvasEl;
-    if (!canvas) return null;
-    this.app.render();
-    const rect = canvas.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return null;
-    const sx = (clientX - rect.left) * (canvas.width / rect.width);
-    const sy = (clientY - rect.top) * (canvas.height / rect.height);
-    const tmp = document.createElement('canvas');
-    tmp.width = 1;
-    tmp.height = 1;
-    const ctx = tmp.getContext('2d');
-    if (!ctx) return null;
-    ctx.drawImage(canvas, Math.floor(sx), Math.floor(sy), 1, 1, 0, 0, 1, 1);
-    const d = ctx.getImageData(0, 0, 1, 1).data;
-    return { r: d[0], g: d[1], b: d[2], a: d[3] };
+    return this.readCanvasPixelsStill([{ x: clientX, y: clientY }])[0] ?? null;
   }
 }

@@ -939,6 +939,7 @@ async function interiorChecks(browser) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   try {
     for (const c of [...CASES, ...Object.keys(ART_ROOMS)]) {
+      process.stdout.write(`qa-sprites: interior ${c}\n`);
       await openMap(page);
       await enterRoom(page, c);
       const layout = await page.evaluate(() => window.__playtestQa.interiorLayout());
@@ -986,6 +987,7 @@ async function interiorChecks(browser) {
     notes.push(`interiors: ${CASES.join(', ')} walk grid == mascara_caminable; ${Object.keys(ART_ROOMS).join(', ')} == interior-rooms.json (all free cells reach the exit); exit mat walkable, cerca probes at default and room min zoom`);
 
     // Estudio noche: dark floor, amber only on lights (windows, monitor, lamp).
+    process.stdout.write('qa-sprites: interior estudio-noche\n');
     await openMap(page);
     await enterRoom(page, 'estudio');
     const pr = await page.evaluate(() => window.__playtestQa.interiorPixelProbes());
@@ -1008,9 +1010,15 @@ async function interiorChecks(browser) {
         return { x0: p0.x - 2, y0: p0.y - 2, x1: p1.x + 2, y1: p1.y + 2 };
       });
     });
-    for (const t of est.walkable) {
-      if ((t.x === est.exit.x && t.y === est.exit.y) || t.x + t.y < 4 || (t.x === ch.x && t.y === ch.y)) continue;
-      const pt = await page.evaluate(([x, y]) => window.__playtestQa.interiorTileScreenPoint(x, y), [t.x, t.y]);
+    const floorTiles = est.walkable.filter(
+      (t) => !((t.x === est.exit.x && t.y === est.exit.y) || t.x + t.y < 4 || (t.x === ch.x && t.y === ch.y)),
+    );
+    const floorScreen = await page.evaluate(
+      (tiles) => tiles.map(([x, y]) => window.__playtestQa.interiorTileScreenPoint(x, y)),
+      floorTiles.map((t) => [t.x, t.y]),
+    );
+    for (const pt of floorScreen) {
+      if (!pt) continue;
       if (avatarBoxes.some((b) => pt.x >= b.x0 && pt.x <= b.x1 && pt.y >= b.y0 && pt.y <= b.y1)) continue;
       floorPts.push(pt);
     }
@@ -1025,6 +1033,7 @@ async function interiorChecks(browser) {
     notes.push(`interiors: estudio uses the Estudio-noche palette (${fc.length} floor samples, ${pr.length} wall/window/desk/monitor probes)`);
 
     // One real click on the exit mat leaves every room at once.
+    process.stdout.write('qa-sprites: interior exit clicks\n');
     for (const c of ['estudio', ...CASES, ...Object.keys(ART_ROOMS)]) {
       await openMap(page);
       await enterRoom(page, c);
