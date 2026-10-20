@@ -45,13 +45,6 @@ function patchPage(page) {
 }
 
 async function patchContext(ctx) {
-  await ctx.addInitScript(() => {
-    try {
-      Object.defineProperty(navigator, 'webdriver', { get: () => false, configurable: true });
-    } catch {
-      /* ignore */
-    }
-  });
   ctx.pages().forEach(patchPage);
   ctx.on('page', patchPage);
   const newPage = ctx.newPage.bind(ctx);

@@ -184,7 +184,7 @@ async function planLongRoute(page) {
 }
 
 /** Walks `route` with real taps, re-tapping further along whenever the current goal is close. */
-async function walkRouteByTaps(page, touch, route, maxMs = 90000) {
+async function walkRouteByTaps(page, touch, route, maxMs = touch ? 180000 : 90000) {
   const t0 = Date.now();
   let taps = 0;
   while (Date.now() - t0 < maxMs) {
