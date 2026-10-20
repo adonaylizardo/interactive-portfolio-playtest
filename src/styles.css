@@ -255,6 +255,8 @@ body.is-canvas-dragging * {
 
 #ui-root > .building-map-labels {
   pointer-events: none;
+}
+
 #ui-root > .persona-kit,
 body.persona-kit #ui-root > .persona-kit {
   pointer-events: none !important;

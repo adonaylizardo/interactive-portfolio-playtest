@@ -737,6 +737,8 @@ body[data-voice-contact='1'] .chrome--sheet .chrome__subtitle:not(:empty) {
 .chrome__sheet-contact {
   margin-top: 16px;
   padding-bottom: 8px;
+}
+
 .chrome__subtitle.chrome__subtitle--compact {
   top: max(12px, env(safe-area-inset-top, 0px));
   bottom: auto;
@@ -902,6 +904,7 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
   .chrome--mobile .chrome__dock {
     display: none;
   }
+}
 
 #ui-root:has(> .chrome.chrome--mobile) > .checklist {
   top: 84px;
