@@ -101,19 +101,10 @@ export class ChecklistUI {
         <div class="checklist__progress-wrap">
           <span class="checklist__counter checklist__counter--label"></span>
           <button type="button" class="checklist__ring-btn" aria-label="">
-            <svg class="checklist__ring" viewBox="0 0 28 28" width="28" height="28" aria-hidden="true">
-              <circle class="checklist__ring-bg" cx="14" cy="14" r="11" fill="none" stroke-width="2" />
-              <circle
-                class="checklist__ring-fg"
-                cx="14"
-                cy="14"
-                r="11"
-                fill="none"
-                stroke-width="2.5"
-                stroke-dasharray="69.12"
-                stroke-dashoffset="69.12"
-                transform="rotate(-90 14 14)"
-              />
+            <svg class="checklist__ring" viewBox="0 0 28 28" width="44" height="44" aria-hidden="true">
+              <circle class="checklist__ring-bg" cx="14" cy="14" r="11" fill="none" stroke-width="2"/>
+              <circle class="checklist__ring-fg" cx="14" cy="14" r="11" fill="none" stroke-width="2.5"
+                stroke-dasharray="69.12" stroke-dashoffset="69.12" transform="rotate(-90 14 14)"/>
             </svg>
             <span class="checklist__counter checklist__counter--in-ring"></span>
             <img

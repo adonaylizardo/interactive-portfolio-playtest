@@ -34,8 +34,9 @@ for (const [re, label] of FORBIDDEN) {
 
 if (!/\bVolaris\b/.test(src)) errors.push('Volaris case copy is missing the client name');
 
-const bainStart = src.indexOf('\n  bain: {');
-const pgStart = src.indexOf('\n  pg: {');
+const casesStart = src.indexOf('export const CASES');
+const bainStart = casesStart >= 0 ? src.indexOf('\n  bain: {', casesStart) : -1;
+const pgStart = casesStart >= 0 ? src.indexOf('\n  pg: {', bainStart + 1) : -1;
 if (bainStart < 0 || pgStart < 0 || pgStart < bainStart) {
   errors.push('could not isolate the Bain case block in src/data/cases.ts');
 } else {

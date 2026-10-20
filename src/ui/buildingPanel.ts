@@ -126,6 +126,7 @@ export class BuildingPanel {
   private activeWriting: { sectionId: string; itemId: string } | null = null;
   private previewEl: HTMLElement | null = null;
   private previewTitle: HTMLElement | null = null;
+  private previewKicker: HTMLElement | null = null;
   private previewSubtitle: HTMLElement | null = null;
   private previewTeaser: HTMLElement | null = null;
   private readEl: HTMLElement | null = null;
@@ -194,7 +195,7 @@ export class BuildingPanel {
           <div class="case-preview__handle" aria-hidden="true"></div>
           <div class="case-preview__head">
             <div class="case-preview__titles">
-              <p class="case-preview__kicker">CASE</p>
+              <p class="case-preview__kicker"></p>
               <h2 class="case-preview__title"></h2>
             </div>
             <button type="button" class="case-preview__x" data-close aria-label="">${iconSvg('close')}</button>
@@ -271,6 +272,7 @@ export class BuildingPanel {
     this.aboutEl = this.el.querySelector('.about')!;
     this.previewEl = this.el.querySelector('[data-preview]') as HTMLElement;
     this.previewTitle = this.el.querySelector('.case-preview__title');
+    this.previewKicker = this.el.querySelector('.case-preview__kicker');
     this.previewSubtitle = this.el.querySelector('.case-preview__subtitle');
     this.previewTeaser = this.el.querySelector('.case-preview__teaser');
     this.readEl = this.el.querySelector('[data-read-view]') as HTMLElement;
@@ -1125,6 +1127,34 @@ export class BuildingPanel {
     studio.playCaseVoice(interiorId);
   }
 
+  /** Map peek for non-case enterable buildings (e.g. estudio) while still on the map. */
+  showBuildingPeek(buildingId: string, panelTitle?: string): void {
+    const title = panelTitle ?? buildingId;
+    this.leaveArmed = false;
+    this.exitPress = null;
+    this.exitFromPointer = false;
+    this.mode = 'interior';
+    this.interiorId = buildingId;
+    this.peekOnly = true;
+    this.el.hidden = false;
+    this.el.style.visibility = '';
+    this.el.style.pointerEvents = '';
+    this.aboutEl.style.contentVisibility = '';
+    this.el.removeAttribute('inert');
+    this.el.classList.remove('building-panel--snap');
+    this.el.classList.remove('building-panel--preview');
+    this.titleEl.hidden = false;
+    if (this.previewEl) this.previewEl.hidden = true;
+    this.setTitle(buildingId, title);
+    this.renderWorkedWith();
+    this.renderAbout();
+    this.el.classList.add('building-panel--open');
+    this.syncPeekClass();
+    this.onVisibilityChange();
+    this.applyI18n();
+    studio.playClick();
+  }
+
   /** Stay on the map: lower-third card, then a full-copy expand. */
   showPreview(interiorId: string): void {
     if (!isCaseHouse(interiorId)) return;
@@ -1148,6 +1178,9 @@ export class BuildingPanel {
     const teaser = this.isMobile()
       ? (preview?.teaser ?? '')
       : (preview?.teaserFull ?? preview?.teaser ?? '');
+    if (this.previewKicker) {
+      this.previewKicker.textContent = preview?.kicker?.split(' · ')[0] ?? t('panel.caseTag');
+    }
     if (this.previewTitle) this.previewTitle.textContent = title;
     if (this.previewSubtitle) this.previewSubtitle.textContent = subtitle;
     if (this.previewTeaser) this.previewTeaser.textContent = teaser;
@@ -1456,5 +1489,9 @@ export class BuildingPanel {
     this.el.querySelectorAll('[data-exp-expand]').forEach((el) => {
       el.setAttribute('aria-label', t('panel.expandSheet'));
     });
+    const workedWithTitle = this.el.querySelector('#worked-with-title');
+    if (workedWithTitle) workedWithTitle.textContent = t('panel.workedWith');
+    const aboutTitle = this.el.querySelector('#about-title');
+    if (aboutTitle) aboutTitle.textContent = t('panel.aboutMe');
   }
 }

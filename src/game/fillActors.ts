@@ -171,6 +171,10 @@ export class FillActors {
     return { x0, y0, x1: x0 + w, y1: y0 + h };
   }
 
+  spritesForBillboard(): Sprite[] {
+    return this.live.map((l) => l.sprite);
+  }
+
   snapshot(): FillActorSnapshot[] {
     return [...this.live, ...this.overlays].map((l) => ({
       id: l.id,

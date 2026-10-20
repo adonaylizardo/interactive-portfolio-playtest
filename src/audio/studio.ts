@@ -420,6 +420,14 @@ export class StudioAudio {
   }
 
   /** Move command: a random bark ≠ last, ~6 s cooldown, never over a case line. */
+  dismissIntroSubtitle(): void {
+    if (!this.subtitleText) return;
+    this.stopVoice();
+    this.subtitleText = '';
+    this.introLock = false;
+    this.emit();
+  }
+
   noteMoveCommand(): void {
     if (!this.played.has('01-intro') && this.unlocked) {
       this.introDeferred = true;

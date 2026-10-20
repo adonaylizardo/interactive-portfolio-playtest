@@ -143,7 +143,7 @@ export class NameLabels {
   private hideOverChrome(): void {
     const blockers = [
       ...document.querySelectorAll(
-        '.checklist, .chrome__lang, .chrome__tools-phone, .chrome__intro, .chrome--sheet .chrome__intro, .chrome__column, .about-panel__sheet, .building-panel__sheet',
+        '.checklist, .chrome__lang, .chrome__tools-phone, .chrome__intro, .chrome--sheet .chrome__intro, .chrome__column, .about-panel__sheet, .building-panel__sheet, .chrome__subtitle, .cenital-building-label',
       ),
     ].filter(
       (el) => {

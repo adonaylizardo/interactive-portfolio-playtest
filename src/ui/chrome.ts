@@ -84,6 +84,7 @@ export class ChromeUI {
   private callbacks: ChromeCallbacks;
   private minimap: HTMLCanvasElement;
   private soundHintTimer: ReturnType<typeof setTimeout> | null = null;
+  private soundHintDismissed = false;
   private getCharTile: () => { x: number; y: number } = () => ({ x: 0, y: 0 });
   private getView: () => { mode: Camera; yaw: number; overview: boolean } = () => ({
     mode: 'isometrica',
@@ -102,6 +103,7 @@ export class ChromeUI {
     this.bind();
     this.applyI18n();
     onLangChange(() => this.applyI18n());
+    if (this.shortLandscape()) this.mobileSheet = false;
     this.sync();
     studio.onChange(() => {
       this.syncSound();
@@ -109,11 +111,13 @@ export class ChromeUI {
     });
     const onLayout = () => {
       this.mobile = isMobileLayout();
+      if (this.shortLandscape()) this.mobileSheet = false;
       this.sync();
       this.callbacks.onLayoutChange();
     };
     window.matchMedia('(max-width: 767px)').addEventListener('change', onLayout);
     window.matchMedia('(max-height: 500px)').addEventListener('change', onLayout);
+    window.matchMedia('(orientation: landscape)').addEventListener('change', onLayout);
     const draw = () => {
       this.drawMinimap();
       this.syncViewButtons();
@@ -186,6 +190,7 @@ export class ChromeUI {
   setLayout(next: DesktopLayout, opts?: ChromeLayoutChangeOpts): void {
     if (this.mobile) {
       this.mobileSheet = next !== 'map';
+      if (this.shortLandscape()) this.mobileSheet = false;
     } else {
       this.layout = next;
     }
@@ -424,7 +429,6 @@ export class ChromeUI {
         <div class="chrome__view-btns">
           <button type="button" class="ui-view is-active" data-view="isometrica" aria-label="Isometric" data-i18n-aria="chrome.isometric">${iconSvg('cube')}</button>
           <button type="button" class="ui-view" data-view="cenital" aria-label="Top-down" data-i18n-aria="chrome.topdown">${iconSvg('grid')}</button>
-          <button type="button" class="ui-view" data-view="perspectiva" aria-label="Perspective" data-i18n-aria="chrome.perspective">${iconSvg('persp')}</button>
           <button type="button" class="ui-view" data-view="map" aria-label="Map overview" data-i18n-aria="chrome.map">${iconSvg('map')}</button>
         </div>
       </div>
@@ -472,10 +476,20 @@ export class ChromeUI {
     });
     this.root.querySelectorAll('[data-view]').forEach((btn) => {
       btn.addEventListener('click', () => {
+        (btn as HTMLElement).blur();
         const v = (btn as HTMLElement).dataset.view;
         if (v === 'rotate') this.callbacks.onRotate();
         else if (v === 'map') this.callbacks.onMapOverview();
         else this.callbacks.onView(v as Camera);
+      });
+    });
+    this.root.querySelectorAll('[data-action="search"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        (btn as HTMLElement).blur();
+        this.setLayout('split');
+        this.scrollTo('#chrome-casos');
+        const first = this.root.querySelector('.chrome__case-row') as HTMLElement | null;
+        first?.focus({ preventScroll: true });
       });
     });
     this.root.querySelectorAll('[data-action="center"]').forEach((btn) => {
@@ -494,6 +508,10 @@ export class ChromeUI {
       this.openContact();
     });
     this.root.querySelector('.chrome__dock [data-action="map"]')?.addEventListener('click', () => {
+      if (this.getView().mode === 'cenital') {
+        this.callbacks.onMapOverview();
+        return;
+      }
       this.setLayout('map');
       this.callbacks.onMapOverview();
     });
@@ -552,10 +570,46 @@ export class ChromeUI {
 
   private syncSubtitle(): void {
     const sub = this.subtitleElement();
+    if (!sub) return;
+    const v = this.getView();
     const text = studio.subtitle();
-    sub.textContent = text;
-    sub.hidden = !text;
     document.body.dataset.voiceContact = studio.subtitleVoiceId() === '11-contact' ? '1' : '0';
+    if (v.mode === 'cenital' && text.startsWith('Hey, welcome')) {
+      sub.classList.remove('chrome__subtitle--compact');
+      sub.textContent = '';
+      sub.hidden = true;
+      sub.style.visibility = 'hidden';
+      return;
+    }
+    const checklist = this.root.querySelector('.checklist') as HTMLElement | null;
+    const checklistExpanded =
+      checklist &&
+      !checklist.hidden &&
+      !checklist.classList.contains('checklist--collapsed') &&
+      !checklist.classList.contains('checklist--mobile-closed');
+    const checklistRect = checklistExpanded ? checklist.getBoundingClientRect() : null;
+    const checklistBlocksTop =
+      checklistRect &&
+      checklistRect.height > 40 &&
+      checklistRect.bottom > 48 &&
+      !this.mobile;
+    const blocksLabels =
+      v.overview ||
+      (v.mode === 'cenital' && (this.mobile || this.shortLandscape()));
+    sub.classList.toggle('chrome__subtitle--compact', !!(blocksLabels && text));
+    sub.hidden = !text;
+    if (blocksLabels && text && !checklistBlocksTop) {
+      sub.style.visibility = 'visible';
+      sub.textContent = text;
+      return;
+    }
+    if (blocksLabels && text && checklistBlocksTop) {
+      sub.style.visibility = 'hidden';
+      sub.textContent = text;
+      return;
+    }
+    sub.style.visibility = text ? 'visible' : 'hidden';
+    sub.textContent = text;
   }
 
   /** 'No sound? Check silent mode' is a boot hint — fade out after ~4s, then stay gone. */
@@ -571,6 +625,7 @@ export class ChromeUI {
     const visibleMs = 4000;
     const fadeMs = reduced ? 0 : 400;
     this.soundHintTimer = window.setTimeout(() => {
+      this.soundHintDismissed = true;
       if (reduced) {
         el.hidden = true;
       } else {
@@ -766,6 +821,17 @@ export class ChromeUI {
       if (key !== 'rotate' && key !== 'map') btn.classList.toggle('is-active', key === v.mode);
       if (key === 'map') btn.classList.toggle('is-active', v.overview);
     });
+    this.syncSubtitle();
+    this.root.classList.toggle('chrome--alt-view', v.mode !== 'isometrica');
+    this.root.classList.toggle('chrome--overview', v.overview);
+    const hint = this.root.querySelector('.chrome__sound') as HTMLElement | null;
+    if (hint && (this.soundHintDismissed || v.mode !== 'isometrica') && !hint.hidden) {
+      hint.hidden = true;
+      hint.dataset.hint = '0';
+      hint.setAttribute('aria-hidden', 'true');
+      hint.classList.remove('chrome__sound--fade');
+      if (!this.soundHintDismissed) this.soundHintDismissed = true;
+    }
   }
 
   private placeSubtitle(): void {
@@ -803,6 +869,15 @@ export class ChromeUI {
         sub.style.top = 'auto';
         return;
       }
+    }
+    const previewOpen = document.querySelector('.building-panel--preview.building-panel--open');
+    if (this.mobile && previewOpen && !this.interiorOpen) {
+      sub.style.bottom = '76px';
+      sub.style.top = 'auto';
+      sub.style.left = '50%';
+      sub.style.transform = 'translateX(-50%)';
+      sub.style.width = 'min(560px, calc(100vw - 32px))';
+      return;
     }
     if (document.body.classList.contains('about-panel-open')) {
       const sheet = document.querySelector('.about-panel__sheet')?.getBoundingClientRect();
@@ -862,6 +937,9 @@ export class ChromeUI {
           sub.style.bottom = 'auto';
           return;
         }
+        sub.style.bottom = `${Math.max(12, window.innerHeight - r.top + 8)}px`;
+        sub.style.top = 'auto';
+        return;
       }
     }
     sub.style.bottom = '';
@@ -871,10 +949,14 @@ export class ChromeUI {
     sub.style.transform = '';
   }
 
+  private shortLandscape(): boolean {
+    return window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
+  }
+
   private placeLang(): void {
     const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
     if (!lang) return;
-    const shortLand = window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
+    const shortLand = this.shortLandscape();
     if (shortLand && this.mobile) {
       if (document.body.classList.contains('about-panel-open')) {
         lang.style.top = '12px';
@@ -894,19 +976,41 @@ export class ChromeUI {
       return;
     }
     lang.style.left = '';
-    if (!this.mobile) {
+    const cl = document.querySelector('.checklist') as HTMLElement | null;
+    const ring = cl && !cl.hidden ? cl.getBoundingClientRect() : null;
+    if (!this.mobile && ring && ring.width > 8) {
+      const top = Math.max(16, ring.top + (ring.height - 40) / 2);
+      const right = Math.max(16, window.innerWidth - ring.left + 8);
+      lang.style.top = `${top}px`;
+      lang.style.right = `${right}px`;
+    } else if (!this.mobile) {
       lang.style.top = '20px';
       lang.style.right = '16px';
-      return;
-    }
-    if (this.mobile && document.body.dataset.layout === 'map') {
+    } else if (document.body.dataset.layout === 'map') {
       lang.style.top = '';
       lang.style.left = '';
       lang.style.right = '';
-      return;
+    } else {
+      lang.style.top = '24px';
+      lang.style.right = '16px';
     }
-    lang.style.top = '24px';
-    lang.style.right = '16px';
+    const locate = this.root.querySelector('.chrome__locate') as HTMLElement | null;
+    const wrap = this.root.querySelector('.chrome__minimap-wrap') as HTMLElement | null;
+    if (locate && wrap && wrap.offsetParent !== null && !locate.hidden) {
+      const lr = locate.getBoundingClientRect();
+      const gr = lang.getBoundingClientRect();
+      if (gr.bottom > lr.top - 4 && gr.right > lr.left - 4 && gr.left < lr.right + 4) {
+        lang.style.top = `${Math.max(8, lr.bottom + 6)}px`;
+        lang.style.right = `${Math.max(16, window.innerWidth - lr.right)}px`;
+      }
+    }
+    const tools = this.root.querySelector('.chrome__tools-phone') as HTMLElement | null;
+    if (this.mobile && tools && tools.offsetParent !== null && document.body.dataset.layout !== 'map') {
+      const tr = tools.getBoundingClientRect();
+      lang.style.left = 'auto';
+      lang.style.right = '16px';
+      lang.style.top = `${Math.max(tr.bottom + 10, 24)}px`;
+    }
   }
 
   private drawMinimap(): void {
@@ -914,17 +1018,25 @@ export class ChromeUI {
     if (!ctx) return;
     const w = this.minimap.width;
     const h = this.minimap.height;
+    const view = this.getView();
+    const cenital = view.mode === 'cenital';
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = '#0B0C0E';
-    ctx.beginPath();
-    ctx.moveTo(w / 2, 4);
-    ctx.lineTo(w - 4, h / 2);
-    ctx.lineTo(w / 2, h - 4);
-    ctx.lineTo(4, h / 2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = '#2A2C31';
-    ctx.stroke();
+    if (cenital) {
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = '#2A2C31';
+      ctx.strokeRect(2, 2, w - 4, h - 4);
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(w / 2, 4);
+      ctx.lineTo(w - 4, h / 2);
+      ctx.lineTo(w / 2, h - 4);
+      ctx.lineTo(4, h / 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#2A2C31';
+      ctx.stroke();
+    }
 
     const buildings = getEnterableBuildings();
     let minX = Infinity;
@@ -951,7 +1063,8 @@ export class ChromeUI {
     ctx.fillStyle = '#24262B';
     for (const { p } of pts) {
       const s = map(p.x, p.y);
-      ctx.fillRect(s.x - 4, s.y - 3, 8, 6);
+      if (cenital) ctx.fillRect(s.x - 5, s.y - 4, 10, 8);
+      else ctx.fillRect(s.x - 4, s.y - 3, 8, 6);
     }
     const t = this.getCharTile();
     const c = map(tileToWorld(t.x, t.y).x, tileToWorld(t.x, t.y).y);
