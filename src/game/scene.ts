@@ -1185,6 +1185,11 @@ export class IsoScene {
           (a.bbox.x1 - a.bbox.x0) * sc,
           (a.bbox.y1 - a.bbox.y0) * sc,
         );
+        if (obj.name === 'muro') {
+          const trim = 112 * sc;
+          box.x += trim;
+          box.width = Math.max(8, box.width - trim);
+        }
         this.objectTapBoxes.set(obj.id, box);
         g.hitArea =
           obj.type === 'building'
@@ -1320,6 +1325,10 @@ export class IsoScene {
    * (front-row ordering); among themselves the one further down the screen draws on top.
    */
   private walkerZIndex(fx: number, fy: number): number {
+    if (this.seatedBench) {
+      const z = this.objectGraphics.get(this.seatedBench.id)?.zIndex;
+      if (z != null) return z + 0.5;
+    }
     let zi = Infinity;
     for (const v of this.objectVisuals.values()) {
       if (!v.occluder || v.zIndex >= zi) continue;
@@ -7997,8 +8006,12 @@ export class IsoScene {
     const t = boundary.hitTest(clientX - rect.left, clientY - rect.top);
     if (!t) return null;
     if (t === this.noah?.sprite) return 'noah';
-    for (const [id, v] of this.objectVisuals) if (v.sprite === t) return `object:${id}`;
-    for (const [id, g] of this.objectGraphics) if (g === t) return `object:${id}`;
+    let node: import('pixi.js').Container | null = t;
+    while (node) {
+      for (const [id, v] of this.objectVisuals) if (v.sprite === node) return `object:${id}`;
+      for (const [id, g] of this.objectGraphics) if (g === node) return `object:${id}`;
+      node = node.parent;
+    }
     return t.label || t.constructor.name;
   }
 
