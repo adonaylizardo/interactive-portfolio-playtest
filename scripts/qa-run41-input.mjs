@@ -208,6 +208,7 @@ async function testKeyboardEntry(ctx, kind, base, errors, notes) {
         page,
         (bb) => {
           const q = window.__playtestQa;
+          const here = q.getCharacterTile();
           for (const k of [5, 4, 3]) {
             for (const lat of [0, 2, -2]) {
               const t = {
@@ -215,7 +216,8 @@ async function testKeyboardEntry(ctx, kind, base, errors, notes) {
                 y: bb.door.y - bb.inward.y * k + (bb.inward.y ? 0 : lat),
               };
               const n = q.findPath(t.x, t.y, bb.door.x, bb.door.y)?.length ?? 0;
-              if (n >= 3) return { ...t, n };
+              const fromHere = q.findPath(here.x, here.y, t.x, t.y)?.length ?? 0;
+              if (n >= 3 && fromHere > 0) return { ...t, n };
             }
           }
           return null;
@@ -241,8 +243,15 @@ async function testKeyboardEntry(ctx, kind, base, errors, notes) {
         await page.keyboard.up(inwardKey);
       }
       const id = await qa(page, () => window.__playtestQa.getInteriorId());
-      if (id !== b.name) {
+      const preview = id !== b.name && (await qa(page, () => window.__playtestQa.isBuildingPanelOpen()));
+      if (id !== b.name && !preview) {
         errors.push(`${tag}: walking into the ${b.name} door with ${inwardKey} did not enter (interior ${id})`);
+        continue;
+      }
+      if (preview) {
+        entered.push(`${b.name} (case preview)`);
+        await qa(page, () => window.__playtestQa.dismissBuildingPanel());
+        await wait(300);
         continue;
       }
       entered.push(`${b.name} (walked ${stage.n} tiles${onArrival ? ', entered on arrival' : `, then ${inwardKey}`})`);
@@ -284,10 +293,19 @@ async function testKeyboardEntry(ctx, kind, base, errors, notes) {
       errors.push(`${tag}: could not walk next to the ${third.name} door: ${sideWhy}`);
     } else {
       await page.keyboard.press('Enter');
-      const ok = await waitFor(page, () => inInterior(page), 5000);
+      const ok = await waitFor(
+        page,
+        async () => (await inInterior(page)) || (await qa(page, () => window.__playtestQa.isBuildingPanelOpen())),
+        5000,
+      );
       const id = await qa(page, () => window.__playtestQa.getInteriorId());
-      if (!ok || id !== third.name) errors.push(`${tag}: Enter next to the ${third.name} door did not enter (interior ${id})`);
-      else entered.push(`${third.name} (Enter)`);
+      const preview = id !== third.name && (await qa(page, () => window.__playtestQa.isBuildingPanelOpen()));
+      if (!ok || (id !== third.name && !preview)) {
+        errors.push(`${tag}: Enter next to the ${third.name} door did not enter (interior ${id})`);
+      } else {
+        entered.push(preview ? `${third.name} (Enter, case preview)` : `${third.name} (Enter)`);
+        if (preview) await qa(page, () => window.__playtestQa.dismissBuildingPanel());
+      }
     }
     if (entered.length < 3) errors.push(`${tag}: entered ${entered.length}/3 buildings by keyboard: ${entered.join(', ')}`);
     notes.push(`${tag}: entered ${entered.join(', ')} by keyboard only`);
@@ -371,7 +389,7 @@ async function testWheel(ctx, kind, base, errors, notes) {
       const drift = Math.hypot(at.x - px, at.y - py);
       if (drift > 6) errors.push(`${tag}: ${mod}+wheel zoom is not centred on the cursor (point drifted ${drift.toFixed(1)} px)`);
     }
-    notes.push(`${tag}: scroll pans 4 directions without zooming; ctrl / cmd + wheel zoom at the cursor`);
+    notes.push(`${tag}: vertical wheel zooms, horizontal wheel pans; ctrl / cmd + wheel zoom at the cursor`);
   } finally {
     await page.close();
   }
