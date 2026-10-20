@@ -621,7 +621,6 @@ async function main(): Promise<void> {
       enterReadingFromWelcome();
     } else if (!parseInteriorFromHash() && !bootReading) {
       if (isMobileLayout()) {
-        chrome.setLayout('map');
         scene.reframeMobileFirstLoadForQa();
       } else {
         chrome.setLayout('split');
