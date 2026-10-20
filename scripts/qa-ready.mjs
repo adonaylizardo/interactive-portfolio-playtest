@@ -94,6 +94,19 @@ export async function launchBrowser(type, options = {}) {
   return installReadyWait(await type.launch({ ...options, args }));
 }
 
+/**
+ * Phone portrait keeps the arrival intro over the map until it is closed.
+ * Layout checks assert that sheet, so this is not part of the navigation wait.
+ */
+export async function dismissArrivalSheet(page) {
+  await page
+    .evaluate(() => {
+      const btn = document.querySelector('.chrome--sheet [data-action="intro-close"]');
+      if (btn instanceof HTMLElement) btn.click();
+    })
+    .catch(() => {});
+}
+
 /** SwiftShader / headless GL sometimes kills the tab without a real app failure. */
 export function isBrowserCrash(err) {
   const s = String(err);

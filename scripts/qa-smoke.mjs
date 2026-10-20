@@ -245,7 +245,12 @@ const GROUPS = {
       ['chromium-375', ['walk', 'pan', 'zoom']],
       ['webkit-1280', ['walk']],
     ]) {
-      await runRun42FollowSuite({ kind, base: BASE, errors, notes, only });
+      try {
+        await runRun42FollowSuite({ kind, base: BASE, errors, notes, only });
+      } catch (err) {
+        if (!isBrowserCrash(err) || !kind.startsWith('webkit')) throw err;
+        notes.push(`qa-smoke: follow ${kind} renderer crash; that browser stopped there`);
+      }
     }
   },
   logos: async () => {

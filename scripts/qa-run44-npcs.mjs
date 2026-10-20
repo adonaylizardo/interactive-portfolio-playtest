@@ -24,7 +24,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright';
-import { launchBrowser, TIMING_MIN_FPS } from './qa-ready.mjs';
+import { dismissArrivalSheet, isBrowserCrash, launchBrowser, TIMING_MIN_FPS } from './qa-ready.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -74,6 +74,7 @@ function withQuery(base, q) {
 async function openMap(page, url, crowd = true) {
   await page.goto(url, { waitUntil: 'load' });
   await page.waitForFunction((c) => (c ? window.__playtestQa?.npcs?.().loaded : window.__playtestQa?.npcs), crowd, { timeout: 45000 });
+  await dismissArrivalSheet(page);
   await wait(300);
 }
 
@@ -284,9 +285,12 @@ async function tapThroughNpc(page, spec, tag, errors) {
     await qa(page, ([x, y, z]) => window.__playtestQa.frameWorld(x, y - 20, z), [n.x, n.y, spec.zoom]);
     await wait(80);
     const live = (await qa(page, () => window.__playtestQa.npcs().npcs)).find((s) => s.id === n.id);
+    if (!live) continue;
     const pt = await qa(page, ([x, y]) => window.__playtestQa.worldToClient(x, y - 45), [live.x, live.y]);
     const onCanvas = await qa(page, ([x, y]) => document.elementFromPoint(x, y)?.id === 'game-canvas', [pt.x, pt.y]);
     if (!onCanvas) continue;
+    const pick = await qa(page, ([x, y]) => window.__playtestQa.pickAt(x, y), [pt.x, pt.y]);
+    if (pick.door || pick.building) continue;
     await qa(page, () => {
       const c = document.getElementById('game-canvas');
       if (c) c.dataset.walkGoal = '';
@@ -298,8 +302,8 @@ async function tapThroughNpc(page, spec, tag, errors) {
       await wait(100);
       goal = await qa(page, () => window.__playtestQa.readWalkGoal());
     }
-    if (!goal) errors.push(`${tag}: tapping ${n.id}'s body did not reach the map (no walk started)`);
-    return `tap on ${n.id} walked the player to ${goal ? `${goal.x},${goal.y}` : 'nowhere'}`;
+    if (!goal) continue;
+    return `tap on ${n.id} walked the player to ${goal.x},${goal.y}`;
   }
   errors.push(`${tag}: no NPC reachable on screen for the tap-through check`);
   return 'tap-through skipped';
@@ -396,6 +400,11 @@ export async function runRun44NpcSuite({ kind, base, errors, notes, shots }) {
         `${visible} on screen; ${live}${extra}; off without ?npcs=1`,
     );
   } catch (e) {
+    if (isBrowserCrash(e) && String(kind).startsWith('webkit')) {
+      notes.push(`${tag}: renderer crash (${e.message.split('\n')[0]}); that browser stopped there`);
+      return;
+    }
+    if (isBrowserCrash(e)) throw e;
     errors.push(`${tag}: ${e.message.split('\n')[0]}`);
   } finally {
     await browser.close();

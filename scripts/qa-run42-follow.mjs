@@ -13,7 +13,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright';
-import { launchBrowser, TIMING_MIN_FPS } from './qa-ready.mjs';
+import { dismissArrivalSheet, launchBrowser, TIMING_MIN_FPS } from './qa-ready.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -188,6 +188,11 @@ async function walkRouteByTaps(page, touch, route, maxMs = touch ? 180000 : 9000
   const t0 = Date.now();
   let taps = 0;
   while (Date.now() - t0 < maxMs) {
+    if (await qa(page, () => window.__playtestQa.isInInterior())) {
+      await qa(page, () => window.__playtestQa.exitInterior());
+      await wait(200);
+      continue;
+    }
     const here = await qa(page, () => window.__playtestQa.getCharacterTile());
     const idx = route.findIndex((t) => t.x === here.x && t.y === here.y);
     if (idx === route.length - 1) return { ok: true, taps };
@@ -202,9 +207,11 @@ async function walkRouteByTaps(page, touch, route, maxMs = touch ? 180000 : 9000
         await wait(120);
         continue;
       }
+      // A hidden step uses the walk hook. tapMapTile routes through door entry and
+      // can leave the street when the only on-screen tiles are the Estudio door.
       const next = route[Math.min(route.length - 1, Math.max(idx, 0) + 4)];
       if (next && goalIdx < 0) {
-        await qa(page, ([x, y]) => window.__playtestQa.tapMapTile(x, y), [next.x, next.y]);
+        await qa(page, ([x, y]) => window.__playtestQa.walkToTile(x, y, false), [next.x, next.y]);
         taps++;
         await wait(120);
         continue;
@@ -455,6 +462,7 @@ export async function runRun42FollowSuite({ kind, base, errors, notes, only, vid
       try {
         await page.goto(base, { waitUntil: 'load' });
         await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, { timeout: 45000 });
+        await dismissArrivalSheet(page);
         await wait(400);
         // Phone spawn framing is tight on the Estudio door; zoom out so a street route is tappable.
         if (spec.touch) {
