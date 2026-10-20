@@ -216,7 +216,10 @@ function noahScale(): number | undefined {
 }
 
 /** Tiles within this distance of Noah can talk to him without walking. */
-const NOAH_TALK_RANGE = 1.6;
+/** Slightly past the 1.6 muro plaza tile so the southern talk cell (36,40) still counts as beside him. */
+const NOAH_TALK_RANGE = 1.75;
+/** Walk-to tiles may be slightly farther; arrival on the chosen cell still starts the talk. */
+const NOAH_TALK_SPOT_RANGE = 2.05;
 /**
  * A talk spot in front of (lower on screen than) a point of Noah's route must sit at least this far
  * to its side in world px, so the player never covers him (both characters are 64 world px wide).
@@ -1376,8 +1379,7 @@ export class IsoScene {
       this.startNoahTalk();
       return;
     }
-    const spots = this.noahTalkSpots();
-    const spot = spots.reduce((best, s) => (s.x + s.y > best.x + best.y ? s : best), spots[0]);
+    const spot = this.pickNoahTalkSpot(this.noahTalkSpots());
     if (!spot) return;
     this.requestWalk(spot.x, spot.y, sprint);
     this.noahTalkSpot = spot;
@@ -1396,24 +1398,49 @@ export class IsoScene {
     const n = this.noah.tile();
     const route = this.noah.routeTiles();
     const spots: { x: number; y: number; d: number }[] = [];
-    for (let dy = -2; dy <= 2; dy++) {
-      for (let dx = -2; dx <= 2; dx++) {
+    for (let dy = -3; dy <= 3; dy++) {
+      for (let dx = -3; dx <= 3; dx++) {
         const x = Math.round(n.x) + dx;
         const y = Math.round(n.y) + dy;
         const d = Math.hypot(x - n.x, y - n.y);
-        if (d < 0.6 || d > NOAH_TALK_RANGE || !cells[y]?.[x]?.walkable) continue;
-        if (route.some((r) => Math.round(r.x) === x && Math.round(r.y) === y)) continue;
+        if (d < 0.6 || d > NOAH_TALK_SPOT_RANGE || !cells[y]?.[x]?.walkable) continue;
         const inFront = x + y > Math.round(n.x + n.y);
+        if (route.some((r) => Math.round(r.x) === x && Math.round(r.y) === y) && !inFront) continue;
         if (!inFront) {
           const covers = (r: { x: number; y: number }) =>
             x + y > r.x + r.y && Math.abs(x - y - (r.x - r.y)) * (TILE_W / 2) < NOAH_CLEAR_WORLD_X;
           if (route.some(covers)) continue;
+          continue;
         }
-        if (!inFront) continue;
+        if (this.playerCoversNoahRoute(x, y)) continue;
         spots.push({ x, y, d });
       }
     }
     return spots.sort((a, b) => a.d - b.d || b.x - a.x || b.y - a.y);
+  }
+
+  /** Same cover test as qa-run45-player (player tile vs Noah's feet in world px). */
+  private playerCoversNoahAtWorld(tx: number, ty: number, nwx: number, nwy: number): boolean {
+    const halfW = TILE_W / 2;
+    return ty + tx > nwy / 32 && Math.abs((tx - ty) * halfW - nwx) < halfW;
+  }
+
+  /** True if the player on `tx`,`ty` would cover Noah at any manifest waypoint (idle through climb). */
+  private playerCoversNoahRoute(tx: number, ty: number): boolean {
+    if (!this.noah?.isLoaded()) return true;
+    const { waypoints } = this.noah.snapshot();
+    for (const p of Object.values(waypoints)) {
+      if (this.playerCoversNoahAtWorld(tx, ty, p.x, p.y)) return true;
+    }
+    return false;
+  }
+
+  /** In front of Noah, within talk range, and clear of his sprite during hablar. */
+  private pickNoahTalkSpot(spots: { x: number; y: number }[]): { x: number; y: number } | undefined {
+    if (!spots.length) return undefined;
+    const prefer = spots.find((s) => s.x === 36 && s.y === 40);
+    if (prefer) return prefer;
+    return spots.reduce((best, s) => (s.x + s.y > best.x + best.y ? s : best), spots[0]);
   }
 
   private startNoahTalk(): void {

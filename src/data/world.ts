@@ -166,7 +166,6 @@ const FILLER_PROPS: { kind: 'tree' | 'bench' | 'lamp' | 'plaza'; x: number; y: n
   { kind: 'plaza', x: 33, y: 38 },
   { kind: 'tree', x: 26, y: 37 },
   { kind: 'tree', x: 35, y: 37 },
-  { kind: 'bench', x: 30, y: 39 },
   { kind: 'bench', x: 32, y: 39 },
   { kind: 'lamp', x: 28, y: 39 },
   { kind: 'tree', x: 20, y: 32 },
