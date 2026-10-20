@@ -372,10 +372,12 @@ async function testDoorEntryOnArrival(ctx, kind, base, errors) {
     }
     await tapAt(page, kind, pt.x, pt.y);
     await wait(120);
+    const caseOpen = () => page.evaluate(() => window.__playtestQa.isBuildingPanelOpen() === true);
     if (await inInterior(page)) errors.push(`${tag}: entered the building instantly without walking`);
+    if (await caseOpen()) errors.push(`${tag}: case preview opened instantly without walking`);
     let entered = false;
     for (let i = 0; i < 70 && !entered; i++) {
-      entered = await inInterior(page);
+      entered = (await inInterior(page)) || (await caseOpen());
       if (!entered) await wait(150);
     }
     if (!entered) errors.push(`${tag}: door tap never entered after walking`);

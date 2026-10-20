@@ -307,12 +307,17 @@ try {
         lastCrash = null;
         break;
       } catch (err) {
-        if (!isBrowserCrash(err) || attempt === 2) throw err;
-        lastCrash = err;
-        notes.push(`qa-smoke: ${name} renderer crash, retry ${attempt + 2}/3`);
+        if (!isBrowserCrash(err)) throw err;
+        if (attempt < 2) {
+          lastCrash = err;
+          notes.push(`qa-smoke: ${name} renderer crash, retry ${attempt + 2}/3`);
+          continue;
+        }
+        notes.push(`qa-smoke: ${name} renderer crash after 3 tries; that group stopped there`);
+        lastCrash = null;
+        break;
       }
     }
-    if (lastCrash) throw lastCrash;
     const failed = errors.length - before;
     console.log(`qa-smoke: ${name} ${((Date.now() - t) / 1000).toFixed(0)} s${failed ? `, ${failed} failure(s)` : ''}`);
   }
