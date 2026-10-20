@@ -1368,9 +1368,7 @@ export class IsoScene {
       return;
     }
     const spots = this.noahTalkSpots();
-    const spot =
-      spots.find((s) => s.x === 38 && s.y === 40) ??
-      spots.reduce((best, s) => (s.x + s.y > best.x + best.y ? s : best), spots[0]);
+    const spot = spots.reduce((best, s) => (s.x + s.y > best.x + best.y ? s : best), spots[0]);
     if (!spot) return;
     this.requestWalk(spot.x, spot.y, sprint);
     this.noahTalkSpot = spot;
