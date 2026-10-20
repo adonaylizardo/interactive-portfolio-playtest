@@ -1,0 +1,261 @@
+body.boot-loading #ui-root {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+body.boot-welcome #ui-root .chrome,
+body.boot-welcome #ui-root .checklist {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.boot-flow {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+  color: #edeef0;
+  background: transparent;
+}
+
+.boot-flow__loading,
+.boot-flow__welcome,
+.boot-flow__lang,
+.boot-flow__btn {
+  pointer-events: auto;
+}
+
+.boot-flow--done {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+.boot-flow__loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(11 12 14 / 52%);
+  transition: opacity 0.25s ease;
+}
+
+body.boot-loading #game-canvas {
+  visibility: visible;
+}
+
+body.boot-loading::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+  background: rgb(0 0 0 / 40%);
+  pointer-events: none;
+}
+
+.boot-flow__loading--out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.boot-flow__center {
+  width: min(320px, calc(100% - 48px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.boot-flow__monogram {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #1a1c20;
+  border: 1px solid #2a2c31;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.boot-flow__name {
+  margin: 0;
+  font-family: Geist, Inter, system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 22px;
+  color: #edeef0;
+}
+
+.boot-flow__track {
+  width: 100%;
+  height: 2px;
+  border-radius: 1px;
+  background: #2a2c31;
+  overflow: hidden;
+}
+
+.boot-flow__fill {
+  height: 100%;
+  width: 0%;
+  background: #edeef0;
+  transition: width 0.12s ease-out;
+}
+
+.boot-flow__meta {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-family: Geist, Inter, system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 18px;
+  color: #8a8f98;
+}
+
+.boot-flow__welcome {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.boot-flow--welcome .boot-flow__welcome {
+  pointer-events: auto;
+}
+
+.boot-flow__lang {
+  position: absolute;
+  top: max(86px, calc(env(safe-area-inset-top) + 70px));
+  left: auto;
+  right: 16px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 22px;
+  border: 1px solid #2a2c31;
+  background: #141518;
+  color: #edeef0;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 45%);
+}
+
+.boot-flow__lang:focus-visible {
+  outline: 2px solid #ffb547;
+  outline-offset: 2px;
+}
+
+.boot-flow__sheet {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  padding: 20px 20px 24px;
+  background: #141518;
+  border: 1px solid #2a2c31;
+  border-radius: 20px;
+  box-shadow: 0 -8px 32px rgb(0 0 0 / 45%);
+}
+
+body.boot-welcome #game-canvas {
+  visibility: visible;
+}
+
+body.boot-welcome::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+  background: rgb(0 0 0 / 45%);
+  pointer-events: none;
+}
+
+.boot-flow__handle {
+  display: none;
+}
+
+.boot-flow__headline {
+  margin: 0 0 20px;
+  font-family: Geist, Inter, system-ui, sans-serif;
+  font-size: clamp(18px, 4.5vw, 22px);
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: center;
+  color: #edeef0;
+}
+
+.boot-flow__actions {
+  display: flex;
+  gap: 12px;
+}
+
+.boot-flow__btn {
+  flex: 1;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-family: Geist, Inter, system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 22px;
+  cursor: pointer;
+}
+
+.boot-flow__btn--primary {
+  border: none;
+  background: #edeef0;
+  color: #0b0c0e;
+}
+
+.boot-flow__btn--ghost {
+  border: 1px solid #edeef0;
+  background: transparent;
+  color: #edeef0;
+}
+
+.boot-flow__btn:focus-visible {
+  outline: 2px solid #ffb547;
+  outline-offset: 2px;
+}
+
+@media (min-width: 768px) {
+  .boot-flow__lang {
+    left: auto;
+    right: 16px;
+  }
+
+  .boot-flow__sheet {
+    left: max(16px, env(safe-area-inset-left));
+    right: auto;
+    bottom: auto;
+    top: 50%;
+    transform: translateY(-50%);
+    width: min(420px, calc(100% - 32px));
+    border-radius: 20px;
+    padding: 24px 28px 28px;
+  }
+
+  .boot-flow__actions {
+    justify-content: flex-start;
+  }
+
+  .boot-flow__btn {
+    flex: 0 1 auto;
+    min-width: 140px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .boot-flow__sheet {
+    max-height: min(70vh, 280px);
+    overflow-y: auto;
+  }
+}

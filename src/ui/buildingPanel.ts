@@ -1,11 +1,11 @@
 import { studio } from '../audio/studio';
-import { ABOUT, ABOUT_PANELS } from '../data/about';
+import { aboutForLang, ABOUT_PANELS } from '../data/about';
 import { aboutBlockNode } from './aboutRender';
-import { CASES, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
+import { caseForLang, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
 import {
+  TALK_SECTIONS,
   TALKS,
   TALKS_COMING_SOON,
-  TALK_SECTIONS,
   WRITINGS,
   type TalkItem,
   type WritingItem,
@@ -15,10 +15,12 @@ import {
   isPlaceholderCopy,
   talkMeta,
   talkSectionTitle,
+  talkThumbnailUrl,
   talkTitle,
   writingArticleUrl,
   writingItemHasCopy,
   writingMeta,
+  writingSourceLabel,
   writingTitle,
 } from './contentLabels';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
@@ -27,12 +29,11 @@ import {
   FIGMA_CLOSE_PHONE_READING,
   FIGMA_DOC,
   FIGMA_DOC_PHONE,
-  FIGMA_PLAY,
   FIGMA_SUBSTACK_PHONE,
   figmaAsset,
 } from './figmaAssets';
 import { iconSvg } from './icons';
-import { onLangChange, t, type I18nKey } from './i18n';
+import { getLang, onLangChange, t, type I18nKey } from './i18n';
 
 const FIGMA_BACK = figmaAsset('talks-desktop-list', '9f9c4.svg');
 const FIGMA_EXPAND = figmaAsset('talks-desktop-list', 'ce7c9.svg');
@@ -104,6 +105,7 @@ export class BuildingPanel {
   private workedWithLogos: WorkedWithLogo[] = WORKED_WITH;
   private interiorId: string | null = null;
   private onVisibilityChange: () => void;
+  private onSheetTransitionEnd: () => void;
   private onSalir: () => void;
   private mode: 'hidden' | 'interior' | 'preview' | 'talks' | 'writings' = 'hidden';
   private experienceEl: HTMLElement | null = null;
@@ -140,14 +142,17 @@ export class BuildingPanel {
   /** Press on Salir: leave only on lift, and only if the finger stayed within ~10 px. */
   private exitPress: { x: number; y: number; drift: number } | null = null;
   private exitFromPointer = false;
+  private visibilitySyncQueued = false;
 
   constructor(
     container: HTMLElement,
     onVisibilityChange: () => void,
     onSalir: () => void,
+    onSheetTransitionEnd?: () => void,
   ) {
     this.onVisibilityChange = onVisibilityChange;
     this.onSalir = onSalir;
+    this.onSheetTransitionEnd = onSheetTransitionEnd ?? onVisibilityChange;
     this.el = document.createElement('div');
     this.el.className = 'building-panel building-panel--interior-only';
     this.el.hidden = true;
@@ -229,11 +234,11 @@ export class BuildingPanel {
             <div class="case__version case__version--short"></div>
           </article>
           <section class="worked-with" aria-labelledby="worked-with-title" hidden>
-            <h3 class="worked-with__title" id="worked-with-title">Worked with</h3>
+            <h3 class="worked-with__title" id="worked-with-title" data-i18n="panel.workedWith">Worked with</h3>
             <ul class="worked-with__logos"></ul>
           </section>
           <section class="about" lang="en" aria-labelledby="about-title" hidden>
-            <h3 class="about__title" id="about-title">About me</h3>
+            <h3 class="about__title" id="about-title" data-i18n="panel.aboutMe">About me</h3>
           </section>
           <section class="experience" data-experience hidden>
             <p class="experience__intro"></p>
@@ -246,6 +251,20 @@ export class BuildingPanel {
     `;
     container.appendChild(this.el);
     this.sheet = this.el.querySelector('.building-panel__sheet')!;
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => {
+        if (this.isOpen() && this.isMobile() && this.isInteriorMode()) this.queueVisibilitySync();
+      });
+      ro.observe(this.sheet);
+    }
+    this.sheet.addEventListener('transitionend', (ev) => {
+      if (ev.target !== this.sheet || ev.propertyName !== 'transform') return;
+      if (!this.isOpen() || !this.isMobile()) return;
+      if (!this.isInteriorMode() && !this.isPreviewMode()) return;
+      this.sheet.scrollTop = 0;
+      this.syncScrolled();
+      this.onSheetTransitionEnd();
+    });
     this.titleEl = this.el.querySelector('.building-panel__title')!;
     this.workedWithEl = this.el.querySelector('.worked-with')!;
     this.caseEl = this.el.querySelector('.case')!;
@@ -261,7 +280,7 @@ export class BuildingPanel {
     this.readHeadline = this.el.querySelector('.case-read__headline');
     this.readLede = this.el.querySelector('.case-read__lede');
     this.readHeroLabel = this.el.querySelector('.case-read__hero-label');
-    this.aboutEl.append(...ABOUT.map(aboutBlockNode));
+    this.aboutEl.append(...aboutForLang(getLang()).map(aboutBlockNode));
     this.experienceEl = this.el.querySelector('[data-experience]');
     this.experienceIntro = this.el.querySelector('.experience__intro');
     this.experienceFilters = this.el.querySelector('[data-exp-filters]');
@@ -296,6 +315,15 @@ export class BuildingPanel {
     onLangChange(() => {
       this.applyI18n();
       this.refreshExperienceCopy();
+      if (this.interiorId && this.mode === 'interior' && ABOUT_PANELS.has(this.interiorId)) {
+        this.aboutEl.replaceChildren(...aboutForLang(getLang()).map(aboutBlockNode));
+      }
+      if (this.interiorId && this.mode === 'interior') {
+        this.setTitle(this.openKey, this.renderCase());
+      }
+      if (this.isPreviewMode() && this.interiorId) {
+        this.syncCasePreview(this.interiorId);
+      }
     });
     // Touch has no hover: a tap shows that logo's colours until another logo (or the same one) is tapped.
     this.workedWithEl.addEventListener('click', (e) => {
@@ -375,7 +403,17 @@ export class BuildingPanel {
     this.sheet.addEventListener('click', (e) => {
       e.stopPropagation();
     });
-    this.sheet.addEventListener('pointerdown', (e) => e.stopPropagation());
+    this.sheet.addEventListener('pointerdown', (e) => {
+      if (
+        this.isMobile() &&
+        this.mode === 'interior' &&
+        this.peekOnly &&
+        (e.target as HTMLElement).closest('[data-drag], .building-panel__title, .building-panel__bar')
+      ) {
+        this.onDragStart(e);
+      }
+      e.stopPropagation();
+    });
 
     const drag = this.el.querySelector('[data-drag]') as HTMLElement;
     drag.addEventListener('pointerdown', (e) => this.onDragStart(e));
@@ -422,12 +460,28 @@ export class BuildingPanel {
     return window.matchMedia('(max-width: 767px)').matches;
   }
 
+  private queueVisibilitySync(): void {
+    if (this.visibilitySyncQueued) return;
+    this.visibilitySyncQueued = true;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        this.visibilitySyncQueued = false;
+        this.sheet.scrollTop = 0;
+        this.syncScrolled();
+        this.onVisibilityChange();
+      });
+    });
+  }
+
   private setPeek(peek: boolean): void {
     this.peekOnly = peek;
     this.dragStartY = 0;
     this.ignoreDragUntil = performance.now() + 400;
     this.syncPeekClass();
-    this.onVisibilityChange();
+    this.queueVisibilitySync();
+    if (this.isMobile() && this.isOpen() && (this.isInteriorMode() || this.isPreviewMode())) {
+      window.setTimeout(() => this.onSheetTransitionEnd(), 280);
+    }
   }
 
   private syncPeekClass(): void {
@@ -537,6 +591,17 @@ export class BuildingPanel {
     this.renderTalksList();
   }
 
+  /** QA / gate: Talks shell with empty list copy (refs `talks-vacio`). */
+  showTalksEmptyForQa(): void {
+    this.showTalks(t('panel.talks'), 'teresa');
+    if (!this.experienceList) return;
+    const p = document.createElement('p');
+    p.className = 'experience__empty';
+    p.textContent = t('talks.comingSoon');
+    this.experienceList.replaceChildren(p);
+    if (this.isMobile() && this.peekOnly) this.setPeek(false);
+  }
+
   showWritings(title: string, interiorId: string | null = 'biblioteca'): void {
     this.openExperience('writings', title, interiorId);
     this.renderWritingsList();
@@ -608,10 +673,13 @@ export class BuildingPanel {
     this.setExperienceView('list');
     if (mode === 'talks') this.renderTalksList();
     else {
-      this.renderWritingsFilters();
+      if (this.experienceFilters) {
+        this.experienceFilters.replaceChildren();
+        this.experienceFilters.hidden = true;
+      }
       this.renderWritingsList();
     }
-    this.onVisibilityChange();
+    this.queueVisibilitySync();
     studio.playClick();
   }
 
@@ -624,7 +692,6 @@ export class BuildingPanel {
     if (!this.isExperienceMode()) return;
     this.syncExperienceIntro();
     if (this.expHeaderTitle) this.expHeaderTitle.textContent = this.experiencePanelTitle;
-    if (this.mode === 'writings') this.renderWritingsFilters();
     if (this.experienceView === 'list') {
       if (this.mode === 'talks') this.renderTalksList();
       else this.renderWritingsList();
@@ -671,8 +738,7 @@ export class BuildingPanel {
     this.experienceView = view;
     this.experienceList.hidden = view !== 'list';
     this.experienceDetail.hidden = view !== 'detail';
-    const showFilters = this.mode === 'writings' && view === 'list';
-    this.experienceFilters.hidden = !showFilters;
+    this.experienceFilters.hidden = true;
     if (this.experienceIntro) {
       this.experienceIntro.hidden = this.mode !== 'talks' || view !== 'list';
     }
@@ -725,7 +791,7 @@ export class BuildingPanel {
   }
 
   private talkRow(
-    item: TalkItem,
+    item: TalkItem | WritingItem,
     onOpen: () => void,
     opts?: { compact?: boolean; kind?: 'talk' | 'writing' },
   ): HTMLElement {
@@ -749,30 +815,33 @@ export class BuildingPanel {
       doc.alt = '';
       thumb.append(doc);
     } else {
-      const play = document.createElement('img');
-      play.className = 'experience__play-icon';
-      play.src = FIGMA_PLAY;
-      play.width = 12;
-      play.height = 12;
-      play.alt = '';
-      thumb.append(play);
+      const talk = item as TalkItem;
+      const src = talkThumbnailUrl(talk);
+      if (src) {
+        const img = document.createElement('img');
+        img.className = 'experience__thumb-img';
+        img.src = src;
+        img.alt = '';
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        thumb.appendChild(img);
+      } else {
+        thumb.innerHTML = '<span class="experience__play" aria-hidden="true">▶</span>';
+      }
     }
     const copy = document.createElement('span');
     copy.className = 'experience__copy';
     const title = document.createElement('span');
     title.className = 'experience__row-title';
-    const titleText = kind === 'writing' ? writingTitle(item as WritingItem) : talkTitle(item);
+    const titleText = kind === 'writing' ? writingTitle(item as WritingItem) : talkTitle(item as TalkItem);
     if (titleText && !isPlaceholderCopy(titleText)) title.textContent = titleText;
     else title.hidden = true;
     const meta = document.createElement('span');
     meta.className = 'experience__row-meta';
-    const metaText = kind === 'writing' ? writingMeta(item as WritingItem) : talkMeta(item);
-    if (metaText && !isPlaceholderCopy(metaText)) {
-      meta.textContent = metaText;
-      copy.append(title, meta);
-    } else {
-      copy.append(title);
-    }
+    const metaText = kind === 'writing' ? writingMeta(item as WritingItem) : talkMeta(item as TalkItem);
+    if (metaText && !isPlaceholderCopy(metaText)) meta.textContent = metaText;
+    meta.hidden = !metaText || isPlaceholderCopy(metaText);
+    copy.append(title, meta);
     btn.append(thumb, copy);
     btn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -798,55 +867,65 @@ export class BuildingPanel {
     if (this.isMobile() && this.peekOnly) this.setPeek(false);
   }
 
-  private talkVideoUrl(item: TalkItem): string | null {
-    if (item.url?.startsWith('http')) return item.url;
-    if (!item.titleKey) return null;
-    const key = item.titleKey.replace(/\.title$/, '.url') as I18nKey;
-    const url = t(key);
-    return url.startsWith('http') ? url : null;
+  private openTalkUrl(url: string): void {
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 
   private renderTalkPlayer(item: TalkItem): void {
     if (!this.experienceDetail) return;
     const title = talkTitle(item);
     const meta = talkMeta(item);
-    const videoUrl = this.talkVideoUrl(item);
-    const upNextLimit = this.isMobile() ? 3 : 4;
-    const upNext = TALKS.filter((x) => x.id !== item.id).slice(0, upNextLimit);
+    const upNext = TALKS.filter((x) => x.id !== item.id).slice(0, 3);
+    const thumb = talkThumbnailUrl(item);
     const wrap = document.createElement('div');
     wrap.className = 'talks-player';
-    if (videoUrl) {
-      wrap.innerHTML = `
-        <div class="talks-player__stage talks-player__stage--link">
-          <p class="talks-player__label">${t('talks.videoLabel')}</p>
-          <button type="button" class="talks-player__pause" aria-label="${t('talks.play')}">
-            <img class="talks-player__pause-icon" src="${FIGMA_PLAY}" width="14" height="14" alt="" />
-          </button>
-          <div class="talks-player__progress" aria-hidden="true"><span class="talks-player__progress-fill"></span></div>
-          <p class="talks-player__time" aria-hidden="true">0:00 / 0:00</p>
-        </div>
-        <h3 class="talks-player__title"></h3>
-        <p class="talks-player__meta"></p>
-        <hr class="experience__divider" />
-        <div class="experience__up-next-list" data-up-next></div>
-      `;
-      wrap.querySelector('.talks-player__pause')!.addEventListener('click', () => {
-        window.open(videoUrl, '_blank', 'noopener,noreferrer');
+    const media = document.createElement('div');
+    media.className = 'talks-player__media';
+    if (thumb) {
+      const img = document.createElement('img');
+      img.className = 'talks-player__thumb';
+      img.src = thumb;
+      img.alt = '';
+      img.tabIndex = 0;
+      img.role = 'button';
+      img.addEventListener('click', () => this.openTalkUrl(item.url));
+      img.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          this.openTalkUrl(item.url);
+        }
       });
-    } else {
-      wrap.innerHTML = `
-        <h3 class="talks-player__title"></h3>
-        <p class="talks-player__meta"></p>
-        <hr class="experience__divider" />
-        <div class="experience__up-next-list" data-up-next></div>
-      `;
+      media.appendChild(img);
     }
-    wrap.querySelector('.talks-player__title')!.textContent = title;
-    wrap.querySelector('.talks-player__meta')!.textContent = meta;
-    const list = wrap.querySelector('[data-up-next]')!;
+    const open = document.createElement('a');
+    open.className = 'ui-btn ui-btn--primary talks-player__open';
+    open.href = item.url;
+    open.target = '_blank';
+    open.rel = 'noopener noreferrer';
+    open.textContent = t('talks.openVideo');
+    wrap.append(media, open);
+    requestAnimationFrame(() => {
+      open.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+    const h3 = document.createElement('h3');
+    h3.className = 'talks-player__title';
+    h3.textContent = title;
+    wrap.appendChild(h3);
+    const pMeta = document.createElement('p');
+    pMeta.className = 'talks-player__meta';
+    pMeta.textContent = meta;
+    wrap.appendChild(pMeta);
+    wrap.appendChild(Object.assign(document.createElement('hr'), { className: 'experience__divider' }));
+    const h4 = document.createElement('h4');
+    h4.className = 'experience__up-next';
+    h4.textContent = t('talks.upNext');
+    wrap.appendChild(h4);
+    const list = document.createElement('div');
+    list.className = 'experience__up-next-list';
     list.replaceChildren(
       ...upNext.map((talk) => this.talkRow(talk, () => this.openTalk(talk), { compact: true })),
     );
+    wrap.appendChild(list);
     this.experienceDetail.replaceChildren(wrap);
   }
 
@@ -985,6 +1064,8 @@ export class BuildingPanel {
 
   private renderWritingReader(_section: WritingSection, item: WritingItem): void {
     if (!this.experienceDetail) return;
+    const title = writingTitle(item);
+    const meta = writingMeta(item);
     const wrap = document.createElement('article');
     wrap.className = 'writings-reader';
     const docIcon = this.isMobile() ? FIGMA_DOC_PHONE : FIGMA_DOC;
@@ -998,9 +1079,11 @@ export class BuildingPanel {
       <h3 class="writings-reader__title"></h3>
       <p class="writings-reader__meta"></p>
     `;
-    wrap.querySelector('.writings-reader__kicker')!.textContent = t('writings.reader.kicker');
-    wrap.querySelector('.writings-reader__title')!.textContent = writingTitle(item);
-    wrap.querySelector('.writings-reader__meta')!.textContent = writingMeta(item);
+    wrap.querySelector('.writings-reader__kicker')!.textContent = writingSourceLabel(item);
+    wrap.querySelector('.writings-reader__title')!.textContent = title;
+    const metaEl = wrap.querySelector('.writings-reader__meta') as HTMLElement;
+    metaEl.textContent = meta;
+    metaEl.hidden = !meta;
     if (articleUrl) {
       const sub = document.createElement('a');
       sub.className = 'writings-reader__substack';
@@ -1008,7 +1091,7 @@ export class BuildingPanel {
       sub.target = '_blank';
       sub.rel = 'noopener noreferrer';
       sub.innerHTML = `<img class="writings-reader__substack-icon" src="${substackIcon}" width="15" height="15" alt="" /><span class="writings-reader__substack-label"></span>`;
-      sub.querySelector('.writings-reader__substack-label')!.textContent = t('writings.substackCta');
+      sub.querySelector('.writings-reader__substack-label')!.textContent = t('writings.openArticle');
       wrap.appendChild(sub);
     }
     this.experienceDetail.replaceChildren(wrap);
@@ -1058,7 +1141,7 @@ export class BuildingPanel {
     this.aboutEl.style.contentVisibility = '';
     this.el.removeAttribute('inert');
     this.el.classList.remove('building-panel--snap');
-    const preview = casePreviewCopy(interiorId);
+    const preview = casePreviewCopy(interiorId, getLang());
     const shown = this.renderCase();
     const title = preview?.title ?? shown ?? interiorId;
     const subtitle = preview?.subtitle ?? '';
@@ -1075,14 +1158,23 @@ export class BuildingPanel {
         ? title
         : `${title}: ${subtitle.charAt(0).toLowerCase()}${subtitle.slice(1)}`;
     }
-    if (this.readKicker) this.readKicker.textContent = preview?.kicker ?? 'CASE';
+    if (this.readKicker) {
+      const tag = t('panel.caseTag');
+      const raw = preview?.kicker ?? tag;
+      this.readKicker.textContent = raw.replace(/^CASE\b/, tag);
+    }
     if (this.readHeadline) {
       this.readHeadline.textContent = this.isMobile()
         ? (preview?.teaser ?? title).replace(/[.]$/, '')
         : (preview?.teaserFull ?? preview?.teaser ?? title);
     }
     if (this.readLede) this.readLede.textContent = subtitle;
-    if (this.readHeroLabel) this.readHeroLabel.textContent = preview?.placeholder ?? 'IMAGE PLACEHOLDER';
+    const hero = this.el.querySelector('.case-read__hero');
+    if (hero) hero.classList.add('case-read__hero--neutral');
+    if (this.readHeroLabel) {
+      this.readHeroLabel.textContent = '';
+      this.readHeroLabel.hidden = true;
+    }
     this.setTitle(interiorId, title);
     this.renderWorkedWith();
     this.renderAbout();
@@ -1124,8 +1216,10 @@ export class BuildingPanel {
 
   /** Fills the case article for the current interior; returns its headline, or null when there is no case. */
   private renderCase(): string | null {
-    const content = this.interiorId ? CASES[this.interiorId] : undefined;
+    const lang = getLang();
+    const content = this.interiorId ? caseForLang(this.interiorId, lang) : undefined;
     this.caseEl.hidden = !content;
+    this.caseEl.lang = lang;
     this.el.classList.toggle('building-panel--case', !!content);
     const full = this.caseEl.querySelector('.case__version--full')!;
     const short = this.caseEl.querySelector('.case__version--short')!;
@@ -1133,6 +1227,15 @@ export class BuildingPanel {
     short.replaceChildren(...(content ? content.short.map(caseBlockNode) : []));
     if (!content) return null;
     return this.isMobile() ? (content.shortHeadline ?? content.headline) : content.headline;
+  }
+
+  private syncCasePreview(interiorId: string): void {
+    const preview = casePreviewCopy(interiorId, getLang());
+    if (!preview) return;
+    const teaser = this.isMobile() ? preview.teaser : (preview.teaserFull ?? preview.teaser);
+    if (this.previewTitle) this.previewTitle.textContent = preview.title;
+    if (this.previewSubtitle) this.previewSubtitle.textContent = preview.subtitle;
+    if (this.previewTeaser) this.previewTeaser.textContent = teaser;
   }
 
   private renderAbout(): void {
@@ -1246,6 +1349,17 @@ export class BuildingPanel {
     return this.isOpen() ? this.openKey : '';
   }
 
+  /** Mobile interior / experience sheet fully expanded (not peek). */
+  isInteriorSheetExpanded(): boolean {
+    if (!this.isOpen() || !this.isMobile() || this.peekOnly) return false;
+    return (
+      this.mode === 'interior' ||
+      this.mode === 'talks' ||
+      this.mode === 'writings' ||
+      this.mode === 'preview'
+    );
+  }
+
   /** Peek / sheet inset for interior camera fit. */
   layoutInsets(): { left: number; top: number; right: number; bottom: number } {
     if (
@@ -1269,6 +1383,11 @@ export class BuildingPanel {
     const sheet = this.sheet.getBoundingClientRect();
     if (this.isMobile()) {
       const peek = this.el.classList.contains('building-panel--peek');
+      if (this.isExperienceMode() && !peek) {
+        const cap = Math.min(window.innerHeight * 0.42, 340);
+        const bottom = Math.min(sheet.height, cap, window.innerHeight - 120);
+        return { left: 0, top: 0, right: 0, bottom: Math.ceil(Math.max(88, bottom) + 8) };
+      }
       const bottom = peek ? Math.min(88, sheet.height) : sheet.height;
       return { left: 0, top: 0, right: 0, bottom: Math.ceil(bottom + 8) };
     }
@@ -1288,10 +1407,8 @@ export class BuildingPanel {
 
   /** Mobile interior: outside sheet tap collapses expanded sheet or consumes (no map walk). */
   expandInteriorSheetForQa(): void {
-    if (!this.isMobile()) return;
-    this.peekOnly = false;
-    this.syncPeekClass();
-    this.onVisibilityChange();
+    if (!this.isMobile() || !this.isOpen()) return;
+    this.setPeek(false);
   }
 
   getExperienceSheetRectForQa(): { x: number; y: number; w: number; h: number } | null {
@@ -1319,6 +1436,10 @@ export class BuildingPanel {
   }
 
   private applyI18n(): void {
+    this.el.querySelectorAll('[data-i18n]').forEach((el) => {
+      const key = (el as HTMLElement).dataset.i18n as Parameters<typeof t>[0];
+      if (key) el.textContent = t(key);
+    });
     const exit = this.el.querySelector('[data-exit]') as HTMLElement | null;
     if (exit) exit.textContent = t('panel.exit');
     this.el.querySelectorAll('[data-close]').forEach((el) => {
@@ -1332,7 +1453,8 @@ export class BuildingPanel {
     if (mobBack) mobBack.setAttribute('aria-label', t('experience.back'));
     const mobClose = this.el.querySelector('[data-exp-mobile-close]') as HTMLElement | null;
     if (mobClose) mobClose.setAttribute('aria-label', t('panel.close'));
-    const expand = this.el.querySelector('[data-exp-expand]') as HTMLElement | null;
-    if (expand) expand.setAttribute('aria-label', t('panel.expand'));
+    this.el.querySelectorAll('[data-exp-expand]').forEach((el) => {
+      el.setAttribute('aria-label', t('panel.expandSheet'));
+    });
   }
 }

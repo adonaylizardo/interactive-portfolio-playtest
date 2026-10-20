@@ -10,8 +10,8 @@ export function isExperienceBuilding(id: string | null | undefined): id is Exper
 
 export type TalkItem = {
   id: string;
-  title?: string;
-  url?: string;
+  title: string;
+  url: string;
   date?: string;
   duration?: string;
   thumbnail?: string;

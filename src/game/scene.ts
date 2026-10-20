@@ -10,7 +10,9 @@ import {
   Texture,
   TilingSprite,
   UPDATE_PRIORITY,
+  getCanvasTexture,
 } from 'pixi.js';
+import { isFatalStateVisible } from '../ui/fatalState';
 import {
   cells,
   doorInwardStep,
@@ -95,7 +97,6 @@ import {
   worldBackgroundColor,
   type BuildingSpriteState,
 } from './sprites';
-import { dismissBootScreen } from './assetUrl';
 import {
   buildInteriorGrid,
   drawInteriorFloor,
@@ -208,6 +209,11 @@ function slideStep(
   return { x, y };
 }
 
+export type PlaceCardBridge = {
+  isOpen: () => boolean;
+  layoutInsets: () => { left: number; top: number; right: number; bottom: number };
+};
+
 export type BuildingPanelBridge = {
   isOpen: () => boolean;
   openTitle: () => string;
@@ -216,6 +222,7 @@ export type BuildingPanelBridge = {
   layoutInsets?: () => { left: number; top: number; right: number; bottom: number };
   consumeInteriorCanvasTap?: (clientX: number, clientY: number) => boolean;
   expandInteriorSheetForQa?: () => void;
+  isInteriorSheetExpanded?: () => boolean;
 };
 
 export type ChecklistBridge = {
@@ -230,6 +237,7 @@ export type ChromeBridge = {
 };
 
 export type SceneEvents = {
+  onInteriorLoadFailed?: () => void;
   onChecklist: (step: ChecklistStepId) => void;
   onEnterBuilding: (buildingId: string, panelTitle: string) => void;
   onExitInterior?: () => void;
@@ -238,12 +246,14 @@ export type SceneEvents = {
   onGetOutToEnter?: () => void;
   onMoveCommand?: () => void;
   onFrame?: () => void;
+  onLoadProgress?: (pct: number) => void;
   stick?: () => { x: number; y: number };
   stickActive?: () => boolean;
   /** Touch/coarse pad is the 1-finger move control — do not pan or capture the pointer. */
   stickShown?: () => boolean;
   stickCancel?: () => void;
   buildingPanel?: BuildingPanelBridge;
+  placeCard?: PlaceCardBridge;
   checklist?: ChecklistBridge;
   chrome?: ChromeBridge;
 };
@@ -397,6 +407,8 @@ export class IsoScene {
   private zoomChanged = false;
   private lastChecklistZoom = 0;
   private canvasEl: HTMLCanvasElement | null = null;
+  private presentCanvas: HTMLCanvasElement | null = null;
+  private presentCtx: CanvasRenderingContext2D | null = null;
   private pointers = new Map<number, { x: number; y: number }>();
   private pinchSession: {
     startDist: number;
@@ -463,8 +475,29 @@ export class IsoScene {
   async init(canvas: HTMLCanvasElement): Promise<void> {
     this.canvasEl = canvas;
     this.app = new Application();
+    const reportLoad = (pct: number): void => {
+      const rounded = Math.max(0, Math.min(100, Math.round(pct)));
+      this.events.onLoadProgress?.(rounded);
+      if (rounded >= 20 && rounded < 100) this.refreshCanvasPresentation(true);
+    };
+    reportLoad(2);
+
+    const glAttrs = {
+      alpha: false,
+      antialias: true,
+      premultipliedAlpha: false,
+      preserveDrawingBuffer: false,
+      stencil: true,
+      failIfMajorPerformanceCaveat: false,
+    };
+    const glContext = (canvas.getContext('webgl2', glAttrs) ??
+      canvas.getContext('webgl', glAttrs) ??
+      canvas.getContext('experimental-webgl', glAttrs)) as WebGL2RenderingContext | null;
+    if (!glContext) throw new Error('WebGL context unavailable');
+
     await this.app.init({
       canvas,
+      context: glContext,
       background: worldBackgroundColor(),
       backgroundAlpha: 1,
       antialias: true,
@@ -472,9 +505,15 @@ export class IsoScene {
       premultipliedAlpha: false,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
       preference: 'webgl',
+      webgl: {
+        context: glContext,
+        preserveDrawingBuffer: false,
+        premultipliedAlpha: false,
+      },
     });
     this.syncRendererBackground();
     this.reflowViewport();
+    canvas.style.backgroundColor = '#0b0c0e';
 
     this.screenFill = new Graphics();
     this.screenFill.eventMode = 'none';
@@ -517,9 +556,22 @@ export class IsoScene {
     }
     this.syncViewTransform();
 
-    await loadMapSprites(this.app.renderer.resolution, this.firstPaintKeys());
-    if (bootInterior && isSpriteInterior(bootInterior)) await loadInteriorSprite(bootInterior);
+    reportLoad(8);
+    const paintKeys = this.firstPaintKeys();
+    const spriteSpan = 62;
+    let spritesDone = 0;
+    const spriteTotal = Math.max(1, paintKeys.length);
+    await loadMapSprites(this.app.renderer.resolution, paintKeys, () => {
+      spritesDone += 1;
+      reportLoad(8 + (spritesDone / spriteTotal) * spriteSpan);
+    });
+    reportLoad(72);
+    if (bootInterior && isSpriteInterior(bootInterior)) {
+      await loadInteriorSprite(bootInterior);
+      reportLoad(78);
+    }
     await loadPlayerSheets(1);
+    reportLoad(88);
     this.avatar = new PlayerAvatar(
       this.objectsLayer,
       {
@@ -575,6 +627,7 @@ export class IsoScene {
       this.reducedMotion,
     );
     this.syncCharacterGraphic();
+    this.refreshCanvasPresentation(true);
 
     if (bootInterior) {
       this.outdoorCamBeforeInterior = {
@@ -595,6 +648,7 @@ export class IsoScene {
     this.app.ticker.add(() => this.paintScreenFill(), undefined, UPDATE_PRIORITY.HIGH);
     this.app.ticker.add(() => this.update(), undefined, UPDATE_PRIORITY.NORMAL);
     this.app.ticker.add(() => this.composeRearPass(), undefined, UPDATE_PRIORITY.NORMAL);
+    this.app.ticker.add(() => this.afterPresentFrame(), undefined, UPDATE_PRIORITY.UTILITY);
     this.app.ticker.add(() => this.events.onFrame?.(), undefined, UPDATE_PRIORITY.UTILITY);
     const scheduleViewportReflow = () => this.scheduleViewportReflow();
     window.addEventListener('resize', scheduleViewportReflow);
@@ -638,7 +692,7 @@ export class IsoScene {
     this.applyCamera(true);
     this.app.render();
     this.events.onFrame?.();
-    dismissBootScreen();
+    reportLoad(100);
     this.hydrateMap();
   }
 
@@ -846,13 +900,26 @@ export class IsoScene {
     };
   }
 
+  private tileLoadWarned = new Set<string>();
+
   private ensureTile(tx: number, ty: number): Sprite | null {
+    if (isFatalStateVisible()) return null;
     const id = `${tx},${ty}`;
     const existing = this.tileByCell.get(id);
     if (existing) return existing.g;
     const key = tileSpriteKey(cells, tx, ty);
     if (!spritesLoaded(key)) {
-      void loadKeys([key]).then(() => this.ensureTile(tx, ty));
+      void loadKeys([key])
+        .then(() => {
+          if (!isFatalStateVisible()) this.ensureTile(tx, ty);
+        })
+        .catch((err) => {
+          if (isFatalStateVisible()) return;
+          if (!this.tileLoadWarned.has(key)) {
+            this.tileLoadWarned.add(key);
+            console.warn('[sprites] tile load failed', err);
+          }
+        });
       return null;
     }
     const cell = cells[ty][tx];
@@ -917,28 +984,52 @@ export class IsoScene {
     }
   }
 
+  private deferSpriteLoad(keys: string[] | (() => Promise<void>), then?: () => void): void {
+    if (isFatalStateVisible()) return;
+    const run = typeof keys === 'function' ? keys : () => loadKeys(keys);
+    void run().then(
+      () => {
+        if (!isFatalStateVisible()) then?.();
+      },
+      (err) => {
+        if (!isFatalStateVisible()) console.warn('[sprites] deferred load failed', err);
+      },
+    );
+  }
+
   /** After first paint: rest of the town, @2x swap, then interiors/hover stay on demand. */
   private hydrateMap(): void {
     const hi = this.app.renderer.resolution;
     void (async () => {
-      await upgradeLoadedSprites(hi);
-      await upgradePlayerSheets(hi);
-      this.refreshTileTextures();
-      this.syncObjectSprites(true);
-      await loadKeys(remainingMapKeys(loadedSpriteKeys()));
-      this.ensureVisibleTiles();
-      this.syncObjectSprites(true);
-      this.queueTileBackfill();
+      try {
+        await upgradeLoadedSprites(hi);
+        await upgradePlayerSheets(hi);
+        this.refreshTileTextures();
+        this.syncObjectSprites(true);
+        await loadKeys(remainingMapKeys(loadedSpriteKeys()));
+        this.ensureVisibleTiles();
+        this.syncObjectSprites(true);
+        this.queueTileBackfill();
+      } catch (err) {
+        console.warn('[hydrate] map expansion failed', err);
+      }
     })();
     window.setTimeout(() => {
-      void loadKeys(allSpriteKeys().filter((k) => k.endsWith('/lejos'))).then(() => this.syncObjectSprites(true));
+      this.deferSpriteLoad(allSpriteKeys().filter((k) => k.endsWith('/lejos')), () =>
+        this.syncObjectSprites(true),
+      );
     }, 800);
     window.setTimeout(() => {
-      void loadBuildingStateSprites().then(() => this.syncObjectSprites(true));
+      this.deferSpriteLoad(() => loadBuildingStateSprites(), () => this.syncObjectSprites(true));
     }, 2500);
-    void loadSpriteProbes();
+    void loadSpriteProbes().catch((err) => console.warn('[sprites] probes failed', err));
     if (this.npcs.isEnabled()) this.loadNpcs();
-    const fillLoad = this.fillActors.load(hi).then(() => this.cullVisibleTiles());
+    const fillLoad = this.fillActors.load(hi).then(
+      () => this.cullVisibleTiles(),
+      (err) => {
+        console.warn('[fill] load failed', err);
+      },
+    );
     void Promise.allSettled([fillLoad, this.buildNoah()]).then(prefetchRestSheets);
   }
 
@@ -1025,7 +1116,11 @@ export class IsoScene {
           occluder: objectOccluder(obj),
           zIndex,
         });
-        if (!ready) void loadKeys([key]).then(() => this.syncObjectSprites(true));
+        if (!ready) {
+          void loadKeys([key])
+            .then(() => this.syncObjectSprites(true))
+            .catch((err) => console.warn('[sprites] object load failed', err));
+        }
       }
       g.on('pointerover', () => {
         if (matchMedia('(hover: hover)').matches) {
@@ -1089,7 +1184,9 @@ export class IsoScene {
       }
       if (!key) continue;
       if (!spritesLoaded(key)) {
-        void loadKeys([key]).then(() => this.syncObjectSprites(true));
+        void loadKeys([key])
+          .then(() => this.syncObjectSprites(true))
+          .catch((err) => console.warn('[sprites] interior load failed', err));
         continue;
       }
       v.state = state;
@@ -2090,6 +2187,16 @@ export class IsoScene {
       if (this.jac.rearCam) top = Math.max(top, phone ? 140 : 160);
     }
     const panelInsets = this.events.buildingPanel?.layoutInsets?.();
+    const placeInsets =
+      !this.interiorActive && this.events.placeCard?.isOpen?.()
+        ? this.events.placeCard.layoutInsets()
+        : null;
+    if (placeInsets) {
+      left = Math.max(left, placeInsets.left + pad);
+      right = Math.max(right, placeInsets.right + pad);
+      top = Math.max(top, placeInsets.top + pad);
+      bottom = Math.max(bottom, placeInsets.bottom + pad);
+    }
     const bottomSheet =
       !!panelInsets && this.interiorActive && panelInsets.bottom > 0 && panelInsets.right === 0;
     this.interiorBottomSheet = bottomSheet;
@@ -3314,6 +3421,9 @@ export class IsoScene {
       this.npcs.update(dt);
       this.fillActors?.update(dt);
     }
+    if (this.presentationHoldFrames > 0) {
+      this.presentationHoldFrames -= 1;
+    }
   }
 
   /**
@@ -3339,7 +3449,41 @@ export class IsoScene {
     const drewRear = !!this.jac?.rearCam;
     if (drewRear) this.renderRearTexture();
     this.layoutRearSprite();
-    if (drewRear) this.restoreMainTarget();
+    if (drewRear) this.restoreMainTarget(true);
+  }
+
+  private ensureMainRenderSurface(clearColor: boolean): void {
+    if (!this.app || !this.canvasEl) return;
+    try {
+      const rtSys = this.app.renderer.renderTarget;
+      const stack = rtSys as unknown as { _renderTargetStack?: unknown[] };
+      while (stack._renderTargetStack && stack._renderTargetStack.length > 1) {
+        rtSys.pop();
+      }
+      const opaque = this.opaqueBgRgba();
+      rtSys.bind({ target: this.canvasEl, clear: clearColor, clearColor: opaque });
+    } catch {
+      /* bind on next pass */
+    }
+    const gl = (this.app.renderer as { gl?: WebGL2RenderingContext }).gl;
+    const pw = this.canvasEl.width;
+    const ph = this.canvasEl.height;
+    if (gl && pw > 0 && ph > 0) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.disable(gl.SCISSOR_TEST);
+      gl.viewport(0, 0, pw, ph);
+      if (clearColor) {
+        const bg = worldBackgroundColor();
+        gl.clearColor(
+          ((bg >> 16) & 255) / 255,
+          ((bg >> 8) & 255) / 255,
+          (bg & 255) / 255,
+          1,
+        );
+        gl.clear(gl.COLOR_BUFFER_BIT);
+      }
+    }
+    this.resetCanvasTextureFrame();
   }
 
   private opaqueBgRgba(): [number, number, number, number] {
@@ -3443,13 +3587,160 @@ export class IsoScene {
     }
   }
 
-  private restoreMainTarget(): void {
+  /** Re-bind the main canvas render target (full viewport). Clears only when asked. */
+  private restoreMainTarget(clear = false): void {
     if (!this.app || !this.canvasEl) return;
     try {
-      this.app.renderer.renderTarget.bind(this.canvasEl, true, this.opaqueBgRgba());
+      const rtSys = this.app.renderer.renderTarget;
+      const opaque = this.opaqueBgRgba();
+      const stack = rtSys as unknown as { _renderTargetStack?: unknown[] };
+      while (stack._renderTargetStack && stack._renderTargetStack.length > 1) {
+        rtSys.pop();
+      }
+      rtSys.bind({ target: this.canvasEl, clear, clearColor: opaque });
+      this.resetCanvasTextureFrame();
     } catch {
       /* next ticker present still targets the canvas */
     }
+  }
+
+  /** CanvasSource textures can keep a sub-rect frame after RT passes — reset to full surface. */
+  private resetCanvasTextureFrame(): void {
+    if (!this.app || !this.canvasEl) return;
+    const tex = getCanvasTexture(this.canvasEl, { transparent: false });
+    const src = tex.source as { transparent?: boolean; pixelWidth?: number; pixelHeight?: number };
+    if (src) src.transparent = false;
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    tex.frame.x = 0;
+    tex.frame.y = 0;
+    tex.frame.width = sw;
+    tex.frame.height = sh;
+    tex.updateUvs();
+    const orig = tex.orig;
+    orig.x = 0;
+    orig.y = 0;
+    orig.width = sw;
+    orig.height = sh;
+  }
+
+  private presentationRefreshPending = false;
+  private presentationBurst = 0;
+  /** Vulkan / SwiftShader can leave alpha-0 bands above interior sheets until the full canvas is repainted. */
+  private presentationHoldFrames = 0;
+
+  /** After sheet peek/expand or rotation, Vulkan can present a sub-rect with alpha 0 above the sheet. */
+  schedulePresentationRefresh(burstFrames = 3): void {
+    this.presentationBurst = Math.max(this.presentationBurst, burstFrames);
+    const hold = this.interiorActive ? Math.max(burstFrames, 420) : burstFrames;
+    this.presentationHoldFrames = Math.max(this.presentationHoldFrames, hold);
+    this.refreshCanvasPresentation(true);
+    if (this.presentationRefreshPending) return;
+    this.presentationRefreshPending = true;
+    const tick = (): void => {
+      this.refreshCanvasPresentation(true);
+      this.presentationBurst -= 1;
+      if (this.presentationBurst > 0) {
+        requestAnimationFrame(tick);
+      } else {
+        this.presentationRefreshPending = false;
+      }
+    };
+    requestAnimationFrame(() => requestAnimationFrame(tick));
+  }
+
+  refreshCanvasPresentation(clear = true): void {
+    if (!this.app || !this.canvasEl || this.readingPaused) return;
+    this.syncRendererToLayout();
+    this.ensureMainRenderSurface(clear);
+    if (this.interiorActive) this.fitInteriorCamera();
+    this.applyCamera(false);
+    const rgba = this.opaqueBgRgba();
+    try {
+      this.app.renderer.render({
+        container: this.app.stage,
+        clear: true,
+        clearColor: rgba,
+      });
+    } catch {
+      this.app.render();
+    }
+    this.ensureMainRenderSurface(false);
+    this.resetCanvasTextureFrame();
+    this.sealCanvasForCompositor();
+  }
+
+  /** Runs after Pixi's default frame render — SwiftShader/Vulkan can present alpha-0 outside the last scissor. */
+  private afterPresentFrame(): void {
+    if (this.readingPaused) return;
+    const expanded = !!this.events.buildingPanel?.isInteriorSheetExpanded?.();
+    if (this.presentationHoldFrames > 0 || (this.interiorActive && expanded)) {
+      this.refreshCanvasPresentation(true);
+    } else if (this.presentationBurst > 0 || this.interiorActive) {
+      this.sealCanvasForCompositor();
+    }
+  }
+
+  private sealCanvasForCompositor(): void {
+    if (!this.app || !this.canvasEl) return;
+    const gl = (this.app.renderer as { gl?: WebGL2RenderingContext }).gl;
+    const pw = this.canvasEl.width;
+    const ph = this.canvasEl.height;
+    if (gl && pw > 0 && ph > 0) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.disable(gl.SCISSOR_TEST);
+      gl.viewport(0, 0, pw, ph);
+      gl.flush();
+      gl.finish();
+    }
+    this.syncPresentCanvasMirror();
+  }
+
+  /** SwiftShader/Vulkan: 2D mirror of the WebGL buffer avoids alpha-0 compositor holes above sheets. */
+  private syncPresentCanvasMirror(): void {
+    const expanded = !!this.events.buildingPanel?.isInteriorSheetExpanded?.();
+    if (!this.canvasEl || !expanded) {
+      this.presentCanvas?.classList.remove('is-active');
+      this.canvasEl?.classList.remove('game-canvas--present-hidden');
+      return;
+    }
+    if (!this.presentCanvas) {
+      const el = document.createElement('canvas');
+      el.id = 'game-canvas-present';
+      el.setAttribute('aria-hidden', 'true');
+      this.canvasEl.insertAdjacentElement('afterend', el);
+      this.presentCanvas = el;
+      this.presentCtx = el.getContext('2d');
+    }
+    const src = this.canvasEl;
+    const dst = this.presentCanvas;
+    const ctx = this.presentCtx;
+    if (!ctx || !dst) return;
+    if (dst.width !== src.width || dst.height !== src.height) {
+      dst.width = src.width;
+      dst.height = src.height;
+    }
+    try {
+      ctx.drawImage(src, 0, 0);
+    } catch {
+      return;
+    }
+    dst.classList.add('is-active');
+    src.classList.add('game-canvas--present-hidden');
+  }
+
+  onViewportLayoutChange(): void {
+    this.schedulePresentationRefresh(4);
+  }
+
+  /** Resize GL backing store, then bind the full canvas before camera insets change. */
+  private syncRendererToLayout(): void {
+    if (!this.app || !this.canvasEl) return;
+    const w = Math.max(1, this.canvasEl.clientWidth || window.innerWidth);
+    const h = Math.max(1, this.canvasEl.clientHeight || window.innerHeight);
+    this.app.renderer.resize(w, h);
+    this.resetCanvasTextureFrame();
+    this.restoreMainTarget(true);
   }
 
   private followTargetWorld(): { x: number; y: number } {
@@ -3920,7 +4211,11 @@ export class IsoScene {
     const door = building?.door;
     if (!def || !door) return;
     if (def.sprite && !spritesLoaded(interiorSpriteKey(def.id, false))) {
-      void loadInteriorSprite(def.id).then(() => this.enterInterior(buildingId, opts));
+      void loadInteriorSprite(def.id)
+        .then(() => this.enterInterior(buildingId, opts))
+        .catch(() => {
+          this.events.onInteriorLoadFailed?.();
+        });
       return;
     }
 
@@ -4122,7 +4417,15 @@ export class IsoScene {
       this.tapDriftPx = 0;
     }
     this.applyCamera(false);
+    this.schedulePresentationRefresh(1);
   }
+
+  /** Resume presenting the main canvas (reading pause / rear-cam can leave the ticker on a dead target). */
+  ensurePresentation(): void {
+    this.refreshCanvasPresentation(true);
+  }
+
+  private readingPaused = false;
 
   getInteriorBuildingId(): string | null {
     return this.interiorActive ? this.interiorDef?.id ?? null : null;
@@ -4961,6 +5264,19 @@ export class IsoScene {
     return { x: rect.left + screen.x, y: rect.top + screen.y };
   }
 
+  /** Pause map simulation while the reading view is open (saves CPU on long-form pages). */
+  setReadingPaused(paused: boolean): void {
+    if (!this.app) return;
+    this.readingPaused = paused;
+    if (paused) {
+      this.app.ticker.stop();
+      return;
+    }
+    this.app.ticker.start();
+    this.syncRendererToLayout();
+    this.ensurePresentation();
+  }
+
   /** For QA — place character on a walkable tile without opening doors. */
   setSuppressTapForQa(ms: number): void {
     this.suppressTapUntil = performance.now() + ms;
@@ -5387,11 +5703,21 @@ export class IsoScene {
       const cy = tl.y + asset.bbox.y0 * sc - 16;
       const s = this.worldToScreen(cx, cy);
       const onScreen = s.x > -60 && s.y > -60 && s.x < sw + 60 && s.y < sh + 60;
+      const phone = sw <= 767;
+      let clientX = (rect?.left ?? 0) + s.x;
+      let clientY = (rect?.top ?? 0) + s.y;
+      let visible = onScreen;
+      if (phone && rect) {
+        const halfW = 56;
+        visible = true;
+        clientX = Math.min(Math.max(clientX, rect.left + halfW + 8), rect.right - halfW - 8);
+        clientY = Math.min(Math.max(clientY, rect.top + 76), rect.bottom - 100);
+      }
       out.push({
         id,
-        x: (rect?.left ?? 0) + s.x,
-        y: (rect?.top ?? 0) + s.y,
-        visible: onScreen,
+        x: clientX,
+        y: clientY,
+        visible,
       });
     }
     return out;
@@ -5578,7 +5904,12 @@ export class IsoScene {
   }
 
   private loadNpcs(): void {
-    void this.npcs.load().then(() => this.cullVisibleTiles());
+    void this.npcs.load().then(
+      () => this.cullVisibleTiles(),
+      (err) => {
+        console.warn('[npcs] load failed', err);
+      },
+    );
   }
 
   qaNpcTown(): ReturnType<NpcCrowd['town']> {

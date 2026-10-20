@@ -1,4 +1,4 @@
-import type { TalkItem, WritingItem } from '../data/experiences';
+import type { TalkItem, TalkSection, WritingItem } from '../data/experiences';
 import { getLang, t, type I18nKey } from './i18n';
 
 type DateParts = { y: number; m: number; d: number };
@@ -141,7 +141,7 @@ export function writingArticleUrl(item: WritingItem): string | null {
   return null;
 }
 
-export function talkSectionTitle(section: { title?: string; titleKey?: string }): string {
+export function talkSectionTitle(section: TalkSection): string {
   if (section.titleKey) return t(section.titleKey as I18nKey);
   return section.title ?? '';
 }

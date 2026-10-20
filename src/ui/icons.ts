@@ -27,6 +27,8 @@ export type IconName =
   | 'page'
   | 'chevron'
   | 'arrowNe'
+  | 'play'
+  | 'pause'
   | 'link';
 
 const PATHS: Record<IconName, string> = {
@@ -50,5 +52,7 @@ const PATHS: Record<IconName, string> = {
   page: `<path ${STROKE} d="M4 2.5h5l3 3V12.5H4z"/><path ${STROKE} d="M9 2.5V5.5h3"/>`,
   chevron: `<path ${STROKE} d="m5 3.5 5 4-5 4"/>`,
   arrowNe: `<path ${STROKE} d="M4 11 11 4M6.5 4H11v4.5"/>`,
+  play: `<path ${STROKE} d="M4.5 3.5 11 7.5 4.5 11.5z"/>`,
+  pause: `<path ${STROKE} d="M4.5 3.5h2.5v8H4.5zM8 3.5h2.5v8H8z"/>`,
   link: `<path ${STROKE} d="M6.2 8.8a2.2 2.2 0 0 0 3.1 0l1.4-1.4a2.2 2.2 0 1 0-3.1-3.1L6.8 4.9"/><path ${STROKE} d="M8.8 6.2a2.2 2.2 0 0 0-3.1 0L4.3 7.6a2.2 2.2 0 1 0 3.1 3.1l1.4-1.4"/>`,
 };

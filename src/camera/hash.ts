@@ -1,3 +1,5 @@
+import { isReadingHash } from '../ui/readingRoute';
+
 const HASH_PREFIX = 'view=';
 
 export type CameraView = {
@@ -15,6 +17,7 @@ export type HistoryNavigationState = {
 
 function hashParams(): URLSearchParams {
   const raw = location.hash.replace(/^#/, '');
+  if (raw.startsWith('/leer')) return new URLSearchParams();
   if (!raw) return new URLSearchParams();
   if (raw.startsWith(HASH_PREFIX)) {
     return new URLSearchParams(raw.slice(HASH_PREFIX.length));
@@ -22,8 +25,8 @@ function hashParams(): URLSearchParams {
   return new URLSearchParams(raw);
 }
 
-/** Building ids that name an NDA client get a neutral public id in the URL. */
-const PUBLIC_INTERIOR_IDS: Record<string, string> = { volaris: 'airline' };
+/** Optional public URL aliases for interior building ids (empty = use id as-is). */
+const PUBLIC_INTERIOR_IDS: Record<string, string> = {};
 
 export function publicInteriorId(interiorId: string): string {
   return PUBLIC_INTERIOR_IDS[interiorId] ?? interiorId;
@@ -76,6 +79,7 @@ export function setHashWriteSuppressed(suppressed: boolean): void {
 }
 
 function flushHash(view: CameraView, replace: boolean): void {
+  if (isReadingHash()) return;
   const interiorId = view.interiorId !== undefined ? view.interiorId : lastInteriorId;
   if (view.interiorId !== undefined) lastInteriorId = view.interiorId;
   const next = buildHash({ ...view, interiorId: interiorId || null });
@@ -105,6 +109,7 @@ export function writeInteriorToHash(
   cam: CameraView,
   mode: 'replace' | 'push' = 'replace',
 ): void {
+  if (isReadingHash() || suppressDebouncedHash) return;
   if (writeTimer) clearTimeout(writeTimer);
   writeTimer = null;
   lastInteriorId = interiorId;
@@ -116,6 +121,7 @@ export function pushInteriorEntry(
   cam: CameraView,
   outdoorCam: { x: number; y: number; zoom: number },
 ): void {
+  if (isReadingHash() || suppressDebouncedHash) return;
   if (writeTimer) clearTimeout(writeTimer);
   writeTimer = null;
   lastInteriorId = interiorId;
@@ -129,6 +135,7 @@ export function pushInteriorEntry(
 }
 
 export function replaceOutdoorHash(cam: CameraView): void {
+  if (isReadingHash() || suppressDebouncedHash) return;
   if (writeTimer) clearTimeout(writeTimer);
   writeTimer = null;
   lastInteriorId = null;

@@ -1,7 +1,11 @@
+import { VOICE_LINES } from './voice-lines';
+import type { Lang } from '../ui/i18n';
+import { CASES_ES } from './cases.es';
+
 /**
  * Panel copy, keyed by building id. English text is verbatim from
  * `content/cases/{id}-panel.md` (Desktop/full on desktop, Mobile/short in the phone sheet).
- * The airline case never names the client — ignore that file's Español section. Landmark rooms
+ * Spanish panel draft in content/cases/*-panel.md is not wired in the app yet. Landmark rooms
  * keep the place name as the title and a short placeholder. Internal draft sections are not stored here.
  */
 export type CaseBlock =
@@ -39,14 +43,20 @@ export function isCaseHouse(id: string | null | undefined): id is CaseHouseId {
   return !!id && (CASE_HOUSE_IDS as readonly string[]).includes(id);
 }
 
-/** Public card title. The airline case never names the client. */
+/** Public card title shown on map labels and case cards. */
 export const CASE_CARD_TITLES: Record<CaseHouseId, string> = {
-  volaris: 'Airline',
+  volaris: 'Volaris',
   bain: 'Bain',
   mentoria: 'Mentoría',
   finoa: 'Finoa',
   pg: 'P&G',
 };
+
+/** Map / reading card title (mentoria is localized). */
+export function caseCardTitle(id: CaseHouseId, lang: 'en' | 'es'): string {
+  if (id === 'mentoria') return lang === 'en' ? 'Mentoring at Applaudo' : 'Mentoría en Applaudo';
+  return CASE_CARD_TITLES[id];
+}
 
 function sectionHeadings(blocks: CaseBlock[]): string[] {
   return blocks.flatMap((block) => (block.kind === 'section' && block.heading ? [block.heading] : []));
@@ -67,9 +77,9 @@ export type CasePreviewCopy = {
 };
 
 /** Door-step card: CASE label, name, one-line role, headline teaser. */
-export function casePreviewCopy(id: string): CasePreviewCopy | null {
+export function casePreviewCopy(id: string, lang: Lang = 'es'): CasePreviewCopy | null {
   if (!isCaseHouse(id)) return null;
-  const content = CASES[id];
+  const content = caseForLang(id, lang);
   if (!content) return null;
   const title = CASE_CARD_TITLES[id];
   const headings = sectionHeadings(content.full).slice(0, 3);
@@ -85,7 +95,7 @@ export function casePreviewCopy(id: string): CasePreviewCopy | null {
 }
 
 const AIRLINE_PROBLEM =
-  "On a Latin American airline's booking app (Android and iOS), Figma, specs, and code each told a different story about the same component in a booking flow. Several design systems overlapped, so nobody could tell which one was the source of truth. Every gap got reinterpreted downstream, and reworked.";
+  "On Volaris's booking app (Android and iOS), Figma, specs, and code each told a different story about the same component in a booking flow. Several design systems overlapped, so nobody could tell which one was the source of truth. Every gap got reinterpreted downstream, and reworked.";
 const AIRLINE_DID =
   'As Product Strategist (Q4 2026), I was the sole approver: I cleaned up the Figma file, verified it against the existing booking flow implementation, and turned each component into an explicit sealed contract between design and code. AI agents helped draft and audit; I reviewed and sealed every one myself.';
 const AIRLINE_DELIVERED =
@@ -95,12 +105,13 @@ const AIRLINE_RESULT =
 const AIRLINE_RULE = 'Design and code never sync directly. Both pass through the sealed contract first.';
 const AIRLINE_CLOSING = "The goal wasn't zero defects. It was zero guessing.";
 
-function landmarkPlaceholder(name: string, voice: string | null = null): CaseContent {
-  const paragraphs = [`${name} — a landmark of the map. More coming soon.`];
+function landmarkVoiceCopy(name: string, voiceKey: string, voiceFile: string | null): CaseContent {
+  const line = VOICE_LINES[voiceKey]?.script_text ?? name;
+  const paragraphs = [line];
   return {
     headline: name,
     subtitle: name,
-    voice,
+    voice: voiceFile,
     full: [{ kind: 'section', paragraphs }],
     short: [{ kind: 'section', paragraphs }],
   };
@@ -353,7 +364,14 @@ export const CASES: Record<string, CaseContent> = {
       { kind: 'closing', text: "Institutions don't need more features. They need to trust what they're looking at." },
     ],
   },
-  sambil: landmarkPlaceholder('Sambil', '10-sambil'),
-  catedral: landmarkPlaceholder('Catedral', '09-cathedral'),
-  flor: landmarkPlaceholder('Flor de Venezuela', '08-flor-de-venezuela'),
+  sambil: landmarkVoiceCopy('Sambil', '10-sambil', '10-sambil'),
+  catedral: landmarkVoiceCopy('Catedral', '09-cathedral', '09-cathedral'),
+  flor: landmarkVoiceCopy('Flor de Venezuela', '08-flor-de-venezuela', '08-flor-de-venezuela'),
 };
+
+export function caseForLang(id: string, lang: Lang): CaseContent | undefined {
+  const en = CASES[id];
+  if (!en) return undefined;
+  if (lang === 'es') return CASES_ES[id] ?? en;
+  return en;
+}

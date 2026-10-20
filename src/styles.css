@@ -95,8 +95,8 @@ body {
   background: #0b0c0e;
 }
 
-body > canvas:not(#game-canvas),
-#app > canvas:not(#game-canvas) {
+body > canvas:not(#game-canvas, #game-canvas-present),
+#app > canvas:not(#game-canvas, #game-canvas-present) {
   display: none !important;
   pointer-events: none !important;
   opacity: 0 !important;
@@ -174,9 +174,29 @@ body > canvas:not(#game-canvas),
   width: 100%;
   height: 100%;
   background: #0b0c0e;
+  opacity: 1;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+}
+
+#game-canvas-present {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  pointer-events: none;
+  z-index: 2;
+  background: #0b0c0e;
+}
+
+#game-canvas-present.is-active {
+  display: block;
+}
+
+#game-canvas.game-canvas--present-hidden {
+  opacity: 0;
 }
 
 body.is-canvas-dragging,
@@ -230,6 +250,10 @@ body.is-canvas-dragging * {
 
 #ui-root > .joystick:not([hidden]) {
   pointer-events: auto;
+}
+
+#ui-root > .building-map-labels {
+  pointer-events: none;
 }
 
 #ui-root > .building-panel.building-panel--open .building-panel__sheet {
@@ -1188,9 +1212,9 @@ body[data-layout='panel'] .checklist {
   position: absolute;
   top: 0;
   right: 0;
-  min-width: 68px;
-  min-height: 36px;
-  padding: 8px 16px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px 16px;
   border: 1px solid #2a2c31;
   border-radius: 999px;
   background: #141518;
@@ -1249,10 +1273,17 @@ body[data-layout='panel'] .checklist {
     pointer-events: none;
   }
 
-  .building-panel--interior-only.building-panel--open.building-panel--expanded
+  .building-panel--interior-only.building-panel--open.building-panel--expanded:not(
+      .building-panel--experience
+    )
     .building-panel__backdrop {
     opacity: 1;
     pointer-events: auto;
+  }
+
+  .building-panel--experience.building-panel--open .building-panel__backdrop {
+    opacity: 0;
+    pointer-events: none;
   }
 }
 
@@ -1332,6 +1363,53 @@ body[data-layout='panel'] .checklist {
 }
 
 @media (max-width: 767px) {
+  .building-panel--experience.building-panel--peek .exp-header,
+  .building-panel--writings.building-panel--peek .exp-header {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 15;
+    box-sizing: border-box;
+    height: 72px;
+    max-height: 72px;
+    margin: 0;
+    padding: 8px 12px;
+    background: #141518;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 16px rgb(0 0 0 / 35%);
+  }
+
+  .building-panel--experience.building-panel--open:not(.building-panel--peek) .building-panel__sheet {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    max-height: min(42vh, 340px);
+    border-radius: 16px 16px 0 0;
+    transform: none;
+    overflow-y: auto;
+    padding-top: 0;
+    scroll-padding-top: 0;
+  }
+
+  .building-panel--writings.building-panel--open:not(.building-panel--peek) .building-panel__sheet {
+    padding-top: 0;
+    scroll-padding-top: 0;
+  }
+
+  .building-panel--experience:not(.building-panel--peek) .exp-header,
+  .building-panel--writings:not(.building-panel--peek) .exp-header {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    margin-top: -4px;
+    padding-top: 4px;
+    background: #141518;
+    box-shadow: 0 6px 12px rgb(0 0 0 / 35%);
+  }
+
   .building-panel__sheet {
     left: 0;
     right: 0;
@@ -1363,8 +1441,8 @@ body[data-layout='panel'] .checklist {
 
   .building-panel--peek .building-panel__title {
     margin: 0;
-    font-size: 17px;
-    line-height: 24px;
+    font-size: 15px;
+    line-height: 18.75px;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -1405,11 +1483,11 @@ body[data-layout='panel'] .checklist {
 }
 
 @media (max-width: 767px) {
-  .case__version--full {
+  .building-panel .case__version--full {
     display: none;
   }
 
-  .case__version--short {
+  .building-panel .case__version--short {
     display: block;
   }
 }
@@ -1478,10 +1556,6 @@ body[data-layout='panel'] .checklist {
     max-height: 82dvh;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
-  }
-
-  .building-panel--case.building-panel--peek .building-panel__title {
-    font-size: 15px;
   }
 }
 
@@ -1624,6 +1698,14 @@ body[data-layout='panel'] .checklist {
   margin: 22px 0 8px;
   line-height: 1.3;
   color: #edeef0;
+  font-family:
+    Geist,
+    Inter,
+    system-ui,
+    'Noto Color Emoji',
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    sans-serif;
 }
 
 .about__h1 {
@@ -1697,19 +1779,23 @@ body[data-layout='panel'] .checklist {
 .building-map-labels {
   position: fixed;
   inset: 0;
-  z-index: 12;
+  z-index: 24;
   pointer-events: none;
   overflow: hidden;
 }
 
 .building-map-label {
+  pointer-events: auto;
+  cursor: pointer;
   position: absolute;
-  top: 0;
-  left: 0;
-  padding: 4px 10px;
-  border-radius: 999px;
   border: 1px solid #3a3d44;
   background: rgb(11 12 14 / 88%);
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: inherit;
+  font: inherit;
+  top: 0;
+  left: 0;
   box-shadow: 0 2px 8px rgb(0 0 0 / 35%);
   white-space: nowrap;
   will-change: transform;
@@ -2216,14 +2302,22 @@ body[data-layout='panel'] .checklist {
   flex-shrink: 0;
 }
 
+.building-panel--writings .exp-header {
+  gap: 4px;
+}
+
+.building-panel--writings .exp-header__actions {
+  gap: 0;
+}
+
 .exp-header__btn {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  min-height: 40px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0;
   border: 0;
   border-radius: 8px;
@@ -2248,10 +2342,16 @@ body[data-layout='panel'] .checklist {
   flex: 1;
   min-width: 0;
   margin: 0;
+  padding-right: 4px;
   font-size: 16px;
   font-weight: 500;
   line-height: 24px;
   color: var(--ui-text);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  white-space: normal;
 }
 
 .exp-header__actions {
@@ -2387,8 +2487,9 @@ body[data-layout='panel'] .checklist {
 
 .experience__see-all {
   flex: 0 0 auto;
-  min-height: 32px;
-  padding: 0 4px 0 8px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px 12px;
   border: 0;
   background: transparent;
   color: #8a8f98;
@@ -2478,6 +2579,24 @@ body[data-layout='panel'] .checklist {
   object-fit: contain;
 }
 
+.experience__thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.experience__section-title {
+  margin: 16px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8a8f98;
+}
+
+.experience__section-title:first-child {
+  margin-top: 0;
+}
+
 .experience__copy {
   flex: 1;
   min-width: 0;
@@ -2528,6 +2647,36 @@ body[data-layout='panel'] .checklist {
 }
 
 /* Talks video player detail */
+.talks-player__media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #2a2c31;
+  background: #0b0c0e;
+}
+
+.talks-player__thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  cursor: pointer;
+}
+
+.talks-player__open {
+  align-self: flex-start;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 10px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
 .talks-player__stage {
   position: relative;
   width: 100%;
@@ -2882,6 +3031,11 @@ body[data-layout='panel'] .checklist {
 
 .case-preview__kicker,
 .case-read__kicker,
+.case-read__hero-label:empty,
+.case-read__hero-label[hidden] {
+  display: none;
+}
+
 .case-read__hero-label {
   margin: 0;
   font-family: 'Geist Mono', ui-monospace, monospace;
@@ -2972,27 +3126,31 @@ body[data-layout='panel'] .checklist {
   flex-direction: column;
 }
 
-.case-preview__read-label,
-.case-preview__read-meta {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
 .case-preview__read-label {
-  height: 20px;
   font-size: 14px;
   line-height: 20px;
   font-weight: 500;
   color: #edeef0;
+  white-space: normal;
 }
 
 .case-preview__read-meta {
-  height: 16px;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 16px;
   font-weight: 400;
   color: #8a8f98;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  .case-preview__read-meta {
+    font-size: 11px;
+    line-height: 14px;
+  }
 }
 
 .case-preview__read-go {
@@ -3063,6 +3221,10 @@ body[data-layout='panel'] .checklist {
   width: 48px;
   height: 48px;
   border-radius: 24px;
+}
+
+.case-read__hero--neutral {
+  display: none;
 }
 
 .case-read__intro {
@@ -3421,6 +3583,10 @@ body[data-layout='panel'] .checklist {
   position: fixed;
   inset: 0;
   z-index: 12;
+}
+
+#ui-root:has(> .chrome.chrome--sheet) > .name-labels {
+  z-index: 10;
 }
 
 .name-label {
