@@ -2,6 +2,7 @@
  * Sprite frames make first paint slower when several QA pages share one software-GL browser.
  * Every navigation waits (up to 45 s) for the app's QA hooks before the test goes on.
  */
+import { spawnSync } from 'node:child_process';
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function waitForQa(page) {
@@ -88,10 +89,45 @@ const CHROMIUM_GL_ARGS = [
  */
 export const TIMING_MIN_FPS = 10;
 
+/**
+ * Headless WebKit sometimes starts MiniBrowser and then never answers the inspector pipe.
+ * Kill that process tree so the suite records a crash instead of sitting there.
+ */
+function armWebkitWatchdog(browser) {
+  const proc = typeof browser.process === 'function' ? browser.process() : null;
+  if (!proc?.pid) return;
+  const killTree = (pid) => {
+    let kids = '';
+    try {
+      kids = spawnSync('ps', ['-o', 'pid=', '--ppid', String(pid)], { encoding: 'utf8' }).stdout || '';
+    } catch {
+      /* ps can fail while the process is already gone */
+    }
+    for (const line of kids.trim().split('\n')) {
+      const child = Number(line);
+      if (child) killTree(child);
+    }
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch {
+      /* already gone */
+    }
+  };
+  const timer = setTimeout(() => killTree(proc.pid), 120000);
+  timer.unref();
+  const close = browser.close.bind(browser);
+  browser.close = async (...args) => {
+    clearTimeout(timer);
+    return close(...args);
+  };
+}
+
 /** Launches a Playwright browser type with the QA GL backend and the QA-hook readiness wait. */
 export async function launchBrowser(type, options = {}) {
   const args = type.name() === 'chromium' ? [...CHROMIUM_GL_ARGS, ...(options.args ?? [])] : options.args;
-  return installReadyWait(await type.launch({ ...options, args }));
+  const browser = installReadyWait(await type.launch({ ...options, args }));
+  if (type.name() === 'webkit') armWebkitWatchdog(browser);
+  return browser;
 }
 
 /**

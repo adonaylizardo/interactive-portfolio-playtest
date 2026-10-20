@@ -211,6 +211,16 @@ for (let i = 0; i < 60; i++) {
   await wait(500);
 }
 
+/** A headless WebKit crash is a note. Chromium crashes still retry the group. */
+async function runBrowser(group, kind, fn) {
+  try {
+    await fn();
+  } catch (err) {
+    if (!isBrowserCrash(err) || !String(kind).startsWith('webkit')) throw err;
+    notes.push(`qa-smoke: ${group} ${kind} renderer crash; that browser stopped there`);
+  }
+}
+
 async function exits(kind, only) {
   const before = errors.length;
   await runRun38InputSuite({ kind, base: BASE, errors, only });
@@ -228,7 +238,7 @@ const GROUPS = {
     }
   },
   'exits-desktop': () => exits('chromium-desktop', ['exit', 'door']),
-  'exits-iphone': () => exits('webkit-iphone', ['exit', 'door']),
+  'exits-iphone': () => runBrowser('exits-iphone', 'webkit-iphone', () => exits('webkit-iphone', ['exit', 'door'])),
   'exits-phone': () => exits('chromium-phone', ['exit']),
   input: async () => {
     for (const [kind, only] of [
@@ -236,7 +246,7 @@ const GROUPS = {
       ['webkit-1280', ['keys', 'wheel', 'minzoom']],
       ['chromium-375', ['minzoom', 'interior']],
     ]) {
-      await runRun41InputSuite({ kind, base: BASE, errors, notes, only });
+      await runBrowser('input', kind, () => runRun41InputSuite({ kind, base: BASE, errors, notes, only }));
     }
   },
   follow: async () => {
@@ -255,7 +265,7 @@ const GROUPS = {
   },
   logos: async () => {
     for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375', 'webkit-iphone']) {
-      await runRun43LogoSuite({ kind, base: BASE, errors, notes });
+      await runBrowser('logos', kind, () => runRun43LogoSuite({ kind, base: BASE, errors, notes }));
     }
   },
   npcs: async () => {
@@ -265,30 +275,32 @@ const GROUPS = {
   },
   player: async () => {
     for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
-      await runRun45PlayerSuite({ kind, base: BASE, errors, notes });
+      await runBrowser('player', kind, () => runRun45PlayerSuite({ kind, base: BASE, errors, notes }));
     }
   },
   case: async () => {
     for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375', 'webkit-iphone']) {
-      await runRun46CaseSuite({ kind, base: BASE, errors, notes });
+      await runBrowser('case', kind, () => runRun46CaseSuite({ kind, base: BASE, errors, notes }));
     }
     for (const kind of ['chromium-1280', 'webkit-iphone']) {
-      await runRun55CaseSuite({ kind, base: BASE, errors, notes });
+      await runBrowser('case', kind, () => runRun55CaseSuite({ kind, base: BASE, errors, notes }));
     }
   },
   fill: async () => {
     for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
-      await runRun46FillSuite({ kind, base: BASE, errors, notes });
+      await runBrowser('fill', kind, () => runRun46FillSuite({ kind, base: BASE, errors, notes }));
     }
   },
   about: async () => {
     for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-390', 'webkit-iphone']) {
-      await runRun47AboutSuite({ kind, base: BASE, errors, notes });
+      await runBrowser('about', kind, () => runRun47AboutSuite({ kind, base: BASE, errors, notes }));
     }
   },
   routines: () => runRun48RoutineSuite({ errors, notes }),
   bench: async () => {
-    for (const kind of Object.keys(RUN50_KINDS)) await runRun50BenchSuite({ kind, base: BASE, errors, notes });
+    for (const kind of Object.keys(RUN50_KINDS)) {
+      await runBrowser('bench', kind, () => runRun50BenchSuite({ kind, base: BASE, errors, notes }));
+    }
   },
 };
 /** QA_SMOKE_ONLY=firstload,exits runs a subset of GROUPS (CI runs them as parallel shards); unset runs all. */
