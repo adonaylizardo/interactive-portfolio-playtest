@@ -410,5 +410,11 @@ export function buildWorld(): {
   });
   objects.push(...fill.objects);
 
+  const [ix, iy] = INICIO;
+  if (!borderKind(ix, iy)) {
+    cells[iy][ix].walkable = true;
+    carveStreet(ix, iy);
+  }
+
   return { cells, objects, fill, keepClear };
 }

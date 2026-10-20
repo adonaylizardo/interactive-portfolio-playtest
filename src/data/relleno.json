@@ -1294,18 +1294,18 @@
    "kind": "prop",
    "sprite": "fill/cuji",
    "footprint": {
-    "x": 10,
+    "x": 8,
     "y": 31,
     "w": 1,
     "h": 1
    },
    "front": [
-    10,
+    8,
     31
    ],
    "cells": [
     [
-     10,
+     8,
      31
     ]
    ]
@@ -1358,18 +1358,18 @@
    "sprite": "fill/cardon",
    "footprint": {
     "x": 12,
-    "y": 33,
+    "y": 35,
     "w": 1,
     "h": 1
    },
    "front": [
     12,
-    33
+    35
    ],
    "cells": [
     [
      12,
-     33
+     35
     ]
    ]
   },

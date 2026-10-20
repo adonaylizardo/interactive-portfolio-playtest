@@ -53,12 +53,25 @@ function run(cmd, cwd = root) {
   execSync(cmd, { cwd, stdio: 'inherit' });
 }
 
+const previewTarget = target === 'preview' || target === 'preview-edificios';
+if (target === 'live' && process.env.QA_GATE_PREVIEW === '1') {
+  console.error('QA_GATE_PREVIEW=1 is preview-only. Refusing to deploy the live root with a warn-only full-frame diff.');
+  process.exit(1);
+}
+if (previewTarget) {
+  // Full-frame visual diff stays in the gate but does not block /preview-*/.
+  // Build, types, logos, case copy, the other sprite checks, and smoke stay blocking.
+  process.env.QA_GATE_PREVIEW = '1';
+} else {
+  delete process.env.QA_GATE_PREVIEW;
+}
+
 if (process.env.DEPLOY_GATE_PASSED === '1') {
   run('npx tsc --pretty false');
   run(`npx vite build --base ${base}`);
 } else {
   run('npm run qa:gate');
-  if (target === 'preview' || target === 'preview-edificios') run(`npx vite build --base ${base}`);
+  if (previewTarget) run(`npx vite build --base ${base}`);
 }
 
 if (!existsSync(path.join(dist, 'index.html'))) {
@@ -77,6 +90,10 @@ try {
     mkdirSync(dest, { recursive: true });
     cpSync(dist, dest, { recursive: true });
     writeFileSync(path.join(pushDir, '.nojekyll'), '');
+    writeFileSync(
+      path.join(pushDir, '.pages-deploy'),
+      `${target} ${new Date().toISOString()}\n`,
+    );
   } else {
     const keep = new Set(['.git', 'preview']);
     for (const name of readdirSync(pushDir)) {

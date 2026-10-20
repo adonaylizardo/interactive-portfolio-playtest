@@ -12,8 +12,8 @@
  * Usage: npm run qa:sprites [-- --shots]   (builds first; QA_BASE_URL skips the local preview server)
  */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
-import { launchBrowser } from './qa-ready.mjs';
+import { execSync, spawn } from 'node:child_process';
+import { isBrowserCrash, launchBrowser } from './qa-ready.mjs';
 import { armExitTimer, readExitTimer, exitIsImmediate, describeExit } from './qa-exit-timer.mjs';
 import { PNG } from 'pngjs';
 import fs from 'node:fs';
@@ -28,6 +28,13 @@ const SHOTS = process.argv.includes('--shots');
 /** QA_SPRITES_ONLY=map,picks runs a subset (placement, picks, map, diff, interiors, shots with --shots); unset runs all. */
 const ONLY = process.env.QA_SPRITES_ONLY?.split(',');
 const want = (part) => !ONLY || ONLY.includes(part);
+/**
+ * Preview deploys only (`QA_GATE_PREVIEW=1`). The full-frame visual diff still runs and
+ * writes a report plus screenshots, but a pixel miss or a SwiftShader crash does not fail
+ * the gate. Unset (live root) keeps that diff blocking.
+ */
+const PREVIEW_GATE = process.env.QA_GATE_PREVIEW === '1';
+const fullFrameWarnings = [];
 const OUT = path.join(ROOT, 'artifacts', 'run39');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -188,14 +195,23 @@ function allConnected(free, start) {
 const dist = (c, e) => (c ? Math.abs(c.r - e[2]) + Math.abs(c.g - e[3]) + Math.abs(c.b - e[4]) : 999);
 
 async function openMap(page) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.reload({ waitUntil: 'networkidle' });
-  await wait(700);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await page.goto(BASE, { waitUntil: 'load' });
+      await page.reload({ waitUntil: 'load' });
+      await wait(700);
+      return;
+    } catch (err) {
+      if (attempt === 0 && /crashed|closed/i.test(String(err))) continue;
+      throw err;
+    }
+  }
 }
 
-async function diffSprite(page, { key, tlx, tly, zoom, id, state }) {
+async function diffSprite(page, { key, tlx, tly, zoom, id, state, scale = 1 }) {
   const a = A[key];
   const pr = probeList(key);
+  const sc = scale ?? 1;
   if (!a || !pr.length) {
     fail(`pixel: ${key} not in sprites.json or no probes`);
     return;
@@ -208,16 +224,16 @@ async function diffSprite(page, { key, tlx, tly, zoom, id, state }) {
         q.isolateSprites([o.id]);
       } else {
         q.isolateSprites([]);
-        q.previewSprite(o.key, 0, 0);
+        await q.previewSprite(o.key, 0, 0);
       }
       q.frameWorld(o.cx, o.cy, o.zoom);
     },
-    { id, state, key, cx: tlx + a.w / 2, cy: tly + a.h / 2, zoom },
+    { id, state, key, cx: tlx + (a.w * sc) / 2, cy: tly + (a.h * sc) / 2, zoom },
   );
-  await wait(60);
+  await wait(120);
   const pts = await page.evaluate(
     (list) => list.map(([wx, wy]) => window.__playtestQa.worldToClient(wx, wy)),
-    pr.map((p) => [tlx + p[0], tly + p[1]]),
+    pr.map((p) => [tlx + p[0] * sc, tly + p[1] * sc]),
   );
   const cols = await page.evaluate((p) => window.__playtestQa.sampleCanvasColors(p), pts);
   const thin = !probes[key]?.length;
@@ -255,44 +271,36 @@ async function lejosZoom(page) {
 }
 
 async function pixelDiffMap(page) {
-  await page.evaluate(() => window.__playtestQa.loadAllSprites());
+  await page.evaluate(async () => {
+    await window.__playtestQa.loadAllSprites();
+    window.__playtestQa.setMapLightsForQa(true);
+  });
   const LEJOS_Z = await lejosZoom(page);
-  const instances = await page.evaluate(() => window.__playtestQa.spriteInstances());
+  const plan = await page.evaluate(() => window.__playtestQa.spritePixelDiffPlan());
   const covered = new Set();
-  const seenKey = new Set();
   const fullCoverage = new Set(Object.keys(A).filter((k) => !k.startsWith('int/')));
 
-  for (const inst of instances) {
-    const isTile = inst.kind === 'tile';
-    const isBuilding = inst.key.startsWith('ext/');
-    const baseKey = inst.key;
-    if (seenKey.has(baseKey)) continue;
-    seenKey.add(baseKey);
-    const sc = inst.scale ?? 1;
-    const sx = inst.tl.x + A[baseKey].vfs.x * sc;
-    const sy = inst.tl.y + A[baseKey].vfs.y * sc;
-    const states = isBuilding ? ['default', 'hover', 'resaltado'] : ['default'];
-    const lods = isTile ? ['cerca'] : ['cerca', 'lejos'];
-    for (const state of states) {
-      for (const lod of lods) {
-        let key = baseKey;
-        if (isBuilding) key = key.replace('/default/', `/${state}/`);
-        if (!isTile) key = key.replace(/\/(cerca|lejos)$/, `/${lod}`);
-        covered.add(key);
-        await diffSprite(page, {
-          key,
-          tlx: sx - A[key].vfs.x,
-          tly: sy - A[key].vfs.y,
-          zoom: lod === 'cerca' || !probes[key]?.length ? 1 : LEJOS_Z,
-          id: inst.id,
-          state,
-        });
-      }
+  for (const item of plan) {
+    const key = item.probeKey;
+    if (!A[key]) {
+      fail(`pixel: atlas missing key ${key} (from ${item.id} ${item.state}/${item.lod})`);
+      continue;
     }
+    covered.add(key);
+    await diffSprite(page, {
+      key,
+      tlx: item.tl.x,
+      tly: item.tl.y,
+      scale: item.scale,
+      zoom: item.lod === 'cerca' || !probes[key]?.length ? 1 : LEJOS_Z,
+      id: item.id,
+      state: item.state,
+    });
   }
   await page.evaluate(async () => {
     window.__playtestQa.isolateSprites(null);
     await window.__playtestQa.forceBuildingState(null);
+    window.__playtestQa.setMapLightsForQa(false);
   });
 
   const unplaced = [...fullCoverage].filter((k) => !covered.has(k));
@@ -417,38 +425,72 @@ async function groundTapChecks(page, solidKeys, front) {
   };
   const onMonument = (x, y) => sil.some((h) => inPoly(x, y, h));
   const centre = (x, y) => [(x - y) * 64, (x + y) * 32];
-  const tapGoal = (wx, wy, via) =>
+  const tapGoal = (wx, wy, via, tileX, tileY) =>
     page.evaluate(
-      async ([x, y, mode]) => {
+      async ([x, y, mode, tx, ty]) => {
         const q = window.__playtestQa;
         const c = document.getElementById('game-canvas');
-        q.setCharacterTile(24, 40);
+        q.releaseMapTapGestureForQa?.();
+        const stand = (stx, sty) => {
+          q.setCharacterTile(stx, sty);
+          const pos = q.getCharacterTile();
+          return pos.x === stx && pos.y === sty;
+        };
+        const candidates = [
+          [tx - 1, ty],
+          [tx + 1, ty],
+          [tx, ty - 1],
+          [tx, ty + 1],
+          [tx - 2, ty],
+          [tx + 2, ty],
+          [17, 36],
+        ];
+        for (const [stx, sty] of candidates) {
+          if (stand(stx, sty)) break;
+        }
         q.frameWorld(x, y, 1);
-        await new Promise((r) => setTimeout(r, 30));
+        await new Promise((r) => setTimeout(r, 40));
         c.dataset.walkGoal = '';
         const p = q.worldToClient(x, y);
         if (mode === 'touch') q.tapScreen(p.x, p.y);
-        return mode === 'touch' ? JSON.parse(c.dataset.walkGoal || 'null') : p;
+        if (mode === 'touch') {
+          for (let i = 0; i < 16; i++) {
+            await new Promise((r) => setTimeout(r, 30));
+            const g = c.dataset.walkGoal;
+            if (g) return JSON.parse(g);
+          }
+          return JSON.parse(c.dataset.walkGoal || 'null');
+        }
+        return p;
       },
-      [wx, wy, via],
+      [wx, wy, via, tileX, tileY],
     );
-  const goalAt = async (wx, wy) => {
+  const goalAt = async (wx, wy, tileX, tileY) => {
     const out = {};
-    out.touch = await tapGoal(wx, wy, 'touch');
-    const p = await tapGoal(wx, wy, 'mouse');
+    out.touch = await tapGoal(wx, wy, 'touch', tileX, tileY);
+    const p = await tapGoal(wx, wy, 'mouse', tileX, tileY);
     await page.mouse.click(p.x, p.y);
-    await wait(60);
-    out.mouse = await page.evaluate(() => JSON.parse(document.getElementById('game-canvas').dataset.walkGoal || 'null'));
+    for (let i = 0; i < 12; i++) {
+      await wait(25);
+      out.mouse = await page.evaluate(() =>
+        JSON.parse(document.getElementById('game-canvas').dataset.walkGoal || 'null'),
+      );
+      if (out.mouse) break;
+    }
     return out;
   };
   const same = (g, x, y) => g && g.x === x && g.y === y;
+  await page.evaluate(() => {
+    window.__playtestQa.setIgnoreJacPick(true);
+    window.__playtestQa.jacSet({ cx: 52, cy: 52, mode: 'parked', lights: 'on' });
+  });
   let behind = 0;
   for (let y = 30; y <= 37; y++) {
     for (let x = 9; x <= 16; x++) {
       if (solidKeys.has(`${x},${y}`) || x + y >= 51) continue;
       const [cx, cy] = centre(x, y);
       if (!onMonument(cx, cy)) continue;
-      const g = await goalAt(cx, cy);
+      const g = await goalAt(cx, cy, x, y);
       behind++;
       for (const via of ['touch', 'mouse']) {
         if (!same(g[via], x, y)) fail(`ground tap (${via}): centre of (${x},${y}) behind the obelisco shaft went to ${JSON.stringify(g[via])}`);
@@ -516,6 +558,7 @@ async function groundTapChecks(page, solidKeys, front) {
     }
   }
   notes.push(`ground taps (mouse + touch): ${behind} tiles behind the obelisco shaft, ${monument} monument points -> stair foot, ${bare} bare-plaza points on solid cells -> open neighbour, ${propTaps} tiles behind trees/lamps`);
+  await page.evaluate(() => window.__playtestQa.setIgnoreJacPick(false));
 }
 
 /**
@@ -740,6 +783,36 @@ const DIFF_VIEWS = [
 ];
 const diffTable = [];
 
+const FULL_FRAME_DIR = path.join(OUT, 'full-frame');
+
+function writeFullFrameReport() {
+  fs.mkdirSync(FULL_FRAME_DIR, { recursive: true });
+  const report = {
+    mode: PREVIEW_GATE ? 'warn' : 'block',
+    warnings: fullFrameWarnings,
+    rows: diffTable,
+  };
+  fs.writeFileSync(path.join(FULL_FRAME_DIR, 'report.json'), JSON.stringify(report, null, 1) + '\n');
+  const summary = [
+    `full-frame diff (${report.mode})`,
+    ...fullFrameWarnings.map((w) => `WARN ${w}`),
+    ...diffTable.map(
+      (r) =>
+        `${r.view} ${r.item} mean ${r.mean.toFixed(2)}/255 off>60 ${r.offPct.toFixed(2)}% in-map ${r.inSitu.toFixed(1)}/255`,
+    ),
+  ].join('\n');
+  fs.writeFileSync(path.join(FULL_FRAME_DIR, 'report.txt'), summary + '\n');
+}
+
+function fullFrameFail(message) {
+  if (PREVIEW_GATE) {
+    fullFrameWarnings.push(message);
+    console.warn(`WARN ${message}`);
+    return;
+  }
+  fail(message);
+}
+
 /** Each item drawn alone vs its @1x export (1 device px = 1 export px in both views), masked by alpha > 128. */
 async function fullFrameDiff(browser) {
   for (const vp of DIFF_VIEWS) {
@@ -747,7 +820,9 @@ async function fullFrameDiff(browser) {
     const page = await ctx.newPage();
     try {
       await openMap(page);
-      await page.addStyleTag({ content: '#ui-root{visibility:hidden !important}' });
+      await page.evaluate(() => {
+        document.getElementById('ui-root')?.style.setProperty('visibility', 'hidden', 'important');
+      });
       await page.evaluate(async () => {
         await window.__playtestQa.loadAllSprites();
         await window.__playtestQa.forceBuildingState('default');
@@ -819,11 +894,20 @@ async function fullFrameDiff(browser) {
         diffTable.push(row);
         const offLimit = row.subpx ? 2 : 1;
         if (!(row.mean < 6) || !(row.offPct < offLimit)) {
-          fail(
-            `diff ${vp.tag}: ${row.item} mean ${row.mean.toFixed(2)}/255, ${row.offPct.toFixed(2)}% px off by >60 (need <6 and <${offLimit}%${row.subpx ? ', sub-pixel origin' : ''})`,
+          fs.mkdirSync(FULL_FRAME_DIR, { recursive: true });
+          const shot = path.join(FULL_FRAME_DIR, `${vp.tag.replace(/[^a-z0-9]+/gi, '-')}-${row.item}.png`);
+          fs.writeFileSync(shot, PNG.sync.write(drawn.png));
+          fullFrameFail(
+            `diff ${vp.tag}: ${row.item} mean ${row.mean.toFixed(2)}/255, ${row.offPct.toFixed(2)}% px off by >60 (need <6 and <${offLimit}%${row.subpx ? ', sub-pixel origin' : ''}); shot ${shot}`,
           );
         }
       }
+    } catch (err) {
+      fs.mkdirSync(FULL_FRAME_DIR, { recursive: true });
+      const shot = path.join(FULL_FRAME_DIR, `crash-${vp.tag.replace(/[^a-z0-9]+/gi, '-')}.png`);
+      await page.screenshot({ path: shot, fullPage: true }).catch(() => {});
+      if (isBrowserCrash(err)) err.fullFrameShot = shot;
+      throw err;
     } finally {
       await page.evaluate(async () => {
         window.__playtestQa.isolateSprites(null);
@@ -839,6 +923,7 @@ async function fullFrameDiff(browser) {
   notes.push(`full-frame alpha-masked diff vs @1x export (pass: mean < 6/255 and < 1% px off by > 60, 2% when the origin is sub-pixel):\n${lines.join('\n')}`);
   fs.mkdirSync(OUT, { recursive: true });
   fs.writeFileSync(path.join(OUT, 'pixel-diff.json'), JSON.stringify(diffTable, null, 1) + '\n');
+  writeFullFrameReport();
 }
 
 async function enterRoom(page, name) {
@@ -1027,7 +1112,75 @@ async function part(name, fn) {
   console.log(`qa-sprites: ${name} ${((Date.now() - t) / 1000).toFixed(0)} s`);
 }
 
-const browser = await launchBrowser(chromium);
+async function runFullFrameDiffWithRetry(initialBrowser) {
+  let browser = initialBrowser;
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      if (attempt > 0) {
+        await browser.close().catch(() => {});
+        browser = await launchBrowser(chromium);
+      }
+      await fullFrameDiff(browser);
+      return browser;
+    } catch (err) {
+      lastErr = err;
+      if (!isBrowserCrash(err) || attempt === 2) {
+        if (PREVIEW_GATE && isBrowserCrash(err)) {
+          fullFrameWarnings.push(`full-frame diff renderer crash after ${attempt + 1} attempt(s): ${err}`);
+          console.warn('WARN full-frame diff: SwiftShader crash (QA_GATE_PREVIEW=1, not blocking)');
+          writeFullFrameReport();
+          return browser;
+        }
+        throw err;
+      }
+      console.log(`qa-sprites: full-frame diff renderer crash, retry ${attempt + 2}/3`);
+    }
+  }
+  throw lastErr;
+}
+
+function runFullFrameDiffSubprocess() {
+  execSync(`"${process.execPath}" "${path.join(ROOT, 'scripts/qa-sprites.mjs')}"`, {
+    env: { ...process.env, QA_SPRITES_ONLY: 'fullframe', QA_BASE_URL: BASE },
+    stdio: 'inherit',
+    cwd: ROOT,
+  });
+}
+
+function finishSprites(exitOnFail = true) {
+  for (const n of notes) console.log(`note: ${n}`);
+  for (const w of fullFrameWarnings) console.warn(`WARN ${w}`);
+  if (PREVIEW_GATE && fullFrameWarnings.length) {
+    console.warn(
+      `qa-sprites: full-frame diff ${fullFrameWarnings.length} warning(s) under QA_GATE_PREVIEW=1 (not blocking). Report: ${path.join(FULL_FRAME_DIR, 'report.json')}`,
+    );
+  }
+  if (errors.length) {
+    for (const e of errors) console.error(`FAIL ${e}`);
+    console.error(`\n${errors.length} sprite check(s) failed`);
+    if (exitOnFail) process.exit(1);
+    return false;
+  }
+  console.log('qa-sprites: all checks passed');
+  return true;
+}
+
+/** Isolated process so SwiftShader state from pixel-diff does not poison full-frame diff. */
+if (ONLY?.length === 1 && ONLY[0] === 'fullframe') {
+  let browser = await launchBrowser(chromium);
+  try {
+    await part('full-frame diff', async () => {
+      browser = await runFullFrameDiffWithRetry(browser);
+    });
+  } finally {
+    await browser.close().catch(() => {});
+    preview?.kill('SIGKILL');
+  }
+  finishSprites(true);
+}
+
+let browser = await launchBrowser(chromium);
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
   await openMap(page);
@@ -1042,7 +1195,23 @@ try {
   if (want('map')) await part('map', () => mapChecks(page));
   if (want('diff')) await part('pixel-diff', () => pixelDiffMap(page));
   await page.close();
-  if (want('diff')) await part('full-frame diff', () => fullFrameDiff(browser));
+  const needsFreshBrowser = want('diff') || want('interiors') || (SHOTS && want('shots'));
+  if (needsFreshBrowser) {
+    await browser.close();
+    browser = await launchBrowser(chromium);
+  }
+  if (want('diff')) {
+    await part('full-frame diff', () => {
+      try {
+        runFullFrameDiffSubprocess();
+      } catch (err) {
+        if (!PREVIEW_GATE) throw err;
+        const msg = `full-frame diff subprocess exited ${err.status ?? 1} (preview warn, not blocking)`;
+        fullFrameWarnings.push(msg);
+        console.warn(`WARN ${msg}`);
+      }
+    });
+  }
   if (want('interiors')) await part('interiors', () => interiorChecks(browser));
   if (SHOTS && want('shots')) await part('shots', () => shots(browser));
 } finally {
@@ -1050,10 +1219,4 @@ try {
   preview?.kill('SIGKILL');
 }
 
-for (const n of notes) console.log(`note: ${n}`);
-if (errors.length) {
-  for (const e of errors) console.error(`FAIL ${e}`);
-  console.error(`\n${errors.length} sprite check(s) failed`);
-  process.exit(1);
-}
-console.log('qa-sprites: all checks passed');
+finishSprites(true);

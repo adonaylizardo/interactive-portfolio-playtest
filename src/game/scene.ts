@@ -22,6 +22,7 @@ import {
   INICIO,
   MAP_HEIGHT,
   MAP_WIDTH,
+  getBuildingDoorTiles,
   objects,
   resolveBuildingEntryFromTile,
   resolveWalkTarget,
@@ -29,6 +30,7 @@ import {
   TILE_W,
   type MapObject,
 } from '../data/map';
+import { isCaseHouse } from '../data/cases';
 import {
   bindPopstate,
   navigateBackFromInterior,
@@ -131,6 +133,7 @@ import {
   viewportMapCoverage,
   zoomMinForInteriorBounds,
   zoomMinForViewport,
+  zoomToFitWorldBounds,
   zoomAtScreenAnchor,
   smoothDampToZero,
 } from './cameraControl';
@@ -375,6 +378,10 @@ export class IsoScene {
   private lodLejos = false;
   private qaIsolation: Set<string> | null = null;
   private qaForcedState: BuildingSpriteState | null = null;
+  /** When set, map buildings use encendida frames regardless of JAC lights (sprite pixel-diff). */
+  private qaMapLightsOn: boolean | null = null;
+  private qaIgnoreJacPick = false;
+  private qaIgnoreVanBlock = false;
   private qaPreview: Sprite | null = null;
   private interiorSprite: Sprite | null = null;
   private lastPanPos: { x: number; y: number } | null = null;
@@ -462,12 +469,17 @@ export class IsoScene {
       backgroundAlpha: 1,
       antialias: true,
       autoDensity: true,
-      premultipliedAlpha: true,
+      premultipliedAlpha: false,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
-      resizeTo: window,
       preference: 'webgl',
     });
+    this.syncRendererBackground();
+    this.reflowViewport();
 
+    this.screenFill = new Graphics();
+    this.screenFill.eventMode = 'none';
+    this.screenFill.label = 'screen-fill';
+    this.app.stage.addChildAt(this.screenFill, 0);
     this.rearLayer = new Container();
     this.rearLayer.eventMode = 'none';
     this.rearLayer.label = 'jac-rear';
@@ -580,11 +592,22 @@ export class IsoScene {
     const focusCanvas = () => canvas.focus({ preventScroll: true });
     focusCanvas();
     requestAnimationFrame(focusCanvas);
+    this.app.ticker.add(() => this.paintScreenFill(), undefined, UPDATE_PRIORITY.HIGH);
     this.app.ticker.add(() => this.update(), undefined, UPDATE_PRIORITY.NORMAL);
     this.app.ticker.add(() => this.composeRearPass(), undefined, UPDATE_PRIORITY.NORMAL);
     this.app.ticker.add(() => this.events.onFrame?.(), undefined, UPDATE_PRIORITY.UTILITY);
-    window.addEventListener('resize', () => this.onWindowViewportChange());
-    window.visualViewport?.addEventListener('resize', () => this.onWindowViewportChange());
+    const scheduleViewportReflow = () => this.scheduleViewportReflow();
+    window.addEventListener('resize', scheduleViewportReflow);
+    window.visualViewport?.addEventListener('resize', scheduleViewportReflow);
+    window.addEventListener('orientationchange', () => {
+      window.setTimeout(() => this.reflowViewport(), 50);
+    });
+    for (const mq of [
+      window.matchMedia('(orientation: portrait)'),
+      window.matchMedia('(orientation: landscape)'),
+    ]) {
+      mq.addEventListener('change', scheduleViewportReflow);
+    }
     const lockViewport = () => {
       if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
     };
@@ -600,8 +623,16 @@ export class IsoScene {
     });
 
     if (bootInterior) {
-      replaceOutdoorHash(this.outdoorCamBeforeInterior ?? { x: this.cameraX, y: this.cameraY, zoom: this.zoom });
-      this.enterInterior(bootInterior, { skipFade: true });
+      const knownInterior =
+        isCaseHouse(bootInterior) ||
+        bootInterior === 'teresa' ||
+        bootInterior === 'biblioteca' ||
+        !!getInteriorDef(bootInterior) ||
+        !!getBuildingByName(bootInterior);
+      if (knownInterior) {
+        replaceOutdoorHash(this.outdoorCamBeforeInterior ?? { x: this.cameraX, y: this.cameraY, zoom: this.zoom });
+        this.enterInterior(bootInterior, { skipFade: true });
+      }
     }
     setHashWriteSuppressed(false);
     this.applyCamera(true);
@@ -619,7 +650,7 @@ export class IsoScene {
       this.cameraY = v.y;
       this.zoom = clampZoom(v.zoom);
     }
-    if (id && !this.interiorActive) {
+    if (id) {
       if (state?.outdoorCam && !this.outdoorCamBeforeInterior) {
         this.outdoorCamBeforeInterior = { ...state.outdoorCam };
       }
@@ -690,6 +721,7 @@ export class IsoScene {
   }
 
   private outskirts: TilingSprite | null = null;
+  private screenFill: Graphics | null = null;
 
   /**
    * Stretches the outskirts over exactly what the camera sees (a tall phone at the 0.04 zoom floor
@@ -698,6 +730,25 @@ export class IsoScene {
    * Hidden while the town covers the whole screen: a full-screen blended quad costs software-GL
    * phones ~4 ms a frame.
    */
+  private syncRendererBackground(): void {
+    if (!this.app) return;
+    const c = worldBackgroundColor();
+    this.app.renderer.background.color = c;
+    this.app.renderer.background.alpha = 1;
+  }
+
+  private paintScreenFill(): void {
+    const g = this.screenFill;
+    if (!g || !this.app) return;
+    this.syncRendererBackground();
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const c = worldBackgroundColor();
+    g.clear();
+    g.rect(0, 0, sw, sh);
+    g.fill({ color: c, alpha: 1 });
+  }
+
   private fitOutskirts(sw: number, sh: number): void {
     const g = this.outskirts;
     if (!g) return;
@@ -712,7 +763,9 @@ export class IsoScene {
       return tx >= 0.5 && ty >= 0.5 && tx <= MAP_WIDTH - 1.5 && ty <= MAP_HEIGHT - 1.5;
     };
     const covered = inTown(left, top) && inTown(right, top) && inTown(left, bottom) && inTown(right, bottom);
-    g.visible = !this.interiorActive && !covered;
+    const phoneSheet =
+      document.body.dataset.chrome === 'phone' && document.body.dataset.layout === 'split';
+    g.visible = !this.interiorActive && (!covered || phoneSheet);
     if (!g.visible) return;
     const x0 = Math.floor(left / TILE_W - 1) * TILE_W;
     const y0 = Math.floor(top / TILE_H - 1) * TILE_H;
@@ -731,6 +784,7 @@ export class IsoScene {
     g.zIndex = -1000;
     g.on('pointertap', (e) => {
       if (this.shouldBlockTap()) return;
+      if (this.skipPixiMapTapForTouch()) return;
       this.pixiTapGestureSerial = this.pointerGestureSerial;
       const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
       if (this.interiorActive || this.jac?.driving) {
@@ -743,14 +797,9 @@ export class IsoScene {
         this.tapJac();
         return;
       }
-      const pos = e.getLocalPosition(this.world);
-      const tile = worldToTile(pos.x, pos.y);
-      if (!tile) {
-        this.tapBeyondMapEdge(pos.x, pos.y, sprint);
-        return;
-      }
-      if (!this.prepareMapTap(undefined, tile.x, tile.y)) return;
-      this.requestWalk(tile.x, tile.y, sprint);
+      const local = this.federatedToCanvas(e);
+      if (!local) return;
+      this.handleScreenTap(local.x, local.y, sprint);
     });
     this.world.addChildAt(g, 0);
   }
@@ -816,6 +865,7 @@ export class IsoScene {
     g.cursor = cell.walkable ? 'pointer' : 'default';
     g.on('pointertap', (e) => {
       if (this.shouldBlockTap()) return;
+      if (this.skipPixiMapTapForTouch()) return;
       this.pixiTapGestureSerial = this.pointerGestureSerial;
       if (this.jac?.driving) {
         const local = this.federatedToCanvas(e);
@@ -827,9 +877,10 @@ export class IsoScene {
         this.tapJac();
         return;
       }
-      if (!this.prepareMapTap(undefined, tx, ty)) return;
+      const local = this.federatedToCanvas(e);
+      if (!local) return;
       const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
-      this.requestWalk(tx, ty, sprint);
+      this.handleScreenTap(local.x, local.y, sprint);
     });
     this.tilesLayer.addChild(g);
     const entry = { g, tx, ty };
@@ -950,7 +1001,13 @@ export class IsoScene {
               ? { contains: (x: number, y: number) => box.contains(x, y) && spriteAlphaHit(obj, pos.x + x, pos.y + y) }
               : box;
         const flat = obj.name === 'redoma' || !!obj.flat;
-        const zIndex = flat ? -10 : objectDepth(obj) + (obj.x - obj.y) * 0.0001;
+        let depthBias = 0;
+        if (obj.type === 'building' && obj.name === 'biblioteca') {
+          depthBias = -30;
+        } else if (obj.name === 'obelisco' || (obj.name === 'tree' && obj.variant === 'redondo')) {
+          depthBias = 12;
+        }
+        const zIndex = flat ? -10 : objectDepth(obj) + depthBias + (obj.x - obj.y) * 0.0001;
         g.zIndex = zIndex;
         if (obj.flat) g.eventMode = 'none';
         const spriteBox = {
@@ -982,39 +1039,13 @@ export class IsoScene {
       });
       g.on('pointertap', (e) => {
         if (this.shouldBlockTap()) return;
+        if (this.skipPixiMapTapForTouch()) return;
         e.stopPropagation();
         this.pixiTapGestureSerial = this.pointerGestureSerial;
-        if (this.jac?.driving) {
-          const local = this.federatedToCanvas(e);
-          if (!local) return;
-          this.handleScreenTap(local.x, local.y, false);
-          return;
-        }
-        if (obj.id === JAC_ID || this.claimJacTap(e)) {
-          this.tapJac();
-          return;
-        }
-        if (obj.type === 'building' && obj.panelTitle && !this.prepareMapTap(obj)) return;
+        const local = this.federatedToCanvas(e);
+        if (!local) return;
         const sprint = (e.detail >= 2 && !isTouchPrimary()) || this.shiftHeld;
-        if (obj.type === 'building' && obj.door && obj.panelTitle) {
-          this.requestWalk(obj.door.x, obj.door.y, sprint, { walkOnly: true });
-          return;
-        }
-        this.pendingBuildingEntry = null;
-        const pos = e.getLocalPosition(this.world);
-        const bench = obj.name === 'bench' ? this.benchAtSeat(obj.x, obj.y) : obj.type !== 'building' ? this.pickBenchAtWorld(pos.x, pos.y) : undefined;
-        if (bench) {
-          if (!this.prepareMapTap(undefined, bench.seat.x, bench.seat.y)) return;
-          if (this.sitOnBench(bench, sprint)) return;
-        }
-        const tile = this.resolveGroundTap(pos.x, pos.y);
-        const scenery = obj.name === 'obelisco' || obj.name === 'redoma' || obj.name === 'muro';
-        if (tile && (scenery || cells[tile.y][tile.x].walkable)) {
-          if (!this.prepareMapTap(undefined, tile.x, tile.y)) return;
-          this.requestWalk(tile.x, tile.y, sprint);
-          return;
-        }
-        this.requestWalk(obj.x, obj.y, sprint);
+        this.handleScreenTap(local.x, local.y, sprint);
       });
       this.objectGraphics.set(obj.id, g);
       this.objectsLayer.addChild(g);
@@ -1050,7 +1081,7 @@ export class IsoScene {
         continue;
       }
       const state = v.obj.type === 'building' ? this.buildingSpriteState(v.obj) : 'default';
-      const lightsOn = this.jac?.lightsOn ?? true;
+      const lightsOn = this.qaMapLightsOn ?? this.jac?.lightsOn ?? true;
       if (!force && !lodChanged && state === v.state && v.lightsOn === lightsOn) continue;
       let key = objectSpriteKey(v.obj, state, lejos, lightsOn);
       if (key && !hasSprite(key) && v.obj.type === 'building') {
@@ -1398,7 +1429,10 @@ export class IsoScene {
     }
     this.savedCam = { x: this.cameraX, y: this.cameraY, zoom: this.zoom };
     this.mapOverview = true;
-    this.zoom = zoomMinForViewport(sw, sh);
+    const doorBounds = this.doorClusterWorldBounds();
+    this.cameraX = doorBounds.cx;
+    this.cameraY = doorBounds.cy;
+    this.zoom = zoomToFitWorldBounds(sw, sh, doorBounds, 24);
     const fitted = clampPanMapFullyInView(
       { cameraX: this.cameraX, cameraY: this.cameraY, zoom: this.zoom },
       sw,
@@ -1408,6 +1442,41 @@ export class IsoScene {
     this.cameraY = fitted.cameraY;
     this.zoom = fitted.zoom;
     this.applyCamera(true);
+  }
+
+  private doorClusterWorldBounds(): {
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+    cx: number;
+    cy: number;
+  } {
+    const doors = getBuildingDoorTiles();
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const d of doors) {
+      const w = tileToWorld(d.door.x + 0.5, d.door.y + 0.5);
+      minX = Math.min(minX, w.x);
+      maxX = Math.max(maxX, w.x);
+      minY = Math.min(minY, w.y);
+      maxY = Math.max(maxY, w.y);
+    }
+    if (!Number.isFinite(minX)) {
+      const b = mapWorldBounds();
+      return { ...b, cx: (b.minX + b.maxX) / 2, cy: (b.minY + b.maxY) / 2 };
+    }
+    const pad = 48;
+    return {
+      minX: minX - pad,
+      maxX: maxX + pad,
+      minY: minY - pad,
+      maxY: maxY + pad,
+      cx: (minX + maxX) / 2,
+      cy: (minY + maxY) / 2,
+    };
   }
 
   requestWalk(
@@ -1453,6 +1522,15 @@ export class IsoScene {
     this.path = [];
     this.drawPathPreview();
     if (this.canvasEl) this.canvasEl.dataset.walkGoal = '';
+  }
+
+  /** After closing a map sheet (case preview, overlay): drop stale walk/entry so the next door tap targets correctly. */
+  resetMapDoorChainState(): void {
+    this.pendingBuildingEntry = null;
+    this.clearWalkPreview();
+    this.doorCooldown = 0;
+    this.suspendCameraFollow();
+    this.applyCameraFromUi();
   }
 
   walkToTile(tx: number, ty: number, sprint: boolean, opts?: { keepView?: boolean }): void {
@@ -1543,12 +1621,8 @@ export class IsoScene {
     }
   }
 
-  /** Door pick in world space (stable at min zoom ~0.04–0.15); closest opening wins. */
+  /** Door pick in world space; closest door opening wins (never building-body fallback). */
   private pickBuildingDoorAtScreen(sx: number, sy: number): MapObject | undefined {
-    if (this.zoom <= 0.15) {
-      const body = this.pickBuildingAtScreen(sx, sy);
-      if (body?.door && body.panelTitle) return body;
-    }
     const { x: wx, y: wy } = this.screenToWorld(sx, sy);
     const buildings = objects.filter((o) => o.type === 'building' && o.door && o.panelTitle);
     let best: { obj: MapObject; dist: number; depth: number } | null = null;
@@ -1647,6 +1721,8 @@ export class IsoScene {
     bridge.dismiss();
     this.pendingBuildingEntry = null;
     this.clearWalkPreview();
+    this.suspendCameraFollow();
+    this.applyCameraFromUi();
     const ctx = Math.round(this.charTx);
     const cty = Math.round(this.charTy);
     if (getBuildingAtDoor(ctx, cty)) {
@@ -1707,18 +1783,6 @@ export class IsoScene {
       this.requestDriveToScreen(sx, sy);
       return;
     }
-    if (this.jac && (this.jac.mode === 'menu' || this.jac.mode === 'info')) {
-      if (this.pickJacAtScreen(sx, sy)) {
-        this.tapJac();
-        return;
-      }
-      this.jacClose();
-      return;
-    }
-    if (this.pickJacAtScreen(sx, sy)) {
-      this.tapJac();
-      return;
-    }
     const doorFirst = this.pickBuildingDoorAtScreen(sx, sy);
     if (doorFirst?.door && doorFirst.panelTitle) {
       if (!this.prepareMapTap(doorFirst)) return;
@@ -1734,6 +1798,18 @@ export class IsoScene {
       this.requestWalk(doorFirst.door.x, doorFirst.door.y, sprint, {
         buildingEntry: { panelTitle: doorFirst.panelTitle, door: doorFirst.door },
       });
+      return;
+    }
+    if (this.jac && (this.jac.mode === 'menu' || this.jac.mode === 'info')) {
+      if (!this.qaIgnoreJacPick && this.pickJacAtScreen(sx, sy)) {
+        this.tapJac();
+        return;
+      }
+      this.jacClose();
+      return;
+    }
+    if (!this.qaIgnoreJacPick && this.pickJacAtScreen(sx, sy)) {
+      this.tapJac();
       return;
     }
     const sceneryTile = this.pickSceneryAtScreen(sx, sy);
@@ -1819,7 +1895,7 @@ export class IsoScene {
   }
 
   private vanWalkBlock(): Set<string> {
-    if (!this.jac || this.jac.driving) return new Set();
+    if (this.qaIgnoreVanBlock || !this.jac || this.jac.driving) return new Set();
     return this.jac.parkedFootprintKeys();
   }
 
@@ -1947,7 +2023,25 @@ export class IsoScene {
   }
 
   recenterOnCharacter(): void {
+    if (this.mapOverview) {
+      this.mapOverview = false;
+      if (this.savedCam) {
+        this.cameraX = this.savedCam.x;
+        this.cameraY = this.savedCam.y;
+        this.zoom = this.savedCam.zoom;
+      }
+    }
     this.centerOnCharacter(false);
+    this.applyCamera(true);
+  }
+
+  /** Case preview on the map (deep-linkable via #view=…&in=). */
+  pushCasePreviewHash(buildingId: string): void {
+    writeInteriorToHash(
+      buildingId,
+      { x: this.cameraX, y: this.cameraY, zoom: this.zoom },
+      'push',
+    );
   }
 
   private freeRectCenter(): { x: number; y: number } {
@@ -2017,7 +2111,10 @@ export class IsoScene {
       }
       bottom = Math.max(bottom, panelInsets.bottom + pad);
     }
-    const checklist = document.querySelector('.checklist');
+    const phoneChromeSheet =
+      document.body.dataset.chrome === 'phone' &&
+      document.querySelector('.chrome.chrome--sheet') != null;
+    const checklist = phoneChromeSheet ? null : document.querySelector('.checklist');
     if (checklist) {
       const box = checklist.getBoundingClientRect();
       if (box.width > 8 && box.height > 8) {
@@ -2029,7 +2126,12 @@ export class IsoScene {
         // Layouts v2: the tutorial is a top-right overlay. Never treat it as a left
         // sidebar — that used to steal the map hole and shove the character off-screen.
         if (bottomAnchored && box.left < sw * 0.45) {
-          bottom = Math.max(bottom, Math.ceil(sh - box.top + pad));
+          // Top map pill (layout=map): reserve space above the map, not the whole column below it.
+          if (box.top < sh * 0.2) {
+            top = Math.max(top, Math.ceil(box.bottom + pad));
+          } else {
+            bottom = Math.max(bottom, Math.ceil(sh - box.top + pad));
+          }
         } else if (box.left < sw * 0.35 && box.top <= sh * 0.5) {
           left = Math.max(left, Math.ceil(box.right + pad));
         }
@@ -2042,6 +2144,7 @@ export class IsoScene {
   applyCamera(persistHash = true): void {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
+    this.paintScreenFill();
     this.updateCameraFitMargins();
     if (this.interiorActive && this.interiorDef) {
       const bounds = interiorWorldBounds(this.interiorDef, this.interiorBottomSheet);
@@ -2288,6 +2391,13 @@ export class IsoScene {
     this.applyCamera(false);
   }
 
+  /** QA / boot: desktop split chrome with Estudio–Volaris first-load framing. */
+  reframeDesktopFirstLoadForQa(): void {
+    if (this.shouldUseMobileFraming()) return;
+    this.frameDesktopFirstLoadView();
+    this.applyCamera(false);
+  }
+
   /**
    * Desktop first load: centred on the character, zoomed so the Estudio and the nearest houses
    * (Volaris, Mentoría, P&G, roofs included) fit around it.
@@ -2490,7 +2600,7 @@ export class IsoScene {
     }
   }
 
-  private onWindowViewportChange(): void {
+  private scheduleViewportReflow(): void {
     if (
       this.pointers.size > 0 ||
       this.pinchGestureActive ||
@@ -2500,14 +2610,40 @@ export class IsoScene {
       this.pendingViewportApply = true;
       return;
     }
+    this.reflowViewport();
+  }
+
+  /** Resize renderer and repaint after viewport / chrome inset changes (rotation, sheets). */
+  reflowViewport(): void {
+    if (!this.app) return;
+    this.pendingViewportApply = false;
+    const vv = window.visualViewport;
+    const w = Math.max(1, Math.round(vv?.width ?? window.innerWidth));
+    const h = Math.max(1, Math.round(vv?.height ?? window.innerHeight));
+    if (this.app.screen.width !== w || this.app.screen.height !== h) {
+      this.app.renderer.resize(w, h);
+    }
+    this.syncRendererBackground();
+    this.paintScreenFill();
+    this.updateCameraFitMargins();
+    if (this.interiorActive && this.interiorDef) {
+      this.fitInteriorCamera();
+    } else if (!this.follow.engaged) {
+      this.centerOnCharacter(false);
+    }
     this.applyCamera(false);
+    try {
+      this.app.render();
+    } catch {
+      /* render may skip before first frame */
+    }
   }
 
   private flushPendingViewport(): void {
     if (!this.pendingViewportApply) return;
     this.pendingViewportApply = false;
     if (this.pointers.size > 0 || this.pinchGestureActive || this.gestureActive) return;
-    this.applyCamera(false);
+    this.reflowViewport();
   }
 
   private applyPinchCamera(next: { cameraX: number; cameraY: number; zoom: number }): void {
@@ -2556,6 +2692,11 @@ export class IsoScene {
     } else {
       this.pinchSession = null;
     }
+  }
+
+  /** Phone map taps resolve on pointerup via tryScheduleDeferredTap; Pixi would double-fire. */
+  private skipPixiMapTapForTouch(): boolean {
+    return isTouchPrimary() && !this.interiorActive;
   }
 
   /** `panSlopPx`: a press that strayed no farther than this still taps, even if it nudged the camera. */
@@ -2820,11 +2961,16 @@ export class IsoScene {
 
     const isTypingTarget = (t: EventTarget | null) =>
       t instanceof HTMLElement &&
-      (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(t.tagName));
+      (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName));
+    const uiCapturesKeyboard = () =>
+      document.body.classList.contains('search-palette-open') ||
+      document.body.classList.contains('about-panel-open');
     window.addEventListener('keydown', (e) => {
       this.noteAvatarInput();
       const k = e.key.toLowerCase();
+      const typing = isTypingTarget(e.target) || uiCapturesKeyboard();
       if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
+        if (typing) return;
         if (!e.repeat && !this.keys.has(k)) {
           this.startCameraFollow();
           this.armDoorPush();
@@ -3622,21 +3768,18 @@ export class IsoScene {
     if (this.interiorActive || this.jac?.driving) return;
     if (this.path.length > 0) return;
     if (this.doorCooldown > 0) return;
-    const building = getBuildingAtDoor(tx, ty);
-    if (!building?.panelTitle || !building.door) return;
+    const pending = this.pendingBuildingEntry;
+    if (!pending) return;
+    const d = pending.door;
+    const building = getBuildingAtDoor(d.x, d.y);
+    if (!building?.panelTitle || building.panelTitle !== pending.panelTitle) return;
 
-    if (!this.pendingBuildingEntry) return;
-    const d = this.pendingBuildingEntry.door;
     const onPendingDoor = tx === d.x && ty === d.y;
-    const adjacentPending =
-      Math.abs(tx - d.x) + Math.abs(ty - d.y) <= 2 &&
-      getBuildingAtDoor(d.x, d.y)?.panelTitle === this.pendingBuildingEntry.panelTitle;
+    const adjacentPending = Math.abs(tx - d.x) + Math.abs(ty - d.y) <= 2;
     if (!onPendingDoor && !adjacentPending) return;
     if (!onPendingDoor) {
       this.charTx = d.x;
       this.charTy = d.y;
-      tx = d.x;
-      ty = d.y;
     }
     this.enterBuildingFromDoor(building);
   }
@@ -3647,6 +3790,7 @@ export class IsoScene {
     this.pendingBuildingEntry = null;
     this.path = [];
     this.drawPathPreview();
+    if (this.canvasEl) this.canvasEl.dataset.walkGoal = '';
     this.doorCooldown = 120;
     this.mapReturnDoor = { x: building.door.x, y: building.door.y };
     this.charTx = building.door.x;
@@ -3768,6 +3912,9 @@ export class IsoScene {
     opts?: { skipFade?: boolean; fromHash?: boolean },
   ): void {
     if (this.interiorActive && this.interiorDef?.id === buildingId) return;
+    if (this.interiorActive && this.interiorDef?.id !== buildingId) {
+      this.exitInterior({ immediate: true, skipFade: true });
+    }
     const def = getInteriorDef(buildingId);
     const building = objects.find((o) => o.type === 'building' && o.name === buildingId);
     const door = building?.door;
@@ -3841,6 +3988,7 @@ export class IsoScene {
         pushInteriorEntry(buildingId, cam, outdoor);
         this.interiorHistoryEntries += 1;
       }
+      this.jacClose();
       this.events.onInteriorIdChange?.(buildingId);
       studio.setInterior(true);
       if (!opts?.fromHash && !opts?.skipFade) studio.playDoor();
@@ -3950,9 +4098,29 @@ export class IsoScene {
     return this.interiorActive;
   }
 
-  /** Refit camera when the interior sheet peek height changes. */
+  /** Refit camera when chrome/panel insets change (preview dismiss, map dock, sheet peek). */
+  /** Full map redraw after phone chrome sheet DOM updates (WebGL band can stale). */
+  repaintMapFrame(): void {
+    if (!this.app) return;
+    this.paintScreenFill();
+    this.applyCamera(false);
+    try {
+      this.app.render();
+    } catch {
+      /* first frame */
+    }
+  }
+
   applyCameraFromUi(): void {
-    if (this.interiorActive) this.fitInteriorCamera();
+    this.updateCameraFitMargins();
+    if (this.interiorActive && this.interiorDef) {
+      this.fitInteriorCamera();
+    } else if (!this.follow.engaged) {
+      this.centerOnCharacter(false);
+      this.panMoved = false;
+      this.hadMultiPointerGesture = false;
+      this.tapDriftPx = 0;
+    }
     this.applyCamera(false);
   }
 
@@ -4728,30 +4896,57 @@ export class IsoScene {
     return true;
   }
 
+  /** QA: one-finger touch release on the door (same deferred-tap path as phone play). */
+  tapDoorWithTouchEventsForQa(name: string): boolean {
+    const client = this.getDoorScreenClientPoint(name);
+    const canvas = this.canvasEl;
+    if (!client || !canvas) return false;
+    this.releaseMapTapGestureForQa();
+    const pid = 42;
+    const base = {
+      bubbles: true,
+      cancelable: true,
+      clientX: client.x,
+      clientY: client.y,
+      pointerId: pid,
+      pointerType: 'touch' as const,
+      isPrimary: true,
+      button: 0,
+      buttons: 0,
+    };
+    canvas.dispatchEvent(new PointerEvent('pointerdown', { ...base, buttons: 1 }));
+    canvas.dispatchEvent(new PointerEvent('pointerup', base));
+    return true;
+  }
+
   /** QA: pan so the character and target door are both on screen before a real pointer tap. */
   frameBuildingDoorForQa(name: string): void {
     const obj = objects.find((o) => o.type === 'building' && o.name === name);
     if (!obj?.door) return;
-    const d = obj.door;
-    const midTx = (this.charTx + d.x) / 2;
-    const midTy = (this.charTy + d.y) / 2;
-    const mid = tileToWorld(midTx, midTy);
-    const doorW = tileToWorld(d.x, d.y);
+    this.suspendCameraFollow();
+    const tap = doorTapPoint(obj);
+    if (!tap) return;
     const charW = tileToWorld(this.charTx, this.charTy);
-    const spanX = Math.abs(doorW.x - charW.x) + TILE_W * 2;
-    const spanY = Math.abs(doorW.y - charW.y) + TILE_H * 4;
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     this.updateCameraFitMargins();
     const m = cameraFitMargins();
     const innerW = Math.max(1, sw - m.left - m.right);
     const innerH = Math.max(1, sh - m.top - m.bottom);
+    const minX = Math.min(tap.x, charW.x);
+    const maxX = Math.max(tap.x, charW.x);
+    const minY = Math.min(tap.y, charW.y);
+    const maxY = Math.max(tap.y, charW.y);
+    const spanX = Math.max(TILE_W * 2.5, maxX - minX + TILE_W * 3);
+    const spanY = Math.max(TILE_H * 3, maxY - minY + TILE_H * 4);
     const zoomX = innerW / spanX;
     const zoomY = innerH / spanY;
-    this.zoom = clampZoom(Math.min(zoomX, zoomY) * 0.88, sw, sh);
+    const fit = clampZoom(Math.min(zoomX, zoomY) * 0.9, sw, sh);
+    this.zoom = Math.max(fit, 0.12);
     const aim = this.freeRectCenter();
-    this.placeWorldAtScreen(mid.x, mid.y - 40, aim.x, aim.y);
+    this.placeWorldAtScreen(tap.x, tap.y - 24, aim.x, aim.y);
     this.applyCamera(false);
+    this.app?.render();
   }
 
   /** Client coordinates for tapping the drawn door of a building (QA). */
@@ -4759,6 +4954,8 @@ export class IsoScene {
     const obj = objects.find((o) => o.type === 'building' && o.name === name);
     const tap = obj ? doorTapPoint(obj) : null;
     if (!tap || !this.canvasEl) return null;
+    this.updateCameraFitMargins();
+    this.app?.render();
     const screen = this.worldToScreen(tap.x, tap.y);
     const rect = this.canvasEl.getBoundingClientRect();
     return { x: rect.left + screen.x, y: rect.top + screen.y };
@@ -4772,11 +4969,50 @@ export class IsoScene {
   setCharacterTileForQa(tx: number, ty: number): void {
     if (!cells[ty]?.[tx]?.walkable) return;
     this.path = [];
+    this.pendingBuildingEntry = null;
+    this.doorCooldown = 0;
     this.charTx = tx;
     this.charTy = ty;
     this.syncCharacterGraphic();
     this.drawPathPreview();
     this.centerOnCharacter(false);
+  }
+
+  /** Stand on the tile in front of the door, frame camera — for real pointer entry tests. */
+  /** Clear pan/suppress flags so the next real pointer tap is not eaten after a sheet dismiss. */
+  releaseMapTapGestureForQa(): void {
+    this.clearDeferredTap();
+    this.panMoved = false;
+    this.hadMultiPointerGesture = false;
+    this.secondFingerArrived = false;
+    this.tapDriftPx = 0;
+    this.suppressTapUntil = 0;
+    this.pixiTapGestureSerial = -1;
+  }
+
+  prepareDoorEntryForQa(name: string): boolean {
+    const obj = objects.find((o) => o.type === 'building' && o.name === name);
+    if (!obj?.door || !obj.panelTitle) return false;
+    const inward = doorInwardStep(obj);
+    const candidates: { x: number; y: number }[] = [];
+    if (inward) {
+      candidates.push({ x: obj.door.x - inward.x, y: obj.door.y - inward.y });
+    }
+    candidates.push({ x: obj.door.x, y: obj.door.y });
+    let placed = false;
+    for (const c of candidates) {
+      if (!cells[c.y]?.[c.x]?.walkable) continue;
+      this.setCharacterTileForQa(c.x, c.y);
+      placed = true;
+      break;
+    }
+    if (!placed) return false;
+    this.suspendCameraFollow();
+    this.frameBuildingDoorForQa(name);
+    this.updateCameraFitMargins();
+    this.app?.render();
+    this.releaseMapTapGestureForQa();
+    return true;
   }
 
   /** QA: same entry path as tapping a building (walk to door + open panel). */
@@ -4923,6 +5159,65 @@ export class IsoScene {
     return out;
   }
 
+  /** QA: atlas keys + world top-lefts for map pixel-diff (matches objectSpriteKey, incl. luz buildings). */
+  qaSpritePixelDiffPlan(): {
+    id: string;
+    probeKey: string;
+    state: 'default' | 'hover' | 'resaltado';
+    lod: 'cerca' | 'lejos';
+    tl: { x: number; y: number };
+    scale: number;
+  }[] {
+    const out: {
+      id: string;
+      probeKey: string;
+      state: 'default' | 'hover' | 'resaltado';
+      lod: 'cerca' | 'lejos';
+      tl: { x: number; y: number };
+      scale: number;
+    }[] = [];
+    const seenBase = new Set<string>();
+    for (const inst of this.qaSpriteInstances()) {
+      if (inst.kind === 'tile') {
+        if (seenBase.has(inst.key)) continue;
+        seenBase.add(inst.key);
+        out.push({
+          id: inst.id,
+          probeKey: inst.key,
+          state: 'default',
+          lod: 'cerca',
+          tl: inst.tl,
+          scale: 1,
+        });
+        continue;
+      }
+      const visual = [...this.objectVisuals.values()].find((v) => v.obj.id === inst.id);
+      if (!visual) continue;
+      const obj = visual.obj;
+      if (seenBase.has(inst.key)) continue;
+      seenBase.add(inst.key);
+      const states: ('default' | 'hover' | 'resaltado')[] =
+        obj.type === 'building' ? ['default', 'hover', 'resaltado'] : ['default'];
+      const lods: ('cerca' | 'lejos')[] = ['cerca', 'lejos'];
+      const sc = objectSpriteScale(obj);
+      for (const state of states) {
+        for (const lod of lods) {
+          const probeKey = objectSpriteKey(obj, state, lod === 'lejos', true);
+          if (!probeKey) continue;
+          out.push({
+            id: inst.id,
+            probeKey,
+            state,
+            lod,
+            tl: objectSpriteTopLeft(obj, probeKey),
+            scale: sc,
+          });
+        }
+      }
+    }
+    return out;
+  }
+
   /** QA: draw only the given sprite ids (objects by id, tiles as `tile:x,y`), no character. */
   qaIsolateSprites(ids: string[] | null): void {
     if (ids) {
@@ -4936,10 +5231,15 @@ export class IsoScene {
   }
 
   /** QA: show one sprite key on its own with its front vertex at world (sx, sy); null removes it. */
-  qaPreviewSprite(key: string | null, sx = 0, sy = 0): { tl: { x: number; y: number }; w: number; h: number } | null {
+  async qaPreviewSprite(
+    key: string | null,
+    sx = 0,
+    sy = 0,
+  ): Promise<{ tl: { x: number; y: number }; w: number; h: number } | null> {
     this.qaPreview?.destroy();
     this.qaPreview = null;
     if (!key) return null;
+    await loadKeys([key]);
     const a = spriteAsset(key);
     const sp = new Sprite(spriteTexture(key));
     sp.position.set(sx - a.vfs.x, sy - a.vfs.y);
@@ -4947,22 +5247,54 @@ export class IsoScene {
     sp.eventMode = 'none';
     this.objectsLayer.addChild(sp);
     this.qaPreview = sp;
+    this.app.render();
     return { tl: { x: sx - a.vfs.x, y: sy - a.vfs.y }, w: a.w, h: a.h };
+  }
+
+  qaSetMapLightsForQa(on: boolean): void {
+    this.qaMapLightsOn = on ? true : null;
+    this.syncObjectSprites(true);
+    this.app.render();
+  }
+
+  qaSetIgnoreJacPick(ignore: boolean): void {
+    this.qaIgnoreJacPick = ignore;
+    this.qaIgnoreVanBlock = ignore;
+  }
+
+/**
+   * Bulk texture uploads must not interleave with a full-map draw. Software GL crashes
+   * (Target crashed) when hundreds of texImage2D calls share the frame with every tile.
+   */
+  private async withRendererPaused<T>(fn: () => Promise<T>): Promise<T> {
+    const ticker = this.app.ticker;
+    const wasStarted = ticker.started;
+    if (wasStarted) ticker.stop();
+    try {
+      return await fn();
+    } finally {
+      if (wasStarted) ticker.start();
+    }
   }
 
   /** QA: force every building sprite into one state (default | hover | resaltado), or null to release. */
   async qaForceBuildingState(state: BuildingSpriteState | null): Promise<void> {
     this.qaForcedState = state;
-    await loadAllSprites();
-    this.syncObjectSprites(true);
-    this.app.render();
+    await this.withRendererPaused(async () => {
+      await loadAllSprites();
+      this.syncObjectSprites(true);
+      this.app.render();
+    });
   }
 
   async qaLoadAllSprites(): Promise<void> {
-    await loadAllSprites();
-    this.ensureAllTiles();
-    this.syncObjectSprites(true);
-    this.refreshTileTextures();
+    await this.withRendererPaused(async () => {
+      await loadAllSprites();
+      this.ensureAllTiles();
+      this.syncObjectSprites(true);
+      this.refreshTileTextures();
+      this.app.render();
+    });
   }
 
   /** QA: put a world point at the canvas centre at an exact zoom. */
@@ -4998,6 +5330,51 @@ export class IsoScene {
     const rect = this.canvasEl?.getBoundingClientRect();
     const s = this.worldToScreen(wx, wy);
     return { x: (rect?.left ?? 0) + s.x, y: (rect?.top ?? 0) + s.y };
+  }
+
+  /** Teresa interior: forge pantalla quad → client rect for stage video placeholder. */
+  interiorStageScreenLayout(): {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+    clipPath: string;
+  } | null {
+    if (!this.interiorActive || this.interiorDef?.id !== 'teresa' || !this.interiorDef.sprite) return null;
+    if (!this.canvasEl || !this.app) return null;
+    const def = this.interiorDef;
+    const tl = interiorSpriteTopLeft(def);
+    const scale = def.scale;
+    const corners1x = [
+      { x: 59.52, y: 173.36 },
+      { x: 206.72, y: 99.76 },
+      { x: 206.72, y: 171.76 },
+      { x: 59.52, y: 245.36 },
+    ];
+    const rect = this.canvasEl.getBoundingClientRect();
+    const sx = rect.width / (this.app.screen.width || 1);
+    const sy = rect.height / (this.app.screen.height || 1);
+    const client = corners1x.map((c) => {
+      const scr = this.worldToScreen(tl.x + c.x * scale, tl.y + c.y * scale);
+      return { x: rect.left + scr.x * sx, y: rect.top + scr.y * sy };
+    });
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const p of client) {
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x);
+      maxY = Math.max(maxY, p.y);
+    }
+    const width = maxX - minX;
+    const height = maxY - minY;
+    if (width < 4 || height < 4) return null;
+    const clipPath = `polygon(${client
+      .map((p) => `${((p.x - minX) / width) * 100}% ${((p.y - minY) / height) * 100}%`)
+      .join(', ')})`;
+    return { left: minX, top: minY, width, height, clipPath };
   }
 
   /** Client pixels for ▶ Talks / 📄 Writings map pills. */

@@ -33,7 +33,14 @@ function patchPage(page) {
   };
 }
 
-function patchContext(ctx) {
+async function patchContext(ctx) {
+  await ctx.addInitScript(() => {
+    try {
+      Object.defineProperty(navigator, 'webdriver', { get: () => false, configurable: true });
+    } catch {
+      /* ignore */
+    }
+  });
   ctx.pages().forEach(patchPage);
   ctx.on('page', patchPage);
   const newPage = ctx.newPage.bind(ctx);
@@ -48,7 +55,7 @@ function patchContext(ctx) {
 function installReadyWait(browser) {
   const newContext = browser.newContext.bind(browser);
   const newPage = browser.newPage.bind(browser);
-  browser.newContext = async (...a) => patchContext(await newContext(...a));
+  browser.newContext = async (...a) => await patchContext(await newContext(...a));
   browser.newPage = async (...a) => {
     const p = await newPage(...a);
     patchPage(p);
@@ -62,7 +69,13 @@ function installReadyWait(browser) {
  * ANGLE's EGL backend (works without an X display; needs Mesa's EGL/GL drivers): about 3x the
  * average frame rate, but it stalls for hundreds of ms now and then, which skews walk timings.
  */
-const CHROMIUM_GL_ARGS = process.env.QA_GL === 'llvmpipe' ? ['--use-angle=gl-egl', '--ignore-gpu-blocklist'] : [];
+const CHROMIUM_GL_ARGS = [
+  '--disable-dev-shm-usage',
+  '--no-sandbox',
+  ...(process.env.QA_GL === 'llvmpipe'
+    ? ['--use-angle=gl-egl', '--ignore-gpu-blocklist']
+    : ['--disable-gpu-compositing']),
+];
 
 /**
  * Pixi caps a frame's game time at 100 ms, so once frames take longer than that game time runs slow.
@@ -75,4 +88,30 @@ export const TIMING_MIN_FPS = 10;
 export async function launchBrowser(type, options = {}) {
   const args = type.name() === 'chromium' ? [...CHROMIUM_GL_ARGS, ...(options.args ?? [])] : options.args;
   return installReadyWait(await type.launch({ ...options, args }));
+}
+
+/** SwiftShader / headless GL sometimes kills the tab without a real app failure. */
+export function isBrowserCrash(err) {
+  const s = String(err);
+  return /Target crashed|Page crashed|has been closed|Browser has been closed/i.test(s);
+}
+
+/**
+ * Re-run `fn` in a fresh browser when the renderer crashes (up to `attempts` times).
+ * Assertion / pixel failures propagate immediately.
+ */
+export async function withFreshBrowser(type, launchOptions, fn, { attempts = 3 } = {}) {
+  let lastErr;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const browser = await launchBrowser(type, launchOptions);
+    try {
+      return await fn(browser);
+    } catch (err) {
+      lastErr = err;
+      if (!isBrowserCrash(err) || attempt === attempts - 1) throw err;
+    } finally {
+      await browser.close().catch(() => {});
+    }
+  }
+  throw lastErr;
 }

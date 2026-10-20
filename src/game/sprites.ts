@@ -213,8 +213,16 @@ export function loadBuildingStateSprites(): Promise<void> {
   return loadKeys([...buildingStateKeys('hover'), ...buildingStateKeys('resaltado')]);
 }
 
+/**
+ * Every frame, including interiors. Uploading them all at once while the map is on screen
+ * kills SwiftShader / llvmpipe (GPU process crash). Small batches leave the GL driver time to retire.
+ */
 export async function loadAllSprites(): Promise<void> {
-  await loadKeys(allSpriteKeys());
+  const keys = allSpriteKeys();
+  const BATCH = 12;
+  for (let i = 0; i < keys.length; i += BATCH) {
+    await loadKeys(keys.slice(i, i + BATCH));
+  }
 }
 
 export async function loadInteriorSprite(id: string): Promise<void> {

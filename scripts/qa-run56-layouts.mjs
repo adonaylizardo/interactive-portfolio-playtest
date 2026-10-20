@@ -128,7 +128,7 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
       if (panel.canvasVis !== 'hidden') errors.push(`${tag}: map still visible in panel-only`);
       if (!panel.colShown) errors.push(`${tag}: column hidden in panel-only`);
 
-      await page.locator('[aria-label="Hide panel"]').click();
+      await page.locator('[data-action="hide-panel"]').click();
       await wait(200);
       const hid = await qa(page, () => {
         const tab = document.querySelector('.chrome__tab');

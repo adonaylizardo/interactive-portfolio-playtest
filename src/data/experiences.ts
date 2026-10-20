@@ -10,19 +10,63 @@ export function isExperienceBuilding(id: string | null | undefined): id is Exper
 
 export type TalkItem = {
   id: string;
+  title?: string;
+  url?: string;
+  date?: string;
+  duration?: string;
+  thumbnail?: string;
+  titleKey?: string;
+  metaKey?: string;
   example?: boolean;
-  titleKey: string;
-  metaKey: string;
 };
 
-export type WritingItem = TalkItem;
+export type TalkSection = {
+  id?: string;
+  title?: string;
+  titleKey?: string;
+  items: TalkItem[];
+};
+
+export type WritingItem = {
+  id: string;
+  example?: boolean;
+  title?: string;
+  url?: string;
+  date?: string;
+  publication?: string;
+  readTime?: string;
+  titleKey?: string;
+  metaKey?: string;
+};
 
 export type WritingSection = {
   id: string;
   titleKey: string;
-  descKey: string;
+  descKey?: string;
   items: WritingItem[];
 };
 
-export const TALKS: TalkItem[] = talksJson.items as TalkItem[];
-export const WRITINGS: WritingSection[] = writingsJson.sections as WritingSection[];
+type WritingsFile = {
+  sections: WritingSection[];
+  substackUrl?: string;
+};
+
+type TalksFile = {
+  sections?: TalkSection[];
+  items?: TalkItem[];
+  comingSoon?: boolean;
+};
+
+const talksFile = talksJson as TalksFile;
+
+export const TALK_SECTIONS: TalkSection[] = talksFile.sections?.length
+  ? talksFile.sections
+  : [{ items: talksFile.items ?? [] }];
+
+export const TALKS: TalkItem[] = TALK_SECTIONS.flatMap((s) => s.items);
+
+export const TALKS_COMING_SOON =
+  !!talksFile.comingSoon || (TALKS.length === 0 && !talksFile.sections?.length);
+
+export const WRITINGS: WritingSection[] = (writingsJson as WritingsFile).sections;
+export const WRITINGS_SUBSTACK_URL = (writingsJson as WritingsFile).substackUrl;
