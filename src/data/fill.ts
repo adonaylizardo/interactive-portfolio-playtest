@@ -339,7 +339,7 @@ export function placeFill(ctx: FillContext): FillResult {
           if (g) why.add(`${g} at (${x},${y})`);
           else if (flatTaken.has(k(x, y))) why.add(`another fill area at (${x},${y})`);
           else if (cells[y][x].groundId.includes('park')) why.add(`plaza at (${x},${y})`);
-          else if (ctx.nearMuro(x, y)) why.add(`climbing-wall clearance at (${x},${y})`);
+          else if (ctx.nearMuro(x, y) && gid !== 'fuente') why.add(`climbing-wall clearance at (${x},${y})`);
           if (solids.has(k(x, y))) why.add(`two props on (${x},${y})`);
           solids.add(k(x, y));
         }

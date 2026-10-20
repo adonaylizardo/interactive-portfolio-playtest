@@ -688,6 +688,10 @@ body[data-voice-contact='1'] .chrome--sheet .chrome__subtitle:not(:empty) {
   display: block;
 }
 
+body[data-voice-contact='1'] .chrome__subtitle:not(:empty) {
+  z-index: 70;
+}
+
 .chrome__subtitle:empty {
   visibility: hidden;
 }

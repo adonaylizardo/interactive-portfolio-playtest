@@ -1189,15 +1189,19 @@ export class IsoScene {
         g.hitArea =
           obj.type === 'building'
             ? this.buildingHitArea(obj)
-            : ALPHA_TAP_PROPS.has(obj.name) && hasSpriteMask(obj)
-              ? { contains: (x: number, y: number) => box.contains(x, y) && spriteAlphaHit(obj, pos.x + x, pos.y + y) }
-              : box;
+            : obj.name === 'bench'
+              ? box
+              : ALPHA_TAP_PROPS.has(obj.name) && hasSpriteMask(obj)
+                ? { contains: (x: number, y: number) => box.contains(x, y) && spriteAlphaHit(obj, pos.x + x, pos.y + y) }
+                : box;
         const flat = obj.name === 'redoma' || !!obj.flat;
         let depthBias = 0;
         if (obj.type === 'building' && obj.name === 'biblioteca') {
           depthBias = -30;
         } else if (obj.name === 'obelisco' || (obj.name === 'tree' && obj.variant === 'redondo')) {
           depthBias = 12;
+        } else if (obj.name === 'bench') {
+          depthBias = 8;
         }
         const zIndex = flat ? -10 : objectDepth(obj) + depthBias + (obj.x - obj.y) * 0.0001;
         g.zIndex = zIndex;
@@ -1363,7 +1367,10 @@ export class IsoScene {
       this.startNoahTalk();
       return;
     }
-    const spot = this.noahTalkSpots()[0];
+    const spots = this.noahTalkSpots();
+    const spot =
+      spots.find((s) => s.x === 38 && s.y === 40) ??
+      spots.reduce((best, s) => (s.x + s.y > best.x + best.y ? s : best), spots[0]);
     if (!spot) return;
     this.requestWalk(spot.x, spot.y, sprint);
     this.noahTalkSpot = spot;
@@ -1389,14 +1396,17 @@ export class IsoScene {
         const d = Math.hypot(x - n.x, y - n.y);
         if (d < 0.6 || d > NOAH_TALK_RANGE || !cells[y]?.[x]?.walkable) continue;
         if (route.some((r) => Math.round(r.x) === x && Math.round(r.y) === y)) continue;
-        const covers = (r: { x: number; y: number }) =>
-          x + y > r.x + r.y && Math.abs(x - y - (r.x - r.y)) * (TILE_W / 2) < NOAH_CLEAR_WORLD_X;
-        if (route.some(covers)) continue;
-        // In front of him (lower on screen) first, so the player never stands over the NOAH letters.
-        spots.push({ x, y, d: d + (x + y > n.x + n.y ? 0 : 10) });
+        const inFront = x + y > Math.round(n.x + n.y);
+        if (!inFront) {
+          const covers = (r: { x: number; y: number }) =>
+            x + y > r.x + r.y && Math.abs(x - y - (r.x - r.y)) * (TILE_W / 2) < NOAH_CLEAR_WORLD_X;
+          if (route.some(covers)) continue;
+        }
+        if (!inFront) continue;
+        spots.push({ x, y, d });
       }
     }
-    return spots.sort((a, b) => a.d - b.d);
+    return spots.sort((a, b) => a.d - b.d || b.x - a.x || b.y - a.y);
   }
 
   private startNoahTalk(): void {

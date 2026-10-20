@@ -121,6 +121,7 @@ body.boot-loading::before {
 .boot-flow__welcome {
   position: absolute;
   inset: 0;
+  z-index: 1;
   pointer-events: none;
 }
 
@@ -158,6 +159,7 @@ body.boot-loading::before {
   left: 16px;
   right: 16px;
   bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 2;
   padding: 20px 20px 24px;
   background: #141518;
   border: 1px solid #2a2c31;

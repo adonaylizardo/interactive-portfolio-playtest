@@ -1399,8 +1399,10 @@ body:has(.building-panel--open) .chrome__lang {
   border: 1px solid #2a2c31;
 }
 
-.building-panel--open .building-panel__sheet {
-  transform: translateY(0);
+@media (max-width: 767px) {
+  .building-panel--open .building-panel__sheet {
+    transform: translateY(0);
+  }
 }
 
 /* Leave: --open drops on this frame so the map is hittable; the sheet still slides out. */

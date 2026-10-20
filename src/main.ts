@@ -322,6 +322,7 @@ async function main(): Promise<void> {
       const open = panel.isInteriorMode();
       if (panel.isOpen()) studio.noteIntroPanelOpen();
       checklist.setBuildingPanelOpen(open);
+      const inRoom = scene?.isInInterior() ?? false;
       if (panel.isExperienceMode()) {
         chrome.setInteriorOpen(false, { skipLayout: true });
         if (!isMobileLayout() && open) {
@@ -329,7 +330,7 @@ async function main(): Promise<void> {
           checklist.setCollapsed(true);
         }
       } else {
-        chrome.setInteriorOpen(open);
+        chrome.setInteriorOpen(inRoom);
       }
       joystick.setHidden(open || panel.isPreviewMode() || panel.isPreviewExpanded());
       if (panel.isPreviewExpanded()) checklist.setCollapsed(true);
@@ -344,7 +345,10 @@ async function main(): Promise<void> {
       scene?.applyCameraFromUi();
       scene?.schedulePresentationRefresh(420);
     },
-    () => scene.leaveInteriorNow(),
+    () => {
+      if (scene.isInInterior()) scene.leaveInteriorNow();
+      else if (panel.isOpen()) panel.hide({ snap: true });
+    },
     () => {
       scene?.refreshCanvasPresentation(true);
       scene?.schedulePresentationRefresh(420);

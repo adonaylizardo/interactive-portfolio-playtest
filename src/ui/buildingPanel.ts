@@ -1138,7 +1138,8 @@ export class BuildingPanel {
     this.exitFromPointer = false;
     this.mode = 'interior';
     this.interiorId = buildingId;
-    this.peekOnly = true;
+    const expandOnPhone = this.isMobile() && buildingId === 'estudio';
+    this.peekOnly = !expandOnPhone;
     this.el.hidden = false;
     this.el.style.visibility = '';
     this.el.style.pointerEvents = '';
@@ -1153,6 +1154,7 @@ export class BuildingPanel {
     this.renderAbout();
     this.el.classList.add('building-panel--open');
     this.syncPeekClass();
+    if (expandOnPhone) this.setPeek(false);
     this.onVisibilityChange();
     this.applyI18n();
     studio.playClick();

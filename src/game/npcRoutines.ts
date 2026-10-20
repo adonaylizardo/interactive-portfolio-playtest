@@ -735,7 +735,7 @@ export class NpcRoutines {
 
   private goTo(w: Walker, to: Cell, task: string, arrive: () => void, opts: PathOpts = {}): boolean {
     const from = { x: w.tx, y: w.ty };
-    const avoid = this.avoidNow(w, 'still');
+    const avoid = opts.streetOnly ? this.avoidNow(w, 'jam') : this.avoidNow(w, 'still');
     const player = (x: number, y: number) => this.host.blocked(x, y);
     // Crossers keep to the street even past people standing on it (they make way when met); off
     // the street only around the player.
