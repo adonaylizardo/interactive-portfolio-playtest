@@ -12,8 +12,8 @@
  * Usage: npm run qa:sprites [-- --shots]   (builds first; QA_BASE_URL skips the local preview server)
  */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
-import { launchBrowser } from './qa-ready.mjs';
+import { execSync, spawn } from 'node:child_process';
+import { isBrowserCrash, launchBrowser } from './qa-ready.mjs';
 import { armExitTimer, readExitTimer, exitIsImmediate, describeExit } from './qa-exit-timer.mjs';
 import { PNG } from 'pngjs';
 import fs from 'node:fs';
@@ -1065,6 +1065,60 @@ async function part(name, fn) {
   console.log(`qa-sprites: ${name} ${((Date.now() - t) / 1000).toFixed(0)} s`);
 }
 
+async function runFullFrameDiffWithRetry(initialBrowser) {
+  let browser = initialBrowser;
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      if (attempt > 0) {
+        await browser.close().catch(() => {});
+        browser = await launchBrowser(chromium);
+      }
+      await fullFrameDiff(browser);
+      return browser;
+    } catch (err) {
+      lastErr = err;
+      if (!isBrowserCrash(err) || attempt === 2) throw err;
+      console.log(`qa-sprites: full-frame diff renderer crash, retry ${attempt + 2}/3`);
+    }
+  }
+  throw lastErr;
+}
+
+function runFullFrameDiffSubprocess() {
+  execSync(`"${process.execPath}" "${path.join(ROOT, 'scripts/qa-sprites.mjs')}"`, {
+    env: { ...process.env, QA_SPRITES_ONLY: 'fullframe', QA_BASE_URL: BASE },
+    stdio: 'inherit',
+    cwd: ROOT,
+  });
+}
+
+function finishSprites(exitOnFail = true) {
+  for (const n of notes) console.log(`note: ${n}`);
+  if (errors.length) {
+    for (const e of errors) console.error(`FAIL ${e}`);
+    console.error(`\n${errors.length} sprite check(s) failed`);
+    if (exitOnFail) process.exit(1);
+    return false;
+  }
+  console.log('qa-sprites: all checks passed');
+  return true;
+}
+
+/** Isolated process so SwiftShader state from pixel-diff does not poison full-frame diff. */
+if (ONLY?.length === 1 && ONLY[0] === 'fullframe') {
+  let browser = await launchBrowser(chromium);
+  try {
+    await part('full-frame diff', async () => {
+      browser = await runFullFrameDiffWithRetry(browser);
+    });
+  } finally {
+    await browser.close().catch(() => {});
+    preview?.kill('SIGKILL');
+  }
+  finishSprites(true);
+}
+
 let browser = await launchBrowser(chromium);
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
@@ -1086,22 +1140,8 @@ try {
     browser = await launchBrowser(chromium);
   }
   if (want('diff')) {
-    await part('full-frame diff', async () => {
-      let lastErr;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          if (attempt > 0) {
-            await browser.close();
-            browser = await launchBrowser(chromium);
-          }
-          await fullFrameDiff(browser);
-          return;
-        } catch (err) {
-          lastErr = err;
-          if (!/crashed|closed/i.test(String(err))) throw err;
-        }
-      }
-      throw lastErr;
+    await part('full-frame diff', () => {
+      runFullFrameDiffSubprocess();
     });
   }
   if (want('interiors')) await part('interiors', () => interiorChecks(browser));
@@ -1111,10 +1151,4 @@ try {
   preview?.kill('SIGKILL');
 }
 
-for (const n of notes) console.log(`note: ${n}`);
-if (errors.length) {
-  for (const e of errors) console.error(`FAIL ${e}`);
-  console.error(`\n${errors.length} sprite check(s) failed`);
-  process.exit(1);
-}
-console.log('qa-sprites: all checks passed');
+finishSprites(true);

@@ -24,7 +24,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit, devices } from 'playwright';
-import { launchBrowser } from './qa-ready.mjs';
+import { isBrowserCrash, launchBrowser, withFreshBrowser } from './qa-ready.mjs';
 import { runRun38InputSuite } from './qa-run38-input.mjs';
 import { runRun41InputSuite } from './qa-run41-input.mjs';
 import { runRun42FollowSuite } from './qa-run42-follow.mjs';
@@ -90,7 +90,7 @@ const FIRST_LOAD = [
 
 /** Character on screen near the middle, zoom in range, Estudio and Volaris doors in view. */
 async function firstLoad({ tag, type, options, minZoom, centred }) {
-  const browser = await launchBrowser(type);
+  await withFreshBrowser(type, {}, async (browser) => {
   const ctx = await browser.newContext(options);
   const page = await ctx.newPage();
   try {
@@ -156,8 +156,8 @@ async function firstLoad({ tag, type, options, minZoom, centred }) {
     notes.push(`firstload ${tag}: zoom ${m.zoom.toFixed(3)} (${m.lod}, lejos below ${m.lodBelow.toFixed(3)}, min ${m.zoomMin.toFixed(3)}), character tile ${m.tile.x},${m.tile.y} at ${Math.round(m.foot.x)},${Math.round(m.foot.y)}`);
   } finally {
     await ctx.close();
-    await browser.close();
   }
+  });
 }
 
 let preview = null;
@@ -278,7 +278,19 @@ try {
   for (const name of ONLY) {
     const t = Date.now();
     const before = errors.length;
-    await GROUPS[name]();
+    let lastCrash;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await GROUPS[name]();
+        lastCrash = null;
+        break;
+      } catch (err) {
+        if (!isBrowserCrash(err) || attempt === 2) throw err;
+        lastCrash = err;
+        notes.push(`qa-smoke: ${name} renderer crash, retry ${attempt + 2}/3`);
+      }
+    }
+    if (lastCrash) throw lastCrash;
     const failed = errors.length - before;
     console.log(`qa-smoke: ${name} ${((Date.now() - t) / 1000).toFixed(0)} s${failed ? `, ${failed} failure(s)` : ''}`);
   }

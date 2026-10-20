@@ -89,3 +89,29 @@ export async function launchBrowser(type, options = {}) {
   const args = type.name() === 'chromium' ? [...CHROMIUM_GL_ARGS, ...(options.args ?? [])] : options.args;
   return installReadyWait(await type.launch({ ...options, args }));
 }
+
+/** SwiftShader / headless GL sometimes kills the tab without a real app failure. */
+export function isBrowserCrash(err) {
+  const s = String(err);
+  return /Target crashed|Page crashed|has been closed|Browser has been closed/i.test(s);
+}
+
+/**
+ * Re-run `fn` in a fresh browser when the renderer crashes (up to `attempts` times).
+ * Assertion / pixel failures propagate immediately.
+ */
+export async function withFreshBrowser(type, launchOptions, fn, { attempts = 3 } = {}) {
+  let lastErr;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const browser = await launchBrowser(type, launchOptions);
+    try {
+      return await fn(browser);
+    } catch (err) {
+      lastErr = err;
+      if (!isBrowserCrash(err) || attempt === attempts - 1) throw err;
+    } finally {
+      await browser.close().catch(() => {});
+    }
+  }
+  throw lastErr;
+}
