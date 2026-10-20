@@ -427,6 +427,13 @@ export async function runRun45PlayerSuite({ kind, base, errors, notes, shots }) 
       timeout: 30000,
     });
     await wait(300);
+    // First paint is @1x; the retina swap follows. Wait for it before comparing sheets.
+    await page
+      .waitForFunction(() => {
+        const a = window.__playtestQa.playerAvatar();
+        return a.rendererResolution < 1.5 || (a.adonay.resolution >= 2 && a.pantone.resolution >= 2);
+      }, null, { timeout: 15000 })
+      .catch(() => {});
     const s = await qa(page, () => window.__playtestQa.playerAvatar());
     const wantRes = s.rendererResolution >= 1.5 ? 2 : 1;
     for (const [who, w, h] of [['adonay', 64, 100], ['pantone', 52, 44]]) {

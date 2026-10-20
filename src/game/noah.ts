@@ -120,6 +120,8 @@ export class Noah {
   private x = 0;
   private y = 0;
   private hidden = false;
+  /** Ground sort captured while he is standing, so the climb stays in front of it. */
+  private groundZ: number | null = null;
 
   private readonly layer: Container;
   private readonly host: NoahHost;
@@ -293,15 +295,19 @@ export class Noah {
 
   syncDepth(): void {
     const muroZ = this.host.muroZIndex();
-    if (ON_WALL.has(this.anim)) {
-      this.sprite.zIndex = muroZ + MURO_CLIMB_EPS;
-      return;
-    }
     const f = worldToTileFrac(this.x, this.y);
     const walk = this.host.zIndexAt(f.x, f.y);
+    if (ON_WALL.has(this.anim)) {
+      // Pin one depth for the whole climb, in front of both the muro and the
+      // ground sort he had while standing (the letters occlude that spot).
+      const aboveGround = (this.groundZ ?? walk) + MURO_CLIMB_EPS;
+      this.sprite.zIndex = Math.max(muroZ + MURO_CLIMB_EPS, aboveGround);
+      return;
+    }
     // Idle and the walk to the holds sit inside the muro occluder. Walker sort would
     // put him behind the sprite (he vanishes). Keep him just in front of the wall.
     this.sprite.zIndex = Math.max(walk, muroZ + MURO_NEAR_EPS);
+    this.groundZ = this.sprite.zIndex;
   }
 
   bindTap(handler: (e: import('pixi.js').FederatedPointerEvent) => void): void {

@@ -34,8 +34,8 @@ const sprites = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/data/sprites.jso
 const alpha = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/data/sprite-alpha.json'), 'utf8'));
 const npcs = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/data/npcs.json'), 'utf8'));
 
-/** FILLER plaza cells in src/data/world.ts: walkable park ground. */
-const PLAZA = [[28, 37], [34, 37], [29, 38], [30, 38], [31, 38], [32, 38], [33, 38]];
+/** FILLER plaza cells in src/data/world.ts: walkable park ground. 34,37 and 31,38 are muro wall cells. */
+const PLAZA = [[28, 37], [29, 38], [30, 38], [32, 38], [33, 38]];
 const REPLACED = relleno.replaced.map(([x, y]) => `prop/tree/${x}-${y}`);
 
 const key = (x, y) => `${x},${y}`;

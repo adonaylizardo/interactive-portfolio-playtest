@@ -46,6 +46,14 @@ function patchPage(page) {
 }
 
 async function patchContext(ctx) {
+  // The town defaults to Spanish. These checks assert the English copy.
+  await ctx.addInitScript(() => {
+    try {
+      localStorage.setItem('portfolio-playtest-lang', 'en');
+    } catch {
+      /* private mode */
+    }
+  });
   ctx.pages().forEach(patchPage);
   ctx.on('page', patchPage);
   const newPage = ctx.newPage.bind(ctx);

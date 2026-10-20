@@ -4452,7 +4452,7 @@ export class IsoScene {
     this.syncPerspective();
     this.syncPersona();
     this.applyBillboards();
-    if (!this.personaOn()) this.avatar.setVisible(!this.interiorActive);
+    if (!this.personaOn() && !this.qaIsolation) this.avatar.setVisible(!this.interiorActive);
   }
 
   /**
