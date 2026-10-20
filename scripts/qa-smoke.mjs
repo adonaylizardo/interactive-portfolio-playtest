@@ -300,25 +300,24 @@ try {
   for (const name of ONLY) {
     const t = Date.now();
     const before = errors.length;
-    let lastCrash;
     for (let attempt = 0; attempt < 3; attempt++) {
+      const mark = errors.length;
       try {
         await GROUPS[name]();
-        lastCrash = null;
         break;
       } catch (err) {
         if (!isBrowserCrash(err)) throw err;
         if (attempt < 2) {
-          lastCrash = err;
+          errors.splice(mark);
           notes.push(`qa-smoke: ${name} renderer crash, retry ${attempt + 2}/3`);
           continue;
         }
         notes.push(`qa-smoke: ${name} renderer crash after 3 tries; that group stopped there`);
-        lastCrash = null;
         break;
       }
     }
     const failed = errors.length - before;
+    for (const e of errors.slice(before)) console.error(`FAIL ${e}`);
     console.log(`qa-smoke: ${name} ${((Date.now() - t) / 1000).toFixed(0)} s${failed ? `, ${failed} failure(s)` : ''}`);
   }
 } finally {

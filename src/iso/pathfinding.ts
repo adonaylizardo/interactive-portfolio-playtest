@@ -1,4 +1,4 @@
-import { cells, MAP_HEIGHT, MAP_WIDTH } from '../data/map';
+import { cells, doorInwardStep, getBuildingAtDoor, MAP_HEIGHT, MAP_WIDTH } from '../data/map';
 
 type Node = { x: number; y: number; g: number; f: number; parent?: Node };
 
@@ -21,12 +21,23 @@ function inBounds(x: number, y: number): boolean {
   return x >= 0 && y >= 0 && x < MAP_WIDTH && y < MAP_HEIGHT;
 }
 
+/** Stepping onto a door toward the building enters, so a through-route has to cross it sideways. */
+function blocksInwardDoor(x: number, y: number, nx: number, ny: number, gx: number, gy: number): boolean {
+  if (nx === gx && ny === gy) return false;
+  const door = getBuildingAtDoor(nx, ny);
+  if (!door) return false;
+  const inward = doorInwardStep(door);
+  if (!inward) return false;
+  return (nx - x) * inward.x + (ny - y) * inward.y > 0;
+}
+
 export function findPathWith(
   sx: number,
   sy: number,
   gx: number,
   gy: number,
   passable: (x: number, y: number) => boolean,
+  blockStep?: (x: number, y: number, nx: number, ny: number) => boolean,
 ): { x: number; y: number }[] | null {
   if (!inBounds(gx, gy)) return null;
   if (!passable(gx, gy)) return null;
@@ -60,6 +71,7 @@ export function findPathWith(
       const ny = current.y + dy;
       if (!inBounds(nx, ny)) continue;
       if (!passable(nx, ny)) continue;
+      if (blockStep?.(current.x, current.y, nx, ny)) continue;
       const nk = key(nx, ny);
       if (closed.has(nk)) continue;
       const g = current.g + 1;
@@ -84,7 +96,14 @@ export function findPath(
   gx: number,
   gy: number,
 ): { x: number; y: number }[] | null {
-  return findPathWith(sx, sy, gx, gy, (x, y) => !!cells[y]?.[x]?.walkable);
+  return findPathWith(
+    sx,
+    sy,
+    gx,
+    gy,
+    (x, y) => !!cells[y]?.[x]?.walkable,
+    (x, y, nx, ny) => blocksInwardDoor(x, y, nx, ny, gx, gy),
+  );
 }
 
 export type PathResult = {

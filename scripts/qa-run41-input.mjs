@@ -336,6 +336,15 @@ async function testWheel(ctx, kind, base, errors, notes) {
       await page.mouse.wheel(dx, dy);
       await wait(250);
       const b = await cam(page);
+      const vertical = dx === 0;
+      if (vertical) {
+        // Plain vertical wheel zooms. Wheel down (positive dy) zooms out.
+        const ratio = b.zoom / a.zoom;
+        if (dy > 0 ? !(ratio < 0.95) : !(ratio > 1.05)) {
+          errors.push(`${tag}: plain scroll ${dir} zoom ${a.zoom.toFixed(3)} -> ${b.zoom.toFixed(3)}`);
+        }
+        continue;
+      }
       if (Math.abs(b.zoom - a.zoom) > a.zoom * 0.01) errors.push(`${tag}: plain scroll ${dir} zoomed ${a.zoom.toFixed(3)} -> ${b.zoom.toFixed(3)}`);
       const px2 = moved(a, b) * a.zoom;
       if (!(px2 > 160 * 0.6)) errors.push(`${tag}: scroll ${dir} moved the view ${px2.toFixed(0)} px (want ~160 in the scroll direction)`);
