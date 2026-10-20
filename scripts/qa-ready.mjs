@@ -8,7 +8,18 @@ async function waitForQa(page) {
   if (!/^https?:/.test(page.url())) return;
   for (let i = 0; i < 450; i++) {
     try {
-      if (await page.evaluate(() => Boolean(window.__playtestQa?.isInInterior))) return;
+      const state = await page.evaluate(() => {
+        if (window.__playtestQa?.isInInterior) return 'ready';
+        const btn = document.querySelector('[data-boot-start]');
+        if (btn && !btn.closest('[hidden]')) return 'welcome';
+        return 'loading';
+      });
+      if (state === 'ready') return;
+      // The map stays behind the welcome sheet until the visitor taps Start.
+      // QA navigations take that tap; a hash reload skips the sheet on its own.
+      if (state === 'welcome') {
+        await page.locator('[data-boot-start]').click({ timeout: 3000 }).catch(() => {});
+      }
     } catch {
       /* navigation in flight */
     }
