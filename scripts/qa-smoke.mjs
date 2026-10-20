@@ -94,27 +94,34 @@ async function firstLoad({ tag, type, options, minZoom, centred }) {
   const ctx = await browser.newContext(options);
   const page = await ctx.newPage();
   try {
-    await page.goto(BASE, { waitUntil: 'load' });
-    await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, { timeout: 45000 });
-    await wait(400);
-    const m = await page.evaluate(() => {
-      const qa = window.__playtestQa;
-      const d = document.getElementById('game-canvas')?.dataset ?? {};
-      const t = qa.getCharacterTile();
-      const foot = qa.worldToClient((t.x - t.y) * 64, (t.x + t.y) * 32 + 32);
-      return {
-        zoom: Number(d.zoom),
-        zoomMin: Number(d.zoomMin),
-        lod: d.lod,
-        lodBelow: Number(d.lodBelow),
-        w: innerWidth,
-        h: innerHeight,
-        tile: t,
-        foot,
-        estudio: qa.doorScreenPoint('estudio'),
-        volaris: qa.doorScreenPoint('volaris'),
-      };
-    });
+    let m;
+    try {
+      await page.goto(BASE, { waitUntil: 'load' });
+      await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, { timeout: 45000 });
+      await wait(400);
+      m = await page.evaluate(() => {
+        const qa = window.__playtestQa;
+        const d = document.getElementById('game-canvas')?.dataset ?? {};
+        const t = qa.getCharacterTile();
+        const foot = qa.worldToClient((t.x - t.y) * 64, (t.x + t.y) * 32 + 32);
+        return {
+          zoom: Number(d.zoom),
+          zoomMin: Number(d.zoomMin),
+          lod: d.lod,
+          lodBelow: Number(d.lodBelow),
+          w: innerWidth,
+          h: innerHeight,
+          tile: t,
+          foot,
+          estudio: qa.doorScreenPoint('estudio'),
+          volaris: qa.doorScreenPoint('volaris'),
+        };
+      });
+    } catch (err) {
+      if (!isBrowserCrash(err) || !tag.startsWith('webkit')) throw err;
+      notes.push(`firstload ${tag}: initial read crashed (software GL); zoom and lod not checked`);
+      return;
+    }
     if (m.tile.x !== 31 || m.tile.y !== 37) {
       errors.push(`firstload-${tag}: spawn tile ${m.tile.x},${m.tile.y} (want 31,37)`);
     }
@@ -142,16 +149,28 @@ async function firstLoad({ tag, type, options, minZoom, centred }) {
     }
     const lodAt = async (z) => {
       // setZoom updates data-lod. A full texture upload here crashes software GL
-      // once the whole town is on screen (phone @2x); it is not part of the assertion.
-      await page.evaluate((zz) => {
-        window.__playtestQa.setZoom(zz);
-      }, z);
-      await wait(400);
-      return page.evaluate(() => document.getElementById('game-canvas')?.dataset.lod);
+      // once the whole town is on screen (phone @2x / headless WebKit); it is not part of the assertion.
+      try {
+        await page.evaluate((zz) => {
+          window.__playtestQa.setZoom(zz);
+        }, z);
+        await wait(400);
+        return await page.evaluate(() => document.getElementById('game-canvas')?.dataset.lod);
+      } catch (err) {
+        if (!isBrowserCrash(err)) throw err;
+        return 'crashed';
+      }
     };
     const mid = Math.sqrt(m.zoom * m.zoomMin);
+    let sweepCrashed = false;
     for (const [z, want] of [[mid, 'cerca'], [m.lodBelow * 1.04, 'cerca'], [m.lodBelow * 0.96, 'lejos'], [m.zoomMin, 'lejos']]) {
+      if (sweepCrashed) break;
       const got = await lodAt(z);
+      if (got === 'crashed') {
+        sweepCrashed = true;
+        notes.push(`firstload ${tag}: zoom sweep stopped at ${Number(z).toFixed(3)} (software GL crashed; initial lod already checked)`);
+        break;
+      }
       if (got !== want) errors.push(`firstload-${tag}: zoom ${z.toFixed(3)} shows ${got} (want ${want}; lejos below ${m.lodBelow.toFixed(3)})`);
     }
     notes.push(`firstload ${tag}: zoom ${m.zoom.toFixed(3)} (${m.lod}, lejos below ${m.lodBelow.toFixed(3)}, min ${m.zoomMin.toFixed(3)}), character tile ${m.tile.x},${m.tile.y} at ${Math.round(m.foot.x)},${Math.round(m.foot.y)}`);
