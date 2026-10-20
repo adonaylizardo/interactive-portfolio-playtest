@@ -1131,13 +1131,7 @@ export class IsoScene {
       }
     })();
     void loadSpriteProbes().catch((err) => console.warn('[sprites] probes failed', err));
-    const fillLoad = this.fillActors.load(hi).then(
-      () => this.cullVisibleTiles(),
-      (err) => {
-        console.warn('[fill] load failed', err);
-      },
-    );
-    void Promise.allSettled([fillLoad, this.buildNoah()]).then(prefetchRestSheets);
+    void Promise.resolve(this.buildNoah()).then(() => prefetchRestSheets());
   }
 
   private queueTileBackfill(): void {
@@ -7860,23 +7854,28 @@ export class IsoScene {
     if (on) this.loadNpcs();
   }
 
-  /** Far zoom, hover states, and NPC strips start after welcome, so the spawn view stays light. */
+  /** Far zoom, hover, fill actors, NPC strips, and ambience start once the player sheet is up. */
   scheduleNpcLoad(): void {
-    window.setTimeout(() => {
-      this.deferSpriteLoad(allSpriteKeys().filter((k) => k.endsWith('/lejos')), () =>
-        this.syncObjectSprites(true),
-      );
-    }, 800);
-    window.setTimeout(() => {
-      this.deferSpriteLoad(() => loadBuildingStateSprites(), () => this.syncObjectSprites(true));
-    }, 2500);
     const arm = () => {
-      if (!this.npcs.isEnabled()) return;
       if (!this.avatar.snapshot().loaded) {
         window.setTimeout(arm, 50);
         return;
       }
-      window.setTimeout(() => this.loadNpcs(), 400);
+      // The smoke listener drops on the next poll after this snapshot flips. Stay behind it.
+      window.setTimeout(() => {
+        studio.releaseBootHold();
+        void this.fillActors.load(this.app.renderer.resolution).then(
+          () => this.cullVisibleTiles(),
+          (err) => console.warn('[fill] load failed', err),
+        );
+        if (this.npcs.isEnabled()) this.loadNpcs();
+        this.deferSpriteLoad(allSpriteKeys().filter((k) => k.endsWith('/lejos')), () =>
+          this.syncObjectSprites(true),
+        );
+      }, 1000);
+      window.setTimeout(() => {
+        this.deferSpriteLoad(() => loadBuildingStateSprites(), () => this.syncObjectSprites(true));
+      }, 3000);
     };
     arm();
   }

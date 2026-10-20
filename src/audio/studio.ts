@@ -75,6 +75,9 @@ export class StudioAudio {
   private introKickTimer: ReturnType<typeof setTimeout> | null = null;
   /** Persona controls card blocks the welcome line until the user dismisses it. */
   private deferIntroForPersonaOverlay = false;
+  /** Welcome is still up: keep ambience and barks from fetching on the Start click. */
+  private bootHold = true;
+  private graphPending = false;
   private pending: string | null = null;
   private voiceQueue: string[] = [];
   private bark: HTMLAudioElement | null = null;
@@ -296,7 +299,20 @@ export class StudioAudio {
     if (!this.played.has('01-intro')) this.introLock = false;
   }
 
+  /** Spawn view has finished booting; a gesture that arrived during welcome can start audio now. */
+  releaseBootHold(): void {
+    if (!this.bootHold) return;
+    this.bootHold = false;
+    if (!this.graphPending) return;
+    this.graphPending = false;
+    this.startGraphAndIntro();
+  }
+
   private startGraphAndIntro(): void {
+    if (this.bootHold) {
+      this.graphPending = true;
+      return;
+    }
     if (this.personaControlsBlockingIntro()) {
       this.deferIntroForPersonaOverlay = true;
       this.introLock = true;
