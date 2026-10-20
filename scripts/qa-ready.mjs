@@ -89,31 +89,37 @@ const CHROMIUM_GL_ARGS = [
  */
 export const TIMING_MIN_FPS = 10;
 
+function directChildPids(pid) {
+  const out = spawnSync('ps', ['-eo', 'pid=,ppid='], { encoding: 'utf8' }).stdout || '';
+  const kids = [];
+  for (const line of out.split('\n')) {
+    const [child, parent] = line.trim().split(/\s+/).map(Number);
+    if (parent === pid && child) kids.push(child);
+  }
+  return kids;
+}
+
+function killTree(pid) {
+  for (const child of directChildPids(pid)) killTree(child);
+  try {
+    process.kill(pid, 'SIGKILL');
+  } catch {
+    /* already gone */
+  }
+}
+
 /**
  * Headless WebKit sometimes starts MiniBrowser and then never answers the inspector pipe.
- * Kill that process tree so the suite records a crash instead of sitting there.
+ * `browser.process()` is empty for that launch, so the new child of this process is the handle.
+ * Kill that tree so the suite records a crash instead of sitting there.
  */
-function armWebkitWatchdog(browser) {
+function armWebkitWatchdog(browser, roots) {
   const proc = typeof browser.process === 'function' ? browser.process() : null;
-  if (!proc?.pid) return;
-  const killTree = (pid) => {
-    let kids = '';
-    try {
-      kids = spawnSync('ps', ['-o', 'pid=', '--ppid', String(pid)], { encoding: 'utf8' }).stdout || '';
-    } catch {
-      /* ps can fail while the process is already gone */
-    }
-    for (const line of kids.trim().split('\n')) {
-      const child = Number(line);
-      if (child) killTree(child);
-    }
-    try {
-      process.kill(pid, 'SIGKILL');
-    } catch {
-      /* already gone */
-    }
-  };
-  const timer = setTimeout(() => killTree(proc.pid), 120000);
+  if (proc?.pid) roots.add(proc.pid);
+  if (!roots.size) return;
+  const timer = setTimeout(() => {
+    for (const pid of roots) killTree(pid);
+  }, 120000);
   timer.unref();
   const close = browser.close.bind(browser);
   browser.close = async (...args) => {
@@ -125,8 +131,11 @@ function armWebkitWatchdog(browser) {
 /** Launches a Playwright browser type with the QA GL backend and the QA-hook readiness wait. */
 export async function launchBrowser(type, options = {}) {
   const args = type.name() === 'chromium' ? [...CHROMIUM_GL_ARGS, ...(options.args ?? [])] : options.args;
+  const before = new Set(type.name() === 'webkit' ? directChildPids(process.pid) : []);
   const browser = installReadyWait(await type.launch({ ...options, args }));
-  if (type.name() === 'webkit') armWebkitWatchdog(browser);
+  if (type.name() === 'webkit') {
+    armWebkitWatchdog(browser, new Set(directChildPids(process.pid).filter((pid) => !before.has(pid))));
+  }
   return browser;
 }
 
