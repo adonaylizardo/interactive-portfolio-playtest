@@ -222,6 +222,13 @@ body.is-canvas-dragging * {
   pointer-events: none;
 }
 
+/* #ui-root > * sets pointer-events:auto, which beats .playtest-toast { pointer-events:none }
+   and lets the offline banner sit on top of an interior exit mat. */
+#ui-root > .playtest-toast,
+#ui-root > .playtest-toast * {
+  pointer-events: none;
+}
+
 @media (min-width: 768px) {
   #ui-root > .building-panel.building-panel--preview {
     z-index: 12;
