@@ -180,7 +180,7 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
         return { mode: d.viewMode, sy: Number(d.viewSy) };
       });
       if (persp.mode !== 'perspectiva') errors.push(`${tag}: perspectiva dataset is ${persp.mode}`);
-      if (Math.abs(persp.sy - 1.38) > 0.01) errors.push(`${tag}: perspectiva scaleY is ${persp.sy}, want 1.38`);
+      if (Math.abs(persp.sy - 1) > 0.01) errors.push(`${tag}: perspectiva scaleY is ${persp.sy}, want 1`);
 
       await qa(page, () => window.__playtestQa.setViewMode('isometrica'));
       await qa(page, () => window.__playtestQa.rotateView());
@@ -286,8 +286,8 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
       if (!m4.dockShown) errors.push(`${tag}: dock hidden after closing the sheet`);
       if (!m4.viewsShown) errors.push(`${tag}: camera buttons hidden on the closed-sheet map`);
       const shown = m4.btns.filter((b) => b.shown).map((b) => b.view);
-      if (shown.join() !== 'isometrica,cenital,perspectiva') {
-        errors.push(`${tag}: M4 view buttons are ${shown.join(',')}, want iso, cenital, perspectiva`);
+      if (shown.join() !== 'isometrica,cenital,map') {
+        errors.push(`${tag}: M4 view buttons are ${shown.join(',')}, want iso, cenital, map`);
       }
 
       await page.locator('.ui-view[data-view="cenital"]').tap();

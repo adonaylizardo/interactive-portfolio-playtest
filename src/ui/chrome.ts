@@ -4,6 +4,7 @@ import { getEnterableBuildings } from '../data/map';
 import { tileToWorld } from '../iso/math';
 import { isMobileLayout } from '../checklist/ui';
 import { CV_HREF } from '../data/contactLinks';
+import { personaEnabled } from '../game/persona/personaSpec';
 import { iconSvg, type IconName } from './icons';
 import type { Camera } from '../tokens';
 import { getLang, onLangChange, setLang, t, type Lang } from './i18n';
@@ -428,8 +429,14 @@ export class ChromeUI {
           ${roundBtn('locate', 'Center on Adonay', 'chrome__locate', 'center')}
         </div>
         <div class="chrome__view-btns">
+          <button type="button" class="ui-view" data-view="rotate" aria-label="Rotate" data-i18n-aria="chrome.rotate">${iconSvg('rotate')}</button>
           <button type="button" class="ui-view is-active" data-view="isometrica" aria-label="Isometric" data-i18n-aria="chrome.isometric">${iconSvg('cube')}</button>
           <button type="button" class="ui-view" data-view="cenital" aria-label="Top-down" data-i18n-aria="chrome.topdown">${iconSvg('grid')}</button>
+          ${
+            personaEnabled()
+              ? `<button type="button" class="ui-view" data-view="persona" aria-label="Over-the-shoulder" data-i18n-aria="chrome.persona">${iconSvg('persp')}</button>`
+              : ''
+          }
           <button type="button" class="ui-view" data-view="map" aria-label="Map overview" data-i18n-aria="chrome.map">${iconSvg('map')}</button>
         </div>
       </div>
