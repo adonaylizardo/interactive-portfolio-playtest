@@ -107,6 +107,7 @@ export class BuildingPanel {
   private onVisibilityChange: () => void;
   private onSheetTransitionEnd: () => void;
   private onSalir: () => void;
+  private onCasePreviewClosed: () => void;
   private mode: 'hidden' | 'interior' | 'preview' | 'talks' | 'writings' = 'hidden';
   private experienceEl: HTMLElement | null = null;
   private experienceIntro: HTMLElement | null = null;
@@ -150,10 +151,12 @@ export class BuildingPanel {
     onVisibilityChange: () => void,
     onSalir: () => void,
     onSheetTransitionEnd?: () => void,
+    onCasePreviewClosed?: () => void,
   ) {
     this.onVisibilityChange = onVisibilityChange;
     this.onSalir = onSalir;
     this.onSheetTransitionEnd = onSheetTransitionEnd ?? onVisibilityChange;
+    this.onCasePreviewClosed = onCasePreviewClosed ?? onSheetTransitionEnd ?? (() => {});
     this.el = document.createElement('div');
     this.el.className = 'building-panel building-panel--interior-only';
     this.el.hidden = true;
@@ -1305,6 +1308,7 @@ export class BuildingPanel {
   }
 
   hide(opts?: { snap?: boolean; silent?: boolean }): void {
+    const closingPreview = this.mode === 'preview';
     this.leaveArmed = false;
     this.clearExperiencePresentation();
     // Snap out of the hit tree on this frame (same as the mat). A transforming sheet still
@@ -1330,7 +1334,10 @@ export class BuildingPanel {
     if (this.readEl) this.readEl.hidden = true;
     if (this.readBar) this.readBar.hidden = true;
     this.el.classList.remove('building-panel--snap');
-    if (!opts?.silent) this.onVisibilityChange();
+    if (!opts?.silent) {
+      if (closingPreview) this.onCasePreviewClosed();
+      this.onVisibilityChange();
+    }
     if (opts?.snap) requestAnimationFrame(() => this.releaseCaseDom());
   }
 

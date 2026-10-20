@@ -356,7 +356,7 @@ export class ChecklistUI {
     const done = countCompleted(this.state, this.compactSteps);
     const counterText = `${done}/${total}`;
     this.counterEl.textContent = counterText;
-    this.counterInRing.textContent = counterText;
+    this.counterInRing.textContent = `${done}/${total}`;
     const circumference = 69.12;
     const mapArcCirc = 105.557;
     const progress = done / total;

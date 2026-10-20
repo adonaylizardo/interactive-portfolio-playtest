@@ -24,7 +24,7 @@ import {
 import { ReadingView } from './ui/readingView';
 import { getInteriorDef, interiorBlockedTilesHaveProps } from './game/interior';
 import { IsoScene } from './game/scene';
-import { findPath } from './iso/pathfinding';
+import { findPath, findPathOrNearest } from './iso/pathfinding';
 import type { SearchResult } from './data/siteSearch';
 import { AboutMePanel } from './ui/aboutMePanel';
 import { BuildingPanel } from './ui/buildingPanel';
@@ -32,9 +32,13 @@ import { PlaceCardPanel } from './ui/placeCardPanel';
 import { ChromeUI, type DesktopLayout } from './ui/chrome';
 import { SearchPalette } from './ui/searchPalette';
 import { JacHud } from './ui/jacHud';
+import { PersonaJacBoard } from './ui/personaJacBoard';
+import { PersonaEnterPrompt } from './ui/personaEnterPrompt';
+import { PersonaKitUI } from './ui/personaKitUi';
 import { Joystick } from './ui/joystick';
 import { BuildingMapLabels } from './ui/buildingMapLabels';
 import { InteriorStageScreen } from './ui/interiorStageScreen';
+import { personaEnabled } from './game/persona/personaSpec';
 import { NameLabels } from './ui/nameLabels';
 import { CenitalBuildingLabels } from './ui/cenitalBuildingLabels';
 import { hideToast, showToast } from './ui/toast';
@@ -271,6 +275,14 @@ async function main(): Promise<void> {
     scene?.walkToBuildingForQa(id);
   });
   const cenitalLabels = new CenitalBuildingLabels(uiRoot);
+  const personaJacBoard = new PersonaJacBoard(uiRoot, {
+    onGetIn: () => scene.jacGetIn(),
+    onGetOut: () => scene.jacGetOut(),
+  });
+  const personaEnterPrompt = new PersonaEnterPrompt(uiRoot, {
+    onEnter: () => scene.personaEnterFromUi(),
+  });
+  let personaKit!: PersonaKitUI;
   const jacHud = new JacHud(uiRoot, {
     onInfo: () => scene.jacOpenInfo(),
     onGetIn: () => scene.jacGetIn(),
@@ -336,6 +348,9 @@ async function main(): Promise<void> {
     () => {
       scene?.refreshCanvasPresentation(true);
       scene?.schedulePresentationRefresh(420);
+      if (personaEnabled() && scene.getViewMode().mode === 'persona') {
+        scene.bumpDoorCooldown(2800);
+      }
     },
   );
   joystick.onStickStart(() => {
@@ -409,11 +424,16 @@ async function main(): Promise<void> {
     onFrame: () => {
       stageScreen.apply(scene.interiorStageScreenLayout());
       const view = scene.getViewMode();
-      const hidePills = view.overview || !!scene.isInInterior();
+      const sheetOpen = chrome.isMobileSheetOpen();
+      const personaActive =
+        personaEnabled() && view.mode === 'persona' && !scene.isInInterior();
+      const hidePills =
+        view.overview || !!scene.isInInterior() || sheetOpen || personaActive ||
+        (isMobileLayout() && (panel.isOpen() || aboutPanel.isOpen() || searchPalette.isOpen()));
       labels.setHidden(hidePills);
       if (!hidePills) labels.update(scene.nameLabelAnchors());
-      mapLabels.setHidden(!!scene.isInInterior() || view.mode === 'cenital');
-      if (view.mode !== 'cenital') {
+      mapLabels.setHidden(!!scene.isInInterior() || view.mode === 'cenital' || view.mode === 'persona' || sheetOpen);
+      if (view.mode !== 'cenital' && view.mode !== 'persona' && !sheetOpen) {
         mapLabels.update(
           scene.buildingMapLabelAnchors().map((a) => ({
             ...a,
@@ -421,28 +441,51 @@ async function main(): Promise<void> {
           })),
         );
       }
-      if (view.mode === 'cenital' && !scene.isInInterior()) {
+      if (!sheetOpen && view.mode === 'cenital' && !scene.isInInterior()) {
         cenitalLabels.setHidden(false);
         cenitalLabels.update(scene.cenitalBuildingLabelAnchors());
-      } else {
+      } else if (!sheetOpen) {
         cenitalLabels.setHidden(true);
       }
-      if (scene.jacHudActive()) {
+      const kitActive = personaEnabled() && scene.personaKitActive();
+      const driving = !!scene.jacSnapshot()?.driving;
+      const kitDriveMobile = kitActive && driving && isMobileLayout();
+      if (personaActive && driving) {
+        jacHud.park();
+      } else if (scene.jacHudActive() && !kitDriveMobile) {
         const snap = scene.jacSnapshot();
         const anchors = scene.jacHudAnchors();
         jacHud.update(snap, anchors, anchors.rear);
+        if (!personaActive && !sheetOpen) labels.setHidden(false);
       } else {
         jacHud.park();
         const hideNameLabels =
           isMobileLayout() &&
-          (chrome.isMobileSheetOpen() ||
-            panel.isOpen() ||
-            aboutPanel.isOpen() ||
-            searchPalette.isOpen());
-        labels.setHidden(hideNameLabels);
+          (sheetOpen || panel.isOpen() || aboutPanel.isOpen() || searchPalette.isOpen());
+        if (personaActive || hideNameLabels) labels.setHidden(true);
+        else if (!sheetOpen) labels.setHidden(false);
       }
+      const ps = scene.qaPersonaState();
+      personaJacBoard.sync({
+        showIn: kitActive && ps.jacBoard && !driving,
+        showOut: kitActive && driving && (isMobileLayout() || personaActive),
+      });
+      personaEnterPrompt.sync(
+        !sheetOpen &&
+          kitActive &&
+          scene.getViewMode().mode === 'persona' &&
+          ps.enterOffer &&
+          !driving &&
+          !panel.isPreviewMode() &&
+          !panel.isPreviewExpanded(),
+      );
+      document.body.dataset.view = scene.getViewMode().mode;
+      const thirdPersonWalk =
+        personaEnabled() && scene.getViewMode().mode === 'persona' && !scene.isInInterior();
+      joystick.setPersonaWalk(thirdPersonWalk && !driving);
       joystick.setHidden(
-        !scene.jacSnapshot()?.driving ||
+        sheetOpen ||
+          (!driving && !kitActive) ||
           !!scene.isInInterior() ||
           panel.isPreviewMode() ||
           panel.isPreviewExpanded() ||
@@ -450,6 +493,7 @@ async function main(): Promise<void> {
           scene.jacInfoOpen(),
       );
       placeCard.tickUi();
+      personaKit?.syncCameraSwitch();
     },
     stick: () => joystick.vector(),
     stickActive: () => joystick.isActive(),
@@ -467,6 +511,7 @@ async function main(): Promise<void> {
     },
     onUnreachable: () => showToast(t('toast.unreachable')),
     onGetOutToEnter: () => showToast(t('toast.getOutToEnter')),
+    onUnknownRoute: () => showToast(t('toast.unknownRoute')),
     buildingPanel: {
       isOpen: () => panel.isOpen(),
       openTitle: () => panel.openTitle(),
@@ -506,10 +551,14 @@ async function main(): Promise<void> {
     (e) => {
       const t = e.target as HTMLElement | null;
       if (!t) return;
-      if (t.closest('.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock')) return;
-      if (t === canvas || t.closest('#game-canvas')) {
-        if (joystick.isActive()) e.preventDefault();
+      if (
+        t.closest(
+          '.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock, .persona-kit, .persona-jac-board, .persona-enter-prompt',
+        )
+      )
         return;
+      if (t === canvas || t.closest('#app, .joystick, #game-canvas, #ui-root')) {
+        if (joystick.isActive() || scene?.jacSnapshot()?.driving) e.preventDefault();
       }
       if (t.closest('#app, .joystick, #ui-root') && joystick.isActive()) e.preventDefault();
     },
@@ -519,7 +568,12 @@ async function main(): Promise<void> {
     'touchmove',
     (e) => {
       const t = e.target as HTMLElement | null;
-      if (t?.closest('.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock')) return;
+      if (
+        t?.closest(
+          '.checklist, .building-panel, .chrome, .jac-sheet, .jac-dock, .persona-kit, .persona-jac-board, .persona-enter-prompt',
+        )
+      )
+        return;
       if (joystick.isActive() || scene?.jacSnapshot()?.driving) e.preventDefault();
     },
     { passive: false, capture: true },
@@ -577,6 +631,15 @@ async function main(): Promise<void> {
     bootFlow.dismiss();
   }
 
+  personaKit = new PersonaKitUI(uiRoot, {
+    getViewMode: () => scene.getViewMode().mode,
+    switchView: (mode) => scene.setViewModeWhenReady(mode),
+  });
+  if (personaEnabled()) {
+    scene.setViewMode('cenital');
+    if (isMobileLayout()) chrome.setLayout('map');
+    personaKit.onBoot();
+  }
   chrome.beginSoundHint();
   const bootFocus = new URLSearchParams(location.search).get('focus');
   if (bootFocus === 'jac') {
@@ -628,11 +691,13 @@ async function main(): Promise<void> {
     inicio: INICIO,
     mapTramos: MAP_TRAMOS,
     findPath,
+    findPathOrNearest,
     getCharacterTile: () => scene.getCharacterTile(),
     getCharacterPos: () => scene.getCharacterPosForQa(),
     walk: (dx: number, dy: number, sprint = false) => scene.qaWalk(dx, dy, sprint),
     setCharacterTile: (x: number, y: number) => scene.setCharacterTileForQa(x, y),
     walkToBuilding: (name: string) => scene.walkToBuildingForQa(name),
+    walkToTile: (x: number, y: number, sprint?: boolean) => scene.qaWalkToTile(x, y, sprint),
     doorScreenPoint: (name: string) => scene.getDoorScreenClientPoint(name),
     frameDoorForQa: (name: string) => scene.frameBuildingDoorForQa(name),
     prepareDoorEntryForQa: (name: string) => scene.prepareDoorEntryForQa(name),
@@ -733,6 +798,21 @@ async function main(): Promise<void> {
     cenitalDoorGlyphScreen: (name: string) => scene.qaCenitalDoorGlyphScreen(name),
     pickDrivingEnterAtScreen: (sx: number, sy: number) =>
       scene.qaPickDrivingEnterAtScreen(sx, sy),
+    personaState: () => scene.qaPersonaState(),
+    personaCam: () => scene.qaPersonaCam(),
+    personaMoveHeading: (opts: { w?: boolean; stickY?: number }) => scene.qaPersonaMoveHeading(opts),
+    personaScreenForwardDeg: () => scene.qaPersonaScreenForwardDeg(),
+    personaClientChar: () => scene.qaPersonaClientChar(),
+    personaWorldMarkClientPx: (tx: number, ty: number) => scene.qaPersonaWorldMarkClientPx(tx, ty),
+    personaRenderProbe: () => scene.qaPersonaRenderProbe(),
+    personaEnterOffer: () => scene.qaPersonaEnterOffer(),
+    personaEnterFromUi: () => scene.personaEnterFromUi(),
+    setPersonaYawDeg: (deg: number) => scene.qaSetPersonaYawDeg(deg),
+    personaStickSpeedMul: (y: number) => scene.qaPersonaStickSpeedMul(y),
+    personaProjectedT9Width: () => scene.qaPersonaProjectedT9Width(),
+    personaScreenMetrics: () => scene.qaPersonaScreenMetrics(),
+    flushPersonaView: () => scene.qaFlushPersonaView(),
+    stickToTile: (dx: number, dy: number) => scene.qaStickToTile(dx, dy),
     cameraViews: () => scene.qaCameraViews(),
     cenitalExpectedHeading: (dx: number, dy: number) => scene.qaCenitalExpectedHeading(dx, dy),
     cenitalBuildingLabels: () => {
@@ -782,6 +862,7 @@ async function main(): Promise<void> {
       return { ...base, overlaps };
     },
     isMobileSheetOpen: () => chrome.isMobileSheetOpen(),
+    mobileSheetPanel: () => chrome.getMobileSheetPanel(),
     audioMuted: () => studio.isMuted(),
     audioUnlocked: () => studio.isUnlocked(),
     setAudioMuted: (muted: boolean) => studio.setMuted(muted),
@@ -801,6 +882,7 @@ async function main(): Promise<void> {
       return { present: true, visible, opacity: Number(style.opacity), hint: el.dataset.hint ?? '' };
     },
     stickCancel: () => joystick.cancel(),
+    clearInput: () => scene.qaClearInput(),
     joystick: () => joystick.qa(),
     nameLabels: () => labels.qa(),
     namePillHeads: () => scene.qaNamePillHeads(),

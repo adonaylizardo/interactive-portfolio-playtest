@@ -73,6 +73,8 @@ export class StudioAudio {
   /** Intro was skipped because a panel was open on unlock; play when back on map. */
   private introDeferred = false;
   private introKickTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Persona controls card blocks the welcome line until the user dismisses it. */
+  private deferIntroForPersonaOverlay = false;
   private pending: string | null = null;
   private voiceQueue: string[] = [];
   private bark: HTMLAudioElement | null = null;
@@ -280,11 +282,31 @@ export class StudioAudio {
     window.setTimeout(() => this.startGraphAndIntro(), phone ? 900 : 320);
   }
 
+  private personaControlsBlockingIntro(): boolean {
+    if (typeof document === 'undefined') return false;
+    return !!document.querySelector('.persona-kit__overlay:not([hidden])');
+  }
+
+  /** Call when the persona intro card closes so the welcome line can play. */
+  playIntroWhenPersonaReady(): void {
+    if (!this.unlocked || this.muted || this.played.has('01-intro')) return;
+    this.deferIntroForPersonaOverlay = false;
+    this.introLock = true;
+    this.playLine('01-intro');
+    if (!this.played.has('01-intro')) this.introLock = false;
+  }
+
   private startGraphAndIntro(): void {
+    if (this.personaControlsBlockingIntro()) {
+      this.deferIntroForPersonaOverlay = true;
+      this.introLock = true;
+    }
     if (automatedWebKitPhone()) {
-      this.introDeferred = true;
-      this.introLock = false;
-      this.scheduleIntroWhenMapIdle(900);
+      if (!this.deferIntroForPersonaOverlay) {
+        this.introDeferred = true;
+        this.introLock = false;
+        this.scheduleIntroWhenMapIdle(900);
+      }
       return;
     }
     try {
@@ -303,9 +325,11 @@ export class StudioAudio {
     } catch {
       /* autoplay / context limits: mute state still flips */
     }
-    this.introDeferred = true;
-    this.introLock = false;
-    this.scheduleIntroWhenMapIdle(700);
+    if (!this.deferIntroForPersonaOverlay) {
+      this.introDeferred = true;
+      this.introLock = false;
+      this.scheduleIntroWhenMapIdle(700);
+    }
   }
 
   setInterior(open: boolean): void {
@@ -434,6 +458,14 @@ export class StudioAudio {
       this.scheduleIntroWhenMapIdle(900);
     }
     if (this.muted || !this.unlocked || this.voice) return;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const lang = document.documentElement.lang || 'es';
+        if (lang.startsWith('es')) return;
+      }
+    } catch {
+      /* ignore */
+    }
     if (automatedWebKitPhone()) return;
     const now = performance.now();
     if (now - this.lastBarkAt < BARK_COOLDOWN_MS) return;

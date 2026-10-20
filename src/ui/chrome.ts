@@ -76,6 +76,7 @@ export class ChromeUI {
   private subtitleEl: HTMLElement;
   private layout: DesktopLayout = 'map';
   private mobileSheet = true;
+  private mobileSheetPanel: 'intro' | 'casos' | 'logros' | 'contact' = 'intro';
   private audience: Audience = 'recruiter';
   private lang: Lang = getLang();
   private interiorOpen = false;
@@ -707,7 +708,12 @@ export class ChromeUI {
     this.callbacks.onLayoutChange();
   }
 
+  getMobileSheetPanel(): 'intro' | 'casos' | 'logros' | 'contact' {
+    return this.mobileSheetPanel;
+  }
+
   openMobileSheetSection(target: 'casos' | 'logros' | 'intro' | 'contact'): void {
+    this.mobileSheetPanel = target;
     this.setLayout('split');
     if (target === 'intro') {
       this.expandMobileSheet(false);

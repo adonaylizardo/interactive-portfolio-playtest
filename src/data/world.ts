@@ -415,6 +415,10 @@ export function buildWorld(): {
     cells[iy][ix].walkable = true;
     carveStreet(ix, iy);
   }
+  // Spawn ↔ Catedral corridor: disqueria fill must not pinch (23,19) for persona walking.
+  if (cells[19]?.[23] && objects.some((o) => o.id === 'fill/disqueria')) {
+    cells[19][23].walkable = true;
+  }
 
   return { cells, objects, fill, keepClear };
 }

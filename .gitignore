@@ -2,11 +2,8 @@ node_modules
 dist
 .gh-pages-stage
 .gh-pages-push
-artifacts/qa-screenshots/*
-!artifacts/qa-screenshots/.gitkeep
 .DS_Store
 *.local
 .env
+# QA screenshots and gate output stay out of the repo. Cloud-agent artifacts hold the few cited in reports.
 artifacts/
-!artifacts/verify-edificios-sbs/
-!artifacts/verify-edificios-sbs/**

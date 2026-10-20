@@ -335,6 +335,8 @@ export class JacT9 {
   private pendingExit = false;
   private exitHold = 0;
   private exitSit: { x: number; y: number } | null = null;
+  /** Facing locked when the exit brake finishes — restored in parkAtExitPose. */
+  private exitFacing: { dir: FacingDir; heading: number } | null = null;
   private stuckT = 0;
   private unstickHold = 0;
   private driveHadSpeed = false;
@@ -1146,6 +1148,27 @@ export class JacT9 {
     return this.nearestReachableApproach(Math.round(from?.x ?? this.cx), Math.round(from?.y ?? this.cy));
   }
 
+  /** Stand tile beside the driver door (≤~1.5 tiles from van centre when possible). */
+  driverExitStandTile(): { x: number; y: number } | null {
+    const cx = this.cx;
+    const cy = this.cy;
+    const edges = this.approachTiles();
+    if (!edges.length) return this.exitTile();
+    let best: { x: number; y: number } | null = null;
+    let bestD = Infinity;
+    for (const t of edges) {
+      const d = Math.hypot(t.x - cx, t.y - cy);
+      if (d > 2.05) continue;
+      if (d < bestD) {
+        bestD = d;
+        best = t;
+      }
+    }
+    if (best) return best;
+    edges.sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy));
+    return edges[0] ?? this.exitTile();
+  }
+
   /** Walkable cells touching the current solid footprint (door + every edge). */
   approachTiles(): { x: number; y: number }[] {
     const blocked = new Set(this.solidCells().map(([x, y]) => k(x, y)));
@@ -1424,6 +1447,7 @@ export class JacT9 {
         if (this.pendingExit) {
           if (!this.exitSit) {
             this.exitSit = { x: this.cx, y: this.cy };
+            this.exitFacing = { dir: this.dir, heading: this.heading };
             this.exitHold = 0.12;
           } else {
             this.exitHold = Math.max(0, this.exitHold - dt);
@@ -1505,6 +1529,7 @@ export class JacT9 {
     this.pendingExit = true;
     this.exitHold = 0;
     this.exitSit = null;
+    this.exitFacing = null;
     this.exitFrom = { x: this.cx, y: this.cy };
     this.clearDrivePath();
     this.gearHeld = false;
@@ -1535,6 +1560,34 @@ export class JacT9 {
     this.pendingExit = false;
     this.exitHold = 0;
     this.exitSit = null;
+    this.exitFacing = null;
+  }
+
+  /** Park exactly where the exit brake stopped — no relayout nudge. */
+  parkAtExitPose(): void {
+    if (this.exitSit) {
+      this.cx = this.exitSit.x;
+      this.cy = this.exitSit.y;
+    }
+    if (this.exitFacing) {
+      this.dir = this.exitFacing.dir;
+      this.heading = this.exitFacing.heading;
+    }
+    this.pendingExit = false;
+    this.exitHold = 0;
+    this.exitFrom = null;
+    this.exitSit = null;
+    this.exitFacing = null;
+    this.vel = 0;
+    this.engineOn = false;
+    this.gear = 'P';
+    this.rpm = 0;
+    this.mph = 0;
+    this.mode = 'parked';
+    this.applyParkedSolid(true);
+    this.layout();
+    this.applySprite();
+    this.hooks.onChange?.();
   }
 
   visualCenterWorld(): { x: number; y: number } {

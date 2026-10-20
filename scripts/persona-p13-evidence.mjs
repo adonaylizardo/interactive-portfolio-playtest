@@ -31,12 +31,17 @@ async function main() {
   await page.evaluate(() => {
     document.querySelector('[data-persona-close]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
-  await wait(400);
+  await wait(500);
 
-  await page.evaluate(async () => {
-    await window.__playtestQa.setViewMode('persona');
+  await page.evaluate(() => {
+    const btn = document.querySelector('.persona-kit__cam-opt[data-cam="persona"]');
+    const r = btn?.getBoundingClientRect();
+    btn?.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, clientX: (r?.left ?? 0) + (r?.width ?? 0) / 2, clientY: (r?.top ?? 0) + (r?.height ?? 0) / 2 }),
+    );
   });
-  await wait(1200);
+  await page.waitForFunction(() => document.body.dataset.view === 'persona', null, { timeout: 20000 });
+  await wait(1500);
 
   await page.evaluate(() => {
     const btn = document.querySelector('.chrome__dock [data-action="contact"]');
@@ -45,11 +50,16 @@ async function main() {
       new MouseEvent('click', { bubbles: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }),
     );
   });
-  await wait(800);
+  await page
+    .waitForFunction(() => (document.querySelector('.chrome__subtitle')?.textContent?.length ?? 0) > 8, null, {
+      timeout: 8000,
+    })
+    .catch(() => {});
+  await wait(400);
 
   const metrics = await page.evaluate(() => {
     const sub = document.querySelector('.chrome__subtitle');
-    const joy = document.querySelector('.joystick:not([hidden])');
+    const joy = document.querySelector('.joystick:not([hidden])') ?? document.querySelector('.joystick');
     const sr = sub?.getBoundingClientRect();
     const jr = joy?.getBoundingClientRect();
     const bundle = [...document.scripts].map((s) => s.src).find((s) => /index-.*\.js/.test(s))?.split('/').pop();
