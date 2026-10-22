@@ -5,7 +5,10 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { launchBrowser } from './qa-ready.mjs';
+import { launchBrowser, dismissArrivalSheet } from './qa-ready.mjs';
+import { ciContextOptions } from './qa-ci.mjs';
+
+const soundBtn = () => '.chrome__rail [data-icon="sound"], .chrome__dock [data-icon="sound"]';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -27,11 +30,11 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
   const spec = RUN56_KINDS[kind];
   const tag = `run56-${kind}`;
   const browser = await launchBrowser(spec.type);
-  const ctx = await browser.newContext(spec.options);
+  const ctx = await browser.newContext(ciContextOptions(spec.options));
   const page = await ctx.newPage();
   try {
-    await page.goto(base, { waitUntil: 'networkidle' });
-    await wait(800);
+    await page.goto(base, { waitUntil: 'load' });
+    if (!spec.desktop) await dismissArrivalSheet(page);
 
     if (spec.desktop) {
       const load = await qa(page, () => {
@@ -202,7 +205,7 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
         window.__playtestQa.setAudioMuted(false);
       });
       const sound0 = await qa(page, () => {
-        const btn = document.querySelector('[aria-label="Sonido"]');
+        const btn = document.querySelector('[data-icon="sound"]');
         return {
           muted: window.__playtestQa.audioMuted(),
           pressed: btn?.getAttribute('aria-pressed'),
@@ -210,34 +213,38 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
         };
       });
       if (sound0.muted) errors.push(`${tag}: sound starts muted`);
-      if (sound0.pressed !== 'true') errors.push(`${tag}: Sonido aria-pressed is ${sound0.pressed}, want true`);
-      await page.locator('.chrome__rail [aria-label="Sonido"]').click();
-      await wait(150);
+      if (sound0.pressed !== 'true') errors.push(`${tag}: sound aria-pressed is ${sound0.pressed}, want true`);
+      await page.locator(soundBtn()).first().click();
+      await page.waitForFunction(
+        () => window.__playtestQa.audioMuted() && window.__playtestQa.audioUnlocked(),
+        null,
+        { timeout: 15000 },
+      );
       const sound1 = await qa(page, () => ({
         muted: window.__playtestQa.audioMuted(),
-        pressed: document.querySelector('[aria-label="Sonido"]')?.getAttribute('aria-pressed'),
+        pressed: document.querySelector('[data-icon="sound"]')?.getAttribute('aria-pressed'),
         stored: localStorage.getItem('studio-audio-muted'),
         unlocked: window.__playtestQa.audioUnlocked(),
       }));
-      if (!sound1.muted) errors.push(`${tag}: Sonido click did not mute`);
-      if (sound1.pressed !== 'false') errors.push(`${tag}: muted Sonido aria-pressed is ${sound1.pressed}, want false`);
+      if (!sound1.muted) errors.push(`${tag}: sound click did not mute`);
+      if (sound1.pressed !== 'false') errors.push(`${tag}: muted sound aria-pressed is ${sound1.pressed}, want false`);
       if (sound1.stored !== '1') errors.push(`${tag}: mute did not persist to localStorage (got ${sound1.stored})`);
-      if (!sound1.unlocked) errors.push(`${tag}: first Sonido click did not unlock audio`);
-      await page.reload({ waitUntil: 'networkidle' });
-      await wait(800);
+      if (!sound1.unlocked) errors.push(`${tag}: first sound click did not unlock audio`);
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, { timeout: 45000 });
       const sound2 = await qa(page, () => ({
         muted: window.__playtestQa.audioMuted(),
         stored: localStorage.getItem('studio-audio-muted'),
-        pressed: document.querySelector('[aria-label="Sonido"]')?.getAttribute('aria-pressed'),
+        pressed: document.querySelector('[data-icon="sound"]')?.getAttribute('aria-pressed'),
       }));
       if (!sound2.muted || sound2.stored !== '1') {
         errors.push(`${tag}: mute did not survive reload (muted=${sound2.muted} stored=${sound2.stored})`);
       }
-      if (sound2.pressed !== 'false') errors.push(`${tag}: reloaded Sonido aria-pressed is ${sound2.pressed}, want false`);
-      await page.locator('.chrome__rail [aria-label="Sonido"]').click();
-      await wait(200);
+      if (sound2.pressed !== 'false') errors.push(`${tag}: reloaded sound aria-pressed is ${sound2.pressed}, want false`);
+      await page.locator(soundBtn()).first().click();
+      await page.waitForFunction(() => !window.__playtestQa.audioMuted(), null, { timeout: 15000 });
       const sound3 = await qa(page, () => window.__playtestQa.audioMuted());
-      if (sound3) errors.push(`${tag}: second Sonido click did not unmute`);
+      if (sound3) errors.push(`${tag}: second sound click did not unmute`);
       await qa(page, () => {
         localStorage.removeItem('studio-audio-muted');
         window.__playtestQa.setAudioMuted(false);

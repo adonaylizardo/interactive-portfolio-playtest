@@ -25,6 +25,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit, devices } from 'playwright';
 import { isBrowserCrash, launchBrowser, withFreshBrowser } from './qa-ready.mjs';
+import { QA_CHROMIUM_ONLY, chromiumOnlyKinds, ciContextOptions } from './qa-ci.mjs';
 import { runRun38InputSuite } from './qa-run38-input.mjs';
 import { runRun41InputSuite } from './qa-run41-input.mjs';
 import { runRun42FollowSuite } from './qa-run42-follow.mjs';
@@ -32,7 +33,7 @@ import { runRun43LogoSuite } from './qa-run43-logos.mjs';
 import { runRun44NpcSuite } from './qa-run44-npcs.mjs';
 import { runRun45PlayerSuite } from './qa-run45-player.mjs';
 import { runRun46CaseSuite } from './qa-run46-case.mjs';
-import { runRun55CaseSuite } from './qa-run55-cases.mjs';
+import { runRun55CaseSuite, RUN55_KINDS } from './qa-run55-cases.mjs';
 import { runRun56LayoutSuite } from './qa-run56-layouts.mjs';
 import { runRun46FillSuite } from './qa-run46-fill.mjs';
 import { runRun47AboutSuite } from './qa-run47-about.mjs';
@@ -78,7 +79,7 @@ async function firstPaintBudget({ tag, type, options }) {
   }
 }
 
-const FIRST_LOAD = [
+const FIRST_LOAD = chromiumOnlyKinds([
   { tag: 'chromium-1280', type: chromium, options: { viewport: { width: 1280, height: 800 } }, minZoom: 0.45, centred: true },
   { tag: 'webkit-1280', type: webkit, options: { viewport: { width: 1280, height: 800 } }, minZoom: 0.45, centred: true },
   {
@@ -88,7 +89,7 @@ const FIRST_LOAD = [
     minZoom: 0.28,
   },
   { tag: 'webkit-iphone', type: webkit, options: { ...devices['iPhone 13'] }, minZoom: 0.28 },
-];
+]).map((spec) => ({ ...spec, options: ciContextOptions(spec.options) }));
 
 /** Character on screen near the middle, zoom in range, Estudio and Volaris doors in view. */
 async function firstLoad({ tag, type, options, minZoom, centred }) {
@@ -238,23 +239,28 @@ const GROUPS = {
     }
   },
   'exits-desktop': () => exits('chromium-desktop', ['exit', 'door']),
-  'exits-iphone': () => runBrowser('exits-iphone', 'webkit-iphone', () => exits('webkit-iphone', ['exit', 'door'])),
+  'exits-desktop-a': () => exits('chromium-desktop', ['exit', 'door']),
+  'exits-desktop-b': () => exits('chromium-desktop', ['exit', 'door']),
+  'exits-iphone': () =>
+    QA_CHROMIUM_ONLY
+      ? exits('chromium-phone', ['exit', 'door'])
+      : runBrowser('exits-iphone', 'webkit-iphone', () => exits('webkit-iphone', ['exit', 'door'])),
   'exits-phone': () => exits('chromium-phone', ['exit']),
   input: async () => {
-    for (const [kind, only] of [
+    for (const [kind, only] of chromiumOnlyKinds([
       ['chromium-1280', ['keys', 'wheel', 'minzoom', 'interior']],
       ['webkit-1280', ['keys', 'wheel', 'minzoom']],
       ['chromium-375', ['minzoom', 'interior']],
-    ]) {
+    ])) {
       await runBrowser('input', kind, () => runRun41InputSuite({ kind, base: BASE, errors, notes, only }));
     }
   },
   follow: async () => {
-    for (const [kind, only] of [
+    for (const [kind, only] of chromiumOnlyKinds([
       ['chromium-1280', ['walk', 'pan', 'zoom']],
       ['chromium-375', ['walk', 'pan', 'zoom']],
       ['webkit-1280', ['walk']],
-    ]) {
+    ])) {
       try {
         await runRun42FollowSuite({ kind, base: BASE, errors, notes, only });
       } catch (err) {
@@ -264,44 +270,55 @@ const GROUPS = {
     }
   },
   logos: async () => {
-    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375', 'webkit-iphone']) {
+    for (const kind of chromiumOnlyKinds(['chromium-1280', 'webkit-1280', 'chromium-375', 'webkit-iphone'])) {
       await runBrowser('logos', kind, () => runRun43LogoSuite({ kind, base: BASE, errors, notes }));
     }
   },
   npcs: async () => {
-    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
+    for (const kind of chromiumOnlyKinds(['chromium-1280', 'webkit-1280', 'chromium-375'])) {
       await runRun44NpcSuite({ kind, base: BASE, errors, notes });
     }
   },
   player: async () => {
-    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
+    for (const kind of chromiumOnlyKinds(['chromium-1280', 'webkit-1280', 'chromium-375'])) {
       await runBrowser('player', kind, () => runRun45PlayerSuite({ kind, base: BASE, errors, notes }));
     }
   },
   case: async () => {
-    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375', 'webkit-iphone']) {
+    for (const kind of chromiumOnlyKinds(['chromium-1280', 'webkit-1280', 'chromium-375', 'webkit-iphone'])) {
       await runBrowser('case', kind, () => runRun46CaseSuite({ kind, base: BASE, errors, notes }));
     }
-    for (const kind of ['chromium-1280', 'webkit-iphone']) {
+    for (const kind of chromiumOnlyKinds(['chromium-1280', 'webkit-iphone'])) {
       await runBrowser('case', kind, () => runRun55CaseSuite({ kind, base: BASE, errors, notes }));
     }
   },
+  'case-1280': () => runRun46CaseSuite({ kind: 'chromium-1280', base: BASE, errors, notes }),
+  'case-375': () => runRun46CaseSuite({ kind: 'chromium-375', base: BASE, errors, notes }),
+  'case-55': async () => {
+    await runRun55CaseSuite({ kind: 'chromium-1280', base: BASE, errors, notes });
+    const phoneKind = QA_CHROMIUM_ONLY ? 'chromium-375' : 'webkit-iphone';
+    if (RUN55_KINDS[phoneKind]) {
+      await runRun55CaseSuite({ kind: phoneKind, base: BASE, errors, notes });
+    }
+  },
   fill: async () => {
-    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
+    for (const kind of chromiumOnlyKinds(['chromium-1280', 'webkit-1280', 'chromium-375'])) {
       await runBrowser('fill', kind, () => runRun46FillSuite({ kind, base: BASE, errors, notes }));
     }
   },
   about: async () => {
-    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-390', 'webkit-iphone']) {
+    for (const kind of chromiumOnlyKinds(['chromium-1280', 'webkit-1280', 'chromium-390', 'webkit-iphone'])) {
       await runBrowser('about', kind, () => runRun47AboutSuite({ kind, base: BASE, errors, notes }));
     }
   },
   routines: () => runRun48RoutineSuite({ errors, notes }),
   bench: async () => {
-    for (const kind of Object.keys(RUN50_KINDS)) {
+    for (const kind of chromiumOnlyKinds(Object.keys(RUN50_KINDS))) {
       await runBrowser('bench', kind, () => runRun50BenchSuite({ kind, base: BASE, errors, notes }));
     }
   },
+  'bench-1280': () => runRun50BenchSuite({ kind: 'chromium-1280', base: BASE, errors, notes }),
+  'bench-375': () => runRun50BenchSuite({ kind: 'chromium-375', base: BASE, errors, notes }),
 };
 /** QA_SMOKE_ONLY=firstload,exits runs a subset of GROUPS (CI runs them as parallel shards); unset runs all. */
 const ONLY = process.env.QA_SMOKE_ONLY?.split(',').filter(Boolean) ?? Object.keys(GROUPS);

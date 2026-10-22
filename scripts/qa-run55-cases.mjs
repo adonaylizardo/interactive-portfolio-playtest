@@ -9,6 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit, devices } from 'playwright';
 import { launchBrowser } from './qa-ready.mjs';
+import { ciContextOptions } from './qa-ci.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -16,6 +17,11 @@ const qa = (page, fn, arg) => page.evaluate(fn, arg);
 
 export const RUN55_KINDS = {
   'chromium-1280': { type: chromium, options: { viewport: { width: 1280, height: 800 } } },
+  'chromium-375': {
+    type: chromium,
+    options: { viewport: { width: 375, height: 812 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
+    phone: true,
+  },
   'webkit-iphone': { type: webkit, options: { ...devices['iPhone 13'] }, phone: true },
 };
 
@@ -275,7 +281,7 @@ async function closingInView(page) {
 export async function runRun55CaseSuite({ kind, base, errors, notes, shots }) {
   const spec = RUN55_KINDS[kind];
   const browser = await launchBrowser(spec.type);
-  const ctx = await browser.newContext(spec.options);
+  const ctx = await browser.newContext(ciContextOptions(spec.options));
   const page = await ctx.newPage();
   const voiceHits = [];
   const onVoice = (req) => {

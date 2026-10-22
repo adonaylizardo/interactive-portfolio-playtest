@@ -3,6 +3,8 @@
  * Every navigation waits (up to 45 s) for the app's QA hooks before the test goes on.
  */
 import { spawnSync } from 'node:child_process';
+import { QA_CI, ciContextOptions } from './qa-ci.mjs';
+
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function waitForQa(page) {
@@ -47,13 +49,20 @@ function patchPage(page) {
 
 async function patchContext(ctx) {
   // The town defaults to Spanish. These checks assert the English copy.
-  await ctx.addInitScript(() => {
+  await ctx.addInitScript((ci) => {
     try {
       localStorage.setItem('portfolio-playtest-lang', 'en');
     } catch {
       /* private mode */
     }
-  });
+    if (ci) {
+      try {
+        Object.defineProperty(window, 'devicePixelRatio', { configurable: true, get: () => 1 });
+      } catch {
+        /* readonly in some embeds */
+      }
+    }
+  }, QA_CI);
   ctx.pages().forEach(patchPage);
   ctx.on('page', patchPage);
   const newPage = ctx.newPage.bind(ctx);
@@ -68,7 +77,7 @@ async function patchContext(ctx) {
 function installReadyWait(browser) {
   const newContext = browser.newContext.bind(browser);
   const newPage = browser.newPage.bind(browser);
-  browser.newContext = async (...a) => await patchContext(await newContext(...a));
+  browser.newContext = async (opts) => await patchContext(await newContext(ciContextOptions(opts ?? {})));
   browser.newPage = async (...a) => {
     const p = await newPage(...a);
     patchPage(p);
@@ -85,6 +94,8 @@ function installReadyWait(browser) {
 const CHROMIUM_GL_ARGS = [
   '--disable-dev-shm-usage',
   '--no-sandbox',
+  '--disable-renderer-backgrounding',
+  '--disable-background-timer-throttling',
   ...(process.env.QA_GL === 'llvmpipe'
     ? ['--use-angle=gl-egl', '--ignore-gpu-blocklist']
     : ['--disable-gpu-compositing']),

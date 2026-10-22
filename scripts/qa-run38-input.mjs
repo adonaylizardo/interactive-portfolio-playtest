@@ -7,6 +7,7 @@
  */
 import { chromium, webkit, devices } from 'playwright';
 import { launchBrowser } from './qa-ready.mjs';
+import { ciContextOptions } from './qa-ci.mjs';
 import { armExitTimer, readExitTimer, exitIsImmediate, describeExit } from './qa-exit-timer.mjs';
 
 const ROOMS = (process.env.R38_ROOMS ? process.env.R38_ROOMS.split(',') : ['estudio', 'volaris', 'bain', 'mentoria', 'finoa', 'pg', 'sambil', 'catedral', 'flor']);
@@ -35,15 +36,34 @@ async function tapAt(page, kind, x, y) {
   else await page.mouse.click(Math.round(x), Math.round(y));
 }
 
-async function openRoom(page, base, name) {
-  await page.goto(base, { waitUntil: 'networkidle' });
-  await wait(500);
-  await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
-  for (let i = 0; i < 80; i++) {
-    if (await page.evaluate(() => window.__playtestQa?.isInInterior?.() === true)) break;
-    await wait(250);
+async function ensureOnMap(page) {
+  if (await page.evaluate(() => !window.__playtestQa?.isInInterior?.())) return;
+  await page.evaluate(() => window.__playtestQa.exitInterior());
+  await wait(300);
+}
+
+async function openMapOnce(page, base) {
+  const ready = await page
+    .evaluate(() => window.__playtestQa?.playerAvatar?.()?.loaded === true)
+    .catch(() => false);
+  if (!ready) {
+    await page.goto(base, { waitUntil: 'load' });
+    await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, { timeout: 45000 });
+    return;
   }
-  await wait(700);
+  await ensureOnMap(page);
+}
+
+async function enterRoomOnPage(page, name) {
+  await ensureOnMap(page);
+  await page.evaluate((n) => window.__playtestQa.enterInterior(n), name);
+  await page.waitForFunction(() => window.__playtestQa.isInInterior() === true, null, { timeout: 20000 });
+  await page.waitForFunction(
+    () => (window.__playtestQa.interiorLayout()?.walkable?.length ?? 0) > 0,
+    null,
+    { timeout: 15000 },
+  );
+  await wait(200);
 }
 
 const inInterior = (page) => page.evaluate(() => window.__playtestQa?.isInInterior?.() === true);
@@ -124,12 +144,13 @@ async function assertReenter(page, name, tag, errors) {
 }
 
 async function testExitSingleTap(ctx, kind, base, errors) {
-  for (const name of ROOMS) {
-    for (const target of ['mat', 'gap']) {
-      const tag = `run38-${kind}-exit-${target}-${name}`;
-      const page = await ctx.newPage();
-      try {
-        await openRoom(page, base, name);
+  const page = await ctx.newPage();
+  try {
+    await openMapOnce(page, base);
+    for (const name of ROOMS) {
+      for (const target of ['mat', 'gap']) {
+        const tag = `run38-${kind}-exit-${target}-${name}`;
+        await enterRoomOnPage(page, name);
         if (!(await inInterior(page))) {
           errors.push(`${tag}: room did not open`);
           continue;
@@ -144,7 +165,7 @@ async function testExitSingleTap(ctx, kind, base, errors) {
             : await tilePoint(page, layout.exit.x, layout.exit.y + gap);
         await armExitTimer(page);
         await tapAt(page, kind, pt.x, pt.y);
-        const r = await readExitTimer(page);
+        const r = await readExitTimer(page, 8000);
         if (!r) {
           errors.push(`${tag}: one tap on the ${target} from the far tile did not exit`);
         } else if (!exitIsImmediate(r)) {
@@ -152,19 +173,20 @@ async function testExitSingleTap(ctx, kind, base, errors) {
         } else {
           await assertReenter(page, name, tag, errors);
         }
-      } finally {
-        await page.close();
       }
     }
+  } finally {
+    await page.close();
   }
 }
 
 async function testExitSalir(ctx, kind, base, errors) {
-  for (const name of ROOMS) {
+  const page = await ctx.newPage();
+  try {
+    await openMapOnce(page, base);
+    for (const name of ROOMS) {
     const tag = `run38-${kind}-exit-salir-${name}`;
-    const page = await ctx.newPage();
-    try {
-      await openRoom(page, base, name);
+      await enterRoomOnPage(page, name);
       if (!(await inInterior(page))) {
         errors.push(`${tag}: room did not open`);
         continue;
@@ -197,18 +219,19 @@ async function testExitSalir(ctx, kind, base, errors) {
       } else {
         await assertReenter(page, name, tag, errors);
       }
-    } finally {
-      await page.close();
     }
+  } finally {
+    await page.close();
   }
 }
 
 async function testExitNeighboursDoNotExit(ctx, kind, base, errors) {
-  for (const name of ROOMS) {
+  const page = await ctx.newPage();
+  try {
+    await openMapOnce(page, base);
+    for (const name of ROOMS) {
     const tag = `run38-${kind}-exit-neighbour-${name}`;
-    const page = await ctx.newPage();
-    try {
-      await openRoom(page, base, name);
+      await enterRoomOnPage(page, name);
       const layout = await page.evaluate(() => window.__playtestQa?.interiorLayout?.());
       if (!layout) {
         errors.push(`${tag}: no layout`);
@@ -233,18 +256,19 @@ async function testExitNeighboursDoNotExit(ctx, kind, base, errors) {
           break;
         }
       }
-    } finally {
-      await page.close();
     }
+  } finally {
+    await page.close();
   }
 }
 
 async function testFloorWalks(ctx, kind, base, errors) {
-  for (const name of ROOMS) {
+  const page = await ctx.newPage();
+  try {
+    await openMapOnce(page, base);
+    for (const name of ROOMS) {
     const tag = `run38-${kind}-walk-${name}`;
-    const page = await ctx.newPage();
-    try {
-      await openRoom(page, base, name);
+      await enterRoomOnPage(page, name);
       const layout = await page.evaluate(() => window.__playtestQa?.interiorLayout?.());
       if (!layout) {
         errors.push(`${tag}: no layout`);
@@ -264,9 +288,9 @@ async function testFloorWalks(ctx, kind, base, errors) {
           break;
         }
       }
-    } finally {
-      await page.close();
     }
+  } finally {
+    await page.close();
   }
 }
 
@@ -291,11 +315,12 @@ async function drag(page, from, to) {
 }
 
 async function testInteriorCameraLock(ctx, kind, base, errors) {
-  for (const name of ROOMS) {
+  const page = await ctx.newPage();
+  try {
+    await openMapOnce(page, base);
+    for (const name of ROOMS) {
     const tag = `run38-${kind}-camlock-${name}`;
-    const page = await ctx.newPage();
-    try {
-      await openRoom(page, base, name);
+      await enterRoomOnPage(page, name);
       const vp = page.viewportSize();
       const start = { x: Math.round(vp.width * 0.5), y: Math.round(vp.height * 0.5) };
       const before = await readBoxes(page);
@@ -348,9 +373,9 @@ async function testInteriorCameraLock(ctx, kind, base, errors) {
           }
         }
       }
-    } finally {
-      await page.close();
     }
+  } finally {
+    await page.close();
   }
 }
 
@@ -358,8 +383,8 @@ async function testDoorEntryOnArrival(ctx, kind, base, errors) {
   const tag = `run38-${kind}-door`;
   const page = await ctx.newPage();
   try {
-    await page.goto(base, { waitUntil: 'networkidle' });
-    await wait(800);
+    await page.goto(base, { waitUntil: 'load' });
+    await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, { timeout: 45000 });
     await page.evaluate(() => {
       window.__playtestQa?.setCharacterTile?.(35, 36);
       window.__playtestQa?.frameDoorForQa?.('volaris');
@@ -392,8 +417,8 @@ async function testNearTaps(ctx, kind, base, errors) {
   const toast = () =>
     page.evaluate(() => document.getElementById('playtest-toast')?.classList.contains('playtest-toast--visible') ?? false);
   try {
-    await page.goto(base, { waitUntil: 'networkidle' });
-    await wait(800);
+    await page.goto(base, { waitUntil: 'load' });
+    await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, { timeout: 45000 });
     await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(20, 20));
     await wait(300);
     await page.evaluate(() => window.__playtestQa?.tapMapTile?.(-2, 30));
@@ -429,7 +454,7 @@ async function testNearTaps(ctx, kind, base, errors) {
 export async function runRun38InputSuite({ kind, base, errors, only }) {
   const spec = RUN38_KINDS[kind];
   const browser = await launchBrowser(spec.type);
-  const ctx = await browser.newContext(spec.options);
+  const ctx = await browser.newContext(ciContextOptions(spec.options));
   const want = (n) => !only || only.includes(n);
   try {
     if (want('exit')) {

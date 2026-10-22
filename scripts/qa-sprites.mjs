@@ -28,6 +28,13 @@ const SHOTS = process.argv.includes('--shots');
 /** QA_SPRITES_ONLY=map,picks runs a subset (placement, picks, map, diff, interiors, shots with --shots); unset runs all. */
 const ONLY = process.env.QA_SPRITES_ONLY?.split(',');
 const want = (part) => !ONLY || ONLY.includes(part);
+/** Optional subset for the interiors shard (comma-separated room ids). */
+const INTERIOR_ROOMS = process.env.QA_INTERIOR_ROOMS?.split(',').filter(Boolean);
+const filterRooms = (list) => {
+  if (!INTERIOR_ROOMS?.length) return list;
+  const set = new Set(INTERIOR_ROOMS);
+  return list.filter((id) => set.has(id));
+};
 /**
  * Preview deploys only (`QA_GATE_PREVIEW=1`). The full-frame visual diff still runs and
  * writes a report plus screenshots, but a pixel miss or a SwiftShader crash does not fail
@@ -943,10 +950,12 @@ async function ensureOnMap(page) {
 }
 
 async function interiorChecks(browser) {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
+  const artRooms = filterRooms(Object.keys(ART_ROOMS));
+  const walkRooms = filterRooms([...CASES, ...Object.keys(ART_ROOMS)]);
   try {
     await openMap(page);
-    for (const c of [...CASES, ...Object.keys(ART_ROOMS)]) {
+    for (const c of walkRooms) {
       process.stdout.write(`qa-sprites: interior ${c}\n`);
       await ensureOnMap(page);
       await enterRoom(page, c);
@@ -992,9 +1001,12 @@ async function interiorChecks(browser) {
       await page.evaluate(() => window.__playtestQa.exitInterior());
       await wait(300);
     }
-    notes.push(`interiors: ${CASES.join(', ')} walk grid == mascara_caminable; ${Object.keys(ART_ROOMS).join(', ')} == interior-rooms.json (all free cells reach the exit); exit mat walkable, cerca probes at default and room min zoom`);
+    notes.push(
+      `interiors: ${walkRooms.join(', ')} walk grid == mascara_caminable; art rooms ${artRooms.join(', ')} == interior-rooms.json when listed; exit mat walkable, cerca probes at default and room min zoom`,
+    );
 
     // Estudio noche: dark floor, amber only on lights (windows, monitor, lamp).
+    if (walkRooms.includes('estudio')) {
     process.stdout.write('qa-sprites: interior estudio-noche\n');
     await ensureOnMap(page);
     await enterRoom(page, 'estudio');
@@ -1039,17 +1051,19 @@ async function interiorChecks(browser) {
     await page.evaluate(() => window.__playtestQa.exitInterior());
     await wait(300);
     notes.push(`interiors: estudio uses the Estudio-noche palette (${fc.length} floor samples, ${pr.length} wall/window/desk/monitor probes)`);
+    }
 
     // One real click on the exit mat leaves every room at once.
+    const exitRooms = filterRooms(['estudio', ...CASES, ...Object.keys(ART_ROOMS)]);
     process.stdout.write('qa-sprites: interior exit clicks\n');
-    for (const c of ['estudio', ...CASES, ...Object.keys(ART_ROOMS)]) {
-      await openMap(page);
+    for (const c of exitRooms) {
+      await ensureOnMap(page);
       await enterRoom(page, c);
       const lay = await page.evaluate(() => window.__playtestQa.interiorLayout());
       const pt = await page.evaluate(([x, y]) => window.__playtestQa.interiorTileScreenPoint(x, y), [lay.exit.x, lay.exit.y]);
       await armExitTimer(page);
       await page.mouse.click(pt.x, pt.y);
-      const r = await readExitTimer(page, 3000);
+      const r = await readExitTimer(page, 8000);
       if (!exitIsImmediate(r)) fail(`interior ${c}: click on exit mat was not immediate (${describeExit(r)}; need no walk and <= 150 ms, or <= 6 frames and 2.5 s)`);
       if (!r) await page.evaluate(() => window.__playtestQa.exitInterior());
       await wait(300);

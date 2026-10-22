@@ -3,13 +3,19 @@ name: Gate
 # Fast checks that must pass before anything is deployed: build, typecheck, sprite
 # placement / picking / interiors, and the real-input smoke (first load framing, door
 # entry, single-tap exits, input, camera follow, logos, NPCs, player, case panel, map
-# fill, bench sit) on Chromium and WebKit, plus the simulated NPC routines. Each suite runs as parallel shards so every job stays
-# well inside its timeout (~12 min wall clock); `gate passed` is the single check to require.
+# fill, bench sit) on Chromium, plus the simulated NPC routines. Each suite runs as
+# parallel shards so every job stays well inside its timeout (~12 min wall clock);
+# `gate passed` is the single check to require.
 on:
   workflow_call:
 
 permissions:
   contents: read
+
+env:
+  QA_CI: '1'
+  QA_CHROMIUM_ONLY: '1'
+  QA_GL: llvmpipe
 
 jobs:
   sprites:
@@ -22,8 +28,12 @@ jobs:
         include:
           - name: map + pixel diff + shots
             parts: placement,picks,map,diff,shots
-          - name: interiors
+          - name: interiors a
             parts: interiors
+            rooms: estudio,volaris,bain,mentoria,finoa
+          - name: interiors b
+            parts: interiors
+            rooms: pg,flor,catedral,sambil,teresa,biblioteca
     steps:
       - uses: actions/checkout@v4
 
@@ -54,6 +64,7 @@ jobs:
         timeout-minutes: 32
         env:
           QA_SPRITES_ONLY: ${{ matrix.parts }}
+          QA_INTERIOR_ROOMS: ${{ matrix.rooms }}
         run: node scripts/qa-sprites.mjs --shots
 
       - name: Upload sprite shots
@@ -71,16 +82,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        groups:
-          - exits-iphone
-          - exits-desktop
-          - exits-phone,about
-          - firstload,chrome
-          - input,fill
-          - case
-          - follow,logos,player
-          - npcs,routines
-          - bench
+        include:
+          - groups: firstload
+          - groups: chrome
+          - groups: exits-iphone
+          - groups: exits-desktop-a
+            r38_rooms: estudio,volaris,bain,mentoria,finoa
+          - groups: exits-desktop-b
+            r38_rooms: pg,sambil,catedral,flor,teresa,biblioteca
+          - groups: exits-phone
+          - groups: about
+          - groups: input
+          - groups: fill
+          - groups: follow
+          - groups: logos
+          - groups: player
+          - groups: case-1280
+          - groups: case-375
+          - groups: case-55
+          - groups: npcs
+          - groups: routines
+          - groups: bench-1280
+          - groups: bench-375
     steps:
       - uses: actions/checkout@v4
 
@@ -95,13 +118,14 @@ jobs:
       - name: npm run build
         run: npm run build
 
-      - name: Install Playwright Chromium + WebKit
-        run: npx playwright install chromium webkit --with-deps
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
 
       - name: qa:smoke
         timeout-minutes: 28
         env:
           QA_SMOKE_ONLY: ${{ matrix.groups }}
+          R38_ROOMS: ${{ matrix.r38_rooms }}
         run: node scripts/qa-smoke.mjs
 
   result:

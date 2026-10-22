@@ -20,3 +20,30 @@ concurrency:
 jobs:
   gate:
     uses: ./.github/workflows/gate.yml
+
+  deploy-preview-integracion:
+    name: deploy preview-integracion
+    needs: gate
+    if: github.ref == 'refs/heads/cursor/integracion' && needs.gate.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: npm ci
+        run: npm ci
+
+      - name: Build and deploy preview-integracion
+        env:
+          DEPLOY_TARGET: preview-integracion
+          DEPLOY_GATE_PASSED: '1'
+        run: |
+          git config user.email adolizardo@gmail.com
+          git config user.name 'Adonay Lizardo'
+          npm run deploy:preview-integracion
