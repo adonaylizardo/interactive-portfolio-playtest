@@ -1042,9 +1042,8 @@ async function interiorChecks(browser) {
 
     // One real click on the exit mat leaves every room at once.
     process.stdout.write('qa-sprites: interior exit clicks\n');
-    await ensureOnMap(page);
     for (const c of ['estudio', ...CASES, ...Object.keys(ART_ROOMS)]) {
-      await ensureOnMap(page);
+      await openMap(page);
       await enterRoom(page, c);
       const lay = await page.evaluate(() => window.__playtestQa.interiorLayout());
       const pt = await page.evaluate(([x, y]) => window.__playtestQa.interiorTileScreenPoint(x, y), [lay.exit.x, lay.exit.y]);
