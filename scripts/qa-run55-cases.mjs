@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit, devices } from 'playwright';
-import { launchBrowser } from './qa-ready.mjs';
+import { launchBrowser, waitForBuildingPanelSettled } from './qa-ready.mjs';
 import { ciContextOptions } from './qa-ci.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -289,13 +289,13 @@ export async function runRun55CaseSuite({ kind, base, errors, notes, shots }) {
   };
   try {
     page.on('request', onVoice);
-    await page.goto(base, { waitUntil: 'networkidle' });
+    await page.goto(base, { waitUntil: 'load' });
     await wait(500);
 
     for (const specCase of Object.values(CASES)) {
       const tag = `run55-${kind}-${specCase.id}`;
       await qa(page, (id) => window.__playtestQa.enterInterior(id), specCase.id);
-      await page.waitForFunction(() => window.__playtestQa.isBuildingPanelOpen(), null, { timeout: 15000 });
+      await waitForBuildingPanelSettled(page);
       await wait(400);
       if (spec.phone) {
         await page.locator('.building-panel__title').tap();
@@ -342,7 +342,7 @@ export async function runRun55CaseSuite({ kind, base, errors, notes, shots }) {
     for (const [id, [name, line]] of Object.entries(LANDMARKS)) {
       const tag = `run55-${kind}-landmark-${id}`;
       await qa(page, (n) => window.__playtestQa.enterInterior(n), id);
-      await page.waitForFunction(() => window.__playtestQa.isBuildingPanelOpen(), null, { timeout: 15000 });
+      await waitForBuildingPanelSettled(page);
       await wait(300);
       if (spec.phone) {
         await page.locator('.building-panel__title').tap();

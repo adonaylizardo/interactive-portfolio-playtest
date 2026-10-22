@@ -1305,6 +1305,7 @@ body:has(.building-panel--open) .chrome__lang {
   position: absolute;
   top: 0;
   right: 0;
+  z-index: 3;
   min-width: 44px;
   min-height: 44px;
   padding: 10px 16px;

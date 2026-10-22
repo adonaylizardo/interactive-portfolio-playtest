@@ -39,7 +39,6 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
   const page = await ctx.newPage();
   try {
     await page.goto(base, { waitUntil: 'load' });
-    if (!spec.desktop) await dismissArrivalSheet(page);
 
     if (spec.desktop) {
       const load = await qa(page, () => {
@@ -210,7 +209,7 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
         window.__playtestQa.setAudioMuted(false);
       });
       const sound0 = await qa(page, () => {
-        const btn = document.querySelector('[data-icon="sound"]');
+        const btn = document.querySelector('[data-action="sound"]');
         return {
           muted: window.__playtestQa.audioMuted(),
           pressed: btn?.getAttribute('aria-pressed'),
@@ -227,7 +226,7 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
       );
       const sound1 = await qa(page, () => ({
         muted: window.__playtestQa.audioMuted(),
-        pressed: document.querySelector('[data-icon="sound"]')?.getAttribute('aria-pressed'),
+        pressed: document.querySelector('[data-action="sound"]')?.getAttribute('aria-pressed'),
         stored: localStorage.getItem('studio-audio-muted'),
         unlocked: window.__playtestQa.audioUnlocked(),
       }));
@@ -240,7 +239,7 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
       const sound2 = await qa(page, () => ({
         muted: window.__playtestQa.audioMuted(),
         stored: localStorage.getItem('studio-audio-muted'),
-        pressed: document.querySelector('[data-icon="sound"]')?.getAttribute('aria-pressed'),
+        pressed: document.querySelector('[data-action="sound"]')?.getAttribute('aria-pressed'),
       }));
       if (!sound2.muted || sound2.stored !== '1') {
         errors.push(`${tag}: mute did not survive reload (muted=${sound2.muted} stored=${sound2.stored})`);

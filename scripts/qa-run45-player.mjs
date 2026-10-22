@@ -422,7 +422,7 @@ export async function runRun45PlayerSuite({ kind, base, errors, notes, shots }) 
   try {
     const ctx = await browser.newContext(spec.options);
     const page = await ctx.newPage();
-    await page.goto(base, { waitUntil: 'networkidle' });
+    await page.goto(base, { waitUntil: 'load' });
     await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.().loaded && window.__playtestQa.noah()?.loaded, null, {
       timeout: 30000,
     });
@@ -480,7 +480,7 @@ export async function runRun45PlayerSuite({ kind, base, errors, notes, shots }) 
     try {
       const roomCtx = await roomBrowser.newContext(spec.options);
       const roomPage = await roomCtx.newPage();
-      await roomPage.goto(base, { waitUntil: 'networkidle' });
+      await roomPage.goto(base, { waitUntil: 'load' });
       await roomPage.waitForFunction(() => window.__playtestQa?.playerAvatar?.().loaded, null, { timeout: 30000 });
       await qa(roomPage, () => window.__playtestQa.enterInterior('estudio'));
       await roomPage.waitForFunction(() => window.__playtestQa.isInInterior(), null, { timeout: 15000 });

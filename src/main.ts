@@ -714,7 +714,7 @@ async function main(): Promise<void> {
     tapScreen: (sx: number, sy: number) => scene.tapScreenForQa(sx, sy),
     isInInterior: () => scene.isInInterior(),
     getInteriorId: () => scene.getInteriorBuildingId(),
-    enterInterior: (name: string) => scene.enterInterior(name),
+    enterInterior: (name: string) => scene.enterInterior(name, { skipFade: true }),
     exitInterior: () => scene.exitInterior(),
     dismissBuildingPanel: () => panel.hide(),
     setChecklistProgressForQa: (completed: Partial<Record<string, boolean>>) =>

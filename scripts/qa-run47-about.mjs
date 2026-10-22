@@ -19,7 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit, devices } from 'playwright';
 import { PNG } from 'pngjs';
-import { launchBrowser } from './qa-ready.mjs';
+import { launchBrowser, waitForBuildingPanelSettled } from './qa-ready.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -309,7 +309,7 @@ async function noahDesktopCheck(page, base, tag, errors) {
   parts.push(`hover bubble + pointer ${hover.bubble && hover.cursor === 'pointer' ? 'ok' : 'MISSING'}, 8 px-drift click from ${far.x},${far.y} ${clicked ? 'starts his climb' : 'FAILS'}`);
 
   for (const key of ['Enter', 'Space']) {
-    await page.goto(base, { waitUntil: 'networkidle' });
+    await page.goto(base, { waitUntil: 'load' });
     await page.waitForFunction(() => window.__playtestQa.noah?.()?.loaded, null, { timeout: 20000 });
     await wait(400);
     const near = await placePlayerByNoah(page, [[1, 1], [1, 0], [0, 1], [1, -1], [-1, 1]]);
@@ -338,15 +338,15 @@ export async function runRun47AboutSuite({ kind, base, errors, notes, shots }) {
     await page.screenshot({ path: path.join(shots, name) });
   };
   try {
-    await page.goto(base, { waitUntil: 'networkidle' });
+    await page.goto(base, { waitUntil: 'load' });
     await wait(600);
     await page.waitForFunction(() => window.__playtestQa.noah?.()?.loaded, null, { timeout: 20000 }).catch(() => {});
     let noah = await noahTapCheck(page, spec, tag, errors);
     if (!spec.phone) noah += `; ${await noahDesktopCheck(page, base, tag, errors)}`;
 
     await qa(page, () => window.__playtestQa.enterInterior('estudio'));
-    await page.waitForFunction(() => window.__playtestQa.isBuildingPanelOpen(), null, { timeout: 15000 });
-    await wait(500);
+    await waitForBuildingPanelSettled(page);
+    await wait(300);
     if (spec.phone) {
       await page.locator('.building-panel__title').tap();
       await wait(500);

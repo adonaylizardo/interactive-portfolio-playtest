@@ -133,7 +133,7 @@ async function testLoadHold(ctx, kind, base, errors, notes) {
   for (const key of ['ArrowUp', 'w', 'ArrowLeft', 'd']) {
     const page = await ctx.newPage();
     try {
-      await page.goto(base, { waitUntil: 'networkidle' });
+      await page.goto(base, { waitUntil: 'load' });
       await page.waitForFunction(() => window.__playtestQa?.getCharacterTile, null, { timeout: 20000 });
       await wait(600);
       await page.locator('#game-canvas').focus();
@@ -185,7 +185,7 @@ async function testKeyboardEntry(ctx, kind, base, errors, notes) {
   const tag = `run41-${kind}-keys`;
   const page = await ctx.newPage();
   try {
-    await page.goto(base, { waitUntil: 'networkidle' });
+    await page.goto(base, { waitUntil: 'load' });
     await wait(900);
     await page.mouse.move(5, 400);
     const buildings = await qa(page, () => window.__playtestQa.getEnterableBuildings().filter((b) => b.panelTitle && b.door && b.inward));
@@ -338,7 +338,7 @@ async function testWheel(ctx, kind, base, errors, notes) {
   const tag = `run41-${kind}-wheel`;
   const page = await ctx.newPage();
   try {
-    await page.goto(base, { waitUntil: 'networkidle' });
+    await page.goto(base, { waitUntil: 'load' });
     await wait(900);
     const px = 700;
     const py = 420;
@@ -405,7 +405,7 @@ async function testMinZoom(ctx, kind, base, errors, notes) {
   const { PNG } = await import('pngjs');
   const page = await ctx.newPage();
   try {
-    await page.goto(base, { waitUntil: 'networkidle' });
+    await page.goto(base, { waitUntil: 'load' });
     await wait(900);
     await qa(page, () => window.__playtestQa.setZoom(0.01));
     await wait(400);
@@ -484,7 +484,7 @@ async function testInteriorFeel(ctx, kind, base, errors, notes) {
     const tag = `run41-${kind}-interior-${name}`;
     const page = await ctx.newPage();
     try {
-      await page.goto(base, { waitUntil: 'networkidle' });
+      await page.goto(base, { waitUntil: 'load' });
       await wait(500);
       await qa(page, (n) => window.__playtestQa.enterInterior(n), name);
       if (!(await waitFor(page, () => inInterior(page), 15000))) {

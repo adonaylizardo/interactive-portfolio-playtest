@@ -124,7 +124,7 @@ export async function runRun46CaseSuite({ kind, base, errors, notes, shots }) {
   };
   try {
     page.on('request', onVoice);
-    await page.goto(base, { waitUntil: 'networkidle' });
+    await page.goto(base, { waitUntil: 'load' });
     await wait(600);
     await qa(page, () => window.__playtestQa.enterInterior('volaris'));
     await page.waitForFunction(() => window.__playtestQa.isBuildingPanelOpen(), null, { timeout: 15000 });

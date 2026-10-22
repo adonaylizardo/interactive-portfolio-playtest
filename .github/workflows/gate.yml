@@ -26,8 +26,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: map + pixel diff + shots
-            parts: placement,picks,map,diff,shots
+          - name: map + pixel diff
+            parts: placement,picks,map,diff
+          - name: sprite shots
+            parts: shots
           - name: full-frame diff
             parts: fullframe
           - name: interiors a

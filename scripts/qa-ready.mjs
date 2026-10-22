@@ -12,7 +12,7 @@ async function waitForQa(page) {
   for (let i = 0; i < 450; i++) {
     try {
       const state = await page.evaluate(() => {
-        if (window.__playtestQa?.isInInterior) return 'ready';
+        if (typeof window.__playtestQa?.enterInterior === 'function') return 'ready';
         const btn = document.querySelector('[data-boot-start]');
         if (btn && !btn.closest('[hidden]')) return 'welcome';
         return 'loading';
@@ -28,6 +28,35 @@ async function waitForQa(page) {
     }
     await wait(100);
   }
+  throw new Error('QA hooks did not install within 45s (__playtestQa.enterInterior missing)');
+}
+
+export { waitForQa };
+
+/** Desktop sheet slides in over ~250ms; don't probe Exit until translate settles. */
+export async function waitForBuildingPanelSettled(page) {
+  await page.waitForFunction(
+    () => {
+      if (!window.__playtestQa?.isBuildingPanelOpen?.()) return false;
+      const sheet = document.querySelector('.building-panel--open .building-panel__sheet');
+      if (!sheet) return false;
+      const tr = getComputedStyle(sheet).transform;
+      if (!tr || tr === 'none') return true;
+      const m = tr.match(/matrix\(([^)]+)\)/);
+      if (!m) return true;
+      const parts = m[1].split(',').map((s) => parseFloat(s.trim()));
+      const tx = parts[4] ?? 0;
+      const ty = parts[5] ?? 0;
+      const phone = window.matchMedia('(max-width: 767px)').matches;
+      if (phone) {
+        // Bottom sheet: peek row or full height — both are valid once off the loading translate.
+        return Math.abs(ty) > 24 || Math.abs(ty) < 2;
+      }
+      return Math.abs(tx) < 2 && Math.abs(ty) < 2;
+    },
+    null,
+    { timeout: 15000 },
+  );
 }
 
 function patchPage(page) {

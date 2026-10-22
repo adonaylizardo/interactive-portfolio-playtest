@@ -49,7 +49,7 @@ function fixtureLogos() {
 }
 
 async function openEstudio(page, base) {
-  await page.goto(base, { waitUntil: 'networkidle' });
+  await page.goto(base, { waitUntil: 'load' });
   await wait(600);
   await qa(page, () => window.__playtestQa.enterInterior('estudio'));
   await page.waitForFunction(() => window.__playtestQa.isBuildingPanelOpen(), null, { timeout: 15000 });

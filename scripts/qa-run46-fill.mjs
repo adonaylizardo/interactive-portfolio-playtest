@@ -206,7 +206,7 @@ export async function runRun46FillSuite({ kind, base, errors, notes, shots }) {
   const ctx = await browser.newContext(spec.options);
   const page = await ctx.newPage();
   try {
-    await page.goto(base, { waitUntil: 'networkidle' });
+    await page.goto(base, { waitUntil: 'load' });
     await page.waitForFunction(() => window.__playtestQa?.fill?.().loaded, null, { timeout: 20000 });
     const f = await qa(page, () => window.__playtestQa.fill());
     const streets = await qa(page, () => window.__playtestQa.streetTiles());
