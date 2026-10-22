@@ -21,6 +21,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit, devices } from 'playwright';
 import { launchBrowser } from './qa-ready.mjs';
+import { QA_CI } from './qa-ci.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -71,7 +72,7 @@ async function openMap(page, url, crowd = false) {
 const avatar = (page) => qa(page, () => window.__playtestQa.playerAvatar());
 
 /** Software-GL WebKit on CI draws a few fps with capped frame time, so game time runs several times slower. */
-const SLOW_WAIT = 3;
+const SLOW_WAIT = QA_CI ? 8 : 3;
 
 async function until(page, fn, arg, timeout, what) {
   try {

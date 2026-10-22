@@ -91,7 +91,9 @@ jobs:
           - groups: exits-desktop-a
             r38_rooms: estudio,volaris,bain,mentoria,finoa
           - groups: exits-desktop-b
-            r38_rooms: pg,sambil,catedral,flor,teresa,biblioteca
+            r38_rooms: pg,sambil,catedral
+          - groups: exits-desktop-c
+            r38_rooms: flor,teresa,biblioteca
           - groups: exits-phone
           - groups: about
           - groups: input

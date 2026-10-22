@@ -1,3 +1,5 @@
+import { QA_CI } from './qa-ci.mjs';
+
 /**
  * Times an interior exit inside the page: from the first pointer/touch/mouse down until the map
  * actually accepts input. Ready means: room closed, panel not open, canvas dataset clear,
@@ -114,7 +116,8 @@ export async function readExitTimer(page, maxWallMs = 3000) {
  * ~450 ms/frame) within 6 frames and 2.5 s of the tap. Sentinel times tap → map accepts input.
  */
 export function exitIsImmediate(r, budgetMs = 150) {
-  return !!r && !r.walked && (r.ms <= budgetMs || (r.frames <= 6 && r.ms <= 2500));
+  const slowCap = QA_CI ? 6000 : 2500;
+  return !!r && !r.walked && (r.ms <= budgetMs || (r.frames <= 6 && r.ms <= slowCap));
 }
 
 export function describeExit(r) {

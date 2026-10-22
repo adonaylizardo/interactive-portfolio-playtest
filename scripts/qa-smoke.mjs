@@ -241,6 +241,7 @@ const GROUPS = {
   'exits-desktop': () => exits('chromium-desktop', ['exit', 'door']),
   'exits-desktop-a': () => exits('chromium-desktop', ['exit', 'door']),
   'exits-desktop-b': () => exits('chromium-desktop', ['exit', 'door']),
+  'exits-desktop-c': () => exits('chromium-desktop', ['exit', 'door']),
   'exits-iphone': () =>
     QA_CHROMIUM_ONLY
       ? exits('chromium-phone', ['exit', 'door'])
