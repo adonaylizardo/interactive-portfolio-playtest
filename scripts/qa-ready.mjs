@@ -56,6 +56,7 @@ async function patchContext(ctx) {
       /* private mode */
     }
     if (ci) {
+      window.__qaCiFastExit = true;
       try {
         Object.defineProperty(window, 'devicePixelRatio', { configurable: true, get: () => 1 });
       } catch {

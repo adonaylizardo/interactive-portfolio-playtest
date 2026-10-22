@@ -28,6 +28,8 @@ jobs:
         include:
           - name: map + pixel diff + shots
             parts: placement,picks,map,diff,shots
+          - name: full-frame diff
+            parts: fullframe
           - name: interiors a
             parts: interiors
             rooms: estudio,volaris,bain,mentoria,finoa
@@ -96,7 +98,8 @@ jobs:
           - groups: fill
           - groups: follow
           - groups: logos
-          - groups: player
+          - groups: player-1280
+          - groups: player-375
           - groups: case-1280
           - groups: case-375
           - groups: case-55

@@ -1232,7 +1232,7 @@ try {
     await browser.close();
     browser = await launchBrowser(chromium);
   }
-  if (want('diff')) {
+  if (want('fullframe')) {
     await part('full-frame diff', () => {
       try {
         runFullFrameDiffSubprocess();

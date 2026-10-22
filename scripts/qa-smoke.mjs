@@ -284,6 +284,8 @@ const GROUPS = {
       await runBrowser('player', kind, () => runRun45PlayerSuite({ kind, base: BASE, errors, notes }));
     }
   },
+  'player-1280': () => runRun45PlayerSuite({ kind: 'chromium-1280', base: BASE, errors, notes }),
+  'player-375': () => runRun45PlayerSuite({ kind: 'chromium-375', base: BASE, errors, notes }),
   case: async () => {
     for (const kind of chromiumOnlyKinds(['chromium-1280', 'webkit-1280', 'chromium-375', 'webkit-iphone'])) {
       await runBrowser('case', kind, () => runRun46CaseSuite({ kind, base: BASE, errors, notes }));

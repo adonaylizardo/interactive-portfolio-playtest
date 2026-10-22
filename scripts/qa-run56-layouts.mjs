@@ -8,7 +8,12 @@ import { chromium } from 'playwright';
 import { launchBrowser, dismissArrivalSheet } from './qa-ready.mjs';
 import { ciContextOptions } from './qa-ci.mjs';
 
-const soundBtn = () => '.chrome__rail [data-icon="sound"], .chrome__dock [data-icon="sound"]';
+async function clickSound(page) {
+  await page.evaluate(() => {
+    const el = document.querySelector('[data-action="sound"]');
+    if (el instanceof HTMLElement) el.click();
+  });
+}
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -214,7 +219,7 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
       });
       if (sound0.muted) errors.push(`${tag}: sound starts muted`);
       if (sound0.pressed !== 'true') errors.push(`${tag}: sound aria-pressed is ${sound0.pressed}, want true`);
-      await page.locator(soundBtn()).first().click();
+      await clickSound(page);
       await page.waitForFunction(
         () => window.__playtestQa.audioMuted() && window.__playtestQa.audioUnlocked(),
         null,
@@ -241,7 +246,7 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
         errors.push(`${tag}: mute did not survive reload (muted=${sound2.muted} stored=${sound2.stored})`);
       }
       if (sound2.pressed !== 'false') errors.push(`${tag}: reloaded sound aria-pressed is ${sound2.pressed}, want false`);
-      await page.locator(soundBtn()).first().click();
+      await clickSound(page);
       await page.waitForFunction(() => !window.__playtestQa.audioMuted(), null, { timeout: 15000 });
       const sound3 = await qa(page, () => window.__playtestQa.audioMuted());
       if (sound3) errors.push(`${tag}: second sound click did not unmute`);

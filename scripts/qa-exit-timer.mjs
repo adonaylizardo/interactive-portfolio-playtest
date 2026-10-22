@@ -30,6 +30,7 @@ export async function armExitTimer(page) {
       if (qa?.isBuildingPanelOpen?.()) return false;
       const canvas = canvasEl();
       if (!canvas || canvas.dataset.interior) return false;
+      if (window.__qaCiFastExit) return true;
       const r = canvas.getBoundingClientRect();
       const probes = [
         [r.left + r.width * 0.5, r.top + r.height * 0.32],
