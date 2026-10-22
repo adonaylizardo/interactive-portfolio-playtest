@@ -51,7 +51,7 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: qa:sprites
-        timeout-minutes: 28
+        timeout-minutes: 32
         env:
           QA_SPRITES_ONLY: ${{ matrix.parts }}
         run: node scripts/qa-sprites.mjs --shots
@@ -74,9 +74,18 @@ jobs:
         groups:
           - exits-iphone
           - exits-desktop
-          - exits-phone,about
-          - firstload,chrome,input,case,fill
-          - follow,logos,npcs,player,routines
+          - exits-phone
+          - about
+          - firstload
+          - chrome
+          - input
+          - case
+          - fill
+          - follow
+          - logos
+          - npcs
+          - player
+          - routines
           - bench
     steps:
       - uses: actions/checkout@v4

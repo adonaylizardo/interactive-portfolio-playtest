@@ -221,11 +221,6 @@ async function runBrowser(group, kind, fn) {
   }
 }
 
-/** Run independent browser kinds in parallel (each suite launches its own browser). */
-async function runKindsParallel(group, kinds, fn) {
-  await Promise.all(kinds.map((kind) => runBrowser(group, kind, () => fn(kind))));
-}
-
 async function exits(kind, only) {
   const before = errors.length;
   await runRun38InputSuite({ kind, base: BASE, errors, only });
@@ -268,18 +263,21 @@ const GROUPS = {
       }
     }
   },
-  logos: () =>
-    runKindsParallel('logos', ['chromium-1280', 'webkit-1280', 'chromium-375', 'webkit-iphone'], (kind) =>
-      runRun43LogoSuite({ kind, base: BASE, errors, notes }),
-    ),
-  npcs: () =>
-    runKindsParallel('npcs', ['chromium-1280', 'webkit-1280', 'chromium-375'], (kind) =>
-      runRun44NpcSuite({ kind, base: BASE, errors, notes }),
-    ),
-  player: () =>
-    runKindsParallel('player', ['chromium-1280', 'webkit-1280', 'chromium-375'], (kind) =>
-      runRun45PlayerSuite({ kind, base: BASE, errors, notes }),
-    ),
+  logos: async () => {
+    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375', 'webkit-iphone']) {
+      await runBrowser('logos', kind, () => runRun43LogoSuite({ kind, base: BASE, errors, notes }));
+    }
+  },
+  npcs: async () => {
+    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
+      await runRun44NpcSuite({ kind, base: BASE, errors, notes });
+    }
+  },
+  player: async () => {
+    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
+      await runBrowser('player', kind, () => runRun45PlayerSuite({ kind, base: BASE, errors, notes }));
+    }
+  },
   case: async () => {
     for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375', 'webkit-iphone']) {
       await runBrowser('case', kind, () => runRun46CaseSuite({ kind, base: BASE, errors, notes }));
@@ -288,17 +286,22 @@ const GROUPS = {
       await runBrowser('case', kind, () => runRun55CaseSuite({ kind, base: BASE, errors, notes }));
     }
   },
-  fill: () =>
-    runKindsParallel('fill', ['chromium-1280', 'webkit-1280', 'chromium-375'], (kind) =>
-      runRun46FillSuite({ kind, base: BASE, errors, notes }),
-    ),
-  about: () =>
-    runKindsParallel('about', ['chromium-1280', 'webkit-1280', 'chromium-390', 'webkit-iphone'], (kind) =>
-      runRun47AboutSuite({ kind, base: BASE, errors, notes }),
-    ),
+  fill: async () => {
+    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
+      await runBrowser('fill', kind, () => runRun46FillSuite({ kind, base: BASE, errors, notes }));
+    }
+  },
+  about: async () => {
+    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-390', 'webkit-iphone']) {
+      await runBrowser('about', kind, () => runRun47AboutSuite({ kind, base: BASE, errors, notes }));
+    }
+  },
   routines: () => runRun48RoutineSuite({ errors, notes }),
-  bench: () =>
-    runKindsParallel('bench', Object.keys(RUN50_KINDS), (kind) => runRun50BenchSuite({ kind, base: BASE, errors, notes })),
+  bench: async () => {
+    for (const kind of Object.keys(RUN50_KINDS)) {
+      await runBrowser('bench', kind, () => runRun50BenchSuite({ kind, base: BASE, errors, notes }));
+    }
+  },
 };
 /** QA_SMOKE_ONLY=firstload,exits runs a subset of GROUPS (CI runs them as parallel shards); unset runs all. */
 const ONLY = process.env.QA_SMOKE_ONLY?.split(',').filter(Boolean) ?? Object.keys(GROUPS);
@@ -309,35 +312,31 @@ if (unknown.length) {
   process.exit(1);
 }
 
-async function runSmokeGroup(name) {
-  const t = Date.now();
-  const before = errors.length;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const mark = errors.length;
-    try {
-      await GROUPS[name]();
-      break;
-    } catch (err) {
-      if (!isBrowserCrash(err)) throw err;
-      if (attempt < 2) {
-        errors.splice(mark);
-        notes.push(`qa-smoke: ${name} renderer crash, retry ${attempt + 2}/3`);
-        continue;
-      }
-      notes.push(`qa-smoke: ${name} renderer crash after 3 tries; that group stopped there`);
-      break;
-    }
-  }
-  const failed = errors.length - before;
-  for (const e of errors.slice(before)) console.error(`FAIL ${e}`);
-  console.log(`qa-smoke: ${name} ${((Date.now() - t) / 1000).toFixed(0)} s${failed ? `, ${failed} failure(s)` : ''}`);
-}
-
 const t0 = Date.now();
 try {
-  // CI shards pass several group names in one job; run them concurrently so the 24 min step limit is not blown serially.
-  if (ONLY.length > 1) await Promise.all(ONLY.map((name) => runSmokeGroup(name)));
-  else if (ONLY.length === 1) await runSmokeGroup(ONLY[0]);
+  for (const name of ONLY) {
+    const t = Date.now();
+    const before = errors.length;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const mark = errors.length;
+      try {
+        await GROUPS[name]();
+        break;
+      } catch (err) {
+        if (!isBrowserCrash(err)) throw err;
+        if (attempt < 2) {
+          errors.splice(mark);
+          notes.push(`qa-smoke: ${name} renderer crash, retry ${attempt + 2}/3`);
+          continue;
+        }
+        notes.push(`qa-smoke: ${name} renderer crash after 3 tries; that group stopped there`);
+        break;
+      }
+    }
+    const failed = errors.length - before;
+    for (const e of errors.slice(before)) console.error(`FAIL ${e}`);
+    console.log(`qa-smoke: ${name} ${((Date.now() - t) / 1000).toFixed(0)} s${failed ? `, ${failed} failure(s)` : ''}`);
+  }
 } finally {
   preview?.kill('SIGKILL');
 }
