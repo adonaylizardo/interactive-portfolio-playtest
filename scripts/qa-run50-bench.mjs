@@ -268,7 +268,7 @@ async function standByMoving(page, spec, tag, errors) {
     }
     if (!goal) throw new Error(`${tag}: no open on-screen tile to tap near the bench`);
     await tapClient(page, spec, pt);
-    await until(page, () => window.__playtestQa.playerAvatar().sit === 'free', null, 5000, `${tag}: Adonay back on his feet`);
+    await until(page, () => window.__playtestQa.playerAvatar().sit === 'free', null, QA_CI ? 15000 : 5000, `${tag}: Adonay back on his feet`);
     await until(page, (g) => {
       const c = window.__playtestQa.getCharacterTile();
       return c.x === g.x && c.y === g.y;
