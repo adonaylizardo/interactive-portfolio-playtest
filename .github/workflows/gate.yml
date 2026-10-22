@@ -20,10 +20,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: placement + picks + map + shots
-            parts: placement,picks,map,shots
-          - name: pixel diff + full frame
-            parts: diff
+          - name: map + pixel diff + shots
+            parts: placement,picks,map,diff,shots
           - name: interiors
             parts: interiors
     steps:
@@ -69,7 +67,7 @@ jobs:
   smoke:
     name: qa:smoke (${{ matrix.groups }})
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 32
     strategy:
       fail-fast: false
       matrix:
@@ -80,10 +78,8 @@ jobs:
           - firstload,chrome
           - input,fill
           - case
-          - follow
-          - logos,npcs
-          - player
-          - routines
+          - follow,logos,player
+          - npcs,routines
           - bench
     steps:
       - uses: actions/checkout@v4
@@ -103,7 +99,7 @@ jobs:
         run: npx playwright install chromium webkit --with-deps
 
       - name: qa:smoke
-        timeout-minutes: 36
+        timeout-minutes: 28
         env:
           QA_SMOKE_ONLY: ${{ matrix.groups }}
         run: node scripts/qa-smoke.mjs
@@ -112,6 +108,7 @@ jobs:
     name: gate passed
     needs: [sprites, smoke]
     if: always()
+    runs-on: ubuntu/ubuntu-latest
     runs-on: ubuntu-latest
     steps:
       - name: every shard passed
