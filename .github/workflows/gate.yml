@@ -108,7 +108,6 @@ jobs:
     name: gate passed
     needs: [sprites, smoke]
     if: always()
-    runs-on: ubuntu/ubuntu-latest
     runs-on: ubuntu-latest
     steps:
       - name: every shard passed
