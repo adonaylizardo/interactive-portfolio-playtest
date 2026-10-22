@@ -106,6 +106,8 @@ function playOrder(a: AnimEntry): number[] {
 export type NpcHost = RoutineHost & {
   /** Draw order for a walker standing at fractional tile (fx, fy). */
   zIndexAt(fx: number, fy: number): number;
+  /** Seated NPCs draw over the bench at `seat` (same as the player on `seatedBench`). */
+  benchZAtSeat?(sx: number, sy: number): number | null;
 };
 
 /**
@@ -236,7 +238,8 @@ export class NpcCrowd {
     sprite.texture = frames[w.frame % frames.length];
     // A sitter sorts on the bench's own tile, which the bench never hides, so it draws over the bench.
     const f = w.seat && seatOffset ? w.seat : r.feet(w);
-    sprite.zIndex = this.host.zIndexAt(f.x, f.y);
+    const benchZ = w.seat && seatOffset ? this.host.benchZAtSeat?.(w.seat.x, w.seat.y) : null;
+    sprite.zIndex = benchZ ?? this.host.zIndexAt(f.x, f.y);
     this.syncVisible(w);
   }
 

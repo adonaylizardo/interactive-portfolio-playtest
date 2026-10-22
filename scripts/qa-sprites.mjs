@@ -932,19 +932,23 @@ async function fullFrameDiff(browser) {
 
 async function enterRoom(page, name) {
   await page.evaluate((n) => window.__playtestQa.enterInterior(n), name);
-  for (let i = 0; i < 80; i++) {
-    if (await page.evaluate(() => window.__playtestQa.isInInterior())) break;
-    await wait(250);
-  }
-  await wait(800);
+  await page.waitForFunction(() => window.__playtestQa.isInInterior(), null, { timeout: 20000 });
+  await wait(400);
+}
+
+async function ensureOnMap(page) {
+  if (await page.evaluate(() => !window.__playtestQa?.isInInterior?.())) return;
+  await page.evaluate(() => window.__playtestQa.exitInterior());
+  await wait(300);
 }
 
 async function interiorChecks(browser) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   try {
+    await openMap(page);
     for (const c of [...CASES, ...Object.keys(ART_ROOMS)]) {
       process.stdout.write(`qa-sprites: interior ${c}\n`);
-      await openMap(page);
+      await ensureOnMap(page);
       await enterRoom(page, c);
       const layout = await page.evaluate(() => window.__playtestQa.interiorLayout());
       const rows = ART_ROOMS[c]?.mask ?? sprites.meta[`int/${c}`].mascara_caminable.filas_y0_a_y5;
@@ -992,7 +996,7 @@ async function interiorChecks(browser) {
 
     // Estudio noche: dark floor, amber only on lights (windows, monitor, lamp).
     process.stdout.write('qa-sprites: interior estudio-noche\n');
-    await openMap(page);
+    await ensureOnMap(page);
     await enterRoom(page, 'estudio');
     const pr = await page.evaluate(() => window.__playtestQa.interiorPixelProbes());
     const cols = await page.evaluate((p) => window.__playtestQa.sampleCanvasColors(p), pr.map((p) => ({ x: p.x, y: p.y })));
@@ -1038,8 +1042,9 @@ async function interiorChecks(browser) {
 
     // One real click on the exit mat leaves every room at once.
     process.stdout.write('qa-sprites: interior exit clicks\n');
+    await ensureOnMap(page);
     for (const c of ['estudio', ...CASES, ...Object.keys(ART_ROOMS)]) {
-      await openMap(page);
+      await ensureOnMap(page);
       await enterRoom(page, c);
       const lay = await page.evaluate(() => window.__playtestQa.interiorLayout());
       const pt = await page.evaluate(([x, y]) => window.__playtestQa.interiorTileScreenPoint(x, y), [lay.exit.x, lay.exit.y]);

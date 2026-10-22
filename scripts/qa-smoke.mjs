@@ -221,6 +221,11 @@ async function runBrowser(group, kind, fn) {
   }
 }
 
+/** Run independent browser kinds in parallel (each suite launches its own browser). */
+async function runKindsParallel(group, kinds, fn) {
+  await Promise.all(kinds.map((kind) => runBrowser(group, kind, () => fn(kind))));
+}
+
 async function exits(kind, only) {
   const before = errors.length;
   await runRun38InputSuite({ kind, base: BASE, errors, only });
@@ -263,21 +268,18 @@ const GROUPS = {
       }
     }
   },
-  logos: async () => {
-    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375', 'webkit-iphone']) {
-      await runBrowser('logos', kind, () => runRun43LogoSuite({ kind, base: BASE, errors, notes }));
-    }
-  },
-  npcs: async () => {
-    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
-      await runRun44NpcSuite({ kind, base: BASE, errors, notes });
-    }
-  },
-  player: async () => {
-    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
-      await runBrowser('player', kind, () => runRun45PlayerSuite({ kind, base: BASE, errors, notes }));
-    }
-  },
+  logos: () =>
+    runKindsParallel('logos', ['chromium-1280', 'webkit-1280', 'chromium-375', 'webkit-iphone'], (kind) =>
+      runRun43LogoSuite({ kind, base: BASE, errors, notes }),
+    ),
+  npcs: () =>
+    runKindsParallel('npcs', ['chromium-1280', 'webkit-1280', 'chromium-375'], (kind) =>
+      runRun44NpcSuite({ kind, base: BASE, errors, notes }),
+    ),
+  player: () =>
+    runKindsParallel('player', ['chromium-1280', 'webkit-1280', 'chromium-375'], (kind) =>
+      runRun45PlayerSuite({ kind, base: BASE, errors, notes }),
+    ),
   case: async () => {
     for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375', 'webkit-iphone']) {
       await runBrowser('case', kind, () => runRun46CaseSuite({ kind, base: BASE, errors, notes }));
@@ -286,22 +288,17 @@ const GROUPS = {
       await runBrowser('case', kind, () => runRun55CaseSuite({ kind, base: BASE, errors, notes }));
     }
   },
-  fill: async () => {
-    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-375']) {
-      await runBrowser('fill', kind, () => runRun46FillSuite({ kind, base: BASE, errors, notes }));
-    }
-  },
-  about: async () => {
-    for (const kind of ['chromium-1280', 'webkit-1280', 'chromium-390', 'webkit-iphone']) {
-      await runBrowser('about', kind, () => runRun47AboutSuite({ kind, base: BASE, errors, notes }));
-    }
-  },
+  fill: () =>
+    runKindsParallel('fill', ['chromium-1280', 'webkit-1280', 'chromium-375'], (kind) =>
+      runRun46FillSuite({ kind, base: BASE, errors, notes }),
+    ),
+  about: () =>
+    runKindsParallel('about', ['chromium-1280', 'webkit-1280', 'chromium-390', 'webkit-iphone'], (kind) =>
+      runRun47AboutSuite({ kind, base: BASE, errors, notes }),
+    ),
   routines: () => runRun48RoutineSuite({ errors, notes }),
-  bench: async () => {
-    for (const kind of Object.keys(RUN50_KINDS)) {
-      await runBrowser('bench', kind, () => runRun50BenchSuite({ kind, base: BASE, errors, notes }));
-    }
-  },
+  bench: () =>
+    runKindsParallel('bench', Object.keys(RUN50_KINDS), (kind) => runRun50BenchSuite({ kind, base: BASE, errors, notes })),
 };
 /** QA_SMOKE_ONLY=firstload,exits runs a subset of GROUPS (CI runs them as parallel shards); unset runs all. */
 const ONLY = process.env.QA_SMOKE_ONLY?.split(',').filter(Boolean) ?? Object.keys(GROUPS);

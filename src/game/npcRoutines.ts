@@ -1010,6 +1010,19 @@ export class NpcRoutines {
       const p = this.randomFree(z.cells);
       if (p && near(p)) c = p;
     }
+    // Muro clearance can leave a stroller in a pocket where every short stroll needs a long detour.
+    if (!c && z) {
+      const loose = (p: Cell) => {
+        const d = Math.abs(p.x - here.x) + Math.abs(p.y - here.y);
+        if (d < 2) return false;
+        const route = findPath(this.town, here, p, { avoid: this.avoidNow(w, 'still') });
+        return !!route && route.length <= d + STROLL_DETOUR * 2;
+      };
+      for (let i = 0; i < 8 && !c; i++) {
+        const p = this.randomFree(z.cells);
+        if (p && loose(p)) c = p;
+      }
+    }
     w.phase = 'stroll';
     if (c && this.goTo(w, c, `stroll by the ${z.name}`, () => this.stand(w, this.range(STROLL_PAUSE_S), `stroll by the ${z.name}`, this.faceZone(w, c)))) return;
     this.retryLater(w);

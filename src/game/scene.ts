@@ -714,6 +714,12 @@ export class IsoScene {
       this.objectsLayer,
       {
         zIndexAt: (fx, fy) => this.walkerZIndex(fx, fy),
+        benchZAtSeat: (sx, sy) => {
+          const bench = this.townBenches().find((b) => b.seat.x === sx && b.seat.y === sy);
+          if (!bench) return null;
+          const z = this.objectVisuals.get(bench.id)?.zIndex;
+          return z != null ? z + 0.5 : null;
+        },
         blocked: (tx, ty) => {
           if (Math.round(this.charTx) === tx && Math.round(this.charTy) === ty) return true;
           const dog = this.avatar.pantoneTile();
