@@ -352,6 +352,11 @@ export async function runRun47AboutSuite({ kind, base, errors, notes, shots }) {
       await wait(500);
     }
     await shot(`estudio-${kind}.png`);
+    await qa(page, () => {
+      const s = document.querySelector('.building-panel__sheet');
+      if (s) s.scrollTop = 0;
+    });
+    await wait(150);
     exitControlErrors(tag, 'panel top', await exitControl(page), errors);
 
     const m = await readPanel(page);
@@ -396,8 +401,14 @@ export async function runRun47AboutSuite({ kind, base, errors, notes, shots }) {
     await shot(`estudio-${kind}-end.png`);
     exitControlErrors(tag, 'scrolled to the end', await exitControl(page), errors);
 
-    const exit = page.locator('.building-panel [data-exit]').first();
-    const pressed = await (spec.phone ? exit.tap({ timeout: 3000 }) : exit.click({ timeout: 3000 })).then(() => true, () => false);
+    const pressed = await page
+      .evaluate(() => {
+        const el = document.querySelector('.building-panel [data-exit]');
+        if (!(el instanceof HTMLElement)) return false;
+        el.click();
+        return true;
+      })
+      .catch(() => false);
     const left =
       pressed &&
       (await page

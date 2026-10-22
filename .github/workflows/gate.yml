@@ -131,6 +131,7 @@ jobs:
         env:
           QA_SMOKE_ONLY: ${{ matrix.groups }}
           R38_ROOMS: ${{ matrix.r38_rooms }}
+          QA_REDUCE_DPR: '1'
         run: node scripts/qa-smoke.mjs
 
   result:

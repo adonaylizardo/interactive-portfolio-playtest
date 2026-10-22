@@ -275,8 +275,15 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
       if (m1.dockShown) errors.push(`${tag}: dock visible on arrival`);
       if (m1.viewsShown) errors.push(`${tag}: view buttons visible under the intro sheet`);
 
-      await page.locator('.chrome__intro-close').tap();
-      await wait(300);
+      await dismissArrivalSheet(page);
+      await page.waitForFunction(
+        () => {
+          const intro = document.querySelector('.chrome__intro');
+          return intro && getComputedStyle(intro).display === 'none';
+        },
+        null,
+        { timeout: 15000 },
+      );
       const m4 = await qa(page, () => {
         const intro = document.querySelector('.chrome__intro');
         const dock = document.querySelector('.chrome__dock');

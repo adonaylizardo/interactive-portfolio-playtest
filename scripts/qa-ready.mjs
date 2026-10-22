@@ -3,7 +3,7 @@
  * Every navigation waits (up to 45 s) for the app's QA hooks before the test goes on.
  */
 import { spawnSync } from 'node:child_process';
-import { QA_CI, ciContextOptions } from './qa-ci.mjs';
+import { QA_CI, QA_REDUCE_DPR, ciContextOptions } from './qa-ci.mjs';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -49,21 +49,25 @@ function patchPage(page) {
 
 async function patchContext(ctx) {
   // The town defaults to Spanish. These checks assert the English copy.
-  await ctx.addInitScript((ci) => {
-    try {
-      localStorage.setItem('portfolio-playtest-lang', 'en');
-    } catch {
-      /* private mode */
-    }
-    if (ci) {
-      window.__qaCiFastExit = true;
+  await ctx.addInitScript(
+    (ci, reduceDpr) => {
       try {
-        Object.defineProperty(window, 'devicePixelRatio', { configurable: true, get: () => 1 });
+        localStorage.setItem('portfolio-playtest-lang', 'en');
       } catch {
-        /* readonly in some embeds */
+        /* private mode */
       }
-    }
-  }, QA_CI);
+      if (ci) window.__qaCiFastExit = true;
+      if (reduceDpr) {
+        try {
+          Object.defineProperty(window, 'devicePixelRatio', { configurable: true, get: () => 1 });
+        } catch {
+          /* readonly in some embeds */
+        }
+      }
+    },
+    QA_CI,
+    QA_REDUCE_DPR,
+  );
   ctx.pages().forEach(patchPage);
   ctx.on('page', patchPage);
   const newPage = ctx.newPage.bind(ctx);
