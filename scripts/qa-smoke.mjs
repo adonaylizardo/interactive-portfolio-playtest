@@ -309,31 +309,35 @@ if (unknown.length) {
   process.exit(1);
 }
 
+async function runSmokeGroup(name) {
+  const t = Date.now();
+  const before = errors.length;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const mark = errors.length;
+    try {
+      await GROUPS[name]();
+      break;
+    } catch (err) {
+      if (!isBrowserCrash(err)) throw err;
+      if (attempt < 2) {
+        errors.splice(mark);
+        notes.push(`qa-smoke: ${name} renderer crash, retry ${attempt + 2}/3`);
+        continue;
+      }
+      notes.push(`qa-smoke: ${name} renderer crash after 3 tries; that group stopped there`);
+      break;
+    }
+  }
+  const failed = errors.length - before;
+  for (const e of errors.slice(before)) console.error(`FAIL ${e}`);
+  console.log(`qa-smoke: ${name} ${((Date.now() - t) / 1000).toFixed(0)} s${failed ? `, ${failed} failure(s)` : ''}`);
+}
+
 const t0 = Date.now();
 try {
-  for (const name of ONLY) {
-    const t = Date.now();
-    const before = errors.length;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const mark = errors.length;
-      try {
-        await GROUPS[name]();
-        break;
-      } catch (err) {
-        if (!isBrowserCrash(err)) throw err;
-        if (attempt < 2) {
-          errors.splice(mark);
-          notes.push(`qa-smoke: ${name} renderer crash, retry ${attempt + 2}/3`);
-          continue;
-        }
-        notes.push(`qa-smoke: ${name} renderer crash after 3 tries; that group stopped there`);
-        break;
-      }
-    }
-    const failed = errors.length - before;
-    for (const e of errors.slice(before)) console.error(`FAIL ${e}`);
-    console.log(`qa-smoke: ${name} ${((Date.now() - t) / 1000).toFixed(0)} s${failed ? `, ${failed} failure(s)` : ''}`);
-  }
+  // CI shards pass several group names in one job; run them concurrently so the 24 min step limit is not blown serially.
+  if (ONLY.length > 1) await Promise.all(ONLY.map((name) => runSmokeGroup(name)));
+  else if (ONLY.length === 1) await runSmokeGroup(ONLY[0]);
 } finally {
   preview?.kill('SIGKILL');
 }
