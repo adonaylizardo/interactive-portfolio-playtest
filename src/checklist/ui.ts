@@ -299,14 +299,20 @@ export class ChecklistUI {
     let bottom: number | null = null;
     let maxH: number;
     const introSheet = document.querySelector('.chrome.chrome--sheet');
-    if (layout === 'map' && !introSheet) {
+    const useTopAnchor = layout !== 'map' || !!introSheet;
+    if (!useTopAnchor) {
       bottom = Math.max(12, window.innerHeight - anchor.top + margin);
       maxH = Math.min(window.innerHeight * 0.52, anchor.top - margin - 12);
       top = NaN;
       left = Math.min(Math.max(12, anchor.left), window.innerWidth - width - 12);
     } else {
       top = anchorBottom + margin;
+      left = window.innerWidth - inset - width;
       maxH = Math.min(window.innerHeight * 0.52, window.innerHeight - top - 12);
+      const peek = document.querySelector('.chrome__intro')?.getBoundingClientRect();
+      if (peek && peek.height > 24) {
+        maxH = Math.min(maxH, Math.max(120, peek.top - top - margin));
+      }
     }
     if (!Number.isNaN(top)) {
       top = Math.min(Math.max(inset, top), window.innerHeight - 120);
@@ -347,7 +353,19 @@ export class ChecklistUI {
       'checklist-mobile-expanded',
       this.mobile && !hidden && this.state.mobileExpanded === true,
     );
-    if (this.mobile && this.state.mobileExpanded) this.positionMobileExpanded();
+    const introCircle =
+      this.mobile &&
+      !this.state.mobileExpanded &&
+      !!document.querySelector('.chrome.chrome--intro-expanded');
+    this.root.classList.toggle('checklist--intro-circle', introCircle);
+    if (this.mobile && this.state.mobileExpanded) {
+      this.positionMobileExpanded();
+    } else if (this.mobile) {
+      this.root.classList.remove('checklist--anchored');
+      for (const prop of ['top', 'bottom', 'left', 'right', 'width', 'maxHeight'] as const) {
+        this.root.style.removeProperty(prop);
+      }
+    }
   }
 
   complete(step: ChecklistStepId): void {
@@ -421,22 +439,6 @@ export class ChecklistUI {
         <p class="checklist__item-detail">${detail}</p>
       `;
       this.listEl.appendChild(li);
-    }
-
-    const chromeRoot = document.querySelector('.chrome');
-    const mapClosedPill =
-      this.mobile &&
-      !this.state.mobileExpanded &&
-      (document.body.dataset.layout === 'map' ||
-        chromeRoot?.classList.contains('chrome--intro-peek') ||
-        chromeRoot?.classList.contains('chrome--dock'));
-
-    if (mapClosedPill && !allDone) {
-      let lastIncomplete: StepCopy | null = null;
-      for (const stepId of platformSteps) {
-        if (!this.state.completed[stepId]) lastIncomplete = copy[stepId];
-      }
-      if (lastIncomplete) activeStep = lastIncomplete;
     }
 
     if (allDone) {

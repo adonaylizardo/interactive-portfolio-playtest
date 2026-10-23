@@ -68,6 +68,51 @@ async function runViewport(viewportW, height, tag) {
     if (!expanded.audienceVisible) errors.push(`${tag}: audience hidden when expanded`);
     if (expanded.checklistW > 52) errors.push(`${tag}: checklist not shrunk (${expanded.checklistW})`);
 
+    const circleUi = await page.evaluate(() => {
+      const cl = document.querySelector('.checklist');
+      const headerText = cl?.querySelector('.checklist__header-text');
+      const hit = cl?.querySelector('.checklist__ring-hit');
+      const ringVis =
+        cl?.querySelector('.checklist__ring-figma') ?? cl?.querySelector('.checklist__map-arc');
+      const clRect = cl?.getBoundingClientRect();
+      const ringRect = ringVis?.getBoundingClientRect();
+      const ht = headerText ? getComputedStyle(headerText).display : '';
+      const hitDisplay = hit ? getComputedStyle(hit).display : '';
+      return {
+        introCircle: cl?.classList.contains('checklist--intro-circle'),
+        headerTextDisplay: ht,
+        hitDisplay,
+        ringInside:
+          clRect && ringRect
+            ? ringRect.left >= clRect.left - 1 &&
+              ringRect.right <= clRect.right + 1 &&
+              ringRect.top >= clRect.top - 1 &&
+              ringRect.bottom <= clRect.bottom + 1
+            : false,
+      };
+    });
+    if (!circleUi.introCircle) errors.push(`${tag}: expected checklist--intro-circle when expanded`);
+    if (circleUi.headerTextDisplay !== 'none') {
+      errors.push(`${tag}: circle mode should hide header text (${circleUi.headerTextDisplay})`);
+    }
+    if (circleUi.hitDisplay === 'none') errors.push(`${tag}: circle ring-hit not shown`);
+    if (!circleUi.ringInside) errors.push(`${tag}: ring button outside 48px circle`);
+
+    const clBox = await page.locator('.checklist').boundingBox();
+    if (clBox) {
+      await page.touchscreen.tap(clBox.x + clBox.width / 2, clBox.y + clBox.height / 2);
+      await wait(350);
+      const opened = await page.evaluate(() => {
+        const cl = document.querySelector('.checklist');
+        return cl && !cl.classList.contains('checklist--mobile-closed');
+      });
+      if (!opened) errors.push(`${tag}: tapping checklist circle did not open card`);
+      else {
+        await page.touchscreen.tap(clBox.x + clBox.width / 2, clBox.y + clBox.height / 2);
+        await wait(300);
+      }
+    }
+
     await page.locator('[data-action="intro-close"]').click();
     await wait(400);
     const afterClose = await page.evaluate(() => ({
@@ -78,6 +123,58 @@ async function runViewport(viewportW, height, tag) {
     if (!afterClose.introPeek || afterClose.introExpanded) {
       errors.push(`${tag}: close should collapse to peek card`);
     }
+
+    await page.locator('[data-action="intro-close"]').click();
+    await wait(450);
+    const dock = await page.evaluate(() => ({
+      dock: document.querySelector('.chrome')?.classList.contains('chrome--dock'),
+      layout: document.body.dataset.layout,
+    }));
+    if (!dock.dock || dock.layout !== 'map') errors.push(`${tag}: expected map dock after dismissing peek`);
+
+    const overlap = await page.evaluate(() => {
+      const targets = [
+        { key: 'search', el: document.querySelector('.chrome__tools-phone [data-action="search"]') },
+        { key: 'lang-en', el: document.querySelector('.chrome__lang [data-lang="en"]') },
+        { key: 'center', el: document.querySelector('.chrome__tools-phone [data-action="center"]') },
+        { key: 'checklist', el: document.querySelector('.checklist .checklist__ring-btn, .checklist .checklist__header') },
+      ];
+      const rects = targets.map((t) => ({
+        key: t.key,
+        r: t.el?.getBoundingClientRect(),
+      }));
+      const failures = [];
+      for (const { key, r } of rects) {
+        if (!r || r.width < 2) {
+          failures.push(`missing ${key}`);
+          continue;
+        }
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
+        const topEl = document.elementFromPoint(cx, cy);
+        if (!topEl || !topEl.closest('.chrome, .checklist')) {
+          failures.push(`${key} center not hittable`);
+        } else if (key === 'lang-en' && !topEl.closest('[data-lang="en"]')) {
+          failures.push(`lang-en center hits ${topEl.className}`);
+        } else if (key === 'checklist' && !topEl.closest('.checklist')) {
+          failures.push(`checklist center hits ${topEl.className}`);
+        }
+      }
+      for (let i = 0; i < rects.length; i++) {
+        for (let j = i + 1; j < rects.length; j++) {
+          const a = rects[i].r;
+          const b = rects[j].r;
+          if (!a || !b) continue;
+          const overlapX = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+          const overlapY = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+          if (overlapX > 6 && overlapY > 6) {
+            failures.push(`${rects[i].key} overlaps ${rects[j].key}`);
+          }
+        }
+      }
+      return failures;
+    });
+    for (const f of overlap) errors.push(`${tag}: dock top bar ${f}`);
   } finally {
     await ctx.close();
     await browser.close();

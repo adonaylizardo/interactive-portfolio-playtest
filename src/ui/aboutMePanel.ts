@@ -1,5 +1,6 @@
 import { studio } from '../audio/studio';
-import { ABOUT } from '../data/about';
+import { aboutForLang } from '../data/about';
+import { getLang } from './i18n';
 import {
   CONTACT_MAILTO,
   CV_HREF,
@@ -34,7 +35,7 @@ export class AboutMePanel {
       <div class="about-panel__sheet" role="dialog" aria-modal="true" aria-labelledby="about-panel-title">
         <div class="about-panel__grab" aria-hidden="true"></div>
         <header class="about-panel__header">
-          <h2 class="about-panel__title" id="about-panel-title">About me</h2>
+          <h2 class="about-panel__title" id="about-panel-title" data-i18n="panel.aboutMe">About me</h2>
           <div class="about-panel__header-actions">
             <button type="button" class="about-panel__icon-btn" data-about-expand aria-label="Expand">${iconSvg('expand')}</button>
             <button type="button" class="about-panel__icon-btn about-panel__icon-btn--plain" data-about-close aria-label="Close">${iconSvg('close')}</button>
@@ -47,7 +48,10 @@ export class AboutMePanel {
     this.scrollEl = this.root.querySelector('.about-panel__scroll')!;
     this.buildContent();
     this.bind();
-    onLangChange(() => this.applyI18n());
+    onLangChange(() => {
+      this.buildContent();
+      this.applyI18n();
+    });
   }
 
   isOpen(): boolean {
@@ -55,7 +59,7 @@ export class AboutMePanel {
   }
 
   private buildContent(): void {
-    const { intro, body } = splitAboutIntroBody(ABOUT);
+    const { intro, body } = splitAboutIntroBody(aboutForLang(getLang()));
     this.scrollEl.replaceChildren();
 
     const introWrap = document.createElement('div');
@@ -124,6 +128,7 @@ export class AboutMePanel {
   }
 
   open(opts: AboutOpenOpts = {}): void {
+    this.applyI18n();
     this.opened = true;
     this.root.hidden = false;
     this.root.classList.add('about-panel--open');

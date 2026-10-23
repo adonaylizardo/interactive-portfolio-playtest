@@ -1002,8 +1002,86 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
   border-bottom: 0;
 }
 
+#ui-root:has(> .chrome.chrome--intro-expanded) > .checklist.checklist--intro-circle .checklist__header {
+  width: 48px;
+  height: 48px !important;
+  min-height: 48px !important;
+  max-height: 48px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  gap: 0 !important;
+  box-sizing: border-box;
+}
+
 .chrome--intro-expanded .checklist--mobile-closed .checklist__progress-wrap {
   margin: 0;
+}
+
+#ui-root:has(> .chrome.chrome--intro-expanded) > .checklist.checklist--intro-circle {
+  pointer-events: auto;
+}
+
+#ui-root:has(> .chrome.chrome--intro-expanded) > .checklist.checklist--intro-circle > .checklist__ring-hit {
+  display: block !important;
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 24px;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+}
+
+#ui-root:has(> .chrome.chrome--intro-expanded) > .checklist.checklist--intro-circle .checklist__header-text,
+#ui-root:has(> .chrome.chrome--intro-expanded) > .checklist.checklist--intro-circle .checklist__counter--label,
+#ui-root:has(> .chrome.chrome--intro-expanded) > .checklist.checklist--intro-circle .checklist__clipboard-figma {
+  display: none !important;
+}
+
+#ui-root:has(> .chrome.chrome--intro-expanded) > .checklist.checklist--intro-circle .checklist__progress-wrap {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+}
+
+#ui-root:has(> .chrome.chrome--intro-expanded) > .checklist.checklist--intro-circle .checklist__ring-btn {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+}
+
+#ui-root:has(> .chrome.chrome--intro-expanded) > .checklist.checklist--intro-circle .checklist__ring,
+#ui-root:has(> .chrome.chrome--intro-expanded) > .checklist.checklist--intro-circle .checklist__counter--in-ring {
+  display: none !important;
+}
+
+#ui-root:has(> .chrome.chrome--dock) > .checklist.checklist--mobile-closed {
+  max-width: min(168px, calc(100vw - max(16px, env(safe-area-inset-left)) - max(16px, env(safe-area-inset-right)) - 196px)) !important;
+}
+
+.chrome--dock .chrome__tools-phone .chrome__lang.chrome__lang--in-tools {
+  position: static;
+  top: auto;
+  right: auto;
+  left: auto;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  margin: 0 0 0 4px;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  z-index: auto;
 }
 
 .chrome--mobile .chrome__intro {

@@ -860,6 +860,7 @@ export class ChromeUI {
     );
     this.root.classList.toggle('chrome--intro-expanded', introExpanded);
     this.mountIntroLang(introExpanded);
+    this.mountDockLang();
     this.root.classList.toggle('chrome--dock', this.mobile && !this.mobileSheet && !this.interiorOpen);
     this.root.classList.toggle('chrome--map', !this.mobile && this.layout === 'map');
     this.root.classList.toggle('chrome--panel', !this.mobile && this.layout === 'panel');
@@ -1047,10 +1048,34 @@ export class ChromeUI {
     lang.classList.remove('chrome__lang--in-intro');
   }
 
+  private mountDockLang(): void {
+    const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
+    const tools = this.root.querySelector('.chrome__tools-phone') as HTMLElement | null;
+    if (!lang) return;
+    if (!this.langHome) {
+      this.langHome = document.createElement('span');
+      this.langHome.hidden = true;
+      this.langHome.setAttribute('aria-hidden', 'true');
+      lang.after(this.langHome);
+    }
+    const dock = this.mobile && !this.mobileSheet && !this.interiorOpen;
+    if (dock && tools) {
+      if (lang.parentElement !== tools) tools.appendChild(lang);
+      lang.classList.add('chrome__lang--in-tools');
+      return;
+    }
+    if (lang.classList.contains('chrome__lang--in-tools')) {
+      if (lang.parentElement !== this.root && this.langHome.parentElement === this.root) {
+        this.langHome.before(lang);
+      }
+      lang.classList.remove('chrome__lang--in-tools');
+    }
+  }
+
   private placeLang(): void {
     const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
     if (!lang) return;
-    if (lang.classList.contains('chrome__lang--in-intro')) {
+    if (lang.classList.contains('chrome__lang--in-intro') || lang.classList.contains('chrome__lang--in-tools')) {
       lang.style.top = '';
       lang.style.left = '';
       lang.style.right = '';

@@ -213,8 +213,9 @@
     bottom: max(188px, calc(env(safe-area-inset-bottom) + 172px));
   }
 
-  body[data-chrome='phone']:has(#ui-root > .chrome.chrome--sheet) .playtest-toast--offline.playtest-toast--visible {
-    top: max(56px, calc(env(safe-area-inset-top) + 48px));
+  body[data-chrome='phone']:has(#ui-root > .chrome.chrome--sheet) .playtest-toast--offline.playtest-toast--visible,
+  body[data-chrome='phone']:has(#ui-root > .chrome.chrome--dock) .playtest-toast--offline.playtest-toast--visible {
+    top: max(80px, calc(env(safe-area-inset-top) + 68px));
     bottom: auto;
     left: 50%;
     right: auto;
