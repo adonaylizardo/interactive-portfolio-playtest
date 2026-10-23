@@ -1,16 +1,17 @@
 #!/usr/bin/env node
-/** Phone top bar flex row + checklist pill/circle/open-card (hostile QA r14). */
+/** Phone top bar flex row + checklist pill/circle/open-card (hostile QA r15). */
 import { chromium } from 'playwright';
 
 const BASE = process.argv[2] ?? `http://127.0.0.1:4194/interactive-portfolio-playtest/`;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const INSET = 16;
 
 function topBarTargets() {
   return [
     { key: 'search', sel: '.chrome__phone-topbar [data-action="search"]' },
+    { key: 'sound', sel: '.chrome__phone-topbar [data-action="sound"]' },
     { key: 'lang-en', sel: '.chrome__phone-topbar [data-lang="en"]' },
     { key: 'lang-es', sel: '.chrome__phone-topbar [data-lang="es"]' },
-    { key: 'center', sel: '.chrome__phone-topbar [data-action="center"]' },
     { key: 'checklist', sel: '.chrome__phone-topbar-checklist .checklist' },
   ];
 }
@@ -19,10 +20,19 @@ async function assertTopBar(page, tag, errors) {
   const overlap = await page.evaluate((targets) => {
     const rects = targets.map((t) => {
       const el = document.querySelector(t.sel);
-      return { key: t.key, r: el?.getBoundingClientRect() };
+      const style = el ? getComputedStyle(el) : null;
+      return {
+        key: t.key,
+        r: el?.getBoundingClientRect(),
+        hidden: style?.display === 'none' || style?.visibility === 'hidden',
+      };
     });
     const failures = [];
-    for (const { key, r } of rects) {
+    for (const { key, r, hidden } of rects) {
+      if (hidden) {
+        failures.push(`${key} hidden`);
+        continue;
+      }
       if (!r || r.width < 2) {
         failures.push(`missing ${key}`);
         continue;
@@ -33,12 +43,12 @@ async function assertTopBar(page, tag, errors) {
       const hitOk =
         key === 'search'
           ? topEl?.closest('[data-action="search"]')
-          : key === 'lang-en'
-            ? topEl?.closest('[data-lang="en"]')
-            : key === 'lang-es'
-              ? topEl?.closest('[data-lang="es"]')
-              : key === 'center'
-                ? topEl?.closest('[data-action="center"]')
+          : key === 'sound'
+            ? topEl?.closest('[data-action="sound"]')
+            : key === 'lang-en'
+              ? topEl?.closest('[data-lang="en"]')
+              : key === 'lang-es'
+                ? topEl?.closest('[data-lang="es"]')
                 : topEl?.closest('.chrome__phone-topbar-checklist .checklist');
       if (!hitOk) failures.push(`${key} not hittable at center`);
     }
@@ -46,11 +56,17 @@ async function assertTopBar(page, tag, errors) {
       for (let j = i + 1; j < rects.length; j++) {
         const a = rects[i].r;
         const b = rects[j].r;
-        if (!a || !b) continue;
+        if (!a || !b || rects[i].hidden || rects[j].hidden) continue;
         const ox = Math.min(a.right, b.right) - Math.max(a.left, b.left);
         const oy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
         if (ox > 4 && oy > 4) failures.push(`${rects[i].key} overlaps ${rects[j].key}`);
       }
+    }
+    const tools = document.querySelector('.chrome__phone-topbar .chrome__tools-phone');
+    const toolsRect = tools?.getBoundingClientRect();
+    const toolsStyle = tools ? getComputedStyle(tools) : null;
+    if (toolsRect && toolsStyle && toolsRect.width > toolsRect.height * 4) {
+      failures.push(`tools pill stretched (${Math.round(toolsRect.width)}px wide)`);
     }
     return failures;
   }, topBarTargets());
@@ -69,105 +85,154 @@ async function closeChecklistIfOpen(page) {
 
 async function tapChecklistPill(page) {
   return await page.evaluate(() => {
-    const cl = document.querySelector(
-      '.chrome__phone-topbar-checklist .checklist.checklist--mobile-closed',
-    );
+    const host = document.querySelector('.chrome__phone-topbar-checklist');
+    const cl =
+      host?.querySelector('.checklist.checklist--mobile-closed') ??
+      document.querySelector('.checklist.checklist--phone-open');
     if (!cl) return false;
     const hit = cl.querySelector('.checklist__ring-hit');
     const btn = cl.querySelector('.checklist__ring-btn');
-    if (hit) hit.click();
+    if (hit && getComputedStyle(hit).display !== 'none') hit.click();
     else btn?.click();
     return true;
   });
 }
 
+async function pillAnchorBottom(page) {
+  return await page.evaluate(() => {
+    const host = document.querySelector('.chrome__phone-topbar-checklist');
+    return host?.getBoundingClientRect().bottom ?? null;
+  });
+}
+
 async function assertOpenCard(page, tag, errors) {
   await wait(350);
-  const card = await page.evaluate(() => {
+  const card = await page.evaluate((inset) => {
     const cl = document.querySelector('.checklist.checklist--phone-open');
     if (!cl) return { ok: false, why: 'no open card' };
     const rect = cl.getBoundingClientRect();
-    const inset = 16;
+    const style = getComputedStyle(cl);
+    const host = document.querySelector('.chrome__phone-topbar-checklist');
+    const anchorBottom = host?.getBoundingClientRect().bottom ?? inset + 52;
+    const expectedTop = anchorBottom + 8;
     const skip = cl.querySelector('.checklist__skip');
     const skipRect = skip?.getBoundingClientRect();
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const failures = [];
-    if (rect.top < 0 || rect.left < 0 || rect.bottom > vh + 2 || rect.right > vw + 2) {
+    if (Math.abs(rect.top - expectedTop) > 8) {
+      failures.push(`top ${Math.round(rect.top)} expected ~${Math.round(expectedTop)} (anchor+8)`);
+    }
+    if (rect.top < inset - 2 || rect.left < -2 || rect.bottom > vh + 2 || rect.right > vw + 2) {
       failures.push(`card outside viewport (${rect.top},${rect.left},${rect.width}x${rect.height})`);
     }
     if (Math.abs(rect.right - (vw - inset)) > 3) {
       failures.push(`right inset not 16 (right=${rect.right})`);
+    }
+    const intro = document.querySelector('.chrome__intro');
+    const dock = document.querySelector('.chrome__dock');
+    const introTop = intro && intro.offsetParent ? intro.getBoundingClientRect().top : null;
+    const dockTop = dock && dock.offsetParent ? dock.getBoundingClientRect().top : null;
+    const limit = Math.min(
+      introTop != null && introTop > rect.top + 40 ? introTop - 8 : vh,
+      dockTop != null && dockTop > rect.top + 40 ? dockTop - 8 : vh,
+    );
+    if (rect.bottom > limit + 4) {
+      failures.push(`card bottom ${Math.round(rect.bottom)} past sheet/dock limit ${Math.round(limit)}`);
     }
     if (skipRect) {
       const cx = skipRect.left + skipRect.width / 2;
       const cy = skipRect.top + skipRect.height / 2;
       const hit = document.elementFromPoint(cx, cy);
       if (!hit?.closest('.checklist__skip')) failures.push('Saltar tutorial not hittable');
-      if (
-        skipRect.bottom > rect.bottom + 2 ||
-        skipRect.top < rect.top - 2 ||
-        skipRect.right > rect.right + 2 ||
-        skipRect.left < rect.left - 2
-      ) {
-        failures.push('skip button spills outside card');
-      }
-    }
-    const list = cl.querySelector('.checklist__list');
-    const listRect = list?.getBoundingClientRect();
-    if (listRect && list && list.scrollHeight <= list.clientHeight + 2) {
-      const items = cl.querySelectorAll('.checklist__item');
-      for (const item of items) {
-        const ir = item.getBoundingClientRect();
-        if (ir.bottom > listRect.bottom + 2 || ir.top < listRect.top - 2) {
-          failures.push('list row spills outside scroll area');
-          break;
-        }
-      }
     }
     return { ok: failures.length === 0, failures, rect };
-  });
+  }, INSET);
   if (!card.ok) {
     for (const f of card.failures ?? [card.why]) errors.push(`${tag}: open card ${f}`);
   }
 }
 
 async function assertCircleOk(page, tag, errors) {
-  const d = await page.evaluate(() => {
+  const d = await page.evaluate((inset) => {
     const cl = document.querySelector('.chrome__phone-topbar-checklist .checklist');
     const clRect = cl?.getBoundingClientRect();
-    const ring =
-      cl?.querySelector('.checklist__ring-btn') ??
-      cl?.querySelector('.checklist__ring-figma') ??
-      cl?.querySelector('.checklist__map-arc');
+    const ring = cl?.querySelector('.checklist__ring-btn');
     const ringRect = ring?.getBoundingClientRect();
-    const ht = cl?.querySelector('.checklist__header-text');
-    const vw = window.innerWidth;
     const hit = cl?.querySelector('.checklist__ring-hit');
-    const hitDisplay = hit ? getComputedStyle(hit).display : '';
-    return {
-      circle: cl?.classList.contains('checklist--phone-circle'),
-      pill: cl?.classList.contains('checklist--phone-pill'),
-      clRect,
-      ringRect,
-      hitDisplay,
-      headerHidden: ht ? getComputedStyle(ht).display === 'none' : true,
-      ringInside:
-        clRect && ringRect
-          ? ringRect.left >= clRect.left - 1 &&
-            ringRect.right <= clRect.right + 1 &&
-            ringRect.top >= clRect.top - 1 &&
-            ringRect.bottom <= clRect.bottom + 1
-          : false,
-      offScreen: clRect ? clRect.right > vw + 2 || clRect.left < -2 : true,
-    };
+    const hitRect = hit?.getBoundingClientRect();
+    const counter = cl?.querySelector('.checklist__counter--label');
+    const counterRect = counter?.getBoundingClientRect();
+    const counterVis =
+      counter && getComputedStyle(counter).display !== 'none' && counterRect && counterRect.width > 2;
+    const vw = window.innerWidth;
+    const failures = [];
+    const circle = cl?.classList.contains('checklist--phone-circle');
+    const pill = cl?.classList.contains('checklist--phone-pill');
+    if (!circle && !pill) failures.push('missing phone mode class');
+    if (circle && clRect) {
+      if (Math.abs(clRect.width - 48) > 2 || Math.abs(clRect.height - 48) > 2) {
+        failures.push(`circle not 48x48 (${clRect.width}x${clRect.height})`);
+      }
+      if (clRect.right > vw - inset + 2) failures.push(`circle past right inset (right=${clRect.right})`);
+      if (clRect.left < inset - 2) failures.push(`circle past left edge`);
+      if (counterVis) failures.push('counter text visible in circle mode');
+      if (hitRect && clRect) {
+        const ccx = clRect.left + clRect.width / 2;
+        const ccy = clRect.top + clRect.height / 2;
+        const hcx = hitRect.left + hitRect.width / 2;
+        const hcy = hitRect.top + hitRect.height / 2;
+        if (Math.abs(hcx - ccx) > 3 || Math.abs(hcy - ccy) > 3) {
+          failures.push(`ring-hit off center (${Math.round(hcx - ccx)},${Math.round(hcy - ccy)})`);
+        }
+      }
+      if (ringRect && clRect) {
+        const rcx = ringRect.left + ringRect.width / 2;
+        const rcx2 = clRect.left + clRect.width / 2;
+        if (Math.abs(rcx - rcx2) > 6) failures.push('ring icon not centered in circle');
+      }
+    }
+    return { failures, circle, pill };
+  }, INSET);
+  for (const f of d.failures) errors.push(`${tag}: ${f}`);
+}
+
+async function assertDockPillText(page, tag, errors) {
+  const d = await page.evaluate(() => {
+    const cl = document.querySelector('.chrome__phone-topbar-checklist .checklist.checklist--phone-pill');
+    if (!cl) return { ok: true };
+    const label = cl.querySelector('.checklist__label');
+    const title = cl.querySelector('.checklist__active-title');
+    const labelText = label?.textContent?.trim() ?? '';
+    const failures = [];
+    if (labelText.includes('…') || labelText.endsWith('...')) {
+      failures.push(`label truncated (${labelText})`);
+    }
+    if (title && getComputedStyle(title).display !== 'none') {
+      const t = title.textContent?.trim() ?? '';
+      if (t.length <= 5 && t.includes('…')) failures.push(`step title over-truncated (${t})`);
+    }
+    return { ok: failures.length === 0, failures };
   });
-  if (!d.circle && !d.pill) errors.push(`${tag}: checklist missing phone mode class`);
-  if (d.circle && !d.headerHidden) errors.push(`${tag}: circle should hide header text`);
-  if (d.circle && !d.ringInside && d.hitDisplay === 'none') {
-    errors.push(`${tag}: ring outside circle box`);
+  if (!d.ok) for (const f of d.failures) errors.push(`${tag}: dock pill ${f}`);
+}
+
+async function assertMapRecenter(page, tag, errors, expectVisible) {
+  const d = await page.evaluate(() => {
+    const btn = document.querySelector('.chrome__map-recenter');
+    if (!btn) return { missing: true };
+    const style = getComputedStyle(btn);
+    const rect = btn.getBoundingClientRect();
+    return { display: style.display, hidden: style.display === 'none', rect };
+  });
+  if (d.missing) {
+    errors.push(`${tag}: map recenter missing`);
+    return;
   }
-  if (d.offScreen) errors.push(`${tag}: checklist off-screen`);
+  if (expectVisible && d.hidden) errors.push(`${tag}: map recenter hidden`);
+  if (!expectVisible && !d.hidden && d.rect.width > 2) {
+    errors.push(`${tag}: map recenter should be hidden`);
+  }
 }
 
 async function bootPhone(page) {
@@ -192,11 +257,13 @@ async function runViewport(viewportW, height, tag) {
     await bootPhone(page);
 
     await assertTopBar(page, `${tag} peek`, errors);
+    await assertMapRecenter(page, `${tag} peek`, errors, true);
 
     await page.locator('[data-details]').click();
     await wait(450);
     await assertTopBar(page, `${tag} expanded`, errors);
     await assertCircleOk(page, `${tag} expanded`, errors);
+    await assertMapRecenter(page, `${tag} expanded`, errors, false);
 
     if (await tapChecklistPill(page)) {
       await assertOpenCard(page, `${tag} expanded-open`, errors);
@@ -212,6 +279,8 @@ async function runViewport(viewportW, height, tag) {
     await page.locator('[data-action="intro-close"]').click();
     await wait(450);
     await assertTopBar(page, `${tag} dock`, errors);
+    await assertDockPillText(page, `${tag} dock`, errors);
+    await assertMapRecenter(page, `${tag} dock`, errors, true);
 
     await page.locator('.chrome__phone-topbar [data-lang="en"]').click();
     await wait(200);

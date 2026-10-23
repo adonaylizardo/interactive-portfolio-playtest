@@ -674,6 +674,21 @@ body:has(.building-panel--open) .chrome__lang {
 }
 
 @media (max-width: 767px) {
+  body[data-chrome='phone'][data-layout='map'] .chrome__phone-topbar-checklist .checklist.checklist--mobile-closed {
+    top: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    right: auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: auto !important;
+    max-height: none !important;
+    pointer-events: auto !important;
+    box-shadow: none !important;
+    border-radius: inherit;
+  }
+
   body[data-chrome='phone'][data-layout='map'] .checklist.checklist--mobile-closed {
     top: auto !important;
     bottom: max(76px, calc(env(safe-area-inset-bottom) + 64px));
@@ -740,7 +755,7 @@ body:has(.building-panel--open) .chrome__lang {
     pointer-events: auto;
   }
 
-  body[data-chrome='phone'] .checklist--mobile:not(.checklist--mobile-closed):not(.checklist--anchored) {
+  body[data-chrome='phone'] .checklist--mobile:not(.checklist--mobile-closed):not(.checklist--anchored):not(.checklist--phone-open) {
     position: fixed;
     top: auto;
     left: max(12px, env(safe-area-inset-left));
@@ -762,7 +777,7 @@ body:has(.building-panel--open) .chrome__lang {
     overflow: auto;
   }
 
-  body[data-chrome='phone'][data-layout='split'] .checklist--mobile:not(.checklist--mobile-closed) {
+  body[data-chrome='phone'][data-layout='split'] .checklist--mobile:not(.checklist--mobile-closed):not(.checklist--phone-open) {
     bottom: max(12px, env(safe-area-inset-bottom));
   }
 

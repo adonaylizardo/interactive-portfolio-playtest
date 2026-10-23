@@ -57,25 +57,52 @@ function peekSheetTop(): number | null {
   return rect.top;
 }
 
+function dockSheetTop(): number | null {
+  const dock = document.querySelector('.chrome__dock') as HTMLElement | null;
+  if (!dock || dock.offsetParent === null) return null;
+  const rect = dock.getBoundingClientRect();
+  if (rect.height < 8) return null;
+  return rect.top;
+}
+
+/** Closed pill/circle slot in the phone top bar (checklist may be reparented when open). */
+function topBarChecklistAnchorRect(): DOMRect | null {
+  const host = document.querySelector('.chrome__phone-topbar-checklist') as HTMLElement | null;
+  if (!host) return null;
+  const rect = host.getBoundingClientRect();
+  if (rect.width < 4 && rect.height < 4) return null;
+  return rect;
+}
+
 export function positionPhoneOpenCard(root: HTMLElement): void {
-  const header = root.querySelector('.checklist__header');
-  const anchor = header ?? root;
-  const pillRect = anchor.getBoundingClientRect();
+  const pillRect = topBarChecklistAnchorRect();
   const inset = 16;
   const gap = 8;
   const width = Math.min(296, window.innerWidth - 32);
-  const top = Math.max(inset, pillRect.bottom + gap);
+  const anchorBottom =
+    pillRect != null ? pillRect.bottom : inset + 52;
+  const top = Math.max(inset, anchorBottom + gap);
   const peekTop = peekSheetTop();
-  const bottomLimit = peekTop != null && peekTop > top + 40 ? peekTop - gap : window.innerHeight - inset;
-  const maxHeight = Math.max(120, bottomLimit - top - gap);
+  const dockTop = dockSheetTop();
+  let bottomLimit = window.innerHeight - inset;
+  if (peekTop != null && peekTop > top + 40) {
+    bottomLimit = Math.min(bottomLimit, peekTop - gap);
+  }
+  if (dockTop != null && dockTop > top + 40) {
+    bottomLimit = Math.min(bottomLimit, dockTop - gap);
+  }
+  const maxHeight = Math.max(120, bottomLimit - top);
 
   root.style.setProperty('position', 'fixed', 'important');
+  root.style.setProperty('--phone-open-top', `${top}px`);
   root.style.setProperty('top', `${top}px`, 'important');
   root.style.setProperty('right', `${inset}px`, 'important');
   root.style.setProperty('left', 'auto', 'important');
   root.style.setProperty('bottom', 'auto', 'important');
   root.style.setProperty('width', `${width}px`, 'important');
   root.style.setProperty('max-height', `${maxHeight}px`, 'important');
+  root.style.setProperty('height', 'auto', 'important');
+  root.style.setProperty('min-height', '0', 'important');
   root.style.setProperty('overflow', 'hidden', 'important');
   root.style.setProperty('box-sizing', 'border-box', 'important');
 }
@@ -111,8 +138,13 @@ export function applyPhoneChecklistMode(root: HTMLElement, mode: PhoneChecklistM
   if (!mode) return;
 
   if (mode === 'open') {
-    root.classList.add('checklist--phone-open');
-    positionPhoneOpenCard(root);
+    root.classList.add('checklist--phone-open', 'checklist--anchored');
+    const place = () => positionPhoneOpenCard(root);
+    place();
+    requestAnimationFrame(() => {
+      place();
+      requestAnimationFrame(place);
+    });
     return;
   }
 

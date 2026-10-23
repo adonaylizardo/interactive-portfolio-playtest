@@ -356,10 +356,10 @@ export class ChromeUI {
         <div class="chrome__tools-phone">
           ${roundBtn('search', 'Buscar', '', 'search')}
           ${roundBtn('sound', 'Sonido', '', 'sound')}
-          ${roundBtn('locate', 'Center on Adonay', '', 'center')}
         </div>
         <div class="chrome__phone-topbar-checklist" data-phone-checklist-host></div>
       </header>
+      ${roundBtn('locate', 'Center on Adonay', 'chrome__map-recenter', 'center')}
       <div class="chrome__intro" data-intro>
         <div class="chrome__sheet-grab" data-intro-grab aria-hidden="true"><span></span></div>
         <div class="chrome__intro-toolbar" data-intro-toolbar hidden>

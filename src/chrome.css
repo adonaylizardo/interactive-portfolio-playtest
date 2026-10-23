@@ -846,6 +846,7 @@ body[data-layout='panel'] #game-canvas {
   right: 0;
   z-index: 30;
   align-items: center;
+  justify-content: flex-start;
   gap: 8px;
   padding: max(16px, env(safe-area-inset-top)) 16px 16px;
   box-sizing: border-box;
@@ -859,10 +860,11 @@ body[data-layout='panel'] #game-canvas {
 .chrome--mobile .chrome__phone-topbar .chrome__tools-phone {
   display: flex;
   position: static;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+  width: fit-content;
+  max-width: calc(100% - 64px);
   min-width: 0;
   height: 48px;
-  max-width: calc(100% - 56px);
   padding: 0 4px;
   border: 1px solid #2a2c31;
   border-radius: 999px;
@@ -874,9 +876,10 @@ body[data-layout='panel'] #game-canvas {
 }
 
 .chrome__phone-topbar-checklist {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 46%;
+  flex: 1 1 auto;
+  min-width: 48px;
+  max-width: none;
+  margin-left: auto;
   display: flex;
   justify-content: flex-end;
   align-items: center;
@@ -916,8 +919,39 @@ body[data-layout='panel'] #game-canvas {
   font-size: 12px;
 }
 
-.chrome--mobile .chrome__phone-topbar [data-action='sound'] {
+.chrome__map-recenter {
+  display: none;
+}
+
+.chrome--mobile .chrome__map-recenter.ui-round {
+  display: flex;
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(88px, calc(env(safe-area-inset-bottom) + 72px));
+  z-index: 27;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  border-radius: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #2a2c31;
+  background: #141518;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+
+.chrome--mobile.chrome--intro-peek .chrome__map-recenter {
+  bottom: max(288px, calc(env(safe-area-inset-bottom) + 272px));
+}
+
+.chrome--mobile.chrome--intro-expanded .chrome__map-recenter {
   display: none !important;
+}
+
+.chrome--mobile.chrome--dock .chrome__map-recenter {
+  bottom: max(80px, calc(env(safe-area-inset-bottom) + 64px));
 }
 
 .chrome--mobile .chrome__lang {
@@ -1028,10 +1062,26 @@ body[data-chrome='phone'] .chrome__phone-topbar-checklist .checklist.checklist--
   justify-content: center;
 }
 
+.chrome__phone-topbar-checklist .checklist.checklist--phone-pill .checklist__label {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 16px;
+}
+
 .chrome__phone-topbar-checklist .checklist.checklist--phone-pill .checklist__active-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 12px;
+  line-height: 14px;
+}
+
+@media (max-width: 430px) {
+  .chrome__phone-topbar-checklist .checklist.checklist--phone-pill .checklist__active-title {
+    display: none;
+  }
 }
 
 .chrome__phone-topbar-checklist .checklist.checklist--phone-pill .checklist__progress-wrap {
@@ -1056,6 +1106,10 @@ body[data-chrome='phone'] .chrome__phone-topbar-checklist .checklist.checklist--
   display: none !important;
 }
 
+body[data-chrome='phone'] .chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__counter--label {
+  display: none !important;
+}
+
 .chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__header {
   width: 48px;
   height: 48px;
@@ -1063,7 +1117,17 @@ body[data-chrome='phone'] .chrome__phone-topbar-checklist .checklist.checklist--
   padding: 0;
   margin: 0;
   justify-content: center;
+  align-items: center;
   border-bottom: 0;
+}
+
+.chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__header-text {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__progress-wrap {
@@ -1093,10 +1157,12 @@ body[data-chrome='phone'] .chrome__phone-topbar-checklist .checklist.checklist--
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   margin: 0;
+  padding: 0;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__ring-figma {
@@ -1119,6 +1185,17 @@ body[data-chrome='phone'] .chrome__phone-topbar-checklist .checklist.checklist--
   overflow: hidden !important;
   border-radius: 28px;
   padding: 0;
+}
+
+body[data-chrome='phone'] .checklist.checklist--phone-open {
+  position: fixed !important;
+  top: var(--phone-open-top, 76px) !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: 16px !important;
+  transform: none !important;
+  max-width: none;
+  width: min(296px, calc(100vw - 32px)) !important;
 }
 
 .checklist.checklist--phone-open .checklist__header {

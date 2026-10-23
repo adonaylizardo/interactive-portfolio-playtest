@@ -135,10 +135,10 @@ async function runViewport(viewportW, height, tag) {
 
     const overlap = await page.evaluate(() => {
       const targets = [
-        { key: 'search', el: document.querySelector('.chrome__tools-phone [data-action="search"]') },
-        { key: 'lang-en', el: document.querySelector('.chrome__lang [data-lang="en"]') },
-        { key: 'lang-es', el: document.querySelector('.chrome__lang [data-lang="es"]') },
-        { key: 'center', el: document.querySelector('.chrome__tools-phone [data-action="center"]') },
+        { key: 'search', el: document.querySelector('.chrome__phone-topbar [data-action="search"]') },
+        { key: 'sound', el: document.querySelector('.chrome__phone-topbar [data-action="sound"]') },
+        { key: 'lang-en', el: document.querySelector('.chrome__phone-topbar [data-lang="en"]') },
+        { key: 'lang-es', el: document.querySelector('.chrome__phone-topbar [data-lang="es"]') },
         { key: 'checklist', el: document.querySelector('.chrome__phone-topbar-checklist .checklist') },
       ];
       const rects = targets.map((t) => ({
@@ -177,6 +177,18 @@ async function runViewport(viewportW, height, tag) {
       return failures;
     });
     for (const f of overlap) errors.push(`${tag}: dock top bar ${f}`);
+
+    const recenter = await page.evaluate(() => {
+      const btn = document.querySelector('.chrome__map-recenter');
+      if (!btn || getComputedStyle(btn).display === 'none') return 'map recenter missing';
+      const r = btn.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const hit = document.elementFromPoint(cx, cy);
+      if (!hit?.closest('[data-action="center"]')) return 'map recenter not hittable';
+      return null;
+    });
+    if (recenter) errors.push(`${tag}: dock ${recenter}`);
   } finally {
     await ctx.close();
     await browser.close();
