@@ -371,7 +371,8 @@ body[data-reading='1'] .chrome__tools-phone,
 body[data-reading='1'] .chrome__rail,
 body[data-reading='1'] .chrome__tab,
 body[data-reading='1'] .chrome__views,
-body[data-reading='1'] .checklist {
+body[data-reading='1'] .checklist,
+body[data-reading='1'] .chrome__lang {
   visibility: hidden;
   pointer-events: none;
 }
@@ -382,18 +383,18 @@ body[data-reading='1'] .building-panel {
 
 @media (min-width: 768px) {
   body[data-reading='1'] .reading-view__main {
-    max-width: 432px;
-    margin-left: 64px;
+    max-width: 720px;
+    margin-left: auto;
     margin-right: auto;
     padding: 28px 24px 48px;
   }
 
   .reading-view__article--about .reading-view__detail-title {
-    margin: 0 0 16px;
-    font-family: 'Inter Tight', Inter, system-ui, sans-serif;
-    font-size: 17px;
-    font-weight: 400;
-    line-height: 22px;
+    margin: 0 0 24px;
+    font-family: Geist, Inter, system-ui, sans-serif;
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 28px;
     color: #edeef0;
   }
 }

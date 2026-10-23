@@ -93,6 +93,7 @@ const DICT = {
     'panel.workedWith': 'Worked with',
     'panel.aboutMe': 'About me',
     'panel.caseTag': 'CASE',
+    'case.heroImageLabel': 'IMAGE PLACEHOLDER',
     'panel.expandSheet': 'Expand panel',
     'panel.talks': 'Talks',
     'panel.writings': 'Articles',
@@ -359,6 +360,7 @@ const DICT = {
     'panel.workedWith': 'Trabajé con',
     'panel.aboutMe': 'Sobre mí',
     'panel.caseTag': 'CASO',
+    'case.heroImageLabel': 'IMAGEN DE REFERENCIA',
     'panel.expandSheet': 'Expandir panel',
     'panel.talks': 'Charlas',
     'panel.writings': 'Artículos',
@@ -575,6 +577,10 @@ export function setLang(next: Lang): void {
 
 export function t(key: I18nKey): string {
   return DICT[lang][key] ?? DICT.en[key] ?? key;
+}
+
+export function tForLang(key: I18nKey, forLang: Lang): string {
+  return DICT[forLang][key] ?? DICT.en[key] ?? key;
 }
 
 export function onLangChange(fn: () => void): () => void {

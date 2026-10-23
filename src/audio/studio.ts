@@ -46,7 +46,11 @@ function canPlayOgg(): boolean {
 function automatedWebKitPhone(): boolean {
   if (typeof navigator === 'undefined' || !navigator.webdriver) return false;
   const phone = window.matchMedia('(pointer: coarse), (max-width: 767px)').matches;
-  return phone && !('chrome' in window);
+  if (!phone) return false;
+  const ua = navigator.userAgent;
+  // Playwright mobile Chromium is HeadlessChrome but often has no `window.chrome`.
+  if (/Chrome|Chromium|HeadlessChrome|CriOS|EdgA|EdgiOS/i.test(ua)) return false;
+  return true;
 }
 
 export class StudioAudio {

@@ -1,5 +1,6 @@
 import { VOICE_LINES } from './voice-lines';
 import type { Lang } from '../ui/i18n';
+import { tForLang } from '../ui/i18n';
 import { CASES_ES } from './cases.es';
 
 /**
@@ -89,7 +90,7 @@ export function casePreviewCopy(id: string, lang: Lang = 'es'): CasePreviewCopy 
     teaser: endSentence(content.shortHeadline ?? content.headline),
     teaserFull: content.headline,
     kicker: `${lang === 'es' ? 'CASO' : 'CASE'} · ${title.toUpperCase()}`,
-    placeholder: `${title.toUpperCase()} · IMAGE PLACEHOLDER`,
+    placeholder: `${title.toUpperCase()} · ${tForLang('case.heroImageLabel', lang)}`,
     pillMeta: headings.length ? headings.join(' · ') : 'Problem · What I did · Result',
   };
 }

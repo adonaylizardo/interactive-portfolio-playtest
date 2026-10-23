@@ -251,8 +251,13 @@
   }
 
   .place-card__hero-img {
-    height: 88%;
+    width: auto;
+    height: auto;
+    min-height: 85%;
     max-height: 88%;
+    max-width: 100%;
+    object-fit: contain;
+    object-position: center bottom;
   }
 }
 

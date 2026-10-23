@@ -292,10 +292,17 @@ body.persona-kit #ui-root > .persona-kit {
   pointer-events: none;
 }
 
-#ui-root:has(> .building-panel--preview) > .checklist {
+#ui-root:has(> .building-panel--preview):not(:has(> .building-panel--preview.building-panel--expanded))
+  > .checklist {
   visibility: visible;
   pointer-events: auto;
   z-index: 21;
+}
+
+#ui-root:has(> .building-panel--preview.building-panel--expanded) > .checklist,
+#ui-root:has(> .building-panel--preview.building-panel--expanded) .chrome__lang {
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 #ui-root:has(> .building-panel--preview) .chrome__sound {
@@ -3520,27 +3527,28 @@ body:has(.building-panel--open) .chrome__lang {
     z-index: 24;
   }
 
-  body[data-layout='split']:has(.building-panel--preview.building-panel--open) .chrome__column {
-    z-index: 26;
+  body[data-layout='split']:has(.building-panel--preview.building-panel--peek.building-panel--open)
+    .chrome__column {
+    z-index: 24;
   }
 
-  body[data-layout='split'] .building-panel--preview .building-panel__sheet {
-    left: 496px;
-    width: min(400px, calc(100vw - 496px - 24px));
+  body[data-layout='split']:has(.building-panel--preview.building-panel--peek.building-panel--open)
+    .building-panel__sheet {
+    z-index: 28;
   }
 
-  body[data-layout='split'] .building-panel--preview.building-panel--expanded .building-panel__sheet {
-    left: 496px;
-    right: 16px;
-    width: auto;
+  body:has(.building-panel--preview.building-panel--expanded) #game-canvas {
+    visibility: hidden;
   }
 
   .building-panel--preview.building-panel--open .building-panel__sheet {
     top: auto;
-    left: 72px;
+    left: 64px;
     right: auto;
-    bottom: 24px;
-    width: 400px;
+    bottom: 0;
+    width: 432px;
+    max-width: 432px;
+    box-sizing: border-box;
     max-height: none;
     padding: 20px;
     transform: translateY(120%);
@@ -3558,11 +3566,11 @@ body:has(.building-panel--open) .chrome__lang {
 
   .building-panel--preview.building-panel--expanded .building-panel__sheet {
     top: 0;
-    left: 72px;
+    left: 64px;
     right: 0;
     bottom: 0;
     width: auto;
-    max-width: 100%;
+    max-width: none;
     max-height: none;
     padding: 0;
     border-radius: 0;

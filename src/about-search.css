@@ -11,10 +11,10 @@
   pointer-events: auto;
 }
 
-body.about-panel-open .chrome__lang {
-  position: fixed;
-  z-index: 100;
-  pointer-events: auto;
+body.about-panel-open .chrome__lang,
+body.about-panel-open .checklist {
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 @media (max-height: 500px) and (orientation: landscape) and (max-width: 900px) {
