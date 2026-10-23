@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Phone top bar flex row + checklist pill/circle/open-card (hostile QA r15). */
+/** Phone top bar flex row + checklist pill/circle/open-card (hostile QA r16). */
 import { chromium } from 'playwright';
 
 const BASE = process.argv[2] ?? `http://127.0.0.1:4194/interactive-portfolio-playtest/`;
@@ -98,56 +98,71 @@ async function tapChecklistPill(page) {
   });
 }
 
-async function pillAnchorBottom(page) {
-  return await page.evaluate(() => {
-    const host = document.querySelector('.chrome__phone-topbar-checklist');
-    return host?.getBoundingClientRect().bottom ?? null;
-  });
-}
-
 async function assertOpenCard(page, tag, errors) {
   await wait(350);
-  const card = await page.evaluate((inset) => {
-    const cl = document.querySelector('.checklist.checklist--phone-open');
-    if (!cl) return { ok: false, why: 'no open card' };
-    const rect = cl.getBoundingClientRect();
-    const style = getComputedStyle(cl);
-    const host = document.querySelector('.chrome__phone-topbar-checklist');
-    const anchorBottom = host?.getBoundingClientRect().bottom ?? inset + 52;
-    const expectedTop = anchorBottom + 8;
-    const skip = cl.querySelector('.checklist__skip');
-    const skipRect = skip?.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const failures = [];
-    if (Math.abs(rect.top - expectedTop) > 8) {
-      failures.push(`top ${Math.round(rect.top)} expected ~${Math.round(expectedTop)} (anchor+8)`);
-    }
-    if (rect.top < inset - 2 || rect.left < -2 || rect.bottom > vh + 2 || rect.right > vw + 2) {
-      failures.push(`card outside viewport (${rect.top},${rect.left},${rect.width}x${rect.height})`);
-    }
-    if (Math.abs(rect.right - (vw - inset)) > 3) {
-      failures.push(`right inset not 16 (right=${rect.right})`);
-    }
-    const intro = document.querySelector('.chrome__intro');
-    const dock = document.querySelector('.chrome__dock');
-    const introTop = intro && intro.offsetParent ? intro.getBoundingClientRect().top : null;
-    const dockTop = dock && dock.offsetParent ? dock.getBoundingClientRect().top : null;
-    const limit = Math.min(
-      introTop != null && introTop > rect.top + 40 ? introTop - 8 : vh,
-      dockTop != null && dockTop > rect.top + 40 ? dockTop - 8 : vh,
-    );
-    if (rect.bottom > limit + 4) {
-      failures.push(`card bottom ${Math.round(rect.bottom)} past sheet/dock limit ${Math.round(limit)}`);
-    }
-    if (skipRect) {
-      const cx = skipRect.left + skipRect.width / 2;
-      const cy = skipRect.top + skipRect.height / 2;
-      const hit = document.elementFromPoint(cx, cy);
-      if (!hit?.closest('.checklist__skip')) failures.push('Saltar tutorial not hittable');
-    }
-    return { ok: failures.length === 0, failures, rect };
-  }, INSET);
+  const card = await page.evaluate(({ inset }) => {
+      const overlapArea = (a, b) => {
+        const ox = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+        const oy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        return ox > 0 && oy > 0 ? ox * oy : 0;
+      };
+      const cl = document.querySelector('.checklist.checklist--phone-open');
+      if (!cl) return { ok: false, why: 'no open card' };
+      const rect = cl.getBoundingClientRect();
+      const topbar = document.querySelector('.chrome__phone-topbar');
+      const tools = document.querySelector('.chrome__tools-phone');
+      const closed = document.querySelector('.chrome__phone-topbar-checklist .checklist');
+      let anchorBottom = inset + 52;
+      if (topbar) anchorBottom = Math.max(anchorBottom, topbar.getBoundingClientRect().bottom);
+      if (tools) anchorBottom = Math.max(anchorBottom, tools.getBoundingClientRect().bottom);
+      if (closed && closed.getBoundingClientRect().height > 8) {
+        anchorBottom = Math.max(anchorBottom, closed.getBoundingClientRect().bottom);
+      }
+      const minTop = anchorBottom + 8;
+      const skip = cl.querySelector('.checklist__skip');
+      const skipRect = skip?.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const failures = [];
+      if (rect.top < minTop - 2) {
+        failures.push(`top ${Math.round(rect.top)} < anchor+8 (${Math.round(minTop)})`);
+      }
+      if (rect.top < inset - 2 || rect.left < -2 || rect.bottom > vh + 2 || rect.right > vw + 2) {
+        failures.push(`card outside viewport (${rect.top},${rect.left},${rect.width}x${rect.height})`);
+      }
+      if (Math.abs(rect.right - (vw - inset)) > 3) {
+        failures.push(`right inset not 16 (right=${rect.right})`);
+      }
+      for (const sel of [
+        '.chrome__phone-topbar [data-action="sound"]',
+        '.chrome__phone-topbar [data-lang="en"]',
+        '.chrome__phone-topbar [data-lang="es"]',
+      ]) {
+        const el = document.querySelector(sel);
+        if (!el || getComputedStyle(el).display === 'none') continue;
+        const er = el.getBoundingClientRect();
+        const area = overlapArea(rect, er);
+        if (area > 64) failures.push(`card overlaps ${sel} (${Math.round(area)}px²)`);
+      }
+      const intro = document.querySelector('.chrome__intro');
+      const dock = document.querySelector('.chrome__dock');
+      const introTop = intro && intro.offsetParent ? intro.getBoundingClientRect().top : null;
+      const dockTop = dock && dock.offsetParent ? dock.getBoundingClientRect().top : null;
+      const limit = Math.min(
+        introTop != null && introTop > rect.top + 40 ? introTop - 8 : vh,
+        dockTop != null && dockTop > rect.top + 40 ? dockTop - 8 : vh,
+      );
+      if (rect.bottom > limit + 4) {
+        failures.push(`card bottom ${Math.round(rect.bottom)} past sheet/dock limit ${Math.round(limit)}`);
+      }
+      if (skipRect) {
+        const cx = skipRect.left + skipRect.width / 2;
+        const cy = skipRect.top + skipRect.height / 2;
+        const hit = document.elementFromPoint(cx, cy);
+        if (!hit?.closest('.checklist__skip')) failures.push('Saltar tutorial not hittable');
+      }
+      return { ok: failures.length === 0, failures, rect };
+    }, INSET);
   if (!card.ok) {
     for (const f of card.failures ?? [card.why]) errors.push(`${tag}: open card ${f}`);
   }
@@ -157,10 +172,9 @@ async function assertCircleOk(page, tag, errors) {
   const d = await page.evaluate((inset) => {
     const cl = document.querySelector('.chrome__phone-topbar-checklist .checklist');
     const clRect = cl?.getBoundingClientRect();
-    const ring = cl?.querySelector('.checklist__ring-btn');
+    const ring =
+      cl?.querySelector('.checklist__ring-figma') ?? cl?.querySelector('.checklist__ring-btn');
     const ringRect = ring?.getBoundingClientRect();
-    const hit = cl?.querySelector('.checklist__ring-hit');
-    const hitRect = hit?.getBoundingClientRect();
     const counter = cl?.querySelector('.checklist__counter--label');
     const counterRect = counter?.getBoundingClientRect();
     const counterVis =
@@ -177,19 +191,22 @@ async function assertCircleOk(page, tag, errors) {
       if (clRect.right > vw - inset + 2) failures.push(`circle past right inset (right=${clRect.right})`);
       if (clRect.left < inset - 2) failures.push(`circle past left edge`);
       if (counterVis) failures.push('counter text visible in circle mode');
-      if (hitRect && clRect) {
+      if (ringRect && clRect) {
         const ccx = clRect.left + clRect.width / 2;
         const ccy = clRect.top + clRect.height / 2;
-        const hcx = hitRect.left + hitRect.width / 2;
-        const hcy = hitRect.top + hitRect.height / 2;
-        if (Math.abs(hcx - ccx) > 3 || Math.abs(hcy - ccy) > 3) {
-          failures.push(`ring-hit off center (${Math.round(hcx - ccx)},${Math.round(hcy - ccy)})`);
-        }
-      }
-      if (ringRect && clRect) {
         const rcx = ringRect.left + ringRect.width / 2;
-        const rcx2 = clRect.left + clRect.width / 2;
-        if (Math.abs(rcx - rcx2) > 6) failures.push('ring icon not centered in circle');
+        const rcy = ringRect.top + ringRect.height / 2;
+        if (Math.abs(rcx - ccx) > 1 || Math.abs(rcy - ccy) > 1) {
+          failures.push(`ring off center (${(rcx - ccx).toFixed(1)},${(rcy - ccy).toFixed(1)})`);
+        }
+        if (
+          ringRect.left < clRect.left - 0.5 ||
+          ringRect.top < clRect.top - 0.5 ||
+          ringRect.right > clRect.right + 0.5 ||
+          ringRect.bottom > clRect.bottom + 0.5
+        ) {
+          failures.push('ring spills outside circle box');
+        }
       }
     }
     return { failures, circle, pill };
@@ -197,24 +214,34 @@ async function assertCircleOk(page, tag, errors) {
   for (const f of d.failures) errors.push(`${tag}: ${f}`);
 }
 
-async function assertDockPillText(page, tag, errors) {
+async function assertPillLabel(page, tag, errors) {
   const d = await page.evaluate(() => {
     const cl = document.querySelector('.chrome__phone-topbar-checklist .checklist.checklist--phone-pill');
     if (!cl) return { ok: true };
     const label = cl.querySelector('.checklist__label');
-    const title = cl.querySelector('.checklist__active-title');
+    const counter = cl.querySelector('.checklist__counter--label');
     const labelText = label?.textContent?.trim() ?? '';
     const failures = [];
     if (labelText.includes('…') || labelText.endsWith('...')) {
       failures.push(`label truncated (${labelText})`);
     }
-    if (title && getComputedStyle(title).display !== 'none') {
-      const t = title.textContent?.trim() ?? '';
-      if (t.length <= 5 && t.includes('…')) failures.push(`step title over-truncated (${t})`);
+    if (label && getComputedStyle(label).display !== 'none') {
+      if (label.scrollWidth > label.clientWidth + 1) {
+        failures.push(`label clips (${label.scrollWidth} > ${label.clientWidth})`);
+      }
+      const lr = label.getBoundingClientRect();
+      const cr = counter?.getBoundingClientRect();
+      if (cr && cr.width > 1) {
+        const ox = Math.min(lr.right, cr.right) - Math.max(lr.left, cr.left);
+        const oy = Math.min(lr.bottom, cr.bottom) - Math.max(lr.top, cr.top);
+        if (ox > 1 && oy > 1) failures.push('label intersects counter');
+      }
     }
+    const br = parseFloat(getComputedStyle(cl).borderTopLeftRadius);
+    if (br < 20) failures.push(`pill not rounded (radius ${br})`);
     return { ok: failures.length === 0, failures };
   });
-  if (!d.ok) for (const f of d.failures) errors.push(`${tag}: dock pill ${f}`);
+  if (!d.ok) for (const f of d.failures) errors.push(`${tag}: pill ${f}`);
 }
 
 async function assertMapRecenter(page, tag, errors, expectVisible) {
@@ -257,6 +284,7 @@ async function runViewport(viewportW, height, tag) {
     await bootPhone(page);
 
     await assertTopBar(page, `${tag} peek`, errors);
+    await assertPillLabel(page, `${tag} peek`, errors);
     await assertMapRecenter(page, `${tag} peek`, errors, true);
 
     await page.locator('[data-details]').click();
@@ -279,7 +307,7 @@ async function runViewport(viewportW, height, tag) {
     await page.locator('[data-action="intro-close"]').click();
     await wait(450);
     await assertTopBar(page, `${tag} dock`, errors);
-    await assertDockPillText(page, `${tag} dock`, errors);
+    await assertPillLabel(page, `${tag} dock`, errors);
     await assertMapRecenter(page, `${tag} dock`, errors, true);
 
     await page.locator('.chrome__phone-topbar [data-lang="en"]').click();

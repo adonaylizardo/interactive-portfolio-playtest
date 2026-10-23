@@ -3,6 +3,8 @@ import { figmaAsset } from '../ui/figmaAssets';
 import { onLangChange, t } from '../ui/i18n';
 import {
   applyPhoneChecklistMode,
+  cachePhoneChecklistAnchorBeforeOpen,
+  clearPhoneChecklistAnchorCache,
   clearPhoneChecklistInline,
   derivePhoneChecklistMode,
   readPhoneChromeSnapshot,
@@ -182,6 +184,9 @@ export class ChecklistUI {
     this.ringBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       if (this.mobile) {
+        const opening = !this.state.mobileExpanded;
+        if (opening) cachePhoneChecklistAnchorBeforeOpen();
+        else clearPhoneChecklistAnchorCache();
         this.state.mobileExpanded = !this.state.mobileExpanded;
         this.applyLayoutClasses();
         saveChecklist(this.state);
@@ -271,6 +276,7 @@ export class ChecklistUI {
     const snap = readPhoneChromeSnapshot(this.state, this.panelOpen);
     const mode = derivePhoneChecklistMode(snap);
     if (mode === 'open') {
+      cachePhoneChecklistAnchorBeforeOpen();
       if (this.root.parentElement !== this.desktopHost) this.desktopHost.appendChild(this.root);
     } else {
       this.reparentForLayout();

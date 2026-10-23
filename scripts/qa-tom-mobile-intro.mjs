@@ -99,17 +99,26 @@ async function runViewport(viewportW, height, tag) {
       errors.push(`${tag}: ring button outside 48px circle`);
     }
 
-    const clBox = await page.locator('.checklist').boundingBox();
+    const clBox = await page.locator('.chrome__phone-topbar-checklist .checklist').boundingBox();
     if (clBox) {
       await page.touchscreen.tap(clBox.x + clBox.width / 2, clBox.y + clBox.height / 2);
       await wait(350);
       const opened = await page.evaluate(() => {
-        const cl = document.querySelector('.checklist');
-        return cl && !cl.classList.contains('checklist--mobile-closed');
+        const cl =
+          document.querySelector('.checklist.checklist--phone-open') ??
+          document.querySelector('.chrome__phone-topbar-checklist .checklist');
+        return (
+          !!cl &&
+          (!cl.classList.contains('checklist--mobile-closed') ||
+            cl.classList.contains('checklist--phone-open'))
+        );
       });
       if (!opened) errors.push(`${tag}: tapping checklist circle did not open card`);
       else {
-        await page.touchscreen.tap(clBox.x + clBox.width / 2, clBox.y + clBox.height / 2);
+        await page.evaluate(() => {
+          const open = document.querySelector('.checklist.checklist--phone-open');
+          open?.querySelector('.checklist__ring-btn')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
         await wait(300);
       }
     }
@@ -132,6 +141,12 @@ async function runViewport(viewportW, height, tag) {
       layout: document.body.dataset.layout,
     }));
     if (!dock.dock || dock.layout !== 'map') errors.push(`${tag}: expected map dock after dismissing peek`);
+
+    await page.evaluate(() => {
+      const open = document.querySelector('.checklist.checklist--phone-open');
+      open?.querySelector('.checklist__ring-btn')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    await wait(350);
 
     const overlap = await page.evaluate(() => {
       const targets = [
