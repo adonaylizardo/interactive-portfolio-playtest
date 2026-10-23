@@ -6,7 +6,7 @@
  * door entry only on arrival, and near-edge taps.
  */
 import { chromium, webkit, devices } from 'playwright';
-import { launchBrowser } from './qa-ready.mjs';
+import { launchBrowser, waitForBuildingPanelSettled } from './qa-ready.mjs';
 import { ciContextOptions } from './qa-ci.mjs';
 import { armExitTimer, readExitTimer, exitIsImmediate, describeExit } from './qa-exit-timer.mjs';
 
@@ -39,7 +39,7 @@ async function tapAt(page, kind, x, y) {
 async function ensureOnMap(page) {
   if (await page.evaluate(() => !window.__playtestQa?.isInInterior?.())) return;
   await page.evaluate(() => window.__playtestQa.exitInterior());
-  await wait(300);
+  await page.waitForFunction(() => !window.__playtestQa?.isInInterior?.(), null, { timeout: 15000 });
 }
 
 async function openMapOnce(page, base) {
@@ -63,7 +63,7 @@ async function enterRoomOnPage(page, name) {
     null,
     { timeout: 15000 },
   );
-  await wait(200);
+  await waitForBuildingPanelSettled(page);
 }
 
 const inInterior = (page) => page.evaluate(() => window.__playtestQa?.isInInterior?.() === true);
@@ -72,20 +72,28 @@ const tilePoint = (page, x, y) =>
   page.evaluate(([a, b]) => window.__playtestQa?.interiorTileScreenPoint?.(a, b), [x, y]);
 
 async function waitForChar(page, tx, ty, maxMs = 9000) {
-  for (let t = 0; t < maxMs; t += 150) {
-    const at = await charTile(page);
-    if (at?.x === tx && at?.y === ty) return true;
-    await wait(150);
+  try {
+    await page.waitForFunction(
+      ([x, y]) => {
+        const at = window.__playtestQa?.interiorCharTile?.();
+        return at?.x === x && at?.y === y;
+      },
+      [tx, ty],
+      { timeout: maxMs },
+    );
+    return true;
+  } catch {
+    return false;
   }
-  return false;
 }
 
 async function waitLeftRoom(page, maxMs = 10000) {
-  for (let t = 0; t < maxMs; t += 150) {
-    if (!(await inInterior(page))) return true;
-    await wait(150);
+  try {
+    await page.waitForFunction(() => !window.__playtestQa?.isInInterior?.(), null, { timeout: maxMs });
+    return true;
+  } catch {
+    return false;
   }
-  return false;
 }
 
 /** Walkable tiles connected to the character (some corners of Catedral are enclosed islands). */
@@ -191,6 +199,7 @@ async function testExitSalir(ctx, kind, base, errors) {
         errors.push(`${tag}: room did not open`);
         continue;
       }
+      await waitForBuildingPanelSettled(page);
       await page.waitForSelector('.building-panel--open [data-exit]', { state: 'visible', timeout: 20000 });
       await armExitTimer(page);
       const exit = page.locator('.building-panel [data-exit]').first();

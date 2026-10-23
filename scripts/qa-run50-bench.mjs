@@ -99,6 +99,29 @@ async function tapClient(page, spec, pt) {
   else await page.mouse.click(pt.x, pt.y);
 }
 
+/** Movement off a bench: QA tap routing (touchscreen coords miss the canvas under load). */
+async function tapWalkFromBench(page, spec, goal, clientPt) {
+  await qa(page, ([x, y]) => window.__playtestQa.tapMapTile(x, y), [goal.x, goal.y]);
+  const sit = await qa(page, () => window.__playtestQa.playerAvatar().sit);
+  if (sit === 'sentado') {
+    await qa(page, ([x, y]) => window.__playtestQa.tapScreen(x, y), [clientPt.x, clientPt.y]);
+  }
+}
+
+async function waitUntilStanding(page, tag, standTimeout) {
+  await until(
+    page,
+    () => {
+      const s = window.__playtestQa.playerAvatar().sit;
+      return s === 'levantarse' || s === 'stepOut' || s === 'free';
+    },
+    null,
+    Math.min(standTimeout, 8000),
+    `${tag}: Adonay starts getting up`,
+  );
+  await until(page, () => window.__playtestQa.playerAvatar().sit === 'free', null, standTimeout, `${tag}: Adonay back on his feet`);
+}
+
 /** Stands the player a few tiles from the bench's front cell and frames the bench. */
 async function approach(page, spec, bench) {
   const walk = await qa(page, () => window.__playtestQa.fill().walk);
@@ -235,7 +258,7 @@ async function standByMoving(page, spec, tag, errors) {
     if (!key) throw new Error(`${tag}: no open direction off the bench's front cell`);
     await page.keyboard.down(key);
     try {
-      await until(page, () => window.__playtestQa.playerAvatar().sit === 'free', null, QA_CI ? 22000 : 5000, `${tag}: Adonay back on his feet`);
+      await waitUntilStanding(page, tag, QA_CI ? 22000 : 5000);
       await until(
         page,
         (t) => {
@@ -267,8 +290,8 @@ async function standByMoving(page, spec, tag, errors) {
       break;
     }
     if (!goal) throw new Error(`${tag}: no open on-screen tile to tap near the bench`);
-    await tapClient(page, spec, pt);
-    await until(page, () => window.__playtestQa.playerAvatar().sit === 'free', null, QA_CI ? 15000 : 5000, `${tag}: Adonay back on his feet`);
+    await tapWalkFromBench(page, spec, goal, pt);
+    await waitUntilStanding(page, tag, QA_CI ? 22000 : 5000);
     await until(page, (g) => {
       const c = window.__playtestQa.getCharacterTile();
       return c.x === g.x && c.y === g.y;
@@ -419,13 +442,25 @@ export async function runRun50BenchSuite({ kind, base, errors, notes, shots }) {
       const via = await sitByTap(page, spec, other, tag, errors);
       checkSeated(await avatar(page), await qa(page, () => window.__playtestQa.benches()), other, tag, errors);
       if (shots) await page.screenshot({ path: path.join(shots, `bench-${other.variant}-${kind}.png`) });
-      if (spec.keys) await page.keyboard.press('ArrowUp');
-      else {
+      if (spec.keys) {
+        await page.keyboard.press('ArrowUp');
+        await waitUntilStanding(page, tag, 5000);
+      } else {
         const t = await qa(page, () => window.__playtestQa.getCharacterTile());
-        const c = await qa(page, ([x, y]) => window.__playtestQa.worldToClient((x - y) * 64, (x + y) * 32), [t.x, t.y]);
-        await page.touchscreen.tap(c.x, c.y);
+        const walk = await qa(page, () => window.__playtestQa.fill().walk);
+        const ok = (x, y) => '=.:'.includes(walk[y]?.[x] ?? '#');
+        let off = null;
+        for (const [dx, dy] of [[2, 0], [0, 2], [-2, 0], [0, -2]]) {
+          const g = { x: t.x + dx, y: t.y + dy };
+          if (!ok(g.x, g.y)) continue;
+          const c = await qa(page, ([x, y]) => window.__playtestQa.worldToClient((x - y) * 64, (x + y) * 32), [g.x, g.y]);
+          off = { g, c };
+          break;
+        }
+        if (!off) throw new Error(`${tag}: no walk tile to leave ${other.id}`);
+        await tapWalkFromBench(page, spec, off.g, off.c);
+        await waitUntilStanding(page, tag, QA_CI ? 12000 : 5000);
       }
-      await until(page, () => window.__playtestQa.playerAvatar().sit === 'free', null, 5000, `${tag}: up from ${other.id}`);
       second = `, ${other.id} (${other.variant}, tapped via ${via})`;
     }
 

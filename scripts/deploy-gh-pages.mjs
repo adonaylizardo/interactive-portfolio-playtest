@@ -134,7 +134,7 @@ try {
   } else {
     const msg = COMMIT_MSG[target] ?? `Deploy ${target}`;
     run(
-      'git -c user.email=agent@cursor.com -c user.name="Cursor Agent" commit -m "' + msg + '"',
+      'git -c user.email=adolizardo@gmail.com -c user.name="Adonay Lizardo" commit -m "' + msg + '"',
       pushDir,
     );
     run('git push origin HEAD:gh-pages', pushDir);
