@@ -66,7 +66,6 @@ async function main(): Promise<void> {
   onLangChange(applyCanvasLabel);
 
   const checklist = new ChecklistUI(uiRoot, { onSkip: () => {}, onDismiss: () => {} });
-  if (!isMobileLayout()) checklist.setCollapsed(true);
 
   const bootFlow = new BootFlow();
   bootFlow.mount();
@@ -142,9 +141,9 @@ async function main(): Promise<void> {
     isReadingHash() ||
     !!scene?.isInInterior() ||
     !!placeCard?.isOpen() ||
-    chrome.isMobileSheetOpen() ||
-    panel.isOpen() ||
-    panel.isPreviewExpanded() ||
+    chrome?.isMobileSheetOpen() ||
+    !!panel?.isOpen() ||
+    !!panel?.isPreviewExpanded() ||
     aboutPanel.isOpen() ||
     searchPalette.isOpen();
 
@@ -243,12 +242,11 @@ async function main(): Promise<void> {
   chrome = new ChromeUI(uiRoot, {
     onLayoutChange: () => {
       const layout = chrome.getLayout();
-      if (!isMobileLayout()) checklist.setCollapsed(true);
-      else checklist.collapseMobile();
-      if (layout === 'map' || layout === 'panel' || isReadingHash()) checklist.setCollapsed(true);
+      if (isMobileLayout()) checklist.collapseMobile();
+      else if (layout === 'map' || layout === 'panel' || isReadingHash()) checklist.setCollapsed(true);
       syncMapOverlays();
       scene?.reflowViewport();
-      if (chrome.getLayout() === 'map' && !panel.isOpen() && !isReadingHash()) {
+      if (chrome.getLayout() === 'map' && !panel?.isOpen() && !isReadingHash()) {
         studio.scheduleIntroWhenMapIdle(450);
       }
     },
@@ -645,20 +643,26 @@ async function main(): Promise<void> {
   });
 
   let enteredViaWelcomeRead = false;
+  let startedViaWelcomeStart = false;
   if (skipWelcome) {
     await bootFlow.finishLoading(true);
   } else {
     const choice = await bootFlow.finishLoading(false);
     markWelcomeDone();
-    if (choice === 'start') checklist.resetForNewSession();
+    if (choice === 'start') {
+      startedViaWelcomeStart = true;
+      checklist.resetForNewSession();
+    }
     if (choice === 'read') {
       enteredViaWelcomeRead = true;
       enterReadingFromWelcome();
     } else if (!parseInteriorFromHash() && !bootReading) {
       if (isMobileLayout()) {
+        chrome.resetMobileIntroPeek();
         scene.reframeMobileFirstLoadForQa();
       } else {
         chrome.setLayout('split');
+        checklist.setCollapsed(false);
         scene.reframeDesktopFirstLoadForQa();
       }
     }
@@ -673,6 +677,9 @@ async function main(): Promise<void> {
     scene.setViewMode('cenital');
     if (isMobileLayout()) chrome.setLayout('map');
     personaKit.onBoot();
+  }
+  if (isMobileLayout() && (startedViaWelcomeStart || skipWelcome)) {
+    chrome.resetMobileIntroPeek();
   }
   chrome.beginSoundHint();
   const bootFocus = new URLSearchParams(location.search).get('focus');
@@ -753,6 +760,9 @@ async function main(): Promise<void> {
     collapseChecklistForQa: () => {
       checklist.collapseMobile();
       if (!isMobileLayout()) checklist.setCollapsed(true);
+    },
+    expandChecklistForQa: () => {
+      if (!isMobileLayout()) checklist.setCollapsed(false);
     },
     openPlaceCard: (id: string) => {
       if (isPlaceCard(id)) placeCard.open(id);

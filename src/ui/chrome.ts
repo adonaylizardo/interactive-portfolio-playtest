@@ -353,6 +353,7 @@ export class ChromeUI {
         ${roundBtn('locate', 'Center on Adonay', '', 'center')}
       </div>
       <div class="chrome__intro" data-intro>
+        <div class="chrome__sheet-grab" data-intro-grab aria-hidden="true"><span></span></div>
         <button type="button" class="chrome__intro-close" data-action="intro-close" aria-label="Close" data-i18n-aria="jac.close">${iconSvg('close')}</button>
         <div class="chrome__lede">
           <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
@@ -379,7 +380,7 @@ export class ChromeUI {
               <small data-i18n="chrome.titleShort">Líder de diseño con IA</small>
             </span>
           </div>
-          <button type="button" class="ui-btn ui-btn--secondary" data-details data-i18n="chrome.details">Detalles</button>
+          <button type="button" class="ui-btn ui-btn--primary chrome__see-details" data-details data-i18n="chrome.seeDetails">Ver detalles</button>
         </div>
         <div class="chrome__sheet-body chrome__sheet-body--collapsed" data-sheet-body data-intro-detail>
           <section class="chrome__section" id="chrome-experiencia-mobile">
@@ -464,7 +465,14 @@ export class ChromeUI {
     });
     this.root.querySelector('[data-action="hide-panel"]')?.addEventListener('click', () => this.setLayout('map'));
     this.root.querySelector('[data-action="show-panel"]')?.addEventListener('click', () => this.setLayout('split'));
-    this.root.querySelector('[data-action="intro-close"]')?.addEventListener('click', () => this.setLayout('map'));
+    this.root.querySelector('[data-action="intro-close"]')?.addEventListener('click', () => {
+      const intro = this.root.querySelector('.chrome__intro');
+      if (intro?.classList.contains('chrome__intro--expanded')) {
+        this.expandMobileSheet(false);
+        return;
+      }
+      this.setLayout('map');
+    });
     this.root.querySelector('[data-details]')?.addEventListener('click', () => {
       this.expandMobileSheet(true);
     });
@@ -719,11 +727,19 @@ export class ChromeUI {
   expandMobileSheet(expanded: boolean): void {
     const intro = this.root.querySelector('.chrome__intro') as HTMLElement | null;
     const body = this.root.querySelector('[data-sheet-body]') as HTMLElement | null;
+    const grab = this.root.querySelector('[data-intro-grab]') as HTMLElement | null;
     if (!intro) return;
     intro.classList.toggle('chrome__intro--expanded', expanded);
     if (body) body.classList.toggle('chrome__sheet-body--collapsed', !expanded);
+    if (grab) grab.hidden = !expanded;
     this.sync();
     this.callbacks.onLayoutChange();
+  }
+
+  resetMobileIntroPeek(): void {
+    if (!this.mobile) return;
+    this.mobileSheet = true;
+    this.expandMobileSheet(false);
   }
 
   getMobileSheetPanel(): 'intro' | 'casos' | 'logros' | 'contact' {
@@ -776,6 +792,11 @@ export class ChromeUI {
       (e) => {
         const te = e as TouchEvent;
         const endY = te.changedTouches[0]?.clientY ?? startY;
+        const delta = endY - startY;
+        if (intro.classList.contains('chrome__intro--expanded')) {
+          if (delta > 48) this.expandMobileSheet(false);
+          return;
+        }
         if (startY - endY > 48) this.expandMobileSheet(true);
       },
       { passive: true },
@@ -809,10 +830,21 @@ export class ChromeUI {
       'chrome--landscape-side',
       landscapeSide,
     );
+    const introEl = this.root.querySelector('.chrome__intro');
+    const introExpanded =
+      !!introEl?.classList.contains('chrome__intro--expanded') &&
+      this.mobile &&
+      this.mobileSheet &&
+      !this.interiorOpen;
     this.root.classList.toggle(
       'chrome--sheet',
       this.mobile && this.mobileSheet && !this.interiorOpen && !landscapeSide,
     );
+    this.root.classList.toggle(
+      'chrome--intro-peek',
+      this.mobile && this.mobileSheet && !this.interiorOpen && !landscapeSide && !introExpanded,
+    );
+    this.root.classList.toggle('chrome--intro-expanded', introExpanded);
     this.root.classList.toggle('chrome--dock', this.mobile && !this.mobileSheet && !this.interiorOpen);
     this.root.classList.toggle('chrome--map', !this.mobile && this.layout === 'map');
     this.root.classList.toggle('chrome--panel', !this.mobile && this.layout === 'panel');

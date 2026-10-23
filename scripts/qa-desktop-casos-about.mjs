@@ -64,6 +64,21 @@ const page = await ctx.newPage();
 
 try {
   await dismissWelcome(page);
+  await page.evaluate(() => window.__playtestQa.expandChecklistForQa?.());
+
+  const checklistDesktop = await page.evaluate(() => {
+    const cl = document.querySelector('.checklist');
+    return {
+      collapsed: cl?.classList.contains('checklist--collapsed'),
+      listDisplay: cl?.querySelector('.checklist__list')
+        ? getComputedStyle(cl.querySelector('.checklist__list')).display
+        : null,
+      width: cl?.getBoundingClientRect().width,
+    };
+  });
+  notes.push(`desktop checklist ${JSON.stringify(checklistDesktop)}`);
+  if (checklistDesktop.collapsed) errors.push('desktop: checklist collapsed on first load (want expanded)');
+  if (checklistDesktop.listDisplay === 'none') errors.push('desktop: checklist list hidden on first load');
 
   async function assertPeekHit(layout, expectSplitDock, viaCasosRow = false) {
     await page.evaluate((mode) => window.__playtestQa.setLayout(mode), layout);

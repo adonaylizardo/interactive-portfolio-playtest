@@ -915,6 +915,39 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
   top: 84px;
 }
 
+#ui-root:has(> .chrome.chrome--sheet.chrome--intro-peek) > .checklist.checklist--mobile-closed,
+#ui-root:has(> .chrome.chrome--sheet.chrome--intro-expanded) > .checklist.checklist--mobile-closed {
+  top: max(16px, env(safe-area-inset-top)) !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: max(12px, env(safe-area-inset-right)) !important;
+}
+
+.chrome--intro-expanded .checklist--mobile-closed {
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+.chrome--intro-expanded .checklist--mobile-closed .checklist__header-text,
+.chrome--intro-expanded .checklist--mobile-closed .checklist__counter--label {
+  display: none !important;
+}
+
+.chrome--intro-expanded .checklist--mobile-closed .checklist__header {
+  padding: 0;
+  justify-content: center;
+  min-height: 48px;
+  border-bottom: 0;
+}
+
+.chrome--intro-expanded .checklist--mobile-closed .checklist__progress-wrap {
+  margin: 0;
+}
+
 .chrome--mobile .chrome__intro {
   display: none;
 }
@@ -970,6 +1003,26 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
   }
 }
 
+.chrome__sheet-grab {
+  display: none;
+  flex-shrink: 0;
+  padding: 8px 0 4px;
+  cursor: grab;
+}
+
+.chrome__sheet-grab span {
+  display: block;
+  width: 36px;
+  height: 4px;
+  margin: 0 auto;
+  border-radius: 2px;
+  background: #3a3d44;
+}
+
+.chrome--intro-expanded .chrome__sheet-grab {
+  display: block;
+}
+
 .chrome--sheet .chrome__intro {
   display: flex;
   flex-direction: column;
@@ -988,6 +1041,77 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
   background: #141518;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
   z-index: 6;
+}
+
+/* Tom peek card: short bottom inset before “Ver detalles” expands the sheet. */
+.chrome--sheet.chrome--intro-peek .chrome__intro {
+  bottom: max(16px, env(safe-area-inset-bottom));
+  max-height: min(256px, calc(100dvh - 120px));
+  border-bottom: 1px solid #2a2c31;
+  border-radius: 12px;
+}
+
+.chrome--sheet.chrome--intro-peek .chrome__audience,
+.chrome--sheet.chrome--intro-peek .chrome__ctas,
+.chrome--sheet.chrome--intro-peek .chrome__sheet-body {
+  display: none !important;
+}
+
+.chrome--sheet.chrome--intro-peek .chrome__lede {
+  margin-top: 0;
+}
+
+.chrome--sheet.chrome--intro-peek .chrome__title {
+  font-size: 22px;
+  line-height: 28px;
+  letter-spacing: -0.02em;
+}
+
+.chrome--sheet.chrome--intro-peek .chrome__blurb {
+  margin-top: 8px;
+  font-size: 15px;
+  line-height: 22px;
+  color: #8a8f98;
+}
+
+.chrome--sheet.chrome--intro-peek .chrome__card-row {
+  margin-top: 12px;
+  min-height: 56px;
+}
+
+.chrome--sheet.chrome--intro-peek .chrome__see-details {
+  flex: 0 0 auto;
+  min-width: 120px;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+}
+
+.chrome--sheet.chrome--intro-expanded .chrome__intro {
+  max-height: min(55vh, calc(100dvh - 96px));
+}
+
+.chrome--sheet.chrome--intro-peek .chrome__sound,
+.chrome--sheet.chrome--intro-expanded .chrome__sound {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.chrome--sheet.chrome--intro-peek .chrome__lang {
+  display: none !important;
+}
+
+.chrome--sheet.chrome--intro-expanded .chrome__lang {
+  position: absolute;
+  top: 12px;
+  right: 56px;
+  z-index: 8;
+  display: flex;
+}
+
+.chrome--sheet .chrome__tools-phone [data-action='sound'],
+.chrome--sheet .chrome__tools-phone [data-action='center'] {
+  display: none !important;
 }
 
 .chrome__intro-close {
