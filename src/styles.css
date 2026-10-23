@@ -292,11 +292,23 @@ body.persona-kit #ui-root > .persona-kit {
   pointer-events: none;
 }
 
-#ui-root:has(> .building-panel--preview):not(:has(> .building-panel--preview.building-panel--expanded))
-  > .checklist {
-  visibility: visible;
-  pointer-events: auto;
-  z-index: 21;
+@media (max-width: 767px) {
+  #ui-root:has(> .building-panel--preview):not(:has(> .building-panel--preview.building-panel--expanded))
+    > .checklist {
+    visibility: visible;
+    pointer-events: auto;
+    z-index: 21;
+  }
+}
+
+@media (min-width: 768px) {
+  #ui-root:has(> .building-panel--preview.building-panel--open):not(
+      :has(> .building-panel--preview.building-panel--expanded)
+    )
+    > .checklist {
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
 }
 
 #ui-root:has(> .building-panel--preview.building-panel--expanded) > .checklist,

@@ -424,10 +424,24 @@ export class StudioAudio {
   /** Play / pause / switch landmark voice. Returns whether audio is playing after the call. */
   togglePlaceVoice(voiceId: string): boolean {
     if (this.muted) return false;
-    if (!this.unlocked) this.unlock();
+    this.ensurePlaceVoiceGestureUnlock();
+    if (this.placeVoiceKey === voiceId && !this.placeVoiceEl) {
+      this.placeVoiceKey = null;
+    }
     if (this.placeVoiceKey === voiceId && this.placeVoiceEl) {
       if (this.placeVoiceEl.paused) {
-        void this.placeVoiceEl.play().catch(() => this.stopPlaceVoice());
+        const el = this.placeVoiceEl;
+        const play = () => {
+          void el.play().catch(() => {
+            this.stopPlaceVoice();
+            this.startPlaceVoice(voiceId, { qa: false });
+          });
+        };
+        if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) play();
+        else {
+          el.addEventListener('canplay', () => play(), { once: true });
+          el.load();
+        }
         this.emit();
         return true;
       }
@@ -436,6 +450,11 @@ export class StudioAudio {
       return false;
     }
     return this.startPlaceVoice(voiceId, { qa: false });
+  }
+
+  private ensurePlaceVoiceGestureUnlock(): void {
+    if (!this.unlocked) this.unlock();
+    else this.introLock = false;
   }
 
   private startPlaceVoice(voiceId: string, opts?: { qa?: boolean }): boolean {
@@ -459,7 +478,17 @@ export class StudioAudio {
     this.placeVoiceKey = voiceId;
     this.duckAmbience(true);
     this.emit();
-    void el.play().catch(() => this.stopPlaceVoice());
+    let started = false;
+    const playOnce = () => {
+      if (started || this.placeVoiceEl !== el) return;
+      started = true;
+      void el.play().catch(() => {
+        if (this.placeVoiceEl === el) this.stopPlaceVoice();
+      });
+    };
+    el.addEventListener('canplay', () => playOnce(), { once: true });
+    el.load();
+    if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) playOnce();
     return true;
   }
 

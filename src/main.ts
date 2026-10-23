@@ -80,6 +80,7 @@ async function main(): Promise<void> {
   let labels!: NameLabels;
   let mapLabels!: BuildingMapLabels;
   let placeCard: PlaceCardPanel | undefined;
+  let caseEntryViaChromePanel = false;
 
   function routeSearchResult(result: SearchResult): void {
     switch (result.kind) {
@@ -257,6 +258,7 @@ async function main(): Promise<void> {
     onCenter: () => scene?.recenterOnCharacter(),
     onLocate: (id) => {
       if (isReadingHash()) return;
+      if (!isMobileLayout() && isCaseHouse(id)) caseEntryViaChromePanel = true;
       scene?.walkToBuildingForQa(id);
     },
     onOpenAbout: (opts) => {
@@ -306,7 +308,9 @@ async function main(): Promise<void> {
   });
   const stageScreen = new InteriorStageScreen(document.body);
   placeCard = new PlaceCardPanel(uiRoot, () => {
-    chrome.setPlaceCardOpen(placeCard!.isOpen());
+    const open = placeCard!.isOpen();
+    chrome.setPlaceCardOpen(open);
+    if (open && isMobileLayout()) chrome.dismissMobileIntroSheet({ silent: true });
     syncMapOverlays();
     scene?.applyCameraFromUi();
   });
@@ -324,6 +328,13 @@ async function main(): Promise<void> {
   panel = new BuildingPanel(
     uiRoot,
     () => {
+      if (
+        isMobileLayout() &&
+        panel.isOpen() &&
+        (panel.isPreviewMode() || panel.isPreviewExpanded())
+      ) {
+        chrome.dismissMobileIntroSheet({ silent: true });
+      }
       const open = panel.isInteriorMode();
       if (panel.isOpen()) studio.noteIntroPanelOpen();
       checklist.setBuildingPanelOpen(open);
@@ -412,13 +423,17 @@ async function main(): Promise<void> {
     onChecklist: (step) => checklist.complete(step),
     onEnterBuilding: (buildingId) => {
       checklist.complete('enter-building');
+      const caseViaPanel = caseEntryViaChromePanel && isCaseHouse(buildingId);
+      caseEntryViaChromePanel = false;
       if (isPlaceCard(buildingId)) {
-        if (chrome.isMobileSheetOpen()) chrome.setLayout('map');
+        chrome.dismissMobileIntroSheet({ silent: true });
         placeCard.open(buildingId);
         return;
       }
       if (isCaseHouse(buildingId)) {
-        if (chrome.isMobileSheetOpen()) chrome.setLayout('map');
+        if (isMobileLayout()) chrome.dismissMobileIntroSheet({ silent: true });
+        else if (caseViaPanel) chrome.setLayout('split', { silent: true });
+        else chrome.setLayout('map', { silent: true });
         panel.showPreview(buildingId);
         scene.pushCasePreviewHash(buildingId);
         return;
@@ -427,7 +442,8 @@ async function main(): Promise<void> {
     },
     onDriveBuildingDoor: (buildingId, panelTitle) => {
       if (isCaseHouse(buildingId)) {
-        if (chrome.isMobileSheetOpen()) chrome.setLayout('map');
+        if (isMobileLayout()) chrome.dismissMobileIntroSheet({ silent: true });
+        else chrome.setLayout('map', { silent: true });
         panel.showPreview(buildingId);
         return;
       }

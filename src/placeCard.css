@@ -289,6 +289,14 @@ body[data-place-card='1'] .name-labels {
   pointer-events: none !important;
 }
 
+@media (max-width: 767px) {
+  body[data-place-card='1'] .chrome--sheet .chrome__intro,
+  body:has(#ui-root > .building-panel--preview.building-panel--open) .chrome--sheet .chrome__intro {
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+}
+
 @media (max-height: 500px) and (orientation: landscape) {
   body[data-place-card='1'] .checklist,
   body[data-place-card='1'] .chrome__views,

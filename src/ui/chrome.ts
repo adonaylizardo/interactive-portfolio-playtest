@@ -21,6 +21,8 @@ export type { Lang };
 export type ChromeLayoutChangeOpts = {
   /** Keep map camera when the phone sheet opens (Logros/Casos). */
   preserveMapCamera?: boolean;
+  /** Skip the synthetic click blip (map overlay / programmatic layout). */
+  silent?: boolean;
 };
 
 export type ChromeCallbacks = {
@@ -197,8 +199,17 @@ export class ChromeUI {
       this.layout = next;
     }
     this.sync();
-    studio.playClick();
+    if (!opts?.silent) studio.playClick();
     this.callbacks.onLayoutChange(opts);
+  }
+
+  /** Close the phone intro / About sheet so a single map overlay (ficha, case, etc.) is visible. */
+  dismissMobileIntroSheet(opts?: { silent?: boolean }): void {
+    if (!this.mobile || !this.mobileSheet) return;
+    this.mobileSheet = false;
+    this.sync();
+    if (!opts?.silent) studio.playClick();
+    this.callbacks.onLayoutChange({ silent: true });
   }
 
   private isLandscapeSideSheet(): boolean {
