@@ -88,7 +88,7 @@ export function casePreviewCopy(id: string, lang: Lang = 'es'): CasePreviewCopy 
     subtitle: content.subtitle,
     teaser: endSentence(content.shortHeadline ?? content.headline),
     teaserFull: content.headline,
-    kicker: `CASE · ${title.toUpperCase()}`,
+    kicker: `${lang === 'es' ? 'CASO' : 'CASE'} · ${title.toUpperCase()}`,
     placeholder: `${title.toUpperCase()} · IMAGE PLACEHOLDER`,
     pillMeta: headings.length ? headings.join(' · ') : 'Problem · What I did · Result',
   };

@@ -1184,7 +1184,7 @@ export class BuildingPanel {
       ? (preview?.teaser ?? '')
       : (preview?.teaserFull ?? preview?.teaser ?? '');
     if (this.previewKicker) {
-      this.previewKicker.textContent = preview?.kicker?.split(' · ')[0] ?? t('panel.caseTag');
+      this.previewKicker.textContent = preview?.kicker ?? t('panel.caseTag');
     }
     if (this.previewTitle) this.previewTitle.textContent = title;
     if (this.previewSubtitle) this.previewSubtitle.textContent = subtitle;
@@ -1197,9 +1197,7 @@ export class BuildingPanel {
         : `${title}: ${subtitle.charAt(0).toLowerCase()}${subtitle.slice(1)}`;
     }
     if (this.readKicker) {
-      const tag = t('panel.caseTag');
-      const raw = preview?.kicker ?? tag;
-      this.readKicker.textContent = raw.replace(/^CASE\b/, tag);
+      this.readKicker.textContent = preview?.kicker ?? t('panel.caseTag');
     }
     if (this.readHeadline) {
       this.readHeadline.textContent = this.isMobile()
@@ -1210,8 +1208,8 @@ export class BuildingPanel {
     const hero = this.el.querySelector('.case-read__hero');
     if (hero) hero.classList.add('case-read__hero--neutral');
     if (this.readHeroLabel) {
-      this.readHeroLabel.textContent = '';
-      this.readHeroLabel.hidden = true;
+      this.readHeroLabel.textContent = preview?.placeholder ?? '';
+      this.readHeroLabel.hidden = false;
     }
     this.setTitle(interiorId, title);
     this.renderWorkedWith();
@@ -1271,9 +1269,20 @@ export class BuildingPanel {
     const preview = casePreviewCopy(interiorId, getLang());
     if (!preview) return;
     const teaser = this.isMobile() ? preview.teaser : (preview.teaserFull ?? preview.teaser);
+    if (this.previewKicker) this.previewKicker.textContent = preview.kicker;
     if (this.previewTitle) this.previewTitle.textContent = preview.title;
     if (this.previewSubtitle) this.previewSubtitle.textContent = preview.subtitle;
     if (this.previewTeaser) this.previewTeaser.textContent = teaser;
+    if (this.readKicker) this.readKicker.textContent = preview.kicker;
+    if (this.readHeroLabel) this.readHeroLabel.textContent = preview.placeholder;
+    if (this.readHeadline) {
+      this.readHeadline.textContent = this.isMobile()
+        ? preview.teaser.replace(/[.]$/, '')
+        : (preview.teaserFull ?? preview.teaser);
+    }
+    if (this.readLede) this.readLede.textContent = preview.subtitle;
+    const meta = this.el.querySelector('.case-preview__read-meta');
+    if (meta) meta.textContent = preview.pillMeta;
   }
 
   private renderAbout(): void {

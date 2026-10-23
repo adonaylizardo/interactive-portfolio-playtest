@@ -491,6 +491,17 @@ async function testInteriorFeel(ctx, kind, base, errors, notes) {
         errors.push(`${tag}: room did not open`);
         continue;
       }
+      const labelsHidden = await page.evaluate(() => {
+        const root = document.querySelector('.name-labels');
+        if (root?.hidden) return true;
+        const visible = [...document.querySelectorAll('.name-label')].filter(
+          (el) => !el.hidden && el.getClientRects().length > 0,
+        );
+        return visible.length === 0;
+      });
+      if (!labelsHidden) {
+        errors.push(`${tag}: map name labels still visible inside interior`);
+      }
       await wait(800);
       const layout = await qa(page, () => window.__playtestQa.interiorLayout());
       const walk = new Set(layout.walkable.map((t) => `${t.x},${t.y}`));

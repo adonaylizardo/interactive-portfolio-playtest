@@ -113,12 +113,13 @@ export class BootFlow {
     }
     await new Promise<void>((r) => window.requestAnimationFrame(() => r()));
     this.loadingEl?.classList.add('boot-flow__loading--out');
+    await new Promise<void>((r) => window.setTimeout(r, 260));
+    this.loadingEl?.setAttribute('hidden', '');
+    document.body.classList.remove('boot-loading');
+    await new Promise<void>((r) => window.requestAnimationFrame(() => r()));
     this.welcomeEl?.removeAttribute('hidden');
     this.root?.classList.add('boot-flow--welcome');
-    document.body.classList.remove('boot-loading');
     document.body.classList.add('boot-welcome');
-    await new Promise<void>((r) => window.setTimeout(r, 220));
-    this.loadingEl?.setAttribute('hidden', '');
     return this.waitForChoice();
   }
 

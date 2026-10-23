@@ -433,8 +433,9 @@ async function main(): Promise<void> {
       const sheetOpen = chrome.isMobileSheetOpen();
       const personaActive =
         personaEnabled() && view.mode === 'persona' && !scene.isInInterior();
+      const inInterior = !!scene.isInInterior();
       const hidePills =
-        view.overview || !!scene.isInInterior() || sheetOpen || personaActive || mapPillsObscured();
+        view.overview || inInterior || sheetOpen || personaActive || mapPillsObscured();
       labels.setHidden(hidePills);
       if (!hidePills) labels.update(scene.nameLabelAnchors());
       const hideMapPills =
@@ -463,13 +464,13 @@ async function main(): Promise<void> {
         const snap = scene.jacSnapshot();
         const anchors = scene.jacHudAnchors();
         jacHud.update(snap, anchors, anchors.rear);
-        if (!personaActive && !sheetOpen) labels.setHidden(false);
+        if (!personaActive && !sheetOpen && !inInterior) labels.setHidden(false);
       } else {
         jacHud.park();
         const hideNameLabels =
           isMobileLayout() &&
           (sheetOpen || panel.isOpen() || aboutPanel.isOpen() || searchPalette.isOpen());
-        if (personaActive || hideNameLabels) labels.setHidden(true);
+        if (personaActive || hideNameLabels || inInterior) labels.setHidden(true);
         else if (!sheetOpen) labels.setHidden(false);
       }
       const ps = scene.qaPersonaState();

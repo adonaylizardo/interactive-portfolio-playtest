@@ -211,10 +211,12 @@ body.boot-welcome::before {
   cursor: pointer;
 }
 
-.boot-flow__btn--primary {
+#boot .boot-flow__btn--primary {
   border: none;
   background: #edeef0;
   color: #0b0c0e;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .boot-flow__btn--ghost {

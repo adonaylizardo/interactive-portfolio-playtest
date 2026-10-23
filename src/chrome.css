@@ -314,6 +314,7 @@ body[data-interior='1'] .chrome__column {
   font-size: 22px;
   line-height: 28px;
   letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 
 .chrome__skeleton-stack {

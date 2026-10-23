@@ -225,8 +225,8 @@ const DICT = {
     'chrome.lede':
       'Explore the map, walk into buildings, and open case studies from the doors or the side panel.',
     'chrome.caseMeta': 'On the map',
-    'chrome.title': 'Design lead working with AI.',
-    'chrome.titleShort': 'Design lead working with AI',
+    'chrome.title': 'Design lead working with\u00a0AI.',
+    'chrome.titleShort': 'Design lead working with\u00a0AI',
     'chrome.who': 'Who are you?',
     'chrome.mentorship': 'Mentorship',
     'chrome.mentorshipStat': 'Mentorship: 30+ people',
