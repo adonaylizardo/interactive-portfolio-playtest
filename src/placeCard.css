@@ -92,13 +92,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 8px 12px;
+  box-sizing: border-box;
 }
 
 .place-card__hero-img {
   display: block;
-  width: 100%;
-  height: auto;
-  max-height: 156px;
+  width: auto;
+  height: 88%;
+  max-height: 88%;
+  max-width: 100%;
   object-fit: contain;
   object-position: center bottom;
 }
@@ -176,8 +179,8 @@
     left: 0;
     right: 0;
     bottom: 0;
-    height: min(51vh, 414px);
-    max-height: min(51vh, 414px);
+    height: min(58vh, 460px);
+    max-height: min(58vh, 460px);
     border-radius: 20px 20px 0 0;
     border-bottom: none;
     padding-bottom: max(12px, env(safe-area-inset-bottom));
@@ -185,14 +188,17 @@
   }
 
   .place-card__hero {
-    flex: 0 1 auto;
-    min-height: 72px;
-    max-height: 120px;
-    margin-bottom: 12px;
+    flex: 1 1 auto;
+    min-height: 200px;
+    max-height: none;
+    margin: 0 16px 12px;
+    padding: 10px 12px 6px;
   }
 
   .place-card__hero-img {
-    max-height: 120px;
+    height: 88%;
+    max-height: 88%;
+    max-width: 100%;
   }
 }
 
@@ -241,6 +247,12 @@
   .place-card__hero {
     min-height: 200px;
     max-height: 280px;
+    padding: 12px 16px;
+  }
+
+  .place-card__hero-img {
+    height: 88%;
+    max-height: 88%;
   }
 }
 
@@ -258,6 +270,18 @@ body[data-place-card='1'] .chrome--sheet .chrome__locate {
   bottom: var(--place-locate-bottom, 280px);
   left: 16px;
   top: auto;
+}
+
+@media (max-width: 767px) {
+  body[data-place-card='1'] .checklist {
+    display: none !important;
+  }
+}
+
+body[data-place-card='1'] .building-map-labels,
+body[data-place-card='1'] .name-labels {
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 @media (max-height: 500px) and (orientation: landscape) {

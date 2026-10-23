@@ -9,10 +9,10 @@ body.boot-welcome #ui-root .checklist {
   pointer-events: none;
 }
 
-.boot-flow {
+#boot.boot-flow {
   position: fixed;
   inset: 0;
-  z-index: 45;
+  z-index: 50;
   pointer-events: none;
   color: #edeef0;
   background: transparent;
@@ -34,6 +34,7 @@ body.boot-welcome #ui-root .checklist {
 .boot-flow__loading {
   position: absolute;
   inset: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -171,13 +172,16 @@ body.boot-welcome #game-canvas {
   visibility: visible;
 }
 
-body.boot-welcome::before {
-  content: '';
-  position: fixed;
+.boot-flow__scrim {
+  position: absolute;
   inset: 0;
-  z-index: 44;
+  z-index: 0;
   background: rgb(0 0 0 / 45%);
   pointer-events: none;
+}
+
+.boot-flow__welcome {
+  z-index: 1;
 }
 
 .boot-flow__handle {

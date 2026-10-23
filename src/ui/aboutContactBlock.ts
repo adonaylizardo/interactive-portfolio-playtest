@@ -35,7 +35,7 @@ export function createAboutContactBlock(): HTMLElement {
       a.target = '_blank';
       a.rel = 'noopener noreferrer';
     }
-    a.innerHTML = `<span class="reading-about__contact-row-icon" aria-hidden="true">${iconSvg(icon, 18)}</span><span class="reading-about__contact-label">${label}</span>${iconSvg('arrowNe', 14)}`;
+    a.innerHTML = `<span class="reading-about__contact-row-icon" aria-hidden="true">${iconSvg(icon, 18)}</span><span class="reading-about__contact-label">${label}</span><span class="reading-about__contact-row-trail" aria-hidden="true">${iconSvg('arrowNe', 14)}</span>`;
     return a;
   };
 

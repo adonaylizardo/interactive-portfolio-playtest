@@ -45,6 +45,7 @@ import {
   writeInteriorToHash,
   type HistoryNavigationState,
 } from '../camera/hash';
+import { isCaseHouse } from '../data/cases';
 import { isTouchPrimary, type ChecklistStepId } from '../checklist/storage';
 import { buildingParkPrefer, muroWallTiles, OBELISCO_ACCESS, OBELISCO_SOLID_TILES } from '../data/world';
 import { mapWorldBounds, sortKey, tileFootWorld, tileToWorld, worldToTile } from '../iso/math';
@@ -796,7 +797,7 @@ export class IsoScene {
     if (!isSupportedPlaytestHash()) {
       this.events.onUnknownRoute?.();
       replaceOutdoorHash(this.outdoorCamBeforeInterior ?? { x: this.cameraX, y: this.cameraY, zoom: this.zoom });
-    } else if (bootInterior && getInteriorDef(bootInterior)) {
+    } else if (bootInterior && getInteriorDef(bootInterior) && !isCaseHouse(bootInterior)) {
       replaceOutdoorHash(this.outdoorCamBeforeInterior ?? { x: this.cameraX, y: this.cameraY, zoom: this.zoom });
       this.enterInterior(bootInterior, { skipFade: true });
     }
@@ -822,10 +823,16 @@ export class IsoScene {
       this.zoom = clampZoom(v.zoom);
     }
     if (id) {
-      if (state?.outdoorCam && !this.outdoorCamBeforeInterior) {
-        this.outdoorCamBeforeInterior = { ...state.outdoorCam };
+      if (isCaseHouse(id)) {
+        if (this.interiorActive) {
+          this.exitInterior({ skipFade: true, fromHash: true });
+        }
+      } else {
+        if (state?.outdoorCam && !this.outdoorCamBeforeInterior) {
+          this.outdoorCamBeforeInterior = { ...state.outdoorCam };
+        }
+        this.enterInterior(id, { skipFade: true, fromHash: true });
       }
-      this.enterInterior(id, { skipFade: true, fromHash: true });
     } else if (!id && this.interiorActive) {
       this.exitInterior({
         skipFade: true,

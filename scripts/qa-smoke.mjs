@@ -254,9 +254,9 @@ const GROUPS = {
   'exits-phone': () => exits('chromium-phone', ['exit']),
   input: async () => {
     for (const [kind, only] of chromiumOnlyKinds([
-      ['chromium-1280', ['keys', 'wheel', 'minzoom', 'interior']],
+      ['chromium-1280', ['keys', 'wheel', 'minzoom', 'placecard', 'interior']],
       ['webkit-1280', ['keys', 'wheel', 'minzoom']],
-      ['chromium-375', ['minzoom', 'interior']],
+      ['chromium-375', ['minzoom', 'placecard', 'interior']],
     ])) {
       await runBrowser('input', kind, () => runRun41InputSuite({ kind, base: BASE, errors, notes, only }));
     }

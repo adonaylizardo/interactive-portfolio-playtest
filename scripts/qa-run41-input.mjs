@@ -479,6 +479,61 @@ function reachable(layout, start) {
   return layout.walkable.filter((t) => seen.has(key(t.x, t.y)) && !(t.x === layout.exit.x && t.y === layout.exit.y));
 }
 
+async function nameLabelsHidden(page) {
+  return page.evaluate(() => {
+    const root = document.querySelector('.name-labels');
+    if (root?.hidden) return true;
+    const visible = [...document.querySelectorAll('.name-label')].filter(
+      (el) => !el.hidden && el.getClientRects().length > 0,
+    );
+    return visible.length === 0;
+  });
+}
+
+async function testPlaceCardChrome(ctx, kind, base, errors, notes) {
+  const tag = `run41-${kind}-placecard`;
+  const page = await ctx.newPage();
+  try {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('portfolio-playtest-lang', 'es');
+      } catch {
+        /* private mode */
+      }
+    });
+    await page.goto(base, { waitUntil: 'load' });
+    await wait(500);
+    await qa(page, () => window.__playtestQa.openPlaceCard('catedral'));
+    await page.waitForSelector('.place-card--open', { timeout: 15000 });
+    await wait(300);
+    if (!(await nameLabelsHidden(page))) {
+      errors.push(`${tag}: map name labels still visible with ficha open`);
+    }
+    const chipsHidden = await page.evaluate(() => {
+      const root = document.querySelector('.building-map-labels');
+      if (!root) return true;
+      if (root.hidden) return true;
+      return getComputedStyle(root).visibility === 'hidden';
+    });
+    if (!chipsHidden) errors.push(`${tag}: map chips still visible with ficha open`);
+    const line = await page.evaluate(() => document.querySelector('.place-card__line')?.textContent ?? '');
+    if (!/Catedral de Barquisimeto/i.test(line)) {
+      errors.push(`${tag}: ficha copy not ES voice line (${line.slice(0, 60)}…)`);
+    }
+    if (kind === 'chromium-375') {
+      const checklistHidden = await page.evaluate(() => {
+        const el = document.querySelector('.checklist');
+        if (!el) return true;
+        return getComputedStyle(el).display === 'none';
+      });
+      if (!checklistHidden) errors.push(`${tag}: checklist still visible over ficha on phone`);
+    }
+    notes.push(`${tag}: ficha chrome ok (${line.slice(0, 40)}…)`);
+  } finally {
+    await page.close();
+  }
+}
+
 async function testInteriorFeel(ctx, kind, base, errors, notes) {
   for (const name of ['sambil', 'flor']) {
     const tag = `run41-${kind}-interior-${name}`;
@@ -491,15 +546,7 @@ async function testInteriorFeel(ctx, kind, base, errors, notes) {
         errors.push(`${tag}: room did not open`);
         continue;
       }
-      const labelsHidden = await page.evaluate(() => {
-        const root = document.querySelector('.name-labels');
-        if (root?.hidden) return true;
-        const visible = [...document.querySelectorAll('.name-label')].filter(
-          (el) => !el.hidden && el.getClientRects().length > 0,
-        );
-        return visible.length === 0;
-      });
-      if (!labelsHidden) {
+      if (!(await nameLabelsHidden(page))) {
         errors.push(`${tag}: map name labels still visible inside interior`);
       }
       await wait(800);
@@ -588,6 +635,7 @@ export async function runRun41InputSuite({ kind, base, errors, notes, only }) {
     }
     if (want('wheel')) await testWheel(ctx, kind, base, errors, notes);
     if (want('minzoom')) await testMinZoom(ctx, kind, base, errors, notes);
+    if (want('placecard')) await testPlaceCardChrome(ctx, kind, base, errors, notes);
     if (want('interior')) await testInteriorFeel(ctx, kind, base, errors, notes);
   } finally {
     await ctx.close();

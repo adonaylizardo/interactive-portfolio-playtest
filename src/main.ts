@@ -79,6 +79,7 @@ async function main(): Promise<void> {
   let searchPalette!: SearchPalette;
   let labels!: NameLabels;
   let mapLabels!: BuildingMapLabels;
+  let placeCard: PlaceCardPanel | undefined;
 
   function routeSearchResult(result: SearchResult): void {
     switch (result.kind) {
@@ -139,6 +140,7 @@ async function main(): Promise<void> {
   const mapPillsObscured = (): boolean =>
     isReadingHash() ||
     !!scene?.isInInterior() ||
+    !!placeCard?.isOpen() ||
     chrome.isMobileSheetOpen() ||
     panel.isOpen() ||
     panel.isPreviewExpanded() ||
@@ -146,7 +148,7 @@ async function main(): Promise<void> {
     searchPalette.isOpen();
 
   const syncMapOverlays = (): void => {
-    labels.setHidden(isMobileLayout() ? mapPillsObscured() : isReadingHash());
+    labels.setHidden(mapPillsObscured() || isReadingHash());
     mapLabels.setHidden(mapPillsObscured());
     scene?.applyCameraFromUi();
   };
@@ -303,8 +305,9 @@ async function main(): Promise<void> {
     },
   });
   const stageScreen = new InteriorStageScreen(document.body);
-  const placeCard = new PlaceCardPanel(uiRoot, () => {
-    chrome.setPlaceCardOpen(placeCard.isOpen());
+  placeCard = new PlaceCardPanel(uiRoot, () => {
+    chrome.setPlaceCardOpen(placeCard!.isOpen());
+    syncMapOverlays();
     scene?.applyCameraFromUi();
   });
 
@@ -384,6 +387,10 @@ async function main(): Promise<void> {
           chrome.setInteriorOpen(false, { skipLayout: true });
           if (!isMobileLayout()) chrome.setLayout('split');
           panel.showWritings(b.panelTitle, interiorId);
+        } else if (isCaseHouse(interiorId)) {
+          chrome.setInteriorOpen(false, { skipLayout: true });
+          if (chrome.isMobileSheetOpen()) chrome.setLayout('map');
+          panel.showPreview(interiorId);
         } else {
           chrome.setInteriorOpen(true);
           panel.showInterior(b.panelTitle, interiorId);
@@ -464,13 +471,16 @@ async function main(): Promise<void> {
         const snap = scene.jacSnapshot();
         const anchors = scene.jacHudAnchors();
         jacHud.update(snap, anchors, anchors.rear);
-        if (!personaActive && !sheetOpen && !inInterior) labels.setHidden(false);
+        if (!personaActive && !sheetOpen && !hidePills && !mapPillsObscured()) labels.setHidden(false);
       } else {
         jacHud.park();
         const hideNameLabels =
-          isMobileLayout() &&
-          (sheetOpen || panel.isOpen() || aboutPanel.isOpen() || searchPalette.isOpen());
-        if (personaActive || hideNameLabels || inInterior) labels.setHidden(true);
+          sheetOpen ||
+          panel.isOpen() ||
+          aboutPanel.isOpen() ||
+          searchPalette.isOpen() ||
+          placeCard.isOpen();
+        if (personaActive || hideNameLabels || hidePills || mapPillsObscured()) labels.setHidden(true);
         else if (!sheetOpen) labels.setHidden(false);
       }
       const ps = scene.qaPersonaState();

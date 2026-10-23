@@ -41,14 +41,21 @@ export function isMobileOrCoarsePointer(): boolean {
   );
 }
 
+const ALL_CHECKLIST_STEPS: ChecklistStepId[] = [
+  'walk-around',
+  'walk-keys',
+  'move-camera',
+  'zoom',
+  'enter-building',
+];
+
 export function stepsForPlatform(compact = isMobileOrCoarsePointer()): ChecklistStepId[] {
-  const steps: ChecklistStepId[] = ['walk-around', 'walk-keys', 'move-camera', 'zoom', 'enter-building'];
-  if (compact || isTouchPrimary()) return steps.filter((id) => id !== 'walk-keys');
-  return steps;
+  if (compact || isTouchPrimary()) return ALL_CHECKLIST_STEPS.filter((id) => id !== 'walk-keys');
+  return ALL_CHECKLIST_STEPS;
 }
 
-export function totalStepsForPlatform(compact = isMobileOrCoarsePointer()): number {
-  return stepsForPlatform(compact).length;
+export function totalStepsForPlatform(_compact = isMobileOrCoarsePointer()): number {
+  return ALL_CHECKLIST_STEPS.length;
 }
 
 export function loadChecklist(): ChecklistState {
@@ -82,8 +89,8 @@ export function resetChecklistForSession(): ChecklistState {
   return state;
 }
 
-export function countCompleted(state: ChecklistState, compact = isMobileOrCoarsePointer()): number {
-  return stepsForPlatform(compact).filter((id) => state.completed[id]).length;
+export function countCompleted(state: ChecklistState, _compact = isMobileOrCoarsePointer()): number {
+  return ALL_CHECKLIST_STEPS.filter((id) => state.completed[id]).length;
 }
 
 /** Fully hidden (user closed after finish or explicit dismiss). Skip keeps the ring. */

@@ -31,6 +31,7 @@ export class BootFlow {
   private root: HTMLElement | null = null;
   private loadingEl: HTMLElement | null = null;
   private welcomeEl: HTMLElement | null = null;
+  private scrimEl: HTMLElement | null = null;
   private barFill: HTMLElement | null = null;
   private pctEl: HTMLElement | null = null;
   private headlineEl: HTMLElement | null = null;
@@ -58,6 +59,7 @@ export class BootFlow {
           </div>
         </div>
       </div>
+      <div class="boot-flow__scrim" data-boot-scrim hidden aria-hidden="true"></div>
       <div class="boot-flow__welcome" data-boot-welcome hidden>
         <button type="button" class="boot-flow__lang ui-round" data-boot-lang aria-label="Language">ES</button>
         <div class="boot-flow__sheet" role="dialog" aria-modal="true" aria-labelledby="boot-welcome-title">
@@ -70,11 +72,12 @@ export class BootFlow {
         </div>
       </div>
     `;
-    document.getElementById('app')?.appendChild(this.root);
+    document.body.appendChild(this.root);
     document.body.classList.add('boot-loading');
 
     this.loadingEl = this.root.querySelector('[data-boot-loading]');
     this.welcomeEl = this.root.querySelector('[data-boot-welcome]');
+    this.scrimEl = this.root.querySelector('[data-boot-scrim]');
     this.barFill = this.root.querySelector('.boot-flow__fill');
     this.pctEl = this.root.querySelector('.boot-flow__pct');
     this.headlineEl = this.root.querySelector('.boot-flow__headline');
@@ -117,6 +120,7 @@ export class BootFlow {
     this.loadingEl?.setAttribute('hidden', '');
     document.body.classList.remove('boot-loading');
     await new Promise<void>((r) => window.requestAnimationFrame(() => r()));
+    this.scrimEl?.removeAttribute('hidden');
     this.welcomeEl?.removeAttribute('hidden');
     this.root?.classList.add('boot-flow--welcome');
     document.body.classList.add('boot-welcome');

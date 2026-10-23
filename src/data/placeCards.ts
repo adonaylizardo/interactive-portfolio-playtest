@@ -1,4 +1,6 @@
 import { buildingSpriteKey, spriteAsset } from '../game/sprites';
+import type { Lang } from '../ui/i18n';
+import { getLang } from '../ui/i18n';
 import { VOICE_LINES } from './voice-lines';
 
 /** Map landmarks that open a place card on the map (not full interior). */
@@ -30,9 +32,11 @@ export function placeCardVoiceId(id: PlaceCardId): string {
   return VOICE_ID[id];
 }
 
-/** Verbatim English voice script (Spanish later — do not translate here). */
-export function placeCardLine(id: PlaceCardId): string {
-  return VOICE_LINES[VOICE_ID[id]].script_text;
+/** Verbatim voice script for the active UI language (from voice-lines). */
+export function placeCardLine(id: PlaceCardId, lang: Lang = getLang()): string {
+  const entry = VOICE_LINES[VOICE_ID[id]];
+  if (lang === 'es' && entry.script_text_es) return entry.script_text_es;
+  return entry.script_text;
 }
 
 export function placeCardHeroUrl(id: PlaceCardId): string {

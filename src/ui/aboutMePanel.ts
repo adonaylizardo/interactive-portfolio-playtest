@@ -85,15 +85,18 @@ export class AboutMePanel {
         </a>
       </div>
       <a class="about-panel__link" href="${CONTACT_MAILTO}">
-        ${iconSvg('mail')} <span>Email</span>
+        <span class="about-panel__link-icon">${iconSvg('mail', 18)}</span>
+        <span class="about-panel__link-label">Email</span>
         <span class="about-panel__link-trail">${iconSvg('arrowNe', 15)}</span>
       </a>
       <a class="about-panel__link" href="${LINKEDIN_URL}" target="_blank" rel="noopener noreferrer">
-        ${iconSvg('link')} <span>Linked In</span>
+        <span class="about-panel__link-icon">${iconSvg('link', 18)}</span>
+        <span class="about-panel__link-label">Linked In</span>
         <span class="about-panel__link-trail">${iconSvg('arrowNe', 15)}</span>
       </a>
       <a class="about-panel__link" href="${MEDIUM_URL}" target="_blank" rel="noopener noreferrer">
-        ${iconSvg('link')} <span>Medium</span>
+        <span class="about-panel__link-icon">${iconSvg('link', 18)}</span>
+        <span class="about-panel__link-label">Medium</span>
         <span class="about-panel__link-trail">${iconSvg('arrowNe', 15)}</span>
       </a>
     `;

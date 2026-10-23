@@ -295,7 +295,8 @@
 .reading-about__contact-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 10px;
   min-height: 44px;
   padding: 10px 14px;
   border: 1px solid #2a2c31;
@@ -304,6 +305,18 @@
   text-decoration: none;
   font-size: 15px;
   font-weight: 500;
+}
+
+.reading-about__contact-label {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.reading-about__contact-row-trail {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: #9aa0a6;
 }
 
 .reading-about__contact-row:hover {
@@ -369,8 +382,19 @@ body[data-reading='1'] .building-panel {
 
 @media (min-width: 768px) {
   body[data-reading='1'] .reading-view__main {
-    padding-top: 28px;
-    padding-bottom: 48px;
+    max-width: 432px;
+    margin-left: 64px;
+    margin-right: auto;
+    padding: 28px 24px 48px;
+  }
+
+  .reading-view__article--about .reading-view__detail-title {
+    margin: 0 0 16px;
+    font-family: 'Inter Tight', Inter, system-ui, sans-serif;
+    font-size: 17px;
+    font-weight: 400;
+    line-height: 22px;
+    color: #edeef0;
   }
 }
 

@@ -7,6 +7,7 @@ import {
   placeCardVoiceId,
   type PlaceCardId,
 } from '../data/placeCards';
+import { getLang, onLangChange } from './i18n';
 import { iconSvg } from './icons';
 
 export class PlaceCardPanel {
@@ -75,6 +76,10 @@ export class PlaceCardPanel {
     studio.onChange(() => {
       if (this.isOpen()) this.syncPlayUi();
     });
+    onLangChange(() => {
+      if (!this.openId) return;
+      this.lineEl.textContent = placeCardLine(this.openId, getLang());
+    });
   }
 
   isOpen(): boolean {
@@ -92,7 +97,7 @@ export class PlaceCardPanel {
     this.el.classList.add('place-card--open');
     document.body.dataset.placeCard = '1';
     this.titleEl.textContent = placeCardTitle(id);
-    this.lineEl.textContent = placeCardLine(id);
+    this.lineEl.textContent = placeCardLine(id, getLang());
     this.heroImg.src = placeCardHeroUrl(id);
     this.heroImg.alt = placeCardTitle(id);
     this.syncPlayUi();
