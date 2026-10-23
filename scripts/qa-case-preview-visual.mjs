@@ -53,6 +53,42 @@ function assertPeekTallerThanOneLineBar(pngPath, tag, errors) {
   if (h < 140) errors.push(`${tag}: sheet screenshot height ${h}px — still one-line peek?`);
 }
 
+async function readHudState(page) {
+  return page.evaluate(() => {
+    const views = document.querySelector('.chrome__views');
+    const minimap = document.querySelector('.chrome__minimap-wrap');
+    const locate = document.querySelector('.chrome__locate');
+    const snap = (el) =>
+      el
+        ? {
+            visibility: getComputedStyle(el).visibility,
+            display: getComputedStyle(el).display,
+          }
+        : null;
+    return { views: snap(views), minimap: snap(minimap), locate: snap(locate) };
+  });
+}
+
+function assertHudHidden(state, tag, errors) {
+  for (const key of ['views', 'minimap', 'locate']) {
+    const el = state[key];
+    if (!el) continue;
+    if (el.visibility !== 'hidden' && el.display !== 'none') {
+      errors.push(`${tag}: HUD ${key} still visible (${el.visibility}/${el.display})`);
+    }
+  }
+  if (state.views && state.views.display !== 'none' && state.views.visibility !== 'hidden') {
+    errors.push(`${tag}: chrome__views not hidden`);
+  }
+}
+
+function assertHudShown(state, tag, errors) {
+  if (!state.views) return;
+  if (state.views.display === 'none' || state.views.visibility === 'hidden') {
+    errors.push(`${tag}: chrome__views still hidden after reader closed`);
+  }
+}
+
 async function assertCasePreview(page, tag, errors) {
   const dom = await page.evaluate(() => {
     const panel = document.querySelector('.building-panel');
@@ -105,14 +141,24 @@ async function runPhone(errors, notes) {
       readKicker: document.querySelector('.case-read__kicker')?.textContent?.trim(),
       heroDisplay: getComputedStyle(document.querySelector('.case-read__hero')).display,
       readHidden: document.querySelector('[data-read-view]')?.hidden,
+      hasExpandBtn: !!document.querySelector('[data-read-collapse]'),
     }));
     if (!expanded.expanded) errors.push('phone-expanded: not expanded');
     if (!expanded.readKicker) errors.push('phone-expanded: read kicker empty');
     if (expanded.heroDisplay === 'none') errors.push('phone-expanded: hero hidden');
+    if (!expanded.hasExpandBtn) errors.push('phone-expanded: reader expand control missing');
     notes.push(`phone-expanded dom ${JSON.stringify(expanded)}`);
+    const hudReader = await readHudState(page);
+    assertHudHidden(hudReader, 'phone-expanded', errors);
+    notes.push(`phone-expanded hud ${JSON.stringify(hudReader)}`);
     await page.locator('.building-panel__sheet').screenshot({
       path: path.join(OUT, 'phone-expanded.png'),
     });
+    await page.evaluate(() => window.__playtestQa.collapseCasePreview());
+    await wait(400);
+    const hudPeek = await readHudState(page);
+    assertHudShown(hudPeek, 'phone-peek-after-reader', errors);
+    notes.push(`phone-peek hud ${JSON.stringify(hudPeek)}`);
   } finally {
     await ctx.close();
     await browser.close();
@@ -121,16 +167,31 @@ async function runPhone(errors, notes) {
 
 async function runDesktop(errors, notes) {
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const ctx = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    deviceScaleFactor: 2,
+  });
   const page = await ctx.newPage();
   try {
     await dismissWelcome(page);
     await page.evaluate(() => window.__playtestQa.showCasePreview('bain'));
     await page.locator('[data-read]').click();
     await wait(500);
+    const hudReader = await readHudState(page);
+    assertHudHidden(hudReader, 'desktop-expanded', errors);
+    notes.push(`desktop-expanded hud ${JSON.stringify(hudReader)}`);
+    await page.screenshot({ path: path.join(OUT, 'desktop-expanded-1440.png') });
     await page.locator('.building-panel__sheet').screenshot({
       path: path.join(OUT, 'desktop-expanded.png'),
     });
+    await page.evaluate(() => window.__playtestQa.collapseCasePreview());
+    await wait(400);
+    const hudPeek = await readHudState(page);
+    assertHudShown(hudPeek, 'desktop-peek-after-reader', errors);
+    await page.evaluate(() => window.__playtestQa.dismissBuildingPanel());
+    await wait(300);
+    const hudMap = await readHudState(page);
+    assertHudShown(hudMap, 'desktop-map-after-dismiss', errors);
   } finally {
     await ctx.close();
     await browser.close();

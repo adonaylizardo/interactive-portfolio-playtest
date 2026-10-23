@@ -177,6 +177,24 @@ try {
   await wait(700);
   const expandedShot = path.join(OUT, 'case-expanded-1440.png');
   await page.screenshot({ path: expandedShot });
+  const hudReader = await page.evaluate(() => {
+    const snap = (el) =>
+      el ? { visibility: getComputedStyle(el).visibility, display: getComputedStyle(el).display } : null;
+    const views = document.querySelector('.chrome__views');
+    const minimap = document.querySelector('.chrome__minimap-wrap');
+    const locate = document.querySelector('.chrome__locate');
+    return { views: snap(views), minimap: snap(minimap), locate: snap(locate) };
+  });
+  notes.push(`reader hud ${JSON.stringify(hudReader)}`);
+  for (const key of ['views', 'minimap', 'locate']) {
+    const el = hudReader[key];
+    if (el && el.visibility !== 'hidden' && el.display !== 'none') {
+      errors.push(`case reader: HUD ${key} visible (${el.visibility}/${el.display})`);
+    }
+  }
+  if (hudReader.views && hudReader.views.display !== 'none') {
+    errors.push(`case reader: chrome__views display ${hudReader.views.display}`);
+  }
   const expanded = await page.evaluate(() => {
     const sheet = document.querySelector('.building-panel__sheet')?.getBoundingClientRect();
     const canvas = getComputedStyle(document.getElementById('game-canvas'));
@@ -196,8 +214,21 @@ try {
   if (expanded.checklistVis !== 'hidden') errors.push(`case reader: checklist ${expanded.checklistVis}`);
   if (expanded.langVis !== 'hidden') errors.push(`case reader: lang ${expanded.langVis}`);
 
+  await page.evaluate(() => window.__playtestQa.collapseCasePreview());
+  await wait(400);
+  const hudPeek = await page.evaluate(() => {
+    const views = document.querySelector('.chrome__views');
+    return views
+      ? { visibility: getComputedStyle(views).visibility, display: getComputedStyle(views).display }
+      : null;
+  });
+  notes.push(`peek hud after reader ${JSON.stringify(hudPeek)}`);
+  if (hudPeek && (hudPeek.display === 'none' || hudPeek.visibility === 'hidden')) {
+    errors.push(`case peek: chrome__views still hidden after reader close`);
+  }
+
   await page.evaluate(() => {
-    window.__playtestQa.collapseCasePreview();
+    window.__playtestQa.dismissBuildingPanel();
     location.hash = '#/leer/estudio';
   });
   await page.waitForSelector('.reading-view__article--about', { timeout: 60000 });

@@ -317,6 +317,13 @@ body.persona-kit #ui-root > .persona-kit {
   pointer-events: none !important;
 }
 
+/* Case reader (peek expanded): map HUD must not cover body copy. */
+#ui-root:has(> .building-panel--preview.building-panel--expanded) .chrome__views {
+  visibility: hidden !important;
+  pointer-events: none !important;
+  display: none !important;
+}
+
 #ui-root:has(> .building-panel--preview) .chrome__sound {
   display: none;
 }
@@ -3211,7 +3218,8 @@ body:has(.building-panel--open) .chrome__lang {
 }
 
 .case-preview__x,
-.case-read__x {
+.case-read__x,
+.case-read__expand {
   flex-shrink: 0;
   width: 44px;
   height: 44px;
@@ -3529,6 +3537,7 @@ body:has(.building-panel--open) .chrome__lang {
 @media (min-width: 768px) {
   .case-preview__x,
   .case-read__x,
+  .case-read__expand,
   .case-preview__read-go {
     width: 40px;
     height: 40px;

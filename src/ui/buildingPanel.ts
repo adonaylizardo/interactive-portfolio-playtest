@@ -216,6 +216,7 @@ export class BuildingPanel {
         </div>
         <div class="case-read__bar" data-read-bar hidden>
           <p class="case-read__bar-title"></p>
+          <button type="button" class="case-read__expand" data-read-collapse aria-label="">${iconSvg('expand')}</button>
           <button type="button" class="case-read__x" data-close aria-label="">${iconSvg('close')}</button>
         </div>
         <div class="case-read" data-read-view hidden>
@@ -441,6 +442,11 @@ export class BuildingPanel {
       e.preventDefault();
       e.stopPropagation();
       if (this.mode === 'preview' && this.peekOnly) this.setPeek(false);
+    });
+    this.el.querySelector('[data-read-collapse]')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (this.mode === 'preview' && !this.peekOnly) this.setPeek(true);
     });
     this.el.querySelectorAll('[data-close]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
@@ -1505,6 +1511,9 @@ export class BuildingPanel {
     const mobClose = this.el.querySelector('[data-exp-mobile-close]') as HTMLElement | null;
     if (mobClose) mobClose.setAttribute('aria-label', t('panel.close'));
     this.el.querySelectorAll('[data-exp-expand]').forEach((el) => {
+      el.setAttribute('aria-label', t('panel.expandSheet'));
+    });
+    this.el.querySelectorAll('[data-read-collapse]').forEach((el) => {
       el.setAttribute('aria-label', t('panel.expandSheet'));
     });
     const workedWithTitle = this.el.querySelector('#worked-with-title');
