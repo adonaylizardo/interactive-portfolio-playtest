@@ -10,10 +10,10 @@ fs.mkdirSync(OUT, { recursive: true });
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function runViewport(width, height, tag) {
+async function runViewport(viewportW, height, tag) {
   const browser = await chromium.launch();
   const ctx = await browser.newContext({
-    viewport: { width, height },
+    viewport: { width: viewportW, height },
     deviceScaleFactor: 2,
     isMobile: true,
     hasTouch: true,
@@ -48,6 +48,10 @@ async function runViewport(width, height, tag) {
     if (peek.introHeight > 320) errors.push(`${tag}: peek card too tall (${peek.introHeight})`);
     if (peek.audienceDisplay !== 'none') errors.push(`${tag}: audience visible in peek`);
     if (peek.checklistTop > 120) errors.push(`${tag}: checklist not near top (${peek.checklistTop})`);
+    const pillRight = await page.evaluate(() => document.querySelector('.checklist')?.getBoundingClientRect().right);
+    if (pillRight && pillRight > viewportW + 2) {
+      errors.push(`${tag}: checklist overflows right (${pillRight} > ${viewportW})`);
+    }
 
     await page.locator('[data-details]').click();
     await wait(500);

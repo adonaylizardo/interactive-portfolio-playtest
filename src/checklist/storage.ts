@@ -54,8 +54,8 @@ export function stepsForPlatform(compact = isMobileOrCoarsePointer()): Checklist
   return ALL_CHECKLIST_STEPS;
 }
 
-export function totalStepsForPlatform(_compact = isMobileOrCoarsePointer()): number {
-  return ALL_CHECKLIST_STEPS.length;
+export function totalStepsForPlatform(compact = isMobileOrCoarsePointer()): number {
+  return stepsForPlatform(compact).length;
 }
 
 export function loadChecklist(): ChecklistState {
@@ -89,8 +89,8 @@ export function resetChecklistForSession(): ChecklistState {
   return state;
 }
 
-export function countCompleted(state: ChecklistState, _compact = isMobileOrCoarsePointer()): number {
-  return ALL_CHECKLIST_STEPS.filter((id) => state.completed[id]).length;
+export function countCompleted(state: ChecklistState, compact = isMobileOrCoarsePointer()): number {
+  return stepsForPlatform(compact).filter((id) => state.completed[id]).length;
 }
 
 /** Fully hidden (user closed after finish or explicit dismiss). Skip keeps the ring. */

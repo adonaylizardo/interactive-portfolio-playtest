@@ -229,6 +229,10 @@ export class ChecklistUI {
     this.applyLayoutClasses();
   }
 
+  syncFromChrome(): void {
+    this.render();
+  }
+
   isMobileExpanded(): boolean {
     return (
       this.mobile &&
@@ -281,27 +285,33 @@ export class ChecklistUI {
       }
       return;
     }
+    const header = this.root.querySelector('.checklist__header')?.getBoundingClientRect();
     const anchor = anchorBeforeToggle ?? this.ringBtn.getBoundingClientRect();
-    if (anchor.width < 2) return;
+    if (anchor.width < 2 && (!header || header.width < 2)) return;
     const layout = document.body.dataset.layout;
     const margin = 8;
-    const width = Math.min(360, window.innerWidth - 24);
-    let left = Math.min(Math.max(12, anchor.left), window.innerWidth - width - 12);
+    const inset = 16;
+    const width = Math.min(360, window.innerWidth - inset * 2);
+    const anchorRight = header?.right ?? anchor.right;
+    const anchorBottom = header?.bottom ?? anchor.bottom;
+    let left = Math.max(inset, anchorRight - width);
     let top: number;
     let bottom: number | null = null;
     let maxH: number;
-    if (layout === 'map') {
+    const introSheet = document.querySelector('.chrome.chrome--sheet');
+    if (layout === 'map' && !introSheet) {
       bottom = Math.max(12, window.innerHeight - anchor.top + margin);
       maxH = Math.min(window.innerHeight * 0.52, anchor.top - margin - 12);
       top = NaN;
+      left = Math.min(Math.max(12, anchor.left), window.innerWidth - width - 12);
     } else {
-      top = anchor.bottom + margin;
+      top = anchorBottom + margin;
       maxH = Math.min(window.innerHeight * 0.52, window.innerHeight - top - 12);
     }
     if (!Number.isNaN(top)) {
-      top = Math.min(Math.max(12, top), window.innerHeight - 120);
+      top = Math.min(Math.max(inset, top), window.innerHeight - 120);
     }
-    left = Math.max(margin, Math.min(left, window.innerWidth - width - margin));
+    left = Math.max(inset, Math.min(left, window.innerWidth - width - inset));
     this.root.classList.add('checklist--anchored');
     this.root.style.setProperty('width', `${width}px`, 'important');
     this.root.style.setProperty('left', `${left}px`, 'important');
@@ -371,10 +381,13 @@ export class ChecklistUI {
     this.ringEl.style.strokeDashoffset = String(offset);
     this.mapArcFg.style.strokeDashoffset = String(mapArcCirc * (1 - progress));
 
+    const platformSteps = stepsForPlatform(this.compactSteps);
+    const stepTotal = platformSteps.length;
+    const allDone = done >= stepTotal;
+
     const dismissBtn = this.root.querySelector('.checklist__dismiss') as HTMLButtonElement;
     const skipBtn = this.root.querySelector('.checklist__skip') as HTMLButtonElement;
     const labelEl = this.root.querySelector('.checklist__label') as HTMLElement;
-    const allDone = done >= total;
     dismissBtn.hidden = !allDone;
     skipBtn.hidden = allDone;
     labelEl.textContent = t('check.label');
@@ -385,8 +398,6 @@ export class ChecklistUI {
     ringHit.setAttribute('aria-label', t('check.toggle'));
 
     this.applyLayoutClasses();
-
-    const platformSteps = stepsForPlatform(this.compactSteps);
     const copy = stepCopy();
     this.listEl.replaceChildren();
     let activeStep: StepCopy | null = null;
@@ -412,10 +423,13 @@ export class ChecklistUI {
       this.listEl.appendChild(li);
     }
 
+    const chromeRoot = document.querySelector('.chrome');
     const mapClosedPill =
       this.mobile &&
       !this.state.mobileExpanded &&
-      document.body.dataset.layout === 'map';
+      (document.body.dataset.layout === 'map' ||
+        chromeRoot?.classList.contains('chrome--intro-peek') ||
+        chromeRoot?.classList.contains('chrome--dock'));
 
     if (mapClosedPill && !allDone) {
       let lastIncomplete: StepCopy | null = null;

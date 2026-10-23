@@ -740,34 +740,6 @@ body:has(.building-panel--open) .chrome__lang {
     pointer-events: auto;
   }
 
-  body[data-chrome='phone'][data-layout='split'] .checklist.checklist--mobile.checklist--mobile-closed {
-    top: max(72px, calc(env(safe-area-inset-top) + 56px)) !important;
-    bottom: auto !important;
-    left: max(12px, env(safe-area-inset-left)) !important;
-    right: auto !important;
-    width: 48px;
-    min-width: 48px;
-    max-width: 48px;
-    height: 48px;
-    max-height: 48px;
-    border-radius: 24px;
-    overflow: hidden;
-  }
-
-  body[data-chrome='phone'][data-layout='split'] .checklist.checklist--mobile-closed .checklist__header-text,
-  body[data-chrome='phone'][data-layout='split'] .checklist.checklist--mobile-closed .checklist__counter--label {
-    display: none !important;
-  }
-
-  body[data-chrome='phone'] .chrome--sheet.chrome--intro-expanded .chrome__intro {
-    top: 237px;
-    bottom: max(64px, calc(env(safe-area-inset-bottom) + 48px));
-    height: auto;
-    max-height: none;
-    border-radius: 12px 12px 0 0;
-    border-bottom: 0;
-  }
-
   body[data-chrome='phone'] .checklist--mobile:not(.checklist--mobile-closed):not(.checklist--anchored) {
     position: fixed;
     top: auto;
@@ -1246,9 +1218,9 @@ body:has(.building-panel--open) .chrome__lang {
   }
 
   body[data-layout='split'] .checklist:not(.checklist--mobile).checklist--collapsed {
-    right: max(124px, calc(env(safe-area-inset-right) + 112px));
+    right: max(16px, env(safe-area-inset-right));
     left: auto;
-    max-width: min(360px, calc(100vw - 64px - 140px));
+    max-width: min(360px, calc(100vw - 32px));
     overflow: visible;
     max-height: none;
   }
@@ -1259,10 +1231,10 @@ body:has(.building-panel--open) .chrome__lang {
     padding: 12px 16px;
   }
 
-  .checklist--collapsed {
-    right: max(124px, calc(env(safe-area-inset-right) + 112px));
+  body[data-chrome='desktop'] .checklist:not(.checklist--mobile).checklist--collapsed {
+    right: max(16px, env(safe-area-inset-right));
     left: auto;
-    max-width: min(360px, calc(100vw - 64px - 140px));
+    max-width: min(360px, calc(100vw - 32px));
   }
 
   .checklist:not(.checklist--mobile) .checklist__map-arc,

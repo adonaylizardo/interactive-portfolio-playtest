@@ -212,4 +212,12 @@
   body[data-offline='1'] .playtest-toast--offline.playtest-toast--visible {
     bottom: max(188px, calc(env(safe-area-inset-bottom) + 172px));
   }
+
+  body[data-chrome='phone']:has(#ui-root > .chrome.chrome--sheet) .playtest-toast--offline.playtest-toast--visible {
+    top: max(56px, calc(env(safe-area-inset-top) + 48px));
+    bottom: auto;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+  }
 }

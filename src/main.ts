@@ -242,8 +242,10 @@ async function main(): Promise<void> {
   chrome = new ChromeUI(uiRoot, {
     onLayoutChange: () => {
       const layout = chrome.getLayout();
-      if (isMobileLayout()) checklist.collapseMobile();
-      else if (layout === 'map' || layout === 'panel' || isReadingHash()) checklist.setCollapsed(true);
+      if (isMobileLayout()) {
+        checklist.collapseMobile();
+        checklist.syncFromChrome();
+      } else if (layout === 'map' || layout === 'panel' || isReadingHash()) checklist.setCollapsed(true);
       syncMapOverlays();
       scene?.reflowViewport();
       if (chrome.getLayout() === 'map' && !panel?.isOpen() && !isReadingHash()) {

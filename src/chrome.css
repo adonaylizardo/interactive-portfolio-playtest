@@ -916,11 +916,68 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
 }
 
 #ui-root:has(> .chrome.chrome--sheet.chrome--intro-peek) > .checklist.checklist--mobile-closed,
-#ui-root:has(> .chrome.chrome--sheet.chrome--intro-expanded) > .checklist.checklist--mobile-closed {
+#ui-root:has(> .chrome.chrome--sheet.chrome--intro-expanded) > .checklist.checklist--mobile-closed,
+#ui-root:has(> .chrome.chrome--dock) > .checklist.checklist--mobile-closed {
   top: max(16px, env(safe-area-inset-top)) !important;
   bottom: auto !important;
   left: auto !important;
-  right: max(12px, env(safe-area-inset-right)) !important;
+  right: max(16px, env(safe-area-inset-right)) !important;
+}
+
+#ui-root:has(> .chrome.chrome--sheet.chrome--intro-peek) > .checklist.checklist--mobile-closed,
+#ui-root:has(> .chrome.chrome--dock) > .checklist.checklist--mobile-closed {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: min(279px, calc(100vw - 32px)) !important;
+  height: auto !important;
+  padding: 0;
+  border-radius: 26px;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+#ui-root:has(> .chrome.chrome--sheet.chrome--intro-peek) > .checklist.checklist--mobile-closed .checklist__header,
+#ui-root:has(> .chrome.chrome--dock) > .checklist.checklist--mobile-closed .checklist__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0 8px 0 18px;
+  min-height: 52px;
+  height: 52px;
+  border-bottom: 0;
+}
+
+#ui-root:has(> .chrome.chrome--sheet.chrome--intro-peek) > .checklist.checklist--mobile-closed .checklist__header-text,
+#ui-root:has(> .chrome.chrome--dock) > .checklist.checklist--mobile-closed .checklist__header-text {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+#ui-root:has(> .chrome.chrome--sheet.chrome--intro-peek) > .checklist.checklist--mobile-closed .checklist__label,
+#ui-root:has(> .chrome.chrome--dock) > .checklist.checklist--mobile-closed .checklist__label {
+  display: block;
+}
+
+#ui-root:has(> .chrome.chrome--sheet.chrome--intro-peek) > .checklist.checklist--mobile-closed .checklist__active-title,
+#ui-root:has(> .chrome.chrome--dock) > .checklist.checklist--mobile-closed .checklist__active-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#ui-root:has(> .chrome.chrome--sheet.chrome--intro-peek) > .checklist.checklist--mobile-closed .checklist__counter--label,
+#ui-root:has(> .chrome.chrome--dock) > .checklist.checklist--mobile-closed .checklist__counter--label {
+  display: inline !important;
+}
+
+#ui-root:has(> .chrome.chrome--sheet.chrome--intro-peek) > .checklist.checklist--mobile-closed .checklist__progress-wrap,
+#ui-root:has(> .chrome.chrome--dock) > .checklist.checklist--mobile-closed .checklist__progress-wrap {
+  display: contents;
 }
 
 .chrome--intro-expanded .checklist--mobile-closed {
@@ -930,6 +987,7 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
   height: 48px;
   border-radius: 24px;
   overflow: hidden;
+  right: max(16px, env(safe-area-inset-right)) !important;
 }
 
 .chrome--intro-expanded .checklist--mobile-closed .checklist__header-text,
@@ -1046,6 +1104,7 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
 /* Tom peek card: short bottom inset before “Ver detalles” expands the sheet. */
 .chrome--sheet.chrome--intro-peek .chrome__intro {
   bottom: max(16px, env(safe-area-inset-bottom));
+  min-height: min(256px, calc(100dvh - 120px));
   max-height: min(256px, calc(100dvh - 120px));
   border-bottom: 1px solid #2a2c31;
   border-radius: 12px;
@@ -1088,7 +1147,45 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
 }
 
 .chrome--sheet.chrome--intro-expanded .chrome__intro {
-  max-height: min(55vh, calc(100dvh - 96px));
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: none;
+  height: 55vh;
+  max-height: 55vh;
+  border-radius: 12px 12px 0 0;
+  border-bottom: 0;
+  padding-top: 8px;
+}
+
+.chrome--sheet.chrome--intro-expanded .chrome__intro .chrome__sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chrome--sheet.chrome--intro-expanded .chrome__card-row {
+  display: none !important;
+}
+
+.chrome__intro-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0 48px 0 16px;
+  flex-shrink: 0;
+}
+
+.chrome__intro-lang-host .chrome__lang {
+  position: static;
+  display: flex;
+  gap: 4px;
+}
+
+.chrome--sheet .chrome__lang:not(.chrome__lang--in-intro) {
+  display: none !important;
 }
 
 .chrome--sheet.chrome--intro-peek .chrome__sound,
@@ -1099,14 +1196,6 @@ body[data-layout='map'] .chrome--mobile .chrome__lang {
 
 .chrome--sheet.chrome--intro-peek .chrome__lang {
   display: none !important;
-}
-
-.chrome--sheet.chrome--intro-expanded .chrome__lang {
-  position: absolute;
-  top: 12px;
-  right: 56px;
-  z-index: 8;
-  display: flex;
 }
 
 .chrome--sheet .chrome__tools-phone [data-action='sound'],

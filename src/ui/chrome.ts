@@ -354,6 +354,9 @@ export class ChromeUI {
       </div>
       <div class="chrome__intro" data-intro>
         <div class="chrome__sheet-grab" data-intro-grab aria-hidden="true"><span></span></div>
+        <div class="chrome__intro-toolbar" data-intro-toolbar hidden>
+          <div class="chrome__intro-lang-host" data-intro-lang-host></div>
+        </div>
         <button type="button" class="chrome__intro-close" data-action="intro-close" aria-label="Close" data-i18n-aria="jac.close">${iconSvg('close')}</button>
         <div class="chrome__lede">
           <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
@@ -523,7 +526,8 @@ export class ChromeUI {
       btn.addEventListener('click', () => this.callbacks.onCenter());
     });
     this.root.querySelector('[data-dock="intro"]')?.addEventListener('click', () => {
-      this.openAboutPanel();
+      if (this.mobile) this.reopenMobileIntroPeek();
+      else this.openAboutPanel();
     });
     this.root.querySelector('.chrome__dock [data-action="cases"]')?.addEventListener('click', () => {
       this.openMobileSheetSection('casos');
@@ -728,10 +732,12 @@ export class ChromeUI {
     const intro = this.root.querySelector('.chrome__intro') as HTMLElement | null;
     const body = this.root.querySelector('[data-sheet-body]') as HTMLElement | null;
     const grab = this.root.querySelector('[data-intro-grab]') as HTMLElement | null;
+    const toolbar = this.root.querySelector('[data-intro-toolbar]') as HTMLElement | null;
     if (!intro) return;
     intro.classList.toggle('chrome__intro--expanded', expanded);
     if (body) body.classList.toggle('chrome__sheet-body--collapsed', !expanded);
     if (grab) grab.hidden = !expanded;
+    if (toolbar) toolbar.hidden = !expanded;
     this.sync();
     this.callbacks.onLayoutChange();
   }
@@ -740,6 +746,14 @@ export class ChromeUI {
     if (!this.mobile) return;
     this.mobileSheet = true;
     this.expandMobileSheet(false);
+  }
+
+  reopenMobileIntroPeek(): void {
+    if (!this.mobile) return;
+    this.mobileSheet = true;
+    this.expandMobileSheet(false);
+    this.sync();
+    this.callbacks.onLayoutChange({ silent: true });
   }
 
   getMobileSheetPanel(): 'intro' | 'casos' | 'logros' | 'contact' {
@@ -845,6 +859,7 @@ export class ChromeUI {
       this.mobile && this.mobileSheet && !this.interiorOpen && !landscapeSide && !introExpanded,
     );
     this.root.classList.toggle('chrome--intro-expanded', introExpanded);
+    this.mountIntroLang(introExpanded);
     this.root.classList.toggle('chrome--dock', this.mobile && !this.mobileSheet && !this.interiorOpen);
     this.root.classList.toggle('chrome--map', !this.mobile && this.layout === 'map');
     this.root.classList.toggle('chrome--panel', !this.mobile && this.layout === 'panel');
@@ -1009,9 +1024,38 @@ export class ChromeUI {
     return window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
   }
 
+  private langHome: HTMLElement | null = null;
+
+  private mountIntroLang(introExpanded: boolean): void {
+    const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
+    const host = this.root.querySelector('[data-intro-lang-host]') as HTMLElement | null;
+    if (!lang) return;
+    if (!this.langHome) {
+      this.langHome = document.createElement('span');
+      this.langHome.hidden = true;
+      this.langHome.setAttribute('aria-hidden', 'true');
+      lang.after(this.langHome);
+    }
+    if (this.mobile && this.mobileSheet && !this.interiorOpen && introExpanded && host) {
+      if (lang.parentElement !== host) host.appendChild(lang);
+      lang.classList.add('chrome__lang--in-intro');
+      return;
+    }
+    if (lang.parentElement !== this.root && this.langHome.parentElement === this.root) {
+      this.langHome.before(lang);
+    }
+    lang.classList.remove('chrome__lang--in-intro');
+  }
+
   private placeLang(): void {
     const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
     if (!lang) return;
+    if (lang.classList.contains('chrome__lang--in-intro')) {
+      lang.style.top = '';
+      lang.style.left = '';
+      lang.style.right = '';
+      return;
+    }
     const shortLand = this.shortLandscape();
     if (shortLand && this.mobile) {
       if (document.body.classList.contains('about-panel-open')) {
