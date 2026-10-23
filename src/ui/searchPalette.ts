@@ -81,7 +81,15 @@ export class SearchPalette {
 
   private bind(): void {
     this.root.querySelector('[data-search-backdrop]')?.addEventListener('click', () => this.close());
-    this.backBtn.addEventListener('click', () => this.close());
+    this.backBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (this.filterKind) {
+        this.filterKind = null;
+        this.syncView();
+        return;
+      }
+      this.close();
+    });
     this.closeBtn.addEventListener('click', () => this.close());
     this.root.querySelector('[data-search-clear]')?.addEventListener('click', () => {
       this.input.value = '';

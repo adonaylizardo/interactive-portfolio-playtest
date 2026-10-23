@@ -21,12 +21,28 @@ function syncCopy(): void {
   if (text) text.textContent = t('state.offline');
 }
 
-function syncVisible(): void {
+function applyOffline(offline: boolean): void {
   const node = ensureEl();
-  const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
   node.classList.toggle('playtest-toast--visible', offline);
   document.body.dataset.offline = offline ? '1' : '';
   if (offline) syncCopy();
+  else delete document.body.dataset.offline;
+}
+
+async function probeReachable(): Promise<boolean> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+  try {
+    const base = import.meta.env.BASE_URL || '/';
+    const url = new URL('favicon.ico', new URL(base, location.href)).href;
+    const res = await fetch(url, { method: 'HEAD', cache: 'no-store', credentials: 'same-origin' });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function refreshOnlineState(): Promise<void> {
+  applyOffline(!(await probeReachable()));
 }
 
 export function startOfflineMonitor(): void {
@@ -35,9 +51,11 @@ export function startOfflineMonitor(): void {
   ensureEl();
   onLangChange(syncCopy);
   syncCopy();
-  syncVisible();
-  window.addEventListener('online', syncVisible);
-  window.addEventListener('offline', syncVisible);
+  applyOffline(false);
+  void refreshOnlineState();
+  window.addEventListener('online', () => void refreshOnlineState());
+  window.addEventListener('offline', () => applyOffline(true));
+  window.addEventListener('load', () => void refreshOnlineState());
 }
 
 export function isOfflineBannerVisible(): boolean {

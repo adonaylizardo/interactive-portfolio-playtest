@@ -7162,9 +7162,20 @@ export class IsoScene {
       let visible = onScreen;
       if (phone && rect) {
         const halfW = 56;
+        const pillAbove = 34;
+        const hudEls = [
+          document.querySelector('.chrome__tools-phone'),
+          document.querySelector('.chrome__lang'),
+          document.querySelector('.chrome--sheet'),
+        ];
+        const hudBottom = Math.max(
+          rect.top + 52,
+          ...hudEls.map((el) => el?.getBoundingClientRect().bottom ?? 0),
+        );
+        const minY = hudBottom + pillAbove;
         visible = true;
         clientX = Math.min(Math.max(clientX, rect.left + halfW + 8), rect.right - halfW - 8);
-        clientY = Math.min(Math.max(clientY, rect.top + 76), rect.bottom - 100);
+        clientY = Math.min(Math.max(clientY, minY), rect.bottom - 100);
       }
       out.push({
         id,

@@ -715,7 +715,7 @@ body:has(.building-panel--open) .chrome__lang {
   }
 
   body[data-chrome='phone'][data-layout='split'] .checklist.checklist--mobile.checklist--mobile-closed {
-    top: max(56px, calc(env(safe-area-inset-top) + 44px)) !important;
+    top: max(72px, calc(env(safe-area-inset-top) + 56px)) !important;
     bottom: auto !important;
     left: max(12px, env(safe-area-inset-left)) !important;
     right: auto !important;
@@ -1878,6 +1878,22 @@ body:has(.building-panel--open) .chrome__lang {
   z-index: 24;
   pointer-events: none;
   overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  #ui-root > .chrome {
+    z-index: 18;
+  }
+
+  .building-map-labels {
+    z-index: 11;
+  }
+
+  body.search-palette-open .building-map-labels,
+  body.search-palette-open .building-map-labels .building-map-label {
+    visibility: hidden;
+    pointer-events: none !important;
+  }
 }
 
 .building-map-label {

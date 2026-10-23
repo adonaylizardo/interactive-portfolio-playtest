@@ -313,7 +313,43 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
       const view = await qa(page, () => document.getElementById('game-canvas').dataset.viewMode);
       if (view !== 'cenital') errors.push(`${tag}: tapping cenital left view ${view}`);
 
-      notes.push(`${tag}: M1 intro, M4 dock + 3 camera buttons, cenital tap → ${view}`);
+      const hudHits = await qa(page, () => {
+        const pick = (sel) => {
+          const el = document.querySelector(sel);
+          if (!el || getComputedStyle(el).display === 'none') return null;
+          const r = el.getBoundingClientRect();
+          if (r.width < 4 || r.height < 4) return null;
+          const x = Math.round(r.left + r.width / 2);
+          const y = Math.round(r.top + r.height / 2);
+          const hit = document.elementFromPoint(x, y);
+          const ok = hit === el || !!hit?.closest?.(sel);
+          return { sel, x, y, ok, hit: hit?.className?.slice?.(0, 48) ?? String(hit?.id ?? '') };
+        };
+        return [
+          pick('[data-action="search"]'),
+          pick('[data-action="sound"]'),
+          pick('.chrome__lang .ui-seg__opt.is-active, .chrome__lang [data-lang]'),
+        ].filter(Boolean);
+      });
+      for (const h of hudHits) {
+        if (!h.ok) errors.push(`${tag}: ${h.sel} blocked at ${h.x},${h.y} (hit ${h.hit})`);
+      }
+
+      await page.setViewportSize({ width: 390, height: 844 });
+      await wait(300);
+      const hud390 = await qa(page, () => {
+        const pick = (sel) => {
+          const el = document.querySelector(sel);
+          const r = el?.getBoundingClientRect();
+          if (!r?.width) return true;
+          const hit = document.elementFromPoint(Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2));
+          return hit === el || !!hit?.closest?.(sel);
+        };
+        return pick('[data-action="search"]') && pick('[data-action="sound"]');
+      });
+      if (!hud390) errors.push(`${tag}: HUD blocked at 390px width`);
+
+      notes.push(`${tag}: M1 intro, M4 dock + 3 camera buttons, cenital tap → ${view}, HUD hit-test ok`);
     }
   } finally {
     await ctx.close();

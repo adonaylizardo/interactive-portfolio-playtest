@@ -7,6 +7,7 @@ import {
   isMobileOrCoarsePointer,
   isTouchPrimary,
   loadChecklist,
+  resetChecklistForSession,
   saveChecklist,
   stepsForPlatform,
   totalStepsForPlatform,
@@ -251,6 +252,12 @@ export class ChecklistUI {
   }
 
   /** QA: set checklist progress through the real storage API (no render overrides). */
+  resetForNewSession(): void {
+    this.state = resetChecklistForSession();
+    this.qaPinnedIncomplete.clear();
+    this.render();
+  }
+
   setProgressForQa(completed: Partial<Record<ChecklistStepId, boolean>>): void {
     this.state = loadChecklist();
     for (const [id, done] of Object.entries(completed) as [ChecklistStepId, boolean][]) {

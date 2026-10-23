@@ -75,6 +75,13 @@ export function saveChecklist(state: ChecklistState): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+/** Fresh session after welcome “Start” — no steps credited from a prior visit. */
+export function resetChecklistForSession(): ChecklistState {
+  const state = defaultState();
+  saveChecklist(state);
+  return state;
+}
+
 export function countCompleted(state: ChecklistState, compact = isMobileOrCoarsePointer()): number {
   return stepsForPlatform(compact).filter((id) => state.completed[id]).length;
 }

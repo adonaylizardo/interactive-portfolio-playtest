@@ -136,15 +136,18 @@ async function main(): Promise<void> {
     }
   }
 
+  const mapPillsObscured = (): boolean =>
+    isReadingHash() ||
+    !!scene?.isInInterior() ||
+    chrome.isMobileSheetOpen() ||
+    panel.isOpen() ||
+    panel.isPreviewExpanded() ||
+    aboutPanel.isOpen() ||
+    searchPalette.isOpen();
+
   const syncMapOverlays = (): void => {
-    labels.setHidden(
-      isReadingHash() ||
-        (isMobileLayout() &&
-          (chrome.isMobileSheetOpen() ||
-            panel.isOpen() ||
-            aboutPanel.isOpen() ||
-            searchPalette.isOpen())),
-    );
+    labels.setHidden(isMobileLayout() ? mapPillsObscured() : isReadingHash());
+    mapLabels.setHidden(mapPillsObscured());
     scene?.applyCameraFromUi();
   };
 
@@ -173,14 +176,13 @@ async function main(): Promise<void> {
       else chrome.setLayout('map');
       panel.hide({ snap: true, silent: true });
       scene?.setReadingPaused(true);
-      mapLabels.setHidden(true);
-      scene?.applyCameraFromUi();
+      syncMapOverlays();
       return;
     }
     setHashWriteSuppressed(false);
     reading.syncRoute(null);
     scene?.setReadingPaused(false);
-    mapLabels.setHidden(false);
+    syncMapOverlays();
     if (!isMobileLayout()) chrome.setLayout('split');
     else chrome.restoreMobileSheetAfterReading();
     scene?.applyCameraFromUi();
@@ -195,7 +197,7 @@ async function main(): Promise<void> {
     setHashWriteSuppressed(false);
     reading.syncRoute(null);
     scene?.setReadingPaused(false);
-    mapLabels.setHidden(false);
+    syncMapOverlays();
     const interiorId = parseInteriorFromHash();
     if (interiorId) {
       syncInteriorPanel(interiorId);
@@ -432,12 +434,13 @@ async function main(): Promise<void> {
       const personaActive =
         personaEnabled() && view.mode === 'persona' && !scene.isInInterior();
       const hidePills =
-        view.overview || !!scene.isInInterior() || sheetOpen || personaActive ||
-        (isMobileLayout() && (panel.isOpen() || aboutPanel.isOpen() || searchPalette.isOpen()));
+        view.overview || !!scene.isInInterior() || sheetOpen || personaActive || mapPillsObscured();
       labels.setHidden(hidePills);
       if (!hidePills) labels.update(scene.nameLabelAnchors());
-      mapLabels.setHidden(!!scene.isInInterior() || view.mode === 'cenital' || view.mode === 'persona' || sheetOpen);
-      if (view.mode !== 'cenital' && view.mode !== 'persona' && !sheetOpen) {
+      const hideMapPills =
+        mapPillsObscured() || view.mode === 'cenital' || view.mode === 'persona' || sheetOpen;
+      mapLabels.setHidden(hideMapPills);
+      if (view.mode !== 'cenital' && view.mode !== 'persona' && !sheetOpen && !hideMapPills) {
         mapLabels.update(
           scene.buildingMapLabelAnchors().map((a) => ({
             ...a,
@@ -620,6 +623,7 @@ async function main(): Promise<void> {
   } else {
     const choice = await bootFlow.finishLoading(false);
     markWelcomeDone();
+    if (choice === 'start') checklist.resetForNewSession();
     if (choice === 'read') {
       enteredViaWelcomeRead = true;
       enterReadingFromWelcome();
