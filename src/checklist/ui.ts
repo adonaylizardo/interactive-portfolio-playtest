@@ -227,11 +227,14 @@ export class ChecklistUI {
     });
 
     window.addEventListener('resize', () => {
-      if (this.mobile && this.state.mobileExpanded) this.syncPhoneChecklistMode();
+      if (this.mobile) this.syncPhoneChecklistMode();
     });
 
     this.render();
-    onLangChange(() => this.render());
+    onLangChange(() => {
+      this.render();
+      if (this.mobile) this.syncPhoneChecklistMode();
+    });
   }
 
   private dismiss(callbacks: ChecklistCallbacks): void {
@@ -269,6 +272,7 @@ export class ChecklistUI {
         'checklist--phone-open',
         'checklist--intro-circle',
         'checklist--phone-pill-tight',
+        'checklist--phone-pill-compact',
       );
       this.reparentForLayout();
       return;

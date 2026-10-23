@@ -25,17 +25,22 @@ const POSITION_PROPS = [
 let cachedChecklistAnchorBottom: number | null = null;
 
 /** Call while the closed pill/circle is still in the top bar, before reparenting open. */
-export function cachePhoneChecklistAnchorBeforeOpen(): void {
-  const topbar = document.querySelector('.chrome__phone-topbar') as HTMLElement | null;
+function phoneTopBarControlsBottom(): number {
   const tools = document.querySelector('.chrome__tools-phone') as HTMLElement | null;
   const checklist = document.querySelector(
     '.chrome__phone-topbar-checklist .checklist',
   ) as HTMLElement | null;
   let bottom = 0;
-  if (topbar) bottom = Math.max(bottom, topbar.getBoundingClientRect().bottom);
   if (tools) bottom = Math.max(bottom, tools.getBoundingClientRect().bottom);
-  if (checklist) bottom = Math.max(bottom, checklist.getBoundingClientRect().bottom);
-  cachedChecklistAnchorBottom = bottom > 32 ? bottom : null;
+  if (checklist && checklist.getBoundingClientRect().height > 4) {
+    bottom = Math.max(bottom, checklist.getBoundingClientRect().bottom);
+  }
+  return bottom;
+}
+
+export function cachePhoneChecklistAnchorBeforeOpen(): void {
+  const bottom = phoneTopBarControlsBottom();
+  cachedChecklistAnchorBottom = bottom > 32 && bottom < 160 ? bottom : null;
 }
 
 export function clearPhoneChecklistAnchorCache(): void {
@@ -44,19 +49,16 @@ export function clearPhoneChecklistAnchorCache(): void {
 
 export function phoneOpenCardAnchorBottom(): number {
   const inset = 16;
-  if (cachedChecklistAnchorBottom != null && cachedChecklistAnchorBottom > inset + 20) {
+  const maxControlBottom = 160;
+  if (
+    cachedChecklistAnchorBottom != null &&
+    cachedChecklistAnchorBottom > inset + 20 &&
+    cachedChecklistAnchorBottom < maxControlBottom
+  ) {
     return cachedChecklistAnchorBottom;
   }
-  const topbar = document.querySelector('.chrome__phone-topbar') as HTMLElement | null;
-  if (topbar) {
-    const bar = topbar.getBoundingClientRect();
-    if (bar.height > 8) return bar.bottom;
-  }
-  const tools = document.querySelector('.chrome__tools-phone') as HTMLElement | null;
-  if (tools) {
-    const tr = tools.getBoundingClientRect();
-    if (tr.height > 8) return tr.bottom;
-  }
+  const bottom = phoneTopBarControlsBottom();
+  if (bottom > inset + 20 && bottom < maxControlBottom) return bottom;
   return inset + 52;
 }
 
@@ -145,20 +147,49 @@ function topbarChecklistSlotWidth(root: HTMLElement): number {
   return Math.max(48, barRect.right - inset - toolsRight - gap);
 }
 
-function measureClosedPillWidth(root: HTMLElement): number {
+function withClosedHeaderMeasure(
+  root: HTMLElement,
+  fn: (header: HTMLElement) => number,
+): number {
   const list = root.querySelector('.checklist__list') as HTMLElement | null;
   const foot = root.querySelector('.checklist__footer') as HTMLElement | null;
   const prevList = list?.style.display;
   const prevFoot = foot?.style.display;
   if (list) list.style.display = 'none';
   if (foot) foot.style.display = 'none';
-  root.classList.add('checklist--phone-pill');
   const header = root.querySelector('.checklist__header') as HTMLElement | null;
-  const needed = header?.scrollWidth ?? root.getBoundingClientRect().width;
-  root.classList.remove('checklist--phone-pill');
+  const value = header ? fn(header) : root.getBoundingClientRect().width;
   if (list) list.style.display = prevList ?? '';
   if (foot) foot.style.display = prevFoot ?? '';
-  return needed;
+  return value;
+}
+
+function measurePillHeaderWidths(root: HTMLElement): { full: number; compact: number } {
+  const prevPill = root.classList.contains('checklist--phone-pill');
+  const prevCompact = root.classList.contains('checklist--phone-pill-compact');
+  root.classList.add('checklist--phone-pill');
+  root.classList.remove('checklist--phone-pill-compact');
+  const full = withClosedHeaderMeasure(root, (h) => h.scrollWidth);
+  root.classList.add('checklist--phone-pill-compact');
+  const compact = withClosedHeaderMeasure(root, (h) => h.scrollWidth);
+  if (!prevPill) root.classList.remove('checklist--phone-pill');
+  if (!prevCompact) root.classList.remove('checklist--phone-pill-compact');
+  return { full, compact };
+}
+
+function applyPillCircleOrCompact(root: HTMLElement): void {
+  const available = topbarChecklistSlotWidth(root);
+  const { full, compact } = measurePillHeaderWidths(root);
+  root.classList.remove('checklist--phone-pill-compact');
+  if (full <= available + 2) {
+    root.classList.add('checklist--phone-pill');
+    return;
+  }
+  if (compact <= available + 2) {
+    root.classList.add('checklist--phone-pill', 'checklist--phone-pill-compact');
+    return;
+  }
+  root.classList.add('checklist--phone-circle', 'checklist--intro-circle');
 }
 
 export function applyPhoneChecklistMode(root: HTMLElement, mode: PhoneChecklistMode | null): void {
@@ -168,6 +199,7 @@ export function applyPhoneChecklistMode(root: HTMLElement, mode: PhoneChecklistM
     'checklist--phone-open',
     'checklist--intro-circle',
     'checklist--phone-pill-tight',
+    'checklist--phone-pill-compact',
   );
   clearPhoneChecklistInline(root);
 
@@ -194,9 +226,5 @@ export function applyPhoneChecklistMode(root: HTMLElement, mode: PhoneChecklistM
     return;
   }
 
-  root.classList.add('checklist--phone-pill');
-  if (measureClosedPillWidth(root) > topbarChecklistSlotWidth(root) + 2) {
-    root.classList.remove('checklist--phone-pill');
-    root.classList.add('checklist--phone-circle', 'checklist--intro-circle');
-  }
+  applyPillCircleOrCompact(root);
 }

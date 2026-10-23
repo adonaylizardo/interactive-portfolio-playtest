@@ -686,7 +686,6 @@ body:has(.building-panel--open) .chrome__lang {
     max-height: none !important;
     pointer-events: auto !important;
     box-shadow: none !important;
-    border-radius: inherit;
   }
 
   body[data-chrome='phone'][data-layout='map'] .checklist.checklist--mobile-closed {

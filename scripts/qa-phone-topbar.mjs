@@ -100,6 +100,17 @@ async function tapChecklistPill(page) {
 
 async function assertOpenCard(page, tag, errors) {
   await wait(350);
+  try {
+    await page.waitForFunction(
+      () => {
+        const cl = document.querySelector('.checklist.checklist--phone-open');
+        return cl != null && cl.getBoundingClientRect().top < 200;
+      },
+      { timeout: 4000 },
+    );
+  } catch {
+    /* evaluated below */
+  }
   const card = await page.evaluate(({ inset }) => {
       const overlapArea = (a, b) => {
         const ox = Math.min(a.right, b.right) - Math.max(a.left, b.left);
@@ -109,11 +120,9 @@ async function assertOpenCard(page, tag, errors) {
       const cl = document.querySelector('.checklist.checklist--phone-open');
       if (!cl) return { ok: false, why: 'no open card' };
       const rect = cl.getBoundingClientRect();
-      const topbar = document.querySelector('.chrome__phone-topbar');
       const tools = document.querySelector('.chrome__tools-phone');
       const closed = document.querySelector('.chrome__phone-topbar-checklist .checklist');
       let anchorBottom = inset + 52;
-      if (topbar) anchorBottom = Math.max(anchorBottom, topbar.getBoundingClientRect().bottom);
       if (tools) anchorBottom = Math.max(anchorBottom, tools.getBoundingClientRect().bottom);
       if (closed && closed.getBoundingClientRect().height > 8) {
         anchorBottom = Math.max(anchorBottom, closed.getBoundingClientRect().bottom);
@@ -214,6 +223,17 @@ async function assertCircleOk(page, tag, errors) {
   for (const f of d.failures) errors.push(`${tag}: ${f}`);
 }
 
+async function assertDockChecklistRadius(page, tag, errors) {
+  const d = await page.evaluate(() => {
+    const cl = document.querySelector('.chrome__phone-topbar-checklist .checklist');
+    if (!cl) return ['missing dock checklist'];
+    const br = parseFloat(getComputedStyle(cl).borderTopLeftRadius);
+    if (br < 20) return [`checklist not rounded in dock (radius ${br})`];
+    return [];
+  });
+  for (const f of d) errors.push(`${tag}: ${f}`);
+}
+
 async function assertPillLabel(page, tag, errors) {
   const d = await page.evaluate(() => {
     const cl = document.querySelector('.chrome__phone-topbar-checklist .checklist.checklist--phone-pill');
@@ -308,6 +328,7 @@ async function runViewport(viewportW, height, tag) {
     await wait(450);
     await assertTopBar(page, `${tag} dock`, errors);
     await assertPillLabel(page, `${tag} dock`, errors);
+    await assertDockChecklistRadius(page, `${tag} dock`, errors);
     await assertMapRecenter(page, `${tag} dock`, errors, true);
 
     await page.locator('.chrome__phone-topbar [data-lang="en"]').click();
@@ -347,6 +368,7 @@ const all = [];
 for (const [w, h, tag] of [
   [375, 812, '375x812'],
   [390, 844, '390x844'],
+  [414, 896, '414x896'],
 ]) {
   all.push(...(await runViewport(w, h, tag)));
 }
