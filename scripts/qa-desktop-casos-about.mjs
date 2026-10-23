@@ -65,53 +65,98 @@ const page = await ctx.newPage();
 try {
   await dismissWelcome(page);
 
-  async function assertPeekHit(layout, expectSplitDock) {
+  async function assertPeekHit(layout, expectSplitDock, viaCasosRow = false) {
     await page.evaluate((mode) => window.__playtestQa.setLayout(mode), layout);
-    await page.evaluate(() => window.__playtestQa.showCasePreview('volaris'));
-    await wait(600);
-    const peekShot = path.join(OUT, `case-peek-1440-${layout}.png`);
+    if (viaCasosRow) {
+      await page.locator('#chrome-casos .chrome__case-row[data-locate="volaris"]').click();
+      await page.waitForFunction(
+        () =>
+          document.querySelector(
+            '.building-panel--preview.building-panel--peek.building-panel--open',
+          ) != null,
+        { timeout: 120000 },
+      );
+      await wait(400);
+    } else {
+      await page.evaluate(() => window.__playtestQa.showCasePreview('volaris'));
+      await wait(600);
+    }
+    const peekShot = path.join(OUT, `case-peek-1440-${layout}${viaCasosRow ? '-casos-row' : ''}.png`);
     await page.screenshot({ path: peekShot });
-    const colRight = 64 + 432;
-    const minLeft = expectSplitDock ? colRight + 16 : 64;
-    const maxLeft = expectSplitDock ? colRight + 24 : 80;
+    const colInset = 12;
+    const colLeft = 64;
+    const colWidth = 432;
+    const wantLeft = expectSplitDock ? colLeft + colInset : 64;
+    const wantWidth = expectSplitDock ? colWidth - colInset * 2 : 432;
+    const maxLeft = expectSplitDock ? wantLeft + 4 : 80;
     const hit = await page.evaluate(
-      ({ minLeft, expectSplitDock }) => {
+      ({ colInset, expectSplitDock }) => {
         const sheet = document.querySelector('.building-panel__sheet');
         const col = document.querySelector('.chrome__column');
         const r = sheet?.getBoundingClientRect();
         const colR = col?.getBoundingClientRect();
-        const cx = r ? r.left + r.width / 2 : 0;
-        const cy = r ? r.top + r.height / 2 : 0;
-        const top = document.elementFromPoint(cx, cy);
-        const onPeek =
-          !!top &&
-          (top.closest('.building-panel__sheet') != null ||
-            top.closest('.case-preview') != null);
+        const points = r
+          ? [
+              { name: 'center', x: r.left + r.width / 2, y: r.top + r.height / 2 },
+              { name: 'tl', x: r.left + 8, y: r.top + 8 },
+              { name: 'tr', x: r.right - 8, y: r.top + 8 },
+              { name: 'bl', x: r.left + 8, y: r.bottom - 8 },
+              { name: 'br', x: r.right - 8, y: r.bottom - 8 },
+            ]
+          : [];
+        const samples = points.map((p) => {
+          const top = document.elementFromPoint(p.x, p.y);
+          return {
+            ...p,
+            onPeek:
+              !!top &&
+              (top.closest('.building-panel__sheet') != null ||
+                top.closest('.case-preview') != null),
+            topTag: top?.className?.slice?.(0, 48) ?? String(top),
+          };
+        });
+        const insideCol =
+          !!r &&
+          !!colR &&
+          r.left >= colR.left + colInset - 1 &&
+          r.right <= colR.right - colInset + 1 &&
+          r.bottom <= colR.bottom - colInset + 1;
         return {
           layout: document.body.dataset.layout,
           sheetLeft: r?.left,
           sheetWidth: r?.width,
+          sheetBottom: r?.bottom,
           colRight: colR?.right,
-          onPeek,
-          topTag: top?.className?.slice?.(0, 60) ?? String(top),
+          insideCol,
+          samples,
         };
       },
-      { minLeft, expectSplitDock },
+      { colInset, expectSplitDock },
     );
-    notes.push(`peek ${layout} ${JSON.stringify(hit)}`);
+    notes.push(`peek ${layout}${viaCasosRow ? ' casos-row' : ''} ${JSON.stringify(hit)}`);
     if (hit.layout !== layout) errors.push(`peek ${layout}: body layout ${hit.layout}`);
-    if (!hit.sheetLeft || hit.sheetLeft < minLeft - 2) {
-      errors.push(`peek ${layout}: left ${hit.sheetLeft} (want >= ${minLeft})`);
+    if (expectSplitDock && !hit.insideCol) {
+      errors.push(`peek split: sheet not inside column inset (${JSON.stringify(hit)})`);
+    }
+    if (!hit.sheetLeft || Math.abs(hit.sheetLeft - wantLeft) > 3) {
+      errors.push(`peek ${layout}: left ${hit.sheetLeft} (want ~${wantLeft})`);
+    }
+    if (!hit.sheetWidth || Math.abs(hit.sheetWidth - wantWidth) > 4) {
+      errors.push(`peek ${layout}: width ${hit.sheetWidth} (want ~${wantWidth})`);
     }
     if (!expectSplitDock && hit.sheetLeft > maxLeft) {
-      errors.push(`peek map: left ${hit.sheetLeft} (want ~64, under column)`);
+      errors.push(`peek map: left ${hit.sheetLeft} (want ~64)`);
     }
-    if (!hit.onPeek) errors.push(`peek ${layout}: elementFromPoint center not on peek (${hit.topTag})`);
+    for (const s of hit.samples ?? []) {
+      if (!s.onPeek) {
+        errors.push(`peek ${layout}: elementFromPoint ${s.name} not on peek (${s.topTag})`);
+      }
+    }
     await page.evaluate(() => window.__playtestQa.dismissBuildingPanel());
     await wait(200);
   }
 
-  await assertPeekHit('split', true);
+  await assertPeekHit('split', true, true);
   await assertPeekHit('map', false);
 
   await page.evaluate(() => window.__playtestQa.showCasePreview('bain'));

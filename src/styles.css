@@ -3545,18 +3545,24 @@ body:has(.building-panel--open) .chrome__lang {
   }
 
   body[data-layout='split']:has(.building-panel--preview.building-panel--peek.building-panel--open)
+    #ui-root > .building-panel.building-panel--preview {
+    z-index: 30;
+  }
+
+  body[data-layout='split']:has(.building-panel--preview.building-panel--peek.building-panel--open)
     .building-panel__sheet {
     z-index: 28;
   }
 
-  /* Casos list (split): peek sits beside the column, not underneath it. */
+  /* Casos list (split): peek docks inside the column bottom, over the list. */
   body[data-layout='split']:has(.building-panel--preview.building-panel--peek.building-panel--open)
     .building-panel--preview.building-panel--peek
     .building-panel__sheet {
-    left: calc(64px + 432px + 16px);
+    left: calc(64px + 12px);
     right: auto;
-    width: 432px;
-    max-width: 432px;
+    bottom: 12px;
+    width: calc(432px - 24px);
+    max-width: calc(432px - 24px);
   }
 
   body:has(.building-panel--preview.building-panel--expanded) #game-canvas {
