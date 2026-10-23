@@ -1,0 +1,46 @@
+{
+  "name": "interactive-portfolio-playtest",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "build:preview-edificios": "tsc && vite build --base /interactive-portfolio-playtest/preview-edificios/",
+    "build:preview-contenido": "tsc && vite build --base /interactive-portfolio-playtest/preview-contenido/",
+    "build:preview-camaras": "tsc && vite build --base /interactive-portfolio-playtest/preview-camaras/",
+    "build:preview-persona": "tsc && vite build --base /interactive-portfolio-playtest/preview-persona/",
+    "build:preview-integracion": "tsc && vite build --base /interactive-portfolio-playtest/preview-integracion/",
+    "deploy:preview-contenido": "DEPLOY_TARGET=preview-contenido node scripts/deploy-gh-pages.mjs --preview-contenido",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview",
+    "qa": "npm run build && node scripts/qa.mjs",
+    "qa:pinch": "npm run build && node scripts/qa-pinch.mjs",
+    "qa:sprites": "npm run build && node scripts/qa-sprites.mjs",
+    "qa:smoke": "npm run build && node scripts/qa-smoke.mjs",
+    "qa:gate": "npm run build && npm run typecheck && node scripts/check-logos.mjs && node scripts/check-case-copy.mjs && node scripts/qa-sprites.mjs && node scripts/qa-smoke.mjs",
+    "verify:jac-drive": "node scripts/verify-jac-drive.mjs",
+    "verify:edificios": "npm run build:preview-edificios && node scripts/verify-edificios.mjs",
+    "verify:camera-views": "node scripts/verify-camera-views.mjs",
+    "compress:sprites": "node scripts/compress-sprites.mjs",
+    "check:logos": "node scripts/check-logos.mjs",
+    "check:cases": "node scripts/check-case-copy.mjs",
+    "test:about-intro": "node scripts/test-about-intro-split.mjs",
+    "deploy:gh-pages": "node scripts/deploy-gh-pages.mjs",
+    "deploy:preview": "node scripts/deploy-gh-pages.mjs",
+    "deploy:preview-camaras": "DEPLOY_TARGET=preview-camaras node scripts/deploy-gh-pages.mjs",
+    "deploy:preview-persona": "DEPLOY_TARGET=preview-persona node scripts/deploy-gh-pages.mjs",
+    "deploy:preview-integracion": "DEPLOY_TARGET=preview-integracion node scripts/deploy-gh-pages.mjs",
+    "verify:preview-persona": "node scripts/verify-preview-persona.mjs",
+    "deploy:live": "DEPLOY_TARGET=live node scripts/deploy-gh-pages.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.0",
+    "pngjs": "^7.0.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.7"
+  },
+  "dependencies": {
+    "pixi.js": "^8.14.0"
+  }
+}
