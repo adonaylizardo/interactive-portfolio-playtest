@@ -3549,6 +3549,16 @@ body:has(.building-panel--open) .chrome__lang {
     z-index: 28;
   }
 
+  /* Casos list (split): peek sits beside the column, not underneath it. */
+  body[data-layout='split']:has(.building-panel--preview.building-panel--peek.building-panel--open)
+    .building-panel--preview.building-panel--peek
+    .building-panel__sheet {
+    left: calc(64px + 432px + 16px);
+    right: auto;
+    width: 432px;
+    max-width: 432px;
+  }
+
   body:has(.building-panel--preview.building-panel--expanded) #game-canvas {
     visibility: hidden;
   }

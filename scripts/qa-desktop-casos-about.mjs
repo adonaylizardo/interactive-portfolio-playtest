@@ -65,17 +65,59 @@ const page = await ctx.newPage();
 try {
   await dismissWelcome(page);
 
+  async function assertPeekHit(layout, expectSplitDock) {
+    await page.evaluate((mode) => window.__playtestQa.setLayout(mode), layout);
+    await page.evaluate(() => window.__playtestQa.showCasePreview('volaris'));
+    await wait(600);
+    const peekShot = path.join(OUT, `case-peek-1440-${layout}.png`);
+    await page.screenshot({ path: peekShot });
+    const colRight = 64 + 432;
+    const minLeft = expectSplitDock ? colRight + 16 : 64;
+    const maxLeft = expectSplitDock ? colRight + 24 : 80;
+    const hit = await page.evaluate(
+      ({ minLeft, expectSplitDock }) => {
+        const sheet = document.querySelector('.building-panel__sheet');
+        const col = document.querySelector('.chrome__column');
+        const r = sheet?.getBoundingClientRect();
+        const colR = col?.getBoundingClientRect();
+        const cx = r ? r.left + r.width / 2 : 0;
+        const cy = r ? r.top + r.height / 2 : 0;
+        const top = document.elementFromPoint(cx, cy);
+        const onPeek =
+          !!top &&
+          (top.closest('.building-panel__sheet') != null ||
+            top.closest('.case-preview') != null);
+        return {
+          layout: document.body.dataset.layout,
+          sheetLeft: r?.left,
+          sheetWidth: r?.width,
+          colRight: colR?.right,
+          onPeek,
+          topTag: top?.className?.slice?.(0, 60) ?? String(top),
+        };
+      },
+      { minLeft, expectSplitDock },
+    );
+    notes.push(`peek ${layout} ${JSON.stringify(hit)}`);
+    if (hit.layout !== layout) errors.push(`peek ${layout}: body layout ${hit.layout}`);
+    if (!hit.sheetLeft || hit.sheetLeft < minLeft - 2) {
+      errors.push(`peek ${layout}: left ${hit.sheetLeft} (want >= ${minLeft})`);
+    }
+    if (!expectSplitDock && hit.sheetLeft > maxLeft) {
+      errors.push(`peek map: left ${hit.sheetLeft} (want ~64, under column)`);
+    }
+    if (!hit.onPeek) errors.push(`peek ${layout}: elementFromPoint center not on peek (${hit.topTag})`);
+    await page.evaluate(() => window.__playtestQa.dismissBuildingPanel());
+    await wait(200);
+  }
+
+  await assertPeekHit('split', true);
+  await assertPeekHit('map', false);
+
   await page.evaluate(() => window.__playtestQa.showCasePreview('bain'));
   await wait(600);
-  const peekBox = await page.locator('.building-panel__sheet').boundingBox();
   const peekShot = path.join(OUT, 'case-peek-1440.png');
   await page.screenshot({ path: peekShot });
-  if (!peekBox || peekBox.x > 80 || peekBox.x + peekBox.width > 520) {
-    errors.push(`peek dock: sheet x=${peekBox?.x} w=${peekBox?.width} (want left column ~64–496)`);
-  }
-  if (peekBox && peekBox.y < 400) {
-    errors.push(`peek dock: sheet y=${peekBox.y} (want bottom of sidebar)`);
-  }
 
   const chromeHidden = await page.evaluate(() => {
     const checklist = document.querySelector('.checklist');
