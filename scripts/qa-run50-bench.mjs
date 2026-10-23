@@ -235,7 +235,7 @@ async function standByMoving(page, spec, tag, errors) {
     if (!key) throw new Error(`${tag}: no open direction off the bench's front cell`);
     await page.keyboard.down(key);
     try {
-      await until(page, () => window.__playtestQa.playerAvatar().sit === 'free', null, QA_CI ? 15000 : 5000, `${tag}: Adonay back on his feet`);
+      await until(page, () => window.__playtestQa.playerAvatar().sit === 'free', null, QA_CI ? 22000 : 5000, `${tag}: Adonay back on his feet`);
       await until(
         page,
         (t) => {

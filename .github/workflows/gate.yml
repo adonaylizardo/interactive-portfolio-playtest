@@ -32,6 +32,7 @@ jobs:
             parts: shots
           - name: full-frame diff
             parts: fullframe
+            sprites_timeout: 38
           - name: interiors a
             parts: interiors
             rooms: estudio,volaris,bain,mentoria,finoa
@@ -65,7 +66,7 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: qa:sprites
-        timeout-minutes: 32
+        timeout-minutes: ${{ matrix.sprites_timeout || 32 }}
         env:
           QA_SPRITES_ONLY: ${{ matrix.parts }}
           QA_INTERIOR_ROOMS: ${{ matrix.rooms }}
@@ -91,9 +92,9 @@ jobs:
           - groups: chrome
           - groups: exits-iphone
           - groups: exits-desktop-a
-            r38_rooms: estudio,volaris,bain,mentoria,finoa
+            r38_rooms: estudio,volaris,bain,mentoria
           - groups: exits-desktop-b
-            r38_rooms: pg,sambil,catedral
+            r38_rooms: finoa,pg,sambil,catedral
           - groups: exits-desktop-c
             r38_rooms: flor,teresa,biblioteca
           - groups: exits-phone

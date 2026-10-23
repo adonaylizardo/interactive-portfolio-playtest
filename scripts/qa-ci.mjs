@@ -16,6 +16,7 @@ export function ciContextOptions(options = {}) {
 
 function isWebkitKind(entry) {
   if (typeof entry === 'string') return entry.includes('webkit');
+  if (Array.isArray(entry) && typeof entry[0] === 'string') return entry[0].includes('webkit');
   const name = entry?.tag ?? entry?.kind ?? '';
   return String(name).includes('webkit');
 }

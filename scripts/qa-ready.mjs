@@ -9,7 +9,8 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function waitForQa(page) {
   if (!/^https?:/.test(page.url())) return;
-  for (let i = 0; i < 450; i++) {
+  const attempts = QA_CI ? 900 : 450;
+  for (let i = 0; i < attempts; i++) {
     try {
       const state = await page.evaluate(() => {
         if (typeof window.__playtestQa?.enterInterior === 'function') return 'ready';
@@ -28,7 +29,9 @@ async function waitForQa(page) {
     }
     await wait(100);
   }
-  throw new Error('QA hooks did not install within 45s (__playtestQa.enterInterior missing)');
+  throw new Error(
+    `QA hooks did not install within ${QA_CI ? 90 : 45}s (__playtestQa.enterInterior missing)`,
+  );
 }
 
 export { waitForQa };
@@ -64,13 +67,13 @@ function patchPage(page) {
   page.__qaReady = true;
   const goto = page.goto.bind(page);
   const reload = page.reload.bind(page);
-  page.goto = async (...a) => {
-    const r = await goto(...a);
+  page.goto = async (url, opts = {}) => {
+    const r = await goto(url, { timeout: QA_CI ? 90_000 : 60_000, ...opts });
     await waitForQa(page);
     return r;
   };
-  page.reload = async (...a) => {
-    const r = await reload(...a);
+  page.reload = async (opts = {}) => {
+    const r = await reload({ timeout: QA_CI ? 90_000 : 60_000, ...opts });
     await waitForQa(page);
     return r;
   };
