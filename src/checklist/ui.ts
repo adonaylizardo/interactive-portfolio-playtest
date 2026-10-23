@@ -2,6 +2,12 @@ import { studio } from '../audio/studio';
 import { figmaAsset } from '../ui/figmaAssets';
 import { onLangChange, t } from '../ui/i18n';
 import {
+  applyPhoneChecklistMode,
+  clearPhoneChecklistInline,
+  derivePhoneChecklistMode,
+  readPhoneChromeSnapshot,
+} from './phoneMode';
+import {
   countCompleted,
   isChecklistHidden,
   isMobileOrCoarsePointer,
@@ -83,10 +89,18 @@ export class ChecklistUI {
   private compactSteps = isMobileOrCoarsePointer();
   private mobile = isMobileLayout();
   private panelOpen = false;
+  private desktopHost: HTMLElement;
+  private phoneHost: HTMLElement | null;
   /** Steps explicitly cleared via setProgressForQa stay incomplete until QA updates them. */
   private qaPinnedIncomplete = new Set<ChecklistStepId>();
 
-  constructor(container: HTMLElement, callbacks: ChecklistCallbacks) {
+  constructor(
+    desktopHost: HTMLElement,
+    callbacks: ChecklistCallbacks,
+    opts?: { phoneHost?: HTMLElement | null },
+  ) {
+    this.desktopHost = desktopHost;
+    this.phoneHost = opts?.phoneHost ?? null;
     this.state = loadChecklist();
     this.root = document.createElement('aside');
     this.root.className = 'checklist';
@@ -148,7 +162,7 @@ export class ChecklistUI {
       </footer>
     `;
 
-    container.appendChild(this.root);
+    this.desktopHost.appendChild(this.root);
     this.listEl = this.root.querySelector('.checklist__list')!;
     this.counterEl = this.root.querySelector('.checklist__counter--label')!;
     this.counterInRing = this.root.querySelector('.checklist__counter--in-ring')!;
@@ -168,10 +182,8 @@ export class ChecklistUI {
     this.ringBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       if (this.mobile) {
-        const anchor = this.ringBtn.getBoundingClientRect();
         this.state.mobileExpanded = !this.state.mobileExpanded;
         this.applyLayoutClasses();
-        this.positionMobileExpanded(anchor);
         saveChecklist(this.state);
         return;
       }
@@ -209,6 +221,10 @@ export class ChecklistUI {
       this.render();
     });
 
+    window.addEventListener('resize', () => {
+      if (this.mobile && this.state.mobileExpanded) this.syncPhoneChecklistMode();
+    });
+
     this.render();
     onLangChange(() => this.render());
   }
@@ -230,7 +246,41 @@ export class ChecklistUI {
   }
 
   syncFromChrome(): void {
+    this.syncPhoneChecklistMode();
     this.render();
+  }
+
+  /** Single entry: derive pill / circle / open-card from chrome + clear stale inline layout. */
+  applyPhoneChecklistMode(): void {
+    this.syncPhoneChecklistMode();
+  }
+
+  syncPhoneChecklistMode(): void {
+    if (!this.mobile) {
+      clearPhoneChecklistInline(this.root);
+      this.root.classList.remove(
+        'checklist--phone-pill',
+        'checklist--phone-circle',
+        'checklist--phone-open',
+        'checklist--intro-circle',
+        'checklist--phone-pill-tight',
+      );
+      this.reparentForLayout();
+      return;
+    }
+    const snap = readPhoneChromeSnapshot(this.state, this.panelOpen);
+    const mode = derivePhoneChecklistMode(snap);
+    if (mode === 'open') {
+      if (this.root.parentElement !== this.desktopHost) this.desktopHost.appendChild(this.root);
+    } else {
+      this.reparentForLayout();
+    }
+    applyPhoneChecklistMode(this.root, mode);
+  }
+
+  private reparentForLayout(): void {
+    const target = this.mobile && this.phoneHost ? this.phoneHost : this.desktopHost;
+    if (this.root.parentElement !== target) target.appendChild(this.root);
   }
 
   isMobileExpanded(): boolean {
@@ -277,62 +327,6 @@ export class ChecklistUI {
     this.render();
   }
 
-  private positionMobileExpanded(anchorBeforeToggle?: DOMRect): void {
-    if (!this.mobile || !this.state.mobileExpanded) {
-      this.root.classList.remove('checklist--anchored');
-      for (const prop of ['top', 'bottom', 'left', 'right', 'width', 'maxHeight'] as const) {
-        this.root.style.removeProperty(prop);
-      }
-      return;
-    }
-    const header = this.root.querySelector('.checklist__header')?.getBoundingClientRect();
-    const anchor = anchorBeforeToggle ?? this.ringBtn.getBoundingClientRect();
-    if (anchor.width < 2 && (!header || header.width < 2)) return;
-    const layout = document.body.dataset.layout;
-    const margin = 8;
-    const inset = 16;
-    const width = Math.min(360, window.innerWidth - inset * 2);
-    const anchorRight = header?.right ?? anchor.right;
-    const anchorBottom = header?.bottom ?? anchor.bottom;
-    let left = Math.max(inset, anchorRight - width);
-    let top: number;
-    let bottom: number | null = null;
-    let maxH: number;
-    const introSheet = document.querySelector('.chrome.chrome--sheet');
-    const useTopAnchor = layout !== 'map' || !!introSheet;
-    if (!useTopAnchor) {
-      bottom = Math.max(12, window.innerHeight - anchor.top + margin);
-      maxH = Math.min(window.innerHeight * 0.52, anchor.top - margin - 12);
-      top = NaN;
-      left = Math.min(Math.max(12, anchor.left), window.innerWidth - width - 12);
-    } else {
-      top = anchorBottom + margin;
-      left = window.innerWidth - inset - width;
-      maxH = Math.min(window.innerHeight * 0.52, window.innerHeight - top - 12);
-      const peek = document.querySelector('.chrome__intro')?.getBoundingClientRect();
-      if (peek && peek.height > 24) {
-        maxH = Math.min(maxH, Math.max(120, peek.top - top - margin));
-      }
-    }
-    if (!Number.isNaN(top)) {
-      top = Math.min(Math.max(inset, top), window.innerHeight - 120);
-    }
-    left = Math.max(inset, Math.min(left, window.innerWidth - width - inset));
-    this.root.classList.add('checklist--anchored');
-    this.root.style.setProperty('width', `${width}px`, 'important');
-    this.root.style.setProperty('left', `${left}px`, 'important');
-    this.root.style.setProperty('right', 'auto', 'important');
-    if (bottom != null) {
-      this.root.style.setProperty('bottom', `${bottom}px`, 'important');
-      this.root.style.setProperty('top', 'auto', 'important');
-    } else {
-      const clampedTop = Math.max(margin, Math.min(top, window.innerHeight - Math.max(120, maxH) - margin));
-      this.root.style.setProperty('top', `${clampedTop}px`, 'important');
-      this.root.style.setProperty('bottom', 'auto', 'important');
-    }
-    this.root.style.setProperty('max-height', `${Math.max(120, maxH)}px`, 'important');
-  }
-
   private applyLayoutClasses(): void {
     this.mobile = isMobileLayout();
     const total = totalStepsForPlatform(this.compactSteps);
@@ -353,19 +347,8 @@ export class ChecklistUI {
       'checklist-mobile-expanded',
       this.mobile && !hidden && this.state.mobileExpanded === true,
     );
-    const introCircle =
-      this.mobile &&
-      !this.state.mobileExpanded &&
-      !!document.querySelector('.chrome.chrome--intro-expanded');
-    this.root.classList.toggle('checklist--intro-circle', introCircle);
-    if (this.mobile && this.state.mobileExpanded) {
-      this.positionMobileExpanded();
-    } else if (this.mobile) {
-      this.root.classList.remove('checklist--anchored');
-      for (const prop of ['top', 'bottom', 'left', 'right', 'width', 'maxHeight'] as const) {
-        this.root.style.removeProperty(prop);
-      }
-    }
+    this.reparentForLayout();
+    this.syncPhoneChecklistMode();
   }
 
   complete(step: ChecklistStepId): void {

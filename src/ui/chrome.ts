@@ -144,6 +144,10 @@ export class ChromeUI {
     return this.layout;
   }
 
+  phoneChecklistHost(): HTMLElement {
+    return this.root.querySelector('[data-phone-checklist-host]') as HTMLElement;
+  }
+
   isMobileSheetOpen(): boolean {
     return this.mobile && this.mobileSheet && !this.interiorOpen && !isLandscapePhone();
   }
@@ -166,6 +170,7 @@ export class ChromeUI {
       /* ignore */
     }
     this.sync();
+    this.callbacks.onLayoutChange({ silent: true });
   }
 
   expandIntroDetail(scrollTarget?: string): void {
@@ -347,11 +352,14 @@ export class ChromeUI {
         </div>
       </aside>
       <button type="button" class="chrome__tab" data-action="show-panel" aria-label="Show panel">${iconSvg('chevron')}</button>
-      <div class="chrome__tools-phone">
-        ${roundBtn('search', 'Buscar', '', 'search')}
-        ${roundBtn('sound', 'Sonido', '', 'sound')}
-        ${roundBtn('locate', 'Center on Adonay', '', 'center')}
-      </div>
+      <header class="chrome__phone-topbar" data-phone-topbar>
+        <div class="chrome__tools-phone">
+          ${roundBtn('search', 'Buscar', '', 'search')}
+          ${roundBtn('sound', 'Sonido', '', 'sound')}
+          ${roundBtn('locate', 'Center on Adonay', '', 'center')}
+        </div>
+        <div class="chrome__phone-topbar-checklist" data-phone-checklist-host></div>
+      </header>
       <div class="chrome__intro" data-intro>
         <div class="chrome__sheet-grab" data-intro-grab aria-hidden="true"><span></span></div>
         <div class="chrome__intro-toolbar" data-intro-toolbar hidden>
@@ -859,8 +867,7 @@ export class ChromeUI {
       this.mobile && this.mobileSheet && !this.interiorOpen && !landscapeSide && !introExpanded,
     );
     this.root.classList.toggle('chrome--intro-expanded', introExpanded);
-    this.mountIntroLang(introExpanded);
-    this.mountDockLang();
+    this.syncMobileLang();
     this.root.classList.toggle('chrome--dock', this.mobile && !this.mobileSheet && !this.interiorOpen);
     this.root.classList.toggle('chrome--map', !this.mobile && this.layout === 'map');
     this.root.classList.toggle('chrome--panel', !this.mobile && this.layout === 'panel');
@@ -1027,9 +1034,10 @@ export class ChromeUI {
 
   private langHome: HTMLElement | null = null;
 
-  private mountIntroLang(introExpanded: boolean): void {
+  private syncMobileLang(): void {
     const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
-    const host = this.root.querySelector('[data-intro-lang-host]') as HTMLElement | null;
+    const tools = this.root.querySelector('.chrome__tools-phone') as HTMLElement | null;
+    const soundBtn = tools?.querySelector('[data-action="sound"]');
     if (!lang) return;
     if (!this.langHome) {
       this.langHome = document.createElement('span');
@@ -1037,38 +1045,19 @@ export class ChromeUI {
       this.langHome.setAttribute('aria-hidden', 'true');
       lang.after(this.langHome);
     }
-    if (this.mobile && this.mobileSheet && !this.interiorOpen && introExpanded && host) {
-      if (lang.parentElement !== host) host.appendChild(lang);
-      lang.classList.add('chrome__lang--in-intro');
+    const searchBtn = tools?.querySelector('[data-action="search"]');
+    lang.classList.remove('chrome__lang--in-intro', 'chrome__lang--in-tools');
+    if (this.mobile && !this.interiorOpen && tools) {
+      if (lang.parentElement !== tools) {
+        if (searchBtn?.nextSibling) tools.insertBefore(lang, searchBtn.nextSibling);
+        else if (soundBtn) tools.insertBefore(lang, soundBtn);
+        else tools.appendChild(lang);
+      }
+      lang.classList.add('chrome__lang--in-tools');
       return;
     }
     if (lang.parentElement !== this.root && this.langHome.parentElement === this.root) {
       this.langHome.before(lang);
-    }
-    lang.classList.remove('chrome__lang--in-intro');
-  }
-
-  private mountDockLang(): void {
-    const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
-    const tools = this.root.querySelector('.chrome__tools-phone') as HTMLElement | null;
-    if (!lang) return;
-    if (!this.langHome) {
-      this.langHome = document.createElement('span');
-      this.langHome.hidden = true;
-      this.langHome.setAttribute('aria-hidden', 'true');
-      lang.after(this.langHome);
-    }
-    const dock = this.mobile && !this.mobileSheet && !this.interiorOpen;
-    if (dock && tools) {
-      if (lang.parentElement !== tools) tools.appendChild(lang);
-      lang.classList.add('chrome__lang--in-tools');
-      return;
-    }
-    if (lang.classList.contains('chrome__lang--in-tools')) {
-      if (lang.parentElement !== this.root && this.langHome.parentElement === this.root) {
-        this.langHome.before(lang);
-      }
-      lang.classList.remove('chrome__lang--in-tools');
     }
   }
 

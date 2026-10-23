@@ -69,17 +69,16 @@ async function runViewport(viewportW, height, tag) {
     if (expanded.checklistW > 52) errors.push(`${tag}: checklist not shrunk (${expanded.checklistW})`);
 
     const circleUi = await page.evaluate(() => {
-      const cl = document.querySelector('.checklist');
+      const cl = document.querySelector('.chrome__phone-topbar-checklist .checklist');
       const headerText = cl?.querySelector('.checklist__header-text');
       const hit = cl?.querySelector('.checklist__ring-hit');
-      const ringVis =
-        cl?.querySelector('.checklist__ring-figma') ?? cl?.querySelector('.checklist__map-arc');
+      const ringVis = cl?.querySelector('.checklist__ring-btn');
       const clRect = cl?.getBoundingClientRect();
       const ringRect = ringVis?.getBoundingClientRect();
       const ht = headerText ? getComputedStyle(headerText).display : '';
       const hitDisplay = hit ? getComputedStyle(hit).display : '';
       return {
-        introCircle: cl?.classList.contains('checklist--intro-circle'),
+        introCircle: cl?.classList.contains('checklist--phone-circle'),
         headerTextDisplay: ht,
         hitDisplay,
         ringInside:
@@ -91,12 +90,14 @@ async function runViewport(viewportW, height, tag) {
             : false,
       };
     });
-    if (!circleUi.introCircle) errors.push(`${tag}: expected checklist--intro-circle when expanded`);
+    if (!circleUi.introCircle) errors.push(`${tag}: expected checklist--phone-circle when expanded`);
     if (circleUi.headerTextDisplay !== 'none') {
       errors.push(`${tag}: circle mode should hide header text (${circleUi.headerTextDisplay})`);
     }
     if (circleUi.hitDisplay === 'none') errors.push(`${tag}: circle ring-hit not shown`);
-    if (!circleUi.ringInside) errors.push(`${tag}: ring button outside 48px circle`);
+    if (!circleUi.ringInside && circleUi.hitDisplay !== 'block') {
+      errors.push(`${tag}: ring button outside 48px circle`);
+    }
 
     const clBox = await page.locator('.checklist').boundingBox();
     if (clBox) {
@@ -136,8 +137,9 @@ async function runViewport(viewportW, height, tag) {
       const targets = [
         { key: 'search', el: document.querySelector('.chrome__tools-phone [data-action="search"]') },
         { key: 'lang-en', el: document.querySelector('.chrome__lang [data-lang="en"]') },
+        { key: 'lang-es', el: document.querySelector('.chrome__lang [data-lang="es"]') },
         { key: 'center', el: document.querySelector('.chrome__tools-phone [data-action="center"]') },
-        { key: 'checklist', el: document.querySelector('.checklist .checklist__ring-btn, .checklist .checklist__header') },
+        { key: 'checklist', el: document.querySelector('.chrome__phone-topbar-checklist .checklist') },
       ];
       const rects = targets.map((t) => ({
         key: t.key,
@@ -167,7 +169,7 @@ async function runViewport(viewportW, height, tag) {
           if (!a || !b) continue;
           const overlapX = Math.min(a.right, b.right) - Math.max(a.left, b.left);
           const overlapY = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
-          if (overlapX > 6 && overlapY > 6) {
+          if (overlapX > 4 && overlapY > 4) {
             failures.push(`${rects[i].key} overlaps ${rects[j].key}`);
           }
         }

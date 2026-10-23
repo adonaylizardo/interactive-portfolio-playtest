@@ -65,7 +65,7 @@ async function main(): Promise<void> {
   document.documentElement.lang = getLang();
   onLangChange(applyCanvasLabel);
 
-  const checklist = new ChecklistUI(uiRoot, { onSkip: () => {}, onDismiss: () => {} });
+  let checklist!: ChecklistUI;
 
   const bootFlow = new BootFlow();
   bootFlow.mount();
@@ -211,6 +211,7 @@ async function main(): Promise<void> {
       } else {
         chrome.restoreMobileSheetAfterReading();
       }
+      checklist.syncFromChrome();
     }
     scene?.applyCameraFromUi();
   };
@@ -243,8 +244,7 @@ async function main(): Promise<void> {
     onLayoutChange: () => {
       const layout = chrome.getLayout();
       if (isMobileLayout()) {
-        checklist.collapseMobile();
-        checklist.syncFromChrome();
+        checklist?.syncFromChrome();
       } else if (layout === 'map' || layout === 'panel' || isReadingHash()) checklist.setCollapsed(true);
       syncMapOverlays();
       scene?.reflowViewport();
@@ -274,6 +274,12 @@ async function main(): Promise<void> {
     },
     onReadingClose: closeReading,
   });
+
+  checklist = new ChecklistUI(
+    uiRoot,
+    { onSkip: () => {}, onDismiss: () => {} },
+    { phoneHost: chrome.phoneChecklistHost() },
+  );
 
   const joystick = new Joystick(uiRoot);
   mapLabels = new BuildingMapLabels(uiRoot, (id) => {
