@@ -105,7 +105,10 @@ export class BootFlow {
   async finishLoading(skipWelcome: boolean): Promise<WelcomeChoice | null> {
     this.setProgress(100);
     if (skipWelcome) {
-      this.dismiss();
+      this.loadingEl?.setAttribute('hidden', '');
+      document.body.classList.remove('boot-loading', 'boot-welcome');
+      this.root?.remove();
+      this.root = null;
       return null;
     }
     await new Promise<void>((r) => window.requestAnimationFrame(() => r()));

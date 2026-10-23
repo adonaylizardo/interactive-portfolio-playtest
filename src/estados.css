@@ -163,15 +163,22 @@
 
 .playtest-toast--offline {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   padding: 10px 16px 10px 12px;
-  width: min(330px, calc(100vw - 32px));
-  max-width: min(330px, calc(100vw - 32px));
-  white-space: nowrap;
+  width: min(330px, calc(100vw - max(16px, env(safe-area-inset-left)) - max(16px, env(safe-area-inset-right))));
+  max-width: min(330px, calc(100vw - max(16px, env(safe-area-inset-left)) - max(16px, env(safe-area-inset-right))));
+  box-sizing: border-box;
+  white-space: normal;
   text-align: left;
   line-height: 1.35;
-  border-radius: 999px;
+  border-radius: 20px;
+}
+
+.playtest-toast--offline .playtest-toast__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .playtest-toast__icon {

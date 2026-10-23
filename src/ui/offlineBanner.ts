@@ -33,9 +33,9 @@ async function probeReachable(): Promise<boolean> {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
   try {
     const base = import.meta.env.BASE_URL || '/';
-    const url = new URL('favicon.ico', new URL(base, location.href)).href;
-    const res = await fetch(url, { method: 'HEAD', cache: 'no-store', credentials: 'same-origin' });
-    return res.ok;
+    const url = new URL('favicon.svg', new URL(base, location.href)).href;
+    await fetch(url, { method: 'HEAD', cache: 'no-store', credentials: 'same-origin' });
+    return true;
   } catch {
     return false;
   }
