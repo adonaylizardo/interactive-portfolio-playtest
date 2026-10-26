@@ -9,6 +9,7 @@ export type PhoneChromeSnapshot = {
   introExpanded: boolean;
   dock: boolean;
   introPeek: boolean;
+  introDetailSeen: boolean;
 };
 
 const POSITION_PROPS = [
@@ -74,7 +75,7 @@ export function clearPhoneChecklistInline(root: HTMLElement): void {
 export function derivePhoneChecklistMode(snap: PhoneChromeSnapshot): PhoneChecklistMode | null {
   if (!snap.mobile || snap.hidden) return null;
   if (snap.mobileExpanded) return 'open';
-  if (snap.introExpanded || snap.dock) return 'circle';
+  if (snap.introExpanded || snap.dock || (snap.introPeek && snap.introDetailSeen)) return 'circle';
   return 'pill';
 }
 
@@ -90,6 +91,7 @@ export function readPhoneChromeSnapshot(
     introExpanded: !!chrome?.classList.contains('chrome--intro-expanded'),
     dock: !!chrome?.classList.contains('chrome--dock'),
     introPeek: !!chrome?.classList.contains('chrome--intro-peek'),
+    introDetailSeen: !!chrome?.classList.contains('chrome--intro-detail-seen'),
   };
 }
 

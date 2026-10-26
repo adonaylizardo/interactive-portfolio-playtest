@@ -373,11 +373,15 @@ export class ChromeUI {
         <div class="chrome__sheet-grab" data-intro-grab aria-hidden="true"><span></span></div>
         <div class="chrome__intro-toolbar" data-intro-toolbar hidden>
           <div class="chrome__intro-lang-host" data-intro-lang-host></div>
-          ${roundBtn('sound', 'Sonido', 'chrome__intro-sound', 'sound')}
         </div>
-        <button type="button" class="chrome__intro-close" data-action="intro-close" aria-label="Close" data-i18n-aria="jac.close">${iconSvg('close')}</button>
         <div class="chrome__lede">
-          <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
+          <div class="chrome__intro-title-row">
+            <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
+            <div class="chrome__intro-title-actions">
+              ${roundBtn('sound', 'Sonido', 'chrome__intro-sound', 'sound')}
+              <button type="button" class="chrome__intro-close" data-action="intro-close" aria-label="Close" data-i18n-aria="jac.close">${iconSvg('close')}</button>
+            </div>
+          </div>
           <p class="chrome__blurb" data-i18n="chrome.lede">Explore the map, open cases from the doors, and browse talks and writings inside the buildings.</p>
         </div>
         <div class="chrome__audience">
@@ -497,6 +501,7 @@ export class ChromeUI {
       this.setLayout('map');
     });
     this.root.querySelector('[data-details]')?.addEventListener('click', () => {
+      this.root.classList.add('chrome--intro-detail-seen');
       this.expandMobileSheet(true);
     });
     this.bindMobileSheetGestures();
@@ -739,6 +744,8 @@ export class ChromeUI {
       'show-panel': 'chrome.showPanel',
       center: 'chrome.center',
       map: 'chrome.map',
+      articles: 'panel.writings',
+      talks: 'panel.talks',
     };
     this.root.querySelectorAll('[data-action]').forEach((el) => {
       const key = ariaByAction[(el as HTMLElement).dataset.action ?? ''];
@@ -774,12 +781,11 @@ export class ChromeUI {
     const intro = this.root.querySelector('.chrome__intro') as HTMLElement | null;
     const body = this.root.querySelector('[data-sheet-body]') as HTMLElement | null;
     const grab = this.root.querySelector('[data-intro-grab]') as HTMLElement | null;
-    const toolbar = this.root.querySelector('[data-intro-toolbar]') as HTMLElement | null;
     if (!intro) return;
+    if (expanded) this.root.classList.add('chrome--intro-detail-seen');
     intro.classList.toggle('chrome__intro--expanded', expanded);
     if (body) body.classList.toggle('chrome__sheet-body--collapsed', !expanded);
     if (grab) grab.hidden = !expanded;
-    if (toolbar) toolbar.hidden = false;
     this.sync();
     this.callbacks.onLayoutChange();
   }
@@ -903,7 +909,7 @@ export class ChromeUI {
     this.root.classList.toggle('chrome--intro-expanded', introExpanded);
     const introToolbar = this.root.querySelector('[data-intro-toolbar]') as HTMLElement | null;
     if (introToolbar) {
-      introToolbar.hidden = !(this.mobile && this.mobileSheet && !this.interiorOpen && !landscapeSide);
+      introToolbar.hidden = !introExpanded;
     }
     this.syncMobileLang();
     this.root.classList.toggle('chrome--dock', this.mobile && !this.mobileSheet && !this.interiorOpen);

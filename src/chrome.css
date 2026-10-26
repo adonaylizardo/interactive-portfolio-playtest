@@ -1318,29 +1318,18 @@ body[data-chrome='phone'] .chrome__phone-topbar-checklist .checklist.checklist--
 }
 
 body[data-layout='map'] .chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__counter--label,
-body[data-layout='split'] .chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__counter--label {
-  display: none !important;
-}
-
+body[data-layout='split'] .chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__counter--label,
+.chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__counter--label,
 body[data-layout='map'] .chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__counter--in-ring,
 body[data-layout='split'] .chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__counter--in-ring,
 .chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__counter--in-ring {
-  display: flex !important;
-  position: absolute;
-  inset: 0;
-  align-items: center;
-  justify-content: center;
-  font-family: Inter, system-ui, sans-serif;
-  font-size: 13px !important;
-  font-weight: 700 !important;
-  line-height: 1;
-  letter-spacing: 0;
-  color: #edeef0;
-  pointer-events: none;
-  z-index: 2;
-  transform: none;
-  left: auto;
-  top: auto;
+  display: none !important;
+  visibility: hidden !important;
+  overflow: hidden !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 .checklist.checklist--phone-open {
@@ -1403,25 +1392,49 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
   align-items: center;
 }
 
+.checklist.checklist--phone-open .checklist__ring-figma,
+.checklist.checklist--phone-open .checklist__map-arc,
+.checklist.checklist--phone-open .checklist__clipboard-figma {
+  display: none !important;
+}
+
+.checklist.checklist--phone-open .checklist__ring-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  position: relative;
+}
+
+.checklist.checklist--phone-open .checklist__ring {
+  display: block !important;
+  position: static;
+  width: 28px !important;
+  height: 28px !important;
+  margin: 0 !important;
+  transform: none;
+  flex-shrink: 0;
+}
+
 .checklist.checklist--phone-open .checklist__counter--in-ring {
   display: flex !important;
   position: absolute;
-  inset: 0;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   align-items: center;
   justify-content: center;
   font-family: Inter, system-ui, sans-serif;
   font-size: 13px;
   font-weight: 700;
   line-height: 1;
+  margin: 0;
+  pointer-events: none;
 }
 
 .checklist.checklist--phone-open .checklist__counter--label {
   display: none !important;
-}
-
-.checklist.checklist--phone-open .checklist__ring-btn {
-  width: 44px;
-  height: 44px;
 }
 
 .checklist.checklist--phone-open .checklist__list {
@@ -1544,8 +1557,8 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
 .chrome--sheet.chrome--intro-peek .chrome__intro {
   bottom: max(16px, env(safe-area-inset-bottom));
   height: auto;
-  min-height: min(256px, calc(100dvh - 120px));
-  max-height: min(256px, calc(100dvh - 120px));
+  min-height: min(196px, calc(100dvh - 120px));
+  max-height: min(196px, calc(100dvh - 120px));
   border-bottom: 1px solid #2a2c31;
   border-radius: 12px;
 }
@@ -1649,22 +1662,52 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
   pointer-events: none !important;
 }
 
-.chrome__intro-close {
-  position: absolute;
-  top: 15px;
-  right: 12px;
-  z-index: 45;
-  width: 44px;
-  height: 44px;
+.chrome__intro-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chrome__intro-title-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.chrome__intro-title-actions .chrome__intro-close {
+  position: static;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
   border: 0;
-  border-radius: 22px;
+  border-radius: 20px;
   background: transparent;
   color: #edeef0;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.chrome__intro-title-actions .chrome__intro-sound.ui-round {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
 }
 
 .chrome--sheet .chrome__lede {
-  padding-right: 48px;
+  padding-right: 0;
+}
+
+.chrome--sheet .chrome__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
 }
 
 .chrome--sheet .chrome__audience,

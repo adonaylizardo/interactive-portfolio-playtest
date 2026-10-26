@@ -399,6 +399,9 @@ async function main(): Promise<void> {
       }
     },
   );
+  panel.setOnExperienceDesktopExpand(() => {
+    if (!isMobileLayout()) chrome.setLayout('panel');
+  });
   joystick.onStickStart(() => {
     if (panel.isPreviewMode()) panel.hide();
     if (placeCard.isOpen()) placeCard.hide();

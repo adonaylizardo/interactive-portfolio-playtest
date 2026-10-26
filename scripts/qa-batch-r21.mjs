@@ -183,28 +183,11 @@ async function testH3Desktop(page, errors) {
   for (const f of d) errors.push(`1440 H3: ${f}`);
 }
 
-async function testPhoneM(page, tag, errors, m3peek) {
+async function testPhoneM(page, tag, errors) {
   const alreadyDock = await page.evaluate(() =>
     document.querySelector('.chrome')?.classList.contains('chrome--dock'),
   );
   if (!alreadyDock) await dismissToDock(page);
-  const m3dock = await page.evaluate(() => {
-    const cl = document.querySelector('.checklist--phone-circle');
-    const pick = (el) => {
-      if (!el) return null;
-      const cs = getComputedStyle(el);
-      if (cs.display === 'none' || cs.visibility === 'hidden') return null;
-      return el;
-    };
-    const c =
-      pick(cl?.querySelector('.checklist__counter--in-ring')) ??
-      pick(cl?.querySelector('.checklist__counter--label'));
-    return c ? getComputedStyle(c).fontSize + '|' + getComputedStyle(c).fontWeight : '';
-  });
-  if (!m3peek || !m3dock || m3peek !== m3dock) {
-    errors.push(`${tag} M3: counter font peek(${m3peek}) vs dock(${m3dock})`);
-  }
-
   const m1 = await page.evaluate(() => {
     const cl = document.querySelector('.chrome__phone-topbar-checklist .checklist');
     return cl?.classList.contains('checklist--phone-circle') ? [] : ['dock not circle'];
@@ -292,11 +275,7 @@ async function main() {
   });
   const pp = await phone.newPage();
   await boot(pp);
-  const m3peek = await pp.evaluate(() => {
-    const c = document.querySelector('.checklist--phone-pill .checklist__counter--label');
-    return c ? getComputedStyle(c).fontSize + '|' + getComputedStyle(c).fontWeight : '';
-  });
-  await testPhoneM(pp, '375', errors, m3peek);
+  await testPhoneM(pp, '375', errors);
   await testH1Phone(pp, '375', errors);
   await phone.close();
 

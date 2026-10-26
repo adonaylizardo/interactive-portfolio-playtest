@@ -2,7 +2,13 @@ import { ABOUT, type AboutBlock } from './about';
 import { CASES, CASE_CARD_TITLES, CASE_HOUSE_IDS, type CaseHouseId } from './cases';
 import { TALKS, WRITINGS } from './experiences';
 import { aboutSectionId } from './aboutSectionId';
-import { formatContentDate, talkTitle, writingTitle } from '../ui/contentLabels';
+import {
+  formatContentDate,
+  isPlaceholderCopy,
+  talkTitle,
+  writingTitle,
+} from '../ui/contentLabels';
+import type { TalkItem } from './experiences';
 import type { WritingItem } from './experiences';
 import { t, getLang } from '../ui/i18n';
 import { CONTACT_EMAIL, CV_HREF } from './contactLinks';
@@ -109,6 +115,24 @@ function writingSearchSnippet(item: WritingItem): string {
   return item.publication ?? 'adonaylizardo.com';
 }
 
+function talkSearchSnippet(item: TalkItem): string {
+  const raw = item.date?.trim();
+  if (raw) return formatContentDate(raw);
+  return 'Talk';
+}
+
+/** Talk rows indexed for search and Charlas panel (single source of truth). */
+export function searchableTalkItems(): TalkItem[] {
+  return TALKS.filter((talk) => {
+    const title = talkTitle(talk);
+    return title.length > 0 && !isPlaceholderCopy(title);
+  });
+}
+
+export function searchableTalkCount(): number {
+  return searchableTalkItems().length;
+}
+
 function buildIndex(): SearchResult[] {
   const out: SearchResult[] = [];
 
@@ -137,23 +161,16 @@ function buildIndex(): SearchResult[] {
     }
   }
 
-  for (const talk of TALKS) {
+  for (const talk of searchableTalkItems()) {
     const title = talkTitle(talk);
     pushRow(out, {
       kind: 'talks',
       title,
-      snippet: talk.date ?? 'Talk',
+      snippet: talkSearchSnippet(talk),
       targetId: talk.id,
       haystack: `${title} ${talk.url ?? ''} talk charla speaker teresa teatro`,
     });
   }
-  pushRow(out, {
-    kind: 'talks',
-    title: t('panel.talks'),
-    snippet: 'Teresa',
-    targetId: 'teresa-building',
-    haystack: 'talks charlas speaker teresa teatro podcast video',
-  });
 
   pushRow(out, {
     kind: 'achievements',

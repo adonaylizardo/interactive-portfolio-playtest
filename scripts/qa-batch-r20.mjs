@@ -79,7 +79,7 @@ async function measureR20(page) {
     if (ir) {
       const targetW = vw - 32;
       if (Math.abs(ir.width - targetW) > 3) failures.push(`peek intro width ${ir.width} (want ${targetW})`);
-      if (ir.height < 240) failures.push(`peek intro height ${ir.height} (<240)`);
+      if (ir.height < 188 || ir.height > 196) failures.push(`peek intro height ${ir.height} (want 188-196)`);
     }
 
     return { failures, pill: pr ? { w: pr.width, h: pr.height, r: pr.right } : null };

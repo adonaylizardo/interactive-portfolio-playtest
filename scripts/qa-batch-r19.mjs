@@ -29,7 +29,7 @@ async function phoneArrival(page, tag, errors) {
     const search = document.querySelector('.chrome__phone-topbar [data-action="search"]');
     const lang = document.querySelector('.chrome__phone-topbar [data-action="lang-toggle"]');
     const soundTop = document.querySelector('.chrome__phone-topbar [data-action="sound"]');
-    const soundIntro = document.querySelector('.chrome__intro-toolbar [data-action="sound"]');
+    const soundIntro = document.querySelector('.chrome__intro-title-actions [data-action="sound"]');
     const cl = document.querySelector('.chrome__phone-topbar-checklist .checklist');
     if (soundTop && getComputedStyle(soundTop).display !== 'none') failures.push('sound still in top bar');
     if (!soundIntro || getComputedStyle(soundIntro).display === 'none') failures.push('sound missing in intro toolbar');
