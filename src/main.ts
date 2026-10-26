@@ -243,6 +243,7 @@ async function main(): Promise<void> {
   chrome = new ChromeUI(uiRoot, {
     onLayoutChange: () => {
       const layout = chrome.getLayout();
+      panel?.syncExperienceDesktopExpand();
       if (isMobileLayout()) {
         checklist?.syncFromChrome();
       } else if (layout === 'map' || layout === 'panel' || isReadingHash()) checklist.setCollapsed(true);
@@ -380,7 +381,10 @@ async function main(): Promise<void> {
         checklist.setCollapsed(true);
       }
       if (!panel.isOpen() && !scene?.isInInterior()) {
-        if (!isMobileLayout()) checklist.setCollapsed(true);
+        if (!isMobileLayout()) {
+          checklist.setCollapsed(true);
+          if (chrome.getLayout() === 'panel') chrome.setLayout('split', { silent: true });
+        }
         scene?.resetMapDoorChainState();
         studio.maybePlayDeferredIntro();
       }
@@ -400,7 +404,9 @@ async function main(): Promise<void> {
     },
   );
   panel.setOnExperienceDesktopExpand(() => {
-    if (!isMobileLayout()) chrome.setLayout('panel');
+    if (!isMobileLayout()) {
+      chrome.setLayout(chrome.getLayout() === 'panel' ? 'split' : 'panel');
+    }
   });
   joystick.onStickStart(() => {
     if (panel.isPreviewMode()) panel.hide();

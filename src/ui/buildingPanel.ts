@@ -608,6 +608,21 @@ export class BuildingPanel {
     this.onExperienceDesktopExpand = fn;
   }
 
+  /** Desktop Talks/Writings header expand control follows `data-layout` (split vs panel). */
+  syncExperienceDesktopExpand(): void {
+    if (!this.isExperienceMode() || this.isMobile()) return;
+    const expanded = document.body.dataset.layout === 'panel';
+    this.el.querySelectorAll('[data-exp-expand]').forEach((el) => {
+      const btn = el as HTMLElement;
+      btn.setAttribute('aria-label', t(expanded ? 'chrome.hidePanel' : 'panel.expandSheet'));
+      if (expanded) {
+        btn.innerHTML = `<span class="exp-header__icon" aria-hidden="true">${iconSvg('collapse', 15)}</span>`;
+      } else {
+        btn.innerHTML = `<img class="exp-header__icon" src="${FIGMA_EXPAND}" width="15" height="15" alt="" />`;
+      }
+    });
+  }
+
   showTalks(_title?: string, interiorId: string | null = 'teresa'): void {
     this.openExperience('talks', interiorId);
     this.renderTalksList();
@@ -709,6 +724,7 @@ export class BuildingPanel {
       this.renderWritingsList();
     }
     this.queueVisibilitySync();
+    this.syncExperienceDesktopExpand();
     studio.playClick();
   }
 
@@ -1550,9 +1566,7 @@ export class BuildingPanel {
     if (mobBack) mobBack.setAttribute('aria-label', t('experience.back'));
     const mobClose = this.el.querySelector('[data-exp-mobile-close]') as HTMLElement | null;
     if (mobClose) mobClose.setAttribute('aria-label', t('panel.close'));
-    this.el.querySelectorAll('[data-exp-expand]').forEach((el) => {
-      el.setAttribute('aria-label', t('panel.expandSheet'));
-    });
+    this.syncExperienceDesktopExpand();
     this.el.querySelectorAll('[data-read-collapse]').forEach((el) => {
       el.setAttribute('aria-label', t('panel.expandSheet'));
     });

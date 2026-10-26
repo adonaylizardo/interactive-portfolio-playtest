@@ -204,19 +204,23 @@ async function testPhoneM(page, tag, errors) {
     if (cs.textOverflow === 'ellipsis' || title.scrollWidth > title.clientWidth + 1) {
       failures.push(`title ellipsis/clips ${title.scrollWidth}>${title.clientWidth}`);
     }
-    const hr = document.querySelector('.checklist--phone-open .checklist__ring-btn')?.getBoundingClientRect();
+    const hr = document.querySelector('.checklist--phone-open .checklist__ring')?.getBoundingClientRect();
     const mk = document.querySelector('.checklist--phone-open .checklist__item-mark')?.getBoundingClientRect();
     if (hr && mk && Math.abs(hr.right - mk.right) > 2) {
       failures.push(`ring dx ${Math.abs(hr.right - mk.right)}`);
     }
     const counter = document.querySelector('.checklist--phone-open .checklist__counter--in-ring');
-    const ring = document.querySelector('.checklist--phone-open .checklist__ring-btn');
+    const ring = document.querySelector('.checklist--phone-open .checklist__ring');
     if (counter && ring) {
       const cr = counter.getBoundingClientRect();
       const rr = ring.getBoundingClientRect();
       const ccy = cr.top + cr.height / 2;
+      const rcx = cr.left + cr.width / 2;
       const rcy = rr.top + rr.height / 2;
-      if (Math.abs(ccy - rcy) > 2) failures.push(`counter not centered on ring (${Math.abs(ccy - rcy)}px)`);
+      const rcxRing = rr.left + rr.width / 2;
+      if (Math.abs(ccy - rcy) > 2 || Math.abs(rcx - rcxRing) > 2) {
+        failures.push(`counter not centered on ring`);
+      }
     }
     return failures;
   });

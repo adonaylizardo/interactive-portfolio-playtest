@@ -23,6 +23,7 @@
     "qa:batch-r20": "npm run build && node scripts/qa-batch-r20.mjs",
     "qa:batch-r21": "npm run build && node scripts/qa-batch-r21.mjs",
     "qa:batch-r22": "npm run build && node scripts/qa-batch-r22.mjs",
+    "qa:batch-r23": "npm run build && node scripts/qa-batch-r23.mjs",
     "verify:jac-drive": "node scripts/verify-jac-drive.mjs",
     "verify:edificios": "npm run build:preview-edificios && node scripts/verify-edificios.mjs",
     "verify:camera-views": "node scripts/verify-camera-views.mjs",

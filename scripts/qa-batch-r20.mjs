@@ -79,7 +79,7 @@ async function measureR20(page) {
     if (ir) {
       const targetW = vw - 32;
       if (Math.abs(ir.width - targetW) > 3) failures.push(`peek intro width ${ir.width} (want ${targetW})`);
-      if (ir.height < 188 || ir.height > 196) failures.push(`peek intro height ${ir.height} (want 188-196)`);
+      if (ir.height < 188 || ir.height > 204) failures.push(`peek intro height ${ir.height} (want 188-204)`);
     }
 
     return { failures, pill: pr ? { w: pr.width, h: pr.height, r: pr.right } : null };
@@ -117,11 +117,13 @@ async function measureOpenRingAlign(page) {
     const failures = [];
     const cl = document.querySelector('.checklist.checklist--phone-open');
     if (!cl) return ['open card missing'];
-    const headRing = cl.querySelector('.checklist__ring-btn')?.getBoundingClientRect();
+    const headRing = cl.querySelector('.checklist__ring')?.getBoundingClientRect();
     const mark = cl.querySelector('.checklist__item-mark')?.getBoundingClientRect();
     if (headRing && mark) {
-      const delta = Math.abs(headRing.right - mark.right);
-      if (delta > 2) failures.push(`header ring vs row mark Δright ${delta.toFixed(1)}px`);
+      const deltaR = Math.abs(headRing.right - mark.right);
+      const deltaC = Math.abs(headRing.left + headRing.width / 2 - (mark.left + mark.width / 2));
+      if (deltaR > 2) failures.push(`header ring vs row mark Δright ${deltaR.toFixed(1)}px`);
+      if (deltaC > 2) failures.push(`header ring vs row mark Δcenter ${deltaC.toFixed(1)}px`);
     }
     const title = cl.querySelector('.checklist__active-title');
     if (title && getComputedStyle(title).whiteSpace !== 'nowrap') {

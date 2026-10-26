@@ -81,30 +81,31 @@ async function testF2(page, tag, errors) {
   await page.evaluate(() => document.querySelector('.checklist__ring-btn')?.click());
   await wait(400);
   const d = await page.evaluate(() => {
-    const ring =
-      document.querySelector('.checklist--phone-open .checklist__ring') ??
-      document.querySelector('.checklist--phone-open .checklist__ring-figma');
+    const ring = document.querySelector('.checklist--phone-open .checklist__ring');
     const counter = document.querySelector('.checklist--phone-open .checklist__counter--in-ring');
-    const btn = document.querySelector('.checklist--phone-open .checklist__ring-btn');
+    const mark = document.querySelector('.checklist--phone-open .checklist__item-mark');
     const rr = ring?.getBoundingClientRect();
     const cr = counter?.getBoundingClientRect();
-    const br = btn?.getBoundingClientRect();
-    if (!rr || !cr || !br) return { fail: 'missing nodes' };
-    const rcx = rr.left + rr.width / 2;
-    const rcy = rr.top + rr.height / 2;
-    const ccx = cr.left + cr.width / 2;
+    const mr = mark?.getBoundingClientRect();
+    if (!rr || !cr || !mr) return { fail: 'missing nodes' };
+    const ringCx = rr.left + rr.width / 2;
+    const markCx = mr.left + mr.width / 2;
+    const rcx = cr.left + cr.width / 2;
+    const rcy = cr.top + cr.height / 2;
+    const ringCy = rr.top + rr.height / 2;
     const ccy = cr.top + cr.height / 2;
-    const dx = Math.abs(rcx - ccx);
-    const dy = Math.abs(rcy - ccy);
-    const head = document.querySelector('.checklist--phone-open .checklist__header');
-    const hr = head?.getBoundingClientRect();
-    const ringDx = hr ? Math.abs(br.right - hr.right) : 99;
-    return { dx, dy, ringDx };
+    return {
+      dr: Math.abs(rr.right - mr.right),
+      dc: Math.abs(ringCx - markCx),
+      dx: Math.abs(ringCx - rcx),
+      dy: Math.abs(ringCy - ccy),
+    };
   });
   if (d.fail) errors.push(`${tag} F2: ${d.fail}`);
   else {
+    if (d.dr > 2) errors.push(`${tag} F2: |ringRight-markRight|=${d.dr.toFixed(2)}`);
+    if (d.dc > 2) errors.push(`${tag} F2: |ringCx-markCx|=${d.dc.toFixed(2)}`);
     if (d.dx > 1 || d.dy > 1) errors.push(`${tag} F2: ring-counter Δ(${d.dx.toFixed(2)},${d.dy.toFixed(2)})`);
-    if (d.ringDx > 2) errors.push(`${tag} F2: ring dxRight ${d.ringDx.toFixed(2)}`);
   }
   await page.evaluate(() => document.querySelector('.checklist--phone-open .checklist__ring-btn')?.click());
   await wait(250);
@@ -228,7 +229,7 @@ async function testF8(page, tag, errors) {
     const cr = close?.getBoundingClientRect();
     return { h: ir?.height, sw: sr?.width, sh: sr?.height, cw: cr?.width, ch: cr?.height };
   });
-  if (d.h > 196) errors.push(`${tag} F8 peek height ${d.h?.toFixed(1)} > 196`);
+  if (d.h > 204) errors.push(`${tag} F8 peek height ${d.h?.toFixed(1)} > 204`);
   if ((d.sw ?? 0) < 39 || (d.sh ?? 0) < 39) errors.push(`${tag} F8 sound ${d.sw}x${d.sh}`);
   if ((d.cw ?? 0) < 39 || (d.ch ?? 0) < 39) errors.push(`${tag} F8 close ${d.cw}x${d.ch}`);
   return d;

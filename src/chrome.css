@@ -1401,17 +1401,17 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
 .checklist.checklist--phone-open .checklist__ring-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end !important;
   width: 44px;
   height: 44px;
   position: relative;
 }
 
-.checklist.checklist--phone-open .checklist__ring {
+.checklist.checklist--phone-open .checklist__ring-btn > .checklist__ring {
   display: block !important;
   position: static;
-  width: 28px !important;
-  height: 28px !important;
+  width: 16px !important;
+  height: 16px !important;
   margin: 0 !important;
   transform: none;
   flex-shrink: 0;
@@ -1420,13 +1420,13 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
 .checklist.checklist--phone-open .checklist__counter--in-ring {
   display: flex !important;
   position: absolute;
-  left: 50%;
+  left: calc(100% - 8px);
   top: 50%;
   transform: translate(-50%, -50%);
   align-items: center;
   justify-content: center;
   font-family: Inter, system-ui, sans-serif;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1;
   margin: 0;
@@ -1557,10 +1557,11 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
 .chrome--sheet.chrome--intro-peek .chrome__intro {
   bottom: max(16px, env(safe-area-inset-bottom));
   height: auto;
-  min-height: min(196px, calc(100dvh - 120px));
-  max-height: min(196px, calc(100dvh - 120px));
+  min-height: min(204px, calc(100dvh - 120px));
+  max-height: min(204px, calc(100dvh - 120px));
   border-bottom: 1px solid #2a2c31;
   border-radius: 12px;
+  padding-bottom: 16px;
 }
 
 .chrome--sheet.chrome--intro-peek .chrome__audience,
@@ -1580,9 +1581,9 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
 }
 
 .chrome--sheet.chrome--intro-peek .chrome__blurb {
-  margin-top: 8px;
+  margin-top: 6px;
   font-size: 15px;
-  line-height: 22px;
+  line-height: 20px;
   color: #8a8f98;
 }
 
@@ -1593,7 +1594,7 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
 .chrome--sheet.chrome--intro-peek .chrome__card-row {
   margin-top: auto;
   margin-bottom: 0;
-  min-height: 56px;
+  min-height: 48px;
   flex-shrink: 0;
 }
 

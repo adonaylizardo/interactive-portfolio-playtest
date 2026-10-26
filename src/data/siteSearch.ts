@@ -173,6 +173,14 @@ function buildIndex(): SearchResult[] {
   }
 
   pushRow(out, {
+    kind: 'talks',
+    title: t('panel.talks'),
+    snippet: 'Teresa',
+    targetId: 'teresa-building',
+    haystack: 'talks charlas speaker teresa teatro podcast video',
+  });
+
+  pushRow(out, {
     kind: 'achievements',
     title: t('chrome.mentorshipStat'),
     snippet: t('chrome.achievements'),
@@ -357,7 +365,7 @@ export function searchResultsForKind(
   };
 
   const scored = getIndex()
-    .filter((row) => row.kind === kind)
+    .filter((row) => row.kind === kind && row.targetId !== 'teresa-building')
     .map((row) => {
       const score = q ? matchScore(row.haystack, q) : 1;
       const snippet =
