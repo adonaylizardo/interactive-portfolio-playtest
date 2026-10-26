@@ -59,9 +59,11 @@ async function assertTopBar(page, tag, errors) {
     const tools = document.querySelector('.chrome__phone-topbar .chrome__tools-phone');
     const toolsRect = tools?.getBoundingClientRect();
     const toolsStyle = tools ? getComputedStyle(tools) : null;
-    if (toolsRect && toolsStyle && toolsRect.width > toolsRect.height * 4) {
-      failures.push(`tools pill stretched (${Math.round(toolsRect.width)}px wide)`);
+    if (toolsRect && toolsStyle && toolsRect.width > 96) {
+      failures.push(`tools cluster too wide (${Math.round(toolsRect.width)}px)`);
     }
+    const toolsBorder = toolsStyle ? parseFloat(toolsStyle.borderTopWidth) : 0;
+    if (toolsBorder > 0) failures.push('tools host has outer border');
     return failures;
   }, topBarTargets());
   for (const f of overlap) errors.push(`${tag}: top bar ${f}`);

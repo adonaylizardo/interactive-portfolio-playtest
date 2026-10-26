@@ -737,7 +737,7 @@ body[data-voice-contact='1'] .chrome__subtitle:not(:empty) {
 
 .chrome--sheet .chrome__intro--expanded .chrome__sheet-body {
   display: block;
-  margin-top: 4px;
+  margin-top: 24px;
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
@@ -871,25 +871,27 @@ body[data-layout='panel'] #game-canvas {
   display: flex;
   position: static;
   flex: 0 0 auto;
-  width: fit-content;
-  max-width: calc(100% - 64px);
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  max-width: none;
   min-width: 0;
-  height: 48px;
-  padding: 0 4px;
-  border: 1px solid #2a2c31;
-  border-radius: 999px;
-  background: #141518;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.45);
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   z-index: auto;
   top: auto;
   left: auto;
 }
 
 .chrome__phone-topbar-checklist {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 48px;
   max-width: none;
-  margin-left: auto;
+  margin-left: 0;
   display: flex;
   justify-content: flex-end;
   align-items: center;
@@ -918,12 +920,17 @@ body.checklist-mobile-expanded .chrome__phone-topbar-checklist {
   z-index: auto;
 }
 
-.chrome--mobile .chrome__phone-topbar .chrome__tools-phone .ui-round {
+.chrome--mobile .chrome__phone-topbar .chrome__tools-phone .ui-round,
+.chrome--mobile .chrome__phone-topbar .chrome__tools-phone .chrome__lang-toggle {
   width: 40px;
   height: 40px;
   min-width: 40px;
   min-height: 40px;
   flex-shrink: 0;
+  border: 1px solid #2a2c31;
+  border-radius: 20px;
+  background: #141518;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.45);
 }
 
 .chrome--mobile .chrome__lang-toggle {
@@ -1071,7 +1078,7 @@ body[data-chrome='phone'] .chrome__phone-topbar-checklist .checklist.checklist--
 }
 
 .chrome__phone-topbar-checklist .checklist.checklist--phone-pill.checklist--mobile-closed {
-  width: auto !important;
+  width: 100% !important;
   min-width: 0 !important;
   max-width: 100% !important;
   height: 52px !important;
@@ -1110,7 +1117,7 @@ body[data-chrome='phone'] .chrome__phone-topbar-checklist .checklist.checklist--
 }
 
 body[data-chrome='phone'] .chrome__phone-topbar-checklist .checklist.checklist--phone-pill .checklist__header-text {
-  flex: 0 0 auto !important;
+  flex: 1 1 auto !important;
   min-width: 0 !important;
   display: flex;
   flex-direction: column;
@@ -1294,6 +1301,9 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
   flex-shrink: 0;
   align-items: center;
   gap: 12px;
+  padding: 12px 16px 12px 16px;
+  padding-right: 2px;
+  border-bottom: 1px solid #2a2c31;
 }
 
 .checklist.checklist--phone-open .checklist__header-text {
@@ -1310,6 +1320,17 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
 .checklist.checklist--phone-open .checklist__progress-wrap {
   flex: 0 0 auto;
   margin-left: auto;
+  margin-right: 0;
+  gap: 0;
+}
+
+.checklist.checklist--phone-open .checklist__counter--label {
+  display: none !important;
+}
+
+.checklist.checklist--phone-open .checklist__ring-btn {
+  width: 44px;
+  height: 44px;
 }
 
 .checklist.checklist--phone-open .checklist__list {
@@ -1432,7 +1453,7 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
 .chrome--sheet.chrome--intro-peek .chrome__intro {
   bottom: max(16px, env(safe-area-inset-bottom));
   height: auto;
-  min-height: 0;
+  min-height: min(256px, calc(100dvh - 120px));
   max-height: min(256px, calc(100dvh - 120px));
   border-bottom: 1px solid #2a2c31;
   border-radius: 12px;

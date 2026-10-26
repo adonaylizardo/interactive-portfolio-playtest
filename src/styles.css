@@ -4735,11 +4735,17 @@ body.jac-drive .chrome__view-btns {
   pointer-events: auto;
 }
 
-body.jac-drive[data-chrome='phone'] .chrome__views,
-body.jac-drive .chrome--dock .chrome__views {
+body.jac-drive[data-chrome='phone']:not(:has(.chrome--dock)) .chrome__views {
   visibility: visible !important;
   pointer-events: auto !important;
   display: block !important;
+}
+
+body.jac-drive[data-chrome='phone'] .chrome--dock .chrome__views,
+body.jac-drive .chrome--dock .chrome__views {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 body.jac-drive .chrome__dock,
