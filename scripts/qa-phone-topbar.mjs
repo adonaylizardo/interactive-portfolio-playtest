@@ -9,9 +9,7 @@ const INSET = 16;
 function topBarTargets() {
   return [
     { key: 'search', sel: '.chrome__phone-topbar [data-action="search"]' },
-    { key: 'sound', sel: '.chrome__phone-topbar [data-action="sound"]' },
-    { key: 'lang-en', sel: '.chrome__phone-topbar [data-lang="en"]' },
-    { key: 'lang-es', sel: '.chrome__phone-topbar [data-lang="es"]' },
+    { key: 'lang-toggle', sel: '.chrome__phone-topbar [data-action="lang-toggle"]' },
     { key: 'checklist', sel: '.chrome__phone-topbar-checklist .checklist' },
   ];
 }
@@ -43,13 +41,9 @@ async function assertTopBar(page, tag, errors) {
       const hitOk =
         key === 'search'
           ? topEl?.closest('[data-action="search"]')
-          : key === 'sound'
-            ? topEl?.closest('[data-action="sound"]')
-            : key === 'lang-en'
-              ? topEl?.closest('[data-lang="en"]')
-              : key === 'lang-es'
-                ? topEl?.closest('[data-lang="es"]')
-                : topEl?.closest('.chrome__phone-topbar-checklist .checklist');
+          : key === 'lang-toggle'
+            ? topEl?.closest('[data-action="lang-toggle"]')
+            : topEl?.closest('.chrome__phone-topbar-checklist .checklist');
       if (!hitOk) failures.push(`${key} not hittable at center`);
     }
     for (let i = 0; i < rects.length; i++) {
@@ -143,9 +137,8 @@ async function assertOpenCard(page, tag, errors) {
         failures.push(`right inset not 16 (right=${rect.right})`);
       }
       for (const sel of [
-        '.chrome__phone-topbar [data-action="sound"]',
-        '.chrome__phone-topbar [data-lang="en"]',
-        '.chrome__phone-topbar [data-lang="es"]',
+        '.chrome__phone-topbar [data-action="lang-toggle"]',
+        '.chrome__phone-topbar [data-action="search"]',
       ]) {
         const el = document.querySelector(sel);
         if (!el || getComputedStyle(el).display === 'none') continue;
@@ -331,10 +324,10 @@ async function runViewport(viewportW, height, tag) {
     await assertDockChecklistRadius(page, `${tag} dock`, errors);
     await assertMapRecenter(page, `${tag} dock`, errors, true);
 
-    await page.locator('.chrome__phone-topbar [data-lang="en"]').click();
+    await page.locator('.chrome__phone-topbar [data-action="lang-toggle"]').click();
     await wait(200);
     await assertTopBar(page, `${tag} dock-after-EN`, errors);
-    await page.locator('.chrome__phone-topbar [data-lang="es"]').click();
+    await page.locator('.chrome__phone-topbar [data-action="lang-toggle"]').click();
     await wait(200);
 
     if (await tapChecklistPill(page)) {
@@ -369,6 +362,7 @@ for (const [w, h, tag] of [
   [375, 812, '375x812'],
   [390, 844, '390x844'],
   [414, 896, '414x896'],
+  [430, 932, '430x932'],
 ]) {
   all.push(...(await runViewport(w, h, tag)));
 }

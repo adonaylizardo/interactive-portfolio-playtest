@@ -468,7 +468,11 @@ async function main(): Promise<void> {
       labels.setHidden(hidePills);
       if (!hidePills) labels.update(scene.nameLabelAnchors());
       const hideMapPills =
-        mapPillsObscured() || view.mode === 'cenital' || view.mode === 'persona' || sheetOpen;
+        mapPillsObscured() ||
+        view.mode === 'cenital' ||
+        view.mode === 'persona' ||
+        sheetOpen ||
+        isMobileLayout();
       mapLabels.setHidden(hideMapPills);
       if (view.mode !== 'cenital' && view.mode !== 'persona' && !sheetOpen && !hideMapPills) {
         mapLabels.update(

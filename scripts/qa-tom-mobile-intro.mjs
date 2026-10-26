@@ -151,9 +151,7 @@ async function runViewport(viewportW, height, tag) {
     const overlap = await page.evaluate(() => {
       const targets = [
         { key: 'search', el: document.querySelector('.chrome__phone-topbar [data-action="search"]') },
-        { key: 'sound', el: document.querySelector('.chrome__phone-topbar [data-action="sound"]') },
-        { key: 'lang-en', el: document.querySelector('.chrome__phone-topbar [data-lang="en"]') },
-        { key: 'lang-es', el: document.querySelector('.chrome__phone-topbar [data-lang="es"]') },
+        { key: 'lang-toggle', el: document.querySelector('.chrome__phone-topbar [data-action="lang-toggle"]') },
         { key: 'checklist', el: document.querySelector('.chrome__phone-topbar-checklist .checklist') },
       ];
       const rects = targets.map((t) => ({
@@ -171,8 +169,8 @@ async function runViewport(viewportW, height, tag) {
         const topEl = document.elementFromPoint(cx, cy);
         if (!topEl || !topEl.closest('.chrome, .checklist')) {
           failures.push(`${key} center not hittable`);
-        } else if (key === 'lang-en' && !topEl.closest('[data-lang="en"]')) {
-          failures.push(`lang-en center hits ${topEl.className}`);
+        } else if (key === 'lang-toggle' && !topEl.closest('[data-action="lang-toggle"]')) {
+          failures.push(`lang-toggle center hits ${topEl.className}`);
         } else if (key === 'checklist' && !topEl.closest('.checklist')) {
           failures.push(`checklist center hits ${topEl.className}`);
         }

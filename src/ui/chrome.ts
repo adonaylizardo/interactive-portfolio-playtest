@@ -262,8 +262,11 @@ export class ChromeUI {
     const expRows = EXPERIENCE.map(
       (row) => `
       <button type="button" class="chrome__exp-row" data-locate="${row.id}">
-        <span class="chrome__exp-name"${row.id === 'mentoria' ? ' data-i18n="chrome.expRow.mentoria"' : ''}>${row.id === 'mentoria' ? 'Mentoring at Applaudo' : row.label}</span>
-        <span class="chrome__exp-meta"><span data-i18n="chrome.exp.${row.id}"></span>${iconSvg('locate', 16)}</span>
+        <span class="chrome__exp-copy">
+          <span class="chrome__exp-name"${row.id === 'mentoria' ? ' data-i18n="chrome.expRow.mentoria"' : ''}>${row.id === 'mentoria' ? 'Mentoring at Applaudo' : row.label}</span>
+          <span class="chrome__exp-role" data-i18n="chrome.exp.${row.id}"></span>
+        </span>
+        <span class="chrome__exp-side" aria-hidden="true">${iconSvg('locate', 16)}</span>
       </button>`,
     ).join('');
     const caseRows = CASES_ROWS.map((row) => {
@@ -289,6 +292,7 @@ export class ChromeUI {
           ${roundBtn('download', 'Descargar CV', '', 'download')}
           ${roundBtn('sound', 'Sonido', '', 'sound')}
           ${roundBtn('page', 'Página completa', '', 'fullpage')}
+          <span class="chrome__lang-rail-host" data-lang-rail-host></span>
         </div>
       </nav>
       <aside class="chrome__column" data-column>
@@ -355,7 +359,7 @@ export class ChromeUI {
       <header class="chrome__phone-topbar" data-phone-topbar>
         <div class="chrome__tools-phone">
           ${roundBtn('search', 'Buscar', '', 'search')}
-          ${roundBtn('sound', 'Sonido', '', 'sound')}
+          <button type="button" class="ui-round chrome__lang-toggle" data-action="lang-toggle" aria-label="Language" data-i18n-aria="chrome.language"><span data-lang-toggle-label>ES</span></button>
         </div>
         <div class="chrome__phone-topbar-checklist" data-phone-checklist-host></div>
       </header>
@@ -435,6 +439,7 @@ export class ChromeUI {
         ${roundBtn('briefcase', 'Casos', 'ui-round--lg', 'cases')}
         ${roundBtn('trophy', 'Logros', 'ui-round--lg', 'achievements')}
         ${roundBtn('mail', 'Contacto', 'ui-round--lg', 'contact')}
+        ${roundBtn('sound', 'Sonido', 'ui-round--lg', 'sound')}
         ${roundBtn('map', 'Map', 'ui-round--lg', 'map')}
       </nav>
       <div class="chrome__lang" role="group" aria-label="Language" data-i18n-aria="chrome.language">
@@ -505,6 +510,11 @@ export class ChromeUI {
         this.lang = (btn as HTMLElement).dataset.lang as Lang;
         setLang(this.lang);
       });
+    });
+    this.root.querySelector('[data-action="lang-toggle"]')?.addEventListener('click', () => {
+      const next = getLang() === 'es' ? 'en' : 'es';
+      this.lang = next;
+      setLang(next);
     });
     this.root.querySelectorAll('[data-locate]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -694,6 +704,8 @@ export class ChromeUI {
     this.root.querySelectorAll('[data-lang]').forEach((b) => {
       b.classList.toggle('is-active', (b as HTMLElement).dataset.lang === this.lang);
     });
+    const toggleLabel = this.root.querySelector('[data-lang-toggle-label]');
+    if (toggleLabel) toggleLabel.textContent = this.lang === 'es' ? 'ES' : 'EN';
     this.root.querySelectorAll('[data-i18n]').forEach((el) => {
       const key = (el as HTMLElement).dataset.i18n as Parameters<typeof t>[0];
       if (key) el.textContent = t(key);
@@ -1036,8 +1048,7 @@ export class ChromeUI {
 
   private syncMobileLang(): void {
     const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
-    const tools = this.root.querySelector('.chrome__tools-phone') as HTMLElement | null;
-    const soundBtn = tools?.querySelector('[data-action="sound"]');
+    const railHost = this.root.querySelector('[data-lang-rail-host]') as HTMLElement | null;
     if (!lang) return;
     if (!this.langHome) {
       this.langHome = document.createElement('span');
@@ -1045,15 +1056,18 @@ export class ChromeUI {
       this.langHome.setAttribute('aria-hidden', 'true');
       lang.after(this.langHome);
     }
-    const searchBtn = tools?.querySelector('[data-action="search"]');
     lang.classList.remove('chrome__lang--in-intro', 'chrome__lang--in-tools');
-    if (this.mobile && !this.interiorOpen && tools) {
-      if (lang.parentElement !== tools) {
-        if (searchBtn?.nextSibling) tools.insertBefore(lang, searchBtn.nextSibling);
-        else if (soundBtn) tools.insertBefore(lang, soundBtn);
-        else tools.appendChild(lang);
+    if (this.mobile && !this.interiorOpen) {
+      lang.hidden = true;
+      if (lang.parentElement !== this.root && this.langHome.parentElement === this.root) {
+        this.langHome.before(lang);
       }
-      lang.classList.add('chrome__lang--in-tools');
+      return;
+    }
+    lang.hidden = false;
+    if (!this.mobile && railHost) {
+      if (lang.parentElement !== railHost) railHost.appendChild(lang);
+      lang.classList.add('chrome__lang--in-rail');
       return;
     }
     if (lang.parentElement !== this.root && this.langHome.parentElement === this.root) {
@@ -1064,7 +1078,12 @@ export class ChromeUI {
   private placeLang(): void {
     const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
     if (!lang) return;
-    if (lang.classList.contains('chrome__lang--in-intro') || lang.classList.contains('chrome__lang--in-tools')) {
+    if (
+      lang.hidden ||
+      lang.classList.contains('chrome__lang--in-rail') ||
+      lang.classList.contains('chrome__lang--in-intro') ||
+      lang.classList.contains('chrome__lang--in-tools')
+    ) {
       lang.style.top = '';
       lang.style.left = '';
       lang.style.right = '';
@@ -1148,7 +1167,8 @@ export class ChromeUI {
       ctx.lineTo(4, h / 2);
       ctx.closePath();
       ctx.fill();
-      ctx.strokeStyle = '#2A2C31';
+      ctx.strokeStyle = 'rgba(237, 238, 240, 0.35)';
+      ctx.lineWidth = 1.5;
       ctx.stroke();
     }
 

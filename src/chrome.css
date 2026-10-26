@@ -381,12 +381,12 @@ body[data-interior='1'] .chrome__column {
 
 .chrome__exp-row,
 .chrome__case-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  justify-content: space-between;
   width: 100%;
-  height: 40px;
-  padding: 0;
+  min-height: 40px;
+  padding: 6px 0;
   border: 0;
   border-bottom: 1px dashed #3a3d44;
   background: transparent;
@@ -394,30 +394,40 @@ body[data-interior='1'] .chrome__column {
   font: inherit;
   cursor: pointer;
   text-align: left;
+  gap: 8px 12px;
 }
 
-.chrome__exp-meta span:first-child {
-  flex: 1;
+.chrome__exp-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
-  font-size: 12px;
-  line-height: 16px;
-  color: #8a8f98;
 }
 
 .chrome__exp-name,
 .chrome__case-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: block;
   font-weight: 500;
-  font-size: 13px;
+  font-size: 16px;
+  line-height: 20px;
+  color: #edeef0;
 }
 
-.chrome__exp-meta {
+.chrome__exp-role {
+  display: block;
+  font-size: 13px;
+  line-height: 16px;
+  color: #8a8f98;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chrome__exp-side {
   display: flex;
   align-items: center;
-  gap: 12px;
   color: #8a8f98;
+  flex-shrink: 0;
 }
 
 .chrome__nda {
@@ -916,12 +926,24 @@ body.checklist-mobile-expanded .chrome__phone-topbar-checklist {
   flex-shrink: 0;
 }
 
-.chrome--mobile .chrome__phone-topbar .chrome__lang-opt {
-  min-width: 36px;
-  min-height: 36px;
-  height: 36px;
-  padding: 0 6px;
+.chrome--mobile .chrome__lang-toggle {
+  font-family: Inter, system-ui, sans-serif;
+  font-weight: 600;
   font-size: 12px;
+  letter-spacing: 0.02em;
+  color: #edeef0;
+}
+
+.chrome__lang--in-rail {
+  position: static !important;
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 4px;
+  border-radius: 999px;
+  background: #141518;
+  border: 1px solid #2a2c31;
+  box-shadow: none;
 }
 
 .chrome__map-recenter {
@@ -1061,14 +1083,19 @@ body[data-chrome='phone'] .chrome__phone-topbar-checklist .checklist.checklist--
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.45);
 }
 
-body[data-chrome='phone'] .chrome__phone-topbar-checklist .checklist.checklist--phone-circle.checklist--mobile-closed {
-  border-radius: 24px !important;
+body[data-chrome='phone'] .chrome__phone-topbar-checklist .checklist.checklist--phone-circle.checklist--mobile-closed,
+body[data-chrome='phone'] .chrome__phone-topbar-checklist .checklist.checklist--phone-pill.checklist--mobile-closed {
+  border-radius: 26px !important;
   border: 1px solid #2a2c31 !important;
   background: #141518 !important;
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.45),
     0 2px 8px rgba(0, 0, 0, 0.45) !important;
   overflow: hidden !important;
+}
+
+body[data-chrome='phone'] .chrome__phone-topbar-checklist .checklist.checklist--phone-circle.checklist--mobile-closed {
+  border-radius: 24px !important;
 }
 
 .chrome__phone-topbar-checklist .checklist.checklist--phone-pill .checklist__header {
@@ -1265,6 +1292,24 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
 
 .checklist.checklist--phone-open .checklist__header {
   flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.checklist.checklist--phone-open .checklist__header-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.checklist.checklist--phone-open .checklist__active-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.checklist.checklist--phone-open .checklist__progress-wrap {
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .checklist.checklist--phone-open .checklist__list {
@@ -1386,7 +1431,8 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
 /* Tom peek card: short bottom inset before “Ver detalles” expands the sheet. */
 .chrome--sheet.chrome--intro-peek .chrome__intro {
   bottom: max(16px, env(safe-area-inset-bottom));
-  min-height: min(256px, calc(100dvh - 120px));
+  height: auto;
+  min-height: 0;
   max-height: min(256px, calc(100dvh - 120px));
   border-bottom: 1px solid #2a2c31;
   border-radius: 12px;
@@ -1415,9 +1461,15 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
   color: #8a8f98;
 }
 
+.chrome--sheet.chrome--intro-peek .chrome__intro {
+  justify-content: flex-start;
+}
+
 .chrome--sheet.chrome--intro-peek .chrome__card-row {
-  margin-top: 12px;
+  margin-top: auto;
+  margin-bottom: 0;
   min-height: 56px;
+  flex-shrink: 0;
 }
 
 .chrome--sheet.chrome--intro-peek .chrome__see-details {
@@ -1446,6 +1498,7 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  margin-top: 24px;
 }
 
 .chrome--sheet.chrome--intro-expanded .chrome__card-row {
@@ -1607,12 +1660,7 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
 }
 
 .chrome--dock .chrome__views {
-  display: block;
-  width: auto;
-  right: 16px;
-  bottom: 148px;
-  left: auto;
-  z-index: 5;
+  display: none !important;
 }
 
 .chrome--dock .chrome__minimap-wrap {

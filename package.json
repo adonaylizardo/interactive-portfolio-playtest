@@ -19,6 +19,7 @@
     "qa:sprites": "npm run build && node scripts/qa-sprites.mjs",
     "qa:smoke": "npm run build && node scripts/qa-smoke.mjs",
     "qa:gate": "npm run build && npm run typecheck && node scripts/check-logos.mjs && node scripts/check-case-copy.mjs && node scripts/qa-sprites.mjs && node scripts/qa-smoke.mjs",
+    "qa:batch-r19": "npm run build && node scripts/qa-batch-r19.mjs",
     "verify:jac-drive": "node scripts/verify-jac-drive.mjs",
     "verify:edificios": "npm run build:preview-edificios && node scripts/verify-edificios.mjs",
     "verify:camera-views": "node scripts/verify-camera-views.mjs",

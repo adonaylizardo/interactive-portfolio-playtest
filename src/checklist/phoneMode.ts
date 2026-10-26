@@ -7,6 +7,8 @@ export type PhoneChromeSnapshot = {
   hidden: boolean;
   mobileExpanded: boolean;
   introExpanded: boolean;
+  dock: boolean;
+  introPeek: boolean;
 };
 
 const POSITION_PROPS = [
@@ -86,6 +88,8 @@ export function readPhoneChromeSnapshot(
     hidden: isChecklistHidden(state) || compactHidden,
     mobileExpanded: state.mobileExpanded === true,
     introExpanded: !!chrome?.classList.contains('chrome--intro-expanded'),
+    dock: !!chrome?.classList.contains('chrome--dock'),
+    introPeek: !!chrome?.classList.contains('chrome--intro-peek'),
   };
 }
 
@@ -226,5 +230,10 @@ export function applyPhoneChecklistMode(root: HTMLElement, mode: PhoneChecklistM
     return;
   }
 
-  applyPillCircleOrCompact(root);
+  const dock = !!document.querySelector('.chrome')?.classList.contains('chrome--dock');
+  if (dock) {
+    applyPillCircleOrCompact(root);
+  } else {
+    root.classList.add('checklist--phone-pill');
+  }
 }
