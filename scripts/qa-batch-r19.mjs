@@ -29,10 +29,10 @@ async function phoneArrival(page, tag, errors) {
     const search = document.querySelector('.chrome__phone-topbar [data-action="search"]');
     const lang = document.querySelector('.chrome__phone-topbar [data-action="lang-toggle"]');
     const soundTop = document.querySelector('.chrome__phone-topbar [data-action="sound"]');
-    const soundDock = document.querySelector('.chrome__dock [data-action="sound"]');
+    const soundIntro = document.querySelector('.chrome__intro-toolbar [data-action="sound"]');
     const cl = document.querySelector('.chrome__phone-topbar-checklist .checklist');
     if (soundTop && getComputedStyle(soundTop).display !== 'none') failures.push('sound still in top bar');
-    if (!soundDock || getComputedStyle(soundDock).display === 'none') failures.push('sound missing in dock');
+    if (!soundIntro || getComputedStyle(soundIntro).display === 'none') failures.push('sound missing in intro toolbar');
     if (!lang) failures.push('lang toggle missing');
     for (const el of [search, lang]) {
       const r = el?.getBoundingClientRect();
@@ -60,7 +60,12 @@ async function phoneArrival(page, tag, errors) {
 }
 
 async function phoneDock(page, tag, errors) {
-  await page.locator('[data-details]').click();
+  const details = page.locator('[data-details]');
+  if (await details.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await details.click();
+  } else {
+    await page.evaluate(() => document.querySelector('[data-details]')?.click());
+  }
   await wait(450);
   await page.locator('[data-action="intro-close"]').click();
   await wait(350);
@@ -71,10 +76,7 @@ async function phoneDock(page, tag, errors) {
     const views = document.querySelector('.chrome__views');
     if (views && getComputedStyle(views).display !== 'none') failures.push('floating views on dock');
     const cl = document.querySelector('.chrome__phone-topbar-checklist .checklist');
-    const br = cl ? parseFloat(getComputedStyle(cl).borderTopLeftRadius) : 0;
-    if (br < 20) failures.push(`dock checklist radius ${br}`);
-    const bs = cl ? getComputedStyle(cl).boxShadow : '';
-    if (!bs || bs === 'none') failures.push('dock checklist missing shadow');
+    if (!cl?.classList.contains('checklist--phone-circle')) failures.push('dock should be circle not pill');
     return failures;
   });
   for (const f of d) errors.push(`${tag}: dock ${f}`);
@@ -121,6 +123,14 @@ async function runPhone(w, h, tag) {
     isMobile: true,
     hasTouch: true,
   });
+  await ctx.addInitScript(() => {
+    try {
+      sessionStorage.clear();
+      localStorage.clear();
+    } catch {
+      /* ignore */
+    }
+  });
   const page = await ctx.newPage();
   const errors = [];
   await page.addInitScript(() => {
@@ -150,13 +160,23 @@ async function main() {
     all.push(...(await runPhone(w, h, tag)));
   }
   const browser = await chromium.launch();
-  const page = await browser.newPage();
+  const deskCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await deskCtx.addInitScript(() => {
+    try {
+      sessionStorage.clear();
+      localStorage.clear();
+    } catch {
+      /* ignore */
+    }
+  });
+  const page = await deskCtx.newPage();
   page.on('console', (msg) => {
     if (msg.type() === 'error') all.push(`desktop: console ${msg.text()}`);
   });
   try {
     await desktopChecks(page, '1440x900', all);
   } finally {
+    await deskCtx.close();
     await browser.close();
   }
   const { spawnSync } = await import('node:child_process');

@@ -381,8 +381,6 @@ body[data-interior='1'] .chrome__column {
 
 .chrome__exp-row,
 .chrome__case-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
   align-items: center;
   width: 100%;
   min-height: 40px;
@@ -395,6 +393,16 @@ body[data-interior='1'] .chrome__column {
   cursor: pointer;
   text-align: left;
   gap: 8px 12px;
+}
+
+.chrome__exp-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.chrome__case-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
 }
 
 .chrome__exp-copy {
@@ -421,6 +429,16 @@ body[data-interior='1'] .chrome__column {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.chrome__exp-date {
+  font-size: 13px;
+  line-height: 16px;
+  color: #8a8f98;
+  white-space: nowrap;
+  text-align: right;
+  flex-shrink: 0;
+  min-width: max-content;
 }
 
 .chrome__exp-side {
@@ -787,7 +805,7 @@ body[data-voice-contact='1'] .chrome__subtitle:not(:empty) {
 .chrome--panel .chrome__sound,
 .chrome--panel .chrome__subtitle,
 .chrome--panel .chrome__views,
-.chrome--panel .chrome__lang {
+.chrome--panel .chrome__lang:not(.chrome__lang--in-rail) {
   display: none;
 }
 
@@ -944,13 +962,37 @@ body.checklist-mobile-expanded .chrome__phone-topbar-checklist {
 .chrome__lang--in-rail {
   position: static !important;
   display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 4px;
   margin-top: 8px;
   padding: 4px;
+  width: 40px;
+  box-sizing: border-box;
   border-radius: 999px;
   background: #141518;
   border: 1px solid #2a2c31;
   box-shadow: none;
+  z-index: 8;
+  pointer-events: auto;
+}
+
+.chrome__lang--in-rail .chrome__lang-opt {
+  min-width: 40px;
+  width: 40px;
+  min-height: 40px;
+  height: 40px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chrome__rail .chrome__tools-stack {
+  z-index: 2;
+}
+
+.chrome__rail {
+  z-index: 6;
 }
 
 .chrome__map-recenter {
@@ -1155,6 +1197,10 @@ body[data-chrome='phone'] .chrome__phone-topbar-checklist .checklist.checklist--
 .chrome__phone-topbar-checklist .checklist.checklist--phone-pill .checklist__counter--label {
   flex: 0 0 auto;
   white-space: nowrap;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .chrome__phone-topbar-checklist .checklist.checklist--phone-circle {
@@ -1267,9 +1313,34 @@ body[data-chrome='phone'] .chrome__phone-topbar-checklist .checklist.checklist--
 }
 
 .chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__map-arc,
-.chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__ring,
-.chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__counter--in-ring {
+.chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__ring {
   display: none !important;
+}
+
+body[data-layout='map'] .chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__counter--label,
+body[data-layout='split'] .chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__counter--label {
+  display: none !important;
+}
+
+body[data-layout='map'] .chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__counter--in-ring,
+body[data-layout='split'] .chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__counter--in-ring,
+.chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__counter--in-ring {
+  display: flex !important;
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  line-height: 1;
+  letter-spacing: 0;
+  color: #edeef0;
+  pointer-events: none;
+  z-index: 2;
+  transform: none;
+  left: auto;
+  top: auto;
 }
 
 .checklist.checklist--phone-open {
@@ -1313,8 +1384,15 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
 
 .checklist.checklist--phone-open .checklist__active-title {
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
+  font-size: 12px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.checklist.checklist--phone-open .checklist__label {
+  display: none;
 }
 
 .checklist.checklist--phone-open .checklist__progress-wrap {
@@ -1322,6 +1400,19 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
   margin-left: auto;
   margin-right: 0;
   gap: 0;
+  align-items: center;
+}
+
+.checklist.checklist--phone-open .checklist__counter--in-ring {
+  display: flex !important;
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .checklist.checklist--phone-open .checklist__counter--label {
@@ -1530,8 +1621,16 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
   display: flex;
   justify-content: flex-end;
   align-items: center;
+  gap: 8px;
   padding: 0 48px 0 16px;
   flex-shrink: 0;
+}
+
+.chrome__intro-sound.ui-round {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
 }
 
 .chrome__intro-lang-host .chrome__lang {
@@ -1630,8 +1729,20 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
   bottom: 16px;
   height: 48px;
   justify-content: center;
-  gap: 8px;
+  gap: 4px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  max-width: 100%;
   z-index: 6;
+}
+
+.chrome--dock .chrome__dock .ui-round--lg {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 20px;
+  flex-shrink: 0;
 }
 
 .chrome--mobile .chrome__sound {

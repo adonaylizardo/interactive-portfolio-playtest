@@ -267,6 +267,26 @@ async function main(): Promise<void> {
       chrome.sync();
     },
     onOpenSearch: () => searchPalette.open(),
+    onOpenArticles: () => {
+      chrome.setInteriorOpen(false, { skipLayout: true });
+      chrome.setLayout('map');
+      const b = getBuildingByName('biblioteca');
+      if (b?.panelTitle) {
+        panel.showWritings(b.panelTitle, 'biblioteca');
+        panel.expandExperienceSheet();
+      }
+      syncMapOverlays();
+    },
+    onOpenTalks: () => {
+      chrome.setInteriorOpen(false, { skipLayout: true });
+      chrome.setLayout('map');
+      const b = getBuildingByName('teresa');
+      if (b?.panelTitle) {
+        panel.showTalks(b.panelTitle, 'teresa');
+        panel.expandExperienceSheet();
+      }
+      syncMapOverlays();
+    },
     onReadingOpen: () => {
       if (isMobileLayout()) chrome.rememberMobileSheetBeforeReading();
       navigateReading({ kind: 'list' });

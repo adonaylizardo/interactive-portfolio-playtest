@@ -18,7 +18,12 @@ async function bootPhone(page) {
 }
 
 async function dismissToDock(page) {
-  await page.locator('[data-details]').click();
+  const details = page.locator('[data-details]');
+  if (await details.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await details.click();
+  } else {
+    await page.evaluate(() => document.querySelector('[data-details]')?.click());
+  }
   await wait(400);
   await page.locator('[data-action="intro-close"]').click();
   await wait(350);
@@ -82,7 +87,12 @@ async function measureR20(page) {
 }
 
 async function measureExpandedGap(page) {
-  await page.locator('[data-details]').click();
+  const details = page.locator('[data-details]');
+  if (await details.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await details.click();
+  } else {
+    await page.evaluate(() => document.querySelector('[data-details]')?.click());
+  }
   await wait(500);
   return await page.evaluate(() => {
     const failures = [];
@@ -139,6 +149,14 @@ async function runViewport(w, h, tag, errors) {
     deviceScaleFactor: 2,
     isMobile: true,
     hasTouch: true,
+  });
+  await ctx.addInitScript(() => {
+    try {
+      sessionStorage.clear();
+      localStorage.clear();
+    } catch {
+      /* ignore */
+    }
   });
   const page = await ctx.newPage();
   try {

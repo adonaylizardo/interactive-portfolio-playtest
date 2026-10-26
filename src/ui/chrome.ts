@@ -34,6 +34,8 @@ export type ChromeCallbacks = {
   onLocate: (buildingId: string) => void;
   onOpenAbout: (opts?: AboutPanelOpenOpts) => void;
   onOpenSearch: () => void;
+  onOpenArticles: () => void;
+  onOpenTalks: () => void;
   onReadingOpen?: () => void;
   onReadingClose?: () => void;
 };
@@ -264,8 +266,9 @@ export class ChromeUI {
       <button type="button" class="chrome__exp-row" data-locate="${row.id}">
         <span class="chrome__exp-copy">
           <span class="chrome__exp-name"${row.id === 'mentoria' ? ' data-i18n="chrome.expRow.mentoria"' : ''}>${row.id === 'mentoria' ? 'Mentoring at Applaudo' : row.label}</span>
-          <span class="chrome__exp-role" data-i18n="chrome.exp.${row.id}"></span>
+          <span class="chrome__exp-role" data-i18n="chrome.expRole.${row.id}"></span>
         </span>
+        <span class="chrome__exp-date" data-i18n="chrome.expDate.${row.id}"></span>
         <span class="chrome__exp-side" aria-hidden="true">${iconSvg('locate', 16)}</span>
       </button>`,
     ).join('');
@@ -286,6 +289,8 @@ export class ChromeUI {
         ${roundBtn('briefcase', 'Casos', 'chrome__nav', 'cases')}
         ${roundBtn('trophy', 'Logros', 'chrome__nav', 'achievements')}
         ${roundBtn('mail', 'Contacto', 'chrome__nav', 'contact')}
+        ${roundBtn('page', 'Articles', 'chrome__nav', 'articles')}
+        ${roundBtn('play', 'Talks', 'chrome__nav', 'talks')}
         ${roundBtn('search', 'Buscar', 'chrome__nav', 'search')}
         <span class="chrome__rail-spacer"></span>
         <div class="chrome__tools-stack">
@@ -368,6 +373,7 @@ export class ChromeUI {
         <div class="chrome__sheet-grab" data-intro-grab aria-hidden="true"><span></span></div>
         <div class="chrome__intro-toolbar" data-intro-toolbar hidden>
           <div class="chrome__intro-lang-host" data-intro-lang-host></div>
+          ${roundBtn('sound', 'Sonido', 'chrome__intro-sound', 'sound')}
         </div>
         <button type="button" class="chrome__intro-close" data-action="intro-close" aria-label="Close" data-i18n-aria="jac.close">${iconSvg('close')}</button>
         <div class="chrome__lede">
@@ -439,7 +445,8 @@ export class ChromeUI {
         ${roundBtn('briefcase', 'Casos', 'ui-round--lg', 'cases')}
         ${roundBtn('trophy', 'Logros', 'ui-round--lg', 'achievements')}
         ${roundBtn('mail', 'Contacto', 'ui-round--lg', 'contact')}
-        ${roundBtn('sound', 'Sonido', 'ui-round--lg', 'sound')}
+        ${roundBtn('page', 'Artículos', 'ui-round--lg', 'articles')}
+        ${roundBtn('play', 'Charlas', 'ui-round--lg', 'talks')}
         ${roundBtn('map', 'Map', 'ui-round--lg', 'map')}
       </nav>
       <div class="chrome__lang" role="group" aria-label="Language" data-i18n-aria="chrome.language">
@@ -531,15 +538,6 @@ export class ChromeUI {
         else this.callbacks.onView(v as Camera);
       });
     });
-    this.root.querySelectorAll('[data-action="search"]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        (btn as HTMLElement).blur();
-        this.setLayout('split');
-        this.scrollTo('#chrome-casos');
-        const first = this.root.querySelector('.chrome__case-row') as HTMLElement | null;
-        first?.focus({ preventScroll: true });
-      });
-    });
     this.root.querySelectorAll('[data-action="center"]').forEach((btn) => {
       btn.addEventListener('click', () => this.callbacks.onCenter());
     });
@@ -574,6 +572,20 @@ export class ChromeUI {
     });
     this.root.querySelector('.chrome__rail [data-action="contact"]')?.addEventListener('click', () => {
       this.openContact();
+    });
+    this.root.querySelectorAll('[data-action="articles"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        (btn as HTMLElement).blur();
+        studio.playClick();
+        this.callbacks.onOpenArticles();
+      });
+    });
+    this.root.querySelectorAll('[data-action="talks"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        (btn as HTMLElement).blur();
+        studio.playClick();
+        this.callbacks.onOpenTalks();
+      });
     });
     this.root.querySelector('[data-action="fullpage"]')?.addEventListener('click', () => {
       if (this.callbacks.onReadingOpen && this.callbacks.onReadingClose) {
@@ -743,6 +755,16 @@ export class ChromeUI {
     this.callbacks.onOpenSearch();
   }
 
+  openArticles(): void {
+    studio.playClick();
+    this.callbacks.onOpenArticles();
+  }
+
+  openTalks(): void {
+    studio.playClick();
+    this.callbacks.onOpenTalks();
+  }
+
   openAboutPanel(opts?: AboutPanelOpenOpts): void {
     studio.playClick();
     this.callbacks.onOpenAbout(opts);
@@ -757,7 +779,7 @@ export class ChromeUI {
     intro.classList.toggle('chrome__intro--expanded', expanded);
     if (body) body.classList.toggle('chrome__sheet-body--collapsed', !expanded);
     if (grab) grab.hidden = !expanded;
-    if (toolbar) toolbar.hidden = !expanded;
+    if (toolbar) toolbar.hidden = false;
     this.sync();
     this.callbacks.onLayoutChange();
   }
@@ -879,6 +901,10 @@ export class ChromeUI {
       this.mobile && this.mobileSheet && !this.interiorOpen && !landscapeSide && !introExpanded,
     );
     this.root.classList.toggle('chrome--intro-expanded', introExpanded);
+    const introToolbar = this.root.querySelector('[data-intro-toolbar]') as HTMLElement | null;
+    if (introToolbar) {
+      introToolbar.hidden = !(this.mobile && this.mobileSheet && !this.interiorOpen && !landscapeSide);
+    }
     this.syncMobileLang();
     this.root.classList.toggle('chrome--dock', this.mobile && !this.mobileSheet && !this.interiorOpen);
     this.root.classList.toggle('chrome--map', !this.mobile && this.layout === 'map');

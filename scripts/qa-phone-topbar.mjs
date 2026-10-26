@@ -322,8 +322,7 @@ async function runViewport(viewportW, height, tag) {
     await page.locator('[data-action="intro-close"]').click();
     await wait(450);
     await assertTopBar(page, `${tag} dock`, errors);
-    await assertPillLabel(page, `${tag} dock`, errors);
-    await assertDockChecklistRadius(page, `${tag} dock`, errors);
+    await assertCircleOk(page, `${tag} dock`, errors);
     await assertMapRecenter(page, `${tag} dock`, errors, true);
 
     await page.locator('.chrome__phone-topbar [data-action="lang-toggle"]').click();
