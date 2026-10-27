@@ -30,6 +30,15 @@ async function setLang(page, lang) {
   }
 }
 
+async function dismissToDock(page) {
+  await page.evaluate(() => document.querySelector('[data-details]')?.click());
+  await wait(350);
+  for (const ms of [350, 450]) {
+    await page.evaluate(() => document.querySelector('[data-action="intro-close"]')?.click());
+    await wait(ms);
+  }
+}
+
 async function main() {
   console.log('qa-batch-r24: start');
   const errors = [];
@@ -129,6 +138,60 @@ async function main() {
         if (searchAria !== 'Search') errors.push(`${tag} L1 search aria EN "${searchAria}"`);
       }
 
+      await dismissToDock(page);
+      const dock = await page.evaluate(() => {
+        const el = document.querySelector('.chrome__dock');
+        const r = el?.getBoundingClientRect();
+        const btns = el ? [...el.querySelectorAll('.ui-round, [data-dock]')] : [];
+        const first = btns[0]?.getBoundingClientRect();
+        const gap = btns.length > 1 && first ? btns[1].getBoundingClientRect().left - first.right : 0;
+        return {
+          x: r?.x,
+          y: r?.y,
+          w: r?.width,
+          h: r?.height,
+          count: btns.length,
+          btn: first ? { w: first.width, h: first.height } : null,
+          gap,
+          hasArticles: !!el?.querySelector('[data-action="articles"]'),
+        };
+      });
+      metrics[`M2-${tag}`] = dock;
+      if (w === PHONE_POS) {
+        if (!near(dock.x, 51.5) || !near(dock.y, 748) || !near(dock.w, 272) || dock.count !== 5) {
+          errors.push(`${tag} M2 dock ${JSON.stringify(dock)}`);
+        }
+        if (dock.hasArticles) errors.push(`${tag} M2 dock still has articles button`);
+        if (dock.btn && (!near(dock.btn.w, 48) || !near(dock.btn.h, 48))) {
+          errors.push(`${tag} M2 dock btn size ${JSON.stringify(dock.btn)}`);
+        }
+        if (!near(dock.gap, 8)) errors.push(`${tag} M2 dock gap ${dock.gap}`);
+      }
+
+      await page.evaluate(() => document.querySelector('[data-dock="intro"]')?.click());
+      await page.evaluate(() => document.querySelector('[data-details]')?.click());
+      await wait(450);
+      const m3phone = await page.evaluate(() => {
+        const cl = document.querySelector('.checklist');
+        const r = cl?.getBoundingClientRect();
+        return {
+          x: r?.x,
+          y: r?.y,
+          w: r?.width,
+          h: r?.height,
+          circle: cl?.classList.contains('checklist--phone-circle'),
+          hidden: cl?.hidden,
+        };
+      });
+      metrics[`M3-${tag}`] = m3phone;
+      metrics[`L2-${tag}`] = m3phone;
+      if (w === PHONE_POS) {
+        if (!m3phone.circle || m3phone.hidden) errors.push(`${tag} M3 phone checklist ${JSON.stringify(m3phone)}`);
+        if (!near(m3phone.x, 311) || !near(m3phone.y, 16) || !near(m3phone.w, 48) || !near(m3phone.h, 48)) {
+          errors.push(`${tag} L2 circle ${JSON.stringify(m3phone)}`);
+        }
+      }
+
       await ctx.close();
     }
   }
@@ -161,28 +224,44 @@ async function main() {
   }
   if (collapsed.labelDisplay !== 'none') errors.push(`H2 label display ${collapsed.labelDisplay}`);
 
-  await page.evaluate(() => document.querySelector('.chrome__rail [data-action="articles"]')?.click());
-  await wait(700);
+  await page.evaluate(() => document.querySelector('.chrome__rail [data-action="home"]')?.click());
+  await wait(500);
+  await page.evaluate(() => document.querySelector('#chrome-articulos')?.scrollIntoView({ block: 'start' }));
+  await wait(200);
   const m3 = await page.evaluate(() => {
     const cl = document.querySelector('.checklist');
     const r = cl?.getBoundingClientRect();
     const cs = cl ? getComputedStyle(cl) : null;
-    return { w: r?.width, opacity: cs?.opacity, hidden: cl?.hidden };
+    return { w: r?.width, opacity: cs?.opacity, hidden: cl?.hidden, x: r?.x, y: r?.y };
   });
   metrics.M3desk = m3;
-  if (m3.hidden || parseFloat(m3.opacity ?? '1') < 0.9) errors.push(`M3 desktop checklist ${JSON.stringify(m3)}`);
+  if (m3.hidden || parseFloat(m3.opacity ?? '1') < 0.9) errors.push(`M3 desktop checklist split ${JSON.stringify(m3)}`);
   if (!near(m3.w, 40) && !near(m3.w, 296)) errors.push(`M3 desktop checklist width ${m3.w}`);
 
+  await page.evaluate(() => document.querySelector('[data-action="panel-only"]')?.click());
+  await wait(450);
+  const m3panel = await page.evaluate(() => {
+    const cl = document.querySelector('.checklist');
+    const cs = cl ? getComputedStyle(cl) : null;
+    return { opacity: cs?.opacity, layout: document.body.dataset.layout };
+  });
+  metrics.M3deskExpanded = m3panel;
+  if (parseFloat(m3panel.opacity ?? '1') > 0.05) {
+    errors.push(`M3 desktop expanded opacity ${m3panel.opacity}`);
+  }
+
   const m6 = await page.evaluate(() => ({
-    count: document.querySelector('.exp-header__count')?.textContent,
-    backHidden: document.querySelector('[data-exp-back]')?.hidden,
-    sectionTitles: [...document.querySelectorAll('.experience__section-title')].map((e) => e.textContent),
+    articulosCount: document.querySelector('#chrome-articulos [data-section-count]')?.textContent?.trim(),
+    charlasCount: document.querySelector('#chrome-charlas [data-section-count]')?.textContent?.trim(),
+    articulosRows: document.querySelectorAll('#chrome-articulos .chrome__content-row').length,
+    expPanelOpen: document.querySelector('.building-panel--experience.building-panel--open') != null,
+    railArticles: document.querySelector('.chrome__rail [data-action="articles"]'),
   }));
   metrics.M6 = m6;
-  if (!m6.count || m6.backHidden !== true) errors.push(`M6 header ${JSON.stringify(m6)}`);
-  if (m6.sectionTitles.some((t) => t === 'Artículos' || t === 'Articles')) {
-    errors.push(`M6 dup section ${m6.sectionTitles}`);
-  }
+  if (m6.articulosCount !== '5') errors.push(`M6 articulos count "${m6.articulosCount}"`);
+  if (m6.charlasCount !== '14') errors.push(`M6 charlas count "${m6.charlasCount}"`);
+  if (m6.railArticles) errors.push('M6 rail still has articles icon');
+  if (m6.expPanelOpen) errors.push('M6 experience panel open for list');
 
   const rail = await page.evaluate(() => {
     const stack = document.querySelector('.chrome__tools-stack');

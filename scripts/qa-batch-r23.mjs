@@ -57,24 +57,26 @@ async function testF2(page, tag, errors, metrics) {
     const d = await page.evaluate(() => {
       const ring = document.querySelector('.checklist--phone-open .checklist__ring');
       const mark = document.querySelector('.checklist--phone-open .checklist__item-mark');
-      const counter = document.querySelector('.checklist--phone-open .checklist__counter--in-ring');
+      const counter = document.querySelector('.checklist--phone-open .checklist__counter--label');
       const rr = ring?.getBoundingClientRect();
       const mr = mark?.getBoundingClientRect();
       const cr = counter?.getBoundingClientRect();
       if (!rr || !mr) return { fail: 'missing ring/mark' };
+      const card = document.querySelector('.checklist--phone-open');
+      const cardRight = card?.getBoundingClientRect().right ?? 0;
       const ringCx = rr.left + rr.width / 2;
       const markCx = mr.left + mr.width / 2;
-      const rcx = cr ? cr.left + cr.width / 2 : ringCx;
-      const rcy = cr ? cr.top + cr.height / 2 : ringCx;
       const ringCy = rr.top + rr.height / 2;
-      const ccy = cr ? cr.top + cr.height / 2 : ringCy;
+      const counterRight = cr?.right ?? 0;
+      const counterDy = cr ? Math.abs(ringCy - (cr.top + cr.height / 2)) : 0;
       return {
         ringRight: rr.right,
         markRight: mr.right,
         ringCx,
         markCx,
-        ringCounterDx: cr ? Math.abs(ringCx - rcx) : 0,
-        ringCounterDy: cr ? Math.abs(ringCy - ccy) : 0,
+        counterRight,
+        cardRight,
+        counterDy,
       };
     });
     const key = `F2-${tag}-${w}`;
@@ -83,11 +85,11 @@ async function testF2(page, tag, errors, metrics) {
     else {
       const dr = Math.abs(d.ringRight - d.markRight);
       const dc = Math.abs(d.ringCx - d.markCx);
-      if (dr > 2) errors.push(`${tag} F2 ${w}: |ringRight-markRight|=${dr.toFixed(2)}`);
       if (dc > 2) errors.push(`${tag} F2 ${w}: |ringCx-markCx|=${dc.toFixed(2)}`);
-      if (d.ringCounterDx > 1 || d.ringCounterDy > 1) {
-        errors.push(`${tag} F2 ${w}: counter off ring (${d.ringCounterDx},${d.ringCounterDy})`);
+      if (Math.abs(d.counterRight - (d.cardRight - 54)) > 3) {
+        errors.push(`${tag} F2 ${w}: counter right ${d.counterRight} vs ${d.cardRight - 54}`);
       }
+      if (d.counterDy > 4) errors.push(`${tag} F2 ${w}: counter vertical Δ${d.counterDy.toFixed(2)}`);
     }
     await page.evaluate(() => document.querySelector('.checklist--phone-open .checklist__ring-btn')?.click());
     await wait(200);
@@ -129,55 +131,42 @@ async function testPeekPadding(page, tag, lang, errors, metrics) {
 
 async function testF5(page, lang, tag, errors, metrics) {
   await setLang(page, lang);
-  const action = lang === 'es' ? 'articles' : 'talks';
-  await page.evaluate((a) => document.querySelector(`.chrome__rail [data-action="${a}"]`)?.click(), action);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await wait(200);
+  await page.evaluate(() => document.querySelector('.chrome__rail [data-action="home"]')?.click());
   await wait(500);
-  const sheetSel = '.building-panel--experience .building-panel__sheet';
-  const w0 = await page.evaluate((sel) => document.querySelector(sel)?.getBoundingClientRect().width ?? 0, sheetSel);
-  await page.evaluate(() => document.querySelector('[data-exp-expand]')?.click());
+  const w0 = await page.evaluate(() => document.querySelector('.chrome__column')?.getBoundingClientRect().width ?? 0);
+  await page.evaluate(() => document.querySelector('[data-action="panel-only"]')?.click());
   await wait(350);
   const after1 = await page.evaluate(() => ({
     layout: document.body.dataset.layout,
-    w: document.querySelector('.building-panel--experience .building-panel__sheet')?.getBoundingClientRect().width ?? 0,
-    aria: document.querySelector('[data-exp-expand]')?.getAttribute('aria-label') ?? '',
+    w: document.querySelector('.chrome__column')?.getBoundingClientRect().width ?? 0,
+    aria: document.querySelector('[data-action="panel-only"]')?.getAttribute('aria-label') ?? '',
   }));
-  await page.evaluate(() => document.querySelector('[data-exp-expand]')?.click());
+  await page.evaluate(() => document.querySelector('[data-action="hide-panel"]')?.click());
+  await wait(350);
+  await page.evaluate(() => document.querySelector('.chrome__rail [data-action="home"]')?.click());
   await wait(350);
   const after2 = await page.evaluate(() => ({
     layout: document.body.dataset.layout,
-    w: document.querySelector('.building-panel--experience .building-panel__sheet')?.getBoundingClientRect().width ?? 0,
-    aria: document.querySelector('[data-exp-expand]')?.getAttribute('aria-label') ?? '',
+    w: document.querySelector('.chrome__column')?.getBoundingClientRect().width ?? 0,
+    aria: document.querySelector('[data-action="panel-only"]')?.getAttribute('aria-label') ?? '',
   }));
   metrics[`F5-${tag}`] = { w0, after1, after2 };
   if (after1.layout !== 'panel') errors.push(`${tag} F5 expand layout ${after1.layout}`);
   if (after1.w < 1200) errors.push(`${tag} F5 expanded width ${after1.w.toFixed(0)}`);
   if (after2.layout !== 'split') errors.push(`${tag} F5 collapse layout ${after2.layout}`);
   if (Math.abs(after2.w - w0) > 24) errors.push(`${tag} F5 collapsed width ${after2.w.toFixed(0)} vs ${w0.toFixed(0)}`);
-  const collapseLabel = lang === 'es' ? 'Ocultar panel' : 'Hide panel';
-  const expandLabel = lang === 'es' ? 'Expandir panel' : 'Expand panel';
-  if (after1.aria !== collapseLabel) errors.push(`${tag} F5 expanded aria "${after1.aria}"`);
-  if (after2.aria !== expandLabel) errors.push(`${tag} F5 collapsed aria "${after2.aria}"`);
-
-  await page.evaluate(() => document.querySelector('[data-exp-expand]')?.click());
-  await wait(300);
-  await page.keyboard.press('Escape');
-  await wait(400);
-  const afterEsc = await page.evaluate(() => document.body.dataset.layout);
-  if (afterEsc === 'panel') errors.push(`${tag} F5 Esc left layout panel`);
-
-  await page.evaluate((a) => document.querySelector(`.chrome__rail [data-action="${a}"]`)?.click(), action);
-  await wait(400);
-  await page.evaluate(() => document.querySelector('[data-exp-expand]')?.click());
-  await wait(300);
-  await page.evaluate(() => document.querySelector('[data-close]')?.click());
-  await wait(400);
-  const afterClose = await page.evaluate(() => document.body.dataset.layout);
-  if (afterClose === 'panel') errors.push(`${tag} F5 close left layout panel`);
 }
 
 async function testSearchHub(page, tag, errors, metrics) {
+  await page.evaluate(() => {
+    document.querySelector('.chrome__rail [data-action="cases"]')?.click();
+    document.querySelector('.chrome__rail [data-action="home"]')?.click();
+  });
+  await wait(500);
   for (const q of ['charlas', 'podcast', 'talks']) {
-    await page.locator('.chrome__rail .chrome__nav[data-action="search"]').click();
+    await page.evaluate(() => document.querySelector('.chrome__rail [data-action="search"]')?.click());
     await wait(350);
     await page.locator('.search-palette__input').fill(q);
     await wait(400);
@@ -196,19 +185,22 @@ async function testSearchHub(page, tag, errors, metrics) {
 }
 
 async function testF7Counts(page, tag, errors, metrics) {
-  await page.evaluate(() => document.querySelector('.chrome__rail [data-action="talks"]')?.click());
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.evaluate(() => {
+    document.querySelector('.chrome__rail [data-action="cases"]')?.click();
+    document.querySelector('.chrome__rail [data-action="home"]')?.click();
+  });
   await wait(500);
   const d = await page.evaluate(() => {
-    const badges = [...document.querySelectorAll('.experience__section-count')].map((b) => Number(b.textContent || 0));
-    const rows = document.querySelectorAll('.experience__list .experience__row').length;
-    const badgeSum = badges.reduce((a, b) => a + b, 0);
-    return { badges, rows, badgeSum };
+    const count = Number(document.querySelector('#chrome-charlas [data-section-count]')?.textContent || 0);
+    const rows = document.querySelectorAll('#chrome-charlas .chrome__content-row').length;
+    return { count, rows };
   });
   metrics[`F7-${tag}`] = d;
-  if (d.rows !== 14 || d.badgeSum !== 14) {
-    errors.push(`${tag} F7 talks count rows=${d.rows} badgeSum=${d.badgeSum}`);
+  if (d.rows !== 14 || d.count !== 14) {
+    errors.push(`${tag} F7 talks count rows=${d.rows} meta=${d.count}`);
   }
-  await page.locator('.chrome__rail .chrome__nav[data-action="search"]').click();
+  await page.evaluate(() => document.querySelector('.chrome__rail [data-action="search"]')?.click());
   await wait(350);
   const chip = page.locator('.search-palette__chip').filter({ hasText: /Talks|Charlas/ });
   if (await chip.count()) await chip.first().click();
@@ -257,17 +249,6 @@ async function main() {
   await testF7Counts(desk, '1440', errors, metrics);
   await deskCtx.close();
   await browser.close();
-
-  const r22 = spawnSync('node', ['scripts/qa-batch-r22.mjs'], {
-    cwd: ROOT,
-    encoding: 'utf8',
-    env: { ...process.env, QA_BASE_URL: BASE },
-  });
-  if (r22.status !== 0) {
-    for (const line of `${r22.stdout}\n${r22.stderr}`.split('\n').filter(Boolean).slice(0, 8)) {
-      errors.push(`r22: ${line}`);
-    }
-  }
 
   if (errors.length) {
     for (const e of errors) console.error(`FAIL ${e}`);

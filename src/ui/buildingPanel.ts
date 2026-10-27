@@ -647,27 +647,41 @@ export class BuildingPanel {
 
   /** Site search: open a specific writing in the reader. */
   openWritingById(itemId: string): boolean {
-    for (const section of WRITINGS) {
-      const item = section.items.find((x) => x.id === itemId);
-      if (!item) continue;
-      this.openWriting(section, item);
-      return true;
-    }
-    return false;
+    return this.openWritingDetail(itemId);
   }
 
   openTalkById(talkId: string): boolean {
     if (talkId === 'teresa-building') {
-      this.setExperienceView('list');
       return true;
     }
     const item = TALKS.find((x) => x.id === talkId);
     if (!item) return false;
+    if (this.mode !== 'talks' || !this.isOpen()) {
+      this.openExperience('talks', 'teresa', { shellOnly: true });
+    }
     this.activeTalkId = item.id;
     this.renderTalkPlayer(item);
     this.setExperienceView('detail');
     if (this.isMobile()) this.setPeek(false);
     return true;
+  }
+
+  /** Detail player only — lists live in the Adonay chrome sections. */
+  openTalkDetail(talkId: string): boolean {
+    return this.openTalkById(talkId);
+  }
+
+  openWritingDetail(itemId: string): boolean {
+    for (const section of WRITINGS) {
+      const item = section.items.find((x) => x.id === itemId);
+      if (!item) continue;
+      if (this.mode !== 'writings' || !this.isOpen()) {
+        this.openExperience('writings', 'biblioteca', { shellOnly: true });
+      }
+      this.openWriting(section, item);
+      return true;
+    }
+    return false;
   }
 
   expandExperienceSheet(): void {
@@ -690,7 +704,11 @@ export class BuildingPanel {
     }
   }
 
-  private openExperience(mode: 'talks' | 'writings', interiorId: string | null): void {
+  private openExperience(
+    mode: 'talks' | 'writings',
+    interiorId: string | null,
+    opts?: { shellOnly?: boolean },
+  ): void {
     this.leaveArmed = false;
     this.exitPress = null;
     this.exitFromPointer = false;
@@ -727,7 +745,12 @@ export class BuildingPanel {
     this.el.classList.toggle('building-panel--writings', mode === 'writings');
     this.syncPeekClass();
     this.setExperienceView('list');
-    if (mode === 'talks') this.renderTalksList();
+    if (opts?.shellOnly) {
+      if (this.experienceList) this.experienceList.hidden = true;
+      if (this.experienceDetail) this.experienceDetail.hidden = true;
+      if (this.experienceFilters) this.experienceFilters.hidden = true;
+      this.syncExperienceHeaderCount(0);
+    } else if (mode === 'talks') this.renderTalksList();
     else {
       if (this.experienceFilters) {
         this.experienceFilters.replaceChildren();

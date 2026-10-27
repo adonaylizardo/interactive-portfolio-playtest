@@ -56,48 +56,33 @@ async function testH1Phone(page, tag, errors) {
     const failures = [];
     const dock = document.querySelector('.chrome__dock');
     const btns = dock ? [...dock.querySelectorAll('.ui-round, [data-dock]')] : [];
-    if (btns.length < 7) failures.push(`dock count ${btns.length} < 7`);
+    if (btns.length !== 5) failures.push(`dock count ${btns.length} !== 5`);
     const dockRect = dock?.getBoundingClientRect();
     if (dockRect && dockRect.right > window.innerWidth + 1) failures.push('dock overflows viewport');
     for (const b of btns) {
       const r = b.getBoundingClientRect();
-      if (r.width < 39 || r.height < 39) failures.push(`dock btn small ${r.width}x${r.height}`);
+      if (r.width < 46 || r.height < 46) failures.push(`dock btn small ${r.width}x${r.height}`);
     }
     const articles = dock?.querySelector('[data-action="articles"]');
     const talks = dock?.querySelector('[data-action="talks"]');
-    if (!articles) failures.push('dock missing articles');
-    if (!talks) failures.push('dock missing talks');
+    if (articles) failures.push('dock should not have articles');
+    if (talks) failures.push('dock should not have talks');
     return { failures, hasArticles: !!articles, hasTalks: !!talks };
   });
   for (const f of d.failures) errors.push(`${tag} H1 dock: ${f}`);
 
-  await page.locator('.chrome__dock [data-action="articles"]').click();
+  await page.locator('[data-dock="intro"]').click();
+  await page.evaluate(() => document.querySelector('[data-details]')?.click());
   await wait(600);
-  const articlesPanel = await page.evaluate(() => {
-    const p = document.querySelector('.building-panel--writings');
-    const rows = document.querySelectorAll('.experience__row, .experience__empty');
-    return { open: !!p?.classList.contains('building-panel--open'), rows: rows.length };
-  });
-  if (!articlesPanel.open || articlesPanel.rows < 1) {
-    errors.push(`${tag} H1: articles panel did not open with content`);
-  }
-  await page.keyboard.press('Escape');
-  await wait(300);
-
-  await page.locator('.chrome__dock [data-action="talks"]').click();
-  await wait(600);
-  const talksPanel = await page.evaluate(() => {
-    const p = document.querySelector('.building-panel--experience');
-    const list = document.querySelector('.experience__list');
-    return {
-      open: !!document.querySelector('.building-panel--open'),
-      items: list?.children.length ?? 0,
-    };
-  });
-  if (!talksPanel.open) errors.push(`${tag} H1: talks panel did not open`);
-  await page.evaluate(() => {
-    document.querySelector('.building-panel__exit')?.click();
-  });
+  const aboutSections = await page.evaluate(() => ({
+    articles: document.querySelectorAll('#chrome-mobile-articulos .chrome__content-row').length,
+    talks: document.querySelectorAll('#chrome-mobile-charlas .chrome__content-row').length,
+    expOpen: !!document.querySelector('.building-panel--experience.building-panel--open'),
+  }));
+  if (aboutSections.articles < 1) errors.push(`${tag} H1: about missing articles rows`);
+  if (aboutSections.talks < 1) errors.push(`${tag} H1: about missing charlas rows`);
+  if (aboutSections.expOpen) errors.push(`${tag} H1: experience list panel should stay closed`);
+  await page.evaluate(() => document.querySelector('[data-action="intro-close"]')?.click());
   await wait(400);
 }
 
@@ -108,18 +93,19 @@ async function testH1Desktop(page, errors) {
     const failures = [];
     const a = document.querySelector('.chrome__rail [data-action="articles"]');
     const t = document.querySelector('.chrome__rail [data-action="talks"]');
-    if (!a) failures.push('rail missing articles');
-    if (!t) failures.push('rail missing talks');
+    if (a) failures.push('rail should not have articles');
+    if (t) failures.push('rail should not have talks');
     return failures;
   });
   for (const f of d) errors.push(`1440 H1: ${f}`);
-  if (d.length) return;
-  await page.evaluate(() => document.querySelector('.chrome__rail [data-action="articles"]')?.click());
+  await page.evaluate(() => document.querySelector('.chrome__rail [data-action="home"]')?.click());
   await wait(500);
-  const open = await page.evaluate(
-    () => !!document.querySelector('.building-panel--open.building-panel--writings, .building-panel--writings.building-panel--open'),
-  );
-  if (!open) errors.push('1440 H1: desktop articles panel did not open');
+  const open = await page.evaluate(() => ({
+    articles: document.querySelectorAll('#chrome-articulos .chrome__content-row').length,
+    talks: document.querySelectorAll('#chrome-charlas .chrome__content-row').length,
+  }));
+  if (open.articles < 1) errors.push('1440 H1: desktop about missing articles rows');
+  if (open.talks < 1) errors.push('1440 H1: desktop about missing charlas rows');
 }
 
 async function testH2Desktop(page, errors) {
@@ -137,17 +123,14 @@ async function testH2Desktop(page, errors) {
     }
     const hit = await page.evaluate(() => {
       const failures = [];
-      for (const lang of ['en', 'es']) {
-        const btn = document.querySelector(`.chrome__lang--in-rail [data-lang="${lang}"]`);
-        const r = btn?.getBoundingClientRect();
-        if (!r || r.width < 2) {
-          failures.push(`${lang} missing`);
-          continue;
-        }
+      const toggle = document.querySelector('.chrome__tools-stack [data-action="lang-toggle"]');
+      const r = toggle?.getBoundingClientRect();
+      if (!r || r.width < 2) failures.push('lang toggle missing');
+      else {
         const cx = r.left + r.width / 2;
         const cy = r.top + r.height / 2;
         const top = document.elementFromPoint(cx, cy);
-        if (!top?.closest(`[data-lang="${lang}"]`)) failures.push(`${lang} not hittable`);
+        if (!top?.closest('[data-action="lang-toggle"]')) failures.push('lang toggle not hittable');
       }
       return failures;
     });
@@ -206,20 +189,18 @@ async function testPhoneM(page, tag, errors) {
     }
     const hr = document.querySelector('.checklist--phone-open .checklist__ring')?.getBoundingClientRect();
     const mk = document.querySelector('.checklist--phone-open .checklist__item-mark')?.getBoundingClientRect();
-    if (hr && mk && Math.abs(hr.right - mk.right) > 2) {
-      failures.push(`ring dx ${Math.abs(hr.right - mk.right)}`);
+    if (hr && mk) {
+      const ringCx = hr.left + hr.width / 2;
+      const markCx = mk.left + mk.width / 2;
+      if (Math.abs(ringCx - markCx) > 2) failures.push(`ring/mark cx Δ ${Math.abs(ringCx - markCx)}`);
     }
-    const counter = document.querySelector('.checklist--phone-open .checklist__counter--in-ring');
-    const ring = document.querySelector('.checklist--phone-open .checklist__ring');
-    if (counter && ring) {
+    const counter = document.querySelector('.checklist--phone-open .checklist__counter--label');
+    const card = document.querySelector('.checklist--phone-open');
+    if (counter && card) {
       const cr = counter.getBoundingClientRect();
-      const rr = ring.getBoundingClientRect();
-      const ccy = cr.top + cr.height / 2;
-      const rcx = cr.left + cr.width / 2;
-      const rcy = rr.top + rr.height / 2;
-      const rcxRing = rr.left + rr.width / 2;
-      if (Math.abs(ccy - rcy) > 2 || Math.abs(rcx - rcxRing) > 2) {
-        failures.push(`counter not centered on ring`);
+      const cardRight = card.getBoundingClientRect().right;
+      if (Math.abs(cr.right - (cardRight - 54)) > 3) {
+        failures.push(`counter right ${cr.right} vs card-54 ${cardRight - 54}`);
       }
     }
     return failures;

@@ -90,24 +90,20 @@ async function main(): Promise<void> {
         break;
       case 'articles': {
         chrome.setInteriorOpen(false, { skipLayout: true });
-        chrome.setLayout('map');
-        const b = getBuildingByName('biblioteca');
-        if (b?.panelTitle) {
-          panel.showWritings(b.panelTitle, 'biblioteca');
-          panel.openWritingById(result.targetId);
-          panel.expandExperienceSheet();
-        }
+        chrome.openAdonaySection('articulos');
+        panel.openWritingDetail(result.targetId);
+        syncMapOverlays();
         break;
       }
       case 'talks': {
         chrome.setInteriorOpen(false, { skipLayout: true });
-        chrome.setLayout('map');
-        const b = getBuildingByName('teresa');
-        if (b?.panelTitle) {
-          panel.showTalks(b.panelTitle, 'teresa');
-          panel.openTalkById(result.targetId);
-          panel.expandExperienceSheet();
+        if (result.targetId === 'teresa-building') {
+          chrome.openAdonaySection('charlas');
+        } else {
+          chrome.openAdonaySection('charlas');
+          panel.openTalkDetail(result.targetId);
         }
+        syncMapOverlays();
         break;
       }
       case 'contact':
@@ -270,22 +266,20 @@ async function main(): Promise<void> {
     onOpenSearch: () => searchPalette.open(),
     onOpenArticles: () => {
       chrome.setInteriorOpen(false, { skipLayout: true });
-      chrome.setLayout('map');
-      const b = getBuildingByName('biblioteca');
-      if (b?.panelTitle) {
-        panel.showWritings(b.panelTitle, 'biblioteca');
-        panel.expandExperienceSheet();
-      }
+      chrome.openAdonaySection('articulos');
       syncMapOverlays();
     },
     onOpenTalks: () => {
       chrome.setInteriorOpen(false, { skipLayout: true });
-      chrome.setLayout('map');
-      const b = getBuildingByName('teresa');
-      if (b?.panelTitle) {
-        panel.showTalks(b.panelTitle, 'teresa');
-        panel.expandExperienceSheet();
-      }
+      chrome.openAdonaySection('charlas');
+      syncMapOverlays();
+    },
+    onOpenWritingDetail: (itemId) => {
+      panel.openWritingDetail(itemId);
+      syncMapOverlays();
+    },
+    onOpenTalkDetail: (talkId) => {
+      panel.openTalkDetail(talkId);
       syncMapOverlays();
     },
     onReadingOpen: () => {
@@ -422,22 +416,25 @@ async function main(): Promise<void> {
           reading.syncRoute(null);
           scene.setReadingPaused(false);
         }
-        checklist.setBuildingPanelOpen(true);
         if (interiorId === 'teresa') {
+          checklist.setBuildingPanelOpen(false);
           studio.clearSubtitle();
           chrome.setInteriorOpen(false, { skipLayout: true });
           if (!isMobileLayout()) chrome.setLayout('split');
-          panel.showTalks(b.panelTitle, interiorId);
+          chrome.openAdonaySection('charlas');
         } else if (interiorId === 'biblioteca') {
+          checklist.setBuildingPanelOpen(false);
           studio.clearSubtitle();
           chrome.setInteriorOpen(false, { skipLayout: true });
           if (!isMobileLayout()) chrome.setLayout('split');
-          panel.showWritings(b.panelTitle, interiorId);
+          chrome.openAdonaySection('articulos');
         } else if (isCaseHouse(interiorId)) {
+          checklist.setBuildingPanelOpen(true);
           chrome.setInteriorOpen(false, { skipLayout: true });
           if (chrome.isMobileSheetOpen()) chrome.setLayout('map');
           panel.showPreview(interiorId);
         } else {
+          checklist.setBuildingPanelOpen(true);
           chrome.setInteriorOpen(true);
           panel.showInterior(b.panelTitle, interiorId);
         }

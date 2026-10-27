@@ -8,6 +8,9 @@ import { personaEnabled } from '../game/persona/personaSpec';
 import { iconSvg, type IconName } from './icons';
 import type { Camera } from '../tokens';
 import { getLang, onLangChange, setLang, t, type Lang } from './i18n';
+import { chromeSectionSelector, mountChromeExperienceSections } from './chromeExperienceSections';
+
+export type AdonaySection = 'articulos' | 'charlas' | 'casos' | 'logros' | 'contact' | 'intro';
 
 export type AboutPanelOpenOpts = {
   highlightContact?: boolean;
@@ -36,6 +39,8 @@ export type ChromeCallbacks = {
   onOpenSearch: () => void;
   onOpenArticles: () => void;
   onOpenTalks: () => void;
+  onOpenWritingDetail: (itemId: string) => void;
+  onOpenTalkDetail: (talkId: string) => void;
   onReadingOpen?: () => void;
   onReadingClose?: () => void;
 };
@@ -81,7 +86,7 @@ export class ChromeUI {
   private subtitleEl: HTMLElement;
   private layout: DesktopLayout = 'map';
   private mobileSheet = true;
-  private mobileSheetPanel: 'intro' | 'casos' | 'logros' | 'contact' = 'intro';
+  private mobileSheetPanel: 'intro' | 'casos' | 'logros' | 'contact' | 'articulos' | 'charlas' = 'intro';
   private audience: Audience = 'recruiter';
   private lang: Lang = getLang();
   private interiorOpen = false;
@@ -107,6 +112,10 @@ export class ChromeUI {
     this.subtitleEl = this.root.querySelector('.chrome__subtitle') as HTMLElement;
     this.minimap = this.root.querySelector('.chrome__minimap') as HTMLCanvasElement;
     this.bind();
+    mountChromeExperienceSections(this.root, {
+      onTalk: (id) => this.callbacks.onOpenTalkDetail(id),
+      onWriting: (id) => this.callbacks.onOpenWritingDetail(id),
+    });
     this.applyI18n();
     onLangChange(() => this.applyI18n());
     if (this.shortLandscape()) this.mobileSheet = false;
@@ -289,8 +298,6 @@ export class ChromeUI {
         ${roundBtn('briefcase', 'Casos', 'chrome__nav', 'cases')}
         ${roundBtn('trophy', 'Logros', 'chrome__nav', 'achievements')}
         ${roundBtn('mail', 'Contacto', 'chrome__nav', 'contact')}
-        ${roundBtn('page', 'Articles', 'chrome__nav', 'articles')}
-        ${roundBtn('play', 'Talks', 'chrome__nav', 'talks')}
         ${roundBtn('search', 'Buscar', 'chrome__nav', 'search')}
         <span class="chrome__rail-spacer"></span>
         <div class="chrome__tools-stack">
@@ -357,6 +364,20 @@ export class ChromeUI {
           <section class="chrome__section" id="chrome-casos">
             <h2 data-i18n="chrome.cases">Casos</h2>
             <div class="chrome__cases">${caseRows}</div>
+          </section>
+          <section class="chrome__section chrome__section--content" id="chrome-articulos" data-chrome-section="articulos">
+            <div class="chrome__section-head-inline">
+              <h2 data-i18n="panel.writings">Artículos</h2>
+              <span class="chrome__section-meta" data-section-count aria-hidden="true"></span>
+            </div>
+            <div class="chrome__content-list" data-chrome-articulos-list></div>
+          </section>
+          <section class="chrome__section chrome__section--content" id="chrome-charlas" data-chrome-section="charlas">
+            <div class="chrome__section-head-inline">
+              <h2 data-i18n="panel.talks">Charlas</h2>
+              <span class="chrome__section-meta" data-section-count aria-hidden="true"></span>
+            </div>
+            <div class="chrome__content-list" data-chrome-charlas-list></div>
           </section>
         </div>
       </aside>
@@ -439,6 +460,20 @@ export class ChromeUI {
             <h2 data-i18n="chrome.cases">Casos</h2>
             <div class="chrome__cases">${caseRows}</div>
           </section>
+          <section class="chrome__section chrome__section--content" id="chrome-mobile-articulos" data-chrome-section="articulos">
+            <div class="chrome__section-head-inline">
+              <h2 data-i18n="panel.writings">Artículos</h2>
+              <span class="chrome__section-meta" data-section-count aria-hidden="true"></span>
+            </div>
+            <div class="chrome__content-list" data-chrome-articulos-list></div>
+          </section>
+          <section class="chrome__section chrome__section--content" id="chrome-mobile-charlas" data-chrome-section="charlas">
+            <div class="chrome__section-head-inline">
+              <h2 data-i18n="panel.talks">Charlas</h2>
+              <span class="chrome__section-meta" data-section-count aria-hidden="true"></span>
+            </div>
+            <div class="chrome__content-list" data-chrome-charlas-list></div>
+          </section>
           <div class="chrome__sheet-contact" id="chrome-mobile-contact">
             <button type="button" class="ui-btn ui-btn--secondary" data-action="about-contact">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></button>
           </div>
@@ -449,8 +484,6 @@ export class ChromeUI {
         ${roundBtn('briefcase', 'Casos', 'ui-round--lg', 'cases')}
         ${roundBtn('trophy', 'Logros', 'ui-round--lg', 'achievements')}
         ${roundBtn('mail', 'Contacto', 'ui-round--lg', 'contact')}
-        ${roundBtn('page', 'Artículos', 'ui-round--lg', 'articles')}
-        ${roundBtn('play', 'Charlas', 'ui-round--lg', 'talks')}
         ${roundBtn('map', 'Map', 'ui-round--lg', 'map')}
       </nav>
       <div class="chrome__lang" role="group" aria-label="Language" data-i18n-aria="chrome.language">
@@ -577,20 +610,6 @@ export class ChromeUI {
     });
     this.root.querySelector('.chrome__rail [data-action="contact"]')?.addEventListener('click', () => {
       this.openContact();
-    });
-    this.root.querySelectorAll('[data-action="articles"]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        (btn as HTMLElement).blur();
-        studio.playClick();
-        this.callbacks.onOpenArticles();
-      });
-    });
-    this.root.querySelectorAll('[data-action="talks"]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        (btn as HTMLElement).blur();
-        studio.playClick();
-        this.callbacks.onOpenTalks();
-      });
     });
     this.root.querySelector('[data-action="fullpage"]')?.addEventListener('click', () => {
       if (this.callbacks.onReadingOpen && this.callbacks.onReadingClose) {
@@ -746,8 +765,6 @@ export class ChromeUI {
       'show-panel': 'chrome.showPanel',
       center: 'chrome.center',
       map: 'chrome.map',
-      articles: 'panel.writings',
-      talks: 'panel.talks',
     };
     this.root.querySelectorAll('[data-action]').forEach((el) => {
       const key = ariaByAction[(el as HTMLElement).dataset.action ?? ''];
@@ -757,6 +774,37 @@ export class ChromeUI {
 
   private scrollTo(sel: string): void {
     this.root.querySelector(sel)?.scrollIntoView({ block: 'start' });
+  }
+
+  scrollToAdonaySection(section: AdonaySection): void {
+    if (section === 'intro') return;
+    const sel = chromeSectionSelector(section);
+    const target = this.root.querySelector(sel.split(',')[0].trim());
+    target?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    if (this.mobile && (section === 'articulos' || section === 'charlas' || section === 'casos' || section === 'logros')) {
+      const mobileSel =
+        section === 'articulos'
+          ? '#chrome-mobile-articulos'
+          : section === 'charlas'
+            ? '#chrome-mobile-charlas'
+            : section === 'casos'
+              ? '#chrome-mobile-casos'
+              : '#chrome-mobile-logros';
+      this.root.querySelector(mobileSel)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }
+  }
+
+  openAdonaySection(section: 'articulos' | 'charlas'): void {
+    studio.playClick();
+    this.mobileSheetPanel = section;
+    if (this.mobile) {
+      this.setLayout('split');
+      this.expandMobileSheet(true);
+      window.requestAnimationFrame(() => this.scrollToAdonaySection(section));
+      return;
+    }
+    this.setLayout('split');
+    window.requestAnimationFrame(() => this.scrollToAdonaySection(section));
   }
 
   openSearch(): void {
@@ -806,11 +854,11 @@ export class ChromeUI {
     this.callbacks.onLayoutChange({ silent: true });
   }
 
-  getMobileSheetPanel(): 'intro' | 'casos' | 'logros' | 'contact' {
+  getMobileSheetPanel(): 'intro' | 'casos' | 'logros' | 'contact' | 'articulos' | 'charlas' {
     return this.mobileSheetPanel;
   }
 
-  openMobileSheetSection(target: 'casos' | 'logros' | 'intro' | 'contact'): void {
+  openMobileSheetSection(target: 'casos' | 'logros' | 'intro' | 'contact' | 'articulos' | 'charlas'): void {
     this.mobileSheetPanel = target;
     this.setLayout('split');
     if (target === 'intro') {
@@ -824,7 +872,11 @@ export class ChromeUI {
           ? '#chrome-mobile-logros'
           : target === 'contact'
             ? '#chrome-mobile-contact'
-            : '#chrome-mobile-casos';
+            : target === 'articulos'
+              ? '#chrome-mobile-articulos'
+              : target === 'charlas'
+                ? '#chrome-mobile-charlas'
+                : '#chrome-mobile-casos';
       this.scrollTo(sel);
     });
   }

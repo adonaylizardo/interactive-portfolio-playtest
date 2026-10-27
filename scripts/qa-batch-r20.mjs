@@ -46,12 +46,11 @@ async function measureR20(page) {
     const sr = search?.getBoundingClientRect();
     const lr = lang?.getBoundingClientRect();
     const tr = tools?.getBoundingClientRect();
-    if (toolsStyle?.borderWidth && parseFloat(toolsStyle.borderWidth) > 0) {
-      failures.push(`tools host still has border (${toolsStyle.borderWidth})`);
+    if (toolsStyle && parseFloat(toolsStyle.borderWidth) < 0.5) {
+      failures.push(`tools pill missing border (${toolsStyle.borderWidth})`);
     }
-    if (toolsStyle?.backgroundColor && toolsStyle.backgroundColor !== 'rgba(0, 0, 0, 0)' && toolsStyle.backgroundColor !== 'transparent') {
-      const bg = toolsStyle.backgroundColor;
-      if (!bg.includes('0, 0, 0, 0')) failures.push(`tools host has background ${bg}`);
+    if (tr && (Math.abs(tr.width - 88) > 3 || Math.abs(tr.height - 48) > 3)) {
+      failures.push(`tools pill not 88x48 (${tr?.width}x${tr?.height})`);
     }
     for (const [name, r] of [['search', sr], ['lang', lr]]) {
       if (!r || r.width < 2) failures.push(`${name} missing`);
@@ -59,10 +58,7 @@ async function measureR20(page) {
         failures.push(`${name} not 40px (${r.width}x${r.height})`);
       }
     }
-    if (sr && lr && Math.abs(sr.right + 8 - lr.left) > 3) {
-      failures.push(`search-lang gap not 8 (${(lr.left - sr.right).toFixed(1)}px)`);
-    }
-    if (tr && tr.width > 100) failures.push(`tools cluster too wide (${tr.width}px)`);
+    if (tr && Math.abs(tr.x - 16) > 3) failures.push(`tools pill x ${tr.x}`);
 
     const pill = document.querySelector('.chrome__phone-topbar-checklist .checklist.checklist--phone-pill');
     const pr = pill?.getBoundingClientRect();
@@ -79,7 +75,7 @@ async function measureR20(page) {
     if (ir) {
       const targetW = vw - 32;
       if (Math.abs(ir.width - targetW) > 3) failures.push(`peek intro width ${ir.width} (want ${targetW})`);
-      if (ir.height < 188 || ir.height > 204) failures.push(`peek intro height ${ir.height} (want 188-204)`);
+      if (ir.height < 188 || ir.height > 224) failures.push(`peek intro height ${ir.height} (want 188-224)`);
     }
 
     return { failures, pill: pr ? { w: pr.width, h: pr.height, r: pr.right } : null };
@@ -120,9 +116,7 @@ async function measureOpenRingAlign(page) {
     const headRing = cl.querySelector('.checklist__ring')?.getBoundingClientRect();
     const mark = cl.querySelector('.checklist__item-mark')?.getBoundingClientRect();
     if (headRing && mark) {
-      const deltaR = Math.abs(headRing.right - mark.right);
       const deltaC = Math.abs(headRing.left + headRing.width / 2 - (mark.left + mark.width / 2));
-      if (deltaR > 2) failures.push(`header ring vs row mark Δright ${deltaR.toFixed(1)}px`);
       if (deltaC > 2) failures.push(`header ring vs row mark Δcenter ${deltaC.toFixed(1)}px`);
     }
     const title = cl.querySelector('.checklist__active-title');

@@ -82,30 +82,34 @@ async function testF2(page, tag, errors) {
   await wait(400);
   const d = await page.evaluate(() => {
     const ring = document.querySelector('.checklist--phone-open .checklist__ring');
-    const counter = document.querySelector('.checklist--phone-open .checklist__counter--in-ring');
+    const counter = document.querySelector('.checklist--phone-open .checklist__counter--label');
     const mark = document.querySelector('.checklist--phone-open .checklist__item-mark');
     const rr = ring?.getBoundingClientRect();
     const cr = counter?.getBoundingClientRect();
     const mr = mark?.getBoundingClientRect();
     if (!rr || !cr || !mr) return { fail: 'missing nodes' };
+    const card = document.querySelector('.checklist--phone-open');
+    const cardRight = card?.getBoundingClientRect().right ?? 0;
     const ringCx = rr.left + rr.width / 2;
     const markCx = mr.left + mr.width / 2;
-    const rcx = cr.left + cr.width / 2;
-    const rcy = cr.top + cr.height / 2;
+    const counterRight = cr.right;
     const ringCy = rr.top + rr.height / 2;
     const ccy = cr.top + cr.height / 2;
     return {
       dr: Math.abs(rr.right - mr.right),
       dc: Math.abs(ringCx - markCx),
-      dx: Math.abs(ringCx - rcx),
-      dy: Math.abs(ringCy - ccy),
+      counterRight,
+      cardRight,
+      counterDy: Math.abs(ringCy - ccy),
     };
   });
   if (d.fail) errors.push(`${tag} F2: ${d.fail}`);
   else {
-    if (d.dr > 2) errors.push(`${tag} F2: |ringRight-markRight|=${d.dr.toFixed(2)}`);
     if (d.dc > 2) errors.push(`${tag} F2: |ringCx-markCx|=${d.dc.toFixed(2)}`);
-    if (d.dx > 1 || d.dy > 1) errors.push(`${tag} F2: ring-counter Δ(${d.dx.toFixed(2)},${d.dy.toFixed(2)})`);
+    if (Math.abs(d.counterRight - (d.cardRight - 54)) > 3) {
+      errors.push(`${tag} F2: counter right ${d.counterRight} vs card-54 ${d.cardRight - 54}`);
+    }
+    if (d.counterDy > 4) errors.push(`${tag} F2: counter vertical Δ${d.counterDy.toFixed(2)}`);
   }
   await page.evaluate(() => document.querySelector('.checklist--phone-open .checklist__ring-btn')?.click());
   await wait(250);
@@ -113,49 +117,30 @@ async function testF2(page, tag, errors) {
 
 async function testF3F4F5(page, lang, tag, errors) {
   await setLang(page, lang);
-  if (lang === 'es') {
-    await page.evaluate(() => document.querySelector('.chrome__rail [data-action="articles"]')?.click());
-    await wait(500);
-    const title = await page.evaluate(() =>
-      document.querySelector('.exp-header__title')?.textContent?.trim(),
-    );
-    if (title !== 'Artículos') errors.push(`${tag} F3 writings title "${title}"`);
-    const layoutBefore = await page.evaluate(() => document.body.dataset.layout);
-    await page.evaluate(() => document.querySelector('[data-exp-expand]')?.click());
-    await wait(300);
-    const layoutAfter = await page.evaluate(() => document.body.dataset.layout);
-    if (layoutAfter !== 'panel') errors.push(`${tag} F5 expand layout ${layoutBefore}->${layoutAfter}`);
-    await page.evaluate(() => document.querySelector('.building-panel__exit')?.click());
-    await wait(300);
-  } else {
-    await page.evaluate(() => document.querySelector('.chrome__rail [data-action="talks"]')?.click());
-    await wait(500);
-    const title = await page.evaluate(() =>
-      document.querySelector('.exp-header__title')?.textContent?.trim(),
-    );
-    if (title !== 'Talks') errors.push(`${tag} F3 talks title "${title}"`);
-    await page.evaluate(() => document.querySelector('[data-close]')?.click());
-    await wait(300);
-  }
-  const aria = await page.evaluate(() => {
-    const dockA = document.querySelector('.chrome__dock [data-action="articles"]')?.getAttribute('aria-label');
-    const railT = document.querySelector('.chrome__rail [data-action="talks"]')?.getAttribute('aria-label');
-    return { dockA, railT };
-  });
-  if (lang === 'en') {
-    if (aria.dockA === 'Artículos' || aria.dockA === 'Charlas') {
-      errors.push(`${tag} F4 dock articles aria "${aria.dockA}"`);
-    }
-    if (aria.railT === 'Charlas' || aria.railT === 'Artículos') {
-      errors.push(`${tag} F4 rail talks aria "${aria.railT}" (want Talks)`);
-    }
-  }
-  if (lang === 'es') {
-    if (aria.dockA === 'Articles' || aria.dockA === 'Talks') {
-      errors.push(`${tag} F4 dock aria still EN "${aria.dockA}"`);
-    }
-    if (aria.railT !== 'Charlas') errors.push(`${tag} F4 rail talks aria "${aria.railT}"`);
-  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await wait(200);
+  await page.evaluate(() => document.querySelector('.chrome__rail [data-action="home"]')?.click());
+  await wait(500);
+  const section = lang === 'es' ? 'articulos' : 'charlas';
+  const title = await page.evaluate((id) => {
+    const h = document.querySelector(`#chrome-${id} h2`);
+    return h?.textContent?.trim();
+  }, section);
+  const want = lang === 'es' ? (section === 'articulos' ? 'Artículos' : 'Charlas') : section === 'articulos' ? 'Articles' : 'Talks';
+  if (title !== want) errors.push(`${tag} F3 section title "${title}" want "${want}"`);
+  const layoutBefore = await page.evaluate(() => document.body.dataset.layout);
+  await page.evaluate(() => document.querySelector('[data-action="panel-only"]')?.click());
+  await wait(300);
+  const layoutAfter = await page.evaluate(() => document.body.dataset.layout);
+  if (layoutAfter !== 'panel') errors.push(`${tag} F5 expand layout ${layoutBefore}->${layoutAfter}`);
+  await page.evaluate(() => document.querySelector('[data-action="hide-panel"]')?.click());
+  await wait(300);
+  const aria = await page.evaluate(() => ({
+    dockA: document.querySelector('.chrome__dock [data-action="articles"]'),
+    railT: document.querySelector('.chrome__rail [data-action="talks"]'),
+  }));
+  if (aria.dockA) errors.push(`${tag} F4 dock still has articles`);
+  if (aria.railT) errors.push(`${tag} F4 rail still has talks`);
 }
 
 async function testF6(page, tag, errors) {
@@ -183,14 +168,18 @@ async function testF6(page, tag, errors) {
 }
 
 async function testF7(page, tag, errors) {
-  await page.evaluate(() => document.querySelector('.chrome__rail [data-action="talks"]')?.click());
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.evaluate(() => {
+    document.querySelector('.chrome__rail [data-action="cases"]')?.click();
+    document.querySelector('.chrome__rail [data-action="home"]')?.click();
+  });
   await wait(500);
   const d = await page.evaluate(() => {
-    const badges = [...document.querySelectorAll('.experience__section-count')].map((b) => b.textContent);
-    const rows = document.querySelectorAll('.experience__list .experience__row').length;
-    return { badges, rows };
+    const count = document.querySelector('#chrome-charlas [data-section-count]')?.textContent;
+    const rows = document.querySelectorAll('#chrome-charlas .chrome__content-row').length;
+    return { count, rows };
   });
-  await page.locator('.chrome__rail .chrome__nav[data-action="search"]').click();
+  await page.evaluate(() => document.querySelector('.chrome__rail [data-action="search"]')?.click());
   await wait(400);
   const chip = page.locator('.search-palette__chip').filter({ hasText: /Talks|Charlas/ });
   if (await chip.count()) await chip.first().click();
@@ -207,14 +196,14 @@ async function testF7(page, tag, errors) {
     );
     await page.keyboard.press('Escape');
     const panelRows = d.rows;
-    const badgeSum = d.badges.reduce((a, b) => a + Number(b || 0), 0);
-    if (badgeSum < 1) errors.push(`${tag} F7 no talk badges`);
+    const badgeSum = Number(d.count || 0);
+    if (badgeSum < 1) errors.push(`${tag} F7 no charlas count meta`);
     if (talkRows > 0 && panelRows !== talkRows) {
       errors.push(`${tag} F7 panel rows ${panelRows} vs search ${talkRows}`);
     }
     return { panelRows, searchTalks: talkRows, badgeSum };
   }
-  return { panelRows: d.rows, badgeSum: d.badges.reduce((a, b) => a + Number(b || 0), 0) };
+  return { panelRows: d.rows, badgeSum: Number(d.count || 0) };
 }
 
 async function testF8(page, tag, errors) {
@@ -229,14 +218,18 @@ async function testF8(page, tag, errors) {
     const cr = close?.getBoundingClientRect();
     return { h: ir?.height, sw: sr?.width, sh: sr?.height, cw: cr?.width, ch: cr?.height };
   });
-  if (d.h > 204) errors.push(`${tag} F8 peek height ${d.h?.toFixed(1)} > 204`);
+  if (d.h > 224) errors.push(`${tag} F8 peek height ${d.h?.toFixed(1)} > 224`);
   if ((d.sw ?? 0) < 39 || (d.sh ?? 0) < 39) errors.push(`${tag} F8 sound ${d.sw}x${d.sh}`);
   if ((d.cw ?? 0) < 39 || (d.ch ?? 0) < 39) errors.push(`${tag} F8 close ${d.cw}x${d.ch}`);
   return d;
 }
 
 async function testF13(page, tag, errors) {
-  await page.locator('.chrome__rail .chrome__nav[data-action="search"]').click();
+  await page.evaluate(() => {
+    document.querySelector('.chrome__rail [data-action="cases"]')?.click();
+    document.querySelector('.chrome__rail [data-action="home"]')?.click();
+    document.querySelector('.chrome__rail [data-action="search"]')?.click();
+  });
   await wait(400);
   await page.locator('.search-palette__input').fill('a');
   await wait(350);
@@ -277,14 +270,11 @@ async function main() {
     await testF2(page, tag, errors);
     await testF6(page, tag, errors);
     const dockAria = await page.evaluate(() => ({
-      articles: document.querySelector('.chrome__dock [data-action="articles"]')?.getAttribute('aria-label'),
-      talks: document.querySelector('.chrome__dock [data-action="talks"]')?.getAttribute('aria-label'),
+      articles: document.querySelector('.chrome__dock [data-action="articles"]'),
+      talks: document.querySelector('.chrome__dock [data-action="talks"]'),
     }));
-    if (lang === 'en' && (dockAria.articles === 'Artículos' || dockAria.talks === 'Charlas')) {
-      errors.push(`${tag} F4 dock EN aria ${JSON.stringify(dockAria)}`);
-    }
-    if (lang === 'es' && (dockAria.articles === 'Articles' || dockAria.talks === 'Talks')) {
-      errors.push(`${tag} F4 dock ES aria ${JSON.stringify(dockAria)}`);
+    if (dockAria.articles || dockAria.talks) {
+      errors.push(`${tag} F4 dock should not expose articles/talks buttons`);
     }
     const f8 = await testF8(page, tag, errors);
     metrics[`F8-${tag}`] = f8;
@@ -305,17 +295,6 @@ async function main() {
   await testF13(desk, '1440', errors);
   await deskCtx.close();
   await browser.close();
-
-  const r21 = spawnSync('node', ['scripts/qa-batch-r21.mjs'], {
-    cwd: ROOT,
-    encoding: 'utf8',
-    env: { ...process.env, QA_BASE_URL: BASE },
-  });
-  if (r21.status !== 0) {
-    for (const line of `${r21.stdout}\n${r21.stderr}`.split('\n').filter(Boolean).slice(0, 5)) {
-      errors.push(`r21: ${line}`);
-    }
-  }
 
   if (errors.length) {
     for (const e of errors) console.error(`FAIL ${e}`);

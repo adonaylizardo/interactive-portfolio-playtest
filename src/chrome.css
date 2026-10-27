@@ -375,6 +375,66 @@ body[data-interior='1'] .chrome__column {
   margin: 0;
 }
 
+.chrome__section-head-inline {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.chrome__section-head-inline h2 {
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 22px;
+  line-height: 28px;
+}
+
+.chrome__section-meta {
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 400;
+  color: #8a8f98;
+}
+
+.chrome__section--content .chrome__content-row {
+  min-height: 88px;
+  padding: 12px 0;
+  box-sizing: border-box;
+}
+
+.chrome__section--content .chrome__content-thumb.experience__thumb--video {
+  width: 96px;
+  height: 54px;
+  border-radius: 8px;
+}
+
+.chrome__section--content .chrome__content-thumb.experience__thumb--doc {
+  width: 96px;
+  height: 54px;
+  border-radius: 8px;
+}
+
+.chrome__section--content .experience__row-title {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 500;
+}
+
+.chrome__section--content .experience__row-meta {
+  font-size: 13px;
+  line-height: 16px;
+}
+
+@media (min-width: 768px) {
+  .chrome__section--content .chrome__content-thumb.experience__thumb--video,
+  .chrome__section--content .chrome__content-thumb.experience__thumb--doc {
+    width: 128px;
+    height: 72px;
+  }
+}
+
 .chrome__exp {
   border-top: 1px dashed #3a3d44;
 }
@@ -2148,24 +2208,24 @@ body[data-chrome='phone'] .checklist.checklist--phone-open {
 }
 
 .chrome--dock .chrome__dock {
-  left: 21.5px;
+  left: 51.5px;
   right: auto;
-  width: 332px;
-  max-width: 332px;
-  top: 752px;
+  width: 272px;
+  max-width: 272px;
+  top: 748px;
   bottom: auto;
-  height: 44px;
+  height: 48px;
   padding: 0;
   justify-content: center;
-  gap: 4px;
+  gap: 8px;
 }
 
 .chrome--dock .chrome__dock .ui-round--lg {
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  min-height: 44px;
-  border-radius: 22px;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  border-radius: 24px;
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.16),
     0 2px 8px rgba(0, 0, 0, 0.6);
