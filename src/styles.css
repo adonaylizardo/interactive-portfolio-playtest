@@ -386,7 +386,7 @@ body[data-layout='panel'] .checklist:not(.checklist--mobile) {
   box-shadow: 0 6px 20px rgb(0 0 0 / 35%);
 }
 
-.checklist--complete .checklist__header {
+.checklist--complete:not(.checklist--collapsed) .checklist__header {
   margin-bottom: 12px;
 }
 
@@ -735,18 +735,22 @@ body:has(.building-panel--open) .chrome__lang {
     display: inline !important;
   }
 
-  body[data-chrome='phone'] .checklist.checklist--mobile-closed .checklist__ring,
-  body[data-chrome='phone'] .checklist.checklist--mobile-closed .checklist__counter--in-ring,
-  body[data-chrome='phone'] .checklist.checklist--mobile-closed .checklist__clipboard-figma,
-  body[data-chrome='phone'] .checklist.checklist--mobile-closed .checklist__map-arc {
+  body[data-chrome='phone'] .checklist.checklist--mobile-closed:not(.checklist--phone-circle) .checklist__ring,
+  body[data-chrome='phone'] .checklist.checklist--mobile-closed:not(.checklist--phone-circle) .checklist__counter--in-ring,
+  body[data-chrome='phone'] .checklist.checklist--mobile-closed:not(.checklist--phone-circle) .checklist__clipboard-figma,
+  body[data-chrome='phone'] .checklist.checklist--mobile-closed:not(.checklist--phone-circle) .checklist__map-arc {
     display: none !important;
   }
 
-  body[data-chrome='phone'] .checklist.checklist--mobile-closed .checklist__ring-figma {
+  body[data-chrome='phone'] .checklist.checklist--mobile-closed:not(.checklist--phone-circle) .checklist__ring-figma {
     display: block;
     width: 44px;
     height: 44px;
     flex-shrink: 0;
+  }
+
+  body[data-chrome='phone'] .checklist.checklist--phone-circle.checklist--mobile-closed .checklist__ring-figma {
+    display: none !important;
   }
 
   body[data-chrome='phone'] .checklist.checklist--mobile-closed .checklist__ring-btn {
@@ -906,18 +910,22 @@ body:has(.building-panel--open) .chrome__lang {
     font-variant-numeric: tabular-nums;
   }
 
-  body[data-layout='map'] .checklist--mobile-closed .checklist__ring,
-  body[data-layout='map'] .checklist--mobile-closed .checklist__counter--in-ring,
-  body[data-layout='map'] .checklist--mobile-closed .checklist__clipboard-figma {
+  body[data-layout='map'] .checklist--mobile-closed:not(.checklist--phone-circle) .checklist__ring,
+  body[data-layout='map'] .checklist--mobile-closed:not(.checklist--phone-circle) .checklist__counter--in-ring,
+  body[data-layout='map'] .checklist--mobile-closed:not(.checklist--phone-circle) .checklist__clipboard-figma {
     display: none !important;
   }
 
-  body[data-layout='map'] .checklist--mobile-closed .checklist__ring-figma {
+  body[data-layout='map'] .checklist--mobile-closed:not(.checklist--phone-circle) .checklist__ring-figma {
     display: block;
     width: 44px;
     height: 44px;
     flex-shrink: 0;
     pointer-events: none;
+  }
+
+  body[data-layout='map'] .checklist--phone-circle.checklist--mobile-closed .checklist__ring-figma {
+    display: none !important;
   }
 
   body[data-layout='map'] .checklist--mobile-closed .checklist__map-arc {
@@ -1275,7 +1283,9 @@ body:has(.building-panel--open) .chrome__lang {
   }
 
   .checklist__counter--label {
-    font-size: 14px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 16px;
   }
 
   .checklist__counter--in-ring {
@@ -1347,7 +1357,7 @@ body:has(.building-panel--open) .chrome__lang {
   }
 
   body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__counter--in-ring {
-    display: none !important;
+    display: flex !important;
     position: absolute;
     inset: 0;
     align-items: center;
@@ -1361,9 +1371,15 @@ body:has(.building-panel--open) .chrome__lang {
 
   body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__progress-wrap {
     margin: 0;
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
     justify-content: center;
+    align-items: center;
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
   }
 
   body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__ring-btn {
@@ -1378,6 +1394,24 @@ body:has(.building-panel--open) .chrome__lang {
   body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__ring {
     width: 36px;
     height: 36px;
+  }
+
+  body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__ring {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    margin: 0;
+  }
+
+  body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__ring-fg {
+    transition: none;
+  }
+
+  body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__progress-wrap {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
   }
 }
 

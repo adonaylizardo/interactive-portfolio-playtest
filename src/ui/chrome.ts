@@ -391,11 +391,8 @@ export class ChromeUI {
       </header>
       ${roundBtn('locate', 'Center on Adonay', 'chrome__map-recenter', 'center')}
       <div class="chrome__intro" data-intro>
-        <div class="chrome__sheet-grab" data-intro-grab aria-hidden="true"><span></span></div>
-        <div class="chrome__intro-toolbar" data-intro-toolbar hidden>
-          <div class="chrome__intro-lang-host" data-intro-lang-host></div>
-        </div>
-        <div class="chrome__lede">
+        <div class="chrome__intro-pinned" data-intro-pinned>
+          <div class="chrome__sheet-grab" data-intro-grab aria-hidden="true"><span></span></div>
           <div class="chrome__intro-title-row">
             <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
             <div class="chrome__intro-title-actions">
@@ -403,6 +400,11 @@ export class ChromeUI {
               <button type="button" class="chrome__intro-close" data-action="intro-close" aria-label="Close" data-i18n-aria="jac.close">${iconSvg('close')}</button>
             </div>
           </div>
+        </div>
+        <div class="chrome__intro-toolbar" data-intro-toolbar hidden>
+          <div class="chrome__intro-lang-host" data-intro-lang-host></div>
+        </div>
+        <div class="chrome__lede">
           <p class="chrome__blurb" data-i18n="chrome.lede">Explore the map, open cases from the doors, and browse talks and writings inside the buildings.</p>
         </div>
         <div class="chrome__audience">

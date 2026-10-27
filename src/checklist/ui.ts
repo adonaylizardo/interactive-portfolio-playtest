@@ -152,8 +152,8 @@ export class ChecklistUI {
                 stroke="#EDEEF0"
                 stroke-width="2.5"
                 stroke-linecap="round"
-                stroke-dasharray="105.557"
-                stroke-dashoffset="105.557"
+                stroke-dasharray="${CHECKLIST_RING_CIRCUMFERENCE.toFixed(3)}"
+                stroke-dashoffset="${CHECKLIST_RING_CIRCUMFERENCE.toFixed(3)}"
                 transform="rotate(-90 22 22)"
               />
             </svg>
@@ -392,9 +392,10 @@ export class ChecklistUI {
     const circumference = CHECKLIST_RING_CIRCUMFERENCE;
     const mapArcCirc = CHECKLIST_RING_CIRCUMFERENCE;
     const progress = total > 0 ? done / total : 0;
-    const offset = circumference * (1 - progress);
+    const offset = progress >= 1 ? 0 : circumference * (1 - progress);
     this.ringEl.style.strokeDashoffset = String(offset);
-    this.mapArcFg.style.strokeDashoffset = String(mapArcCirc * (1 - progress));
+    const mapOffset = progress >= 1 ? 0 : mapArcCirc * (1 - progress);
+    this.mapArcFg.style.strokeDashoffset = String(mapOffset);
 
     const platformSteps = stepsForPlatform(this.compactSteps);
     const stepTotal = platformSteps.length;

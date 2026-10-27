@@ -529,7 +529,6 @@ export class BuildingPanel {
     this.el.classList.remove(
       'building-panel--experience',
       'building-panel--writings',
-      'building-panel--exp-list',
       'building-panel--exp-detail',
     );
   }
@@ -742,7 +741,6 @@ export class BuildingPanel {
     if (this.experienceDetail) this.experienceDetail.hidden = true;
     if (this.experienceFilters) this.experienceFilters.hidden = true;
     this.syncExperienceHeaderCount(0);
-    this.el.classList.remove('building-panel--exp-list');
     this.el.classList.toggle('building-panel--exp-detail', false);
     this.queueVisibilitySync();
     this.syncExperienceDesktopExpand();
@@ -806,7 +804,6 @@ export class BuildingPanel {
     const expand = this.el.querySelector('[data-exp-expand]') as HTMLElement | null;
     if (back) back.hidden = view !== 'detail';
     if (expand) expand.hidden = this.isMobile();
-    this.el.classList.remove('building-panel--exp-list');
     this.el.classList.toggle('building-panel--exp-detail', view === 'detail');
     this.syncMobileExperienceChrome();
   }
