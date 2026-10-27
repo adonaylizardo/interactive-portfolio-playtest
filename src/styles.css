@@ -354,8 +354,9 @@ body.persona-kit #ui-root > .persona-kit {
 }
 
 /* Panel-only is full-bleed chrome; the tutorial pill sat on Hide panel. */
-body[data-layout='panel'] .checklist {
-  visibility: hidden;
+body[data-layout='panel'] .checklist:not(.checklist--mobile) {
+  opacity: 0;
+  visibility: visible;
   pointer-events: none;
 }
 
@@ -1199,9 +1200,9 @@ body:has(.building-panel--open) .chrome__lang {
   }
 
   body[data-chrome='desktop'] .checklist:not(.checklist--mobile):not(.checklist--collapsed) {
-    top: max(16px, env(safe-area-inset-top));
-    right: max(16px, env(safe-area-inset-right));
-    left: auto;
+    top: 16px;
+    left: 1128px;
+    right: auto;
     width: 296px;
     max-width: 296px;
     border-radius: 12px;
@@ -1231,24 +1232,38 @@ body:has(.building-panel--open) .chrome__lang {
     display: block !important;
   }
 
-  body[data-layout='split'] .checklist:not(.checklist--mobile).checklist--collapsed {
-    right: max(16px, env(safe-area-inset-right));
-    left: auto;
-    max-width: min(360px, calc(100vw - 32px));
-    overflow: visible;
-    max-height: none;
-  }
-
-  body[data-layout='split'] .checklist:not(.checklist--mobile).checklist--collapsed .checklist__header {
-    border-bottom: none;
-    margin-bottom: 0;
-    padding: 12px 16px;
-  }
-
+  body[data-layout='split'] .checklist:not(.checklist--mobile).checklist--collapsed,
   body[data-chrome='desktop'] .checklist:not(.checklist--mobile).checklist--collapsed {
-    right: max(16px, env(safe-area-inset-right));
-    left: auto;
-    max-width: min(360px, calc(100vw - 32px));
+    top: 22px;
+    left: 1378px;
+    right: auto;
+    width: 40px;
+    height: 40px;
+    max-width: 40px;
+    max-height: 40px;
+    overflow: hidden;
+    border-radius: 20px;
+    padding: 0;
+  }
+
+  body[data-layout='split'] .checklist:not(.checklist--mobile).checklist--collapsed .checklist__header,
+  body[data-chrome='desktop'] .checklist:not(.checklist--mobile).checklist--collapsed .checklist__header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    height: 40px;
+    margin: 0;
+    padding: 0;
+    border-bottom: 0;
+  }
+
+  body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__header-text {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    pointer-events: none;
   }
 
   .checklist:not(.checklist--mobile) .checklist__map-arc,
@@ -1330,7 +1345,7 @@ body:has(.building-panel--open) .chrome__lang {
   }
 
   body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__counter--in-ring {
-    display: flex !important;
+    display: none !important;
     position: absolute;
     inset: 0;
     align-items: center;
@@ -1341,16 +1356,25 @@ body:has(.building-panel--open) .chrome__lang {
     pointer-events: none;
   }
 
-  body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__ring-btn {
-    position: relative;
+  body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__progress-wrap {
+    margin: 0;
     width: 40px;
     height: 40px;
+    justify-content: center;
+  }
+
+  body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__ring-btn {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 18px;
   }
 
   body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__ring-btn,
   body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__ring {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
   }
 }
 
@@ -1555,6 +1579,42 @@ body:has(.building-panel--open) .chrome__lang {
   body[data-layout='panel'] .building-panel__sheet {
     left: 64px;
     width: calc(100% - 64px);
+  }
+
+  body[data-layout='panel'] .building-panel--experience .exp-header {
+    padding: 12px 358px 12px 342px;
+    box-sizing: border-box;
+  }
+
+  body[data-layout='panel'] .building-panel--experience .building-panel__body-wrap {
+    padding: 32px 228px 48px;
+    box-sizing: border-box;
+  }
+
+  body[data-layout='panel'] .building-panel--experience .experience {
+    max-width: 660px;
+    margin: 0 auto;
+  }
+
+  .building-panel--experience .exp-header {
+    position: relative;
+    min-height: 76px;
+    padding: 0 16px 8px;
+    box-sizing: border-box;
+    align-items: center;
+  }
+
+  .building-panel--experience .exp-header__actions {
+    position: absolute;
+    top: 12px;
+    left: 320px;
+    right: auto;
+    gap: 8px;
+  }
+
+  .building-panel--experience .exp-header__title {
+    padding-left: 0;
+    max-width: 280px;
   }
 
   body[data-layout='map'] .building-panel--open .building-panel__sheet {
@@ -2171,26 +2231,36 @@ body:has(.building-panel--open) .chrome__lang {
     gap: 12px;
   }
 
-  .building-panel--experience.building-panel--open:not(.building-panel--peek).building-panel--exp-list
-    .building-panel__sheet {
-    height: 560px;
+  .building-panel--experience.building-panel--open:not(.building-panel--peek) .building-panel__sheet {
+    top: 365.4px;
+    height: 446.6px;
+    max-height: 446.6px;
     transform: translateY(0);
   }
 
-  .building-panel--experience.building-panel--open:not(.building-panel--peek).building-panel--exp-detail
-    .building-panel__sheet {
-    height: 720px;
-    transform: translateY(0);
+  .building-panel--experience .exp-mobile-chrome {
+    min-height: 76px;
+    padding: 0 16px 8px;
+    box-sizing: border-box;
   }
 
-  .building-panel--experience.building-panel--writings.building-panel--open:not(.building-panel--peek).building-panel--exp-list
-    .building-panel__sheet {
-    height: 620px;
+  .building-panel--experience .exp-mobile-chrome__grab {
+    width: 100%;
+    min-height: 24px;
+    max-height: 24px;
   }
 
-  .building-panel--experience.building-panel--writings.building-panel--open:not(.building-panel--peek).building-panel--exp-detail
-    .building-panel__sheet {
-    height: 740px;
+  .building-panel--experience .exp-mobile-chrome__grab span {
+    display: block;
+    width: 70px;
+    height: 4px;
+    margin: 10px auto;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .building-panel--experience .exp-mobile-chrome__row {
+    min-height: 44px;
   }
 
   .building-panel--experience .building-panel__drag {
@@ -2574,11 +2644,25 @@ body:has(.building-panel--open) .chrome__lang {
   font-weight: 500;
   line-height: 24px;
   color: var(--ui-text);
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   overflow: hidden;
-  white-space: normal;
+  white-space: nowrap;
+}
+
+.exp-header__title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.exp-header__count {
+  flex: 0 0 auto;
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 400;
+  color: #8a8f98;
 }
 
 .exp-header__actions {

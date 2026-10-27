@@ -115,8 +115,8 @@ export class ChecklistUI {
           <span class="checklist__label"></span>
           <h2 class="checklist__active-title"></h2>
         </div>
+        <span class="checklist__counter checklist__counter--label"></span>
         <div class="checklist__progress-wrap">
-          <span class="checklist__counter checklist__counter--label"></span>
           <button type="button" class="checklist__ring-btn" aria-label="">
             <svg class="checklist__ring" viewBox="0 0 28 28" width="44" height="44" aria-hidden="true">
               <circle class="checklist__ring-bg" cx="14" cy="14" r="11" fill="none" stroke-width="2"/>

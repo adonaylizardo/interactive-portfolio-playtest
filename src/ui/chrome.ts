@@ -297,7 +297,7 @@ export class ChromeUI {
           ${roundBtn('download', 'Descargar CV', '', 'download')}
           ${roundBtn('sound', 'Sonido', '', 'sound')}
           ${roundBtn('page', 'Página completa', '', 'fullpage')}
-          <span class="chrome__lang-rail-host" data-lang-rail-host></span>
+          <button type="button" class="ui-round chrome__lang-toggle chrome__lang-toggle--rail" data-action="lang-toggle" aria-label="Language" data-i18n-aria="chrome.language"><span data-lang-toggle-label-rail>ES</span></button>
         </div>
       </nav>
       <aside class="chrome__column" data-column>
@@ -321,7 +321,7 @@ export class ChromeUI {
           <div class="chrome__audience">
             <p class="chrome__label" data-i18n="chrome.who">¿Quién eres?</p>
             <div class="ui-seg" role="tablist" aria-label="Audience" data-i18n-aria="chrome.audience">
-              <button type="button" class="ui-seg__opt is-active" data-audience="recruiter">Recruiter</button>
+              <button type="button" class="ui-seg__opt is-active" data-audience="recruiter" data-i18n="chrome.recruiter">Recruiter</button>
               <button type="button" class="ui-seg__opt" data-audience="mentoria" data-i18n="chrome.mentorship">Mentoría</button>
               <button type="button" class="ui-seg__opt" data-audience="cliente" data-i18n="chrome.client">Cliente</button>
             </div>
@@ -387,7 +387,7 @@ export class ChromeUI {
         <div class="chrome__audience">
           <p class="chrome__label" data-i18n="chrome.who">¿Quién eres?</p>
           <div class="ui-seg ui-seg--phone" role="tablist" aria-label="Audience" data-i18n-aria="chrome.audience">
-            <button type="button" class="ui-seg__opt is-active" data-audience="recruiter">Recruiter</button>
+            <button type="button" class="ui-seg__opt is-active" data-audience="recruiter" data-i18n="chrome.recruiter">Recruiter</button>
             <button type="button" class="ui-seg__opt" data-audience="mentoria" data-i18n="chrome.mentorship">Mentoría</button>
             <button type="button" class="ui-seg__opt" data-audience="cliente" data-i18n="chrome.client">Cliente</button>
           </div>
@@ -723,6 +723,8 @@ export class ChromeUI {
     });
     const toggleLabel = this.root.querySelector('[data-lang-toggle-label]');
     if (toggleLabel) toggleLabel.textContent = this.lang === 'es' ? 'ES' : 'EN';
+    const railToggleLabel = this.root.querySelector('[data-lang-toggle-label-rail]');
+    if (railToggleLabel) railToggleLabel.textContent = this.lang === 'es' ? 'ES' : 'EN';
     this.root.querySelectorAll('[data-i18n]').forEach((el) => {
       const key = (el as HTMLElement).dataset.i18n as Parameters<typeof t>[0];
       if (key) el.textContent = t(key);
@@ -1080,7 +1082,6 @@ export class ChromeUI {
 
   private syncMobileLang(): void {
     const lang = this.root.querySelector('.chrome__lang') as HTMLElement | null;
-    const railHost = this.root.querySelector('[data-lang-rail-host]') as HTMLElement | null;
     if (!lang) return;
     if (!this.langHome) {
       this.langHome = document.createElement('span');
@@ -1097,9 +1098,8 @@ export class ChromeUI {
       return;
     }
     lang.hidden = false;
-    if (!this.mobile && railHost) {
-      if (lang.parentElement !== railHost) railHost.appendChild(lang);
-      lang.classList.add('chrome__lang--in-rail');
+    if (!this.mobile) {
+      lang.hidden = true;
       return;
     }
     if (lang.parentElement !== this.root && this.langHome.parentElement === this.root) {

@@ -10,6 +10,7 @@ export type PhoneChromeSnapshot = {
   dock: boolean;
   introPeek: boolean;
   introDetailSeen: boolean;
+  panelOpen: boolean;
 };
 
 const POSITION_PROPS = [
@@ -75,23 +76,31 @@ export function clearPhoneChecklistInline(root: HTMLElement): void {
 export function derivePhoneChecklistMode(snap: PhoneChromeSnapshot): PhoneChecklistMode | null {
   if (!snap.mobile || snap.hidden) return null;
   if (snap.mobileExpanded) return 'open';
-  if (snap.introExpanded || snap.dock || (snap.introPeek && snap.introDetailSeen)) return 'circle';
+  if (
+    snap.panelOpen ||
+    snap.introExpanded ||
+    snap.dock ||
+    (snap.introPeek && snap.introDetailSeen)
+  ) {
+    return 'circle';
+  }
   return 'pill';
 }
 
 export function readPhoneChromeSnapshot(
   state: ChecklistState,
-  compactHidden: boolean,
+  panelOpen: boolean,
 ): PhoneChromeSnapshot {
   const chrome = document.querySelector('.chrome');
   return {
     mobile: true,
-    hidden: isChecklistHidden(state) || compactHidden,
+    hidden: isChecklistHidden(state),
     mobileExpanded: state.mobileExpanded === true,
     introExpanded: !!chrome?.classList.contains('chrome--intro-expanded'),
     dock: !!chrome?.classList.contains('chrome--dock'),
     introPeek: !!chrome?.classList.contains('chrome--intro-peek'),
     introDetailSeen: !!chrome?.classList.contains('chrome--intro-detail-seen'),
+    panelOpen,
   };
 }
 
@@ -114,9 +123,9 @@ function dockSheetTop(): number | null {
 export function positionPhoneOpenCard(root: HTMLElement): void {
   const inset = 16;
   const gap = 8;
-  const width = Math.min(296, window.innerWidth - 32);
-  const anchorBottom = phoneOpenCardAnchorBottom();
-  const top = Math.max(inset, anchorBottom + gap);
+  const width = Math.min(247, window.innerWidth - 112 - inset);
+  const left = 112;
+  const top = 16;
   const peekTop = peekSheetTop();
   const dockTop = dockSheetTop();
   let bottomLimit = window.innerHeight - inset;
@@ -131,8 +140,8 @@ export function positionPhoneOpenCard(root: HTMLElement): void {
   root.style.setProperty('position', 'fixed', 'important');
   root.style.setProperty('--phone-open-top', `${top}px`);
   root.style.setProperty('top', `${top}px`, 'important');
-  root.style.setProperty('right', `${inset}px`, 'important');
-  root.style.setProperty('left', 'auto', 'important');
+  root.style.setProperty('left', `${left}px`, 'important');
+  root.style.setProperty('right', 'auto', 'important');
   root.style.setProperty('bottom', 'auto', 'important');
   root.style.setProperty('width', `${width}px`, 'important');
   root.style.setProperty('max-height', `${maxHeight}px`, 'important');

@@ -15,7 +15,6 @@ import { searchableTalkItems } from '../data/siteSearch';
 import {
   isPlaceholderCopy,
   talkMeta,
-  talkSectionTitle,
   talkThumbnailUrl,
   talkTitle,
   writingArticleUrl,
@@ -117,6 +116,7 @@ export class BuildingPanel {
   private experienceDetail: HTMLElement | null = null;
   private expHeader: HTMLElement | null = null;
   private expHeaderTitle: HTMLElement | null = null;
+  private expHeaderCount: HTMLElement | null = null;
   private expMobileChrome: HTMLElement | null = null;
   private expMobileTitle: HTMLElement | null = null;
   private experienceView: 'list' | 'detail' = 'list';
@@ -183,7 +183,7 @@ export class BuildingPanel {
           <button type="button" class="exp-header__btn exp-header__back" data-exp-back aria-label="">
             <img class="exp-header__icon" src="${FIGMA_BACK}" width="15" height="15" alt="" />
           </button>
-          <h2 class="exp-header__title"></h2>
+          <h2 class="exp-header__title"><span class="exp-header__title-text"></span><span class="exp-header__count" hidden></span></h2>
           <div class="exp-header__actions">
             <button type="button" class="exp-header__btn" data-exp-expand aria-label="">
               <img class="exp-header__icon" src="${FIGMA_EXPAND}" width="15" height="15" alt="" />
@@ -296,7 +296,8 @@ export class BuildingPanel {
     this.experienceList = this.el.querySelector('[data-exp-list]');
     this.experienceDetail = this.el.querySelector('[data-exp-detail]');
     this.expHeader = this.el.querySelector('[data-exp-header]');
-    this.expHeaderTitle = this.el.querySelector('.exp-header__title');
+    this.expHeaderTitle = this.el.querySelector('.exp-header__title-text');
+    this.expHeaderCount = this.el.querySelector('.exp-header__count');
     this.expMobileChrome = this.el.querySelector('[data-exp-mobile-chrome]');
     this.expMobileTitle = this.el.querySelector('.exp-mobile-chrome__title');
     this.el.querySelector('[data-exp-mobile-back]')?.addEventListener('click', (e) => {
@@ -678,6 +679,17 @@ export class BuildingPanel {
     return this.experiencePanelTitle;
   }
 
+  private syncExperienceHeaderCount(total: number): void {
+    if (!this.expHeaderCount) return;
+    if (total > 0 && this.experienceView === 'list') {
+      this.expHeaderCount.hidden = false;
+      this.expHeaderCount.textContent = String(total);
+    } else {
+      this.expHeaderCount.hidden = true;
+      this.expHeaderCount.textContent = '';
+    }
+  }
+
   private openExperience(mode: 'talks' | 'writings', interiorId: string | null): void {
     this.leaveArmed = false;
     this.exitPress = null;
@@ -792,7 +804,7 @@ export class BuildingPanel {
     if (back) {
       const showWritingsSection =
         this.mode === 'writings' && view === 'list' && !!this.writingsSectionFocus;
-      back.hidden = this.isMobile() && view === 'list' && !showWritingsSection;
+      back.hidden = view === 'list' && !showWritingsSection;
     }
     if (expand) expand.hidden = this.isMobile();
     this.el.classList.toggle('building-panel--exp-list', view === 'list');
@@ -816,6 +828,7 @@ export class BuildingPanel {
       p.className = 'experience__empty';
       p.textContent = t('talks.comingSoon');
       this.experienceList.replaceChildren(p);
+      this.syncExperienceHeaderCount(0);
       return;
     }
     const listedIds = new Set(listed.map((x) => x.id));
@@ -830,31 +843,12 @@ export class BuildingPanel {
         frag.appendChild(divider);
       }
       firstSection = false;
-      const block = document.createElement('div');
-      block.className = 'experience__section';
-      const head = document.createElement('div');
-      head.className = 'experience__section-head';
-      const row = document.createElement('div');
-      row.className = 'experience__section-row';
-      const heading = talkSectionTitle(section);
-      const h = document.createElement('h3');
-      h.className = 'experience__section-title';
-      h.textContent = heading || t('panel.talks');
-      const badge = document.createElement('span');
-      badge.className = 'experience__section-count';
-      badge.textContent = String(items.length);
-      const spacer = document.createElement('div');
-      spacer.className = 'experience__section-spacer';
-      spacer.setAttribute('aria-hidden', 'true');
-      row.append(h, badge, spacer);
-      head.append(row);
-      block.appendChild(head);
       for (const item of items) {
-        block.appendChild(this.talkRow(item, () => this.openTalk(item)));
+        frag.appendChild(this.talkRow(item, () => this.openTalk(item)));
       }
-      frag.appendChild(block);
     }
     this.experienceList.replaceChildren(frag);
+    this.syncExperienceHeaderCount(listed.length);
   }
 
   private talkRow(
@@ -1038,7 +1032,7 @@ export class BuildingPanel {
       this.mode === 'writings' &&
       this.experienceView === 'list' &&
       !!this.writingsSectionFocus;
-    back.hidden = this.isMobile() && this.experienceView === 'list' && !showWritingsSection;
+    back.hidden = this.experienceView === 'list' && !showWritingsSection;
   }
 
   private renderWritingsList(): void {
@@ -1056,6 +1050,7 @@ export class BuildingPanel {
     const frag = document.createDocumentFragment();
     const rowLimit: Record<string, number> = { uxsc: 3 };
     let firstSection = true;
+    let totalItems = 0;
     for (const section of sections) {
       if (!firstSection) {
         const divider = document.createElement('hr');
@@ -1069,8 +1064,10 @@ export class BuildingPanel {
         this.writingsSectionFocus === section.id || this.writingsFilter === section.id;
       const visibleItems =
         showAll || !truncated ? section.items : section.items.slice(0, previewLimit);
+      totalItems += visibleItems.length;
       const block = document.createElement('div');
       block.className = 'experience__section';
+      const showSectionHead = !!this.writingsSectionFocus;
       const head = document.createElement('div');
       head.className = 'experience__section-head';
       const row = document.createElement('div');
@@ -1098,26 +1095,29 @@ export class BuildingPanel {
       spacer.className = 'experience__section-spacer';
       spacer.setAttribute('aria-hidden', 'true');
       row.append(h, badge, spacer, seeAll);
-      if (section.descKey) {
-        const descText = t(section.descKey as I18nKey);
-        if (descText && !isPlaceholderCopy(descText)) {
-          const p = document.createElement('p');
-          p.className = 'experience__section-desc';
-          p.textContent = descText;
-          head.append(row, p);
+      if (showSectionHead) {
+        if (section.descKey) {
+          const descText = t(section.descKey as I18nKey);
+          if (descText && !isPlaceholderCopy(descText)) {
+            const p = document.createElement('p');
+            p.className = 'experience__section-desc';
+            p.textContent = descText;
+            head.append(row, p);
+          } else {
+            head.append(row);
+          }
         } else {
           head.append(row);
         }
-      } else {
-        head.append(row);
+        block.appendChild(head);
       }
-      block.appendChild(head);
       for (const item of visibleItems) {
         block.appendChild(this.writingRow(item, section));
       }
       frag.appendChild(block);
     }
     this.experienceList.replaceChildren(frag);
+    this.syncExperienceHeaderCount(totalItems);
     this.syncExperienceBackButton();
   }
 
