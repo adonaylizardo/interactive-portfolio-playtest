@@ -1434,28 +1434,10 @@ body[data-layout='split'] .chrome__phone-topbar-checklist .checklist.checklist--
 }
 
 .chrome__phone-topbar-checklist .checklist.checklist--phone-circle .checklist__counter--in-ring {
-  display: flex !important;
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  align-items: center;
-  justify-content: center;
-  width: auto !important;
-  height: auto !important;
-  margin: 0;
-  padding: 0;
-  opacity: 1 !important;
-  visibility: visible !important;
-  overflow: visible !important;
-  font-family: Inter, system-ui, sans-serif;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 16px;
-  font-variant-numeric: tabular-nums;
-  color: #edeef0;
-  z-index: 3;
-  pointer-events: none;
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 .checklist.checklist--phone-open {
@@ -1760,12 +1742,12 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
   max-height: none;
   border-radius: 12px 12px 0 0;
   border-bottom: 0;
-  padding-top: max(12px, env(safe-area-inset-top, 0px));
+  padding-top: 0;
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   z-index: 28;
-  scroll-padding-top: 12px;
+  scroll-padding-top: var(--intro-sheet-scroll-margin, 89px);
 }
 
 .chrome--mobile.chrome--sheet.chrome--intro-expanded .chrome__intro-pinned,
@@ -1775,7 +1757,7 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
   z-index: 6;
   flex-shrink: 0;
   margin: 0 -16px;
-  padding: 0 16px 8px;
+  padding: max(12px, env(safe-area-inset-top, 0px)) 16px 8px;
   background: #141518;
   box-shadow: 0 1px 0 #141518;
 }
@@ -1791,9 +1773,22 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
   pointer-events: none;
 }
 
+.chrome--mobile.chrome--intro-expanded .chrome__phone-topbar-checklist,
+.chrome--mobile.chrome--intro-full .chrome__phone-topbar-checklist {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+}
+
 .chrome--mobile.chrome--intro-expanded [data-chrome-section],
 .chrome--mobile.chrome--intro-full [data-chrome-section] {
-  scroll-margin-top: 12px;
+  scroll-margin-top: var(--intro-sheet-scroll-margin, 89px);
+}
+
+.chrome--mobile.chrome--intro-expanded .chrome__section h2,
+.chrome--mobile.chrome--intro-full .chrome__section h2 {
+  scroll-margin-top: var(--intro-sheet-scroll-margin, 89px);
 }
 
 .chrome--mobile.chrome--sheet:not(.chrome--intro-expanded) [data-chrome-section],
@@ -2478,15 +2473,34 @@ body[data-chrome='phone'] .chrome--sheet.chrome--intro-peek .chrome__phone-topba
   min-height: 0;
 }
 
+.chrome--sheet.chrome--intro-peek .chrome__card-row {
+  display: flex;
+  align-items: flex-start;
+}
+
 .chrome--sheet.chrome--intro-peek .chrome__card-id {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.chrome--sheet.chrome--intro-peek .chrome__card-id-text {
+  flex: 1 1 0;
   min-width: 0;
 }
 
 .chrome--sheet.chrome--intro-peek .chrome__card-id strong {
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: unset;
+}
+
+.chrome--sheet.chrome--intro-peek .chrome__card-id small {
+  display: block;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  -webkit-line-clamp: unset;
+  -webkit-box-orient: unset;
 }
 
 .chrome--sheet.chrome--intro-peek .chrome__mono {

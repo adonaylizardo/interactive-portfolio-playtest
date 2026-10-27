@@ -834,6 +834,8 @@ async function main(): Promise<void> {
     expandChecklistForQa: () => {
       if (!isMobileLayout()) checklist.setCollapsed(false);
     },
+    openSearchForQa: () => searchPalette.open(),
+    openAdonaySectionForQa: (section: 'articulos' | 'charlas') => chrome.openAdonaySection(section),
     openPlaceCard: (id: string) => {
       if (isPlaceCard(id)) placeCard.open(id);
     },

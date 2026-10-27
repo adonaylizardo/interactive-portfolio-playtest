@@ -1377,9 +1377,14 @@ body:has(.building-panel--open) .chrome__lang {
     justify-content: center;
     align-items: center;
     position: absolute;
-    right: 8px;
+    left: 50%;
     top: 50%;
-    transform: translateY(-50%);
+    right: auto;
+    transform: translate(-50%, -50%);
+  }
+
+  body[data-chrome='desktop'] .checklist:not(.checklist--mobile).checklist--collapsed .checklist__header {
+    overflow: visible;
   }
 
   body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__ring-btn {
@@ -1406,6 +1411,21 @@ body:has(.building-panel--open) .chrome__lang {
 
   body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__ring-fg {
     transition: none;
+  }
+
+  body[data-chrome='desktop'] .checklist:not(.checklist--collapsed) .checklist__ring-fg {
+    transition: none;
+  }
+
+  body[data-chrome='desktop'] .checklist.checklist--complete:not(.checklist--collapsed) .checklist__header {
+    margin-bottom: 0;
+    min-height: 58px;
+    box-sizing: border-box;
+  }
+
+  body[data-chrome='desktop'] .checklist:not(.checklist--collapsed) .checklist__progress-wrap {
+    align-self: start;
+    margin-top: 10px;
   }
 
   body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__progress-wrap {

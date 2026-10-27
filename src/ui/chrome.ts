@@ -423,7 +423,7 @@ export class ChromeUI {
         <div class="chrome__card-row">
           <div class="chrome__card-id">
             <span class="chrome__mono">AL</span>
-            <span>
+            <span class="chrome__card-id-text">
               <strong>Adonay Lizardo</strong>
               <small data-i18n="chrome.titleShort">Líder de diseño con IA</small>
             </span>
@@ -815,17 +815,24 @@ export class ChromeUI {
         this.root.classList.contains('chrome--intro-expanded') ||
         this.root.classList.contains('chrome--intro-full');
       const topbar = this.root.querySelector('[data-phone-topbar]') as HTMLElement | null;
+      const pinned = this.root.querySelector('[data-intro-pinned]') as HTMLElement | null;
+      const hostRect = scrollHost.getBoundingClientRect();
+      const pinnedRect = pinned?.getBoundingClientRect();
+      const pinnedHead = pinned?.offsetHeight ?? 0;
       const headerInset = this.mobile
         ? introExpanded
-          ? 12
+          ? Math.max(
+              Math.round((pinnedRect ? pinnedRect.bottom - hostRect.top : pinnedHead) + 12),
+              72,
+            )
           : Math.round(topbar?.getBoundingClientRect().height ?? 72) + 12
         : 77;
-      const offset =
-        target.getBoundingClientRect().top -
-        scrollHost.getBoundingClientRect().top +
-        scrollHost.scrollTop -
-        headerInset;
-      scrollHost.scrollTo({ top: Math.max(0, offset), behavior: this.mobile ? 'smooth' : 'auto' });
+      if (this.mobile && introExpanded) {
+        scrollHost.style.setProperty('--intro-sheet-scroll-margin', `${headerInset}px`);
+      }
+      const targetRect = target.getBoundingClientRect();
+      const offset = scrollHost.scrollTop + (targetRect.top - hostRect.top) - headerInset;
+      scrollHost.scrollTo({ top: Math.max(0, offset), behavior: 'auto' });
     };
     doScroll();
     window.requestAnimationFrame(() => window.requestAnimationFrame(doScroll));
