@@ -207,6 +207,7 @@ const DICT = {
 
     'search.placeholder': 'Search',
     'search.back': 'Back',
+    'search.clear': 'Clear search',
     'search.tryAnother': 'Try another word, or browse by type.',
     'search.group.cases': 'Cases',
     'search.group.articles': 'Articles',
@@ -486,6 +487,7 @@ const DICT = {
 
     'search.placeholder': 'Buscar',
     'search.back': 'Atrás',
+    'search.clear': 'Borrar búsqueda',
     'search.tryAnother': 'Prueba otra palabra o explora por tipo.',
     'search.group.cases': 'Casos',
     'search.group.articles': 'Artículos',

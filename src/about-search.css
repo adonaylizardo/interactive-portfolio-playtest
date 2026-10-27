@@ -379,7 +379,20 @@ body[data-chrome='desktop'] .search-palette__hint-key {
   color: #9aa0a6;
   cursor: pointer;
   padding: 0;
-  display: flex;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.search-palette__clear .ui-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .search-palette__chips {

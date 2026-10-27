@@ -52,7 +52,7 @@ export class SearchPalette {
           <label class="search-palette__input-wrap">
             ${iconSvg('search')}
             <input type="text" class="search-palette__input" autocomplete="off" spellcheck="false" enterkeyhint="search" />
-            <button type="button" class="search-palette__clear" data-search-clear hidden aria-label="Clear">${iconSvg('close')}</button>
+            <button type="button" class="search-palette__clear" data-search-clear hidden data-i18n-aria="search.clear" aria-label="Clear search">${iconSvg('close')}</button>
           </label>
           <span class="search-palette__hint-key" aria-hidden="true">ESC</span>
           <button type="button" class="search-palette__close" data-search-close aria-label="Close">${iconSvg('close')}</button>
@@ -141,6 +141,8 @@ export class SearchPalette {
     this.input.setAttribute('aria-label', t('chrome.search'));
     this.backBtn.setAttribute('aria-label', t('search.back'));
     this.closeBtn.setAttribute('aria-label', t('panel.close'));
+    const clearBtn = this.root.querySelector('[data-search-clear]') as HTMLButtonElement | null;
+    if (clearBtn) clearBtn.setAttribute('aria-label', t('search.clear'));
   }
 
   private isPhonePortrait(): boolean {

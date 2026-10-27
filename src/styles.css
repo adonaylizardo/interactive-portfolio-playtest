@@ -592,6 +592,9 @@ body[data-layout='panel'] .checklist:not(.checklist--mobile) {
   cursor: pointer;
   text-decoration: underline;
   padding: 4px 0;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .checklist__skip:hover {
@@ -1277,9 +1280,35 @@ body:has(.building-panel--open) .chrome__lang {
   }
 
   .checklist:not(.checklist--mobile) .checklist__map-arc,
-  .checklist:not(.checklist--mobile) .checklist__ring-figma,
-  .checklist:not(.checklist--mobile) .checklist__clipboard-figma {
+  .checklist:not(.checklist--mobile) .checklist__ring-figma {
     display: none !important;
+  }
+
+  body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__clipboard-figma {
+    display: block !important;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 15px !important;
+    height: 15px !important;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__counter--in-ring {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  body[data-chrome='desktop'] .checklist:not(.checklist--collapsed) .checklist__clipboard-figma {
+    display: none !important;
+  }
+
+  body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__progress-wrap {
+    position: relative;
   }
 
   .checklist__counter--label {

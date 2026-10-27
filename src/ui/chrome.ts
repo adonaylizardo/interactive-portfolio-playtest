@@ -397,7 +397,7 @@ export class ChromeUI {
             <h1 class="chrome__title" data-i18n="chrome.title">Líder de diseño con IA.</h1>
             <div class="chrome__intro-title-actions">
               ${roundBtn('sound', 'Sonido', 'chrome__intro-sound', 'sound')}
-              <button type="button" class="chrome__intro-close" data-action="intro-close" aria-label="Close" data-i18n-aria="jac.close">${iconSvg('close')}</button>
+              <button type="button" class="chrome__intro-close" data-action="intro-close" data-i18n-aria="jac.close" aria-label="Close">${iconSvg('close')}</button>
             </div>
           </div>
         </div>
