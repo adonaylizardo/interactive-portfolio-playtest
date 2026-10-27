@@ -558,8 +558,8 @@ export class BuildingPanel {
       this.activeWriting = null;
       if (this.experienceDetail) this.experienceDetail.replaceChildren();
       this.experienceView = 'list';
-      this.onExperienceDetailBack?.(section);
       this.hide({ snap: true, silent: true });
+      this.onExperienceDetailBack?.(section);
       return;
     }
     if (this.mode === 'writings' && this.writingsSectionFocus) {

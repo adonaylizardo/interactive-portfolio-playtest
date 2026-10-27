@@ -800,7 +800,7 @@ export class ChromeUI {
             : section === 'logros'
               ? '#chrome-mobile-logros, #chrome-logros'
               : chromeSectionSelector(section).split(',')[0].trim();
-    const desktopSel = chromeSectionSelector(section).split(',')[0].trim();
+    const desktopSel = `.chrome__column ${chromeSectionSelector(section).split(',')[0].trim()}`;
     const doScroll = () => {
       const target = this.mobile
         ? this.root.querySelector(mobileSel.split(',')[0].trim())
@@ -810,12 +810,17 @@ export class ChromeUI {
         : (this.root.querySelector('.chrome__column') as HTMLElement | null);
       if (!target || !scrollHost) return;
       const headerInset = this.mobile ? 12 : 77;
-      const hostRect = scrollHost.getBoundingClientRect();
-      const targetRect = target.getBoundingClientRect();
-      const offset = targetRect.top - hostRect.top + scrollHost.scrollTop - headerInset;
-      scrollHost.scrollTo({ top: Math.max(0, offset), behavior: 'smooth' });
+      const offset =
+        target.getBoundingClientRect().top -
+        scrollHost.getBoundingClientRect().top +
+        scrollHost.scrollTop -
+        headerInset;
+      scrollHost.scrollTo({ top: Math.max(0, offset), behavior: this.mobile ? 'smooth' : 'auto' });
     };
+    doScroll();
     window.requestAnimationFrame(() => window.requestAnimationFrame(doScroll));
+    window.setTimeout(doScroll, 120);
+    window.setTimeout(doScroll, 450);
   }
 
   openAdonaySection(section: 'articulos' | 'charlas'): void {
@@ -828,7 +833,7 @@ export class ChromeUI {
       return;
     }
     this.setLayout('split');
-    window.requestAnimationFrame(() => this.scrollToAdonaySection(section));
+    this.scrollToAdonaySection(section);
   }
 
   openSearch(): void {

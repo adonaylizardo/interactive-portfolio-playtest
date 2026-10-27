@@ -418,8 +418,13 @@ async function main(): Promise<void> {
     }
   });
   panel.setOnExperienceDetailBack((section) => {
-    chrome.openAdonaySection(section);
-    syncMapOverlays();
+    const focus = () => {
+      chrome.openAdonaySection(section);
+      syncMapOverlays();
+    };
+    focus();
+    requestAnimationFrame(focus);
+    window.setTimeout(focus, 200);
   });
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || isMobileLayout()) return;

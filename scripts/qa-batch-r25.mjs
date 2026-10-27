@@ -240,19 +240,20 @@ async function main() {
   await page.waitForFunction(
     () => {
       if (document.querySelector('.building-panel--experience.building-panel--open')) return false;
-      const h = document.querySelector('.chrome__header')?.getBoundingClientRect();
-      const s = document.querySelector('#chrome-articulos h2')?.getBoundingClientRect();
-      return !!(s && h && s.top - h.bottom >= 10);
+      const col = document.querySelector('.chrome__column');
+      return (col?.scrollTop ?? 0) > 800;
     },
     undefined,
-    { timeout: 5000 },
+    { timeout: 8000 },
   );
   const h2 = await page.evaluate(() => {
-    const h = document.querySelector('.chrome__header')?.getBoundingClientRect();
-    const s = document.querySelector('#chrome-articulos h2')?.getBoundingClientRect();
+    const h = document.querySelector('.chrome__column .chrome__header')?.getBoundingClientRect();
+    const s = document.querySelector('.chrome__column #chrome-articulos h2')?.getBoundingClientRect();
+    const col = document.querySelector('.chrome__column');
     return {
       expOpen: !!document.querySelector('.building-panel--experience.building-panel--open'),
       gap: s && h ? s.top - h.bottom : 0,
+      colScroll: col?.scrollTop ?? 0,
       layout: document.body.dataset.layout,
     };
   });
@@ -262,8 +263,8 @@ async function main() {
   await page.evaluate(() => document.querySelector('#chrome-charlas')?.scrollIntoView({ block: 'start' }));
   await wait(200);
   const scrollLand = await page.evaluate(() => {
-    const h = document.querySelector('.chrome__header')?.getBoundingClientRect();
-    const s = document.querySelector('#chrome-charlas h2')?.getBoundingClientRect();
+    const h = document.querySelector('.chrome__column .chrome__header')?.getBoundingClientRect();
+    const s = document.querySelector('.chrome__column #chrome-charlas h2')?.getBoundingClientRect();
     return { gap: s && h ? s.top - h.bottom : 0 };
   });
   metrics.M6 = scrollLand;
