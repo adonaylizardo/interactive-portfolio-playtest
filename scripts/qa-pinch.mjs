@@ -107,9 +107,9 @@ async function testMinZoomPhoneFraming(browser, errors) {
   ]) {
     const page = await browser.newPage({ viewport: { width, height } });
     try {
-      await page.goto(BASE, { waitUntil: 'networkidle' });
+      await page.goto(BASE, { waitUntil: 'load' });
       await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'load' });
       await wait(800);
       const canvas = await page.locator('#game-canvas').boundingBox();
       if (!canvas) {
@@ -179,7 +179,7 @@ function buildingSilhouettesMatch(a, b) {
 }
 
 async function testBuildingSilhouetteStable(page, name, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
   await wait(800);
   const cam = await page.evaluate(() => {
     const c = document.getElementById('game-canvas');
@@ -192,7 +192,7 @@ async function testBuildingSilhouetteStable(page, name, errors) {
 
   for (const z of zoomLevels) {
     const hash = `#view=x=${cam.x}&y=${cam.y}&z=${z.toFixed(3)}`;
-    await page.goto(`${BASE}${hash}`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}${hash}`, { waitUntil: 'load' });
     await wait(900);
     await page.evaluate((targetZ) => window.__playtestQa?.setZoom?.(targetZ), z);
     await wait(200);
@@ -559,9 +559,9 @@ async function conflictDuringPointerPinch(page, name, cx, cy, errors, client) {
 }
 
 async function wheelSweep(page, name, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await wait(800);
   const canvas = await page.locator('#game-canvas').boundingBox();
   if (!canvas) {
@@ -632,7 +632,7 @@ async function testMinZoomFullMapVisible(browser, errors) {
   ]) {
     const page = await browser.newPage({ viewport: { width, height } });
     try {
-      await page.goto(BASE, { waitUntil: 'networkidle' });
+      await page.goto(BASE, { waitUntil: 'load' });
       await wait(900);
       if (desktopChecklist) {
         await page.evaluate(() =>
@@ -647,7 +647,7 @@ async function testMinZoomFullMapVisible(browser, errors) {
             }),
           ),
         );
-        await page.reload({ waitUntil: 'networkidle' });
+        await page.reload({ waitUntil: 'load' });
         await wait(900);
       }
       const canvas = await page.locator('#game-canvas').boundingBox();
@@ -719,7 +719,7 @@ async function runPinchCase(page, name, viewportLabel) {
   const cy = canvas.y + canvas.height / 2;
 
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await wait(1500);
 
   const z0 = (await readCanvasMetrics(page))?.zoom ?? 0;
@@ -764,7 +764,7 @@ async function runPinchCase(page, name, viewportLabel) {
 }
 
 async function testUnreachableClick(page, errors) {
-  await page.goto(`${BASE}#view=x=2100&y=-3800&z=0.25`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}#view=x=2100&y=-3800&z=0.25`, { waitUntil: 'load' });
   await wait(800);
   const canvas = await page.locator('#game-canvas').boundingBox();
   if (!canvas) {
@@ -908,7 +908,7 @@ async function cdpClickBuildingDoor(page, buildingName) {
 }
 
 async function testWalkGridFootprintRules(page, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
   const gridErrors = await page.evaluate(() => window.__playtestQa?.validateWalkGridFootprint?.() ?? []);
   for (const msg of gridErrors) errors.push(`footprint-walk: ${msg}`);
 
@@ -939,9 +939,9 @@ async function testWalkGridFootprintRules(page, errors) {
 
 /** Close panel on a door tile, then move away — panel must not reopen. */
 async function testNoDoorReopenOnKeypressAfterClose(page, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await wait(1200);
 
   if (!(await cdpClickTile(page, QA.pg.x, QA.pg.y, { building: true }))) {
@@ -968,9 +968,9 @@ async function testNoDoorReopenOnKeypressAfterClose(page, errors) {
 
 /** Ground click whose route crosses another building door must not open that panel. */
 async function testGroundWalkCrossingDoorNoPanel(page, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await wait(1200);
 
   if (!(await cdpClickTile(page, QA.volaris.x, QA.volaris.y, { building: true }))) {
@@ -997,9 +997,9 @@ async function testGroundWalkCrossingDoorNoPanel(page, errors) {
 
 /** After entering caso-1, a ground walk past caso-2 must not open caso-2's panel. */
 async function testNoSpuriousDoorPanelAfterGroundWalk(page, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await wait(1200);
 
   if (!(await cdpClickTile(page, QA.volaris.x, QA.volaris.y, { building: true }))) {
@@ -1095,8 +1095,8 @@ async function waitForInterior(page, maxMs = 20000) {
 
 /** Run #30: panel overlay on map — outside tap closes without walking (next tap walks). */
 async function testRun30DismissOutsideTapNoWalk(page, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
+  await page.reload({ waitUntil: 'load' });
   await wait(800);
   await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 36));
   await page.evaluate(() => window.__playtestQa?.showPanelOverlayForQa?.('Volaris'));
@@ -1145,8 +1145,8 @@ async function testRun30DismissOutsideTapNoWalk(page, errors) {
 
 /** Run #30: roof tap while walking must not open interior until door arrival. */
 async function testRun30NoEarlyInteriorOnRoofTap(page, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
+  await page.reload({ waitUntil: 'load' });
   await wait(800);
   await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 36));
   await page.evaluate(() => window.__playtestQa?.tapMapTile?.(46, 36));
@@ -1181,8 +1181,8 @@ async function testRun30NoEarlyInteriorOnRoofTap(page, errors) {
 
 /** Run #30: long walk survives staggered pinches and drags. */
 async function testRun30WalkSurvivesPinch(page, errors, client) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
+  await page.reload({ waitUntil: 'load' });
   await wait(800);
   await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 36));
   await page.evaluate(() => window.__playtestQa?.tapMapTile?.(46, 36));
@@ -1250,8 +1250,8 @@ async function testRun30WalkSurvivesPinch(page, errors, client) {
 async function testRun30AllInteriorsClick(page, errors) {
   const buildings = await page.evaluate(() => window.__playtestQa?.getEnterableBuildings?.() ?? []);
   for (const b of buildings) {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'load' });
+    await page.reload({ waitUntil: 'load' });
     await wait(600);
     const start = QA_WALK_START[b.name] ?? [31, 36];
     await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), start);
@@ -1286,8 +1286,8 @@ async function testRun30AllInteriorsClick(page, errors) {
 
 /** Run #31: browser back exits interior without leaving the app. */
 async function testRun31HistoryBackExitsInterior(page, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
+  await page.reload({ waitUntil: 'load' });
   await wait(800);
   await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(39, 30));
   await cdpClickBuildingDoor(page, 'bain');
@@ -1309,7 +1309,7 @@ async function testRun31HistoryBackExitsInterior(page, errors) {
 
 /** Run #31: deep-link opens interior + panel on first load. */
 async function testRun31DeepLinkInterior(page, errors) {
-  await page.goto(`${BASE}#view=x=0&y=0&z=0.85&in=flor`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}#view=x=0&y=0&z=0.85&in=flor`, { waitUntil: 'load' });
   await wait(1200);
   if (!(await page.evaluate(() => window.__playtestQa?.isInInterior?.()))) {
     errors.push('run31-deeplink: flor interior not active on boot');
@@ -1332,8 +1332,8 @@ async function testRun31InteriorSizes(page, errors) {
     bain: [6, 6],
   };
   for (const [name, [ew, eh]] of Object.entries(expected)) {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'load' });
+    await page.reload({ waitUntil: 'load' });
     await wait(600);
     await page.evaluate(
       ([n]) => window.__playtestQa?.enterInterior?.(n),
@@ -1355,8 +1355,8 @@ async function testRun31InteriorSizes(page, errors) {
 
 /** Run #31: mid-walk map tap cancels pending Sambil entry. */
 async function testRun31SambilWalkCancel(page, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
+  await page.reload({ waitUntil: 'load' });
   await wait(800);
   await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(39, 36));
   await page.evaluate(() => window.__playtestQa?.walkToBuilding?.('sambil'));
@@ -1375,8 +1375,8 @@ async function testRun31SambilWalkCancel(page, errors) {
 
 /** Run #31: exit tile tap at high zoom. */
 async function testRun31InteriorExitTileZoom(page, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
+  await page.reload({ waitUntil: 'load' });
   await wait(600);
   await page.evaluate(() => window.__playtestQa?.enterInterior?.('bain'));
   await waitForInterior(page);
@@ -1397,8 +1397,8 @@ async function testRun31InteriorExitTileZoom(page, errors) {
 async function testRun31ChecklistOutsideTapMobile(browser, errors) {
   const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
   try {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'load' });
+    await page.reload({ waitUntil: 'load' });
     await wait(800);
     await page.locator('.checklist__ring-btn').click();
     await wait(300);
@@ -1441,7 +1441,7 @@ async function testRun33DoorRealInputAll(browser, errors) {
     .newPage()
     .then((p) =>
       p
-        .goto(BASE, { waitUntil: 'networkidle' })
+        .goto(BASE, { waitUntil: 'load' })
         .then(() => p.evaluate(() => window.__playtestQa?.getEnterableBuildings?.() ?? []))
         .finally(() => p.close()),
     );
@@ -1451,8 +1451,8 @@ async function testRun33DoorRealInputAll(browser, errors) {
   await ensureTouchEmulation(mobileClient);
   try {
     for (const b of buildings) {
-      await mobile.goto(BASE, { waitUntil: 'networkidle' });
-      await mobile.reload({ waitUntil: 'networkidle' });
+      await mobile.goto(BASE, { waitUntil: 'load' });
+      await mobile.reload({ waitUntil: 'load' });
       await wait(700);
       await mobile.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
       const canvas = await mobile.locator('#game-canvas').boundingBox();
@@ -1478,7 +1478,7 @@ async function testRun33DoorRealInputAll(browser, errors) {
   for (const b of buildings) {
     const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     try {
-      await desktop.goto(BASE, { waitUntil: 'networkidle' });
+      await desktop.goto(BASE, { waitUntil: 'load' });
       await desktop.evaluate(() => {
         localStorage.setItem(
           'playtest-checklist-v3',
@@ -1491,7 +1491,7 @@ async function testRun33DoorRealInputAll(browser, errors) {
           }),
         );
       });
-      await desktop.reload({ waitUntil: 'networkidle' });
+      await desktop.reload({ waitUntil: 'load' });
       await wait(900);
       const start = QA_WALK_START[b.name] ?? [31, 36];
       await desktop.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), start);
@@ -1526,8 +1526,8 @@ async function testRun33BainDoorLowZoomTouch(browser, errors) {
   try {
     for (let trial = 0; trial < 10; trial++) {
       const z = zoomLevels[trial % zoomLevels.length];
-      await page.goto(BASE, { waitUntil: 'networkidle' });
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.goto(BASE, { waitUntil: 'load' });
+      await page.reload({ waitUntil: 'load' });
       await wait(600);
       await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
       await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), [39, 36]);
@@ -1556,8 +1556,8 @@ async function testRun33SheetOutsideTapMobile(browser, errors) {
     const client = await page.context().newCDPSession(page);
     await ensureTouchEmulation(client);
     try {
-      await page.goto(BASE, { waitUntil: 'networkidle' });
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.goto(BASE, { waitUntil: 'load' });
+      await page.reload({ waitUntil: 'load' });
       await wait(800);
       await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
       await waitForInterior(page);
@@ -1629,8 +1629,8 @@ async function testRun33InteriorExitAllMobile(browser, errors) {
   await ensureTouchEmulation(client);
   try {
     for (const name of buildings) {
-      await page.goto(BASE, { waitUntil: 'networkidle' });
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.goto(BASE, { waitUntil: 'load' });
+      await page.reload({ waitUntil: 'load' });
       await wait(600);
       await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
       await waitForInterior(page);
@@ -1673,8 +1673,8 @@ async function testRun33InteriorExitAllMobile(browser, errors) {
 /** Run #32: walk survives 5 pinch cycles + 2 drags (5 trials). */
 async function testRun32WalkPinchFiveTrials(page, errors, client) {
   for (let trial = 0; trial < 5; trial++) {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'load' });
+    await page.reload({ waitUntil: 'load' });
     await wait(700);
     await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 36));
     const walkPt = await tileToScreen(page, 46, 36);
@@ -1735,8 +1735,8 @@ async function testRun33ArrivalOnlyFour(page, errors) {
       continue;
     }
     for (const mode of ['roof', 'door']) {
-      await page.goto(BASE, { waitUntil: 'networkidle' });
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.goto(BASE, { waitUntil: 'load' });
+      await page.reload({ waitUntil: 'load' });
       await wait(700);
       await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), c.start);
       await wait(200);
@@ -1799,8 +1799,8 @@ async function testRun34FloorTapNoExit(browser, errors) {
     }
     try {
       for (const name of names) {
-        await page.goto(BASE, { waitUntil: 'networkidle' });
-        await page.reload({ waitUntil: 'networkidle' });
+        await page.goto(BASE, { waitUntil: 'load' });
+        await page.reload({ waitUntil: 'load' });
         await wait(500);
         await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
         await waitForInterior(page);
@@ -1830,8 +1830,8 @@ async function testRun34FloorTapNoExit(browser, errors) {
 async function testRun34MobileSheetScrim(browser, errors) {
   const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
   try {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'load' });
+    await page.reload({ waitUntil: 'load' });
     await wait(500);
     await page.evaluate(() => window.__playtestQa?.enterInterior?.('bain'));
     await waitForInterior(page);
@@ -1865,8 +1865,8 @@ async function testRun34MobileSheetScrim(browser, errors) {
 async function testRun34SingleExitUi(browser, errors) {
   const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
   try {
-    await mobile.goto(BASE, { waitUntil: 'networkidle' });
-    await mobile.reload({ waitUntil: 'networkidle' });
+    await mobile.goto(BASE, { waitUntil: 'load' });
+    await mobile.reload({ waitUntil: 'load' });
     await wait(500);
     await mobile.evaluate(() => window.__playtestQa?.enterInterior?.('estudio'));
     await waitForInterior(mobile);
@@ -1881,8 +1881,8 @@ async function testRun34SingleExitUi(browser, errors) {
   }
   const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   try {
-    await desktop.goto(BASE, { waitUntil: 'networkidle' });
-    await desktop.reload({ waitUntil: 'networkidle' });
+    await desktop.goto(BASE, { waitUntil: 'load' });
+    await desktop.reload({ waitUntil: 'load' });
     await wait(500);
     await desktop.evaluate(() => window.__playtestQa?.enterInterior?.('estudio'));
     await waitForInterior(desktop);
@@ -1943,8 +1943,8 @@ async function testRun35ExitTileAfterFloorTaps(browser, errors) {
     }
     try {
       for (const name of INTERIOR_ROOM_NAMES) {
-        await page.goto(BASE, { waitUntil: 'networkidle' });
-        await page.reload({ waitUntil: 'networkidle' });
+        await page.goto(BASE, { waitUntil: 'load' });
+        await page.reload({ waitUntil: 'load' });
         await wait(500);
         await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
         await waitForInterior(page);
@@ -1999,8 +1999,8 @@ async function testRun35ExitTileAfterFloorTaps(browser, errors) {
 /** Run #35: every blocked interior tile has a drawn prop. */
 async function testRun35BlockedTilesHaveProps(page, errors) {
   for (const name of INTERIOR_ROOM_NAMES) {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'load' });
+    await page.reload({ waitUntil: 'load' });
     await wait(500);
     await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
     await waitForInterior(page);
@@ -2065,8 +2065,8 @@ async function testRun37InteriorPixelProbes(browser, errors) {
     const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
     try {
       for (const name of INTERIOR_ROOM_NAMES) {
-        await page.goto(BASE, { waitUntil: 'networkidle' });
-        await page.reload({ waitUntil: 'networkidle' });
+        await page.goto(BASE, { waitUntil: 'load' });
+        await page.reload({ waitUntil: 'load' });
         await wait(500);
         await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
         await waitForInterior(page);
@@ -2120,8 +2120,8 @@ async function testRun37PhoneTouchWalkAllRooms(browser, errors) {
   await ensureTouchEmulation(client);
   try {
     for (const name of INTERIOR_ROOM_NAMES) {
-      await page.goto(BASE, { waitUntil: 'networkidle' });
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.goto(BASE, { waitUntil: 'load' });
+      await page.reload({ waitUntil: 'load' });
       await wait(600);
       await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
       await waitForInterior(page);
@@ -2167,8 +2167,8 @@ async function testRun37DesktopInteriorMargins(browser, errors) {
     const page = await browser.newPage({ viewport: vp });
     try {
       for (const name of INTERIOR_ROOM_NAMES) {
-        await page.goto(BASE, { waitUntil: 'networkidle' });
-        await page.reload({ waitUntil: 'networkidle' });
+        await page.goto(BASE, { waitUntil: 'load' });
+        await page.reload({ waitUntil: 'load' });
         await wait(500);
         await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
         await waitForInterior(page);
@@ -2229,7 +2229,7 @@ async function testRun38MobileFirstLoadFraming(browser, errors) {
   });
   const page = await context.newPage();
   try {
-    await page.goto(BASE.replace(/#.*$/, ''), { waitUntil: 'networkidle' });
+    await page.goto(BASE.replace(/#.*$/, ''), { waitUntil: 'load' });
     await wait(1200);
     const m = await page.evaluate(() => {
       const d = document.getElementById('game-canvas')?.dataset ?? {};
@@ -2270,7 +2270,7 @@ async function testRun38PhoneInteriorFit(browser, errors) {
   });
   const page = await context.newPage();
   try {
-    await page.goto(BASE.replace(/#.*$/, ''), { waitUntil: 'networkidle' });
+    await page.goto(BASE.replace(/#.*$/, ''), { waitUntil: 'load' });
     await wait(800);
     for (const name of INTERIOR_ROOM_NAMES) {
       await page.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
@@ -2334,7 +2334,7 @@ async function testRun38ToastClearsAcrossRooms(browser, errors) {
   const toastVisible = () =>
     page.evaluate(() => document.getElementById('playtest-toast')?.classList.contains('playtest-toast--visible') ?? false);
   try {
-    await page.goto(BASE.replace(/#.*$/, ''), { waitUntil: 'networkidle' });
+    await page.goto(BASE.replace(/#.*$/, ''), { waitUntil: 'load' });
     await wait(800);
     await page.evaluate(() => window.__playtestQa?.enterInterior?.('sambil'));
     const entered = await waitForInterior(page);
@@ -2377,8 +2377,8 @@ async function captureRun36Interiors(browser) {
   const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   try {
     for (const name of INTERIOR_ROOM_NAMES) {
-      await desktop.goto(BASE, { waitUntil: 'networkidle' });
-      await desktop.reload({ waitUntil: 'networkidle' });
+      await desktop.goto(BASE, { waitUntil: 'load' });
+      await desktop.reload({ waitUntil: 'load' });
       await dismissChecklistForCapture(desktop);
       await wait(500);
       await desktop.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
@@ -2394,8 +2394,8 @@ async function captureRun36Interiors(browser) {
   const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
   try {
     for (const name of INTERIOR_ROOM_NAMES) {
-      await mobile.goto(BASE, { waitUntil: 'networkidle' });
-      await mobile.reload({ waitUntil: 'networkidle' });
+      await mobile.goto(BASE, { waitUntil: 'load' });
+      await mobile.reload({ waitUntil: 'load' });
       await dismissChecklistForCapture(mobile);
       await wait(500);
       await mobile.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
@@ -2433,8 +2433,8 @@ async function captureRun35Interiors(browser) {
   const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   try {
     for (const name of INTERIOR_ROOM_NAMES) {
-      await desktop.goto(BASE, { waitUntil: 'networkidle' });
-      await desktop.reload({ waitUntil: 'networkidle' });
+      await desktop.goto(BASE, { waitUntil: 'load' });
+      await desktop.reload({ waitUntil: 'load' });
       await dismissChecklistForCapture(desktop);
       await wait(500);
       await desktop.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
@@ -2450,8 +2450,8 @@ async function captureRun35Interiors(browser) {
   const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
   try {
     for (const name of INTERIOR_ROOM_NAMES) {
-      await mobile.goto(BASE, { waitUntil: 'networkidle' });
-      await mobile.reload({ waitUntil: 'networkidle' });
+      await mobile.goto(BASE, { waitUntil: 'load' });
+      await mobile.reload({ waitUntil: 'load' });
       await dismissChecklistForCapture(mobile);
       await wait(500);
       await mobile.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
@@ -2490,8 +2490,8 @@ async function captureRun34Interiors(browser) {
   const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   try {
     for (const name of names) {
-      await desktop.goto(BASE, { waitUntil: 'networkidle' });
-      await desktop.reload({ waitUntil: 'networkidle' });
+      await desktop.goto(BASE, { waitUntil: 'load' });
+      await desktop.reload({ waitUntil: 'load' });
       await wait(500);
       await desktop.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
       await waitForInterior(desktop);
@@ -2506,8 +2506,8 @@ async function captureRun34Interiors(browser) {
   const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
   try {
     for (const name of names) {
-      await mobile.goto(BASE, { waitUntil: 'networkidle' });
-      await mobile.reload({ waitUntil: 'networkidle' });
+      await mobile.goto(BASE, { waitUntil: 'load' });
+      await mobile.reload({ waitUntil: 'load' });
       await wait(500);
       await mobile.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
       await waitForInterior(mobile);
@@ -2552,8 +2552,8 @@ async function captureRun33Interiors(browser) {
   const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   try {
     for (const name of names) {
-      await desktop.goto(BASE, { waitUntil: 'networkidle' });
-      await desktop.reload({ waitUntil: 'networkidle' });
+      await desktop.goto(BASE, { waitUntil: 'load' });
+      await desktop.reload({ waitUntil: 'load' });
       await wait(500);
       await desktop.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
       await waitForInterior(desktop);
@@ -2568,8 +2568,8 @@ async function captureRun33Interiors(browser) {
   const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
   try {
     for (const name of names) {
-      await mobile.goto(BASE, { waitUntil: 'networkidle' });
-      await mobile.reload({ waitUntil: 'networkidle' });
+      await mobile.goto(BASE, { waitUntil: 'load' });
+      await mobile.reload({ waitUntil: 'load' });
       await wait(500);
       await mobile.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
       await waitForInterior(mobile);
@@ -2589,8 +2589,8 @@ async function captureRun31(browser, errors) {
   const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   try {
     for (const name of ['catedral', 'sambil', 'bain', 'flor']) {
-      await desktop.goto(BASE, { waitUntil: 'networkidle' });
-      await desktop.reload({ waitUntil: 'networkidle' });
+      await desktop.goto(BASE, { waitUntil: 'load' });
+      await desktop.reload({ waitUntil: 'load' });
       await wait(600);
       await desktop.evaluate(([n]) => window.__playtestQa?.enterInterior?.(n), [name]);
       await waitForInterior(desktop);
@@ -2599,7 +2599,7 @@ async function captureRun31(browser, errors) {
       await desktop.keyboard.press('Escape');
       await wait(700);
     }
-    await desktop.goto(`${BASE}#view=x=1420&y=-1580&z=1.2`, { waitUntil: 'networkidle' });
+    await desktop.goto(`${BASE}#view=x=1420&y=-1580&z=1.2`, { waitUntil: 'load' });
     await wait(800);
     await desktop.screenshot({ path: path.join(dir, 'obelisco-z1.2.png') });
   } finally {
@@ -2611,8 +2611,8 @@ async function captureRun31(browser, errors) {
       ['flor', [46, 37]],
       ['sambil', [39, 36]],
     ]) {
-      await mobile.goto(BASE, { waitUntil: 'networkidle' });
-      await mobile.reload({ waitUntil: 'networkidle' });
+      await mobile.goto(BASE, { waitUntil: 'load' });
+      await mobile.reload({ waitUntil: 'load' });
       await wait(600);
       if (start) {
         await mobile.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), start);
@@ -2636,8 +2636,8 @@ async function captureRun31(browser, errors) {
       await wait(900);
       await mobile.screenshot({ path: path.join(dir, `map-after-${name}-exit-375.png`) });
     }
-    await mobile.goto(BASE, { waitUntil: 'networkidle' });
-    await mobile.reload({ waitUntil: 'networkidle' });
+    await mobile.goto(BASE, { waitUntil: 'load' });
+    await mobile.reload({ waitUntil: 'load' });
     await wait(600);
     await mobile.evaluate(() => window.__playtestQa?.setCharacterTile?.(39, 35));
     await cdpClickBuildingDoor(mobile, 'volaris');
@@ -2660,8 +2660,8 @@ async function captureRun30Interiors(browser) {
       ['flor', [46, 37]],
       ['sambil', [39, 36]],
     ]) {
-      await page.goto(BASE, { waitUntil: 'networkidle' });
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.goto(BASE, { waitUntil: 'load' });
+      await page.reload({ waitUntil: 'load' });
       await wait(600);
       await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), start);
       await wait(200);
@@ -2770,9 +2770,9 @@ async function testTouchBuildingEntry(browser, errors, warnings) {
   for (const house of houses) {
     const { page, client, context } = await setupIPhoneTouchPage(browser);
     try {
-      await page.goto(BASE, { waitUntil: 'networkidle' });
+      await page.goto(BASE, { waitUntil: 'load' });
       await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'load' });
       await wait(1500);
       const doorCase = qaDoorEntry[house.id];
       const start = qaStartFar[house.id];
@@ -2839,8 +2839,8 @@ async function testTouchBuildingEntry(browser, errors, warnings) {
   {
     const { page, client, context } = await setupIPhoneTouchPage(browser);
     try {
-      await page.goto(BASE, { waitUntil: 'networkidle' });
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.goto(BASE, { waitUntil: 'load' });
+      await page.reload({ waitUntil: 'load' });
       await wait(1500);
       await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 36));
       await wait(200);
@@ -2861,8 +2861,8 @@ async function testTouchBuildingEntry(browser, errors, warnings) {
   {
     const { page, client, context } = await setupIPhoneTouchPage(browser);
     try {
-      await page.goto(BASE, { waitUntil: 'networkidle' });
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.goto(BASE, { waitUntil: 'load' });
+      await page.reload({ waitUntil: 'load' });
       await wait(1500);
       const near = await tileToScreen(page, 31, 37);
       const building = await buildingRoofScreenPoint(page, QA.volaris.x, QA.volaris.y);
@@ -2889,9 +2889,9 @@ async function readCamX(page) {
 }
 
 async function openVolarisPanel(page) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await wait(1200);
   if (!(await cdpClickTile(page, QA.volaris.x, QA.volaris.y, { building: true }))) return false;
   for (let i = 0; i < 36; i++) {
@@ -2964,9 +2964,9 @@ async function pointerTouchUp(client, id, x, y) {
 
 /** Staggered pinch: B down 60ms after A; B up 80ms before A — no camera jump / tap / walk. */
 async function testStaggeredPinchNoJump(page, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await wait(900);
   await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 36));
   await page.evaluate(() => window.__playtestQa?.setSuppressTap?.(4000));
@@ -3100,8 +3100,8 @@ async function testPanelClickInside(page, errors) {
 async function testPanelDismissTouch(browser, errors) {
   const { page, client, context } = await setupIPhoneTouchPage(browser);
   try {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'load' });
+    await page.reload({ waitUntil: 'load' });
     await wait(1500);
     await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(31, 36));
     await wait(200);
@@ -3136,7 +3136,7 @@ async function testMobile375PinchAndUi(browser, errors) {
   const { page, client, context } = await setupIPhoneTouchPage(browser);
   try {
     await page.evaluate(() => window.__playtestQa?.setSuppressTap?.(5000));
-    await page.goto(`${BASE}#view=x=120&y=-420&z=0.500`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}#view=x=120&y=-420&z=0.500`, { waitUntil: 'load' });
     await wait(1200);
     const canvas = await page.locator('#game-canvas').boundingBox();
     if (!canvas) {
@@ -3182,12 +3182,12 @@ async function testMobile375PinchAndUi(browser, errors) {
         }),
       ),
     );
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'load' });
     await wait(600);
     const zMin375 =
       (await readCanvasMetrics(page))?.zoomMin ?? zoomMinForViewportJs(375, 812);
     const panZoom = zMin375 + 0.012;
-    await page.goto(`${BASE}#view=x=200&y=-500&z=${panZoom.toFixed(3)}`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}#view=x=200&y=-500&z=${panZoom.toFixed(3)}`, { waitUntil: 'load' });
     await wait(800);
     const camBefore = await page.evaluate(() => {
       const c = document.getElementById('game-canvas');
@@ -3265,7 +3265,7 @@ async function testMobile375PinchAndUi(browser, errors) {
         }),
       );
     });
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'load' });
     await wait(600);
     const ring = await page.locator('.checklist__ring-btn').boundingBox();
     if (!ring) {
@@ -3285,9 +3285,9 @@ async function testMobile375PinchAndUi(browser, errors) {
 }
 
 async function testEnterBuildingChecklist(page, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await wait(1200);
   if (!(await cdpClickBuildingDoor(page, 'volaris'))) {
     errors.push('enter-building: could not click Volaris door');
@@ -3315,9 +3315,9 @@ async function testBuildingWalkEndsOnDoorTile(page, errors) {
     return;
   }
   for (const b of buildings) {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'load' });
     await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'load' });
     await wait(800);
     const start = QA_WALK_START[b.name] ?? [31, 36];
     await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), start);
@@ -3344,9 +3344,9 @@ async function testBuildingWalkEndsOnDoorTile(page, errors) {
 }
 
 async function testWalkKeysFirstPress(page, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await wait(800);
   await page.locator('#game-canvas').click();
   await page.evaluate(() => window.__playtestQa?.setCharacterTile?.(36, 36));
@@ -3404,9 +3404,9 @@ async function testWalkKeysFirstPress(page, errors) {
 }
 
 async function testHashCameraChecklistRebaseline(page, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await wait(600);
   await page.evaluate(() => {
     location.hash = '#view=x=120&y=-420&z=1.500';
@@ -3435,11 +3435,11 @@ async function testHashCameraChecklistRebaseline(page, errors) {
 
 async function testBainDoorLowZoomDeterministic(page, errors) {
   for (let i = 0; i < 7; i++) {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'load' });
     await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
     await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), [39, 36]);
     await wait(200);
-    await page.goto(`${BASE}#view=x=920&y=-2180&z=0.370`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}#view=x=920&y=-2180&z=0.370`, { waitUntil: 'load' });
     await wait(700);
     await page.locator('[data-exit]').first().click().catch(() => {});
     await wait(150);
@@ -3488,7 +3488,7 @@ async function testBainDoorLowZoomDeterministic(page, errors) {
 }
 
 async function testChecklistCollapsedPill(page, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
   await page.evaluate(() => {
     localStorage.setItem(
       'playtest-checklist-v3',
@@ -3507,7 +3507,7 @@ async function testChecklistCollapsedPill(page, errors) {
       }),
     );
   });
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await wait(600);
   const hiddenAfterMigrate = await page.locator('.checklist').evaluate((el) => el.hidden);
   if (hiddenAfterMigrate) {
@@ -3607,9 +3607,9 @@ async function testMap64EnterablePanels(page, errors) {
     return;
   }
   for (const b of buildings) {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'load' });
     await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'load' });
     await wait(600);
     const start = QA_WALK_START[b.name] ?? [31, 36];
     await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), start);
@@ -3701,7 +3701,7 @@ async function testSceneryTapWalks(page, errors) {
   for (const spot of cases) {
     for (const start of starts) {
       for (const [tx, ty] of spot.taps) {
-        await page.goto(BASE, { waitUntil: 'networkidle' });
+        await page.goto(BASE, { waitUntil: 'load' });
         await wait(500);
         await page.evaluate(([x, y]) => window.__playtestQa?.setCharacterTile?.(x, y), start);
         await wait(200);
@@ -3722,7 +3722,7 @@ async function testSceneryTapWalks(page, errors) {
 
 /** After pan at min zoom, first pinch-out must not snap the on-map anchor. */
 async function testMinZoomPanThenPinchOutNoSnap(page, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
   await wait(800);
   const canvas = await page.locator('#game-canvas').boundingBox();
   if (!canvas) {
@@ -3780,7 +3780,7 @@ async function testMap64PaisajeNoPanel(page, errors) {
     { name: 'redoma', ...QA.redoma },
     { name: 'muro', ...QA.muro },
   ]) {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'load' });
     await wait(700);
     if (!(await cdpClickTile(page, spot.tx, spot.ty))) {
       errors.push(`map64-paisaje: could not click ${spot.name}`);
@@ -3806,7 +3806,7 @@ async function captureRun25Closeups(browser) {
       { file: 'pg-door-close.png', hash: '#view=x=-280&y=-2180&z=0.95' },
       { file: 'bain-door-close.png', hash: '#view=x=920&y=-2180&z=0.95' },
     ]) {
-      await page.goto(`${BASE}${v.hash}`, { waitUntil: 'networkidle' });
+      await page.goto(`${BASE}${v.hash}`, { waitUntil: 'load' });
       await wait(700);
       await page.screenshot({ path: path.join(run25Dir, v.file) });
     }
@@ -3827,7 +3827,7 @@ async function captureRun29Closeups(browser) {
       { file: 'catedral-towers-z1.2.png', hash: '#view=x=-1180&y=-780&z=1.2' },
       { file: 'obelisco-z1.2.png', hash: '#view=x=1420&y=-1580&z=1.2' },
     ]) {
-      await page.goto(`${BASE}${v.hash}`, { waitUntil: 'networkidle' });
+      await page.goto(`${BASE}${v.hash}`, { waitUntil: 'load' });
       await wait(700);
       await page.screenshot({ path: path.join(dir, v.file) });
     }
@@ -3846,7 +3846,7 @@ async function captureRun28Closeups(browser) {
       { file: 'redoma-z1.2.png', hash: '#view=x=920&y=-1580&z=1.2' },
       { file: 'estudio-door-z1.2.png', hash: '#view=x=-520&y=-2180&z=1.2' },
     ]) {
-      await page.goto(`${BASE}${v.hash}`, { waitUntil: 'networkidle' });
+      await page.goto(`${BASE}${v.hash}`, { waitUntil: 'load' });
       await wait(700);
       await page.screenshot({ path: path.join(dir, v.file) });
     }
@@ -3859,9 +3859,9 @@ async function captureRun28Closeups(browser) {
   ]) {
     const p = await browser.newPage({ viewport: { width, height } });
     try {
-      await p.goto(BASE, { waitUntil: 'networkidle' });
+      await p.goto(BASE, { waitUntil: 'load' });
       await p.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
-      await p.reload({ waitUntil: 'networkidle' });
+      await p.reload({ waitUntil: 'load' });
       await wait(800);
       const canvas = await p.locator('#game-canvas').boundingBox();
       if (canvas) await wheelOutToMinZoom(p, canvas);
@@ -3885,7 +3885,7 @@ async function captureRun27Closeups(browser) {
       { file: 'redoma-z1.2.png', hash: '#view=x=920&y=-1580&z=1.2' },
       { file: 'catedral-front-left-z1.2.png', hash: '#view=x=-1180&y=-780&z=1.2' },
     ]) {
-      await page.goto(`${BASE}${v.hash}`, { waitUntil: 'networkidle' });
+      await page.goto(`${BASE}${v.hash}`, { waitUntil: 'load' });
       await wait(700);
       if (v.clip) {
         await page.screenshot({ path: path.join(run27Dir, v.file), clip: v.clip });
@@ -3910,7 +3910,7 @@ async function captureRun26Closeups(browser) {
       { file: 'catedral-z1.2.png', hash: '#view=x=-920&y=-920&z=1.2' },
       { file: 'redoma-z1.2.png', hash: '#view=x=920&y=-1580&z=1.2' },
     ]) {
-      await page.goto(`${BASE}${v.hash}`, { waitUntil: 'networkidle' });
+      await page.goto(`${BASE}${v.hash}`, { waitUntil: 'load' });
       await wait(700);
       await page.screenshot({ path: path.join(run26Dir, v.file) });
     }
@@ -3922,7 +3922,7 @@ async function captureRun26Closeups(browser) {
 async function captureMap64ProofScreenshots(browser, errors, routeReport) {
   const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   try {
-    await desktop.goto(BASE, { waitUntil: 'networkidle' });
+    await desktop.goto(BASE, { waitUntil: 'load' });
     await wait(800);
     await desktop.screenshot({ path: path.join(outDir, 'map64-start-view.png') });
     await desktop.screenshot({ path: path.join(outDir, DESKTOP_PROOF), fullPage: false });
@@ -3944,15 +3944,15 @@ async function captureMap64ProofScreenshots(browser, errors, routeReport) {
     await desktop.locator('[data-exit]').first().click().catch(() => {});
     await wait(300);
 
-    await desktop.goto(`${BASE}#view=x=1420&y=-1580&z=0.75`, { waitUntil: 'networkidle' });
+    await desktop.goto(`${BASE}#view=x=1420&y=-1580&z=0.75`, { waitUntil: 'load' });
     await wait(700);
     await desktop.screenshot({ path: path.join(outDir, 'map64-obelisco-view.png') });
 
-    await desktop.goto(`${BASE}#view=x=920&y=-1580&z=0.75`, { waitUntil: 'networkidle' });
+    await desktop.goto(`${BASE}#view=x=920&y=-1580&z=0.75`, { waitUntil: 'load' });
     await wait(700);
     await desktop.screenshot({ path: path.join(outDir, 'map64-redoma-view.png') });
 
-    await desktop.goto(`${BASE}#view=x=320&y=-2424&z=0.88`, { waitUntil: 'networkidle' });
+    await desktop.goto(`${BASE}#view=x=320&y=-2424&z=0.88`, { waitUntil: 'load' });
     await wait(700);
     await desktop.screenshot({ path: path.join(outDir, 'map64-muro-view.png') });
 
@@ -3962,7 +3962,7 @@ async function captureMap64ProofScreenshots(browser, errors, routeReport) {
       ['mid', 1],
       ['max', ZOOM_MAX],
     ]) {
-      await desktop.goto(`${BASE}#view=x=2480&y=-4080&z=${z}`, { waitUntil: 'networkidle' });
+      await desktop.goto(`${BASE}#view=x=2480&y=-4080&z=${z}`, { waitUntil: 'load' });
       await wait(600);
       await desktop.screenshot({ path: path.join(outDir, `map64-edge-corner-63-63-${zLabel}.png`) });
     }
@@ -3977,7 +3977,7 @@ async function captureMap64ProofScreenshots(browser, errors, routeReport) {
       { file: 'map64-obelisco-vs-catedral.png', hash: '#view=x=-520&y=-2380&z=0.55' },
     ];
     for (const v of buildingViews) {
-      await desktop.goto(`${BASE}${v.hash}`, { waitUntil: 'networkidle' });
+      await desktop.goto(`${BASE}${v.hash}`, { waitUntil: 'load' });
       await wait(650);
       await desktop.screenshot({ path: path.join(outDir, v.file) });
     }
@@ -3989,7 +3989,7 @@ async function captureMap64ProofScreenshots(browser, errors, routeReport) {
 
   const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
   try {
-    await mobile.goto(BASE, { waitUntil: 'networkidle' });
+    await mobile.goto(BASE, { waitUntil: 'load' });
     await wait(800);
     await mobile.screenshot({ path: path.join(outDir, MOBILE_PROOF), fullPage: false });
   } catch (e) {
@@ -4002,7 +4002,7 @@ async function captureMap64ProofScreenshots(browser, errors, routeReport) {
 }
 
 async function testSkipRingDesktop(page, errors) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'load' });
   await page.evaluate(() => localStorage.removeItem('playtest-checklist-v3'));
   await page.reload();
   await wait(800);
@@ -4076,7 +4076,7 @@ async function main() {
     await wheelSweep(desktop, 'desktop-wheel', errors);
     mark('testBuildingSilhouetteStable');
     await testBuildingSilhouetteStable(desktop, 'desktop-silhouette', errors);
-    await desktop.goto(BASE, { waitUntil: 'networkidle' });
+    await desktop.goto(BASE, { waitUntil: 'load' });
     await wait(800);
     assertBuildingInteriorClosed(
       'desktop-interior',
@@ -4091,7 +4091,7 @@ async function main() {
       'default-zoom',
     );
 
-    await desktop.goto(BASE, { waitUntil: 'networkidle' });
+    await desktop.goto(BASE, { waitUntil: 'load' });
     const canvas = await desktop.locator('#game-canvas').boundingBox();
     await desktop.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
     await desktop.keyboard.down('Control');
@@ -4223,7 +4223,7 @@ async function main() {
     await testMobile375PinchAndUi(browser, errors);
 
     const mobile = await browser.newPage({ viewport: { width: 375, height: 812 } });
-    await mobile.goto(BASE, { waitUntil: 'networkidle' });
+    await mobile.goto(BASE, { waitUntil: 'load' });
     const mobileOut = await runPinchCase(mobile, 'iphone-375', 'mobile-375');
     for (const msg of mobileOut) {
       if (msg.includes('skipped')) warnings.push(msg);
@@ -4231,7 +4231,7 @@ async function main() {
     }
 
     const ipad = await browser.newPage({ viewport: { width: 820, height: 1180 } });
-    await ipad.goto(BASE, { waitUntil: 'networkidle' });
+    await ipad.goto(BASE, { waitUntil: 'load' });
     const ipadOut = await runPinchCase(ipad, 'ipad-820', 'ipad-820');
     for (const msg of ipadOut) {
       if (msg.includes('skipped')) warnings.push(msg);

@@ -59,11 +59,26 @@ async function enterRoomOnPage(page, name) {
   await page.evaluate((n) => window.__playtestQa.enterInterior(n), name);
   await page.waitForFunction(() => window.__playtestQa.isInInterior() === true, null, { timeout: 20000 });
   await page.waitForFunction(
-    () => (window.__playtestQa.interiorLayout()?.walkable?.length ?? 0) > 0,
+    () => {
+      if (!window.__playtestQa.isInInterior()) return false;
+      const walk = window.__playtestQa.interiorLayout()?.walkable?.length ?? 0;
+      if (walk > 0) return true;
+      return !window.__playtestQa.isBuildingPanelOpen?.();
+    },
     null,
     { timeout: 15000 },
   );
   await waitForBuildingPanelSettled(page);
+}
+
+async function mapAcceptsInput(page) {
+  return page.evaluate(() => {
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas || window.__playtestQa?.isBuildingPanelOpen?.()) return false;
+    const r = canvas.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.left + r.width * 0.5, r.top + r.height * 0.4);
+    return hit === canvas || canvas.contains(hit) || !!hit?.closest?.('#game-canvas');
+  });
 }
 
 const inInterior = (page) => page.evaluate(() => window.__playtestQa?.isInInterior?.() === true);
@@ -200,14 +215,35 @@ async function testExitSalir(ctx, kind, base, errors) {
         continue;
       }
       await waitForBuildingPanelSettled(page);
+      const isPreview = await page.evaluate(() => window.__playtestQa?.isCasePreview?.() === true);
+      if (isPreview) {
+        const close = page.locator('.building-panel--preview .case-preview__x').first();
+        await close.waitFor({ state: 'visible', timeout: 10000 });
+        await close.click();
+        await wait(300);
+        if (!(await mapAcceptsInput(page))) {
+          errors.push(`${tag}: preview × did not return map input`);
+        } else {
+          await ensureOnMap(page);
+          await assertReenter(page, name, `${tag}-preview-x`, errors);
+        }
+        await enterRoomOnPage(page, name);
+        await page.keyboard.press('Escape');
+        await wait(300);
+        if (!(await mapAcceptsInput(page))) {
+          errors.push(`${tag}: preview Esc did not return map input`);
+        } else {
+          await ensureOnMap(page);
+          await assertReenter(page, name, `${tag}-preview-esc`, errors);
+        }
+        continue;
+      }
       const exitVisible = await page
         .locator('.building-panel--open [data-exit]')
         .first()
         .isVisible()
         .catch(() => false);
       if (!exitVisible) {
-        // Desktop case peek preview hides Salir; mat/gap exit is covered in the single-tap suite.
-        if (await page.evaluate(() => window.__playtestQa?.isCasePreview?.() === true)) continue;
         errors.push(`${tag}: Salir not visible and not a case preview`);
         continue;
       }

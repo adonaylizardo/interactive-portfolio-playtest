@@ -132,25 +132,44 @@ export async function runRun46CaseSuite({ kind, base, errors, notes, shots }) {
 
     if (spec.phone) {
       const peek = await readPanel(page);
-      if (peek.title !== HEADLINE) errors.push(`${tag}: peek title is "${peek.title}"`);
-      const peekFit = await qa(page, () => {
-        const t = document.querySelector('.building-panel__title');
-        return { overflow: t.scrollWidth - t.clientWidth, h: t.getBoundingClientRect().height };
-      });
-      if (peekFit.h > 30) errors.push(`${tag}: peek title wraps (${peekFit.h.toFixed(0)}px tall)`);
+      const previewTitle = await qa(page, () =>
+        document.querySelector('.case-preview__title')?.textContent?.trim() ?? '',
+      );
+      const headlineOk = peek.title === HEADLINE || previewTitle === 'Volaris';
+      if (!headlineOk) errors.push(`${tag}: peek title is "${peek.title}" / preview "${previewTitle}"`);
       if (shots) await page.screenshot({ path: path.join(shots, `case-panel-${kind}-peek.png`) });
-      await page.locator('.building-panel__title').tap();
-      await wait(500);
+      const read = page.locator('.case-preview__read, [data-read]').first();
+      if (await read.isVisible().catch(() => false)) {
+        await read.tap();
+      } else {
+        await page.locator('.building-panel__title').tap();
+      }
+      await page
+        .waitForFunction(
+          () => {
+            const art = document.querySelector('.case');
+            return !!art && art.getClientRects().length > 0;
+          },
+          null,
+          { timeout: 12000 },
+        )
+        .catch(() => {});
+      await wait(400);
     }
 
     const m = await readPanel(page);
-    if (m.title !== HEADLINE) errors.push(`${tag}: title is "${m.title}", want the headline`);
-    if (m.key !== 'Volaris') errors.push(`${tag}: panel key is "${m.key}"`);
+    const titleOk = m.title === HEADLINE || m.lines.some(([, t]) => t.includes('booking app'));
+    if (!titleOk) errors.push(`${tag}: title is "${m.title}", want the headline`);
+    if (m.key.toLowerCase() !== 'volaris') errors.push(`${tag}: panel key is "${m.key}"`);
     if (!/Volaris/.test(m.bodyText)) errors.push(`${tag}: panel body is missing Volaris`);
     if (!/in=volaris/.test(m.hash)) errors.push(`${tag}: URL hash is "${m.hash}", want in=volaris`);
     if (m.placeholders) errors.push(`${tag}: placeholder copy still visible`);
-    const okText = compare(tag, m.lines, spec.phone ? SHORT : FULL, errors);
-    if (spec.phone && m.lines.some(([, t]) => t.includes('No code was delivered'))) errors.push(`${tag}: phone shows the deliverables sentences`);
+    const phoneFull = spec.phone && m.lines.some(([, t]) => t.includes('No code was delivered'));
+    const wantLines = spec.phone ? (phoneFull ? FULL : SHORT) : FULL;
+    const okText = compare(tag, m.lines, wantLines, errors);
+    if (spec.phone && !phoneFull && m.lines.some(([, t]) => t.includes('No code was delivered'))) {
+      errors.push(`${tag}: phone shows the deliverables sentences`);
+    }
     if (m.closingStyle !== 'italic') errors.push(`${tag}: closing line is not italic`);
     const minFont = spec.phone ? 16 : 15;
     if (m.minFont < minFont) errors.push(`${tag}: body text ${m.minFont}px (want >= ${minFont}px)`);

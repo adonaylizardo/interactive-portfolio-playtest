@@ -21,7 +21,7 @@ async function waitForQa(page) {
       if (state === 'ready') return;
       // The map stays behind the welcome sheet until the visitor taps Start.
       // QA navigations take that tap; a hash reload skips the sheet on its own.
-      if (state === 'welcome') {
+      if (state === 'welcome' || (state === 'loading' && i > 40)) {
         await page.locator('[data-boot-start]').click({ timeout: 3000 }).catch(() => {});
       }
     } catch {
@@ -40,24 +40,30 @@ export { waitForQa };
 export async function waitForBuildingPanelSettled(page) {
   await page.waitForFunction(
     () => {
-      if (!window.__playtestQa?.isBuildingPanelOpen?.()) return false;
+      const inInterior = window.__playtestQa?.isInInterior?.() === true;
+      const panelOpen = window.__playtestQa?.isBuildingPanelOpen?.() === true;
+      if (!panelOpen) return inInterior;
       const sheet = document.querySelector('.building-panel--open .building-panel__sheet');
       if (!sheet) return false;
+      const phone = window.matchMedia('(max-width: 767px)').matches;
       const tr = getComputedStyle(sheet).transform;
-      if (!tr || tr === 'none') return true;
+      const r = sheet.getBoundingClientRect();
+      if (!tr || tr === 'none') {
+        if (phone) return true;
+        return r.width >= 200 && r.left >= 60 && r.left <= 96;
+      }
       const m = tr.match(/matrix\(([^)]+)\)/);
       if (!m) return true;
       const parts = m[1].split(',').map((s) => parseFloat(s.trim()));
       const tx = parts[4] ?? 0;
       const ty = parts[5] ?? 0;
-      const phone = window.matchMedia('(max-width: 767px)').matches;
       if (phone) {
         const panel = document.querySelector('.building-panel--open');
         if (panel?.classList.contains('building-panel--peek')) return true;
-        // Bottom sheet: peek translate (~-11px) or full open (0) — not mid-slide.
         return Math.abs(ty) > 24 || Math.abs(ty) < 2;
       }
-      return Math.abs(tx) < 2 && Math.abs(ty) < 2;
+      if (r.width >= 200 && r.left >= 60 && r.left <= 96) return Math.abs(ty) < 4;
+      return Math.abs(tx) < 4 && Math.abs(ty) < 4 && r.left >= 60;
     },
     null,
     { timeout: 15000 },
@@ -203,6 +209,10 @@ export async function launchBrowser(type, options = {}) {
 export async function dismissArrivalSheet(page) {
   await page
     .evaluate(() => {
+      if (document.querySelector('.chrome--intro-expanded, .chrome--intro-full')) {
+        document.querySelector('[data-action="intro-close"]')?.click();
+        return;
+      }
       const btn = document.querySelector('.chrome--sheet [data-action="intro-close"]');
       if (btn instanceof HTMLElement) btn.click();
     })

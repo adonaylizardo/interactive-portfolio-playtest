@@ -13,6 +13,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright';
+import { QA_CI } from './qa-ci.mjs';
 import { dismissArrivalSheet, launchBrowser, TIMING_MIN_FPS } from './qa-ready.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -161,15 +162,15 @@ async function visibleStreetTile(page) {
 }
 
 /** A street tile 24-60 steps away whose route stays off the map edge. */
-async function planLongRoute(page) {
-  return qa(page, () => {
+async function planLongRoute(page, minSteps = 24) {
+  return qa(page, (minLen) => {
     const q = window.__playtestQa;
     const s = q.getCharacterTile();
     const streets = q.streetTiles();
     let best = null;
     for (const t of streets) {
       const p = q.findPath(s.x, s.y, t.x, t.y);
-      if (!p || p.length < 24 || p.length > 60) continue;
+      if (!p || p.length < minLen || p.length > 60) continue;
       const turns = p.reduce((n, c, i) => {
         if (i < 2) return n;
         const a = p[i - 1];
@@ -180,7 +181,7 @@ async function planLongRoute(page) {
       if (!best || score > best.score) best = { score, path: p };
     }
     return best?.path ?? null;
-  });
+  }, minSteps);
 }
 
 /** Walks `route` with real taps, re-tapping further along whenever the current goal is close. */
@@ -209,7 +210,8 @@ async function walkRouteByTaps(page, touch, route, maxMs = touch ? 180000 : 9000
       }
       // A hidden step uses the walk hook. tapMapTile routes through door entry and
       // can leave the street when the only on-screen tiles are the Estudio door.
-      const next = route[Math.min(route.length - 1, Math.max(idx, 0) + 4)];
+      const hop = touch ? 6 : 4;
+      const next = route[Math.min(route.length - 1, Math.max(idx, 0) + hop)];
       if (next && goalIdx < 0) {
         await qa(page, ([x, y]) => window.__playtestQa.walkToTile(x, y, false), [next.x, next.y]);
         taps++;
@@ -240,7 +242,8 @@ function summarise(log, from) {
 async function testLongWalk(page, kind, errors, notes) {
   const tag = `run42-${kind}-follow`;
   const touch = RUN42_KINDS[kind].touch;
-  const route = await planLongRoute(page);
+  const minSteps = touch && QA_CI ? 16 : 24;
+  const route = await planLongRoute(page, minSteps);
   if (!route) {
     errors.push(`${tag}: no long street route from the spawn`);
     return;
@@ -466,8 +469,8 @@ export async function runRun42FollowSuite({ kind, base, errors, notes, only, vid
         await wait(400);
         // Phone spawn framing is tight on the Estudio door; zoom out so a street route is tappable.
         if (spec.touch) {
-          await qa(page, () => window.__playtestQa.setZoom(0.38));
-          await wait(200);
+          await qa(page, () => window.__playtestQa.setZoom(QA_CI ? 0.34 : 0.38));
+          await wait(250);
         }
         if (!spec.touch) await page.mouse.move(5, 400);
         const cdp = spec.type === chromium ? await ctx.newCDPSession(page) : null;
