@@ -468,9 +468,10 @@ body[data-layout='panel'] .checklist:not(.checklist--mobile) {
 }
 
 .checklist__counter {
-  font-weight: 700;
+  font-family: Inter, system-ui, sans-serif;
+  font-weight: 500;
   font-size: 13px;
-  line-height: 1;
+  line-height: 16px;
 }
 
 .checklist__ring-btn {
@@ -491,7 +492,7 @@ body[data-layout='panel'] .checklist:not(.checklist--mobile) {
 }
 
 .checklist__ring-bg {
-  stroke: #2a2c31;
+  stroke: #6e727a;
 }
 
 .checklist__ring-fg {
@@ -1351,9 +1352,10 @@ body:has(.building-panel--open) .chrome__lang {
     inset: 0;
     align-items: center;
     justify-content: center;
+    font-family: Inter, system-ui, sans-serif;
     font-size: 13px;
-    font-weight: 700;
-    line-height: 1;
+    font-weight: 500;
+    line-height: 16px;
     pointer-events: none;
   }
 
@@ -2134,25 +2136,6 @@ body:has(.building-panel--open) .chrome__lang {
     padding: 20px 24px 24px;
   }
 
-  .building-panel--experience.building-panel--writings.building-panel--exp-list .experience {
-    gap: 8px;
-  }
-
-  .building-panel--experience.building-panel--writings.building-panel--exp-list .experience__row {
-    height: 72px;
-    box-sizing: border-box;
-    overflow: hidden;
-    align-items: center;
-  }
-
-  .building-panel--experience.building-panel--writings.building-panel--exp-list .experience__list {
-    gap: 8px;
-  }
-
-  .building-panel--experience.building-panel--writings.building-panel--exp-list .experience__section {
-    gap: 4px;
-  }
-
   .building-panel--experience .talks-player {
     gap: 15px;
   }
@@ -2178,13 +2161,6 @@ body:has(.building-panel--open) .chrome__lang {
     max-height: 40px;
   }
 
-  .building-panel--experience.building-panel--writings.building-panel--exp-list .experience__section-row {
-    min-height: 32px;
-  }
-
-  .building-panel--experience.building-panel--writings.building-panel--exp-list .experience__see-all {
-    min-height: 32px;
-  }
 }
 
 @media (max-width: 767px) {
@@ -2227,8 +2203,7 @@ body:has(.building-panel--open) .chrome__lang {
     gap: 0;
   }
 
-  .building-panel--experience.building-panel--exp-detail .building-panel__sheet,
-  .building-panel--experience.building-panel--writings.building-panel--exp-list .building-panel__sheet {
+  .building-panel--experience.building-panel--exp-detail .building-panel__sheet {
     gap: 12px;
   }
 
@@ -2373,19 +2348,10 @@ body:has(.building-panel--open) .chrome__lang {
     height: 15px;
   }
 
-  .building-panel--experience.building-panel--exp-list:not(.building-panel--writings)
-    .building-panel__body-wrap {
-    padding-top: 12px;
-  }
-
-  .building-panel--experience.building-panel--exp-detail .building-panel__body-wrap,
-  .building-panel--experience.building-panel--writings.building-panel--exp-list
-    .building-panel__body-wrap {
+  .building-panel--experience.building-panel--exp-detail .building-panel__body-wrap {
     padding-top: 0;
   }
 
-  .building-panel--experience.building-panel--writings.building-panel--exp-list
-    .building-panel__body-wrap,
   .building-panel--experience.building-panel--writings.building-panel--exp-detail
     .building-panel__body-wrap {
     margin-top: -12px;
@@ -2419,15 +2385,6 @@ body:has(.building-panel--open) .chrome__lang {
 
   .building-panel--experience.building-panel--writings.building-panel--exp-detail .experience {
     gap: 0;
-  }
-
-  .building-panel--experience.building-panel--writings .experience__list {
-    gap: 12px;
-  }
-
-  .building-panel--experience.building-panel--writings.building-panel--exp-list .experience__row {
-    min-height: 80px;
-    box-sizing: border-box;
   }
 
   .building-panel--experience.building-panel--writings.building-panel--exp-detail .writings-reader {

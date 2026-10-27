@@ -809,7 +809,15 @@ export class ChromeUI {
         ? (this.root.querySelector('.chrome__intro') as HTMLElement | null)
         : (this.root.querySelector('.chrome__column') as HTMLElement | null);
       if (!target || !scrollHost) return;
-      const headerInset = this.mobile ? 12 : 77;
+      const introExpanded =
+        this.root.classList.contains('chrome--intro-expanded') ||
+        this.root.classList.contains('chrome--intro-full');
+      const topbar = this.root.querySelector('[data-phone-topbar]') as HTMLElement | null;
+      const headerInset = this.mobile
+        ? introExpanded
+          ? 12
+          : Math.round(topbar?.getBoundingClientRect().height ?? 72) + 12
+        : 77;
       const offset =
         target.getBoundingClientRect().top -
         scrollHost.getBoundingClientRect().top +

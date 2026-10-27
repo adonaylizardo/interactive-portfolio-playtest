@@ -67,6 +67,10 @@ function stepCopy(): Record<ChecklistStepId, StepCopy> {
 
 export const COMPACT_LAYOUT_MQ = '(max-width: 767px), (max-height: 500px)';
 
+/** Phone / figma ring r=16.75 — keep dash math in sync with SVG circles. */
+export const CHECKLIST_RING_R = 16.75;
+export const CHECKLIST_RING_CIRCUMFERENCE = 2 * Math.PI * CHECKLIST_RING_R;
+
 export function isMobileLayout(): boolean {
   return window.matchMedia(COMPACT_LAYOUT_MQ).matches;
 }
@@ -121,7 +125,7 @@ export class ChecklistUI {
             <svg class="checklist__ring" viewBox="0 0 36 36" width="36" height="36" aria-hidden="true">
               <circle class="checklist__ring-bg" cx="18" cy="18" r="16.75" fill="none" stroke-width="2"/>
               <circle class="checklist__ring-fg" cx="18" cy="18" r="16.75" fill="none" stroke-width="2.5"
-                stroke-dasharray="105.22" stroke-dashoffset="105.22" transform="rotate(-90 18 18)"/>
+                stroke-dasharray="${(2 * Math.PI * 16.75).toFixed(2)}" stroke-dashoffset="${(2 * Math.PI * 16.75).toFixed(2)}" transform="rotate(-90 18 18)"/>
             </svg>
             <span class="checklist__counter checklist__counter--in-ring"></span>
             <img
@@ -385,9 +389,9 @@ export class ChecklistUI {
     const counterText = `${done}/${total}`;
     this.counterEl.textContent = counterText;
     this.counterInRing.textContent = `${done}/${total}`;
-    const circumference = 69.12;
-    const mapArcCirc = 105.557;
-    const progress = done / total;
+    const circumference = CHECKLIST_RING_CIRCUMFERENCE;
+    const mapArcCirc = CHECKLIST_RING_CIRCUMFERENCE;
+    const progress = total > 0 ? done / total : 0;
     const offset = circumference * (1 - progress);
     this.ringEl.style.strokeDashoffset = String(offset);
     this.mapArcFg.style.strokeDashoffset = String(mapArcCirc * (1 - progress));

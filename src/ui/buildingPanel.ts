@@ -2,23 +2,13 @@ import { studio } from '../audio/studio';
 import { aboutForLang, ABOUT_PANELS } from '../data/about';
 import { aboutBlockNode } from './aboutRender';
 import { caseForLang, casePreviewCopy, isCaseHouse, type CaseBlock } from '../data/cases';
-import {
-  TALK_SECTIONS,
-  TALKS,
-  TALKS_COMING_SOON,
-  WRITINGS,
-  type TalkItem,
-  type WritingItem,
-  type WritingSection,
-} from '../data/experiences';
-import { searchableTalkItems } from '../data/siteSearch';
+import { TALKS, WRITINGS, type TalkItem, type WritingItem, type WritingSection } from '../data/experiences';
 import {
   isPlaceholderCopy,
   talkMeta,
   talkThumbnailUrl,
   talkTitle,
   writingArticleUrl,
-  writingItemHasCopy,
   writingMeta,
   writingSourceLabel,
   writingTitle,
@@ -33,7 +23,7 @@ import {
   figmaAsset,
 } from './figmaAssets';
 import { iconSvg } from './icons';
-import { getLang, onLangChange, t, type I18nKey } from './i18n';
+import { getLang, onLangChange, t } from './i18n';
 
 const FIGMA_BACK = figmaAsset('talks-desktop-list', '9f9c4.svg');
 const FIGMA_EXPAND = figmaAsset('talks-desktop-list', 'ce7c9.svg');
@@ -112,7 +102,6 @@ export class BuildingPanel {
   private experienceEl: HTMLElement | null = null;
   private experienceIntro: HTMLElement | null = null;
   private experienceFilters: HTMLElement | null = null;
-  private experienceList: HTMLElement | null = null;
   private experienceDetail: HTMLElement | null = null;
   private expHeader: HTMLElement | null = null;
   private expHeaderTitle: HTMLElement | null = null;
@@ -124,8 +113,6 @@ export class BuildingPanel {
   private experienceTitleKey: 'panel.talks' | 'panel.writings' | null = null;
   private onExperienceDesktopExpand: (() => void) | null = null;
   private onExperienceDetailBack: ((section: 'articulos' | 'charlas') => void) | null = null;
-  private writingsFilter: 'all' | string = 'all';
-  /** Writings “See all” — single-section list before reader detail. */
   private writingsSectionFocus: string | null = null;
   private activeTalkId: string | null = null;
   private activeWriting: { sectionId: string; itemId: string } | null = null;
@@ -252,7 +239,6 @@ export class BuildingPanel {
           <section class="experience" data-experience hidden>
             <p class="experience__intro"></p>
             <div class="experience__filters" data-exp-filters hidden></div>
-            <div class="experience__list" data-exp-list></div>
             <div class="experience__detail" data-exp-detail hidden></div>
           </section>
         </div>
@@ -294,7 +280,6 @@ export class BuildingPanel {
     this.experienceEl = this.el.querySelector('[data-experience]');
     this.experienceIntro = this.el.querySelector('.experience__intro');
     this.experienceFilters = this.el.querySelector('[data-exp-filters]');
-    this.experienceList = this.el.querySelector('[data-exp-list]');
     this.experienceDetail = this.el.querySelector('[data-exp-detail]');
     this.expHeader = this.el.querySelector('[data-exp-header]');
     this.expHeaderTitle = this.el.querySelector('.exp-header__title-text');
@@ -533,7 +518,6 @@ export class BuildingPanel {
     this.activeTalkId = null;
     this.activeWriting = null;
     if (this.experienceEl) this.experienceEl.hidden = true;
-    if (this.experienceList) this.experienceList.hidden = true;
     if (this.experienceDetail) {
       this.experienceDetail.hidden = true;
       this.experienceDetail.replaceChildren();
@@ -564,8 +548,8 @@ export class BuildingPanel {
     }
     if (this.mode === 'writings' && this.writingsSectionFocus) {
       this.writingsSectionFocus = null;
-      this.renderWritingsList();
-      this.syncExperienceBackButton();
+      this.onExperienceDetailBack?.('articulos');
+      this.hide({ snap: true, silent: true });
       return;
     }
     this.salir();
@@ -636,24 +620,24 @@ export class BuildingPanel {
   }
 
   showTalks(_title?: string, interiorId: string | null = 'teresa'): void {
-    this.openExperience('talks', interiorId);
-    this.renderTalksList();
+    this.openExperience('talks', interiorId, { shellOnly: true });
   }
 
   /** QA / gate: Talks shell with empty list copy (refs `talks-vacio`). */
   showTalksEmptyForQa(): void {
-    this.showTalks(t('panel.talks'), 'teresa');
-    if (!this.experienceList) return;
-    const p = document.createElement('p');
-    p.className = 'experience__empty';
-    p.textContent = t('talks.comingSoon');
-    this.experienceList.replaceChildren(p);
+    this.openExperience('talks', 'teresa', { shellOnly: true });
+    if (this.experienceDetail) {
+      const p = document.createElement('p');
+      p.className = 'experience__empty';
+      p.textContent = t('talks.comingSoon');
+      this.experienceDetail.hidden = false;
+      this.experienceDetail.replaceChildren(p);
+    }
     if (this.isMobile() && this.peekOnly) this.setPeek(false);
   }
 
   showWritings(_title?: string, interiorId: string | null = 'biblioteca'): void {
-    this.openExperience('writings', interiorId);
-    this.renderWritingsList();
+    this.openExperience('writings', interiorId, { shellOnly: true });
   }
 
   /** Site search: open a specific writing in the reader. */
@@ -718,7 +702,7 @@ export class BuildingPanel {
   private openExperience(
     mode: 'talks' | 'writings',
     interiorId: string | null,
-    opts?: { shellOnly?: boolean },
+    _opts?: { shellOnly?: boolean },
   ): void {
     this.leaveArmed = false;
     this.exitPress = null;
@@ -726,7 +710,6 @@ export class BuildingPanel {
     studio.clearSubtitle();
     this.mode = mode;
     this.interiorId = interiorId;
-    this.writingsFilter = 'all';
     this.writingsSectionFocus = null;
     this.activeTalkId = null;
     this.activeWriting = null;
@@ -755,20 +738,12 @@ export class BuildingPanel {
     this.el.classList.add('building-panel--open', 'building-panel--experience');
     this.el.classList.toggle('building-panel--writings', mode === 'writings');
     this.syncPeekClass();
-    this.setExperienceView('list');
-    if (opts?.shellOnly) {
-      if (this.experienceList) this.experienceList.hidden = true;
-      if (this.experienceDetail) this.experienceDetail.hidden = true;
-      if (this.experienceFilters) this.experienceFilters.hidden = true;
-      this.syncExperienceHeaderCount(0);
-    } else if (mode === 'talks') this.renderTalksList();
-    else {
-      if (this.experienceFilters) {
-        this.experienceFilters.replaceChildren();
-        this.experienceFilters.hidden = true;
-      }
-      this.renderWritingsList();
-    }
+    this.experienceView = 'detail';
+    if (this.experienceDetail) this.experienceDetail.hidden = true;
+    if (this.experienceFilters) this.experienceFilters.hidden = true;
+    this.syncExperienceHeaderCount(0);
+    this.el.classList.remove('building-panel--exp-list');
+    this.el.classList.toggle('building-panel--exp-detail', false);
     this.queueVisibilitySync();
     this.syncExperienceDesktopExpand();
     studio.playClick();
@@ -783,11 +758,6 @@ export class BuildingPanel {
     if (!this.isExperienceMode()) return;
     this.syncExperienceIntro();
     if (this.expHeaderTitle) this.expHeaderTitle.textContent = this.experienceDisplayTitle();
-    if (this.experienceView === 'list') {
-      if (this.mode === 'talks') this.renderTalksList();
-      else this.renderWritingsList();
-      return;
-    }
     if (this.mode === 'talks' && this.activeTalkId) {
       const item = TALKS.find((x) => x.id === this.activeTalkId);
       if (item) this.renderTalkPlayer(item);
@@ -808,10 +778,12 @@ export class BuildingPanel {
     const back = this.expMobileChrome.querySelector('[data-exp-mobile-back]') as HTMLElement | null;
     const showBack = this.experienceView === 'detail';
     if (back) back.hidden = !showBack;
-    const talksList = this.mode === 'talks' && this.experienceView === 'list';
-    this.expMobileChrome.classList.toggle('exp-mobile-chrome--grab-wide', talksList);
-    this.expMobileChrome.classList.toggle('exp-mobile-chrome--grab-compact', !talksList);
-    this.expMobileChrome.classList.toggle('exp-mobile-chrome--list-pad', talksList);
+    this.expMobileChrome.classList.remove(
+      'exp-mobile-chrome--grab-wide',
+      'exp-mobile-chrome--grab-compact',
+      'exp-mobile-chrome--list-pad',
+    );
+    this.expMobileChrome.classList.add('exp-mobile-chrome--grab-compact');
     if (this.mode === 'writings' && this.experienceView === 'detail') {
       const backIcon = this.expMobileChrome.querySelector(
         '.exp-mobile-chrome__back .exp-mobile-chrome__icon',
@@ -824,65 +796,19 @@ export class BuildingPanel {
     }
   }
 
-  private setExperienceView(view: 'list' | 'detail'): void {
-    if (!this.experienceList || !this.experienceDetail || !this.experienceFilters) return;
+  private setExperienceView(view: 'detail'): void {
+    if (!this.experienceDetail || !this.experienceFilters) return;
     this.experienceView = view;
-    this.experienceList.hidden = view !== 'list';
     this.experienceDetail.hidden = view !== 'detail';
     this.experienceFilters.hidden = true;
-    if (this.experienceIntro) {
-      this.experienceIntro.hidden = this.mode !== 'talks' || view !== 'list';
-    }
+    if (this.experienceIntro) this.experienceIntro.hidden = true;
     const back = this.el.querySelector('[data-exp-back]') as HTMLElement | null;
     const expand = this.el.querySelector('[data-exp-expand]') as HTMLElement | null;
-    if (back) {
-      const showWritingsSection =
-        this.mode === 'writings' && view === 'list' && !!this.writingsSectionFocus;
-      back.hidden = view === 'list' && !showWritingsSection;
-    }
+    if (back) back.hidden = view !== 'detail';
     if (expand) expand.hidden = this.isMobile();
-    this.el.classList.toggle('building-panel--exp-list', view === 'list');
+    this.el.classList.remove('building-panel--exp-list');
     this.el.classList.toggle('building-panel--exp-detail', view === 'detail');
     this.syncMobileExperienceChrome();
-    if (view === 'list') {
-      this.activeTalkId = null;
-      this.activeWriting = null;
-      this.writingsSectionFocus = null;
-      if (this.experienceDetail) this.experienceDetail.replaceChildren();
-      if (this.mode === 'talks') this.renderTalksList();
-      else this.renderWritingsList();
-    }
-  }
-
-  private renderTalksList(): void {
-    if (!this.experienceList) return;
-    const listed = searchableTalkItems();
-    if (TALKS_COMING_SOON || listed.length === 0) {
-      const p = document.createElement('p');
-      p.className = 'experience__empty';
-      p.textContent = t('talks.comingSoon');
-      this.experienceList.replaceChildren(p);
-      this.syncExperienceHeaderCount(0);
-      return;
-    }
-    const listedIds = new Set(listed.map((x) => x.id));
-    const frag = document.createDocumentFragment();
-    let firstSection = true;
-    for (const section of TALK_SECTIONS) {
-      const items = section.items.filter((item) => listedIds.has(item.id));
-      if (!items.length) continue;
-      if (!firstSection) {
-        const divider = document.createElement('hr');
-        divider.className = 'experience__section-divider';
-        frag.appendChild(divider);
-      }
-      firstSection = false;
-      for (const item of items) {
-        frag.appendChild(this.talkRow(item, () => this.openTalk(item)));
-      }
-    }
-    this.experienceList.replaceChildren(frag);
-    this.syncExperienceHeaderCount(listed.length);
   }
 
   private talkRow(
@@ -944,14 +870,6 @@ export class BuildingPanel {
       onOpen();
     });
     return btn;
-  }
-
-  private writingRow(item: WritingItem, section: WritingSection, compact = false): HTMLElement {
-    const row = this.talkRow(item, () => this.openWriting(section, item), { compact, kind: 'writing' });
-    if (item.id === 'ux-example-2' || item.id === 'sin-example-2') {
-      row.querySelector('.experience__row-title')?.classList.add('experience__row-title--two-line');
-    }
-    return row;
   }
 
   private openTalk(item: TalkItem): void {
@@ -1022,137 +940,6 @@ export class BuildingPanel {
     );
     wrap.appendChild(list);
     this.experienceDetail.replaceChildren(wrap);
-  }
-
-  private renderWritingsFilters(): void {
-    if (!this.experienceFilters) return;
-    type WritingsFilterId = 'all' | string;
-    const sectionFilters = WRITINGS.filter((s) => s.items.some((i) => writingItemHasCopy(i))).map(
-      (s) => ({
-        id: s.id as WritingsFilterId,
-        label: t(s.titleKey as I18nKey),
-      }),
-    );
-    const filters: { id: WritingsFilterId; label: string }[] = [
-      { id: 'all', label: t('writings.filter.all') },
-      ...sectionFilters,
-    ];
-    this.experienceFilters.replaceChildren(
-      ...filters.map(({ id, label }) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'experience__filter';
-        btn.dataset.writingsFilter = id;
-        if (id === this.writingsFilter) btn.classList.add('is-active');
-        btn.textContent = label;
-        btn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (this.writingsFilter === id) return;
-          this.writingsFilter = id;
-          this.writingsSectionFocus = null;
-          this.renderWritingsFilters();
-          this.renderWritingsList();
-        });
-        return btn;
-      }),
-    );
-  }
-
-  private syncExperienceBackButton(): void {
-    const back = this.el.querySelector('[data-exp-back]') as HTMLElement | null;
-    if (!back) return;
-    const showWritingsSection =
-      this.mode === 'writings' &&
-      this.experienceView === 'list' &&
-      !!this.writingsSectionFocus;
-    back.hidden = this.experienceView === 'list' && !showWritingsSection;
-  }
-
-  private renderWritingsList(): void {
-    if (!this.experienceList) return;
-    let sections =
-      this.writingsFilter === 'all'
-        ? WRITINGS
-        : WRITINGS.filter((s) => s.id === this.writingsFilter);
-    if (this.writingsSectionFocus) {
-      sections = WRITINGS.filter((s) => s.id === this.writingsSectionFocus);
-    }
-    sections = sections
-      .map((s) => ({ ...s, items: s.items.filter((i) => writingItemHasCopy(i)) }))
-      .filter((s) => s.items.length > 0);
-    const frag = document.createDocumentFragment();
-    const rowLimit: Record<string, number> = { uxsc: 3 };
-    let firstSection = true;
-    let totalItems = 0;
-    for (const section of sections) {
-      if (!firstSection) {
-        const divider = document.createElement('hr');
-        divider.className = 'experience__section-divider';
-        frag.appendChild(divider);
-      }
-      firstSection = false;
-      const previewLimit = rowLimit[section.id] ?? 3;
-      const truncated = section.items.length > previewLimit;
-      const showAll =
-        this.writingsSectionFocus === section.id || this.writingsFilter === section.id;
-      const visibleItems =
-        showAll || !truncated ? section.items : section.items.slice(0, previewLimit);
-      totalItems += visibleItems.length;
-      const block = document.createElement('div');
-      block.className = 'experience__section';
-      const showSectionHead = !!this.writingsSectionFocus;
-      const head = document.createElement('div');
-      head.className = 'experience__section-head';
-      const row = document.createElement('div');
-      row.className = 'experience__section-row';
-      const h = document.createElement('h3');
-      h.className = 'experience__section-title';
-      h.textContent = t(section.titleKey as I18nKey);
-      const badge = document.createElement('span');
-      badge.className = 'experience__section-count';
-      badge.textContent = String(section.items.length);
-      const seeAll = document.createElement('button');
-      seeAll.type = 'button';
-      seeAll.className = 'experience__see-all';
-      seeAll.textContent = t('writings.seeAll');
-      seeAll.hidden =
-        this.writingsSectionFocus === section.id || visibleItems.length >= section.items.length;
-      seeAll.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.writingsSectionFocus = section.id;
-        this.renderWritingsList();
-        this.syncExperienceBackButton();
-      });
-      const spacer = document.createElement('div');
-      spacer.className = 'experience__section-spacer';
-      spacer.setAttribute('aria-hidden', 'true');
-      row.append(h, badge, spacer, seeAll);
-      if (showSectionHead) {
-        if (section.descKey) {
-          const descText = t(section.descKey as I18nKey);
-          if (descText && !isPlaceholderCopy(descText)) {
-            const p = document.createElement('p');
-            p.className = 'experience__section-desc';
-            p.textContent = descText;
-            head.append(row, p);
-          } else {
-            head.append(row);
-          }
-        } else {
-          head.append(row);
-        }
-        block.appendChild(head);
-      }
-      for (const item of visibleItems) {
-        block.appendChild(this.writingRow(item, section));
-      }
-      frag.appendChild(block);
-    }
-    this.experienceList.replaceChildren(frag);
-    this.syncExperienceHeaderCount(totalItems);
-    this.syncExperienceBackButton();
   }
 
   private openWriting(section: WritingSection, item: WritingItem): void {
