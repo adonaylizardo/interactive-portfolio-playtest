@@ -123,6 +123,7 @@ export class BuildingPanel {
   private experiencePanelTitle = '';
   private experienceTitleKey: 'panel.talks' | 'panel.writings' | null = null;
   private onExperienceDesktopExpand: (() => void) | null = null;
+  private onExperienceDetailBack: ((section: 'articulos' | 'charlas') => void) | null = null;
   private writingsFilter: 'all' | string = 'all';
   /** Writings “See all” — single-section list before reader detail. */
   private writingsSectionFocus: string | null = null;
@@ -552,7 +553,13 @@ export class BuildingPanel {
   private onExperienceBack(): void {
     if (!this.isExperienceMode()) return;
     if (this.experienceView === 'detail') {
-      this.setExperienceView('list');
+      const section: 'articulos' | 'charlas' = this.mode === 'talks' ? 'charlas' : 'articulos';
+      this.activeTalkId = null;
+      this.activeWriting = null;
+      if (this.experienceDetail) this.experienceDetail.replaceChildren();
+      this.experienceView = 'list';
+      this.onExperienceDetailBack?.(section);
+      this.hide({ snap: true, silent: true });
       return;
     }
     if (this.mode === 'writings' && this.writingsSectionFocus) {
@@ -607,6 +614,10 @@ export class BuildingPanel {
 
   setOnExperienceDesktopExpand(fn: () => void): void {
     this.onExperienceDesktopExpand = fn;
+  }
+
+  setOnExperienceDetailBack(fn: (section: 'articulos' | 'charlas') => void): void {
+    this.onExperienceDetailBack = fn;
   }
 
   /** Desktop Talks/Writings header expand control follows `data-layout` (split vs panel). */

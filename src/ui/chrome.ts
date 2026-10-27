@@ -520,8 +520,7 @@ export class ChromeUI {
       btn.addEventListener('click', () => this.callbacks.onReadingOpen?.());
     });
     this.root.querySelector('[data-action="panel-only"]')?.addEventListener('click', () => {
-      if (this.callbacks.onReadingOpen) this.callbacks.onReadingOpen();
-      else this.setLayout('panel');
+      this.setLayout('panel');
     });
     this.root.querySelector('[data-action="hide-panel"]')?.addEventListener('click', () => this.setLayout('map'));
     this.root.querySelector('[data-action="show-panel"]')?.addEventListener('click', () => this.setLayout('split'));
@@ -556,10 +555,13 @@ export class ChromeUI {
         setLang(this.lang);
       });
     });
-    this.root.querySelector('[data-action="lang-toggle"]')?.addEventListener('click', () => {
-      const next = getLang() === 'es' ? 'en' : 'es';
-      this.lang = next;
-      setLang(next);
+    this.root.querySelectorAll('[data-action="lang-toggle"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const next = getLang() === 'es' ? 'en' : 'es';
+        this.lang = next;
+        setLang(next);
+        this.applyI18n();
+      });
     });
     this.root.querySelectorAll('[data-locate]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -778,20 +780,42 @@ export class ChromeUI {
 
   scrollToAdonaySection(section: AdonaySection): void {
     if (section === 'intro') return;
-    const sel = chromeSectionSelector(section);
-    const target = this.root.querySelector(sel.split(',')[0].trim());
-    target?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    if (this.mobile && (section === 'articulos' || section === 'charlas' || section === 'casos' || section === 'logros')) {
-      const mobileSel =
-        section === 'articulos'
-          ? '#chrome-mobile-articulos'
-          : section === 'charlas'
-            ? '#chrome-mobile-charlas'
-            : section === 'casos'
-              ? '#chrome-mobile-casos'
-              : '#chrome-mobile-logros';
-      this.root.querySelector(mobileSel)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    if (this.mobile && this.mobileSheet) {
+      this.mobileSheetPanel =
+        section === 'articulos' || section === 'charlas' || section === 'casos' || section === 'logros'
+          ? section
+          : this.mobileSheetPanel;
+      this.setLayout('split');
+      this.expandMobileSheet(true, { full: true });
+    } else if (!this.mobile) {
+      this.setLayout('split');
     }
+    const mobileSel =
+      section === 'articulos'
+        ? '#chrome-mobile-articulos'
+        : section === 'charlas'
+          ? '#chrome-mobile-charlas'
+          : section === 'casos'
+            ? '#chrome-mobile-casos, #chrome-casos'
+            : section === 'logros'
+              ? '#chrome-mobile-logros, #chrome-logros'
+              : chromeSectionSelector(section).split(',')[0].trim();
+    const desktopSel = chromeSectionSelector(section).split(',')[0].trim();
+    const doScroll = () => {
+      const target = this.mobile
+        ? this.root.querySelector(mobileSel.split(',')[0].trim())
+        : this.root.querySelector(desktopSel);
+      const scrollHost = this.mobile
+        ? (this.root.querySelector('.chrome__intro') as HTMLElement | null)
+        : (this.root.querySelector('.chrome__column') as HTMLElement | null);
+      if (!target || !scrollHost) return;
+      const headerInset = this.mobile ? 12 : 77;
+      const hostRect = scrollHost.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const offset = targetRect.top - hostRect.top + scrollHost.scrollTop - headerInset;
+      scrollHost.scrollTo({ top: Math.max(0, offset), behavior: 'smooth' });
+    };
+    window.requestAnimationFrame(() => window.requestAnimationFrame(doScroll));
   }
 
   openAdonaySection(section: 'articulos' | 'charlas'): void {
@@ -827,13 +851,15 @@ export class ChromeUI {
     this.callbacks.onOpenAbout(opts);
   }
 
-  expandMobileSheet(expanded: boolean): void {
+  expandMobileSheet(expanded: boolean, opts?: { full?: boolean }): void {
     const intro = this.root.querySelector('.chrome__intro') as HTMLElement | null;
     const body = this.root.querySelector('[data-sheet-body]') as HTMLElement | null;
     const grab = this.root.querySelector('[data-intro-grab]') as HTMLElement | null;
     if (!intro) return;
     if (expanded) this.root.classList.add('chrome--intro-detail-seen');
     intro.classList.toggle('chrome__intro--expanded', expanded);
+    this.root.classList.toggle('chrome--intro-full', !!opts?.full && expanded);
+    if (!expanded) this.root.classList.remove('chrome--intro-full');
     if (body) body.classList.toggle('chrome__sheet-body--collapsed', !expanded);
     if (grab) grab.hidden = !expanded;
     this.sync();
@@ -893,30 +919,32 @@ export class ChromeUI {
 
   private bindMobileSheetGestures(): void {
     const intro = this.root.querySelector('.chrome__intro');
+    const grab = this.root.querySelector('[data-intro-grab]');
     if (!intro) return;
     let startY = 0;
-    intro.addEventListener(
-      'touchstart',
-      (e) => {
-        const te = e as TouchEvent;
-        startY = te.touches[0]?.clientY ?? 0;
-      },
-      { passive: true },
-    );
-    intro.addEventListener(
-      'touchend',
-      (e) => {
-        const te = e as TouchEvent;
-        const endY = te.changedTouches[0]?.clientY ?? startY;
-        const delta = endY - startY;
-        if (intro.classList.contains('chrome__intro--expanded')) {
-          if (delta > 48) this.expandMobileSheet(false);
+    const onTouchStart = (e: Event) => {
+      const te = e as TouchEvent;
+      startY = te.touches[0]?.clientY ?? 0;
+    };
+    const onTouchEnd = (e: Event) => {
+      const te = e as TouchEvent;
+      const endY = te.changedTouches[0]?.clientY ?? startY;
+      const delta = endY - startY;
+      const expanded = intro.classList.contains('chrome__intro--expanded');
+      if (expanded) {
+        if (delta > 48) {
+          this.expandMobileSheet(false);
           return;
         }
-        if (startY - endY > 48) this.expandMobileSheet(true);
-      },
-      { passive: true },
-    );
+        if (startY - endY > 36) this.expandMobileSheet(true, { full: true });
+        return;
+      }
+      if (startY - endY > 48) this.expandMobileSheet(true);
+    };
+    intro.addEventListener('touchstart', onTouchStart, { passive: true });
+    intro.addEventListener('touchend', onTouchEnd, { passive: true });
+    grab?.addEventListener('touchstart', onTouchStart, { passive: true });
+    grab?.addEventListener('touchend', onTouchEnd, { passive: true });
   }
 
   private openContact(): void {

@@ -123,8 +123,8 @@ function dockSheetTop(): number | null {
 export function positionPhoneOpenCard(root: HTMLElement): void {
   const inset = 16;
   const gap = 8;
-  const width = Math.min(247, window.innerWidth - 112 - inset);
-  const left = 112;
+  const width = 247;
+  const left = Math.max(inset, window.innerWidth - inset - width);
   const top = 16;
   const peekTop = peekSheetTop();
   const dockTop = dockSheetTop();

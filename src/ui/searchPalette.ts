@@ -11,7 +11,8 @@ import { getLang, onLangChange, t } from './i18n';
 
 export type SearchPaletteCallbacks = {
   onSelect: (result: SearchResult) => void;
-  onChip?: (kind: SearchResultKind) => void;
+  /** Return true to skip in-palette filtering (e.g. navigate to Adonay section). */
+  onChip?: (kind: SearchResultKind) => boolean | void;
   onOpenChange?: (open: boolean) => void;
 };
 
@@ -206,9 +207,13 @@ export class SearchPalette {
       btn.className = 'search-palette__chip';
       btn.innerHTML = `${iconSvg(KIND_ICON[chip.kind], 13)}<span>${chip.label}</span>`;
       btn.addEventListener('click', () => {
-        this.filterKind = chip.kind;
         this.input.value = '';
-        this.callbacks.onChip?.(chip.kind);
+        const handled = this.callbacks.onChip?.(chip.kind);
+        if (handled) {
+          this.syncView();
+          return;
+        }
+        this.filterKind = chip.kind;
         this.syncView();
       });
       this.chipsEl.append(btn);

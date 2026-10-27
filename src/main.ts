@@ -158,6 +158,21 @@ async function main(): Promise<void> {
   });
   searchPalette = new SearchPalette(uiRoot, {
     onSelect: (result) => routeSearchResult(result),
+    onChip: (kind) => {
+      if (kind === 'articles') {
+        searchPalette.close();
+        chrome.openAdonaySection('articulos');
+        syncMapOverlays();
+        return true;
+      }
+      if (kind === 'talks') {
+        searchPalette.close();
+        chrome.openAdonaySection('charlas');
+        syncMapOverlays();
+        return true;
+      }
+      return false;
+    },
     onOpenChange: () => syncMapOverlays(),
   });
 
@@ -400,6 +415,18 @@ async function main(): Promise<void> {
   panel.setOnExperienceDesktopExpand(() => {
     if (!isMobileLayout()) {
       chrome.setLayout(chrome.getLayout() === 'panel' ? 'split' : 'panel');
+    }
+  });
+  panel.setOnExperienceDetailBack((section) => {
+    chrome.openAdonaySection(section);
+    syncMapOverlays();
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || isMobileLayout()) return;
+    if (reading.isActive() || isReadingHash()) return;
+    if (searchPalette.isOpen()) return;
+    if (chrome.getLayout() === 'panel') {
+      chrome.setLayout('split');
     }
   });
   joystick.onStickStart(() => {
