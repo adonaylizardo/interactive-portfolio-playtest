@@ -10,7 +10,7 @@ export async function armExitTimer(page) {
   await page.evaluate(() => {
     const qa = window.__playtestQa;
     const t = {
-      down: 0,
+      down: performance.now(),
       left: 0,
       frames: 0,
       walked: false,

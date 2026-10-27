@@ -1417,9 +1417,13 @@ body:has(.building-panel--open) .chrome__lang {
   }
 
   body[data-chrome='desktop'] .checklist.checklist--collapsed .checklist__ring-btn {
-    position: relative;
+    position: absolute;
+    left: 50%;
+    top: 50%;
     width: 36px;
     height: 36px;
+    margin: 0;
+    transform: translate(-50%, -50%);
     background: rgba(255, 255, 255, 0.04);
     border-radius: 18px;
   }
@@ -3327,6 +3331,17 @@ body:has(.building-panel--open) .chrome__lang {
 
 .building-panel--preview.building-panel--open .building-panel__sheet {
   pointer-events: auto;
+}
+
+@media (min-width: 768px) {
+  #ui-root > .building-panel.building-panel--preview.building-panel--open .building-panel__sheet {
+    pointer-events: none;
+  }
+
+  #ui-root > .building-panel.building-panel--preview.building-panel--open .case-preview,
+  #ui-root > .building-panel.building-panel--preview.building-panel--open .case-preview * {
+    pointer-events: auto;
+  }
 }
 
 .building-panel--preview .building-panel__backdrop {

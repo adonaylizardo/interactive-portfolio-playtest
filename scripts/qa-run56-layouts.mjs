@@ -119,7 +119,17 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
       }
       if (map.canvasVis !== 'visible') errors.push(`${tag}: map hidden in map-only`);
 
-      await page.locator('.chrome__tab').click();
+      await page.waitForFunction(
+        () => {
+          const tab = document.querySelector('[data-action="show-panel"]');
+          if (!tab || getComputedStyle(tab).display === 'none') return false;
+          const r = tab.getBoundingClientRect();
+          return r.width > 8 && r.height > 8;
+        },
+        null,
+        { timeout: 15000 },
+      );
+      await page.locator('[data-action="show-panel"]').click({ timeout: 15000 });
       await wait(200);
       const back = await qa(page, () => window.__playtestQa.getLayout());
       if (back !== 'split') errors.push(`${tag}: tab did not restore split (got ${back})`);

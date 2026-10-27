@@ -43,6 +43,11 @@ export async function waitForBuildingPanelSettled(page) {
       const inInterior = window.__playtestQa?.isInInterior?.() === true;
       const panelOpen = window.__playtestQa?.isBuildingPanelOpen?.() === true;
       if (!panelOpen) return inInterior;
+      if (window.__playtestQa?.isCasePreview?.() === true) {
+        const sheet = document.querySelector('.building-panel--preview.building-panel--open .building-panel__sheet');
+        const r = sheet?.getBoundingClientRect();
+        return !!sheet && (r?.width ?? 0) > 80;
+      }
       const sheet = document.querySelector('.building-panel--open .building-panel__sheet');
       if (!sheet) return false;
       const phone = window.matchMedia('(max-width: 767px)').matches;

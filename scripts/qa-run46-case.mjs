@@ -130,7 +130,9 @@ export async function runRun46CaseSuite({ kind, base, errors, notes, shots }) {
     await page.waitForFunction(() => window.__playtestQa.isBuildingPanelOpen(), null, { timeout: 15000 });
     await wait(500);
 
-    if (spec.phone) {
+    const previewRead = page.locator('.case-preview__read, [data-read]').first();
+    const hasPreviewRead = await previewRead.isVisible().catch(() => false);
+    if (hasPreviewRead) {
       const peek = await readPanel(page);
       const previewTitle = await qa(page, () =>
         document.querySelector('.case-preview__title')?.textContent?.trim() ?? '',
@@ -138,12 +140,8 @@ export async function runRun46CaseSuite({ kind, base, errors, notes, shots }) {
       const headlineOk = peek.title === HEADLINE || previewTitle === 'Volaris';
       if (!headlineOk) errors.push(`${tag}: peek title is "${peek.title}" / preview "${previewTitle}"`);
       if (shots) await page.screenshot({ path: path.join(shots, `case-panel-${kind}-peek.png`) });
-      const read = page.locator('.case-preview__read, [data-read]').first();
-      if (await read.isVisible().catch(() => false)) {
-        await read.tap();
-      } else {
-        await page.locator('.building-panel__title').tap();
-      }
+      if (spec.phone) await previewRead.tap();
+      else await previewRead.click();
       await page
         .waitForFunction(
           () => {
@@ -154,6 +152,9 @@ export async function runRun46CaseSuite({ kind, base, errors, notes, shots }) {
           { timeout: 12000 },
         )
         .catch(() => {});
+      await wait(400);
+    } else if (spec.phone) {
+      await page.locator('.building-panel__title').tap();
       await wait(400);
     }
 

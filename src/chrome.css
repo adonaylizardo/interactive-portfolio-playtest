@@ -190,6 +190,13 @@
 .chrome--map .chrome__rail {
   background: #141518;
   border-right: 1px solid #2a2c31;
+  pointer-events: none;
+}
+
+.chrome--map .chrome__rail .ui-round,
+.chrome--map .chrome__rail .chrome__tools-stack,
+.chrome--map .chrome__rail .chrome__lang-toggle {
+  pointer-events: auto;
 }
 
 .chrome--map .chrome__rail .ui-round--avatar {
@@ -653,6 +660,7 @@ body[data-interior='1'] .chrome__column {
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 12;
 }
 
 .chrome__tools-phone,
@@ -1794,10 +1802,10 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
 
 .chrome--mobile.chrome--sheet.chrome--intro-expanded .chrome__sheet-grab span,
 .chrome--mobile.chrome--sheet.chrome--intro-full .chrome__sheet-grab span {
-  width: 100%;
-  max-width: 343px;
+  width: 36px;
+  max-width: 36px;
   height: 4px;
-  margin: 0;
+  margin: 0 auto;
 }
 
 .chrome--mobile.chrome--sheet.chrome--intro-expanded .chrome__title,
@@ -2560,8 +2568,8 @@ body[data-chrome='phone'] .chrome--sheet.chrome--intro-peek .chrome__phone-topba
   flex-shrink: 0;
 }
 
-/* 375px: keep “Adonay Lizardo” clear of the Details pill (Tom peek card). */
-@media (max-width: 375px) {
+/* Phone peek: compact Details pill through 430px so titleShort stays clear of the pill. */
+@media (max-width: 430px) {
   .chrome--sheet.chrome--intro-peek .chrome__card-row {
     gap: 8px;
     padding-left: 10px;
@@ -2574,6 +2582,7 @@ body[data-chrome='phone'] .chrome--sheet.chrome--intro-peek .chrome__phone-topba
 
   .chrome--sheet.chrome--intro-peek .chrome__see-details {
     min-width: 0;
+    min-height: 44px;
     padding: 0 10px;
     font-size: 14px;
   }
