@@ -161,6 +161,14 @@ function buildIndex(): SearchResult[] {
     }
   }
 
+  pushRow(out, {
+    kind: 'articles',
+    title: t('panel.writings'),
+    snippet: 'Biblioteca',
+    targetId: 'articles-section',
+    haystack: 'articles artículos articulos escritos writings biblioteca library',
+  });
+
   for (const talk of searchableTalkItems()) {
     const title = talkTitle(talk);
     pushRow(out, {

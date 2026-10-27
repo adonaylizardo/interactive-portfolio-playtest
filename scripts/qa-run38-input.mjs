@@ -200,7 +200,17 @@ async function testExitSalir(ctx, kind, base, errors) {
         continue;
       }
       await waitForBuildingPanelSettled(page);
-      await page.waitForSelector('.building-panel--open [data-exit]', { state: 'visible', timeout: 20000 });
+      const exitVisible = await page
+        .locator('.building-panel--open [data-exit]')
+        .first()
+        .isVisible()
+        .catch(() => false);
+      if (!exitVisible) {
+        // Desktop case peek preview hides Salir; mat/gap exit is covered in the single-tap suite.
+        if (await page.evaluate(() => window.__playtestQa?.isCasePreview?.() === true)) continue;
+        errors.push(`${tag}: Salir not visible and not a case preview`);
+        continue;
+      }
       await armExitTimer(page);
       const exit = page.locator('.building-panel [data-exit]').first();
       if (RUN38_KINDS[kind].touch) {

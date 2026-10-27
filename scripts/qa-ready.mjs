@@ -52,7 +52,9 @@ export async function waitForBuildingPanelSettled(page) {
       const ty = parts[5] ?? 0;
       const phone = window.matchMedia('(max-width: 767px)').matches;
       if (phone) {
-        // Bottom sheet: peek row or full height — both are valid once off the loading translate.
+        const panel = document.querySelector('.building-panel--open');
+        if (panel?.classList.contains('building-panel--peek')) return true;
+        // Bottom sheet: peek translate (~-11px) or full open (0) — not mid-slide.
         return Math.abs(ty) > 24 || Math.abs(ty) < 2;
       }
       return Math.abs(tx) < 2 && Math.abs(ty) < 2;

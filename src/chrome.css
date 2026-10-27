@@ -2515,3 +2515,22 @@ body[data-chrome='phone'] .chrome--sheet.chrome--intro-peek .chrome__phone-topba
   flex: 0 0 auto;
   flex-shrink: 0;
 }
+
+/* 375px: keep “Adonay Lizardo” clear of the Details pill (Tom peek card). */
+@media (max-width: 375px) {
+  .chrome--sheet.chrome--intro-peek .chrome__card-row {
+    gap: 8px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .chrome--sheet.chrome--intro-peek .chrome__card-id {
+    gap: 8px;
+  }
+
+  .chrome--sheet.chrome--intro-peek .chrome__see-details {
+    min-width: 0;
+    padding: 0 10px;
+    font-size: 14px;
+  }
+}

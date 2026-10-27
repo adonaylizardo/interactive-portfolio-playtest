@@ -90,8 +90,12 @@ async function main(): Promise<void> {
         break;
       case 'articles': {
         chrome.setInteriorOpen(false, { skipLayout: true });
-        chrome.openAdonaySection('articulos');
-        panel.openWritingDetail(result.targetId);
+        if (result.targetId === 'articles-section') {
+          chrome.openAdonaySection('articulos');
+        } else {
+          chrome.openAdonaySection('articulos');
+          panel.openWritingDetail(result.targetId);
+        }
         syncMapOverlays();
         break;
       }
