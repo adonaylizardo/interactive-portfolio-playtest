@@ -234,7 +234,12 @@ async function readPanel(page) {
     const titleEl = document.querySelector('.building-panel__title');
     const previewTitle = document.querySelector('.case-preview__title');
     const article = document.querySelector('.case');
-    const lines = [...(article?.querySelectorAll('h3, p.case__text, li, .case__closing em') ?? [])]
+    const isPhone = window.matchMedia('(max-width: 767px)').matches;
+    const versionRoot = isPhone
+      ? document.querySelector('.case__version--short')
+      : document.querySelector('.case__version--full');
+    const lineRoot = versionRoot && shown(versionRoot) ? versionRoot : article;
+    const lines = [...(lineRoot?.querySelectorAll('h3, p.case__text, li, .case__closing em') ?? [])]
       .filter(shown)
       .map((el) => [el.tagName.toLowerCase(), el.textContent.replace(/\s+/g, ' ').trim()]);
     const title =
@@ -252,7 +257,9 @@ async function readPanel(page) {
       key: document.querySelector('.building-panel')?.dataset.panelKey ?? '',
       placeholders: [...document.querySelectorAll('[data-placeholder]')].filter(shown).length,
       closingStyle: (() => {
-        const em = [...(article?.querySelectorAll('.case__closing em') ?? [])].find(shown);
+        const em = [...(lineRoot?.querySelectorAll('.case__closing em') ?? article?.querySelectorAll('.case__closing em') ?? [])].find(
+          shown,
+        );
         return em ? getComputedStyle(em).fontStyle : '';
       })(),
       sheet: sheet
