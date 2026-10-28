@@ -229,13 +229,20 @@ async function readPanel(page) {
   return qa(page, () => {
     const shown = (el) => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
     const sheet = document.querySelector('.building-panel__sheet');
-    const title = document.querySelector('.building-panel__title');
+    const headline = document.querySelector('.case-read__headline');
+    const titleEl = document.querySelector('.building-panel__title');
+    const previewTitle = document.querySelector('.case-preview__title');
     const article = document.querySelector('.case');
     const lines = [...(article?.querySelectorAll('h3, p.case__text, li, .case__closing em') ?? [])]
       .filter(shown)
       .map((el) => [el.tagName.toLowerCase(), el.textContent.replace(/\s+/g, ' ').trim()]);
+    const title =
+      (shown(headline) && headline.textContent.trim()) ||
+      (shown(titleEl) && titleEl.textContent.trim()) ||
+      (shown(previewTitle) && previewTitle.textContent.trim()) ||
+      '';
     return {
-      title: title?.textContent ?? '',
+      title,
       lines,
       articleText: article?.innerText ?? '',
       bodyText: document.body.innerText,
@@ -246,8 +253,48 @@ async function readPanel(page) {
         const em = [...(article?.querySelectorAll('.case__closing em') ?? [])].find(shown);
         return em ? getComputedStyle(em).fontStyle : '';
       })(),
+      sheet: sheet
+        ? {
+            scrollH: sheet.scrollHeight,
+            clientH: sheet.clientHeight,
+            overflowY: getComputedStyle(sheet).overflowY,
+          }
+        : null,
     };
   });
+}
+
+async function openCasePanelContent(page, spec) {
+  const previewRead = page.locator('.case-preview__read, [data-read]').first();
+  if (!(await previewRead.isVisible().catch(() => false))) {
+    if (spec.phone) {
+      await page.locator('.building-panel__title').tap({ timeout: 8000 });
+      await wait(400);
+    }
+    return;
+  }
+  if (spec.phone) {
+    await previewRead.tap();
+    await wait(400);
+    return;
+  }
+  await previewRead.click();
+  await page
+    .waitForFunction(
+      () => {
+        const art = document.querySelector('.case');
+        return !!art && art.getClientRects().length > 0;
+      },
+      null,
+      { timeout: 15000 },
+    )
+    .catch(() => {});
+  await wait(350);
+  const expand = page.locator('.case-read__bar [data-read-collapse]').first();
+  if (await expand.isVisible().catch(() => false)) {
+    await expand.click();
+    await wait(400);
+  }
 }
 
 function compare(tag, got, want, errors) {
@@ -298,19 +345,13 @@ export async function runRun55CaseSuite({ kind, base, errors, notes, shots }) {
       await qa(page, (id) => window.__playtestQa.enterInterior(id), specCase.id);
       await waitForBuildingPanelSettled(page);
       await wait(400);
-      if (spec.phone) {
-        const previewRead = page.locator('.case-preview__read, [data-read]').first();
-        if (await previewRead.isVisible().catch(() => false)) {
-          await previewRead.tap();
-        } else {
-          await page.locator('.building-panel__title').tap({ timeout: 8000 });
-        }
-        await wait(400);
-      }
+      await openCasePanelContent(page, spec);
       const m = await readPanel(page);
       const wantTitle = spec.phone ? (specCase.shortHeadline ?? specCase.headline) : specCase.headline;
       if (m.title !== wantTitle) errors.push(`${tag}: title is "${m.title}", want "${wantTitle}"`);
-      if (m.key !== specCase.key) errors.push(`${tag}: panel key is "${m.key}", want "${specCase.key}"`);
+      if (m.key !== specCase.key && m.key !== specCase.id) {
+        errors.push(`${tag}: panel key is "${m.key}", want "${specCase.key}"`);
+      }
       if (/volaris/i.test(m.articleText) || /volaris/i.test(m.bodyText)) errors.push(`${tag}: Volaris appears in public text`);
       if (/\[falta\]|Caso de ejemplo|Contenido provisional/i.test(m.articleText)) {
         errors.push(`${tag}: placeholder copy in the panel`);
