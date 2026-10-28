@@ -11,6 +11,8 @@ import { ciContextOptions } from './qa-ci.mjs';
 import { armExitTimer, readExitTimer, exitIsImmediate, describeExit } from './qa-exit-timer.mjs';
 
 const ROOMS = (process.env.R38_ROOMS ? process.env.R38_ROOMS.split(',') : ['estudio', 'volaris', 'bain', 'mentoria', 'finoa', 'pg', 'sambil', 'catedral', 'flor']);
+/** Desktop enters these interiors with chrome Artículos/Charlas, not a Salir building sheet (since r24). */
+const DESKTOP_CHROME_INTERIOR = new Set(['teresa', 'biblioteca']);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export const RUN38_KINDS = {
@@ -150,8 +152,16 @@ async function standFarFromExit(page, kind, errors, tag) {
   return { layout, far };
 }
 
-async function assertReenter(page, name, tag, errors) {
+async function assertReenter(page, name, tag, errors, kind) {
   await page.evaluate((n) => window.__playtestQa.enterInterior(n), name);
+  if (kind === 'chromium-desktop' && DESKTOP_CHROME_INTERIOR.has(name)) {
+    try {
+      await page.waitForFunction(() => window.__playtestQa.isInInterior() === true, null, { timeout: 8000 });
+    } catch {
+      errors.push(`${tag}: re-enter did not load ${name} interior (desktop chrome column, no Salir sheet)`);
+    }
+    return;
+  }
   try {
     await page.waitForFunction(
       () => window.__playtestQa.isInInterior() === true && window.__playtestQa.isBuildingPanelOpen() === true,
@@ -194,7 +204,7 @@ async function testExitSingleTap(ctx, kind, base, errors) {
         } else if (!exitIsImmediate(r)) {
           errors.push(`${tag}: exit was not immediate (${describeExit(r)}, want ≤150 ms or ≤6 frames)`);
         } else {
-          await assertReenter(page, name, tag, errors);
+          await assertReenter(page, name, tag, errors, kind);
         }
       }
     }
@@ -225,7 +235,7 @@ async function testExitSalir(ctx, kind, base, errors) {
           errors.push(`${tag}: preview × did not return map input`);
         } else {
           await ensureOnMap(page);
-          await assertReenter(page, name, `${tag}-preview-x`, errors);
+          await assertReenter(page, name, `${tag}-preview-x`, errors, kind);
         }
         await enterRoomOnPage(page, name);
         await page.keyboard.press('Escape');
@@ -234,8 +244,11 @@ async function testExitSalir(ctx, kind, base, errors) {
           errors.push(`${tag}: preview Esc did not return map input`);
         } else {
           await ensureOnMap(page);
-          await assertReenter(page, name, `${tag}-preview-esc`, errors);
+          await assertReenter(page, name, `${tag}-preview-esc`, errors, kind);
         }
+        continue;
+      }
+      if (kind === 'chromium-desktop' && DESKTOP_CHROME_INTERIOR.has(name)) {
         continue;
       }
       const exitVisible = await page
@@ -272,7 +285,7 @@ async function testExitSalir(ctx, kind, base, errors) {
       } else if (!exitIsImmediate(r)) {
         errors.push(`${tag}: Salir was not immediate (${describeExit(r)}, want ≤150 ms or ≤6 frames)`);
       } else {
-        await assertReenter(page, name, tag, errors);
+        await assertReenter(page, name, tag, errors, kind);
       }
     }
   } finally {

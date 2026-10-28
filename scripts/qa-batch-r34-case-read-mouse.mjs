@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * r34: desktop case read — wheel, Expandir → 660 column, × closes (ES + EN).
+ * r34/r35: desktop case read — wheel to closing, text click does not hit map,
+ * Expandir → 660 column @ ~422, × closes (ES + EN).
  * Usage: node scripts/qa-batch-r34-case-read-mouse.mjs [baseUrl]
  */
 import { spawn } from 'node:child_process';
@@ -16,6 +17,7 @@ const BASE =
   process.env.QA_BASE_URL ??
   `http://127.0.0.1:${PORT}/interactive-portfolio-playtest/`;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const near = (a, b, tol = 12) => Math.abs(a - b) <= tol;
 
 async function ensurePreview() {
   if (process.env.QA_BASE_URL) return;
@@ -55,38 +57,91 @@ async function runViewport(width, lang) {
     const sheet = page.locator('.building-panel--preview.building-panel--open .building-panel__sheet').first();
     await sheet.waitFor({ state: 'visible', timeout: 10000 });
     const before = await sheet.evaluate((el) => el.scrollTop);
+    const metrics = await sheet.evaluate((el) => ({
+      scrollH: el.scrollHeight,
+      clientH: el.clientHeight,
+    }));
     const box = await sheet.boundingBox();
     if (!box) throw new Error('no sheet box');
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await page.mouse.wheel(0, 800);
-    await wait(200);
-    const afterWheel = await sheet.evaluate((el) => el.scrollTop);
-    if (afterWheel <= before) {
-      await page.evaluate(() => {
-        const closing = document.querySelector('.case__closing');
-        closing?.scrollIntoView({ block: 'end' });
+    await page.mouse.move(box.x + box.width / 2, box.y + Math.min(box.height * 0.55, box.height - 40));
+    for (let i = 0; i < 24 && metrics.scrollH > metrics.clientH + 8; i++) {
+      await page.mouse.wheel(0, 500);
+      await wait(80);
+      const closingInView = await page.evaluate(() => {
+        const el = document.querySelector('.case__closing');
+        if (!el) return false;
+        const r = el.getBoundingClientRect();
+        const s = document.querySelector('.building-panel--preview.building-panel--open .building-panel__sheet');
+        if (!s) return false;
+        const sr = s.getBoundingClientRect();
+        return r.top >= sr.top && r.bottom <= sr.bottom + 2;
       });
-      await wait(100);
+      if (closingInView) break;
     }
-    const afterWheel2 = await sheet.evaluate((el) => el.scrollTop);
-    if (afterWheel2 <= before && afterWheel <= before) {
-      out.errors.push(`wheel: scrollTop ${before} -> ${afterWheel2}`);
-    }
-
-    const closingVisible = await page.evaluate(() => {
+    const afterWheel = await sheet.evaluate((el) => el.scrollTop);
+    const closingInView = await page.evaluate(() => {
       const el = document.querySelector('.case__closing');
       if (!el) return false;
       const r = el.getBoundingClientRect();
-      return r.height > 0 && getComputedStyle(el).display !== 'none';
+      const s = document.querySelector('.building-panel--preview.building-panel--open .building-panel__sheet');
+      if (!s) return false;
+      const sr = s.getBoundingClientRect();
+      return r.height > 0 && r.top >= sr.top - 2 && r.bottom <= sr.bottom + 4;
     });
-    if (!closingVisible) out.errors.push('wheel: closing line not in DOM before expand');
+    if (!closingInView) {
+      out.errors.push(
+        `wheel: closing not in view (scrollTop ${before}→${afterWheel}, sheet ${metrics.clientH}/${metrics.scrollH})`,
+      );
+    }
+
+    const mapBeforeClick = await page.evaluate(() => ({
+      zoom: window.__playtestQa?.getZoom?.() ?? null,
+      goal: document.getElementById('game-canvas')?.dataset.walkGoal ?? '',
+    }));
+    const textEl = page.locator('.case__text, .case-read__lede').first();
+    const tb = await textEl.boundingBox();
+    if (!tb) out.errors.push('click: no case text box');
+    else {
+      await page.mouse.click(tb.x + Math.min(40, tb.width / 2), tb.y + Math.min(20, tb.height / 2));
+      await wait(200);
+      const mapAfterClick = await page.evaluate(() => ({
+        zoom: window.__playtestQa?.getZoom?.() ?? null,
+        goal: document.getElementById('game-canvas')?.dataset.walkGoal ?? '',
+        hit: (() => {
+          const r = document.querySelector('.case__text, .case-read__lede')?.getBoundingClientRect();
+          if (!r) return '';
+          const el = document.elementFromPoint(r.left + 20, r.top + 10);
+          return el?.id ?? el?.tagName ?? '';
+        })(),
+      }));
+      if (mapAfterClick.goal && mapAfterClick.goal !== mapBeforeClick.goal) {
+        out.errors.push(`click: walk goal changed to ${mapAfterClick.goal}`);
+      }
+      if (mapAfterClick.hit === 'game-canvas' || mapAfterClick.hit === 'CANVAS') {
+        out.errors.push('click: elementFromPoint on case text hit the canvas (map ate the click)');
+      }
+    }
 
     const expandBtn = page.locator('.case-read__bar [data-read-collapse]').first();
     await expandBtn.waitFor({ state: 'visible', timeout: 10000 });
     await expandBtn.click();
-    await wait(300);
+    await wait(400);
     const column = await page.evaluate(() => document.querySelector('.building-panel--expanded') !== null);
-    if (!column) out.errors.push('expand: did not open 660 expanded column');
+    if (!column) out.errors.push('expand: did not open expanded column');
+    else {
+      const panel = await page.evaluate(() => {
+        const wrap = document.querySelector('.building-panel--expanded .building-panel__body-wrap');
+        const r = wrap?.getBoundingClientRect();
+        return r ? { w: r.width, x: r.x } : null;
+      });
+      if (!panel) out.errors.push('expand: no expanded body-wrap rect');
+      else {
+        if (!near(panel.w, 660)) out.errors.push(`expand: column width ${Math.round(panel.w)}px (want ~660)`);
+        if (width >= 1440 && !near(panel.x, 422)) {
+          out.errors.push(`expand: column @ x${Math.round(panel.x)} (want ~422 at ${width}px)`);
+        }
+      }
+    }
 
     const closeBtn = page.locator('.case-read__x').first();
     await closeBtn.waitFor({ state: 'visible', timeout: 10000 });
@@ -101,7 +156,7 @@ async function runViewport(width, lang) {
 
     out.ok = out.errors.length === 0;
     out.scrollBefore = before;
-    out.scrollAfter = afterWheel2 ?? afterWheel;
+    out.scrollAfter = afterWheel;
   } finally {
     await browser.close();
   }

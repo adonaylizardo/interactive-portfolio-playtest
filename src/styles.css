@@ -3336,22 +3336,22 @@ body:has(.building-panel--open) .chrome__lang {
 }
 
 @media (min-width: 768px) {
-  #ui-root > .building-panel.building-panel--preview.building-panel--open:not(.building-panel--expanded)
+  /* Peek card only: pass wheel/clicks through the sheet except on the preview card itself. */
+  #ui-root > .building-panel.building-panel--preview.building-panel--peek.building-panel--open:not(
+      .building-panel--expanded
+    )
     .building-panel__sheet {
     pointer-events: none;
   }
 
-  #ui-root > .building-panel.building-panel--preview.building-panel--open:not(.building-panel--expanded) .case-preview,
-  #ui-root > .building-panel.building-panel--preview.building-panel--open:not(.building-panel--expanded)
+  #ui-root > .building-panel.building-panel--preview.building-panel--peek.building-panel--open:not(
+      .building-panel--expanded
+    )
+    .case-preview,
+  #ui-root > .building-panel.building-panel--preview.building-panel--peek.building-panel--open:not(
+      .building-panel--expanded
+    )
     .case-preview
-    *,
-  #ui-root > .building-panel.building-panel--preview.building-panel--open:not(.building-panel--expanded) .case-read,
-  #ui-root > .building-panel.building-panel--preview.building-panel--open:not(.building-panel--expanded)
-    .case-read
-    *,
-  #ui-root > .building-panel.building-panel--preview.building-panel--open:not(.building-panel--expanded) .case-read__bar,
-  #ui-root > .building-panel.building-panel--preview.building-panel--open:not(.building-panel--expanded)
-    .case-read__bar
     * {
     pointer-events: auto;
   }
@@ -3815,8 +3815,8 @@ body:has(.building-panel--open) .chrome__lang {
     right: max(16px, env(safe-area-inset-right)) !important;
     bottom: max(16px, env(safe-area-inset-bottom)) !important;
     top: auto !important;
-    width: min(360px, calc(100vw - 96px)) !important;
-    max-width: min(360px, calc(100vw - 96px)) !important;
+    width: min(408px, calc(100vw - 96px)) !important;
+    max-width: min(408px, calc(100vw - 96px)) !important;
   }
 
   body:has(.building-panel--preview.building-panel--expanded) #game-canvas {
@@ -3877,7 +3877,7 @@ body:has(.building-panel--open) .chrome__lang {
   }
 
   .case-read__page {
-    width: 720px;
+    width: 660px;
     max-width: calc(100% - 48px);
     margin: 0 auto;
     gap: 40px;
@@ -3903,7 +3903,7 @@ body:has(.building-panel--open) .chrome__lang {
   }
 
   .building-panel--preview.building-panel--expanded .building-panel__body-wrap {
-    width: 720px;
+    width: 660px;
     max-width: calc(100% - 48px);
     margin: 0 auto;
     padding: 40px 0 96px;

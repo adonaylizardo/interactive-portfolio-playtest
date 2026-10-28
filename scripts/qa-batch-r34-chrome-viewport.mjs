@@ -55,10 +55,10 @@ async function ensurePreview() {
 
 export async function runR34ChromeViewport({ base = BASE, errors = [] } = {}) {
   console.log('run34-chrome-viewport: starting');
-  const browser = await launchBrowser(chromium);
-  try {
-    for (const [w, h] of VIEWPORTS) {
-      console.log(`run34-chrome-viewport: ${w}x${h}`);
+  for (const [w, h] of VIEWPORTS) {
+    console.log(`run34-chrome-viewport: ${w}x${h}`);
+    const browser = await launchBrowser(chromium);
+    try {
       const page = await browser.newPage({ viewport: { width: w, height: h } });
       await page.goto(base, { waitUntil: 'load' });
       await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded === true, null, { timeout: 45000 });
@@ -92,10 +92,11 @@ export async function runR34ChromeViewport({ base = BASE, errors = [] } = {}) {
         );
       }
       await page.close();
+    } finally {
+      await browser.close();
     }
-  } finally {
-    await browser.close();
   }
+  console.log('run34-chrome-viewport: done');
   return errors;
 }
 

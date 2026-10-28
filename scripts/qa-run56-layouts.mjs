@@ -343,6 +343,7 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
       }
 
       await qa(page, () => window.__playtestQa.setViewMode('cenital'));
+      console.log(`${tag}: cenital set (phone map)`);
       await wait(200);
       const view = await qa(page, () => document.getElementById('game-canvas').dataset.viewMode);
       if (view !== 'cenital') errors.push(`${tag}: setViewMode cenital left view ${view}`);

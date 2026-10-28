@@ -470,7 +470,7 @@ export async function runRun42FollowSuite({ kind, base, errors, notes, only, vid
         await wait(400);
         // Phone spawn framing is tight on the Estudio door; zoom out so a street route is tappable.
         if (spec.touch) {
-          await qa(page, () => window.__playtestQa.setZoom(QA_CI ? 0.34 : 0.38));
+          await qa(page, (ci) => window.__playtestQa.setZoom(ci ? 0.34 : 0.38), QA_CI);
           await wait(250);
         }
         if (!spec.touch) await page.mouse.move(5, 400);

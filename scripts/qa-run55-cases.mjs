@@ -299,7 +299,12 @@ export async function runRun55CaseSuite({ kind, base, errors, notes, shots }) {
       await waitForBuildingPanelSettled(page);
       await wait(400);
       if (spec.phone) {
-        await page.locator('.building-panel__title').tap();
+        const previewRead = page.locator('.case-preview__read, [data-read]').first();
+        if (await previewRead.isVisible().catch(() => false)) {
+          await previewRead.tap();
+        } else {
+          await page.locator('.building-panel__title').tap({ timeout: 8000 });
+        }
         await wait(400);
       }
       const m = await readPanel(page);
@@ -346,7 +351,12 @@ export async function runRun55CaseSuite({ kind, base, errors, notes, shots }) {
       await waitForBuildingPanelSettled(page);
       await wait(300);
       if (spec.phone) {
-        await page.locator('.building-panel__title').tap();
+        const previewRead = page.locator('.case-preview__read, [data-read]').first();
+        if (await previewRead.isVisible().catch(() => false)) {
+          await previewRead.tap();
+        } else {
+          await page.locator('.building-panel__title').tap({ timeout: 8000 });
+        }
         await wait(300);
       }
       const m = await readPanel(page);
