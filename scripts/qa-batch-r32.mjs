@@ -152,6 +152,51 @@ async function main() {
         }
       }
 
+      if (!en) {
+        await page.locator('.chrome__tools-phone [data-action="search"]').tap();
+        await wait(450);
+        const chipFit = await page.evaluate(() => {
+          const chip = [...document.querySelectorAll('.search-palette__chip')].find((c) =>
+            (c.textContent ?? '').includes('Lugares'),
+          );
+          const label = chip?.querySelector('span') ?? chip;
+          const cs = label ? getComputedStyle(label) : null;
+          return {
+            text: label?.textContent?.trim(),
+            scrollW: label?.scrollWidth ?? 0,
+            clientW: label?.clientWidth ?? 0,
+            chipH: chip?.getBoundingClientRect().height ?? 0,
+            nowrap: cs?.whiteSpace,
+            ellipsis: cs?.textOverflow,
+          };
+        });
+        metrics[`copy_chip_${w}`] = chipFit;
+        if (chipFit.text !== 'Lugares') errors.push(`${tag} landmarks chip text ${chipFit.text}`);
+        if (chipFit.scrollW > chipFit.clientW + 1) errors.push(`${tag} Lugares chip trunc ${chipFit.scrollW}>${chipFit.clientW}`);
+        await page.keyboard.press('Escape');
+        await wait(200);
+        await page.evaluate(() => document.querySelector('.checklist__ring-hit')?.click());
+        await wait(350);
+        const walkFit = await page.evaluate(() => {
+          const detail = document.querySelector('.checklist__item--active .checklist__item-detail');
+          const want = 'Toca el suelo para ir allí. Doble toque para correr.';
+          const cs = detail ? getComputedStyle(detail) : null;
+          return {
+            text: detail?.textContent?.trim(),
+            scrollW: detail?.scrollWidth ?? 0,
+            clientW: detail?.clientWidth ?? 0,
+            lineCount: detail ? Math.round(detail.getBoundingClientRect().height / (parseFloat(cs?.lineHeight || '16') || 16)) : 0,
+            clamp: cs?.webkitLineClamp,
+          };
+        });
+        metrics[`copy_walk_${w}`] = walkFit;
+        const wantWalk = 'Toca el suelo para ir allí. Doble toque para correr.';
+        if (walkFit.text !== wantWalk) errors.push(`${tag} walk touch copy mismatch`);
+        if (walkFit.scrollW > walkFit.clientW + 1) errors.push(`${tag} walk detail trunc ${walkFit.scrollW}>${walkFit.clientW}`);
+        await page.evaluate(() => document.querySelector('.checklist.checklist--phone-open .checklist__ring-hit')?.click());
+        await wait(250);
+      }
+
       await page.locator('.chrome__tools-phone [data-action="search"]').tap();
       await wait(450);
       await page.locator('.search-palette__input').fill('a');

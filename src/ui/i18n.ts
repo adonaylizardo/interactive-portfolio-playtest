@@ -297,7 +297,7 @@ const DICT = {
     'check.label': 'Primeros pasos',
     'check.walkAround': 'Camina por el mundo',
     'check.walkAround.desk': 'Haz clic en un tile para ir allí. Doble clic o Shift para correr.',
-    'check.walkAround.touch': 'Toca un tile para ir allí. Doble toque en un tile para correr.',
+    'check.walkAround.touch': 'Toca el suelo para ir allí. Doble toque para correr.',
     'check.walkKeys': 'Camina con las teclas',
     'check.walkKeys.desk':
       'Usa WASD o las flechas para mover al personaje. Camina hacia una puerta (o pulsa Enter junto a ella) para entrar.',
@@ -493,7 +493,7 @@ const DICT = {
     'search.group.articles': 'Artículos',
     'search.group.talks': 'Charlas',
     'search.group.achievements': 'Logros',
-    'search.group.landmarks': 'Landmarks',
+    'search.group.landmarks': 'Lugares',
     'search.group.contact': 'Contacto',
     'search.group.about': 'About',
 
