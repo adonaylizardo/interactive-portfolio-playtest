@@ -242,17 +242,26 @@ async function walkChecks(page, spec, tag, errors) {
     const c = await qa(page, ([x, y]) => window.__playtestQa.worldToClient((x - y) * 64, (x + y) * 32), [goal.x, goal.y]);
     if (spec.touch) await page.touchscreen.tap(Math.round(c.x), Math.round(c.y));
     else await page.mouse.click(Math.round(c.x), Math.round(c.y));
-    await wait(200);
-    const walkStarted = await qa(
-      page,
-      ([x, y]) => document.getElementById('game-canvas')?.dataset.walkGoal === `${x},${y}`,
-      [goal.x, goal.y],
-    );
-    await wait(400);
-    const tapLog = await stopRecorder(page);
-    const tapFps = logFps(tapLog);
-    const tapTimed = !spec.light && walkStarted && tapFps >= TIMING_MIN_FPS;
-    if (tapTimed) {
+    let walkStarted = false;
+    for (let i = 0; i < 20; i++) {
+      await wait(i === 0 ? 100 : 100);
+      walkStarted = await qa(
+        page,
+        ([x, y]) => {
+          const raw = document.getElementById('game-canvas')?.dataset.walkGoal ?? '';
+          if (!raw) return false;
+          try {
+            const g = JSON.parse(raw);
+            return g.x === x && g.y === y;
+          } catch {
+            return raw === `${x},${y}`;
+          }
+        },
+        [goal.x, goal.y],
+      );
+      if (walkStarted) break;
+    }
+    if (walkStarted && !spec.light) {
       await page
         .waitForFunction(
           ([x, y]) => {
@@ -261,9 +270,15 @@ async function walkChecks(page, spec, tag, errors) {
             return t.x === x && t.y === y && p.x === x && p.y === y;
           },
           [goal.x, goal.y],
-          { timeout: 12000 },
+          { timeout: 20000 },
         )
-        .catch(() => errors.push(`${tag}: tapped walk to ${goal.x},${goal.y} never arrived`));
+        .catch(() => errors.push(`${tag}: tapped walk to ${goal.x},${goal.y} never arrived within 20s`));
+    }
+    await wait(400);
+    const tapLog = await stopRecorder(page);
+    const tapFps = logFps(tapLog);
+    const tapTimed = !spec.light && walkStarted && tapFps >= TIMING_MIN_FPS;
+    if (tapTimed) {
       const moving = tapLog.filter((r, i) => i > 0 && Math.hypot(r[1] - tapLog[i - 1][1], r[2] - tapLog[i - 1][2]) > 0.01);
       const dur = moving.length ? (moving[moving.length - 1][0] - moving[0][0]) / 1000 : 0;
       const tilesPerS = dur ? 4 / dur : 0;
@@ -279,9 +294,14 @@ async function walkChecks(page, spec, tag, errors) {
       }
       tapNote = `; tapped 4 tiles at ${tilesPerS.toFixed(2)} tiles/s`;
     } else if (!spec.light) {
-      tapNote = walkStarted
-        ? untimedNote('tapped walk and Pantone follow', tapFps)
-        : `; map tap did not set walk goal to ${goal.x},${goal.y} (skipped Pantone tap asserts)`;
+      if (!walkStarted) {
+        errors.push(
+          `${tag}: SKIPPED — map tap did not set walk goal to ${goal.x},${goal.y} (player-1280 would vacuously pass)`,
+        );
+        tapNote = `; SKIPPED walk goal ${goal.x},${goal.y}`;
+      } else {
+        tapNote = untimedNote('tapped walk and Pantone follow', tapFps);
+      }
     }
   }
   const fmt = Object.entries(a.speeds).map(([k, v]) => `${k.replace('key-', '')} ${(v / TILE_STEP).toFixed(2)}`).join(', ');

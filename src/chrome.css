@@ -493,8 +493,15 @@ body[data-interior='1'] .chrome__column {
     white-space: normal;
     overflow: visible;
     text-overflow: unset;
-    display: block;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
     line-height: 18px;
+  }
+
+  .chrome--mobile .chrome__section--content .experience__row-meta-date {
+    white-space: nowrap;
   }
 
   .chrome--mobile .chrome__exp-role {
@@ -1821,9 +1828,9 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
   z-index: 6;
   flex-shrink: 0;
   margin: 0 -16px;
-  padding: 0 16px 8px;
+  padding: env(safe-area-inset-top, 0px) 16px 8px;
   box-sizing: border-box;
-  min-height: 76px;
+  min-height: calc(76px + env(safe-area-inset-top, 0px));
   background: #141518;
   box-shadow: 0 1px 0 #141518;
 }
@@ -1900,7 +1907,7 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
   height: 44px;
 }
 
-.chrome--mobile.chrome--sheet .chrome__ctas .ui-btn::before {
+.chrome--mobile.chrome--sheet .chrome__ctas .ui-btn:not([data-action='reading'])::before {
   content: '';
   position: absolute;
   inset: -2px 0;

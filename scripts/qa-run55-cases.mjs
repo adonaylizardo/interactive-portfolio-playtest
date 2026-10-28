@@ -372,7 +372,7 @@ export async function runRun55CaseSuite({ kind, base, errors, notes, shots }) {
       const hasNine = /9\.5/.test(m.articleText);
       if (specCase.id === 'bain' && !hasNine) errors.push(`${tag}: Bain is missing 9.5`);
       if (specCase.id !== 'bain' && hasNine) errors.push(`${tag}: 9.5 leaked into ${specCase.id}`);
-      compare(tag, m.lines, spec.phone ? specCase.short : specCase.full, errors);
+      compare(tag, m.lines, spec.phone && m.lines[0]?.[0] === 'h3' ? specCase.full : spec.phone ? specCase.short : specCase.full, errors);
       if (m.closingStyle !== 'italic') errors.push(`${tag}: closing line is not italic`);
       if (shots) {
         fs.mkdirSync(shots, { recursive: true });

@@ -1,7 +1,8 @@
-import { ABOUT, type AboutBlock } from './about';
+import { aboutForLang, type AboutBlock } from './about';
 import {
-  CASE_CARD_TITLES,
   CASE_HOUSE_IDS,
+  CASES,
+  caseCardTitle,
   caseForLang,
   type CaseHouseId,
 } from './cases';
@@ -143,12 +144,16 @@ function buildIndex(lang: Lang): SearchResult[] {
 
   for (const id of CASE_HOUSE_IDS) {
     const localized = caseForLang(id, lang);
-    const title = localized?.headline ?? CASE_CARD_TITLES[id];
+    const title = caseCardTitle(id, lang);
     const text = caseText(id, lang);
+    const snippet =
+      lang === 'en'
+        ? (CASES[id]?.subtitle ?? title)
+        : (localized?.subtitle ?? title);
     pushRow(out, {
       kind: 'cases',
       title,
-      snippet: localized?.subtitle ?? title,
+      snippet,
       targetId: id,
       haystack: `${title} ${text}`,
     });
@@ -250,7 +255,7 @@ function buildIndex(lang: Lang): SearchResult[] {
     });
   };
 
-  for (const block of ABOUT) {
+  for (const block of aboutForLang(lang)) {
     if (block.kind === 'heading') {
       flushAbout();
       sectionTitle = block.text;
@@ -268,7 +273,7 @@ function buildIndex(lang: Lang): SearchResult[] {
     title: lang === 'es' ? t('panel.aboutMe') : 'About me',
     snippet: 'Adonay Lizardo',
     targetId: 'about',
-    haystack: ABOUT.map(aboutBlockPlain).join(' '),
+    haystack: aboutForLang(lang).map(aboutBlockPlain).join(' '),
   });
 
   return out;
