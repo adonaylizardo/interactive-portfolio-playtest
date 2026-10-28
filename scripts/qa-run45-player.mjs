@@ -225,9 +225,24 @@ async function walkChecks(page, spec, tag, errors) {
   await wait(300);
   const goal = await qa(page, (f) => {
     const q = window.__playtestQa;
-    for (const [dx, dy] of [[4, 0], [-4, 0], [0, 4], [0, -4]]) {
-      const p = q.findPath(f.x, f.y, f.x + dx, f.y + dy);
-      if (p && p.length === 4) return { x: f.x + dx, y: f.y + dy };
+    const dirs = [
+      [4, 0],
+      [-4, 0],
+      [0, 4],
+      [0, -4],
+      [4, 4],
+      [-4, -4],
+      [4, -4],
+      [-4, 4],
+    ];
+    for (const [dx, dy] of dirs) {
+      const gx = f.x + dx;
+      const gy = f.y + dy;
+      const p = q.findPath(f.x, f.y, gx, gy);
+      if (!p || p.length !== 4) continue;
+      const c = q.worldToClient((gx - gy) * 64, (gx + gy) * 32);
+      const el = document.elementFromPoint(Math.round(c.x), Math.round(c.y));
+      if (el?.id === 'game-canvas' || el?.tagName === 'CANVAS') return { x: gx, y: gy };
     }
     return null;
   }, from);

@@ -96,6 +96,42 @@ async function closingInView(page) {
   });
 }
 
+/** Fail when the sheet or control is wholly outside the viewport (QA visibility discipline). */
+async function rectInViewport(page, selector) {
+  return qa(page, (sel) => {
+    const el = document.querySelector(sel);
+    if (!el || el.getClientRects().length === 0) return { ok: false, reason: 'missing' };
+    const r = el.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const visibleW = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0));
+    const visibleH = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
+    if (visibleW < 8 || visibleH < 8) {
+      return {
+        ok: false,
+        reason: 'off-screen',
+        rect: { x: r.x, y: r.y, w: r.width, h: r.height, vw, vh },
+      };
+    }
+    return { ok: true, rect: { x: r.x, y: r.y, w: r.width, h: r.height, vw, vh } };
+  }, selector);
+}
+
+async function readCaseScrollColumn(page) {
+  return qa(page, () => {
+    const wrap = document.querySelector('.building-panel--expanded .building-panel__body-wrap');
+    const pageCol = document.querySelector('.building-panel--expanded .case-read__page');
+    const el = wrap ?? pageCol;
+    if (!el) return null;
+    return {
+      scrollH: el.scrollHeight,
+      clientH: el.clientHeight,
+      overflowY: getComputedStyle(el).overflowY,
+      width: el.getBoundingClientRect().width,
+    };
+  });
+}
+
 function compare(tag, got, want, errors) {
   const n = Math.max(got.length, want.length);
   for (let i = 0; i < n; i++) {
@@ -154,10 +190,26 @@ export async function runRun46CaseSuite({ kind, base, errors, notes, shots }) {
         .catch(() => {});
       await wait(400);
       if (!spec.phone) {
-        const expand = page.locator('.case-read__bar [data-read-collapse]').first();
-        if (await expand.isVisible().catch(() => false)) {
+        const expand = page.locator('.case-read__expand').first();
+        await expand.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+        const expandVis = await rectInViewport(page, '.case-read__expand');
+        if (!expandVis?.ok) {
+          errors.push(`${tag}: expand control ${expandVis?.reason ?? 'missing'} ${JSON.stringify(expandVis?.rect ?? {})}`);
+        } else {
           await expand.click();
-          await wait(350);
+          await wait(400);
+          const expanded = await rectInViewport(page, '.building-panel--expanded .building-panel__sheet');
+          if (!expanded?.ok) {
+            errors.push(`${tag}: expanded sheet ${expanded?.reason ?? 'missing'} ${JSON.stringify(expanded?.rect ?? {})}`);
+          }
+          const col = await readCaseScrollColumn(page);
+          if (col && col.clientH > 0 && col.scrollH > col.clientH + 1 && !/auto|scroll/.test(col.overflowY)) {
+            errors.push(`${tag}: expanded text column overflow-y is ${col.overflowY} (${col.scrollH}/${col.clientH})`);
+          }
+          const closeVis = await rectInViewport(page, '.case-read__x');
+          if (!closeVis?.ok) {
+            errors.push(`${tag}: expanded close × ${closeVis?.reason ?? 'missing'} ${JSON.stringify(closeVis?.rect ?? {})}`);
+          }
         }
       }
     } else if (spec.phone) {
@@ -206,6 +258,18 @@ export async function runRun46CaseSuite({ kind, base, errors, notes, shots }) {
     }
     if (!(await closingInView(page))) errors.push(`${tag}: the closing line cannot be scrolled into view`);
     if (shots && scrolls) await page.screenshot({ path: path.join(shots, `case-panel-${kind}-end.png`) });
+
+    if (!spec.phone) {
+      const closeVis = await rectInViewport(page, '.case-read__x');
+      if (closeVis?.ok) {
+        await page.locator('.case-read__x').first().click();
+        await wait(350);
+        const stillExpanded = await qa(page, () =>
+          document.querySelector('.building-panel--preview')?.classList.contains('building-panel--expanded'),
+        );
+        if (stillExpanded) errors.push(`${tag}: × did not close expanded sheet`);
+      }
+    }
 
     const empty = voiceHits.filter((u) => !/\/(01-intro|02-volaris)\.(ogg|mp3)$/.test(u));
     if (empty.length) {

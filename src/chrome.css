@@ -513,6 +513,13 @@ body[data-interior='1'] .chrome__column {
 }
 
 @media (min-width: 768px) {
+  #chrome-articulos .experience__row-meta {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    overflow-wrap: anywhere;
+  }
+
   .chrome__section--content .chrome__content-thumb.experience__thumb--video,
   .chrome__section--content .chrome__content-thumb.experience__thumb--doc {
     width: 128px;

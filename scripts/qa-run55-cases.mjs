@@ -112,13 +112,9 @@ async function openCasePanelContent(page, spec) {
     )
     .catch(() => {});
   await wait(350);
-  const expand = page.locator('.case-read__bar [data-read-collapse]').first();
+  const expand = page.locator('.case-read__expand').first();
   if (await expand.isVisible().catch(() => false)) {
-    await page.evaluate(() => {
-      document.querySelector('.case-read__bar [data-read-collapse]')?.dispatchEvent(
-        new MouseEvent('click', { bubbles: true, cancelable: true }),
-      );
-    });
+    await expand.click();
     await wait(400);
   }
 }
