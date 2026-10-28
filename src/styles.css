@@ -1250,6 +1250,7 @@ body:has(.building-panel--open) .chrome__lang {
     top: 22px;
     left: 1378px;
     right: auto;
+    box-sizing: border-box;
     width: 40px;
     height: 40px;
     max-width: 40px;
@@ -1264,8 +1265,9 @@ body:has(.building-panel--open) .chrome__lang {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 40px;
-    height: 40px;
+    box-sizing: border-box;
+    min-height: 0;
+    height: 100%;
     margin: 0;
     padding: 0;
     border-bottom: 0;
@@ -3334,12 +3336,15 @@ body:has(.building-panel--open) .chrome__lang {
 }
 
 @media (min-width: 768px) {
-  #ui-root > .building-panel.building-panel--preview.building-panel--open .building-panel__sheet {
+  #ui-root > .building-panel.building-panel--preview.building-panel--open:not(.building-panel--expanded)
+    .building-panel__sheet {
     pointer-events: none;
   }
 
-  #ui-root > .building-panel.building-panel--preview.building-panel--open .case-preview,
-  #ui-root > .building-panel.building-panel--preview.building-panel--open .case-preview * {
+  #ui-root > .building-panel.building-panel--preview.building-panel--open:not(.building-panel--expanded) .case-preview,
+  #ui-root > .building-panel.building-panel--preview.building-panel--open:not(.building-panel--expanded)
+    .case-preview
+    * {
     pointer-events: auto;
   }
 }

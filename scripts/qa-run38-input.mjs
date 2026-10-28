@@ -32,19 +32,8 @@ export const RUN38_KINDS = {
 };
 
 async function tapAt(page, kind, x, y) {
-  if (RUN38_KINDS[kind].touch) {
-    await page.touchscreen.tap(Math.round(x), Math.round(y));
-    return;
-  }
-  const inInterior = await page.evaluate(() => window.__playtestQa?.isInInterior?.() === true);
-  if (inInterior) {
-    await page.evaluate(
-      ([cx, cy]) => window.__playtestQa.tapScreen(cx, cy, false),
-      [x, y],
-    );
-    return;
-  }
-  await page.mouse.click(Math.round(x), Math.round(y));
+  if (RUN38_KINDS[kind].touch) await page.touchscreen.tap(Math.round(x), Math.round(y));
+  else await page.mouse.click(Math.round(x), Math.round(y));
 }
 
 async function ensureOnMap(page) {
