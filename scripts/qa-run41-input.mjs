@@ -421,7 +421,7 @@ async function testMinZoom(ctx, kind, base, errors, notes) {
         await wait(40);
       }
       await wait(400);
-      const png = PNG.sync.read(await page.screenshot());
+      const png = PNG.sync.read(await page.screenshot({ timeout: 60_000 }));
       const s = png.width / vp.width;
       let voidPx = 0;
       let n = 0;

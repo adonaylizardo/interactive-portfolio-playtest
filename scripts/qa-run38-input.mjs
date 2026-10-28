@@ -507,6 +507,7 @@ async function testNearTaps(ctx, kind, base, errors) {
  * @param {{ kind: keyof typeof RUN38_KINDS, base: string, errors: string[], only?: string[] }} args
  */
 export async function runRun38InputSuite({ kind, base, errors, only }) {
+  console.log(`run38-${kind}: starting (only=${only?.join(',') ?? 'all'})`);
   const spec = RUN38_KINDS[kind];
   const browser = await launchBrowser(spec.type);
   const ctx = await browser.newContext(ciContextOptions(spec.options));

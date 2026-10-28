@@ -35,6 +35,7 @@ import { runRun45PlayerSuite } from './qa-run45-player.mjs';
 import { runRun46CaseSuite } from './qa-run46-case.mjs';
 import { runRun55CaseSuite, RUN55_KINDS } from './qa-run55-cases.mjs';
 import { runRun56LayoutSuite } from './qa-run56-layouts.mjs';
+import { runR34ChromeViewport } from './qa-batch-r34-chrome-viewport.mjs';
 import { runRun46FillSuite } from './qa-run46-fill.mjs';
 import { runRun47AboutSuite } from './qa-run47-about.mjs';
 import { runRun48RoutineSuite } from './qa-run48-routines.mjs';
@@ -239,9 +240,11 @@ const GROUPS = {
     for (const spec of FIRST_LOAD) await firstLoad(spec);
   },
   chrome: async () => {
+    console.log('qa-smoke: chrome group starting');
     for (const kind of ['chromium-1280', 'chromium-375']) {
       await runRun56LayoutSuite({ kind, base: BASE, errors, notes });
     }
+    await runR34ChromeViewport({ base: BASE, errors });
   },
   'exits-desktop': () => exits('chromium-desktop', ['exit', 'door']),
   'exits-desktop-a': () => exits('chromium-desktop', ['exit', 'door']),
@@ -342,6 +345,7 @@ try {
   for (const name of ONLY) {
     const t = Date.now();
     const before = errors.length;
+    console.log(`qa-smoke: ${name} starting…`);
     for (let attempt = 0; attempt < 3; attempt++) {
       const mark = errors.length;
       try {

@@ -279,6 +279,7 @@ async function closingInView(page) {
  * @param {{ kind: keyof typeof RUN55_KINDS, base: string, errors: string[], notes: string[], shots?: string }} args
  */
 export async function runRun55CaseSuite({ kind, base, errors, notes, shots }) {
+  console.log(`run55-${kind}: starting`);
   const spec = RUN55_KINDS[kind];
   const browser = await launchBrowser(spec.type);
   const ctx = await browser.newContext(ciContextOptions(spec.options));

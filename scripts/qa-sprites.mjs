@@ -1138,6 +1138,7 @@ for (let i = 0; i < 60; i++) {
 
 /** Logs each part as it ends, so a CI step that times out still shows how far it got. */
 async function part(name, fn) {
+  console.log(`qa-sprites: ${name} starting…`);
   const t = Date.now();
   await fn();
   console.log(`qa-sprites: ${name} ${((Date.now() - t) / 1000).toFixed(0)} s`);

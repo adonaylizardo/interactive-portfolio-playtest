@@ -416,6 +416,7 @@ async function noahChecks(page, spec, tag, errors, shots, kind) {
 }
 
 export async function runRun45PlayerSuite({ kind, base, errors, notes, shots }) {
+  console.log(`run45-${kind}: starting`);
   const spec = RUN45_KINDS[kind];
   const tag = `run45-${kind}-player`;
   const browser = await launchBrowser(spec.type);

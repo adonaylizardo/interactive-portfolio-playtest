@@ -1245,10 +1245,11 @@ export class ChromeUI {
     lang.style.left = '';
     const cl = document.querySelector('.checklist') as HTMLElement | null;
     const ring = cl && !cl.hidden ? cl.getBoundingClientRect() : null;
-    if (!this.mobile && ring && ring.width > 8) {
+    if (!this.mobile && ring && ring.width > 8 && ring.left + ring.width <= window.innerWidth + 1) {
       const top = Math.max(16, ring.top + (ring.height - 40) / 2);
+      const topClamped = Math.min(window.innerHeight - 48, top);
       const right = Math.max(16, window.innerWidth - ring.left + 8);
-      lang.style.top = `${top}px`;
+      lang.style.top = `${topClamped}px`;
       lang.style.right = `${right}px`;
     } else if (!this.mobile) {
       lang.style.top = '20px';
@@ -1267,7 +1268,8 @@ export class ChromeUI {
       const lr = locate.getBoundingClientRect();
       const gr = lang.getBoundingClientRect();
       if (gr.bottom > lr.top - 4 && gr.right > lr.left - 4 && gr.left < lr.right + 4) {
-        lang.style.top = `${Math.max(8, lr.bottom + 6)}px`;
+        const bumped = Math.max(8, lr.bottom + 6);
+        lang.style.top = `${Math.min(window.innerHeight - 48, bumped)}px`;
         lang.style.right = `${Math.max(16, window.innerWidth - lr.right)}px`;
       }
     }

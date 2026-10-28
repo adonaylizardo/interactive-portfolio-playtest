@@ -97,7 +97,7 @@ const DICT = {
     'panel.expandSheet': 'Expand panel',
     'panel.talks': 'Talks',
     'panel.writings': 'Articles',
-    'writings.openArticle': '↗ Read on adonaylizardo.com',
+    'writings.openArticle': 'Read on adonaylizardo.com',
 
     'experience.back': 'Back to list',
     'experience.example': 'Example data',
@@ -377,7 +377,7 @@ const DICT = {
     'panel.expandSheet': 'Expandir panel',
     'panel.talks': 'Charlas',
     'panel.writings': 'Artículos',
-    'writings.openArticle': '↗ Leer en adonaylizardo.com',
+    'writings.openArticle': 'Leer en adonaylizardo.com',
 
     'experience.back': 'Volver a la lista',
     'experience.example': 'Datos de ejemplo',

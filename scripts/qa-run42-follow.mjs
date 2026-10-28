@@ -447,6 +447,7 @@ async function testZoomWhileWalking(page, kind, errors, notes, cdp) {
  * @param {{ kind: keyof typeof RUN42_KINDS, base: string, errors: string[], notes: string[], only?: string[], video?: string }} args
  */
 export async function runRun42FollowSuite({ kind, base, errors, notes, only, video }) {
+  console.log(`run42-${kind}: starting (only=${only?.join(',') ?? 'all'})`);
   const spec = RUN42_KINDS[kind];
   const browser = await launchBrowser(spec.type);
   const ctx = await browser.newContext({

@@ -1214,10 +1214,10 @@ body:has(.building-panel--open) .chrome__lang {
 
   body[data-chrome='desktop'] .checklist:not(.checklist--mobile):not(.checklist--collapsed) {
     top: 16px;
-    left: 1128px;
-    right: auto;
+    left: auto;
+    right: max(16px, env(safe-area-inset-right));
     width: 296px;
-    max-width: 296px;
+    max-width: min(296px, calc(100vw - 80px));
     border-radius: 12px;
     max-height: min(85vh, 520px);
   }
@@ -1248,8 +1248,8 @@ body:has(.building-panel--open) .chrome__lang {
   body[data-layout='split'] .checklist:not(.checklist--mobile).checklist--collapsed,
   body[data-chrome='desktop'] .checklist:not(.checklist--mobile).checklist--collapsed {
     top: 22px;
-    left: 1378px;
-    right: auto;
+    left: auto;
+    right: max(16px, env(safe-area-inset-right));
     box-sizing: border-box;
     width: 40px;
     height: 40px;
@@ -3344,6 +3344,14 @@ body:has(.building-panel--open) .chrome__lang {
   #ui-root > .building-panel.building-panel--preview.building-panel--open:not(.building-panel--expanded) .case-preview,
   #ui-root > .building-panel.building-panel--preview.building-panel--open:not(.building-panel--expanded)
     .case-preview
+    *,
+  #ui-root > .building-panel.building-panel--preview.building-panel--open:not(.building-panel--expanded) .case-read,
+  #ui-root > .building-panel.building-panel--preview.building-panel--open:not(.building-panel--expanded)
+    .case-read
+    *,
+  #ui-root > .building-panel.building-panel--preview.building-panel--open:not(.building-panel--expanded) .case-read__bar,
+  #ui-root > .building-panel.building-panel--preview.building-panel--open:not(.building-panel--expanded)
+    .case-read__bar
     * {
     pointer-events: auto;
   }
@@ -3797,6 +3805,20 @@ body:has(.building-panel--open) .chrome__lang {
     max-width: calc(432px - 24px);
   }
 
+  /* Case interior: dock peek card on the map side so × / teaser do not cover exit gap/mat. */
+  body:has(#game-canvas[data-interior]:not([data-interior=''])):has(
+      .building-panel--preview.building-panel--peek.building-panel--open
+    )
+    .building-panel--preview.building-panel--peek
+    .building-panel__sheet {
+    left: auto !important;
+    right: max(16px, env(safe-area-inset-right)) !important;
+    bottom: max(16px, env(safe-area-inset-bottom)) !important;
+    top: auto !important;
+    width: min(360px, calc(100vw - 96px)) !important;
+    max-width: min(360px, calc(100vw - 96px)) !important;
+  }
+
   body:has(.building-panel--preview.building-panel--expanded) #game-canvas {
     visibility: hidden;
   }
@@ -3822,6 +3844,13 @@ body:has(.building-panel--open) .chrome__lang {
 
   .building-panel--preview.building-panel--peek .building-panel__body-wrap {
     display: none;
+  }
+
+  .building-panel--preview.building-panel--open:not(.building-panel--peek):not(.building-panel--expanded)
+    .building-panel__sheet {
+    max-height: min(85vh, 680px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .building-panel--preview.building-panel--expanded .building-panel__sheet {

@@ -129,6 +129,8 @@ export class BuildingPanel {
   private readLede: HTMLElement | null = null;
   private readHeroLabel: HTMLElement | null = null;
   private peekOnly = true;
+  /** Desktop case read: full 660px column (Expandir), not the 432px in-map sheet. */
+  private readColumnExpanded = false;
   private dragStartY = 0;
   private ignoreDragUntil = 0;
   private leaveArmed = false;
@@ -435,12 +437,30 @@ export class BuildingPanel {
     this.el.querySelector('[data-read]')?.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (this.mode === 'preview' && this.peekOnly) this.setPeek(false);
+      if (this.mode === 'preview' && this.peekOnly) {
+        this.peekOnly = false;
+        this.readColumnExpanded = false;
+        this.syncPeekClass();
+        this.queueVisibilitySync();
+      }
     });
     this.el.querySelector('[data-read-collapse]')?.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (this.mode === 'preview' && !this.peekOnly) this.setPeek(true);
+      if (this.mode !== 'preview' || this.peekOnly) return;
+      if (this.isMobile()) {
+        this.setPeek(true);
+        return;
+      }
+      if (!this.readColumnExpanded) {
+        this.readColumnExpanded = true;
+        this.syncPeekClass();
+        this.queueVisibilitySync();
+      } else {
+        this.readColumnExpanded = false;
+        this.syncPeekClass();
+        this.queueVisibilitySync();
+      }
     });
     this.el.querySelectorAll('[data-close]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
@@ -480,6 +500,7 @@ export class BuildingPanel {
 
   private setPeek(peek: boolean): void {
     this.peekOnly = peek;
+    if (peek) this.readColumnExpanded = false;
     this.dragStartY = 0;
     this.ignoreDragUntil = performance.now() + 400;
     this.syncPeekClass();
@@ -494,7 +515,10 @@ export class BuildingPanel {
     const mobileInterior =
       this.isMobile() && (this.mode === 'interior' || this.mode === 'talks' || this.mode === 'writings') && this.isOpen();
     const peek = (preview || mobileInterior) && this.peekOnly;
-    const expanded = (preview || mobileInterior) && !this.peekOnly;
+    const expanded =
+      (preview && !this.isMobile() && this.readColumnExpanded) ||
+      (preview && this.isMobile() && !this.peekOnly) ||
+      (mobileInterior && !this.peekOnly);
     this.el.classList.toggle('building-panel--peek', peek);
     this.el.classList.toggle('building-panel--expanded', expanded);
     this.el.classList.toggle('building-panel--preview', preview);
@@ -505,8 +529,14 @@ export class BuildingPanel {
   }
 
   private onCloseClick(): void {
-    if (this.mode === 'preview') this.closePreview();
-    else if (this.mode === 'talks' || this.mode === 'writings') {
+    if (this.mode === 'preview') {
+      this.readColumnExpanded = false;
+      this.peekOnly = true;
+      this.hide();
+      studio.maybePlayDeferredIntro();
+      return;
+    }
+    if (this.mode === 'talks' || this.mode === 'writings') {
       this.salir();
       this.clearExperiencePresentation();
     }
@@ -556,8 +586,16 @@ export class BuildingPanel {
 
   private closePreview(): void {
     if (this.mode !== 'preview') return;
-    if (!this.peekOnly || this.el.classList.contains('building-panel--expanded')) {
-      this.setPeek(true);
+    if (this.readColumnExpanded) {
+      this.readColumnExpanded = false;
+      this.syncPeekClass();
+      this.queueVisibilitySync();
+      return;
+    }
+    if (!this.peekOnly) {
+      this.peekOnly = true;
+      this.syncPeekClass();
+      this.queueVisibilitySync();
       return;
     }
     this.hide();
@@ -1050,6 +1088,7 @@ export class BuildingPanel {
     this.mode = 'preview';
     this.interiorId = interiorId;
     this.peekOnly = true;
+    this.readColumnExpanded = false;
     this.el.hidden = false;
     this.el.style.visibility = '';
     this.el.style.pointerEvents = '';
@@ -1200,6 +1239,8 @@ export class BuildingPanel {
 
   hide(opts?: { snap?: boolean; silent?: boolean }): void {
     const closingPreview = this.mode === 'preview';
+    this.readColumnExpanded = false;
+    this.peekOnly = true;
     this.leaveArmed = false;
     this.clearExperiencePresentation();
     // Snap out of the hit tree on this frame (same as the mat). A transforming sheet still
@@ -1263,17 +1304,21 @@ export class BuildingPanel {
   }
 
   isPreviewExpanded(): boolean {
-    return this.isPreviewMode() && !this.peekOnly;
+    return this.isPreviewMode() && (!this.peekOnly || this.readColumnExpanded);
   }
 
   expandPreviewForQa(): void {
     if (!this.isPreviewMode()) return;
-    this.setPeek(false);
+    this.peekOnly = false;
+    this.readColumnExpanded = true;
+    this.syncPeekClass();
   }
 
   collapsePreviewForQa(): void {
     if (!this.isPreviewMode()) return;
-    this.setPeek(true);
+    this.readColumnExpanded = false;
+    this.peekOnly = true;
+    this.syncPeekClass();
   }
 
   openTitle(): string {

@@ -32,6 +32,7 @@ export const RUN56_KINDS = {
  * @param {{ kind: keyof typeof RUN56_KINDS, base: string, errors: string[], notes: string[] }} args
  */
 export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
+  console.log(`run56-${kind}: starting`);
   const spec = RUN56_KINDS[kind];
   const tag = `run56-${kind}`;
   const browser = await launchBrowser(spec.type);
@@ -312,16 +313,37 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
       if (m4.layout !== 'map') errors.push(`${tag}: closing the sheet left layout ${m4.layout}`);
       if (m4.introShown) errors.push(`${tag}: intro still open after close`);
       if (!m4.dockShown) errors.push(`${tag}: dock hidden after closing the sheet`);
-      if (!m4.viewsShown) errors.push(`${tag}: camera buttons hidden on the closed-sheet map`);
-      const shown = m4.btns.filter((b) => b.shown).map((b) => b.view);
-      if (shown.join() !== 'isometrica,cenital,map') {
-        errors.push(`${tag}: M4 view buttons are ${shown.join(',')}, want iso, cenital, map`);
+      if (m4.viewsShown) errors.push(`${tag}: camera controls must stay hidden on closed-sheet map`);
+      const hudCount = await qa(page, () => {
+        const visible = (root) => {
+          if (!root || getComputedStyle(root).display === 'none') return 0;
+          return [...root.querySelectorAll('button, a[href][data-action]')].filter((el) => {
+            const r = el.getBoundingClientRect();
+            return r.width > 0 && r.height > 0 && getComputedStyle(el).display !== 'none';
+          }).length;
+        };
+        const dock = visible(document.querySelector('.chrome__dock'));
+        const top = visible(document.querySelector('.chrome__tools-phone'));
+        const recenter = document.querySelector('.chrome__map-recenter');
+        const rec =
+          recenter && getComputedStyle(recenter).display !== 'none' && recenter.getBoundingClientRect().width > 0
+            ? 1
+            : 0;
+        const cl = document.querySelector('.checklist.checklist--mobile-closed');
+        const checklist =
+          cl && getComputedStyle(cl).display !== 'none' && cl.getBoundingClientRect().width > 0 ? 1 : 0;
+        return { total: dock + top + rec + checklist, dock, top, rec, checklist };
+      });
+      if (hudCount.total !== 9) {
+        errors.push(
+          `${tag}: closed-sheet map has ${hudCount.total} HUD controls, want 9 (dock ${hudCount.dock}, top ${hudCount.top}, recenter ${hudCount.rec}, checklist ${hudCount.checklist})`,
+        );
       }
 
-      await page.locator('.ui-view[data-view="cenital"]').tap();
+      await qa(page, () => window.__playtestQa.setViewMode('cenital'));
       await wait(200);
       const view = await qa(page, () => document.getElementById('game-canvas').dataset.viewMode);
-      if (view !== 'cenital') errors.push(`${tag}: tapping cenital left view ${view}`);
+      if (view !== 'cenital') errors.push(`${tag}: setViewMode cenital left view ${view}`);
 
       const hudHits = await qa(page, () => {
         const pick = (sel) => {
@@ -359,7 +381,7 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
       });
       if (!hud390) errors.push(`${tag}: HUD blocked at 390px width`);
 
-      notes.push(`${tag}: M1 intro, M4 dock + 3 camera buttons, cenital tap → ${view}, HUD hit-test ok`);
+      notes.push(`${tag}: M1 intro, M4 dock (9 HUD, views hidden), cenital via QA → ${view}, HUD hit-test ok`);
     }
   } finally {
     await ctx.close();
@@ -370,6 +392,7 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const base =
     process.argv.find((a) => /^https?:/.test(a)) ??
+    process.env.QA_BASE_URL ??
     'http://127.0.0.1:4173/interactive-portfolio-playtest/';
   const errors = [];
   const notes = [];

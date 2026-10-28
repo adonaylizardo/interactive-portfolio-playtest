@@ -219,8 +219,12 @@ async function main() {
     };
   });
   metrics.H2 = collapsed;
-  if (!near(collapsed.w, 40) || !near(collapsed.h, 40) || !near(collapsed.x, 1378) || !near(collapsed.y, 22)) {
+  if (!near(collapsed.w, 40) || !near(collapsed.h, 40) || !near(collapsed.y, 22)) {
     errors.push(`H2 collapsed ${JSON.stringify(collapsed)}`);
+  }
+  const vw = await page.evaluate(() => innerWidth);
+  if (collapsed.x != null && collapsed.x + collapsed.w > vw + 2) {
+    errors.push(`H2 collapsed off-screen x=${collapsed.x} w=${collapsed.w} vw=${vw}`);
   }
   if (collapsed.labelDisplay !== 'none') errors.push(`H2 label display ${collapsed.labelDisplay}`);
 
