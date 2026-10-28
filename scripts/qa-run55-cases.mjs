@@ -230,6 +230,7 @@ async function readPanel(page) {
     const shown = (el) => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
     const sheet = document.querySelector('.building-panel__sheet');
     const headline = document.querySelector('.case-read__headline');
+    const caseTitle = article?.querySelector('h2, .case__title');
     const titleEl = document.querySelector('.building-panel__title');
     const previewTitle = document.querySelector('.case-preview__title');
     const article = document.querySelector('.case');
@@ -237,6 +238,7 @@ async function readPanel(page) {
       .filter(shown)
       .map((el) => [el.tagName.toLowerCase(), el.textContent.replace(/\s+/g, ' ').trim()]);
     const title =
+      (shown(caseTitle) && caseTitle.textContent.trim()) ||
       (shown(headline) && headline.textContent.trim()) ||
       (shown(titleEl) && titleEl.textContent.trim()) ||
       (shown(previewTitle) && previewTitle.textContent.trim()) ||
