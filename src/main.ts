@@ -468,7 +468,8 @@ async function main(): Promise<void> {
           checklist.setBuildingPanelOpen(true);
           chrome.setInteriorOpen(false, { skipLayout: true });
           if (chrome.isMobileSheetOpen()) chrome.setLayout('map');
-          panel.showPreview(interiorId);
+          if (isMobileLayout()) panel.showPreview(interiorId);
+          else panel.showInterior(b.panelTitle, interiorId);
         } else {
           checklist.setBuildingPanelOpen(true);
           chrome.setInteriorOpen(true);
