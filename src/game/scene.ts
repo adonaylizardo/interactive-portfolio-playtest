@@ -3595,15 +3595,31 @@ export class IsoScene {
         minY = Math.min(minY, c.y);
         maxY = Math.max(maxY, c.y);
       }
+      const mark = cenitalDoorMarker(b);
+      if (mark) {
+        minX = Math.min(minX, mark.x - mark.hw);
+        maxX = Math.max(maxX, mark.x + mark.hw);
+        minY = Math.min(minY, mark.y - mark.hh);
+        maxY = Math.max(maxY, mark.y + mark.hh);
+      }
+      const tap = doorTapPoint(b);
+      if (tap) {
+        const pad = 14;
+        minX = Math.min(minX, tap.x - pad);
+        maxX = Math.max(maxX, tap.x + pad);
+        minY = Math.min(minY, tap.y - pad);
+        maxY = Math.max(maxY, tap.y + pad);
+      }
     }
     const roofRise = 140;
-    const side = 12;
+    const side = 16;
     const chrome = this.events.chrome?.layoutInsets?.();
     const ml = Math.max(side, chrome?.left ?? 0);
     const mr = Math.max(side, chrome?.right ?? 0);
     const mt = Math.max(48, chrome?.top ?? 0);
     const mb = Math.max(96, chrome?.bottom ?? 0);
-    const zoom = clampZoom((sw - ml - mr) / (maxX - minX), sw, sh);
+    const screenPad = 28;
+    const zoom = clampZoom((sw - ml - mr - screenPad * 2) / (maxX - minX), sw, sh);
     const cx = (minX + maxX) / 2;
     const cy = (minY - roofRise + maxY) / 2;
     setCameraFitMargins({ left: ml, right: mr, top: mt, bottom: mb });
