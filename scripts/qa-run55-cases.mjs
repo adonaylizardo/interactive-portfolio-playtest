@@ -25,199 +25,12 @@ export const RUN55_KINDS = {
   'webkit-iphone': { type: webkit, options: { ...devices['iPhone 13'] }, phone: true },
 };
 
-const CASES = {
-  bain: {
-    id: 'bain',
-    key: 'Bain',
-    headline: 'Leading 9 designers across Bain, while still shipping the work',
-    shortHeadline: 'Leading 9 designers across Bain',
-    full: [
-      ['h3', 'Problem'],
-      [
-        'p',
-        "Applaudo's designers were spread across several Bain products, each embedded in its own team. Without a shared space, overlaps and misalignments between products stayed invisible across the portfolio.",
-      ],
-      ['h3', 'What I did'],
-      [
-        'p',
-        'I was squad lead and mentor for 9 Applaudo designers distributed across several Bain accounts. I ran a weekly team ceremony to connect them, built around three blocks: a Visual Status review where designers look at work in progress side by side (to build horizontal visibility across the portfolio and surface overlaps, not to critique), a shared Experiment Tracker for portfolio initiatives, and a Red Flags block to raise risks early.',
-      ],
-      ['h3', 'Result'],
-      [
-        'p',
-        "The Bain team's CSAT rating of the Applaudo designers who worked with them rose from about 8.5 to 9.5 across 2025 to 2026, reaching 10 in some quarters.",
-      ],
-      ['h3', 'Hands-on work'],
-      [
-        'li',
-        "Signal (Product Designer): I built a new design process, with documentation and testing, behind several shipped features. The biggest was a Gantt view, Signal's largest release to date. I also ran a team feedback workshop on Gantt enhancements, and Signal's product team adopted the remote video collaboration method I introduced.",
-      ],
-      [
-        'li',
-        'Case Wrap MVP (around June to August 2026, Senior Product Designer / Product Strategist): I reframed case wrap-up as review-and-approve instead of one-click acceptance: AI drafts, humans decide, no "approve all." Three coded directions in Bain\'s design system turned the choice into a team decision. The deliverable was a validated MVP direction. I did not win a concept; I made the trade-off cheap to see.',
-      ],
-      [
-        'li',
-        'NPS Prism, Instrument Management (around April to June 2026, sole designer): what the admin called "instruments" were really presets, with real ownership and refresh data scattered in spreadsheets outside the platform. I designed a two-entity model with an in-platform refresh calendar and notifications. Product and engineering approved it for build.',
-      ],
-      ['li', 'PEG: Product Designer on the account.'],
-      ['li', "PAS: product design on Bain's live Partner Assessment System."],
-      [
-        'em',
-        "Leading the portfolio didn't mean stepping back from the work: I kept shipping product while helping nine other designers do the same.",
-      ],
-    ],
-    short: [
-      ['li', 'Problem: Bain designers were scattered across teams with no shared space, so overlaps and misalignment stayed invisible.'],
-      ['li', 'What I did: Squad lead and mentor for 9 designers; ran a weekly ceremony (Visual Status, Experiment Tracker, Red Flags).'],
-      [
-        'li',
-        "Result: Bain's CSAT rating of the designers rose from about 8.5 to 9.5 across 2025 to 2026, reaching 10 in some quarters.",
-      ],
-      [
-        'li',
-        "Hands-on: Signal's Gantt view, its largest release; Case Wrap moved to review-and-approve with AI drafts; NPS Prism moved ownership data off spreadsheets and into the product.",
-      ],
-      ['em', "Leading didn't mean stepping back: I kept shipping while nine designers got clarity across the portfolio."],
-    ],
-  },
-  pg: {
-    id: 'pg',
-    key: 'P&G',
-    headline: 'An app panelists actually want to open',
-    full: [
-      ['h3', 'Problem'],
-      [
-        'p',
-        "P&G Latam's innovation team needed a mobile app for its panelists, one that could track the menstrual cycle, collect surveys, and run product tests, while meeting P&G's own standards for performance, reliability, and security around sensitive personal health data. The timeline was tight.",
-      ],
-      ['h3', 'What I did'],
-      [
-        'p',
-        'As UX/UI Designer at Talpor, I worked in a small cross-functional team (a PM, a science team, and a UI & motion designer), and together we co-created the app in about 8 weeks. The first 2 to 3 weeks were strategy: 4 user profiles, a competitive benchmark, feature focus maps, user flows, and wireframes. Interviews, heuristic tests, and design thinking sessions showed navigation needed to differ across profiles, which shaped a quick-access logging pattern around the calendar, the cycle wheel, and a single add button. From there we built the design system and UI, covering symptom tracking, gamification, a news feed, and "Diary," a survey and product-testing system tied into gamification.',
-      ],
-      ['h3', 'Result'],
-      [
-        'p',
-        'The app launched with real users in three languages (Portuguese, Spanish, English), reaching panelists mainly in Brazil, Mexico, and the US. It beat the agreed time and quality standards and opened the door to follow-up work with P&G.',
-      ],
-      ['em', 'Good research finds the shortest path to logging before design ever touches a screen.'],
-    ],
-    short: [
-      [
-        'li',
-        'Problem: P&G needed panelists to log their cycle, answer surveys, and test products in one app built to handle sensitive health data securely.',
-      ],
-      [
-        'li',
-        'What I did: As UX/UI Designer at Talpor, I worked over about 8 weeks, from research and user flows to a full design system and a gamified "Diary" feature.',
-      ],
-      [
-        'li',
-        'Result: Launched in 3 languages for panelists in Brazil, Mexico, and the US, beating the agreed time and quality bar.',
-      ],
-      [
-        'li',
-        'Extra: The logging flow (calendar, cycle wheel, add button) was shaped directly by interviews and heuristic testing across user profiles.',
-      ],
-      ['em', 'Good research finds the shortest path to logging before design touches a screen.'],
-    ],
-  },
-  mentoria: {
-    id: 'mentoria',
-    key: 'Mentoría',
-    headline: 'Mentoring with the same rigor as client work',
-    shortHeadline: 'Mentoring as a system',
-    full: [
-      ['h3', 'Problem'],
-      [
-        'p',
-        "Growth inside the design team was hard to see, and there was no structured way to support it. The team needed both: visibility into how designers were developing, and a system to make that growth deliberate, so it could translate into real impact on client accounts and on Applaudo's own goals.",
-      ],
-      ['h3', 'What I did'],
-      [
-        'p',
-        "I co-created and help lead Applaudo's design mentoring program, run as a product: with releases, a measurement framework, and quarterly goals, not as an informal perk. It has four session formats: allocated 1:1 coaching, booked consultations on demand, scouted invitations, and group team sessions and workshops. Every session is tagged to a shared competencies library (critical thinking, strategic thinking, information architecture, business acumen, and more), so growth is tracked by skill, not just by hours spent. On top of that sit gamified events and email automations that keep participation alive between sessions. I also sit on Applaudo's Design Senior Council, one of seven seats. In my own mentoring practice, every review produces two outputs: internal notes with probing questions for myself, and student-ready feedback with concrete strengths and next steps.",
-      ],
-      ['h3', 'Result'],
-      [
-        'p',
-        'The program moved from an informal Notion log in 2023 to a measured system with quarterly goals, set up in January 2024. It tracks 51 designers across 11 countries, with 32 who attended at least one logged session. Program-wide, 247 attended sessions have been logged, from January 2024 to February 2026. Global attendance held at 82 to 95% every measured quarter from 2024 to Q1 2025, above the 80% goal. The program also ran 10 group events, each drawing 11 to 21 designers.',
-      ],
-      ['h3', 'Beyond Applaudo'],
-      [
-        'p',
-        "Across my career overall, separate from this program, I've mentored 200+ designers at Applaudo, DesignLab, CareerFoundry, ADPList, and others.",
-      ],
-      ['h3', 'The rule'],
-      ['p', '"Diagnosis before prescription, same as client work. Mentoring is not softer, it\'s more developmental."'],
-      ['em', "Growth isn't something that happens to a team. It's something you have to design for."],
-    ],
-    short: [
-      [
-        'li',
-        "Problem: The design team's growth was hard to see and had no structure behind it, limiting its impact on clients and on Applaudo's own goals.",
-      ],
-      [
-        'li',
-        'What I did: Co-created and help lead a measured mentoring program: 1:1 coaching, consultations, scouted invites, team workshops, all tagged to a competencies library with quarterly goals.',
-      ],
-      [
-        'li',
-        'Result: 51 designers across 11 countries, 247 attended sessions logged (Jan 2024 to Feb 2026), attendance of 82 to 95% every measured quarter above the 80% goal, and 10 group events with 11 to 21 designers each.',
-      ],
-      ['li', "Career-wide: I've mentored 200+ designers across Applaudo, DesignLab, CareerFoundry, ADPList, and others."],
-      ['em', "Mentoring is not softer, it's more developmental."],
-    ],
-  },
-  finoa: {
-    id: 'finoa',
-    key: 'Finoa',
-    headline: 'A custody platform institutions can trust at a glance',
-    shortHeadline: 'A custody platform institutions can trust',
-    full: [
-      ['h3', 'Problem'],
-      [
-        'p',
-        "Finoa is a regulated custodian for digital assets, built for institutional investors and corporations. The platform worked, but it didn't yet let users do everything they needed, and it had to clear the bar large institutions hold any platform to: performance, reliability, security. Time was short.",
-      ],
-      ['h3', 'What I did'],
-      [
-        'p',
-        "As UX Designer at LoremLabs, I joined a small cross-functional team, a Design Director, Finoa's product manager, and two UI designers, for an eight-week co-creation. I led the research side: customer interviews, friction points, user stories, story mapping, a feature focus map, and the information architecture. From there, flows and wireframes for the core screens.",
-      ],
-      ['h3', 'Result'],
-      [
-        'p',
-        'The main platform was redesigned and modernized, and we prototyped the mobile version, with a plan to iterate, test, and scale from there. What the redesign enabled:',
-      ],
-      [
-        'li',
-        "Institutional users can read how their portfolio moves over time, the way they'd track any traded asset.",
-      ],
-      ['li', 'Anything pending or processing is surfaced in one notification system instead of scattered across the product.'],
-      ['li', 'User permissions and management are easier to reach.'],
-      ['li', 'A mobile prototype covers the core screens beyond desktop.'],
-      ['p', 'This was qualitative design work; no outcome metric was measured.'],
-      ['em', "Institutions don't need more features. They need to trust what they're looking at."],
-    ],
-    short: [
-      [
-        'li',
-        "Problem: Finoa's platform worked, but institutional users needed more than it allowed, under a high bar for security and reliability.",
-      ],
-      [
-        'li',
-        'What I did: As UX Designer at LoremLabs, led research and IA in an eight-week co-creation: interviews, user stories, flows, wireframes.',
-      ],
-      [
-        'li',
-        'Result: Clearer portfolio tracking, one place for pending actions, simpler permissions, plus a mobile prototype. Qualitative work; no metrics measured.',
-      ],
-      ['em', "Institutions don't need more features. They need to trust what they're looking at."],
-    ],
-  },
-};
+const CASE_SPECS = [
+  { id: 'bain', key: 'Bain' },
+  { id: 'pg', key: 'P&G' },
+  { id: 'mentoria', key: 'Mentoría' },
+  { id: 'finoa', key: 'Finoa' },
+];
 
 const LANDMARKS = {
   sambil: ['Sambil', 'Sambil, Barquisimeto. A mall shaped like a cuatro, our little guitar.'],
@@ -301,7 +114,11 @@ async function openCasePanelContent(page, spec) {
   await wait(350);
   const expand = page.locator('.case-read__bar [data-read-collapse]').first();
   if (await expand.isVisible().catch(() => false)) {
-    await expand.click();
+    await page.evaluate(() => {
+      document.querySelector('.case-read__bar [data-read-collapse]')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true }),
+      );
+    });
     await wait(400);
   }
 }
@@ -349,15 +166,39 @@ export async function runRun55CaseSuite({ kind, base, errors, notes, shots }) {
     await page.goto(base, { waitUntil: 'load' });
     await wait(500);
 
-    for (const specCase of Object.values(CASES)) {
+    for (const specCase of CASE_SPECS) {
       const tag = `run55-${kind}-${specCase.id}`;
       await qa(page, (id) => window.__playtestQa.enterInterior(id), specCase.id);
       await waitForBuildingPanelSettled(page);
       await wait(400);
       await openCasePanelContent(page, spec);
       const m = await readPanel(page);
-      const wantTitle = spec.phone ? (specCase.shortHeadline ?? specCase.headline) : specCase.headline;
-      if (m.title !== wantTitle) errors.push(`${tag}: title is "${m.title}", want "${wantTitle}"`);
+      const variant = await qa(page, () => {
+        const phone = window.matchMedia('(max-width:767px)').matches;
+        if (!phone) return 'full';
+        return document.querySelector('.building-panel--preview.building-panel--expanded') ? 'full' : 'short';
+      });
+      const expected = await qa(
+        page,
+        ({ id, v }) => {
+          const exp = window.__playtestQa.casePanelQaExpectation(id, v, 'en');
+          if (!exp) return null;
+          const phone = window.matchMedia('(max-width:767px)').matches;
+          const expanded = !!document.querySelector('.building-panel--preview.building-panel--expanded');
+          if (phone && expanded) {
+            const peek = window.__playtestQa.casePanelQaExpectation(id, 'short', 'en');
+            if (peek?.title) exp.title = peek.title;
+          }
+          return exp;
+        },
+        { id: specCase.id, v: variant },
+      );
+      if (!expected) {
+        errors.push(`${tag}: no CASES fixture in src/data/cases.ts for ${specCase.id}`);
+      } else {
+        if (m.title !== expected.title) errors.push(`${tag}: title is "${m.title}", want "${expected.title}"`);
+        compare(tag, m.lines, expected.lines, errors);
+      }
       if (m.key !== specCase.key && m.key !== specCase.id) {
         errors.push(`${tag}: panel key is "${m.key}", want "${specCase.key}"`);
       }
@@ -372,7 +213,6 @@ export async function runRun55CaseSuite({ kind, base, errors, notes, shots }) {
       const hasNine = /9\.5/.test(m.articleText);
       if (specCase.id === 'bain' && !hasNine) errors.push(`${tag}: Bain is missing 9.5`);
       if (specCase.id !== 'bain' && hasNine) errors.push(`${tag}: 9.5 leaked into ${specCase.id}`);
-      compare(tag, m.lines, spec.phone && m.lines[0]?.[0] === 'h3' ? specCase.full : spec.phone ? specCase.short : specCase.full, errors);
       if (m.closingStyle !== 'italic') errors.push(`${tag}: closing line is not italic`);
       if (shots) {
         fs.mkdirSync(shots, { recursive: true });

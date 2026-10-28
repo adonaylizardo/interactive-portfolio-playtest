@@ -1,6 +1,6 @@
 import { studio } from './audio/studio';
 import { ChecklistUI, isMobileLayout } from './checklist/ui';
-import { isCaseHouse } from './data/cases';
+import { casePanelQaExpectation, isCaseHouse } from './data/cases';
 import { isPlaceCard } from './data/placeCards';
 import {
   doorInwardStep,
@@ -14,6 +14,7 @@ import {
 import { parseInteriorFromHash, replaceOutdoorHash, setHashWriteSuppressed } from './camera/hash';
 import {
   isReadingHash,
+  isValidReadingDetailSlug,
   leaveReadingHash,
   navigateReading,
   readingDepth,
@@ -182,6 +183,14 @@ async function main(): Promise<void> {
 
   const syncReadingFromHash = (): void => {
     const route = parseReadingRoute();
+    if (route?.kind === 'detail' && !isValidReadingDetailSlug(route.slug)) {
+      showToast(t('toast.unknownRoute'));
+      setHashWriteSuppressed(false);
+      reading.syncRoute(null);
+      scene?.setReadingPaused(false);
+      syncMapOverlays();
+      return;
+    }
     if (route) {
       if (isMobileLayout() && !reading.isActive()) {
         chrome.rememberMobileSheetBeforeReading();
@@ -1058,6 +1067,8 @@ async function main(): Promise<void> {
     jacSet: (partial: Parameters<IsoScene['qaJacSet']>[0]) => scene.qaJacSet(partial),
     setLang: (lang: 'en' | 'es') => setLang(lang),
     searchForQa: (query: string) => searchSite(query),
+    casePanelQaExpectation: (id: string, variant: 'full' | 'short', lang?: 'en' | 'es') =>
+      casePanelQaExpectation(id, lang ?? getLang(), variant),
     getLang: () => getLang(),
     t: (key: Parameters<typeof t>[0]) => t(key),
     showFatalState: (kind: 'webgl' | 'load-failed') => showFatalState(kind),

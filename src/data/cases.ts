@@ -376,3 +376,38 @@ export function caseForLang(id: string, lang: Lang): CaseContent | undefined {
   if (lang === 'es') return CASES_ES[id] ?? en;
   return en;
 }
+
+function normCaseLine(text: string): string {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** QA: expected panel lines from CASES (not from the live DOM). */
+export function casePanelQaExpectation(
+  id: string,
+  lang: Lang,
+  variant: 'full' | 'short',
+): { title: string; lines: [string, string][] } | null {
+  const content = caseForLang(id, lang);
+  if (!content) return null;
+  const title =
+    variant === 'short' ? (content.shortHeadline ?? content.headline) : content.headline;
+  const blocks = variant === 'short' ? content.short : content.full;
+  const lines: [string, string][] = [];
+  for (const block of blocks) {
+    if (block.kind === 'closing') {
+      lines.push(['em', normCaseLine(block.text)]);
+      continue;
+    }
+    if (block.heading) lines.push(['h3', normCaseLine(block.heading)]);
+    for (const p of block.paragraphs) {
+      if (p) lines.push(['p', normCaseLine(p)]);
+    }
+    for (const li of block.bullets ?? []) {
+      if (li) lines.push(['li', normCaseLine(li)]);
+    }
+  }
+  return { title, lines };
+}

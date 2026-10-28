@@ -1,4 +1,4 @@
-import { isReadingHash } from '../ui/readingRoute';
+import { isReadingHash, isSupportedReadingHash } from '../ui/readingRoute';
 
 const HASH_PREFIX = 'view=';
 
@@ -76,6 +76,7 @@ export function parseInteriorFromHash(): string | null {
 export function isSupportedPlaytestHash(hash = location.hash): boolean {
   const raw = hash.replace(/^#/, '').trim();
   if (!raw) return true;
+  if (isSupportedReadingHash(hash)) return true;
   if (raw.startsWith('/') || raw.includes('<') || raw.includes('>')) return false;
   if (/^caso=/i.test(raw) || /^\/caso\//i.test(raw) || /^edificio\//i.test(raw)) return false;
   if (raw.startsWith(HASH_PREFIX)) {

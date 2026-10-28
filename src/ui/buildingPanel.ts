@@ -1133,8 +1133,20 @@ export class BuildingPanel {
     this.setTitle(interiorId, title);
     this.renderWorkedWith();
     this.renderAbout();
+    const interiorCasePeek =
+      !this.isMobile() && !!document.getElementById('game-canvas')?.dataset.interior;
+    if (interiorCasePeek) {
+      this.el.classList.add('building-panel--case-enter');
+    }
     this.el.classList.add('building-panel--open');
     this.syncPeekClass();
+    if (interiorCasePeek) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          this.el.classList.remove('building-panel--case-enter');
+        });
+      });
+    }
     this.onVisibilityChange();
     studio.clearSubtitle();
     studio.playClick();

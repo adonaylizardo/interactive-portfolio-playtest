@@ -2,6 +2,7 @@ import { aboutForLang, type AboutBlock } from './about';
 import {
   CASE_HOUSE_IDS,
   CASES,
+  CASE_CARD_TITLES,
   caseCardTitle,
   caseForLang,
   type CaseHouseId,
@@ -144,7 +145,7 @@ function buildIndex(lang: Lang): SearchResult[] {
 
   for (const id of CASE_HOUSE_IDS) {
     const localized = caseForLang(id, lang);
-    const title = caseCardTitle(id, lang);
+    const title = lang === 'en' ? CASE_CARD_TITLES[id] : caseCardTitle(id, lang);
     const text = caseText(id, lang);
     const snippet =
       lang === 'en'

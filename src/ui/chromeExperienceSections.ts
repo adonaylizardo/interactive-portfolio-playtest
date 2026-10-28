@@ -13,6 +13,7 @@ import {
   talkThumbnailUrl,
   talkTitle,
   writingItemHasCopy,
+  writingMeta,
   writingTitle,
 } from './contentLabels';
 import { FIGMA_DOC, FIGMA_DOC_PHONE } from './figmaAssets';
@@ -81,20 +82,24 @@ function writingRow(_section: WritingSection, item: WritingItem, onOpen: () => v
   title.textContent = writingTitle(item);
   const meta = document.createElement('span');
   meta.className = 'experience__row-meta';
-  if (item.publication) {
-    const source = document.createElement('span');
-    source.className = 'experience__row-meta-source';
-    source.textContent = item.publication;
-    meta.append(source);
-  }
-  if (item.date) {
-    const date = document.createElement('span');
-    date.className = 'experience__row-meta-date';
-    date.textContent = formatContentDate(item.date);
-    meta.append(date);
-  }
-  if (item.readTime && !item.publication && !item.date) {
-    meta.textContent = item.readTime;
+  if (isPhone()) {
+    if (item.publication) {
+      const source = document.createElement('span');
+      source.className = 'experience__row-meta-source';
+      source.textContent = item.publication;
+      meta.append(source);
+    }
+    if (item.date) {
+      const date = document.createElement('span');
+      date.className = 'experience__row-meta-date';
+      date.textContent = formatContentDate(item.date);
+      meta.append(date);
+    }
+    if (item.readTime && !item.publication && !item.date) {
+      meta.textContent = item.readTime;
+    }
+  } else {
+    meta.textContent = writingMeta(item);
   }
   copy.append(title, meta);
   btn.append(thumb, copy);

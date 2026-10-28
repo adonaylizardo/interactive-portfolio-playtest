@@ -5,6 +5,27 @@ export type ReadingRoute =
 const PREFIX = '/leer';
 const OUTDOOR_HASH_KEY = 'portfolio-playtest-outdoor-hash';
 
+const READING_DETAIL_SLUGS = new Set([
+  'estudio',
+  'experiencia',
+  'logros',
+  'talks',
+  'writings',
+  'volaris',
+  'bain',
+  'mentoria',
+  'finoa',
+  'pg',
+  'sambil',
+  'catedral',
+  'flor',
+]);
+
+/** Valid `#/leer/<slug>` detail targets (invalid slugs should surface the unknown-route toast). */
+export function isValidReadingDetailSlug(slug: string): boolean {
+  return READING_DETAIL_SLUGS.has(slug);
+}
+
 type ReadingNavState = { reading?: boolean; rDepth?: number; playtest?: boolean };
 
 /** In-memory only — reset on every full document load. */
@@ -105,6 +126,15 @@ export function parseReadingRoute(rawHash = location.hash): ReadingRoute | null 
   const slug = decodeURIComponent(raw.slice(PREFIX.length + 1)).trim();
   if (!slug) return { kind: 'list' };
   return { kind: 'detail', slug };
+}
+
+/** Reading hash with a known list or detail slug. */
+export function isSupportedReadingHash(rawHash = location.hash): boolean {
+  if (!isReadingHash(rawHash)) return false;
+  const route = parseReadingRoute(rawHash);
+  if (!route) return false;
+  if (route.kind === 'list') return true;
+  return isValidReadingDetailSlug(route.slug);
 }
 
 export function readingHash(slug?: string, anchor?: string): string {

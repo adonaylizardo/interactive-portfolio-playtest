@@ -3806,10 +3806,8 @@ body:has(.building-panel--open) .chrome__lang {
   }
 
   /* Case interior: dock peek card on the map side so × / teaser do not cover exit gap/mat. */
-  body:has(#game-canvas[data-interior]:not([data-interior=''])):has(
-      .building-panel--preview.building-panel--peek
-    )
-    .building-panel--preview.building-panel--peek
+  body:has(#game-canvas[data-interior]:not([data-interior=''])):has(.building-panel--preview)
+    .building-panel--preview
     .building-panel__sheet {
     left: auto !important;
     right: max(16px, env(safe-area-inset-right)) !important;
@@ -3817,7 +3815,18 @@ body:has(.building-panel--open) .chrome__lang {
     top: auto !important;
     width: min(408px, calc(100vw - 96px)) !important;
     max-width: min(408px, calc(100vw - 96px)) !important;
-    transform: translateX(110%);
+    transform: translateX(110%) !important;
+    pointer-events: none !important;
+    transition: transform 0.28s ease-out;
+  }
+
+  body:has(#game-canvas[data-interior]:not([data-interior=''])):has(.building-panel--preview.building-panel--case-enter)
+    .building-panel--preview.building-panel--case-enter
+    .building-panel__sheet {
+    transform: translateX(110%) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition: none !important;
   }
 
   body:has(#game-canvas[data-interior]:not([data-interior=''])):has(
@@ -3825,14 +3834,16 @@ body:has(.building-panel--open) .chrome__lang {
     )
     .building-panel--preview.building-panel--peek.building-panel--open
     .building-panel__sheet {
-    transform: translateX(0);
+    transform: translateX(0) !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
   }
 
   body:has(.building-panel--preview.building-panel--expanded) #game-canvas {
     visibility: hidden;
   }
 
-  .building-panel--preview.building-panel--open .building-panel__sheet {
+  .building-panel--preview.building-panel--open:not(.building-panel--peek) .building-panel__sheet {
     top: auto;
     left: 64px;
     right: auto;
@@ -3847,7 +3858,7 @@ body:has(.building-panel--open) .chrome__lang {
     box-shadow: 0 -8px 16px rgb(0 0 0 / 45%);
   }
 
-  .building-panel--preview.building-panel--open .building-panel__sheet {
+  .building-panel--preview.building-panel--open:not(.building-panel--peek) .building-panel__sheet {
     transform: translateY(0);
   }
 
