@@ -286,6 +286,7 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
       if (m1.viewsShown) errors.push(`${tag}: view buttons visible under the intro sheet`);
 
       await dismissArrivalSheet(page);
+      console.log(`${tag}: intro dismissed`);
       await page.waitForFunction(
         () => {
           const intro = document.querySelector('.chrome__intro');
@@ -310,6 +311,7 @@ export async function runRun56LayoutSuite({ kind, base, errors, notes }) {
           btns,
         };
       });
+      console.log(`${tag}: M4 layout checks`);
       if (m4.layout !== 'map') errors.push(`${tag}: closing the sheet left layout ${m4.layout}`);
       if (m4.introShown) errors.push(`${tag}: intro still open after close`);
       if (!m4.dockShown) errors.push(`${tag}: dock hidden after closing the sheet`);

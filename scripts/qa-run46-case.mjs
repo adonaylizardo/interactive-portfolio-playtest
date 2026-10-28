@@ -153,6 +153,13 @@ export async function runRun46CaseSuite({ kind, base, errors, notes, shots }) {
         )
         .catch(() => {});
       await wait(400);
+      if (!spec.phone) {
+        const expand = page.locator('.case-read__bar [data-read-collapse]').first();
+        if (await expand.isVisible().catch(() => false)) {
+          await expand.click();
+          await wait(350);
+        }
+      }
     } else if (spec.phone) {
       await page.locator('.building-panel__title').tap();
       await wait(400);
