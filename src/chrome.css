@@ -2076,6 +2076,15 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
   display: none !important;
 }
 
+/* Closed-sheet phone map: camera controls sit above the bottom dock (not under it). */
+.chrome--mobile.chrome--dock .chrome__views {
+  display: block !important;
+  z-index: 8;
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 48px + 12px);
+  right: max(16px, env(safe-area-inset-right));
+  width: auto;
+}
+
 .chrome--dock .chrome__minimap-wrap {
   display: none;
 }
