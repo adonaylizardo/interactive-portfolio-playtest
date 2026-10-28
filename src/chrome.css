@@ -481,6 +481,30 @@ body[data-interior='1'] .chrome__column {
   min-width: 0;
 }
 
+@media (max-width: 767px) {
+  .chrome--mobile .chrome__section--content .chrome__content-row {
+    height: auto;
+    min-height: 88px;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .chrome--mobile .chrome__section--content .experience__row-meta {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    display: block;
+    line-height: 18px;
+  }
+
+  .chrome--mobile .chrome__exp-role {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    overflow-wrap: anywhere;
+  }
+}
+
 @media (min-width: 768px) {
   .chrome__section--content .chrome__content-thumb.experience__thumb--video,
   .chrome__section--content .chrome__content-thumb.experience__thumb--doc {
@@ -1787,7 +1811,7 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   z-index: 28;
-  scroll-padding-top: var(--intro-sheet-scroll-margin, 88px);
+  scroll-padding-top: var(--intro-sheet-scroll-margin, 76px);
 }
 
 .chrome--mobile.chrome--sheet.chrome--intro-expanded .chrome__intro-pinned,
@@ -1797,9 +1821,9 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
   z-index: 6;
   flex-shrink: 0;
   margin: 0 -16px;
-  padding: max(12px, env(safe-area-inset-top, 0px)) 16px 0;
+  padding: 0 16px 8px;
   box-sizing: border-box;
-  min-height: calc(76px + max(12px, env(safe-area-inset-top, 0px)));
+  min-height: 76px;
   background: #141518;
   box-shadow: 0 1px 0 #141518;
 }
@@ -1828,10 +1852,15 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
 
 .chrome--mobile.chrome--sheet.chrome--intro-expanded .chrome__sheet-grab span,
 .chrome--mobile.chrome--sheet.chrome--intro-full .chrome__sheet-grab span {
-  width: 36px;
-  max-width: 36px;
+  width: 70px;
+  max-width: 70px;
   height: 4px;
   margin: 0 auto;
+}
+
+.chrome--mobile.chrome--sheet.chrome--intro-expanded .chrome__intro-title-actions,
+.chrome--mobile.chrome--sheet.chrome--intro-full .chrome__intro-title-actions {
+  gap: 4px;
 }
 
 .chrome--mobile.chrome--sheet.chrome--intro-expanded .chrome__title,
@@ -1847,10 +1876,34 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
 .chrome--mobile.chrome--sheet.chrome--intro-expanded .chrome__intro-title-actions .chrome__intro-close,
 .chrome--mobile.chrome--sheet.chrome--intro-full .chrome__intro-title-actions .chrome__intro-sound.ui-round,
 .chrome--mobile.chrome--sheet.chrome--intro-full .chrome__intro-title-actions .chrome__intro-close {
+  position: relative;
   width: 44px;
   height: 44px;
   min-width: 44px;
   min-height: 44px;
+}
+
+.chrome--mobile.chrome--sheet.chrome--intro-expanded .chrome__intro-title-actions .chrome__intro-close::before,
+.chrome--mobile.chrome--sheet.chrome--intro-full .chrome__intro-title-actions .chrome__intro-close::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
+.chrome--mobile.chrome--sheet .chrome__ctas .ui-btn {
+  position: relative;
+  min-height: 44px;
+  height: 44px;
+}
+
+.chrome--mobile.chrome--sheet .chrome__ctas .ui-btn::before {
+  content: '';
+  position: absolute;
+  inset: -2px 0;
 }
 
 .chrome--mobile.chrome--intro-expanded .chrome__phone-topbar,
@@ -1869,12 +1922,12 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
 
 .chrome--mobile.chrome--intro-expanded [data-chrome-section],
 .chrome--mobile.chrome--intro-full [data-chrome-section] {
-  scroll-margin-top: var(--intro-sheet-scroll-margin, 88px);
+  scroll-margin-top: var(--intro-sheet-scroll-margin, 76px);
 }
 
 .chrome--mobile.chrome--intro-expanded .chrome__section h2,
 .chrome--mobile.chrome--intro-full .chrome__section h2 {
-  scroll-margin-top: var(--intro-sheet-scroll-margin, 88px);
+  scroll-margin-top: var(--intro-sheet-scroll-margin, 76px);
 }
 
 .chrome--mobile.chrome--sheet:not(.chrome--intro-expanded) [data-chrome-section],

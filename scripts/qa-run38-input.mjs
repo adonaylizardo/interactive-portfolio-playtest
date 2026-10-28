@@ -249,6 +249,20 @@ async function testExitSalir(ctx, kind, base, errors) {
         continue;
       }
       if (kind === 'chromium-desktop' && DESKTOP_CHROME_INTERIOR.has(name)) {
+        const wantSection = name === 'teresa' ? 'charlas' : 'articulos';
+        const adonayOk = await page.evaluate((sec) => {
+          const panel = document.querySelector(`#chrome-${sec}`);
+          if (!panel) return { ok: false, reason: 'no section node' };
+          const r = panel.getBoundingClientRect();
+          const salir = document.querySelector('.building-panel--open [data-exit]');
+          if (salir && getComputedStyle(salir).display !== 'none') {
+            return { ok: false, reason: 'unexpected Salir building sheet' };
+          }
+          return { ok: r.width > 8 && r.height > 8, reason: 'section not laid out' };
+        }, wantSection);
+        if (!adonayOk.ok) {
+          errors.push(`${tag}: desktop ${name} should open Adonay ${wantSection}, not Salir (${adonayOk.reason})`);
+        }
         continue;
       }
       const exitVisible = await page

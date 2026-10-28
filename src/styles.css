@@ -3805,18 +3805,27 @@ body:has(.building-panel--open) .chrome__lang {
     max-width: calc(432px - 24px);
   }
 
-  /* Case interior: dock peek card on the map side so × / teaser do not cover exit gap/mat. */
+  /* Case interior: bottom-left on map column; slide in from the left (never over the avatar/mat). */
   body:has(#game-canvas[data-interior]:not([data-interior=''])):has(
       .building-panel--preview.building-panel--peek.building-panel--open
     )
     .building-panel--preview.building-panel--peek
     .building-panel__sheet {
-    left: auto !important;
-    right: max(16px, env(safe-area-inset-right)) !important;
-    bottom: max(16px, env(safe-area-inset-bottom)) !important;
+    left: 64px !important;
+    right: auto !important;
+    bottom: calc(100vh - 662px) !important;
     top: auto !important;
     width: min(408px, calc(100vw - 96px)) !important;
     max-width: min(408px, calc(100vw - 96px)) !important;
+    transform: translateX(-110%);
+  }
+
+  body:has(#game-canvas[data-interior]:not([data-interior=''])):has(
+      .building-panel--preview.building-panel--peek.building-panel--open
+    )
+    .building-panel--preview.building-panel--peek.building-panel--open
+    .building-panel__sheet {
+    transform: translateX(0);
   }
 
   body:has(.building-panel--preview.building-panel--expanded) #game-canvas {

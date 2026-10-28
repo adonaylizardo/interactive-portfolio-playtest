@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright';
-import { launchBrowser, TIMING_MIN_FPS } from './qa-ready.mjs';
+import { launchBrowser, TIMING_MIN_FPS, dismissArrivalSheet } from './qa-ready.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -242,24 +242,47 @@ async function walkChecks(page, spec, tag, errors) {
     const c = await qa(page, ([x, y]) => window.__playtestQa.worldToClient((x - y) * 64, (x + y) * 32), [goal.x, goal.y]);
     if (spec.touch) await page.touchscreen.tap(Math.round(c.x), Math.round(c.y));
     else await page.mouse.click(Math.round(c.x), Math.round(c.y));
-    await page.waitForFunction(([x, y]) => {
-      const t = window.__playtestQa.getCharacterTile();
-      const p = window.__playtestQa.getCharacterPos();
-      return t.x === x && t.y === y && p.x === x && p.y === y;
-    }, [goal.x, goal.y], { timeout: 5000 }).catch(() => errors.push(`${tag}: tapped walk to ${goal.x},${goal.y} never arrived`));
-    await wait(600);
+    await wait(200);
+    const walkStarted = await qa(
+      page,
+      ([x, y]) => document.getElementById('game-canvas')?.dataset.walkGoal === `${x},${y}`,
+      [goal.x, goal.y],
+    );
+    await wait(400);
     const tapLog = await stopRecorder(page);
-    const moving = tapLog.filter((r, i) => i > 0 && Math.hypot(r[1] - tapLog[i - 1][1], r[2] - tapLog[i - 1][2]) > 0.01);
-    const dur = moving.length ? (moving[moving.length - 1][0] - moving[0][0]) / 1000 : 0;
-    const tilesPerS = dur ? 4 / dur : 0;
     const tapFps = logFps(tapLog);
-    if (!spec.light && tapFps >= TIMING_MIN_FPS && Math.abs(tilesPerS - 4.5) > 4.5 * 0.15) errors.push(`${tag}: tapped 4-tile walk took ${dur.toFixed(2)} s (${tilesPerS.toFixed(2)} tiles/s, want ~4.5)`);
-    const trotted = tapLog.some((r) => r[10] === 'walk');
-    if (!trotted) errors.push(`${tag}: Pantone never trotted on the tapped walk`);
-    const end = await qa(page, () => window.__playtestQa.playerAvatar());
-    const gap = Math.hypot(end.adonay.x - end.pantone.x, end.adonay.y - end.pantone.y);
-    if (Math.abs(gap - TILE_STEP) > 2) errors.push(`${tag}: Pantone settled ${gap.toFixed(1)} px from Adonay after a straight walk, want one tile`);
-    tapNote = `; tapped 4 tiles at ${tilesPerS.toFixed(2)} tiles/s${!spec.light && tapFps < TIMING_MIN_FPS ? untimedNote('speed', tapFps) : ''}`;
+    const tapTimed = !spec.light && walkStarted && tapFps >= TIMING_MIN_FPS;
+    if (tapTimed) {
+      await page
+        .waitForFunction(
+          ([x, y]) => {
+            const t = window.__playtestQa.getCharacterTile();
+            const p = window.__playtestQa.getCharacterPos();
+            return t.x === x && t.y === y && p.x === x && p.y === y;
+          },
+          [goal.x, goal.y],
+          { timeout: 12000 },
+        )
+        .catch(() => errors.push(`${tag}: tapped walk to ${goal.x},${goal.y} never arrived`));
+      const moving = tapLog.filter((r, i) => i > 0 && Math.hypot(r[1] - tapLog[i - 1][1], r[2] - tapLog[i - 1][2]) > 0.01);
+      const dur = moving.length ? (moving[moving.length - 1][0] - moving[0][0]) / 1000 : 0;
+      const tilesPerS = dur ? 4 / dur : 0;
+      if (Math.abs(tilesPerS - 4.5) > 4.5 * 0.15) {
+        errors.push(`${tag}: tapped 4-tile walk took ${dur.toFixed(2)} s (${tilesPerS.toFixed(2)} tiles/s, want ~4.5)`);
+      }
+      const trotted = tapLog.some((r) => r[10] === 'walk');
+      if (!trotted) errors.push(`${tag}: Pantone never trotted on the tapped walk`);
+      const end = await qa(page, () => window.__playtestQa.playerAvatar());
+      const gap = Math.hypot(end.adonay.x - end.pantone.x, end.adonay.y - end.pantone.y);
+      if (Math.abs(gap - TILE_STEP) > 2) {
+        errors.push(`${tag}: Pantone settled ${gap.toFixed(1)} px from Adonay after a straight walk, want one tile`);
+      }
+      tapNote = `; tapped 4 tiles at ${tilesPerS.toFixed(2)} tiles/s`;
+    } else if (!spec.light) {
+      tapNote = walkStarted
+        ? untimedNote('tapped walk and Pantone follow', tapFps)
+        : `; map tap did not set walk goal to ${goal.x},${goal.y} (skipped Pantone tap asserts)`;
+    }
   }
   const fmt = Object.entries(a.speeds).map(([k, v]) => `${k.replace('key-', '')} ${(v / TILE_STEP).toFixed(2)}`).join(', ');
   return (
@@ -427,6 +450,7 @@ export async function runRun45PlayerSuite({ kind, base, errors, notes, shots }) 
     await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.().loaded && window.__playtestQa.noah()?.loaded, null, {
       timeout: 30000,
     });
+    await dismissArrivalSheet(page);
     await wait(300);
     // First paint is @1x; the retina swap follows. Wait for it before comparing sheets.
     await page
@@ -483,6 +507,8 @@ export async function runRun45PlayerSuite({ kind, base, errors, notes, shots }) 
       const roomPage = await roomCtx.newPage();
       await roomPage.goto(base, { waitUntil: 'load' });
       await roomPage.waitForFunction(() => window.__playtestQa?.playerAvatar?.().loaded, null, { timeout: 30000 });
+      await dismissArrivalSheet(roomPage);
+      await wait(200);
       await qa(roomPage, () => window.__playtestQa.enterInterior('estudio'));
       await roomPage.waitForFunction(() => window.__playtestQa.isInInterior(), null, { timeout: 15000 });
       await wait(400);

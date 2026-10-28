@@ -1,5 +1,10 @@
 import { ABOUT, type AboutBlock } from './about';
-import { CASES, CASE_CARD_TITLES, CASE_HOUSE_IDS, type CaseHouseId } from './cases';
+import {
+  CASE_CARD_TITLES,
+  CASE_HOUSE_IDS,
+  caseForLang,
+  type CaseHouseId,
+} from './cases';
 import { TALKS, WRITINGS } from './experiences';
 import { aboutSectionId } from './aboutSectionId';
 import {
@@ -10,7 +15,7 @@ import {
 } from '../ui/contentLabels';
 import type { TalkItem } from './experiences';
 import type { WritingItem } from './experiences';
-import { t, getLang } from '../ui/i18n';
+import { getLang, onLangChange, t, type Lang, type I18nKey } from '../ui/i18n';
 import { CONTACT_EMAIL, CV_HREF } from './contactLinks';
 
 export type SearchResultKind =
@@ -71,8 +76,8 @@ function matchScore(haystack: string, query: string): number {
   return 0;
 }
 
-function caseText(id: CaseHouseId): string {
-  const c = CASES[id];
+function caseText(id: CaseHouseId, lang: Lang): string {
+  const c = caseForLang(id, lang);
   if (!c) return '';
   const chunks: string[] = [c.headline, c.subtitle, c.shortHeadline ?? '', ...CASE_ALIASES[id]];
   for (const block of [...c.full, ...c.short]) {
@@ -133,16 +138,17 @@ export function searchableTalkCount(): number {
   return searchableTalkItems().length;
 }
 
-function buildIndex(): SearchResult[] {
+function buildIndex(lang: Lang): SearchResult[] {
   const out: SearchResult[] = [];
 
   for (const id of CASE_HOUSE_IDS) {
-    const title = CASE_CARD_TITLES[id];
-    const text = caseText(id);
+    const localized = caseForLang(id, lang);
+    const title = localized?.headline ?? CASE_CARD_TITLES[id];
+    const text = caseText(id, lang);
     pushRow(out, {
       kind: 'cases',
       title,
-      snippet: CASES[id]?.subtitle ?? title,
+      snippet: localized?.subtitle ?? title,
       targetId: id,
       haystack: `${title} ${text}`,
     });
@@ -197,7 +203,7 @@ function buildIndex(): SearchResult[] {
   });
 
   for (const id of LANDMARK_IDS) {
-    const c = CASES[id];
+    const c = caseForLang(id, lang);
     pushRow(out, {
       kind: 'landmarks',
       title: c?.headline ?? id,
@@ -237,7 +243,7 @@ function buildIndex(): SearchResult[] {
     const full = sectionParts.join(' ').replace(/\s+/g, ' ').trim();
     pushRow(out, {
       kind: 'about',
-      title: sectionTitle || 'About me',
+      title: sectionTitle || (lang === 'es' ? t('panel.aboutMe') : 'About me'),
       snippet: full.slice(0, 120),
       targetId: sectionId,
       haystack: `${sectionTitle} ${full}`,
@@ -259,7 +265,7 @@ function buildIndex(): SearchResult[] {
 
   pushRow(out, {
     kind: 'about',
-    title: 'About me',
+    title: lang === 'es' ? t('panel.aboutMe') : 'About me',
     snippet: 'Adonay Lizardo',
     targetId: 'about',
     haystack: ABOUT.map(aboutBlockPlain).join(' '),
@@ -268,16 +274,37 @@ function buildIndex(): SearchResult[] {
   return out;
 }
 
-let indexCache: SearchResult[] | null = null;
+let indexCache: { lang: Lang; rows: SearchResult[] } | null = null;
 
 function getIndex(): SearchResult[] {
-  if (!indexCache) indexCache = buildIndex();
-  return indexCache;
+  const lang = getLang();
+  if (indexCache?.lang === lang) return indexCache.rows;
+  indexCache = { lang, rows: buildIndex(lang) };
+  return indexCache.rows;
 }
+
+onLangChange(() => {
+  indexCache = null;
+});
 
 /** Rebuild when language changes (achievement/contact labels). */
 export function resetSearchIndexForTests(): void {
   indexCache = null;
+}
+
+const GROUP_LABEL_KEYS: Record<SearchResultKind, I18nKey> = {
+  cases: 'search.group.cases',
+  articles: 'search.group.articles',
+  talks: 'search.group.talks',
+  achievements: 'search.group.achievements',
+  landmarks: 'search.group.landmarks',
+  contact: 'search.group.contact',
+  about: 'search.group.about',
+};
+
+function searchGroupLabel(kind: SearchResultKind): string {
+  if (kind === 'about' && getLang() === 'es') return t('panel.aboutMe');
+  return t(GROUP_LABEL_KEYS[kind]);
 }
 
 export function searchTypeChips(): SearchTypeChip[] {
@@ -289,28 +316,23 @@ export function searchTypeChips(): SearchTypeChip[] {
     'landmarks',
     'contact',
   ];
-  const labels: Record<SearchResultKind, Parameters<typeof t>[0]> = {
-    cases: 'search.group.cases',
-    articles: 'search.group.articles',
-    talks: 'search.group.talks',
-    achievements: 'search.group.achievements',
-    landmarks: 'search.group.landmarks',
-    contact: 'search.group.contact',
-    about: 'search.group.about',
-  };
-  return kinds.map((kind) => ({ kind, label: t(labels[kind]) }));
+  return kinds.map((kind) => ({ kind, label: searchGroupLabel(kind) }));
 }
 
 export function searchSite(query: string): SearchResultGroup[] {
   const q = query.trim();
   if (!q) return [];
-  void getLang();
 
-  const scored = getIndex().map((row) => {
-    const score = matchScore(row.haystack, q);
-    const snippet = row.kind === 'about' ? excerpt(row.haystack.replace(row.title, '').trim() || row.haystack, q) : excerpt(row.snippet || row.haystack, q);
-    return { ...row, snippet, score };
-  }).filter((r) => r.score > 0);
+  const scored = getIndex()
+    .map((row) => {
+      const score = matchScore(row.haystack, q);
+      const snippet =
+        row.kind === 'about'
+          ? excerpt(row.haystack.replace(row.title, '').trim() || row.haystack, q)
+          : excerpt(row.snippet || row.haystack, q);
+      return { ...row, snippet, score };
+    })
+    .filter((r) => r.score > 0);
 
   scored.sort((a, b) => b.score - a.score);
 
@@ -336,21 +358,11 @@ export function searchSite(query: string): SearchResultGroup[] {
     'about',
   ];
 
-  const labels: Record<SearchResultKind, Parameters<typeof t>[0]> = {
-    cases: 'search.group.cases',
-    articles: 'search.group.articles',
-    talks: 'search.group.talks',
-    achievements: 'search.group.achievements',
-    landmarks: 'search.group.landmarks',
-    contact: 'search.group.contact',
-    about: 'search.group.about',
-  };
-
   return order
     .filter((k) => byKind.has(k))
     .map((kind) => ({
       kind,
-      label: t(labels[kind]),
+      label: searchGroupLabel(kind),
       items: byKind.get(kind)!,
     }));
 }
@@ -360,17 +372,7 @@ export function searchResultsForKind(
   kind: SearchResultKind,
   query = '',
 ): SearchResultGroup | null {
-  void getLang();
   const q = query.trim();
-  const labels: Record<SearchResultKind, Parameters<typeof t>[0]> = {
-    cases: 'search.group.cases',
-    articles: 'search.group.articles',
-    talks: 'search.group.talks',
-    achievements: 'search.group.achievements',
-    landmarks: 'search.group.landmarks',
-    contact: 'search.group.contact',
-    about: 'search.group.about',
-  };
 
   const scored = getIndex()
     .filter((row) => row.kind === kind && row.targetId !== 'teresa-building')
@@ -395,5 +397,5 @@ export function searchResultsForKind(
     if (items.length >= 20) break;
   }
   if (!items.length) return null;
-  return { kind, label: t(labels[kind]), items };
+  return { kind, label: searchGroupLabel(kind), items };
 }

@@ -229,11 +229,11 @@ async function readPanel(page) {
   return qa(page, () => {
     const shown = (el) => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
     const sheet = document.querySelector('.building-panel__sheet');
+    const article = document.querySelector('.case');
     const headline = document.querySelector('.case-read__headline');
     const caseTitle = article?.querySelector('h2, .case__title');
     const titleEl = document.querySelector('.building-panel__title');
     const previewTitle = document.querySelector('.case-preview__title');
-    const article = document.querySelector('.case');
     const isPhone = window.matchMedia('(max-width: 767px)').matches;
     const versionRoot = isPhone
       ? document.querySelector('.case__version--short')

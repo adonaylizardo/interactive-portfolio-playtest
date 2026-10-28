@@ -25,7 +25,7 @@ import { ReadingView } from './ui/readingView';
 import { getInteriorDef, interiorBlockedTilesHaveProps } from './game/interior';
 import { IsoScene } from './game/scene';
 import { findPath, findPathOrNearest } from './iso/pathfinding';
-import type { SearchResult } from './data/siteSearch';
+import { searchSite, type SearchResult } from './data/siteSearch';
 import { AboutMePanel } from './ui/aboutMePanel';
 import { BuildingPanel } from './ui/buildingPanel';
 import { PlaceCardPanel } from './ui/placeCardPanel';
@@ -1057,6 +1057,7 @@ async function main(): Promise<void> {
     jacSetBubble: (on: boolean) => scene.jacSetBubble(on),
     jacSet: (partial: Parameters<IsoScene['qaJacSet']>[0]) => scene.qaJacSet(partial),
     setLang: (lang: 'en' | 'es') => setLang(lang),
+    searchForQa: (query: string) => searchSite(query),
     getLang: () => getLang(),
     t: (key: Parameters<typeof t>[0]) => t(key),
     showFatalState: (kind: 'webgl' | 'load-failed') => showFatalState(kind),

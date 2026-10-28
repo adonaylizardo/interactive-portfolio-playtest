@@ -823,7 +823,7 @@ export class ChromeUI {
         ? introExpanded
           ? Math.max(
               Math.round((pinnedRect ? pinnedRect.bottom - hostRect.top : pinnedHead) + 12),
-              72,
+              76,
             )
           : Math.round(topbar?.getBoundingClientRect().height ?? 72) + 12
         : 77;
