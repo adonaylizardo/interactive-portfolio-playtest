@@ -1,0 +1,639 @@
+{
+ "asset": "biblioteca-ingenieria-interior",
+ "titulo": "Biblioteca Ingeniería UCV · sala de lectura en corte, UNA planta, pulida (Writings)",
+ "tipo": "edificio (interior)",
+ "version": "v3",
+ "estado": "APROBADO",
+ "aprobado_para_mapa": false,
+ "colocacion": {
+  "activa": false,
+  "instrucciones": "Colocación: sea S el punto del mundo en pantalla (edificios: vértice frontal de la huella; tiles: vértice inferior del rombo de la casilla; muebles: su punto de piso). Dibuja el frame con la esquina superior izquierda en (S.x − ancla.x, S.y − ancla.y − offset_y). Con offset_y = 0 el ancla cae justo en S; con offset_y = −24 (tiles de borde) el ancla queda 24 px por debajo de S, así el rombo calza con la grilla y la losa cuelga 24 px. En @2x multiplica todo por 2."
+ },
+ "huella": {
+  "x": 10,
+  "y": 8
+ },
+ "origen": {
+  "tipo": "programático PIL (sin Figma, sin SVG)",
+  "script": "/workspace/portfolio/qa/edificios/biblioteca-ingenieria-src/build_biblioteca.py",
+  "fecha": "2026-10-16",
+  "referencias": "/workspace/portfolio/personaje-refs/biblioteca-ingenieria-ucv/refs.md"
+ },
+ "paleta": "la del kit (tokens.ts), igual que Catedral, Sambil y Teresa Carreño. Acentos Villanueva apagados (naranja #5C3828, amarillo #5E5432, gris claro = tile-line) solo como paneles chicos; borde de la cáscara y parteluces #787C84 (entre prop-line y ui/text). Nota: #787C84 (parteluces/borde) y los acentos naranja/amarillo apagados NO son tokens del kit; se mantienen a propósito.",
+ "unidades": "px @1x (multiplica por 2 para @2x)",
+ "nota": "Huella 10×8 tiles (128×64 @2x): bóvedas en x 1..9, y 1..7; los puntales llegan a y≈0,15 y y≈7,9. Ancla = centro inferior del frame (304,438) @1x. OJO: el vértice frontal del suelo cae en (336,438), +32 px en x respecto del ancla. Vértice trasero [272.0, 150.0]; esquinas laterales [16.0, 278.0] y [592.0, 310.0]. Exterior e interior comparten frame y ancla.",
+ "variantes": [
+  {
+   "nombre": "estado=interior, zoom=cerca",
+   "nodo": null,
+   "archivos": {
+    "png1x": "biblioteca-ingenieria-interior__estado-interior_zoom-cerca@1x.png",
+    "png2x": "biblioteca-ingenieria-interior__estado-interior_zoom-cerca@2x.png"
+   },
+   "tamano": {
+    "w": 608,
+    "h": 438
+   },
+   "ancla": {
+    "x": 304,
+    "y": 438
+   },
+   "offset_y": 0,
+   "vertice_frontal_suelo": {
+    "x": 336.0,
+    "y": 438.0
+   }
+  },
+  {
+   "nombre": "estado=interior, zoom=lejos",
+   "nodo": null,
+   "archivos": {
+    "png1x": "biblioteca-ingenieria-interior__estado-interior_zoom-lejos@1x.png",
+    "png2x": "biblioteca-ingenieria-interior__estado-interior_zoom-lejos@2x.png"
+   },
+   "tamano": {
+    "w": 608,
+    "h": 438
+   },
+   "ancla": {
+    "x": 304,
+    "y": 438
+   },
+   "offset_y": 0,
+   "vertice_frontal_suelo": {
+    "x": 336.0,
+    "y": 438.0
+   }
+  }
+ ],
+ "muro_articulos": {
+  "descripcion": "v3: rect principal para la lista de artículos de Pixel en el testero x=1 (cara interior mira +x), con marco de madera grueso, paspartú oscuro, degradado de pantalla, 5 apliques con haz cálido tenue y repisa al pie. Encima, dentro de cada arco, una luneta (cabecera/título) con máscara aparte.",
+  "mascara": {
+   "png1x": "biblioteca-ingenieria-interior__mascara-articulos@1x.png",
+   "png2x": "biblioteca-ingenieria-interior__mascara-articulos@2x.png",
+   "nota": "L 8-bit, 255 = muro"
+  },
+  "esquinas_1x": {
+   "tl": [
+    93.44,
+    231.92
+   ],
+   "tr": [
+    259.84,
+    148.72
+   ],
+   "br": [
+    259.84,
+    182.72
+   ],
+   "bl": [
+    93.44,
+    265.92
+   ]
+  },
+  "esquinas_2x": {
+   "tl": [
+    186.88,
+    463.84
+   ],
+   "tr": [
+    519.68,
+    297.44
+   ],
+   "br": [
+    519.68,
+    365.44
+   ],
+   "bl": [
+    186.88,
+    531.84
+   ]
+  },
+  "bbox_1x": {
+   "x": 93.44,
+   "y": 148.72,
+   "w": 166.4,
+   "h": 117.2
+  },
+  "afin_1x": {
+   "formula": "p(u,v) = tl + u·(tr−tl) + v·(bl−tl), u,v ∈ [0,1]",
+   "tr_menos_tl": [
+    166.4,
+    -83.2
+   ],
+   "bl_menos_tl": [
+    0,
+    34.0
+   ]
+  },
+  "mundo": "rect 5,2 tiles (y 1,4..6,6) × 34 px (z 6..40); + 2 lunetas en los arcos (y 1,6..3,4 y 4,6..6,4, de z 47 hasta la curva −8)",
+  "lunetas": {
+   "mascara": {
+    "png1x": "biblioteca-ingenieria-interior__mascara-articulos-lunetas@1x.png",
+    "png2x": "biblioteca-ingenieria-interior__mascara-articulos-lunetas@2x.png",
+    "nota": "L 8-bit, 255 = luneta; dos polígonos"
+   },
+   "poligonos_1x": [
+    [
+     [
+      253.44,
+      144.92
+     ],
+     [
+      253.44,
+      96.83
+     ],
+     [
+      250.56,
+      94.81
+     ],
+     [
+      247.68,
+      93.27
+     ],
+     [
+      244.8,
+      92.15
+     ],
+     [
+      241.92,
+      91.43
+     ],
+     [
+      239.04,
+      91.08
+     ],
+     [
+      236.16,
+      91.08
+     ],
+     [
+      233.28,
+      91.41
+     ],
+     [
+      230.4,
+      92.06
+     ],
+     [
+      227.52,
+      93.04
+     ],
+     [
+      224.64,
+      94.32
+     ],
+     [
+      221.76,
+      95.92
+     ],
+     [
+      218.88,
+      97.82
+     ],
+     [
+      216.0,
+      100.05
+     ],
+     [
+      213.12,
+      102.6
+     ],
+     [
+      210.24,
+      105.48
+     ],
+     [
+      207.36,
+      108.71
+     ],
+     [
+      204.48,
+      112.31
+     ],
+     [
+      201.6,
+      116.31
+     ],
+     [
+      198.72,
+      120.73
+     ],
+     [
+      195.84,
+      125.63
+     ],
+     [
+      195.84,
+      173.72
+     ]
+    ],
+    [
+     [
+      157.44,
+      192.92
+     ],
+     [
+      157.44,
+      144.83
+     ],
+     [
+      154.56,
+      142.81
+     ],
+     [
+      151.68,
+      141.27
+     ],
+     [
+      148.8,
+      140.15
+     ],
+     [
+      145.92,
+      139.43
+     ],
+     [
+      143.04,
+      139.08
+     ],
+     [
+      140.16,
+      139.08
+     ],
+     [
+      137.28,
+      139.41
+     ],
+     [
+      134.4,
+      140.06
+     ],
+     [
+      131.52,
+      141.04
+     ],
+     [
+      128.64,
+      142.32
+     ],
+     [
+      125.76,
+      143.92
+     ],
+     [
+      122.88,
+      145.82
+     ],
+     [
+      120.0,
+      148.05
+     ],
+     [
+      117.12,
+      150.6
+     ],
+     [
+      114.24,
+      153.48
+     ],
+     [
+      111.36,
+      156.71
+     ],
+     [
+      108.48,
+      160.31
+     ],
+     [
+      105.6,
+      164.31
+     ],
+     [
+      102.72,
+      168.73
+     ],
+     [
+      99.84,
+      173.63
+     ],
+     [
+      99.84,
+      221.72
+     ]
+    ]
+   ]
+  }
+ },
+ "caminabilidad": {
+  "sistema": "casillas interiores x 1..8, y 1..6 (fila = y). UN solo nivel (z=0).",
+  "leyenda": {
+   "A": "pasillo, caminable",
+   "E": "entrada/spawn, caminable",
+   "B": "estantería, bloqueado",
+   "T": "mesa de lectura, bloqueado",
+   "F": "sofá, bloqueado",
+   "C": "butaca, bloqueado",
+   "L": "mesita con lámpara, bloqueado",
+   "P": "planta grande, bloqueado"
+  },
+  "filas_y1_a_y6": [
+   "ABBBBBBB",
+   "AAAAACLC",
+   "AAAAAAAA",
+   "ACTAFATA",
+   "ACTAFATA",
+   "PAAAEAAP"
+  ],
+  "caminables": [
+   "1,1",
+   "1,2",
+   "2,2",
+   "3,2",
+   "4,2",
+   "5,2",
+   "1,3",
+   "2,3",
+   "3,3",
+   "4,3",
+   "5,3",
+   "6,3",
+   "7,3",
+   "8,3",
+   "1,4",
+   "4,4",
+   "6,4",
+   "8,4",
+   "1,5",
+   "4,5",
+   "6,5",
+   "8,5",
+   "2,6",
+   "3,6",
+   "4,6",
+   "5,6",
+   "6,6",
+   "7,6"
+  ],
+  "bloqueadas": [
+   "2,1",
+   "3,1",
+   "4,1",
+   "5,1",
+   "6,1",
+   "7,1",
+   "8,1",
+   "6,2",
+   "7,2",
+   "8,2",
+   "2,4",
+   "3,4",
+   "5,4",
+   "7,4",
+   "2,5",
+   "3,5",
+   "5,5",
+   "7,5",
+   "1,6",
+   "8,6"
+  ],
+  "centro_casilla_px_1x": {
+   "1,1": [
+    272.0,
+    198.0
+   ],
+   "2,1": [
+    304.0,
+    214.0
+   ],
+   "3,1": [
+    336.0,
+    230.0
+   ],
+   "4,1": [
+    368.0,
+    246.0
+   ],
+   "5,1": [
+    400.0,
+    262.0
+   ],
+   "6,1": [
+    432.0,
+    278.0
+   ],
+   "7,1": [
+    464.0,
+    294.0
+   ],
+   "8,1": [
+    496.0,
+    310.0
+   ],
+   "1,2": [
+    240.0,
+    214.0
+   ],
+   "2,2": [
+    272.0,
+    230.0
+   ],
+   "3,2": [
+    304.0,
+    246.0
+   ],
+   "4,2": [
+    336.0,
+    262.0
+   ],
+   "5,2": [
+    368.0,
+    278.0
+   ],
+   "6,2": [
+    400.0,
+    294.0
+   ],
+   "7,2": [
+    432.0,
+    310.0
+   ],
+   "8,2": [
+    464.0,
+    326.0
+   ],
+   "1,3": [
+    208.0,
+    230.0
+   ],
+   "2,3": [
+    240.0,
+    246.0
+   ],
+   "3,3": [
+    272.0,
+    262.0
+   ],
+   "4,3": [
+    304.0,
+    278.0
+   ],
+   "5,3": [
+    336.0,
+    294.0
+   ],
+   "6,3": [
+    368.0,
+    310.0
+   ],
+   "7,3": [
+    400.0,
+    326.0
+   ],
+   "8,3": [
+    432.0,
+    342.0
+   ],
+   "1,4": [
+    176.0,
+    246.0
+   ],
+   "2,4": [
+    208.0,
+    262.0
+   ],
+   "3,4": [
+    240.0,
+    278.0
+   ],
+   "4,4": [
+    272.0,
+    294.0
+   ],
+   "5,4": [
+    304.0,
+    310.0
+   ],
+   "6,4": [
+    336.0,
+    326.0
+   ],
+   "7,4": [
+    368.0,
+    342.0
+   ],
+   "8,4": [
+    400.0,
+    358.0
+   ],
+   "1,5": [
+    144.0,
+    262.0
+   ],
+   "2,5": [
+    176.0,
+    278.0
+   ],
+   "3,5": [
+    208.0,
+    294.0
+   ],
+   "4,5": [
+    240.0,
+    310.0
+   ],
+   "5,5": [
+    272.0,
+    326.0
+   ],
+   "6,5": [
+    304.0,
+    342.0
+   ],
+   "7,5": [
+    336.0,
+    358.0
+   ],
+   "8,5": [
+    368.0,
+    374.0
+   ],
+   "1,6": [
+    112.0,
+    278.0
+   ],
+   "2,6": [
+    144.0,
+    294.0
+   ],
+   "3,6": [
+    176.0,
+    310.0
+   ],
+   "4,6": [
+    208.0,
+    326.0
+   ],
+   "5,6": [
+    240.0,
+    342.0
+   ],
+   "6,6": [
+    272.0,
+    358.0
+   ],
+   "7,6": [
+    304.0,
+    374.0
+   ],
+   "8,6": [
+    336.0,
+    390.0
+   ]
+  },
+  "entrada": {
+   "casilla": [
+    5,
+    6
+   ],
+   "borde": "+y (vano del muro largo, x 5..6; misma puerta del exterior)",
+   "px_1x": [
+    240.0,
+    342.0
+   ]
+  },
+  "spawn": {
+   "casilla": [
+    5,
+    6
+   ],
+   "mira": "nw"
+  },
+  "pasillos": {
+   "frente_muro_articulos": "x=1, y=1..5",
+   "pasillo_estanterias": "y=2 x 1..5 y y=3 x 1..8 (y=3 corrido; el rincón de lectura ocupa y=2 x 6..8)",
+   "entrada": "y=6, x 2..7",
+   "entre_mesas": "x=1, 4, 6 y 8 en y=4..5"
+  },
+  "notas": "Todo pasillo ≥1 casilla completa (128 px @2x); Adonay 96 px @2x. Verificado por BFS: las 28 casillas caminables están conectadas con la entrada (5,6). Las alfombras son decorativas y caminables."
+ },
+ "ambar_medido_1x": {
+  "interior_cerca": "0,05 %",
+  "lejos": "0,10 %",
+  "limite": "≤5 %",
+  "nota": "los charcos de luz y haces usan ámbar con alpha baja (≤46/255) y no cuentan como ámbar puro"
+ },
+ "muebles_compartidos": [],
+ "muebles_nuevos_dibujados": [
+  "estanterías con lomos",
+  "sofá",
+  "4 butacas tapizadas (la butaca del kit mide 16 px @1x y queda de juguete a esta escala)",
+  "3 alfombras",
+  "7 lámparas (de pie y de mesa) con charcos de luz",
+  "mesita del rincón de lectura",
+  "3 plantas de hojas en maceta (reemplazan muebles/planta)",
+  "marco, lunetas y apliques del muro de artículos"
+ ],
+ "cambios_v2": "Corrección de Adonay: el edificio es de UNA planta. Se quitaron entrepiso, baranda, mesas redondas del entrepiso y escalera. Muro de artículos ampliado (3,3→5,2 tiles). Grilla de un solo nivel.",
+ "cambios_v3": "Pulido: sala llena y cálida (butacas, alfombras, lámparas, rincón de lectura, plantas legibles), muro de artículos premium con lunetas en los arcos. Hoja QA: la máscara ya no tapa a la gente."
+}

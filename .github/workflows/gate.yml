@@ -1,0 +1,151 @@
+name: Gate
+
+# Fast checks that must pass before anything is deployed: build, typecheck, sprite
+# placement / picking / interiors, and the real-input smoke (first load framing, door
+# entry, single-tap exits, input, camera follow, logos, NPCs, player, case panel, map
+# fill, bench sit) on Chromium, plus the simulated NPC routines. Each suite runs as
+# parallel shards so every job stays well inside its timeout (~12 min wall clock);
+# `gate passed` is the single check to require.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  QA_CI: '1'
+  QA_CHROMIUM_ONLY: '1'
+  QA_GL: llvmpipe
+
+jobs:
+  sprites:
+    name: qa:sprites (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        include:
+          - name: map + pixel diff
+            parts: placement,picks,map,diff
+          - name: sprite shots
+            parts: shots
+          - name: full-frame diff
+            parts: fullframe
+            sprites_timeout: 38
+          - name: interiors a
+            parts: interiors
+            rooms: estudio,volaris,bain,mentoria,finoa
+          - name: interiors b
+            parts: interiors
+            rooms: pg,flor,catedral,sambil,teresa,biblioteca
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: npm ci
+        run: npm ci
+
+      - name: npm run build
+        run: npm run build
+
+      - name: npm run typecheck
+        run: npm run typecheck
+
+      - name: check:logos
+        run: node scripts/check-logos.mjs
+
+      - name: check:cases
+        run: node scripts/check-case-copy.mjs
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: qa:sprites
+        timeout-minutes: ${{ matrix.sprites_timeout || 32 }}
+        env:
+          QA_SPRITES_ONLY: ${{ matrix.parts }}
+          QA_INTERIOR_ROOMS: ${{ matrix.rooms }}
+        run: node scripts/qa-sprites.mjs --shots
+
+      - name: Upload sprite shots
+        if: always() && contains(matrix.parts, 'shots')
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-sprites-${{ github.run_id }}
+          path: artifacts/run39/*.png
+          if-no-files-found: warn
+
+  smoke:
+    name: qa:smoke (${{ matrix.groups }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 32
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        include:
+          - groups: firstload
+          - groups: chrome
+          - groups: exits-iphone
+          - groups: exits-desktop-a
+            r38_rooms: estudio,volaris,bain,mentoria
+          - groups: exits-desktop-b
+            r38_rooms: finoa,pg,sambil,catedral
+          - groups: exits-desktop-c
+            r38_rooms: flor,teresa,biblioteca
+          - groups: exits-phone
+          - groups: about
+          - groups: input
+          - groups: fill
+          - groups: follow
+          - groups: logos
+          - groups: player-1280
+          - groups: player-375
+          - groups: case-1280
+          - groups: case-375
+          - groups: case-55
+          - groups: npcs
+          - groups: routines
+          - groups: bench-1280
+          - groups: bench-375
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: npm ci
+        run: npm ci
+
+      - name: npm run build
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: qa:smoke
+        timeout-minutes: 28
+        env:
+          QA_SMOKE_ONLY: ${{ matrix.groups }}
+          R38_ROOMS: ${{ matrix.r38_rooms }}
+          QA_REDUCE_DPR: '1'
+        run: node scripts/qa-smoke.mjs
+
+  result:
+    name: gate passed
+    needs: [sprites, smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: every shard passed
+        run: |
+          echo "sprites: ${{ needs.sprites.result }}, smoke: ${{ needs.smoke.result }}"
+          test "${{ needs.sprites.result }}" = success && test "${{ needs.smoke.result }}" = success
