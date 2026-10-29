@@ -76,12 +76,19 @@ body.about-panel-open .checklist {
   padding: 12px 16px 10px;
   border-bottom: 1px solid #2a2c31;
   flex-shrink: 0;
+  pointer-events: none;
+}
+
+.about-panel__header > * {
+  pointer-events: auto;
 }
 
 .about-panel__header-actions {
   display: flex;
   gap: 4px;
   align-items: center;
+  position: relative;
+  z-index: 2;
 }
 
 .about-panel__icon-btn {
@@ -95,6 +102,56 @@ body.about-panel-open .checklist {
   align-items: center;
   justify-content: center;
   padding: 0;
+}
+
+body[data-chrome='phone'] .about-panel__icon-btn[data-about-close] {
+  position: relative;
+}
+
+body[data-chrome='phone'] .about-panel__icon-btn[data-about-close]::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
+.about-panel__contact {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0 20px;
+  padding: 0;
+  scroll-margin-top: 80px;
+  scroll-margin-bottom: 20px;
+  pointer-events: none;
+}
+
+.about-panel__contact > * {
+  pointer-events: auto;
+}
+
+.about-panel__cta-row {
+  display: flex;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+body[data-chrome='phone'] .about-panel__cta-row .ui-btn {
+  position: relative;
+}
+
+body[data-chrome='phone'] .about-panel__cta-row .ui-btn::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
 }
 
 .about-panel__icon-btn--plain .ui-icon {
@@ -117,26 +174,11 @@ body.about-panel-open .checklist {
   margin-top: 0;
 }
 
-.about-panel__contact {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 16px 0 20px;
-  padding: 0;
-  scroll-margin-top: 80px;
-  scroll-margin-bottom: 20px;
-}
-
 .about-panel__contact--flash {
   outline: 2px solid #5b8def;
   outline-offset: 4px;
   border-radius: 12px;
   background: rgba(91, 141, 239, 0.08);
-}
-
-.about-panel__cta-row {
-  display: flex;
-  gap: 8px;
 }
 
 .about-panel__cta-half {

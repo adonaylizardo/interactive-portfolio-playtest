@@ -588,10 +588,8 @@ body[data-interior='1'] .chrome__column {
     white-space: normal;
     text-overflow: unset;
     overflow-wrap: anywhere;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    overflow: visible;
+    display: block;
   }
 
   .chrome__exp-name {
@@ -1948,35 +1946,14 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
 
 .chrome--mobile.chrome--sheet .chrome__ctas .ui-btn {
   position: relative;
-  min-height: 40px;
-  height: 40px;
-}
-
-.chrome--mobile.chrome--sheet .chrome__ctas .ui-btn::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  width: 100%;
+  min-height: 44px;
   height: 44px;
-  transform: translateY(-50%);
-  z-index: 0;
 }
 
 .chrome--mobile.chrome--sheet .chrome__ctas .ui-btn:not([data-action='reading'])::before {
-  inset: auto;
-  left: 0;
-  right: 0;
-  top: 50%;
-  width: 100%;
-  height: 44px;
-  transform: translateY(-50%);
-}
-
-.chrome--mobile.chrome--sheet .chrome__ctas .ui-btn > * {
-  position: relative;
-  z-index: 1;
+  content: '';
+  position: absolute;
+  inset: -2px 0;
 }
 
 .chrome--mobile.chrome--intro-expanded .chrome__phone-topbar,
