@@ -3831,9 +3831,19 @@ body:has(.building-panel--open) .chrome__lang {
   }
 
   body:has(#game-canvas[data-interior]:not([data-interior=''])):has(
+      .building-panel--preview.building-panel--peek.building-panel--case-enter.building-panel--open
+    )
+    .building-panel--preview.building-panel--peek.building-panel--case-enter.building-panel--open
+    .building-panel__sheet {
+    transform: translateX(110%);
+    opacity: 0;
+    transition: none;
+  }
+
+  body:has(#game-canvas[data-interior]:not([data-interior=''])):has(
       .building-panel--preview.building-panel--peek.building-panel--open
     )
-    .building-panel--preview.building-panel--peek.building-panel--open
+    .building-panel--preview.building-panel--peek.building-panel--open:not(.building-panel--case-enter)
     .building-panel__sheet {
     transform: translateX(0);
     opacity: 1;
