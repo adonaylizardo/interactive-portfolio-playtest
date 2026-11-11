@@ -558,6 +558,10 @@ export class IsoScene {
   private historySyncInProgress = false;
   /** Cancels a deferred Salir cleanup if the player re-enters before the next frame. */
   private interiorExitGen = 0;
+  /** When set, avoid fitInteriorCamera overwriting pinch / wheel zoom until exit or resize refit. */
+  private interiorCameraUserAdjusted = false;
+  private lastInteriorViewportW = 0;
+  private lastInteriorViewportH = 0;
   private suppressMapTapOnce = false;
   constructor(events: SceneEvents) {
     this.events = events;
@@ -3713,6 +3717,7 @@ export class IsoScene {
       this.cameraY = refit.cameraY;
       this.zoom = refit.zoom;
     }
+    if (this.interiorActive) this.interiorCameraUserAdjusted = true;
     this.zoomChanged = true;
     this.applyCamera();
   }
@@ -3777,7 +3782,14 @@ export class IsoScene {
     this.paintScreenFill();
     this.updateCameraFitMargins();
     if (this.interiorActive && this.interiorDef) {
-      this.fitInteriorCamera();
+      const sw = this.app.screen.width;
+      const sh = this.app.screen.height;
+      const resized = sw !== this.lastInteriorViewportW || sh !== this.lastInteriorViewportH;
+      if (resized) {
+        this.lastInteriorViewportW = sw;
+        this.lastInteriorViewportH = sh;
+        if (!this.interiorCameraUserAdjusted) this.fitInteriorCamera(true);
+      }
     } else if (!this.follow.engaged) {
       this.centerOnCharacter(false);
     }
@@ -3799,6 +3811,7 @@ export class IsoScene {
   private applyPinchCamera(next: { cameraX: number; cameraY: number; zoom: number }): void {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
+    if (this.interiorActive) this.interiorCameraUserAdjusted = true;
     if (this.follow.engaged) {
       // While following, pinch only zooms, about the character, so it stays where it is on screen.
       next = zoomAtScreenAnchor(
@@ -4758,7 +4771,6 @@ export class IsoScene {
     if (!this.app || !this.canvasEl || this.readingPaused) return;
     this.syncRendererToLayout();
     this.ensureMainRenderSurface(clear);
-    if (this.interiorActive) this.fitInteriorCamera();
     this.applyCamera(false);
     const rgba = this.opaqueBgRgba();
     try {
@@ -5482,19 +5494,32 @@ export class IsoScene {
     await new Promise((r) => setTimeout(r, active ? 280 : 280));
   }
 
-  private fitInteriorCamera(): void {
+  private fitInteriorCamera(force = false): void {
     if (!this.interiorDef) return;
+    if (!force && this.interiorCameraUserAdjusted) return;
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
+    this.lastInteriorViewportW = sw;
+    this.lastInteriorViewportH = sh;
     this.updateCameraFitMargins();
     const fitted = fitCameraToInteriorBounds(
       interiorWorldBounds(this.interiorDef, this.interiorBottomSheet),
       sw,
       sh,
     );
+    let zoom = fitted.zoom;
+    if (this.shouldUseMobileFraming()) {
+      zoom = Math.min(1.5, zoom * 1.28);
+    }
     this.cameraX = fitted.cameraX;
     this.cameraY = fitted.cameraY;
-    this.zoom = fitted.zoom;
+    this.zoom = zoom;
+  }
+
+  private resetInteriorCameraFit(): void {
+    this.interiorCameraUserAdjusted = false;
+    this.lastInteriorViewportW = 0;
+    this.lastInteriorViewportH = 0;
   }
 
   private restoreOutdoorCameraAfterExit(outdoorCam?: { x: number; y: number; zoom: number }): void {
@@ -5599,7 +5624,8 @@ export class IsoScene {
       if (!this.mapReturnDoor) {
         this.mapReturnDoor = { x: door.x, y: door.y };
       }
-      this.fitInteriorCamera();
+      this.resetInteriorCameraFit();
+      this.fitInteriorCamera(true);
       this.applyCamera(false);
       if (this.canvasEl) {
         this.canvasEl.dataset.interior = buildingId;
@@ -5656,6 +5682,7 @@ export class IsoScene {
       this.interiorGrid = [];
       this.interiorPath = [];
       this.interiorSprite = null;
+      this.resetInteriorCameraFit();
       // Sheet off first, before the outdoor restore, so leave is visible and timed without the close transition.
       this.events.onExitInterior?.();
       this.tilesLayer.visible = true;
@@ -5756,7 +5783,7 @@ export class IsoScene {
   applyCameraFromUi(): void {
     this.updateCameraFitMargins();
     if (this.interiorActive && this.interiorDef) {
-      this.fitInteriorCamera();
+      if (!this.interiorCameraUserAdjusted) this.fitInteriorCamera(true);
     } else if (!this.follow.engaged) {
       this.centerOnCharacter(false);
       this.panMoved = false;

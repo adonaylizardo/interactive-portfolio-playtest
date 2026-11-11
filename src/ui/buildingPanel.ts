@@ -8,11 +8,14 @@ import {
   talkMeta,
   talkThumbnailUrl,
   talkTitle,
+  talkItemHasCopy,
+  talksInteriorExcerpt,
   writingArticleUrl,
   writingMeta,
   writingSourceLabel,
   writingTitle,
   writingItemHasCopy,
+  writingsInteriorExcerpt,
 } from './contentLabels';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
 import {
@@ -142,6 +145,10 @@ export class BuildingPanel {
   private exitPress: { x: number; y: number; drift: number } | null = null;
   private exitFromPointer = false;
   private visibilitySyncQueued = false;
+  private interiorExpPeek: HTMLElement | null = null;
+  private interiorExpPeekTitle: HTMLElement | null = null;
+  private interiorExpPeekExcerpt: HTMLElement | null = null;
+  private expReopenFab: HTMLElement | null = null;
 
   constructor(
     container: HTMLElement,
@@ -172,6 +179,13 @@ export class BuildingPanel {
               <img class="exp-mobile-chrome__icon" src="${FIGMA_CLOSE}" width="15" height="15" alt="" />
             </button>
           </div>
+        </div>
+        <div class="interior-exp-peek" data-interior-exp-peek hidden>
+          <h3 class="interior-exp-peek__title"></h3>
+          <p class="interior-exp-peek__excerpt"></p>
+          <button type="button" class="ui-btn ui-btn--primary interior-exp-peek__expand" data-exp-peek-expand hidden>
+            <span data-i18n="panel.expandSheet">Expandir</span>
+          </button>
         </div>
         <header class="exp-header" data-exp-header hidden>
           <button type="button" class="exp-header__btn exp-header__back" data-exp-back aria-label="">
@@ -247,9 +261,6 @@ export class BuildingPanel {
           </section>
           <section class="experience" data-experience hidden>
             <p class="experience__intro"></p>
-            <button type="button" class="ui-btn ui-btn--primary experience__expand-peek" data-exp-peek-expand hidden>
-              <span data-i18n="panel.expandSheet">Expandir</span>
-            </button>
             <div class="experience__filters" data-exp-filters hidden></div>
             <div class="experience__detail" data-exp-detail hidden></div>
           </section>
@@ -257,6 +268,13 @@ export class BuildingPanel {
       </div>
     `;
     container.appendChild(this.el);
+    const reopenFab = document.createElement('button');
+    reopenFab.type = 'button';
+    reopenFab.className = 'interior-exp-reopen-fab';
+    reopenFab.dataset.expReopenFab = '1';
+    reopenFab.hidden = true;
+    reopenFab.innerHTML = '<span data-exp-reopen-label></span>';
+    this.el.appendChild(reopenFab);
     this.sheet = this.el.querySelector('.building-panel__sheet')!;
     if (typeof ResizeObserver !== 'undefined') {
       const ro = new ResizeObserver(() => {
@@ -298,6 +316,21 @@ export class BuildingPanel {
     this.expHeaderCount = this.el.querySelector('.exp-header__count');
     this.expMobileChrome = this.el.querySelector('[data-exp-mobile-chrome]');
     this.expMobileTitle = this.el.querySelector('.exp-mobile-chrome__title');
+    this.interiorExpPeek = this.el.querySelector('[data-interior-exp-peek]');
+    this.interiorExpPeekTitle = this.el.querySelector('.interior-exp-peek__title');
+    this.interiorExpPeekExcerpt = this.el.querySelector('.interior-exp-peek__excerpt');
+    this.expReopenFab = this.el.querySelector('[data-exp-reopen-fab]');
+    this.expReopenFab?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!this.interiorExperienceEntry) return;
+      this.experienceCardDismissed = false;
+      this.peekOnly = true;
+      this.syncPeekClass();
+      this.renderInteriorExperienceList();
+      this.syncExperienceCardDismissed();
+      this.queueVisibilitySync();
+    });
     this.el.querySelector('[data-exp-mobile-back]')?.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -533,10 +566,62 @@ export class BuildingPanel {
     if (peek) this.readColumnExpanded = false;
     this.dragStartY = 0;
     this.ignoreDragUntil = performance.now() + 400;
+  this.syncInteriorExperienceListVisibility();
     this.syncPeekClass();
     this.queueVisibilitySync();
     if (this.isMobile() && this.isOpen() && (this.isInteriorMode() || this.isPreviewMode())) {
       window.setTimeout(() => this.onSheetTransitionEnd(), 280);
+    }
+  }
+
+  private syncInteriorExperienceListVisibility(): void {
+    if (!this.interiorExperienceEntry || !this.experienceDetail) return;
+    if (!this.peekOnly && !this.experienceCardDismissed) {
+      this.renderInteriorExperienceList();
+    } else {
+      this.experienceDetail.hidden = this.peekOnly || this.experienceCardDismissed;
+    }
+    this.syncInteriorExpPeek();
+  }
+
+  private resetSheetGeometry(): void {
+    this.sheet.style.transform = '';
+    this.sheet.style.left = '';
+    this.sheet.style.right = '';
+    this.sheet.style.top = '';
+    this.sheet.style.bottom = '';
+    this.sheet.style.width = '';
+    this.sheet.style.height = '';
+    this.sheet.style.maxHeight = '';
+    this.sheet.style.visibility = '';
+    this.sheet.style.pointerEvents = '';
+    this.el.style.visibility = '';
+    this.el.style.pointerEvents = '';
+    void this.sheet.offsetHeight;
+  }
+
+  private syncInteriorExpPeek(): void {
+    const on = this.interiorExperienceEntry && this.isOpen() && !this.experienceCardDismissed;
+    if (this.interiorExpPeek) {
+      this.interiorExpPeek.hidden = !on;
+    }
+    if (!on) return;
+    const showExpand = this.peekOnly;
+    const expandBtns = this.el.querySelectorAll('[data-exp-peek-expand]');
+    expandBtns.forEach((btn) => {
+      (btn as HTMLElement).hidden = !showExpand;
+    });
+    const title = this.experienceDisplayTitle();
+    if (this.interiorExpPeekTitle) this.interiorExpPeekTitle.textContent = title;
+    if (this.interiorExpPeekExcerpt) {
+      this.interiorExpPeekExcerpt.textContent =
+        this.mode === 'talks' ? talksInteriorExcerpt() : writingsInteriorExcerpt();
+    }
+    if (this.expMobileTitle) this.expMobileTitle.textContent = title;
+    if (this.experienceIntro && !this.peekOnly) {
+      this.experienceIntro.textContent =
+        this.mode === 'talks' ? talksInteriorExcerpt() : writingsInteriorExcerpt();
+      this.experienceIntro.hidden = false;
     }
   }
 
@@ -545,9 +630,12 @@ export class BuildingPanel {
   }
 
   showExperienceInteriorEntry(mode: 'talks' | 'writings', interiorId: string): void {
+    this.resetSheetGeometry();
     this.interiorExperienceEntry = true;
     this.experienceCardDismissed = false;
+    this.el.classList.add('building-panel--interior-entry');
     this.openExperience(mode, interiorId, { interiorEntry: true });
+    this.syncInteriorExpPeek();
   }
 
   private dismissExperienceCard(): void {
@@ -560,13 +648,28 @@ export class BuildingPanel {
 
   private syncExperienceCardDismissed(): void {
     this.el.classList.toggle('building-panel--card-dismissed', this.experienceCardDismissed);
-    const expandBtn = this.el.querySelector('[data-exp-peek-expand]') as HTMLElement | null;
-    const reopen = this.el.querySelector('[data-exp-reopen]') as HTMLElement | null;
     const showPeek = this.interiorExperienceEntry && !this.experienceCardDismissed && this.peekOnly;
-    if (expandBtn) expandBtn.hidden = !showPeek;
-    if (reopen) reopen.hidden = !(this.interiorExperienceEntry && this.experienceCardDismissed);
+    this.el.querySelectorAll('[data-exp-peek-expand]').forEach((btn) => {
+      (btn as HTMLElement).hidden = !showPeek;
+    });
+  const reopenBar = this.el.querySelector('[data-exp-reopen]') as HTMLElement | null;
+    if (reopenBar) reopenBar.hidden = true;
+    const showFab = this.interiorExperienceEntry && this.experienceCardDismissed && this.isOpen();
+    if (this.expReopenFab) {
+      this.expReopenFab.hidden = !showFab;
+      const label = this.expReopenFab.querySelector('[data-exp-reopen-label]');
+      if (label) {
+        label.textContent =
+          this.mode === 'talks' ? t('panel.reopenTalks') : t('panel.reopenWritings');
+      }
+    }
+    if (this.interiorExpPeek) {
+      this.interiorExpPeek.hidden =
+        !this.interiorExperienceEntry || this.experienceCardDismissed || !this.isOpen();
+    }
     if (this.expMobileChrome) {
-      this.expMobileChrome.hidden = this.experienceCardDismissed || !this.isMobile() || !this.isExperienceMode();
+      this.expMobileChrome.hidden =
+        this.experienceCardDismissed || !this.isMobile() || !this.isExperienceMode();
     }
     if (this.sheet) {
       this.sheet.style.visibility = this.experienceCardDismissed ? 'hidden' : '';
@@ -579,8 +682,9 @@ export class BuildingPanel {
     const list = document.createElement('div');
     list.className = 'experience__list';
     if (this.mode === 'talks') {
-      list.replaceChildren(...TALKS.map((talk) => this.talkRow(talk, () => this.openTalk(talk))));
-      this.syncExperienceHeaderCount(TALKS.length);
+      const talks = TALKS.filter(talkItemHasCopy);
+      list.replaceChildren(...talks.map((talk) => this.talkRow(talk, () => this.openTalk(talk))));
+      this.syncExperienceHeaderCount(talks.length);
     } else {
       const rows: HTMLElement[] = [];
       let n = 0;
@@ -600,6 +704,7 @@ export class BuildingPanel {
     this.experienceDetail.hidden = this.peekOnly || this.experienceCardDismissed;
     this.experienceView = 'list';
     this.el.classList.toggle('building-panel--exp-detail', false);
+    this.syncInteriorExpPeek();
   }
 
   private syncPeekClass(): void {
@@ -649,6 +754,9 @@ export class BuildingPanel {
   private clearExperiencePresentation(): void {
     this.interiorExperienceEntry = false;
     this.experienceCardDismissed = false;
+    this.el.classList.remove('building-panel--interior-entry', 'building-panel--card-dismissed');
+    if (this.expReopenFab) this.expReopenFab.hidden = true;
+    if (this.interiorExpPeek) this.interiorExpPeek.hidden = true;
     this.experienceView = 'list';
     this.activeTalkId = null;
     this.activeWriting = null;
@@ -889,6 +997,10 @@ export class BuildingPanel {
     if (this.expHeaderTitle) this.expHeaderTitle.textContent = shown;
     this.el.classList.add('building-panel--open', 'building-panel--experience');
     this.el.classList.toggle('building-panel--writings', mode === 'writings');
+    if (opts?.interiorEntry) {
+      this.resetSheetGeometry();
+      this.el.classList.add('building-panel--interior-entry');
+    }
     this.syncPeekClass();
     if (opts?.interiorEntry) {
       this.experienceView = 'list';
@@ -908,9 +1020,10 @@ export class BuildingPanel {
   private syncExperienceIntro(): void {
     if (!this.experienceIntro) return;
     if (this.interiorExperienceEntry) {
-      const key = this.mode === 'talks' ? 'talks.intro' : 'writings.intro';
-      this.experienceIntro.textContent = t(key);
-      this.experienceIntro.hidden = this.experienceCardDismissed;
+      this.experienceIntro.textContent =
+        this.mode === 'talks' ? talksInteriorExcerpt() : writingsInteriorExcerpt();
+      this.experienceIntro.hidden = this.experienceCardDismissed || this.peekOnly;
+      this.syncInteriorExpPeek();
       return;
     }
     this.experienceIntro.hidden = true;
@@ -940,6 +1053,10 @@ export class BuildingPanel {
     const back = this.expMobileChrome.querySelector('[data-exp-mobile-back]') as HTMLElement | null;
     const showBack = this.experienceView === 'detail';
     if (back) back.hidden = !showBack;
+    this.expMobileChrome.classList.toggle(
+      'exp-mobile-chrome--no-back',
+      !!(this.interiorExperienceEntry && this.experienceView === 'list'),
+    );
     this.expMobileChrome.classList.remove(
       'exp-mobile-chrome--grab-wide',
       'exp-mobile-chrome--grab-compact',

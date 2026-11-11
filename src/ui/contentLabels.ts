@@ -1,4 +1,4 @@
-import type { TalkItem, TalkSection, WritingItem } from '../data/experiences';
+import { TALKS, WRITINGS, type TalkItem, type TalkSection, type WritingItem } from '../data/experiences';
 import { getLang, t, type I18nKey } from './i18n';
 
 type DateParts = { y: number; m: number; d: number };
@@ -121,6 +121,53 @@ export function talkTitle(item: TalkItem): string {
   if (item.title) return item.title;
   if (item.titleKey) return t(item.titleKey as I18nKey);
   return '';
+}
+
+export function talkItemHasCopy(item: TalkItem): boolean {
+  const title = talkTitle(item);
+  return title.length > 0 && !isPlaceholderCopy(title);
+}
+
+/** One-line peek for Teresa interior (real titles only). */
+export function talksInteriorExcerpt(): string {
+  const items = TALKS.filter(talkItemHasCopy);
+  const n = items.length;
+  const a = items[0] ? talkTitle(items[0]) : '';
+  const b = items[1] ? talkTitle(items[1]) : '';
+  if (getLang() === 'es') {
+    if (n === 0) return 'Charlas';
+    if (n === 1) return `${n} charla · ${a}`;
+    return `${n} charlas · ${a} · ${b}`;
+  }
+  if (n === 0) return 'Talks';
+  if (n === 1) return `${n} talk · ${a}`;
+  return `${n} talks · ${a} · ${b}`;
+}
+
+export function writingsInteriorExcerpt(): string {
+  const titles: string[] = [];
+  for (const section of WRITINGS) {
+    for (const item of section.items) {
+      if (!writingItemHasCopy(item)) continue;
+      titles.push(writingTitle(item));
+      if (titles.length >= 2) break;
+    }
+    if (titles.length >= 2) break;
+  }
+  const n = WRITINGS.reduce(
+    (acc, section) => acc + section.items.filter((item) => writingItemHasCopy(item)).length,
+    0,
+  );
+  const a = titles[0] ?? '';
+  const b = titles[1] ?? '';
+  if (getLang() === 'es') {
+    if (n === 0) return 'Artículos';
+    if (n === 1) return `${n} artículo · ${a}`;
+    return `${n} artículos · ${a} · ${b}`;
+  }
+  if (n === 0) return 'Articles';
+  if (n === 1) return `${n} article · ${a}`;
+  return `${n} articles · ${a} · ${b}`;
 }
 
 export function talkMeta(item: TalkItem): string {
