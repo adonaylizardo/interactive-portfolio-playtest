@@ -5,6 +5,14 @@ const CSS_VAR = '--mobile-peek-card-height';
 let measureHost: HTMLDivElement | null = null;
 let initialized = false;
 
+function sanitizeMeasureClone(root: HTMLElement): void {
+  root.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+  root.querySelectorAll('[aria-labelledby]').forEach((el) => el.removeAttribute('aria-labelledby'));
+  root.querySelectorAll('[aria-controls]').forEach((el) => el.removeAttribute('aria-controls'));
+  root.querySelectorAll('[aria-describedby]').forEach((el) => el.removeAttribute('aria-describedby'));
+  root.querySelectorAll('label[for]').forEach((el) => el.removeAttribute('for'));
+}
+
 /** Offscreen clone of the About intro peek — does not require the peek to be on screen. */
 export function syncMobilePeekCardHeight(): number {
   const source = document.querySelector('.chrome .chrome__intro');
@@ -25,6 +33,7 @@ export function syncMobilePeekCardHeight(): number {
   measureHost.style.width = `${window.innerWidth}px`;
   measureHost.replaceChildren();
   const clone = source.cloneNode(true) as HTMLElement;
+  sanitizeMeasureClone(clone);
   measureHost.appendChild(clone);
   const h = clone.getBoundingClientRect().height;
   if (h > 80) {

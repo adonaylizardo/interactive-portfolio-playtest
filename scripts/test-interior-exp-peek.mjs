@@ -157,6 +157,65 @@ async function main() {
         return window.__playtestQa?.getMobilePeekCardHeight?.() ?? 0;
       });
 
+    const assertMeasureCloneSanitized = async () => {
+      const audit = await page.evaluate(() => {
+        const host = document.getElementById('mobile-peek-card-measure');
+        const cloneIds = host ? host.querySelectorAll(':scope [id]').length : -1;
+        const labelled = host ? host.querySelectorAll('[aria-labelledby]').length : -1;
+        const controls = host ? host.querySelectorAll('[aria-controls]').length : -1;
+        const forAttr = host ? host.querySelectorAll('label[for]').length : -1;
+        return { cloneIds, labelled, controls, forAttr };
+      });
+      if (audit.cloneIds !== 0) {
+        errors.push(`measure clone must strip ids (found ${audit.cloneIds} in #mobile-peek-card-measure)`);
+      }
+      if (audit.labelled !== 0) {
+        errors.push(`measure clone aria-labelledby: ${audit.labelled}`);
+      }
+      if (audit.controls !== 0) {
+        errors.push(`measure clone aria-controls: ${audit.controls}`);
+      }
+      if (audit.forAttr !== 0) {
+        errors.push(`measure clone label[for]: ${audit.forAttr}`);
+      }
+    };
+
+    const measurePeekCtaLayout = async () =>
+      page.evaluate(() => {
+        const sheet = document.querySelector(
+          '.building-panel--interior-entry.building-panel--floating-peek .building-panel__sheet',
+        );
+        const btn =
+          document.querySelector('.building-panel--interior-entry [data-exp-peek-expand]') ??
+          document.querySelector('.building-panel--interior-entry .interior-exp-peek__expand');
+        const excerpt = document.querySelector(
+          '.building-panel--interior-entry .interior-exp-peek__excerpt',
+        );
+        const aboutBtn = document.querySelector(
+          '.chrome:not(#mobile-peek-card-measure).chrome--intro-peek .chrome__see-details',
+        );
+        const aboutIntro = document.querySelector(
+          '.chrome:not(#mobile-peek-card-measure).chrome--intro-peek .chrome__intro',
+        );
+        if (!sheet || !btn || !excerpt) return null;
+        const sheetR = sheet.getBoundingClientRect();
+        const btnR = btn.getBoundingClientRect();
+        const exR = excerpt.getBoundingClientRect();
+        const padB = parseFloat(getComputedStyle(sheet).paddingBottom) || 0;
+        const out = {
+          btnToSheetBottom: sheetR.bottom - btnR.bottom,
+          excerptToBtn: btnR.top - exR.bottom,
+          innerBelowBtn: sheetR.bottom - padB - btnR.bottom,
+          aboutBtnToCardBottom: null,
+        };
+        if (aboutBtn && aboutIntro) {
+          const introR = aboutIntro.getBoundingClientRect();
+          const abR = aboutBtn.getBoundingClientRect();
+          out.aboutBtnToCardBottom = introR.bottom - abR.bottom;
+        }
+        return out;
+      });
+
     const measureInteriorPeek = async (vw) =>
       page.evaluate((w) => {
         const sheet = document.querySelector(
@@ -186,12 +245,31 @@ async function main() {
         timeout: 10_000,
       });
       await wait(350);
+      await assertMeasureCloneSanitized();
       const layout = await measureInteriorPeek(vw);
       if (!layout) errors.push(`missing interior floating peek ${label} @${vw}`);
       else if (refH > 0 && Math.abs(layout.height - refH) > 2) {
         errors.push(
           `peek height mismatch ${label} @${vw}: interior=${layout.height.toFixed(1)} ref=${refH.toFixed(1)} (Δ${Math.abs(layout.height - refH).toFixed(1)})`,
         );
+      }
+      const cta = await measurePeekCtaLayout();
+      if (cta) {
+        if (cta.excerptToBtn < 16) {
+          errors.push(
+            `excerpt→CTA gap < 16px ${label} @${vw}: ${cta.excerptToBtn.toFixed(1)}px`,
+          );
+        }
+        if (cta.innerBelowBtn > 6) {
+          errors.push(
+            `empty padding below CTA ${label} @${vw}: ${cta.innerBelowBtn.toFixed(1)}px (max 6)`,
+          );
+        }
+        if (cta.btnToSheetBottom < 28 || cta.btnToSheetBottom > 38) {
+          errors.push(
+            `CTA inset from card bottom ${label} @${vw}: ${cta.btnToSheetBottom.toFixed(1)}px (expected ~33±5)`,
+          );
+        }
       }
       await page.evaluate(() => window.__playtestQa.leaveInteriorNow());
       await page.waitForFunction(() => window.__playtestQa.isInInterior() === false, null, {
@@ -244,6 +322,22 @@ async function main() {
           `token vs visible about height @${vw}: token=${refH.toFixed(1)} visible=${ref.height.toFixed(1)}`,
         );
       }
+      await assertMeasureCloneSanitized();
+      const aboutCta = await page.evaluate(() => {
+        const intro = document.querySelector(
+          '.chrome:not(#mobile-peek-card-measure).chrome--intro-peek .chrome__intro',
+        );
+        const btn = document.querySelector(
+          '.chrome:not(#mobile-peek-card-measure).chrome--intro-peek .chrome__see-details',
+        );
+        if (!intro || !btn) return null;
+        const introR = intro.getBoundingClientRect();
+        const abR = btn.getBoundingClientRect();
+        return introR.bottom - abR.bottom;
+      });
+      if (aboutCta != null && (aboutCta < 24 || aboutCta > 40)) {
+        errors.push(`about peek CTA bottom inset @${vw}: ${aboutCta.toFixed(1)}px (expected ~33±6)`);
+      }
     }
 
     await page.setViewportSize({ width: 390, height: 844 });
@@ -257,6 +351,35 @@ async function main() {
     const enterId = await page.evaluate(() => window.__playtestQa.getInteriorId?.());
     if (enterId !== 'teresa') errors.push(`enter interior id ${enterId}`);
     await wait(400);
+    await assertMeasureCloneSanitized();
+    const ctaLayout = await measurePeekCtaLayout();
+    if (ctaLayout) {
+      if (ctaLayout.excerptToBtn < 16) {
+        errors.push(`excerpt→CTA gap < 16px @390: ${ctaLayout.excerptToBtn.toFixed(1)}px`);
+      }
+      if (ctaLayout.innerBelowBtn > 6) {
+        errors.push(`empty padding below CTA @390: ${ctaLayout.innerBelowBtn.toFixed(1)}px`);
+      }
+      await page.evaluate(() => {
+        sessionStorage.setItem('playtest-welcome-done', '1');
+        const chrome = document.querySelector('.chrome');
+        if (chrome) {
+          chrome.classList.add('chrome--sheet', 'chrome--intro-peek');
+          chrome.classList.remove('chrome--intro-expanded', 'chrome--intro-full');
+        }
+      });
+      await wait(200);
+      const withAbout = await measurePeekCtaLayout();
+      if (
+        withAbout?.aboutBtnToCardBottom != null &&
+        withAbout.aboutBtnToCardBottom > 8 &&
+        Math.abs(ctaLayout.btnToSheetBottom - withAbout.aboutBtnToCardBottom) > 8
+      ) {
+        errors.push(
+          `interior CTA bottom inset ${ctaLayout.btnToSheetBottom.toFixed(1)}px vs about ${withAbout.aboutBtnToCardBottom.toFixed(1)}px`,
+        );
+      }
+    }
 
     const peekLabels = await page.evaluate(() => {
       const cta = document.querySelector('[data-exp-peek-expand-label]')?.textContent?.trim() ?? '';
