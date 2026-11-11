@@ -28,6 +28,7 @@ import {
 } from './figmaAssets';
 import { iconSvg } from './icons';
 import { getLang, onLangChange, t } from './i18n';
+import { syncMobilePeekCardHeight } from './mobilePeekCardHeight';
 
 const FIGMA_BACK = figmaAsset('talks-desktop-list', '9f9c4.svg');
 const FIGMA_EXPAND = figmaAsset('talks-desktop-list', 'ce7c9.svg');
@@ -150,7 +151,6 @@ export class BuildingPanel {
   private interiorExpPeekExcerpt: HTMLElement | null = null;
   private expReopenFab: HTMLElement | null = null;
   private interiorVvListener: (() => void) | null = null;
-  private aboutPeekRefHeight = 0;
 
   constructor(
     container: HTMLElement,
@@ -636,13 +636,6 @@ export class BuildingPanel {
     this.interiorVvListener = null;
   }
 
-  private syncAboutPeekRefHeight(): void {
-    const h =
-      document.querySelector('.chrome--intro-peek .chrome__intro')?.getBoundingClientRect().height ??
-      0;
-    if (h > 80) this.aboutPeekRefHeight = h;
-  }
-
   private syncMobileSheetVisualViewport(): void {
     const vv = window.visualViewport;
     if (!vv) {
@@ -663,17 +656,10 @@ export class BuildingPanel {
     this.el.classList.toggle('building-panel--floating-peek', floatingPeek);
     if (!floatingPeek) {
       this.sheet.style.removeProperty('--vv-layout-bottom');
-      this.sheet.style.removeProperty('--floating-peek-min-h');
       return;
     }
-    this.syncAboutPeekRefHeight();
+    syncMobilePeekCardHeight();
     this.syncMobileSheetVisualViewport();
-    if (this.aboutPeekRefHeight > 0) {
-      this.sheet.style.setProperty(
-        '--floating-peek-min-h',
-        `${Math.round(this.aboutPeekRefHeight)}px`,
-      );
-    }
   }
 
   private syncInteriorBackButtons(): void {
@@ -741,9 +727,9 @@ export class BuildingPanel {
     return this.interiorExperienceEntry;
   }
 
-  /** Capture About peek height before chrome hides the intro card (interior entry). */
+  /** Sync shared peek card height before chrome hides the intro card (interior entry). */
   prepareInteriorFloatingPeek(): void {
-    this.syncAboutPeekRefHeight();
+    syncMobilePeekCardHeight();
   }
 
   showExperienceInteriorEntry(mode: 'talks' | 'writings', interiorId: string): void {

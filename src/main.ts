@@ -55,6 +55,11 @@ import { showFatalState, setOnFatalReadInstead } from './ui/fatalState';
 import { startOfflineMonitor, isOfflineBannerVisible } from './ui/offlineBanner';
 import { canUseWebGL } from './ui/webglCheck';
 import { getLang, onLangChange, setLang, t } from './ui/i18n';
+import {
+  getMobilePeekCardHeight,
+  initMobilePeekCardHeight,
+  syncMobilePeekCardHeight,
+} from './ui/mobilePeekCardHeight';
 import type { Camera } from './tokens';
 
 async function main(): Promise<void> {
@@ -443,6 +448,7 @@ async function main(): Promise<void> {
     requestAnimationFrame(focus);
     window.setTimeout(focus, 200);
   });
+  initMobilePeekCardHeight();
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || isMobileLayout()) return;
     if (reading.isActive() || isReadingHash()) return;
@@ -1072,6 +1078,8 @@ async function main(): Promise<void> {
     jacSetBubble: (on: boolean) => scene.jacSetBubble(on),
     jacSet: (partial: Parameters<IsoScene['qaJacSet']>[0]) => scene.qaJacSet(partial),
     setLang: (lang: 'en' | 'es') => setLang(lang),
+    syncMobilePeekCardHeight: () => syncMobilePeekCardHeight(),
+    getMobilePeekCardHeight: () => getMobilePeekCardHeight(),
     searchForQa: (query: string) => searchSite(query),
     casePanelQaExpectation: (id: string, variant: 'full' | 'short', lang?: 'en' | 'es') =>
       casePanelQaExpectation(id, lang ?? getLang(), variant),

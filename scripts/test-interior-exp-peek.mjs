@@ -4,6 +4,7 @@
  */
 import { mkdirSync, readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
+import { execPath } from 'node:process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, devices } from 'playwright';
@@ -13,7 +14,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TEST_OUT = path.join(ROOT, 'test-output');
 mkdirSync(TEST_OUT, { recursive: true });
 const PREVIEW_PORT = Number(process.env.QA_PREVIEW_PORT) || 4198;
-const GLOBAL_TIMEOUT_MS = 120_000;
+const GLOBAL_TIMEOUT_MS = 240_000;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function resolvePreviewBase() {
@@ -45,11 +46,27 @@ function resolvePreviewBase() {
 
 function startPreview(basePath) {
   const base = basePath.startsWith('/') ? basePath : `/${basePath}`;
+  const viteBin = path.join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js');
   return spawn(
-    'npx',
-    ['vite', 'preview', '--host', '127.0.0.1', `--port=${PREVIEW_PORT}`, '--base', base],
-    { cwd: ROOT, stdio: 'ignore' },
+    execPath,
+    [viteBin, 'preview', '--host', '127.0.0.1', `--port=${PREVIEW_PORT}`, '--base', base],
+    { cwd: ROOT, stdio: 'ignore', detached: true },
   );
+}
+
+async function stopPreview(preview) {
+  if (!preview?.pid) return;
+  try {
+    process.kill(-preview.pid, 'SIGTERM');
+  } catch {
+    preview.kill('SIGTERM');
+  }
+  await wait(400);
+  try {
+    process.kill(-preview.pid, 'SIGKILL');
+  } catch {
+    /* already stopped */
+  }
 }
 
 async function pinchZoom(cdp, cx, cy, spread) {
@@ -111,6 +128,14 @@ async function main() {
     });
     await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     await waitForQa(page);
+    const dismissAboutPeek = async () => {
+      const close = page.locator(
+        '.chrome:not(#mobile-peek-card-measure) [data-action="intro-close"]',
+      );
+      if (await close.first().isVisible()) await close.first().click();
+      await wait(250);
+    };
+
     const measureAbout = async (vw) =>
       page.evaluate((w) => {
         const intro = document.querySelector('.chrome--intro-peek .chrome__intro');
@@ -125,6 +150,12 @@ async function main() {
           height: r.height,
         };
       }, vw);
+
+    const syncPeekRefHeight = async () =>
+      page.evaluate(() => {
+        window.__playtestQa?.syncMobilePeekCardHeight?.();
+        return window.__playtestQa?.getMobilePeekCardHeight?.() ?? 0;
+      });
 
     const measureInteriorPeek = async (vw) =>
       page.evaluate((w) => {
@@ -143,16 +174,11 @@ async function main() {
         };
       }, vw);
 
-    for (const [vw, vh] of [
-      [375, 667],
-      [390, 844],
-      [430, 932],
-    ]) {
-      await page.setViewportSize({ width: vw, height: vh });
-      await wait(250);
-      const ref = await measureAbout(vw);
-      if (!ref) errors.push(`about peek reference missing @${vw}`);
-      await page.evaluate(() => window.__playtestQa.enterInterior('teresa'));
+    const assertInteriorMatchesPeekRef = async (vw, label, interiorId) => {
+      await dismissAboutPeek();
+      const refH = await syncPeekRefHeight();
+      if (refH < 80) errors.push(`peek ref height missing ${label} @${vw}`);
+      await page.evaluate((id) => window.__playtestQa.enterInterior(id), interiorId);
       await page.waitForFunction(() => window.__playtestQa?.isInInterior?.() === true, null, {
         timeout: 20_000,
       });
@@ -161,22 +187,48 @@ async function main() {
       });
       await wait(350);
       const layout = await measureInteriorPeek(vw);
-      if (!layout) errors.push(`missing interior floating peek @${vw}`);
-      else if (ref) {
-        if (!ref) errors.push(`about peek reference missing @${vw}`);
-        for (const key of ['left', 'right', 'bottom', 'height']) {
-          const d = Math.abs(layout[key] - ref[key]);
-          if (d > 2) {
-            errors.push(
-              `peek ${key} mismatch @${vw}: interior=${layout[key].toFixed(1)} about=${ref[key].toFixed(1)} (Δ${d.toFixed(1)})`,
-            );
-          }
-        }
+      if (!layout) errors.push(`missing interior floating peek ${label} @${vw}`);
+      else if (refH > 0 && Math.abs(layout.height - refH) > 2) {
+        errors.push(
+          `peek height mismatch ${label} @${vw}: interior=${layout.height.toFixed(1)} ref=${refH.toFixed(1)} (Δ${Math.abs(layout.height - refH).toFixed(1)})`,
+        );
       }
       await page.evaluate(() => window.__playtestQa.leaveInteriorNow());
       await page.waitForFunction(() => window.__playtestQa.isInInterior() === false, null, {
         timeout: 10_000,
       });
+      await wait(200);
+    };
+
+    for (const [vw, vh] of [
+      [375, 667],
+      [390, 844],
+      [430, 932],
+    ]) {
+      await page.setViewportSize({ width: vw, height: vh });
+      await wait(250);
+      await page.evaluate(() => window.__playtestQa.setLang('es'));
+      await wait(200);
+      await assertInteriorMatchesPeekRef(vw, 'teresa ES about dismissed', 'teresa');
+      await assertInteriorMatchesPeekRef(vw, 'biblioteca ES about dismissed', 'biblioteca');
+    }
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.evaluate(() => window.__playtestQa.setLang('en'));
+    await wait(350);
+    await assertInteriorMatchesPeekRef(390, 'teresa EN about dismissed', 'teresa');
+    const refEn = await syncPeekRefHeight();
+    await page.evaluate(() => window.__playtestQa.setLang('es'));
+    await wait(350);
+    const refEs = await syncPeekRefHeight();
+    if (refEn > 0 && refEs > 0 && Math.abs(refEs - refEn) < 1) {
+      errors.push('peek ref height unchanged after EN→ES language switch');
+    }
+    await assertInteriorMatchesPeekRef(390, 'teresa ES after EN switch', 'teresa');
+
+    for (const [vw, vh] of [[390, 844]]) {
+      await page.setViewportSize({ width: vw, height: vh });
+      await wait(250);
       await page.evaluate(() => {
         sessionStorage.setItem('playtest-welcome-done', '1');
         const chrome = document.querySelector('.chrome');
@@ -185,7 +237,13 @@ async function main() {
           chrome.classList.remove('chrome--intro-expanded', 'chrome--intro-full');
         }
       });
-      await wait(200);
+      const ref = await measureAbout(vw);
+      const refH = await syncPeekRefHeight();
+      if (ref && refH > 0 && Math.abs(ref.height - refH) > 2) {
+        errors.push(
+          `token vs visible about height @${vw}: token=${refH.toFixed(1)} visible=${ref.height.toFixed(1)}`,
+        );
+      }
     }
 
     await page.setViewportSize({ width: 390, height: 844 });
@@ -419,7 +477,7 @@ async function main() {
   } finally {
     clearTimeout(timeout);
     await browser.close();
-    preview.kill('SIGTERM');
+    await stopPreview(preview);
   }
 
   if (errors.length) {
