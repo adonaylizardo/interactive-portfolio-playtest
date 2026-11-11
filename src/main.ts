@@ -389,10 +389,14 @@ async function main(): Promise<void> {
       checklist.setBuildingPanelOpen(open);
       const inRoom = scene?.isInInterior() ?? false;
       if (panel.isExperienceMode()) {
-        chrome.setInteriorOpen(false, { skipLayout: true });
-        if (!isMobileLayout() && open) {
-          chrome.setLayout('split');
-          checklist.setCollapsed(true);
+        if (panel.isInteriorExperienceEntry()) {
+          chrome.setInteriorOpen(true, { skipLayout: true });
+        } else {
+          chrome.setInteriorOpen(false, { skipLayout: true });
+          if (!isMobileLayout() && open) {
+            chrome.setLayout('split');
+            checklist.setCollapsed(true);
+          }
         }
       } else {
         chrome.setInteriorOpen(inRoom);
@@ -462,17 +466,15 @@ async function main(): Promise<void> {
           scene.setReadingPaused(false);
         }
         if (interiorId === 'teresa') {
-          checklist.setBuildingPanelOpen(false);
+          checklist.setBuildingPanelOpen(true);
           studio.clearSubtitle();
-          chrome.setInteriorOpen(false, { skipLayout: true });
-          if (!isMobileLayout()) chrome.setLayout('split');
-          chrome.openAdonaySection('charlas');
+          chrome.setInteriorOpen(true);
+          panel.showExperienceInteriorEntry('talks', 'teresa');
         } else if (interiorId === 'biblioteca') {
-          checklist.setBuildingPanelOpen(false);
+          checklist.setBuildingPanelOpen(true);
           studio.clearSubtitle();
-          chrome.setInteriorOpen(false, { skipLayout: true });
-          if (!isMobileLayout()) chrome.setLayout('split');
-          chrome.openAdonaySection('articulos');
+          chrome.setInteriorOpen(true);
+          panel.showExperienceInteriorEntry('writings', 'biblioteca');
         } else if (isCaseHouse(interiorId)) {
           checklist.setBuildingPanelOpen(true);
           chrome.setInteriorOpen(false, { skipLayout: true });

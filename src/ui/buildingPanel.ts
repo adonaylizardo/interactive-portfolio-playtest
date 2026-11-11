@@ -12,6 +12,7 @@ import {
   writingMeta,
   writingSourceLabel,
   writingTitle,
+  writingItemHasCopy,
 } from './contentLabels';
 import { WORKED_WITH, WORKED_WITH_PANELS, type WorkedWithLogo } from '../data/workedWith';
 import {
@@ -129,6 +130,9 @@ export class BuildingPanel {
   private readLede: HTMLElement | null = null;
   private readHeroLabel: HTMLElement | null = null;
   private peekOnly = true;
+  /** Teresa / Biblioteca: in-room card instead of the generic Adonay interior sheet. */
+  private interiorExperienceEntry = false;
+  private experienceCardDismissed = false;
   /** Desktop case read: full 660px column (Expandir), not the 432px in-map sheet. */
   private readColumnExpanded = false;
   private dragStartY = 0;
@@ -185,6 +189,9 @@ export class BuildingPanel {
         </header>
         <div class="building-panel__bar">
           <button type="button" class="building-panel__exit" data-exit></button>
+          <button type="button" class="building-panel__reopen ui-btn ui-btn--secondary" data-exp-reopen hidden>
+            <span data-i18n="panel.expandSheet">Expandir</span>
+          </button>
           <button type="button" class="building-panel__close" data-close aria-label="">×</button>
         </div>
         <div class="case-preview" data-preview hidden>
@@ -240,6 +247,9 @@ export class BuildingPanel {
           </section>
           <section class="experience" data-experience hidden>
             <p class="experience__intro"></p>
+            <button type="button" class="ui-btn ui-btn--primary experience__expand-peek" data-exp-peek-expand hidden>
+              <span data-i18n="panel.expandSheet">Expandir</span>
+            </button>
             <div class="experience__filters" data-exp-filters hidden></div>
             <div class="experience__detail" data-exp-detail hidden></div>
           </section>
@@ -312,6 +322,26 @@ export class BuildingPanel {
         return;
       }
       this.onExperienceDesktopExpand?.();
+    });
+    this.el.querySelector('[data-exp-peek-expand]')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!this.interiorExperienceEntry) return;
+      this.experienceCardDismissed = false;
+      this.setPeek(false);
+      this.renderInteriorExperienceList();
+      this.syncExperienceCardDismissed();
+    });
+    this.el.querySelector('[data-exp-reopen]')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!this.interiorExperienceEntry) return;
+      this.experienceCardDismissed = false;
+      this.peekOnly = true;
+      this.syncPeekClass();
+      this.renderInteriorExperienceList();
+      this.syncExperienceCardDismissed();
+      this.queueVisibilitySync();
     });
     this.applyI18n();
     onLangChange(() => {
@@ -510,10 +540,78 @@ export class BuildingPanel {
     }
   }
 
+  isInteriorExperienceEntry(): boolean {
+    return this.interiorExperienceEntry;
+  }
+
+  showExperienceInteriorEntry(mode: 'talks' | 'writings', interiorId: string): void {
+    this.interiorExperienceEntry = true;
+    this.experienceCardDismissed = false;
+    this.openExperience(mode, interiorId, { interiorEntry: true });
+  }
+
+  private dismissExperienceCard(): void {
+    this.experienceCardDismissed = true;
+    this.peekOnly = true;
+    this.syncPeekClass();
+    this.syncExperienceCardDismissed();
+    this.queueVisibilitySync();
+  }
+
+  private syncExperienceCardDismissed(): void {
+    this.el.classList.toggle('building-panel--card-dismissed', this.experienceCardDismissed);
+    const expandBtn = this.el.querySelector('[data-exp-peek-expand]') as HTMLElement | null;
+    const reopen = this.el.querySelector('[data-exp-reopen]') as HTMLElement | null;
+    const showPeek = this.interiorExperienceEntry && !this.experienceCardDismissed && this.peekOnly;
+    if (expandBtn) expandBtn.hidden = !showPeek;
+    if (reopen) reopen.hidden = !(this.interiorExperienceEntry && this.experienceCardDismissed);
+    if (this.expMobileChrome) {
+      this.expMobileChrome.hidden = this.experienceCardDismissed || !this.isMobile() || !this.isExperienceMode();
+    }
+    if (this.sheet) {
+      this.sheet.style.visibility = this.experienceCardDismissed ? 'hidden' : '';
+      this.sheet.style.pointerEvents = this.experienceCardDismissed ? 'none' : '';
+    }
+  }
+
+  private renderInteriorExperienceList(): void {
+    if (!this.experienceDetail || !this.interiorExperienceEntry) return;
+    const list = document.createElement('div');
+    list.className = 'experience__list';
+    if (this.mode === 'talks') {
+      list.replaceChildren(...TALKS.map((talk) => this.talkRow(talk, () => this.openTalk(talk))));
+      this.syncExperienceHeaderCount(TALKS.length);
+    } else {
+      const rows: HTMLElement[] = [];
+      let n = 0;
+      for (const section of WRITINGS) {
+        for (const item of section.items) {
+          if (!writingItemHasCopy(item)) continue;
+          n += 1;
+          rows.push(
+            this.talkRow(item, () => this.openWriting(section, item), { kind: 'writing' }),
+          );
+        }
+      }
+      list.replaceChildren(...rows);
+      this.syncExperienceHeaderCount(n);
+    }
+    this.experienceDetail.replaceChildren(list);
+    this.experienceDetail.hidden = this.peekOnly || this.experienceCardDismissed;
+    this.experienceView = 'list';
+    this.el.classList.toggle('building-panel--exp-detail', false);
+  }
+
   private syncPeekClass(): void {
     const preview = this.mode === 'preview' && this.isOpen();
+  const interiorExperiencePeek =
+      this.interiorExperienceEntry &&
+      this.isOpen() &&
+      (this.mode === 'talks' || this.mode === 'writings');
     const mobileInterior =
-      this.isMobile() && (this.mode === 'interior' || this.mode === 'talks' || this.mode === 'writings') && this.isOpen();
+      (this.isMobile() || interiorExperiencePeek) &&
+      (this.mode === 'interior' || this.mode === 'talks' || this.mode === 'writings') &&
+      this.isOpen();
     const peek = (preview || mobileInterior) && this.peekOnly;
     const expanded =
       (preview && !this.isMobile() && this.readColumnExpanded) ||
@@ -526,6 +624,7 @@ export class BuildingPanel {
     if (this.readEl) this.readEl.hidden = !preview || this.peekOnly;
     if (this.readBar) this.readBar.hidden = !preview || this.peekOnly;
     this.titleEl.hidden = preview || this.mode === 'talks' || this.mode === 'writings';
+    this.syncExperienceCardDismissed();
   }
 
   private onCloseClick(): void {
@@ -537,6 +636,10 @@ export class BuildingPanel {
       return;
     }
     if (this.mode === 'talks' || this.mode === 'writings') {
+      if (this.interiorExperienceEntry) {
+        this.dismissExperienceCard();
+        return;
+      }
       this.salir();
       this.clearExperiencePresentation();
     }
@@ -544,6 +647,8 @@ export class BuildingPanel {
 
   /** Drop Talks/Writings chrome so the next building sheet is not stacked underneath. */
   private clearExperiencePresentation(): void {
+    this.interiorExperienceEntry = false;
+    this.experienceCardDismissed = false;
     this.experienceView = 'list';
     this.activeTalkId = null;
     this.activeWriting = null;
@@ -565,6 +670,15 @@ export class BuildingPanel {
 
   private onExperienceBack(): void {
     if (!this.isExperienceMode()) return;
+    if (this.interiorExperienceEntry && this.experienceView === 'detail') {
+      this.activeTalkId = null;
+      this.activeWriting = null;
+      if (this.experienceDetail) this.experienceDetail.replaceChildren();
+      this.experienceView = 'list';
+      this.setPeek(true);
+      this.renderInteriorExperienceList();
+      return;
+    }
     if (this.experienceView === 'detail') {
       const section: 'articulos' | 'charlas' = this.mode === 'talks' ? 'charlas' : 'articulos';
       this.activeTalkId = null;
@@ -739,7 +853,7 @@ export class BuildingPanel {
   private openExperience(
     mode: 'talks' | 'writings',
     interiorId: string | null,
-    _opts?: { shellOnly?: boolean },
+    opts?: { shellOnly?: boolean; interiorEntry?: boolean },
   ): void {
     this.leaveArmed = false;
     this.exitPress = null;
@@ -750,7 +864,8 @@ export class BuildingPanel {
     this.writingsSectionFocus = null;
     this.activeTalkId = null;
     this.activeWriting = null;
-    this.peekOnly = this.isMobile();
+    if (opts?.interiorEntry) this.interiorExperienceEntry = true;
+    this.peekOnly = opts?.interiorEntry ? true : this.isMobile();
     this.el.classList.remove('building-panel--preview');
     this.titleEl.hidden = true;
     this.caseEl.hidden = true;
@@ -775,10 +890,15 @@ export class BuildingPanel {
     this.el.classList.add('building-panel--open', 'building-panel--experience');
     this.el.classList.toggle('building-panel--writings', mode === 'writings');
     this.syncPeekClass();
-    this.experienceView = 'detail';
-    if (this.experienceDetail) this.experienceDetail.hidden = true;
-    if (this.experienceFilters) this.experienceFilters.hidden = true;
-    this.syncExperienceHeaderCount(0);
+    if (opts?.interiorEntry) {
+      this.experienceView = 'list';
+      this.renderInteriorExperienceList();
+    } else {
+      this.experienceView = 'detail';
+      if (this.experienceDetail) this.experienceDetail.hidden = true;
+      if (this.experienceFilters) this.experienceFilters.hidden = true;
+      this.syncExperienceHeaderCount(0);
+    }
     this.el.classList.toggle('building-panel--exp-detail', false);
     this.queueVisibilitySync();
     this.syncExperienceDesktopExpand();
@@ -787,6 +907,12 @@ export class BuildingPanel {
 
   private syncExperienceIntro(): void {
     if (!this.experienceIntro) return;
+    if (this.interiorExperienceEntry) {
+      const key = this.mode === 'talks' ? 'talks.intro' : 'writings.intro';
+      this.experienceIntro.textContent = t(key);
+      this.experienceIntro.hidden = this.experienceCardDismissed;
+      return;
+    }
     this.experienceIntro.hidden = true;
   }
 
@@ -1366,6 +1492,9 @@ export class BuildingPanel {
           bottom: Math.ceil(Math.min(sheet.height, this.peekOnly ? 280 : window.innerHeight) + 8),
         };
       }
+      return { left: 0, top: 0, right: 0, bottom: 0 };
+    }
+    if (this.experienceCardDismissed && this.interiorExperienceEntry) {
       return { left: 0, top: 0, right: 0, bottom: 0 };
     }
     const sheet = this.sheet.getBoundingClientRect();

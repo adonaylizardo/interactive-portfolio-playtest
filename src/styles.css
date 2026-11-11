@@ -2612,6 +2612,27 @@ body:has(.building-panel--open) .chrome__lang {
   display: none;
 }
 
+.building-panel--experience .building-panel__reopen {
+  display: none;
+}
+
+.building-panel--experience.building-panel--card-dismissed .building-panel__reopen {
+  display: inline-flex;
+  margin-left: auto;
+}
+
+.building-panel--experience.building-panel--peek .experience__expand-peek {
+  display: inline-flex;
+  width: calc(100% - 32px);
+  margin: 8px 16px 0;
+  min-height: 44px;
+}
+
+.building-panel--experience.building-panel--card-dismissed .building-panel__sheet {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .building-panel--experience .building-panel__drag {
   cursor: grab;
   touch-action: none;

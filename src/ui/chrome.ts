@@ -9,6 +9,8 @@ import { iconSvg, type IconName } from './icons';
 import type { Camera } from '../tokens';
 import { getLang, onLangChange, setLang, t, type Lang } from './i18n';
 import { chromeSectionSelector, mountChromeExperienceSections } from './chromeExperienceSections';
+import { ENABLE_MAP_OVERVIEW_ENTRY } from './chromeFlags';
+import { mobileSheetExpandedAfterDrag } from './mobileIntroSheet';
 
 export type AdonaySection = 'articulos' | 'charlas' | 'casos' | 'logros' | 'contact' | 'intro';
 
@@ -87,7 +89,6 @@ export class ChromeUI {
   private layout: DesktopLayout = 'map';
   private mobileSheet = true;
   private mobileSheetPanel: 'intro' | 'casos' | 'logros' | 'contact' | 'articulos' | 'charlas' = 'intro';
-  private audience: Audience = 'recruiter';
   private lang: Lang = getLang();
   private interiorOpen = false;
   private placeCardOpen = false;
@@ -325,14 +326,6 @@ export class ChromeUI {
             <button type="button" class="ui-btn ui-btn--secondary" data-action="about-contact">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></button>
             <button type="button" class="ui-btn ui-btn--secondary" data-action="reading">${iconSvg('page')} <span data-i18n="read.title">Leer</span></button>
           </div>
-          <div class="chrome__audience">
-            <p class="chrome__label" data-i18n="chrome.who">¿Quién eres?</p>
-            <div class="ui-seg" role="tablist" aria-label="Audience" data-i18n-aria="chrome.audience">
-              <button type="button" class="ui-seg__opt is-active" data-audience="recruiter" data-i18n="chrome.recruiter">Recruiter</button>
-              <button type="button" class="ui-seg__opt" data-audience="mentoria" data-i18n="chrome.mentorship">Mentoría</button>
-              <button type="button" class="ui-seg__opt" data-audience="cliente" data-i18n="chrome.client">Cliente</button>
-            </div>
-          </div>
           <section class="chrome__section" id="chrome-experiencia">
             <h2 data-i18n="chrome.experience">Experiencia</h2>
             <div class="chrome__exp">${expRows}</div>
@@ -407,14 +400,6 @@ export class ChromeUI {
         <div class="chrome__lede">
           <p class="chrome__blurb" data-i18n="chrome.lede">Explore the map, open cases from the doors, and browse talks and writings inside the buildings.</p>
         </div>
-        <div class="chrome__audience">
-          <p class="chrome__label" data-i18n="chrome.who">¿Quién eres?</p>
-          <div class="ui-seg ui-seg--phone" role="tablist" aria-label="Audience" data-i18n-aria="chrome.audience">
-            <button type="button" class="ui-seg__opt is-active" data-audience="recruiter" data-i18n="chrome.recruiter">Recruiter</button>
-            <button type="button" class="ui-seg__opt" data-audience="mentoria" data-i18n="chrome.mentorship">Mentoría</button>
-            <button type="button" class="ui-seg__opt" data-audience="cliente" data-i18n="chrome.client">Cliente</button>
-          </div>
-        </div>
         <div class="chrome__ctas">
           <a class="ui-btn ui-btn--primary" href="${CV_HREF}" target="_blank" rel="noopener noreferrer" download>${iconSvg('download')} <span data-i18n="chrome.downloadCv">Descargar CV</span></a>
           <button type="button" class="ui-btn ui-btn--secondary" data-action="about-contact">${iconSvg('mail')} <span data-i18n="chrome.contact">Contacto</span></button>
@@ -486,7 +471,7 @@ export class ChromeUI {
         ${roundBtn('briefcase', 'Casos', 'ui-round--lg', 'cases')}
         ${roundBtn('trophy', 'Logros', 'ui-round--lg', 'achievements')}
         ${roundBtn('mail', 'Contacto', 'ui-round--lg', 'contact')}
-        ${roundBtn('map', 'Map', 'ui-round--lg', 'map')}
+        ${ENABLE_MAP_OVERVIEW_ENTRY ? roundBtn('map', 'Map', 'ui-round--lg', 'map') : ''}
       </nav>
       <div class="chrome__lang" role="group" aria-label="Language" data-i18n-aria="chrome.language">
         <button type="button" class="chrome__lang-opt" data-lang="en">EN</button>
@@ -511,7 +496,11 @@ export class ChromeUI {
               ? `<button type="button" class="ui-view" data-view="persona" aria-label="Over-the-shoulder" data-i18n-aria="chrome.persona">${iconSvg('persp')}</button>`
               : ''
           }
-          <button type="button" class="ui-view" data-view="map" aria-label="Map overview" data-i18n-aria="chrome.map">${iconSvg('map')}</button>
+          ${
+            ENABLE_MAP_OVERVIEW_ENTRY
+              ? `<button type="button" class="ui-view" data-view="map" aria-label="Map overview" data-i18n-aria="chrome.map">${iconSvg('map')}</button>`
+              : ''
+          }
         </div>
       </div>
     `;
@@ -544,12 +533,6 @@ export class ChromeUI {
     });
     this.root.querySelectorAll('[data-action="about-contact"]').forEach((btn) => {
       btn.addEventListener('click', () => this.openContact());
-    });
-    this.root.querySelectorAll('[data-audience]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        this.audience = (btn as HTMLElement).dataset.audience as Audience;
-        this.syncAudience();
-      });
     });
     this.root.querySelectorAll('[data-lang]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -596,14 +579,16 @@ export class ChromeUI {
     this.root.querySelector('.chrome__dock [data-action="contact"]')?.addEventListener('click', () => {
       this.openContact();
     });
-    this.root.querySelector('.chrome__dock [data-action="map"]')?.addEventListener('click', () => {
-      if (this.getView().mode === 'cenital') {
+    if (ENABLE_MAP_OVERVIEW_ENTRY) {
+      this.root.querySelector('.chrome__dock [data-action="map"]')?.addEventListener('click', () => {
+        if (this.getView().mode === 'cenital') {
+          this.callbacks.onMapOverview();
+          return;
+        }
+        this.setLayout('map');
         this.callbacks.onMapOverview();
-        return;
-      }
-      this.setLayout('map');
-      this.callbacks.onMapOverview();
-    });
+      });
+    }
     this.root.querySelector('.chrome__rail [data-action="cases"]')?.addEventListener('click', () => {
       this.setLayout('split');
       this.scrollTo('#chrome-casos');
@@ -944,41 +929,37 @@ export class ChromeUI {
     const grab = this.root.querySelector('[data-intro-grab]');
     if (!intro) return;
     let startY = 0;
+    let fromGrab = false;
     const onTouchStart = (e: Event) => {
       const te = e as TouchEvent;
       startY = te.touches[0]?.clientY ?? 0;
+      fromGrab = !!(e.currentTarget as HTMLElement).closest?.('[data-intro-grab]');
     };
     const onTouchEnd = (e: Event) => {
       const te = e as TouchEvent;
       const endY = te.changedTouches[0]?.clientY ?? startY;
-      const delta = endY - startY;
       const expanded = intro.classList.contains('chrome__intro--expanded');
-      if (expanded) {
-        if (delta > 48) {
-          this.expandMobileSheet(false);
-          return;
-        }
-        if (startY - endY > 36) this.expandMobileSheet(true, { full: true });
-        return;
-      }
-      if (startY - endY > 48) this.expandMobileSheet(true);
+      const next = mobileSheetExpandedAfterDrag({
+        expanded,
+        startY,
+        endY,
+        grabOnlyCollapse: true,
+        fromGrab: fromGrab || !!(e.currentTarget as HTMLElement).closest?.('[data-intro-grab]'),
+      });
+      if (next === null) return;
+      if (next) this.expandMobileSheet(true, expanded ? { full: true } : undefined);
+      else this.expandMobileSheet(false);
     };
-    intro.addEventListener('touchstart', onTouchStart, { passive: true });
-    intro.addEventListener('touchend', onTouchEnd, { passive: true });
     grab?.addEventListener('touchstart', onTouchStart, { passive: true });
     grab?.addEventListener('touchend', onTouchEnd, { passive: true });
+    intro.addEventListener('touchstart', onTouchStart, { passive: true });
+    intro.addEventListener('touchend', onTouchEnd, { passive: true });
   }
 
   private openContact(): void {
     this.openAboutPanel({ highlightContact: true });
     studio.unlock();
     studio.playLineForced('11-contact');
-  }
-
-  private syncAudience(): void {
-    this.root.querySelectorAll('[data-audience]').forEach((b) => {
-      b.classList.toggle('is-active', (b as HTMLElement).dataset.audience === this.audience);
-    });
   }
 
   sync(opts?: { deferColumn?: boolean }): void {

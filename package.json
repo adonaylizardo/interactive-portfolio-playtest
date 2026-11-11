@@ -40,6 +40,8 @@
     "check:logos": "node scripts/check-logos.mjs",
     "check:cases": "node scripts/check-case-copy.mjs",
     "test:about-intro": "node scripts/test-about-intro-split.mjs",
+    "test:batch-r42": "npx --yes tsx scripts/test-mobile-sheet-idle.mjs && npx --yes tsx scripts/test-exit-spawn-grace.mjs && node scripts/test-interior-two-finger.mjs",
+    "qa:batch-r42": "npm run build && npm run test:batch-r42",
     "deploy:gh-pages": "node scripts/deploy-gh-pages.mjs",
     "deploy:preview": "node scripts/deploy-gh-pages.mjs",
     "deploy:preview-camaras": "DEPLOY_TARGET=preview-camaras node scripts/deploy-gh-pages.mjs",

@@ -48,6 +48,7 @@ import {
 import { isCaseHouse } from '../data/cases';
 import { isTouchPrimary, type ChecklistStepId } from '../checklist/storage';
 import { buildingParkPrefer, muroWallTiles, OBELISCO_ACCESS, OBELISCO_SOLID_TILES } from '../data/world';
+import { EXTERIOR_DOOR_ENTRY_COOLDOWN_MS, outdoorSpawnTileAwayFromDoor } from './outdoorSpawn';
 import { mapWorldBounds, sortKey, tileFootWorld, tileToWorld, worldToTile } from '../iso/math';
 import { findPathOrNearestWith, findPathWith } from '../iso/pathfinding';
 import { C } from './colors';
@@ -110,7 +111,6 @@ import {
   interiorWorldBounds,
   interiorForwardTile,
   interiorHitExit,
-  interiorNearestReachable,
   interiorPickPoint,
   interiorPickTile,
   interiorPixelProbes,
@@ -3954,7 +3954,7 @@ export class IsoScene {
 
     const hadMulti = this.hadMultiPointerGesture;
     const hadSecond = this.secondFingerArrived;
-    if (hadMulti || hadSecond || this.panMoved) return;
+    if (hadMulti || hadSecond || this.pointers.size >= 2 || this.panMoved) return;
 
     const dist = Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y);
     if (dist >= 10) return;
@@ -4224,6 +4224,9 @@ export class IsoScene {
       if (this.zoomSource === 'gesture') return;
       const n = e.touches.length;
       if (n < 2) return;
+      this.secondFingerArrived = true;
+      this.hadMultiPointerGesture = true;
+      this.clearDeferredTap();
       e.preventDefault();
       const t0 = e.touches[0];
       const t1 = e.touches[1];
@@ -5662,15 +5665,23 @@ export class IsoScene {
       this.interiorLayer.visible = false;
       if (door) {
         const building = getBuildingAtDoor(door.x, door.y);
-        const inward = building ? doorInwardStep(building) : null;
-        if (inward) {
-          this.charTx = door.x - inward.x;
-          this.charTy = door.y - inward.y;
+        const spawn =
+          building ? outdoorSpawnTileAwayFromDoor(building, 2) : null;
+        if (spawn) {
+          this.charTx = spawn.x;
+          this.charTy = spawn.y;
         } else {
-          this.charTx = door.x;
-          this.charTy = door.y;
+          const inward = building ? doorInwardStep(building) : null;
+          if (inward) {
+            this.charTx = door.x - inward.x;
+            this.charTy = door.y - inward.y;
+          } else {
+            this.charTx = door.x;
+            this.charTy = door.y;
+          }
         }
-        this.doorCooldown = this.viewMode === 'persona' ? 4000 : 800;
+        this.doorCooldown =
+          this.viewMode === 'persona' ? 4000 : EXTERIOR_DOOR_ENTRY_COOLDOWN_MS;
         this.syncCharacterGraphic();
       }
       this.restoreOutdoorCameraAfterExit(opts?.outdoorCam);
@@ -5779,11 +5790,10 @@ export class IsoScene {
     if (pick.x < -1.5 || pick.y < -1.5 || pick.x > def.w + 0.5 || pick.y > def.h + 0.5) return;
     const sx0 = Math.round(this.interiorCharTx);
     const sy0 = Math.round(this.interiorCharTy);
-    let tile = interiorPickTile(def, wx, wy);
+    const tile = interiorPickTile(def, wx, wy);
     if (!tile || !this.interiorGrid[tile.y]?.[tile.x]?.walkable || (tile.x === def.exit.x && tile.y === def.exit.y)) {
-      tile = interiorNearestReachable(this.interiorGrid, def, pick.x, pick.y, { x: sx0, y: sy0 });
+      return;
     }
-    if (!tile) return;
     const path = findPathInterior(this.interiorGrid, sx0, sy0, tile.x, tile.y, {
       x: this.interiorCharTx,
       y: this.interiorCharTy,
