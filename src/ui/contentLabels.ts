@@ -102,9 +102,8 @@ export function writingItemHasCopy(item: WritingItem): boolean {
 }
 
 export function writingTitle(item: WritingItem): string {
-  if (item.title) return item.title;
   if (item.titleKey) return t(item.titleKey as I18nKey);
-  return '';
+  return item.title ?? '';
 }
 
 export function writingMeta(item: WritingItem): string {
@@ -118,9 +117,8 @@ export function writingMeta(item: WritingItem): string {
 }
 
 export function talkTitle(item: TalkItem): string {
-  if (item.title) return item.title;
   if (item.titleKey) return t(item.titleKey as I18nKey);
-  return '';
+  return item.title ?? '';
 }
 
 export function talkItemHasCopy(item: TalkItem): boolean {

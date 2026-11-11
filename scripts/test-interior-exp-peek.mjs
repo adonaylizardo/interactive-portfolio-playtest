@@ -128,6 +128,49 @@ async function main() {
     });
     await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     await waitForQa(page);
+
+    const EN_TITLE_IN_ES = /^(How to |UX Tricks|The |Creating |Everyone |You're )/i;
+    const ES_TITLE_IN_EN = /[áéíóúñ¿]|^(Cómo |La |El |Todos le|Trucos |Píxeles|Método |Creando )/i;
+
+    const assertExperienceLangInUi = async (lang, building) => {
+      await page.evaluate((l) => window.__playtestQa.setLang(l), lang);
+      if (await page.evaluate(() => window.__playtestQa.isInInterior())) {
+        await page.evaluate(() => window.__playtestQa.leaveInteriorNow());
+        await wait(300);
+      }
+      await page.evaluate((b) => window.__playtestQa.enterInterior(b), building);
+      await page.waitForSelector('.interior-exp-peek__excerpt', { timeout: 12_000 });
+      await wait(350);
+      const excerpt = (await page.locator('.interior-exp-peek__excerpt').textContent())?.trim() ?? '';
+      if (lang === 'es' && /\b(How to|Top 10 tools|UX Tricks)\b/i.test(excerpt)) {
+        errors.push(`${building} excerpt looks EN while ES: ${excerpt}`);
+      }
+      if (lang === 'en' && /\b(Cómo hackear|Trucos de UX|Píxeles en órbita)\b/i.test(excerpt)) {
+        errors.push(`${building} excerpt looks ES while EN: ${excerpt}`);
+      }
+      await page.locator('[data-exp-peek-expand]').click();
+      await wait(350);
+      const titles = await page.$$eval(
+        '.building-panel--interior-entry .experience__row-title',
+        (els) => els.map((e) => e.textContent?.trim() ?? '').filter(Boolean),
+      );
+      for (const title of titles) {
+        if (lang === 'es' && EN_TITLE_IN_ES.test(title)) {
+          errors.push(`${building} list title EN in ES: ${title}`);
+        }
+        if (lang === 'en' && ES_TITLE_IN_EN.test(title)) {
+          errors.push(`${building} list title ES in EN: ${title}`);
+        }
+      }
+      await page.evaluate(() => window.__playtestQa.leaveInteriorNow());
+      await wait(200);
+    };
+
+    await assertExperienceLangInUi('es', 'teresa');
+    await assertExperienceLangInUi('en', 'teresa');
+    await assertExperienceLangInUi('es', 'biblioteca');
+    await assertExperienceLangInUi('en', 'biblioteca');
+
     const dismissAboutPeek = async () => {
       const close = page.locator(
         '.chrome:not(#mobile-peek-card-measure) [data-action="intro-close"]',

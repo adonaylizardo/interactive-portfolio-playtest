@@ -1,3 +1,5 @@
+import { EXPERIENCE_ITEM_TITLES_EN, EXPERIENCE_ITEM_TITLES_ES } from '../data/experienceItemTitles';
+
 export type Lang = 'en' | 'es';
 
 const LANG_STORAGE_KEY = 'portfolio-playtest-lang';
@@ -294,6 +296,8 @@ const DICT = {
     'welcome.headline': 'Hey there, my name is Adonay Lizardo 👋',
     'welcome.start': 'Get started',
     'welcome.readOnly': 'Read only',
+
+    ...EXPERIENCE_ITEM_TITLES_EN,
   },
   es: {
     'check.label': 'Primeros pasos',
@@ -577,6 +581,8 @@ const DICT = {
     'welcome.headline': 'Hola, me llamo Adonay Lizardo 👋',
     'welcome.start': 'Empezar',
     'welcome.readOnly': 'Solo leer',
+
+    ...EXPERIENCE_ITEM_TITLES_ES,
   },
 } as const;
 
