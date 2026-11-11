@@ -2704,6 +2704,21 @@ body:has(.building-panel--open) .chrome__lang {
     z-index: 2;
     background: #141518;
   }
+
+  .building-panel--interior-entry .interior-exp-body-open {
+    display: inline-flex;
+    align-self: flex-start;
+    margin: 4px 0 12px;
+    min-height: 40px;
+  }
+
+  .building-panel--interior-entry .interior-exp-body-open[hidden] {
+    display: none !important;
+  }
+}
+
+.interior-exp-body-open {
+  display: none;
 }
 
 .interior-exp-peek__title {

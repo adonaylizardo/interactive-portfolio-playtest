@@ -2239,6 +2239,10 @@ body[data-chrome='phone'] .checklist.checklist--phone-open.checklist--anchored {
   display: inline-flex;
 }
 
+.chrome__view-btns .ui-view[data-view='cenital'] {
+  display: none !important;
+}
+
 .chrome--overview .chrome__minimap-wrap {
   visibility: hidden;
   pointer-events: none;

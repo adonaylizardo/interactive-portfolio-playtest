@@ -18,9 +18,16 @@ function resolvePreviewBase() {
   if (process.env.QA_BASE_URL) {
     return process.env.QA_BASE_URL.replace(/\/?$/, '/');
   }
-  const html = readFileSync(path.join(ROOT, 'dist/index.html'), 'utf8');
-  const m = html.match(/<base\s+href="([^"]+)"/i);
-  const basePath = m?.[1] ?? '/';
+  let basePath = '/';
+  const viteConfig = readFileSync(path.join(ROOT, 'vite.config.ts'), 'utf8');
+  const cfg = viteConfig.match(/base:\s*['"]([^'"]+)['"]/);
+  if (cfg?.[1]) basePath = cfg[1];
+  else {
+    const html = readFileSync(path.join(ROOT, 'dist/index.html'), 'utf8');
+    const m = html.match(/<base\s+href="([^"]+)"/i);
+    if (m?.[1]) basePath = m[1];
+  }
+  if (!basePath.endsWith('/')) basePath += '/';
   return `http://127.0.0.1:${PREVIEW_PORT}${basePath}`;
 }
 
@@ -99,6 +106,8 @@ async function main() {
     await page.waitForSelector('.building-panel--interior-entry.building-panel--open', {
       timeout: 10_000,
     });
+    const enterId = await page.evaluate(() => window.__playtestQa.getInteriorId?.());
+    if (enterId !== 'teresa') errors.push(`enter interior id ${enterId}`);
     await wait(600);
 
     const backBtn = page.locator('[data-exp-mobile-back]');
@@ -126,6 +135,9 @@ async function main() {
       .locator('.building-panel--interior-entry .experience__intro:not([hidden])')
       .count();
     if (dupIntro > 0) errors.push('duplicate experience intro on expanded sheet');
+    if (await page.locator('.interior-exp-peek__title:visible').count()) {
+      errors.push('duplicate title: peek strip title visible on expanded sheet');
+    }
 
     const backVisible = await backBtn.isVisible();
     if (backVisible) {
@@ -139,28 +151,88 @@ async function main() {
       errors.push('back not visible on expanded list');
     }
 
-    await expand.evaluate((el) => el.click());
-    await wait(300);
-    await page.locator('[data-exp-mobile-close]').tap();
-    await wait(400);
-    if (!(await page.evaluate(() => window.__playtestQa.isInInterior()))) {
-      errors.push('× closed building');
-    }
-    await page.locator('[data-exp-reopen-fab]').waitFor({ state: 'visible', timeout: 3000 });
-
-    await page.evaluate(() => window.__playtestQa.leaveInteriorNow());
-    await page.waitForFunction(() => window.__playtestQa.isInInterior() === false, null, {
-      timeout: 10_000,
+    const gracePack = await page.evaluate(async () => {
+      const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+      const wasIn = window.__playtestQa.isInInterior();
+      const beforeId = window.__playtestQa.getInteriorId?.();
+      const canvasInterior = document.getElementById('game-canvas')?.dataset.interior ?? '';
+      window.__playtestQa.leaveInteriorNow();
+      const leaveAt = window.__playtestQa.doorGraceSnapshot?.()?.leaveGraceAt ?? 0;
+      const tapAt = leaveAt + 750;
+      while (leaveAt > 0 && performance.now() < tapAt) {
+        /* wall-clock spin — timers drift under Playwright load */
+      }
+      const tapNow = performance.now();
+      const graceActive = leaveAt > 0 && tapNow < leaveAt + 1500;
+      let tapped = false;
+      if (graceActive) {
+        const pt = window.__playtestQa.doorScreenPoint('teresa');
+        if (pt) {
+          window.__playtestQa.tapScreen(pt.x, pt.y);
+          tapped = true;
+        }
+      }
+      return {
+        wasIn,
+        beforeId,
+        canvasInterior,
+        leaveAt,
+        now: tapNow,
+        graceActive,
+        tapped,
+        grace: window.__playtestQa.doorGraceSnapshot?.(),
+        canvasGrace: document.getElementById('game-canvas')?.dataset.doorGraceId ?? null,
+      };
     });
-    await wait(900);
-    const pt = await page.evaluate(() => window.__playtestQa.doorScreenPoint('teresa'));
-    if (pt) {
-      await page.evaluate(([x, y]) => window.__playtestQa.tapScreen(x, y), [pt.x, pt.y]);
+    if (!gracePack.leaveAt) {
+      errors.push(`missing leaveGraceAt after exit: ${JSON.stringify(gracePack)}`);
+    }
+    if (!gracePack.wasIn) errors.push('not inside building before grace leave');
+    if (!gracePack.beforeId && !gracePack.canvasInterior) {
+      errors.push(
+        `no interior id before leave (beforeId=${gracePack.beforeId} canvas=${gracePack.canvasInterior})`,
+      );
+    }
+    if (
+      gracePack.grace?.graceId !== 'teresa' &&
+      gracePack.canvasGrace !== 'teresa'
+    ) {
+      errors.push(`exit grace not armed: ${JSON.stringify(gracePack)}`);
+    }
+    if (!gracePack.graceActive || !gracePack.tapped) {
+      errors.push(`grace door tap failed: ${JSON.stringify(gracePack)}`);
     }
     await wait(4000);
-    if (await page.evaluate(() => window.__playtestQa.isInInterior())) {
-      errors.push('re-entered teresa during exit grace');
+    if (gracePack.graceActive && (await page.evaluate(() => window.__playtestQa.isInInterior()))) {
+      const snap = await page.evaluate(() => window.__playtestQa.doorGraceSnapshot?.());
+      errors.push(`re-entered teresa during exit grace ${JSON.stringify(snap ?? {})}`);
     }
+
+    await page.evaluate(async () => {
+      const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+      window.__playtestQa.enterInterior('teresa');
+      await delay(400);
+      window.__playtestQa.leaveInteriorNow();
+      const t0 = Number(document.getElementById('game-canvas')?.dataset.leaveGraceAt ?? 0);
+      while (t0 > 0 && performance.now() < t0 + 2500) {
+        await delay(20);
+      }
+    });
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+    const ptAfterGrace = await page.evaluate(() => window.__playtestQa.doorScreenPoint('teresa'));
+    if (ptAfterGrace) {
+      await page.evaluate(([x, y]) => window.__playtestQa.tapScreen(x, y), [ptAfterGrace.x, ptAfterGrace.y]);
+    }
+    try {
+      await page.waitForFunction(() => window.__playtestQa.isInInterior() === true, null, {
+        timeout: 22_000,
+      });
+    } catch {
+      errors.push('single door tap after grace did not enter (throttled CPU)');
+    }
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+    await page.evaluate(() => window.__playtestQa.leaveInteriorNow());
+    await wait(300);
 
     await page.evaluate(() => window.__playtestQa.enterInterior('teresa'));
     await wait(500);
@@ -197,6 +269,26 @@ async function main() {
     }
     if (headerBox && introBox && introBox.y < headerBox.y) {
       errors.push('desktop: experience intro above exp-header');
+    }
+    if (await dPage.locator('.ui-view[data-view="cenital"]').isVisible()) {
+      errors.push('desktop: cenital toggle should be hidden');
+    }
+    const listOpen = dPage.locator('[data-exp-interior-list-open]');
+    await listOpen.waitFor({ state: 'visible', timeout: 5000 });
+    await listOpen.click();
+    await wait(400);
+    const rowCount = await dPage.locator('.building-panel--interior-entry .experience__list .experience__row').count();
+    if (rowCount < 14) errors.push(`desktop list expected 14 rows, got ${rowCount}`);
+    const deskBack = dPage.locator('[data-exp-back]');
+    if (await deskBack.isVisible()) {
+      await deskBack.click();
+      await wait(350);
+      if (!(await dPage.evaluate(() => window.__playtestQa.isInInterior()))) {
+        errors.push('desktop ‹ on list exited building');
+      }
+      if (!(await listOpen.isVisible())) errors.push('desktop ‹ did not return to excerpt peek');
+    } else {
+      errors.push('desktop ‹ missing on expanded list');
     }
     await desk.close();
   } catch (e) {

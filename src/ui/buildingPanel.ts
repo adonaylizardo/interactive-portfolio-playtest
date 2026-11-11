@@ -261,6 +261,7 @@ export class BuildingPanel {
           </section>
           <section class="experience" data-experience hidden>
             <p class="experience__intro"></p>
+            <button type="button" class="ui-btn ui-btn--primary interior-exp-body-open" data-exp-interior-list-open hidden></button>
             <div class="experience__filters" data-exp-filters hidden></div>
             <div class="experience__detail" data-exp-detail hidden></div>
           </section>
@@ -350,11 +351,24 @@ export class BuildingPanel {
       e.preventDefault();
       e.stopPropagation();
       if (!this.isExperienceMode()) return;
+      if (this.interiorExperienceEntry) {
+        if (this.isMobile()) {
+          this.setPeek(!this.peekOnly);
+        } else {
+          this.openInteriorExperienceList();
+        }
+        return;
+      }
       if (this.isMobile()) {
         this.setPeek(!this.peekOnly);
         return;
       }
       this.onExperienceDesktopExpand?.();
+    });
+    this.el.querySelector('[data-exp-interior-list-open]')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.openInteriorExperienceList();
     });
     this.el.querySelector('[data-exp-peek-expand]')?.addEventListener('click', (e) => {
       e.preventDefault();
@@ -643,6 +657,17 @@ export class BuildingPanel {
         this.experienceIntro.hidden = true;
       }
     }
+    const deskOpen = this.el.querySelector('[data-exp-interior-list-open]') as HTMLElement | null;
+    const deskExpand = this.el.querySelector('[data-exp-expand]') as HTMLElement | null;
+    if (deskExpand) deskExpand.hidden = this.interiorExperienceEntry && !mobile;
+    if (deskOpen) {
+      const showDeskOpen = on && this.peekOnly && !mobile;
+      deskOpen.hidden = !showDeskOpen;
+      if (showDeskOpen) {
+        deskOpen.textContent =
+          this.mode === 'talks' ? t('panel.reopenTalks') : t('panel.reopenWritings');
+      }
+    }
   }
 
   isInteriorExperienceEntry(): boolean {
@@ -684,8 +709,14 @@ export class BuildingPanel {
       }
     }
     if (this.interiorExpPeek) {
-      this.interiorExpPeek.hidden =
-        !this.interiorExperienceEntry || this.experienceCardDismissed || !this.isOpen();
+      const mobile = this.isMobile();
+      const showPeekStrip =
+        this.interiorExperienceEntry &&
+        this.isOpen() &&
+        !this.experienceCardDismissed &&
+        this.peekOnly &&
+        mobile;
+      this.interiorExpPeek.hidden = !showPeekStrip;
     }
     if (this.expMobileChrome) {
       this.expMobileChrome.hidden =
@@ -891,9 +922,18 @@ export class BuildingPanel {
     this.onExperienceDetailBack = fn;
   }
 
+  private openInteriorExperienceList(): void {
+    if (!this.interiorExperienceEntry) return;
+    this.experienceCardDismissed = false;
+    this.setPeek(false);
+    this.renderInteriorExperienceList();
+    this.syncExperienceCardDismissed();
+  }
+
   /** Desktop Talks/Writings header expand control follows `data-layout` (split vs panel). */
   syncExperienceDesktopExpand(): void {
     if (!this.isExperienceMode() || this.isMobile()) return;
+    if (this.interiorExperienceEntry) return;
     const expanded = document.body.dataset.layout === 'panel';
     this.el.querySelectorAll('[data-exp-expand]').forEach((el) => {
       const btn = el as HTMLElement;
@@ -1050,7 +1090,11 @@ export class BuildingPanel {
     if (this.interiorExperienceEntry) {
       this.experienceIntro.textContent =
         this.mode === 'talks' ? talksInteriorExcerpt() : writingsInteriorExcerpt();
-      this.experienceIntro.hidden = this.experienceCardDismissed || this.peekOnly;
+      if (this.isMobile()) {
+        this.experienceIntro.hidden = true;
+      } else {
+        this.experienceIntro.hidden = this.experienceCardDismissed || !this.peekOnly;
+      }
       this.syncInteriorExpPeek();
       return;
     }

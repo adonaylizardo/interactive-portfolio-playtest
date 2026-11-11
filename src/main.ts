@@ -501,6 +501,7 @@ async function main(): Promise<void> {
     },
     onChecklist: (step) => checklist.complete(step),
     onEnterBuilding: (buildingId) => {
+      if (scene.isExitGraceBlocking(buildingId)) return;
       checklist.complete('enter-building');
       const caseViaPanel = caseEntryViaChromePanel && isCaseHouse(buildingId);
       caseEntryViaChromePanel = false;
