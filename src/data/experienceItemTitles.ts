@@ -2,7 +2,7 @@
 export const EXPERIENCE_ITEM_TITLES_EN = {
   'talks.items.innova360-2025.title':
     'How to hack your career when everything is against you (literally)',
-  'talks.items.yt-EBecBkHkRos.title': 'How to create businesses in pandemic times',
+  'talks.items.yt-EBecBkHkRos.title': 'How to start a business during a pandemic',
   'talks.items.yt-aCHPQatcjWQ.title': 'How to unlock your true potential',
   'talks.items.yt-gK6rYI__wag.title': 'Creating an MVP',
   'talks.items.sinergia-como-hackear-tu-motivacion.title': 'How to hack your motivation',
@@ -13,7 +13,7 @@ export const EXPERIENCE_ITEM_TITLES_EN = {
     'How to start your day right (according to science)',
   'talks.items.sinergia-como-ser-mas-inteligente.title': 'How to be smarter',
   'talks.items.sinergia-la-comunicacion-intencional-en-los.title':
-    'Intentional communication in business: functional ugly, dazzling beauty, or strategic middle?',
+    'Intentional communication in business: functional and plain, dazzling, or a strategic middle ground?',
   'talks.items.sinergia-la-brillantez-no-es-un-accidente.title':
     "Brilliance isn't accidental—it's forged",
   'talks.items.sinergia-tu-capacidad-de-disfrute-esta-en.title':
@@ -21,7 +21,7 @@ export const EXPERIENCE_ITEM_TITLES_EN = {
   'talks.items.sinergia-eres-un-ladron-de-crecimiento-ajeno.title':
     "You're stealing other people's growth",
   'talks.items.sinergia-todos-le-creyeron-a-la-ia-todos-se.title':
-    'Everyone believed AI. Everyone was wrong.',
+    'Everyone believed the AI. Everyone was wrong.',
 
   'writings.items.ux-tricks-to-boost-customer-retention.title':
     'UX Tricks to boost customer retention',
@@ -32,7 +32,7 @@ export const EXPERIENCE_ITEM_TITLES_EN = {
   'writings.items.pixels-in-orbit-a-short-story-about-how-my-designs-made-it-to-space.title':
     'Pixels in Orbit: How my designs made it to space',
   'writings.items.googles-heart-method-what-how-the-perks.title':
-    "Google's HEART method — what, how & the perks",
+    'Google’s HEART method — what, how & the perks',
 } as const;
 
 export const EXPERIENCE_ITEM_TITLES_ES = {
@@ -44,14 +44,14 @@ export const EXPERIENCE_ITEM_TITLES_ES = {
   'talks.items.sinergia-como-hackear-tu-motivacion.title': 'Cómo hackear tu motivación',
   'talks.items.sinergia-la-solucion-para-que-dejes-de-sabotearte.title':
     'La solución para que dejes de sabotearte',
-  'talks.items.sinergia-el-verdadero-problema-eres-tu.title': 'El verdadero problema, eres tú',
+  'talks.items.sinergia-el-verdadero-problema-eres-tu.title': 'El verdadero problema eres tú',
   'talks.items.sinergia-como-empezar-tu-dia-adecuadamente.title':
     'Cómo empezar tu día adecuadamente (según la ciencia)',
   'talks.items.sinergia-como-ser-mas-inteligente.title': 'Cómo ser más inteligente',
   'talks.items.sinergia-la-comunicacion-intencional-en-los.title':
-    'La Comunicación Intencional en los Negocios: ¿Feo Funcional, Bello Deslumbrante o Punto Medio Estratégico?',
+    'La comunicación intencional en los negocios: ¿feo funcional, bello deslumbrante o punto medio estratégico?',
   'talks.items.sinergia-la-brillantez-no-es-un-accidente.title':
-    'La Brillantez no es un accidente, se forja',
+    'La brillantez no es un accidente, se forja',
   'talks.items.sinergia-tu-capacidad-de-disfrute-esta-en.title':
     'Tu capacidad de disfrute está en peligro de extinción',
   'talks.items.sinergia-eres-un-ladron-de-crecimiento-ajeno.title':
@@ -64,11 +64,11 @@ export const EXPERIENCE_ITEM_TITLES_ES = {
   'writings.items.top-10-tools-for-ux-design-and-research.title':
     'Top 10 herramientas para diseño e investigación UX',
   'writings.items.how-to-streamline-the-construction-of-digital-products-with-ux-consulting.title':
-    'Cómo agilizar productos digitales con consultoría UX',
+    'Cómo agilizar la construcción de productos digitales con consultoría UX',
   'writings.items.pixels-in-orbit-a-short-story-about-how-my-designs-made-it-to-space.title':
     'Píxeles en órbita: cómo mis diseños llegaron al espacio',
   'writings.items.googles-heart-method-what-how-the-perks.title':
-    'Método HEART de Google: qué es, cómo y ventajas',
+    'Método HEART de Google: qué es, cómo funciona y sus ventajas',
 } as const;
 
 export function experienceItemTitleKey(kind: 'talks' | 'writings', id: string): string {

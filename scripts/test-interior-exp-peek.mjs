@@ -131,12 +131,21 @@ async function main() {
 
     const EN_TITLE_IN_ES = /^(How to |UX Tricks|The |Creating |Everyone |You're )/i;
     const ES_TITLE_IN_EN = /[áéíóúñ¿]|^(Cómo |La |El |Todos le|Trucos |Píxeles|Método |Creando )/i;
+    const ES_MONTH_IN_META = /enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre/i;
+
+    const waitForDoorGraceAfterLeave = async (targetPage) => {
+      await targetPage.evaluate(async () => {
+        const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+        const t0 = Number(document.getElementById('game-canvas')?.dataset.leaveGraceAt ?? 0);
+        while (t0 > 0 && performance.now() < t0 + 1600) await delay(20);
+      });
+    };
 
     const assertExperienceLangInUi = async (lang, building) => {
       await page.evaluate((l) => window.__playtestQa.setLang(l), lang);
       if (await page.evaluate(() => window.__playtestQa.isInInterior())) {
         await page.evaluate(() => window.__playtestQa.leaveInteriorNow());
-        await wait(300);
+        await waitForDoorGraceAfterLeave(page);
       }
       await page.evaluate((b) => window.__playtestQa.enterInterior(b), building);
       await page.waitForSelector('.interior-exp-peek__excerpt', { timeout: 12_000 });
@@ -163,7 +172,7 @@ async function main() {
         }
       }
       await page.evaluate(() => window.__playtestQa.leaveInteriorNow());
-      await wait(200);
+      await waitForDoorGraceAfterLeave(page);
     };
 
     await assertExperienceLangInUi('es', 'teresa');
@@ -608,6 +617,48 @@ async function main() {
     await dPage.addInitScript(() => sessionStorage.setItem('playtest-welcome-done', '1'));
     await dPage.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     await waitForQa(dPage);
+
+    const assertDesktopListLangAfterToggle = async (building) => {
+      await dPage.evaluate(() => window.__playtestQa.setLang('es'));
+      await wait(200);
+      await dPage.evaluate((b) => window.__playtestQa.enterInterior(b), building);
+      await dPage.waitForSelector('.building-panel--interior-entry.building-panel--open', {
+        timeout: 12_000,
+      });
+      await wait(300);
+      const listOpenBtn = dPage.locator('[data-exp-interior-list-open]');
+      await listOpenBtn.waitFor({ state: 'visible', timeout: 8000 });
+      await listOpenBtn.click();
+      await wait(350);
+      await dPage.evaluate(() => window.__playtestQa.setLang('en'));
+      await wait(350);
+      const titles = await dPage.$$eval(
+        '.building-panel--interior-entry .experience__row-title',
+        (els) => els.map((e) => e.textContent?.trim() ?? '').filter(Boolean),
+      );
+      const metas = await dPage.$$eval(
+        '.building-panel--interior-entry .experience__row-meta',
+        (els) => els.map((e) => e.textContent?.trim() ?? '').filter(Boolean),
+      );
+      if (!titles.length) errors.push(`desktop ${building}: no list titles after lang toggle`);
+      for (const title of titles) {
+        if (ES_TITLE_IN_EN.test(title)) {
+          errors.push(`desktop ${building} list title still ES after EN toggle: ${title}`);
+        }
+      }
+      for (const meta of metas) {
+        if (ES_MONTH_IN_META.test(meta)) {
+          errors.push(`desktop ${building} list date still ES after EN toggle: ${meta}`);
+        }
+      }
+      await dPage.evaluate(() => window.__playtestQa.leaveInteriorNow());
+      await waitForDoorGraceAfterLeave(dPage);
+    };
+
+    await assertDesktopListLangAfterToggle('teresa');
+    await assertDesktopListLangAfterToggle('biblioteca');
+
+    await dPage.evaluate(() => window.__playtestQa.setLang('es'));
     await dPage.evaluate(() => window.__playtestQa.enterInterior('teresa'));
     await dPage.waitForSelector('.building-panel--interior-entry.building-panel--open', {
       timeout: 10_000,

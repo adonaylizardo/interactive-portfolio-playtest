@@ -1168,10 +1168,26 @@ export class BuildingPanel {
     this.experienceIntro.hidden = true;
   }
 
+  private refreshExperienceListIfVisible(): void {
+    if (!this.isExperienceMode() || this.experienceView !== 'list' || this.peekOnly) return;
+    if (!this.interiorExperienceEntry) return;
+    const bodyWrap = this.el.querySelector('.building-panel__body-wrap') as HTMLElement | null;
+    const scrollTop = bodyWrap?.scrollTop ?? this.sheet.scrollTop;
+    this.renderInteriorExperienceList();
+    const restore = () => {
+      if (bodyWrap) bodyWrap.scrollTop = scrollTop;
+      else this.sheet.scrollTop = scrollTop;
+    };
+    requestAnimationFrame(restore);
+    requestAnimationFrame(() => requestAnimationFrame(restore));
+  }
+
   private refreshExperienceCopy(): void {
     if (!this.isExperienceMode()) return;
     this.syncExperienceIntro();
     if (this.expHeaderTitle) this.expHeaderTitle.textContent = this.experienceDisplayTitle();
+    if (this.expMobileTitle) this.expMobileTitle.textContent = this.experienceDisplayTitle();
+    this.refreshExperienceListIfVisible();
     if (this.mode === 'talks' && this.activeTalkId) {
       const item = TALKS.find((x) => x.id === this.activeTalkId);
       if (item) this.renderTalkPlayer(item);
