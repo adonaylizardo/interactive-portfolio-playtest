@@ -466,11 +466,13 @@ async function main(): Promise<void> {
           scene.setReadingPaused(false);
         }
         if (interiorId === 'teresa') {
+          panel.prepareInteriorFloatingPeek();
           checklist.setBuildingPanelOpen(true);
           studio.clearSubtitle();
           chrome.setInteriorOpen(true);
           panel.showExperienceInteriorEntry('talks', 'teresa');
         } else if (interiorId === 'biblioteca') {
+          panel.prepareInteriorFloatingPeek();
           checklist.setBuildingPanelOpen(true);
           studio.clearSubtitle();
           chrome.setInteriorOpen(true);

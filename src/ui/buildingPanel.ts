@@ -150,6 +150,7 @@ export class BuildingPanel {
   private interiorExpPeekExcerpt: HTMLElement | null = null;
   private expReopenFab: HTMLElement | null = null;
   private interiorVvListener: (() => void) | null = null;
+  private aboutPeekRefHeight = 0;
 
   constructor(
     container: HTMLElement,
@@ -635,6 +636,13 @@ export class BuildingPanel {
     this.interiorVvListener = null;
   }
 
+  private syncAboutPeekRefHeight(): void {
+    const h =
+      document.querySelector('.chrome--intro-peek .chrome__intro')?.getBoundingClientRect().height ??
+      0;
+    if (h > 80) this.aboutPeekRefHeight = h;
+  }
+
   private syncMobileSheetVisualViewport(): void {
     const vv = window.visualViewport;
     if (!vv) {
@@ -646,39 +654,26 @@ export class BuildingPanel {
   }
 
   private syncInteriorPeekSheetMetrics(): void {
-    if (
-      !this.interiorExperienceEntry ||
-      !this.isMobile() ||
-      !this.peekOnly ||
-      !this.isOpen() ||
-      this.experienceCardDismissed
-    ) {
-      this.sheet.style.removeProperty('--interior-peek-rise');
+    const floatingPeek =
+      this.interiorExperienceEntry &&
+      this.isMobile() &&
+      this.peekOnly &&
+      this.isOpen() &&
+      !this.experienceCardDismissed;
+    this.el.classList.toggle('building-panel--floating-peek', floatingPeek);
+    if (!floatingPeek) {
       this.sheet.style.removeProperty('--vv-layout-bottom');
+      this.sheet.style.removeProperty('--floating-peek-min-h');
       return;
     }
+    this.syncAboutPeekRefHeight();
     this.syncMobileSheetVisualViewport();
-    const measure = () => {
-      if (!this.interiorExpPeek || this.interiorExpPeek.hidden) return;
-      const sheetStyle = getComputedStyle(this.sheet);
-      const padTop = parseFloat(sheetStyle.paddingTop) || 0;
-      const padBottom = parseFloat(sheetStyle.paddingBottom) || 0;
-      let content = 0;
-      for (const el of [this.expMobileChrome, this.interiorExpPeek]) {
-        if (!el || el.hidden) continue;
-        content += el.getBoundingClientRect().height;
-      }
-      const aboutRef =
-        document.querySelector('.chrome--intro-peek .chrome__intro')?.getBoundingClientRect()
-          .height ??
-        document.querySelector('.chrome__intro')?.getBoundingClientRect().height ??
-        0;
-      const natural = Math.ceil(content + padTop + padBottom);
-      const minRise = aboutRef > 100 ? aboutRef : 200;
-      const rise = Math.max(natural, minRise);
-      this.sheet.style.setProperty('--interior-peek-rise', `${rise}px`);
-    };
-    requestAnimationFrame(measure);
+    if (this.aboutPeekRefHeight > 0) {
+      this.sheet.style.setProperty(
+        '--floating-peek-min-h',
+        `${Math.round(this.aboutPeekRefHeight)}px`,
+      );
+    }
   }
 
   private syncInteriorBackButtons(): void {
@@ -746,11 +741,17 @@ export class BuildingPanel {
     return this.interiorExperienceEntry;
   }
 
+  /** Capture About peek height before chrome hides the intro card (interior entry). */
+  prepareInteriorFloatingPeek(): void {
+    this.syncAboutPeekRefHeight();
+  }
+
   showExperienceInteriorEntry(mode: 'talks' | 'writings', interiorId: string): void {
     this.resetSheetGeometry();
     this.interiorExperienceEntry = true;
     this.experienceCardDismissed = false;
     this.el.classList.add('building-panel--interior-entry');
+    this.prepareInteriorFloatingPeek();
     this.bindInteriorViewportSync();
     this.openExperience(mode, interiorId, { interiorEntry: true });
     this.syncInteriorExpPeek();
@@ -1210,8 +1211,13 @@ export class BuildingPanel {
       'exp-mobile-chrome--grab-wide',
       'exp-mobile-chrome--grab-compact',
       'exp-mobile-chrome--list-pad',
+      'exp-mobile-chrome--floating-card',
     );
-    this.expMobileChrome.classList.add('exp-mobile-chrome--grab-compact');
+    if (this.interiorExperienceEntry && this.peekOnly) {
+      this.expMobileChrome.classList.add('exp-mobile-chrome--floating-card');
+    } else {
+      this.expMobileChrome.classList.add('exp-mobile-chrome--grab-compact');
+    }
     if (this.mode === 'writings' && this.experienceView === 'detail') {
       const backIcon = this.expMobileChrome.querySelector(
         '.exp-mobile-chrome__back .exp-mobile-chrome__icon',

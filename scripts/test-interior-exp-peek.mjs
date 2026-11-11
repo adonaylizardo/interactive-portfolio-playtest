@@ -2,7 +2,7 @@
 /**
  * Real-DOM QA: interior peek, list back, dismiss/reopen, pinch zoom, post-exit door grace.
  */
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +10,8 @@ import { chromium, devices } from 'playwright';
 import { waitForQa } from './qa-ready.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const TEST_OUT = path.join(ROOT, 'test-output');
+mkdirSync(TEST_OUT, { recursive: true });
 const PREVIEW_PORT = Number(process.env.QA_PREVIEW_PORT) || 4198;
 const GLOBAL_TIMEOUT_MS = 120_000;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -21,8 +23,14 @@ function resolvePreviewBase() {
   let basePath = '/';
   try {
     const html = readFileSync(path.join(ROOT, 'dist/index.html'), 'utf8');
-    const m = html.match(/<base\s+href="([^"]+)"/i);
-    if (m?.[1]) basePath = m[1];
+    const script =
+      html.match(/<script[^>]+type="module"[^>]+src="([^"]+)"/i) ??
+      html.match(/<script[^>]+src="([^"]+)"/i);
+    if (script?.[1]) {
+      const src = script[1];
+      const assets = src.indexOf('/assets/');
+      basePath = assets > 0 ? src.slice(0, assets + 1) : src.replace(/\/[^/]+$/, '');
+    }
   } catch {
     /* dist not built yet */
   }
@@ -103,11 +111,84 @@ async function main() {
     });
     await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     await waitForQa(page);
-    const aboutPeekH = await page.evaluate(() => {
-      const intro = document.querySelector('.chrome--intro-peek .chrome__intro');
-      return intro?.getBoundingClientRect().height ?? 0;
-    });
+    const measureAbout = async (vw) =>
+      page.evaluate((w) => {
+        const intro = document.querySelector('.chrome--intro-peek .chrome__intro');
+        const r = intro?.getBoundingClientRect();
+        if (!r) return null;
+        const vv = window.visualViewport;
+        const vvBottom = (vv?.offsetTop ?? 0) + (vv?.height ?? window.innerHeight);
+        return {
+          left: r.left,
+          right: w - r.right,
+          bottom: vvBottom - r.bottom,
+          height: r.height,
+        };
+      }, vw);
 
+    const measureInteriorPeek = async (vw) =>
+      page.evaluate((w) => {
+        const sheet = document.querySelector(
+          '.building-panel--interior-entry.building-panel--floating-peek .building-panel__sheet',
+        );
+        const r = sheet?.getBoundingClientRect();
+        if (!r) return null;
+        const vv = window.visualViewport;
+        const vvBottom = (vv?.offsetTop ?? 0) + (vv?.height ?? window.innerHeight);
+        return {
+          left: r.left,
+          right: w - r.right,
+          bottom: vvBottom - r.bottom,
+          height: r.height,
+        };
+      }, vw);
+
+    for (const [vw, vh] of [
+      [375, 667],
+      [390, 844],
+      [430, 932],
+    ]) {
+      await page.setViewportSize({ width: vw, height: vh });
+      await wait(250);
+      const ref = await measureAbout(vw);
+      if (!ref) errors.push(`about peek reference missing @${vw}`);
+      await page.evaluate(() => window.__playtestQa.enterInterior('teresa'));
+      await page.waitForFunction(() => window.__playtestQa?.isInInterior?.() === true, null, {
+        timeout: 20_000,
+      });
+      await page.waitForSelector('.building-panel--interior-entry.building-panel--floating-peek', {
+        timeout: 10_000,
+      });
+      await wait(350);
+      const layout = await measureInteriorPeek(vw);
+      if (!layout) errors.push(`missing interior floating peek @${vw}`);
+      else if (ref) {
+        if (!ref) errors.push(`about peek reference missing @${vw}`);
+        for (const key of ['left', 'right', 'bottom', 'height']) {
+          const d = Math.abs(layout[key] - ref[key]);
+          if (d > 2) {
+            errors.push(
+              `peek ${key} mismatch @${vw}: interior=${layout[key].toFixed(1)} about=${ref[key].toFixed(1)} (Δ${d.toFixed(1)})`,
+            );
+          }
+        }
+      }
+      await page.evaluate(() => window.__playtestQa.leaveInteriorNow());
+      await page.waitForFunction(() => window.__playtestQa.isInInterior() === false, null, {
+        timeout: 10_000,
+      });
+      await page.evaluate(() => {
+        sessionStorage.setItem('playtest-welcome-done', '1');
+        const chrome = document.querySelector('.chrome');
+        if (chrome) {
+          chrome.classList.add('chrome--sheet', 'chrome--intro-peek');
+          chrome.classList.remove('chrome--intro-expanded', 'chrome--intro-full');
+        }
+      });
+      await wait(200);
+    }
+
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.evaluate(() => window.__playtestQa.enterInterior('teresa'));
     await page.waitForFunction(() => window.__playtestQa?.isInInterior?.() === true, null, {
       timeout: 20_000,
@@ -117,37 +198,7 @@ async function main() {
     });
     const enterId = await page.evaluate(() => window.__playtestQa.getInteriorId?.());
     if (enterId !== 'teresa') errors.push(`enter interior id ${enterId}`);
-    await wait(600);
-
-    for (const [vw, vh] of [
-      [375, 667],
-      [390, 844],
-      [430, 932],
-    ]) {
-      await page.setViewportSize({ width: vw, height: vh });
-      await wait(250);
-      const layout = await page.evaluate(() => {
-        const sheet = document.querySelector(
-          '.building-panel--interior-entry.building-panel--peek .building-panel__sheet',
-        );
-        const vv = window.visualViewport;
-        const sheetR = sheet?.getBoundingClientRect();
-        const vvBottom = (vv?.offsetTop ?? 0) + (vv?.height ?? window.innerHeight);
-        return { sheetBottom: sheetR?.bottom ?? 0, vvBottom, sheetH: sheetR?.height ?? 0 };
-      });
-      if (Math.abs(layout.sheetBottom - layout.vvBottom) > 3) {
-        errors.push(
-          `interior peek not bottom-anchored @${vw}: bottom=${layout.sheetBottom.toFixed(1)} vv=${layout.vvBottom.toFixed(1)}`,
-        );
-      }
-      if (aboutPeekH > 40 && Math.abs(layout.sheetH - aboutPeekH) > 40) {
-        errors.push(
-          `interior peek height ${layout.sheetH.toFixed(0)}px vs about ${aboutPeekH.toFixed(0)}px @${vw}`,
-        );
-      }
-    }
-    await page.setViewportSize({ width: 390, height: 844 });
-    await wait(200);
+    await wait(400);
 
     const peekLabels = await page.evaluate(() => {
       const cta = document.querySelector('[data-exp-peek-expand-label]')?.textContent?.trim() ?? '';
@@ -162,7 +213,7 @@ async function main() {
     }
     if (peekLabels.stripVisible) errors.push('duplicate title: interior-exp-peek__title visible on phone peek');
 
-    await page.screenshot({ path: '/opt/cursor/artifacts/interior-peek-390-r43.png' });
+    await page.screenshot({ path: path.join(TEST_OUT, 'interior-peek-vs-about-390.png'), fullPage: true });
 
     const backBtn = page.locator('[data-exp-mobile-back]');
     if (await backBtn.isVisible()) {
@@ -195,8 +246,26 @@ async function main() {
 
     const backVisible = await backBtn.isVisible();
     if (backVisible) {
+      const peekHBeforeBack = await page.evaluate(() => {
+        const sheet = document.querySelector(
+          '.building-panel--interior-entry.building-panel--floating-peek .building-panel__sheet',
+        );
+        return sheet?.getBoundingClientRect().height ?? 0;
+      });
       await backBtn.evaluate((el) => el.click());
-      await wait(400);
+      await wait(50);
+      const peekHAfterBack = await page.evaluate(() => {
+        const sheet = document.querySelector(
+          '.building-panel--interior-entry.building-panel--floating-peek .building-panel__sheet',
+        );
+        return sheet?.getBoundingClientRect().height ?? 0;
+      });
+      if (peekHBeforeBack > 0 && Math.abs(peekHAfterBack - peekHBeforeBack) > 2) {
+        errors.push(
+          `peek height jump after ‹: ${peekHBeforeBack.toFixed(1)} → ${peekHAfterBack.toFixed(1)}`,
+        );
+      }
+      await wait(350);
       const stillIn = await page.evaluate(() => window.__playtestQa.isInInterior());
       if (!stillIn) errors.push('‹ on expanded list exited building');
       const peekAgain = await page.locator('[data-exp-peek-expand]').isVisible();

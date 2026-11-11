@@ -7,3 +7,4 @@ dist
 .env
 # QA screenshots and gate output stay out of the repo. Cloud-agent artifacts hold the few cited in reports.
 artifacts/
+test-output/

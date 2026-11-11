@@ -2295,13 +2295,43 @@ body:has(.building-panel--open) .chrome__lang {
     display: none;
   }
 
-  .building-panel--interior-entry.building-panel--peek .building-panel__sheet {
-    bottom: calc(var(--vv-layout-bottom, 0px) + env(safe-area-inset-bottom, 0px)) !important;
+  /* Charlas/Biblioteca in-room peek: same floating card as About + case preview (not full-bleed sheet). */
+  .building-panel--interior-entry.building-panel--peek.building-panel--floating-peek
+    .building-panel__sheet {
+    left: 16px !important;
+    right: 16px !important;
+    width: auto !important;
     top: auto !important;
-    transform: translateY(calc(100% - var(--interior-peek-rise, 168px))) !important;
-    max-height: var(--interior-peek-rise, 168px) !important;
-    min-height: var(--interior-peek-rise, 168px) !important;
+    bottom: calc(
+      max(16px, env(safe-area-inset-bottom, 0px)) + var(--vv-layout-bottom, 0px)
+    ) !important;
+    height: auto !important;
+    min-height: var(--floating-peek-min-h, auto) !important;
+    max-height: none !important;
+    transform: none !important;
+    box-sizing: border-box;
+    padding: 16px 16px 16px !important;
+    border: 1px solid #2a2c31 !important;
+    border-radius: 12px !important;
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 50%),
+      0 2px 8px rgb(0 0 0 / 40%);
     overflow: hidden;
+  }
+
+  .building-panel--interior-entry.building-panel--floating-peek .exp-mobile-chrome__grab {
+    display: none !important;
+  }
+
+  .building-panel--interior-entry.building-panel--floating-peek .exp-mobile-chrome {
+    min-height: 0;
+    padding: 0 0 4px;
+  }
+
+  .building-panel--interior-entry.building-panel--floating-peek .exp-mobile-chrome--floating-card
+    .exp-mobile-chrome__row {
+    min-height: 44px;
+    height: auto;
   }
 
   .building-panel--interior-entry.building-panel--peek .interior-exp-peek__title {
@@ -2309,8 +2339,18 @@ body:has(.building-panel--open) .chrome__lang {
   }
 
   .building-panel--interior-entry.building-panel--peek .interior-exp-peek {
-    padding: 0 0 4px;
-    gap: 6px;
+    padding: 0;
+    gap: 8px;
+  }
+
+  .building-panel--interior-entry.building-panel--floating-peek .interior-exp-peek {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .building-panel--interior-entry.building-panel--floating-peek .interior-exp-peek__expand {
+    margin-top: auto;
   }
 
   .building-panel--interior-entry.building-panel--open:not(.building-panel--peek) .building-panel__sheet {
