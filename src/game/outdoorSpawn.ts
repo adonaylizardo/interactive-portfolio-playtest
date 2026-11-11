@@ -1,7 +1,7 @@
 import { cells, doorInwardStep, type MapObject } from '../data/map';
 
 /** Minimum ms after exiting a building before the exterior door can re-trigger entry. */
-export const EXTERIOR_DOOR_ENTRY_COOLDOWN_MS = 1000;
+export const EXTERIOR_DOOR_ENTRY_COOLDOWN_MS = 1500;
 
 function walkable(tx: number, ty: number): boolean {
   return !!cells[ty]?.[tx]?.walkable;

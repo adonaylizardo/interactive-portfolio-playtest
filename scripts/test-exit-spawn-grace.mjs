@@ -10,7 +10,7 @@ const teresa = objects.find((o) => o.name === 'teresa');
 const biblioteca = objects.find((o) => o.name === 'biblioteca');
 assert.ok(teresa?.door, 'teresa has door');
 assert.ok(biblioteca?.door, 'biblioteca has door');
-assert.ok(EXTERIOR_DOOR_ENTRY_COOLDOWN_MS >= 1000, 'door grace at least 1s');
+assert.ok(EXTERIOR_DOOR_ENTRY_COOLDOWN_MS >= 1500, 'door grace at least 1.5s');
 
 for (const b of [teresa, biblioteca]) {
   const spawn = outdoorSpawnTileAwayFromDoor(b, 2);

@@ -562,6 +562,13 @@ export class IsoScene {
   private interiorCameraUserAdjusted = false;
   private lastInteriorViewportW = 0;
   private lastInteriorViewportH = 0;
+  /** Block re-entering the same building until grace ends after exterior exit. */
+  private doorExitGraceBuildingId: string | null = null;
+  private doorExitGraceUntil = 0;
+  /** Walk started during exit grace must not complete as a door entry. */
+  private pathNoDoorEntry = false;
+  /** Outdoor path started while post-exit grace is active — block door entry until it finishes. */
+  private doorGraceWalkNoEntry = false;
   private suppressMapTapOnce = false;
   constructor(events: SceneEvents) {
     this.events = events;
@@ -2166,6 +2173,35 @@ export class IsoScene {
     this.applyBillboards();
   }
 
+  private exitGraceBlocksBuilding(name: string | null | undefined): boolean {
+    if (!name || !this.doorExitGraceBuildingId) return false;
+    if (this.doorExitGraceBuildingId !== name) return false;
+    if (this.doorGraceWalkNoEntry) return true;
+    return performance.now() < this.doorExitGraceUntil;
+  }
+
+  private postExitDoorGraceActive(): boolean {
+    if (!this.doorExitGraceBuildingId) return false;
+    return performance.now() < this.doorExitGraceUntil;
+  }
+
+  private markDoorGraceWalkIfActive(): void {
+    if (!this.interiorActive && this.postExitDoorGraceActive()) {
+      this.doorGraceWalkNoEntry = true;
+    }
+  }
+
+  private clearDoorGraceWalkBlockIfIdle(): void {
+    if (this.path.length > 0 || this.interiorPath.length > 0) return;
+    this.doorGraceWalkNoEntry = false;
+    this.pathNoDoorEntry = false;
+  }
+
+  private buildingNameForEntry(entry: { panelTitle: string; door: { x: number; y: number } }): string | null {
+    const b = getBuildingAtDoor(entry.door.x, entry.door.y);
+    return b?.name ?? null;
+  }
+
   requestWalk(
     tx: number,
     ty: number,
@@ -2192,12 +2228,41 @@ export class IsoScene {
       const bench = this.benchAtSeat(tx, ty);
       if (bench && this.sitOnBench(bench, sprint)) return;
     }
+    let buildingEntry = opts?.buildingEntry;
+    if (this.postExitDoorGraceActive()) {
+      this.markDoorGraceWalkIfActive();
+    }
+    if (buildingEntry) {
+      const name = this.buildingNameForEntry(buildingEntry);
+      if (this.exitGraceBlocksBuilding(name)) {
+        const building = getBuildingAtDoor(buildingEntry.door.x, buildingEntry.door.y);
+        const away = building ? outdoorSpawnTileAwayFromDoor(building, 3) : null;
+        this.pendingBuildingEntry = null;
+        this.pathNoDoorEntry = true;
+        this.doorGraceWalkNoEntry = true;
+        if (away) {
+          this.walkToTile(away.x, away.y, sprint);
+          return;
+        }
+        buildingEntry = undefined;
+      } else {
+        this.pathNoDoorEntry = false;
+      }
+    } else if (!this.doorGraceWalkNoEntry) {
+      this.pathNoDoorEntry = false;
+    }
     const walkTx = tx;
     const walkTy = ty;
     const entry = this.personaOn()
       ? null
-      : opts?.buildingEntry ?? resolveBuildingEntryFromTile(walkTx, walkTy, this.roundedCharTile());
-    this.pendingBuildingEntry = entry;
+      : buildingEntry ?? resolveBuildingEntryFromTile(walkTx, walkTy, this.roundedCharTile());
+    if (entry && this.exitGraceBlocksBuilding(this.buildingNameForEntry(entry))) {
+      this.pendingBuildingEntry = null;
+      this.pathNoDoorEntry = true;
+      this.doorGraceWalkNoEntry = true;
+    } else {
+      this.pendingBuildingEntry = entry;
+    }
     const walkable = !!cells[walkTy]?.[walkTx]?.walkable;
     const target = walkable ? { x: walkTx, y: walkTy } : resolveWalkTarget(walkTx, walkTy);
     this.walkToTile(target.x, target.y, sprint);
@@ -2213,7 +2278,9 @@ export class IsoScene {
   resetMapDoorChainState(): void {
     this.pendingBuildingEntry = null;
     this.clearWalkPreview();
-    this.doorCooldown = 0;
+    if (!this.postExitDoorGraceActive()) {
+      this.doorCooldown = 0;
+    }
     this.suspendCameraFollow();
     this.applyCameraFromUi();
   }
@@ -2239,6 +2306,13 @@ export class IsoScene {
     }
     if (!tileIsStandable(Math.round(this.charTx), Math.round(this.charTy))) {
       this.rescueAvatarIfTrapped();
+    }
+    this.markDoorGraceWalkIfActive();
+    if (this.doorGraceWalkNoEntry && this.pendingBuildingEntry) {
+      const graceName = this.buildingNameForEntry(this.pendingBuildingEntry);
+      if (graceName && graceName === this.doorExitGraceBuildingId) {
+        this.pendingBuildingEntry = null;
+      }
     }
     const sx = Math.round(this.charTx);
     const sy = Math.round(this.charTy);
@@ -2576,6 +2650,14 @@ export class IsoScene {
     const doorFirst = this.pickBuildingDoorAtScreen(sx, sy);
     if (doorFirst?.door && doorFirst.panelTitle) {
       if (!this.prepareMapTap(doorFirst)) return;
+      if (this.exitGraceBlocksBuilding(doorFirst.name)) {
+        const away = outdoorSpawnTileAwayFromDoor(doorFirst, 3);
+        this.pathNoDoorEntry = true;
+        this.doorGraceWalkNoEntry = true;
+        this.pendingBuildingEntry = null;
+        if (away) this.walkToTile(away.x, away.y, sprint);
+        return;
+      }
       const here = this.roundedCharTile();
       if (here.x === doorFirst.door.x && here.y === doorFirst.door.y) {
         this.pendingBuildingEntry = {
@@ -2614,6 +2696,14 @@ export class IsoScene {
       const building = this.pickBuildingAtScreen(sx, sy);
       if (building?.door && building.panelTitle) {
         if (!this.prepareMapTap(building)) return;
+        if (this.exitGraceBlocksBuilding(building.name)) {
+          const away = outdoorSpawnTileAwayFromDoor(building, 3);
+          this.pathNoDoorEntry = true;
+          this.doorGraceWalkNoEntry = true;
+          this.pendingBuildingEntry = null;
+          if (away) this.walkToTile(away.x, away.y, sprint);
+          return;
+        }
         this.requestWalk(building.door.x, building.door.y, sprint, {
           buildingEntry: { panelTitle: building.panelTitle, door: building.door },
         });
@@ -5164,6 +5254,11 @@ export class IsoScene {
     if (this.doorCooldown > 0) {
       this.doorCooldown -= this.app.ticker.deltaMS;
     }
+    if (this.doorExitGraceBuildingId && performance.now() >= this.doorExitGraceUntil) {
+      this.doorExitGraceBuildingId = null;
+      this.doorGraceWalkNoEntry = false;
+      this.pathNoDoorEntry = false;
+    }
     this.leaveBenchIfStood();
     const stick = this.qaStick ?? this.events.stick?.() ?? { x: 0, y: 0 };
     const stickHeld = !!this.qaStick || !!this.events.stickActive?.();
@@ -5399,11 +5494,24 @@ export class IsoScene {
     if (this.interiorActive || this.jac?.driving) return;
     if (this.path.length > 0) return;
     if (this.doorCooldown > 0) return;
+    if (this.pathNoDoorEntry || this.doorGraceWalkNoEntry) {
+      this.pendingBuildingEntry = null;
+      this.clearDoorGraceWalkBlockIfIdle();
+      return;
+    }
     const pending = this.pendingBuildingEntry;
     if (!pending) return;
     const d = pending.door;
     const building = getBuildingAtDoor(d.x, d.y);
     if (!building?.panelTitle || building.panelTitle !== pending.panelTitle) return;
+    if (
+      this.exitGraceBlocksBuilding(building.name) ||
+      (this.doorExitGraceBuildingId === building.name &&
+        performance.now() < this.doorExitGraceUntil)
+    ) {
+      this.pendingBuildingEntry = null;
+      return;
+    }
 
     const onPendingDoor = tx === d.x && ty === d.y;
     const adjacentPending = Math.abs(tx - d.x) + Math.abs(ty - d.y) <= 2;
@@ -5418,6 +5526,10 @@ export class IsoScene {
   private enterBuildingFromDoor(building: MapObject): void {
     if (this.jac?.driving) return;
     if (!building.door || !building.panelTitle) return;
+    if (this.exitGraceBlocksBuilding(building.name)) {
+      this.pendingBuildingEntry = null;
+      return;
+    }
     this.pendingBuildingEntry = null;
     this.path = [];
     this.drawPathPreview();
@@ -5676,6 +5788,7 @@ export class IsoScene {
     const dyingSprite = this.interiorSprite;
     const fromHash = !!opts?.fromHash;
     const immediate = !!opts?.immediate;
+    const exitingBuildingId = this.interiorDef?.id ?? null;
     const finish = () => {
       this.interiorActive = false;
       this.interiorDef = null;
@@ -5709,6 +5822,12 @@ export class IsoScene {
         }
         this.doorCooldown =
           this.viewMode === 'persona' ? 4000 : EXTERIOR_DOOR_ENTRY_COOLDOWN_MS;
+        const graceId = building?.name ?? exitingBuildingId;
+        this.doorExitGraceBuildingId = graceId;
+        this.doorExitGraceUntil = performance.now() + EXTERIOR_DOOR_ENTRY_COOLDOWN_MS;
+        this.pathNoDoorEntry = false;
+        this.doorGraceWalkNoEntry = false;
+        this.pendingBuildingEntry = null;
         this.syncCharacterGraphic();
       }
       this.restoreOutdoorCameraAfterExit(opts?.outdoorCam);
@@ -5765,6 +5884,26 @@ export class IsoScene {
 
   isInInterior(): boolean {
     return this.interiorActive;
+  }
+
+  doorGraceSnapshotForQa(): {
+    graceId: string | null;
+    graceUntil: number;
+    doorCooldown: number;
+    pathNoDoorEntry: boolean;
+    doorGraceWalkNoEntry: boolean;
+    mapReturnDoor: { x: number; y: number } | null;
+    pending: boolean;
+  } {
+    return {
+      graceId: this.doorExitGraceBuildingId,
+      graceUntil: this.doorExitGraceUntil,
+      doorCooldown: this.doorCooldown,
+      pathNoDoorEntry: this.pathNoDoorEntry,
+      doorGraceWalkNoEntry: this.doorGraceWalkNoEntry,
+      mapReturnDoor: this.mapReturnDoor,
+      pending: !!this.pendingBuildingEntry,
+    };
   }
 
   /** Refit camera when chrome/panel insets change (preview dismiss, map dock, sheet peek). */

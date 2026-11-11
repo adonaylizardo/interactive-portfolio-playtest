@@ -2678,7 +2678,32 @@ body:has(.building-panel--open) .chrome__lang {
 }
 
 .building-panel--interior-entry:not(.building-panel--card-dismissed) .interior-exp-peek {
-  display: flex;
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .building-panel--interior-entry:not(.building-panel--card-dismissed) .interior-exp-peek {
+    display: flex;
+  }
+}
+
+@media (min-width: 768px) {
+  .building-panel--interior-entry .interior-exp-peek {
+    display: none !important;
+  }
+
+  .building-panel--interior-entry.building-panel--peek .building-panel__body-wrap {
+    display: flex !important;
+    flex-direction: column;
+    padding-top: 8px;
+  }
+
+  .building-panel--interior-entry .exp-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #141518;
+  }
 }
 
 .interior-exp-peek__title {

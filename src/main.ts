@@ -883,6 +883,7 @@ async function main(): Promise<void> {
     getExperienceSheetRect: () => panel.getExperienceSheetRectForQa(),
     expandInteriorSheetForQa: () => panel.expandInteriorSheetForQa(),
     leaveInteriorNow: () => scene.leaveInteriorNow(),
+    doorGraceSnapshot: () => scene.doorGraceSnapshotForQa(),
     collapseInteriorSheetToPeek: () => panel.collapseToPeekOnly(),
     reframeMobileDefault: () => scene.reframeMobileDefaultViewForQa(),
     interiorBlockedTilesHaveProps: (name: string) => {
