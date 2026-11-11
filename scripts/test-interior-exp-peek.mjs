@@ -512,31 +512,43 @@ async function main() {
       errors.push(`re-entered teresa during exit grace ${JSON.stringify(snap ?? {})}`);
     }
 
-    await page.evaluate(async () => {
-      const delay = (ms) => new Promise((r) => setTimeout(r, ms));
-      window.__playtestQa.enterInterior('teresa');
-      await delay(400);
-      window.__playtestQa.leaveInteriorNow();
-      const t0 = Number(document.getElementById('game-canvas')?.dataset.leaveGraceAt ?? 0);
-      while (t0 > 0 && performance.now() < t0 + 2500) {
-        await delay(20);
-      }
-    });
-    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
-    const ptAfterGrace = await page.evaluate(() => window.__playtestQa.doorScreenPoint('teresa'));
-    if (ptAfterGrace) {
-      await page.evaluate(([x, y]) => window.__playtestQa.tapScreen(x, y), [ptAfterGrace.x, ptAfterGrace.y]);
-    }
-    try {
-      await page.waitForFunction(() => window.__playtestQa.isInInterior() === true, null, {
-        timeout: 22_000,
+    const runGraceTapThenEnter = async (targetPage, cdpSession, label) => {
+      const pack = await targetPage.evaluate(async () => {
+        const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+        window.__playtestQa.enterInterior('teresa');
+        await delay(400);
+        window.__playtestQa.leaveInteriorNow();
+        const t0 = Number(document.getElementById('game-canvas')?.dataset.leaveGraceAt ?? 0);
+        while (t0 > 0 && performance.now() < t0 + 800) await delay(10);
+        const pt = window.__playtestQa.doorScreenPoint('teresa');
+        if (!pt) return { error: 'no door point' };
+        window.__playtestQa.tapScreen(pt.x, pt.y);
+        while (t0 > 0 && performance.now() < t0 + 2000) await delay(10);
+        const snap = window.__playtestQa.doorGraceSnapshot?.();
+        const graceExpired = t0 > 0 && performance.now() >= t0 + 1500;
+        if (graceExpired && snap?.doorGraceWalkNoEntry) {
+          return { error: 'doorGraceWalkNoEntry still set after grace expired', snap };
+        }
+        window.__playtestQa.tapScreen(pt.x, pt.y);
+        return { error: null, snap, graceExpired, t0 };
       });
-    } catch {
-      errors.push('single door tap after grace did not enter (throttled CPU)');
-    }
-    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
-    await page.evaluate(() => window.__playtestQa.leaveInteriorNow());
-    await wait(300);
+      if (pack.error) errors.push(`${label}: ${pack.error} ${JSON.stringify(pack.snap ?? {})}`);
+      await cdpSession.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+      try {
+        await targetPage.waitForFunction(() => window.__playtestQa.isInInterior() === true, null, {
+          timeout: 22_000,
+        });
+      } catch {
+        errors.push(`${label}: single door tap at 2s did not enter (CPU throttled)`);
+      }
+      await cdpSession.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+      if (await targetPage.evaluate(() => window.__playtestQa.isInInterior())) {
+        await targetPage.evaluate(() => window.__playtestQa.leaveInteriorNow());
+        await wait(300);
+      }
+    };
+
+    await runGraceTapThenEnter(page, cdp, 'phone grace 0.8s tap then 2s enter');
 
     await page.evaluate(() => window.__playtestQa.enterInterior('teresa'));
     await wait(500);
@@ -594,6 +606,8 @@ async function main() {
     } else {
       errors.push('desktop ‹ missing on expanded list');
     }
+    const deskCdp = await dPage.context().newCDPSession(dPage);
+    await runGraceTapThenEnter(dPage, deskCdp, 'desktop grace 0.8s tap then 2s enter');
     await desk.close();
   } catch (e) {
     errors.push(e.message || String(e));
