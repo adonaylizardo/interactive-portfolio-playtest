@@ -19,13 +19,17 @@ function resolvePreviewBase() {
     return process.env.QA_BASE_URL.replace(/\/?$/, '/');
   }
   let basePath = '/';
-  const viteConfig = readFileSync(path.join(ROOT, 'vite.config.ts'), 'utf8');
-  const cfg = viteConfig.match(/base:\s*['"]([^'"]+)['"]/);
-  if (cfg?.[1]) basePath = cfg[1];
-  else {
+  try {
     const html = readFileSync(path.join(ROOT, 'dist/index.html'), 'utf8');
     const m = html.match(/<base\s+href="([^"]+)"/i);
     if (m?.[1]) basePath = m[1];
+  } catch {
+    /* dist not built yet */
+  }
+  if (basePath === '/') {
+    const viteConfig = readFileSync(path.join(ROOT, 'vite.config.ts'), 'utf8');
+    const cfg = viteConfig.match(/base:\s*['"]([^'"]+)['"]/);
+    if (cfg?.[1]) basePath = cfg[1];
   }
   if (!basePath.endsWith('/')) basePath += '/';
   return `http://127.0.0.1:${PREVIEW_PORT}${basePath}`;
@@ -99,6 +103,11 @@ async function main() {
     });
     await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     await waitForQa(page);
+    const aboutPeekH = await page.evaluate(() => {
+      const intro = document.querySelector('.chrome--intro-peek .chrome__intro');
+      return intro?.getBoundingClientRect().height ?? 0;
+    });
+
     await page.evaluate(() => window.__playtestQa.enterInterior('teresa'));
     await page.waitForFunction(() => window.__playtestQa?.isInInterior?.() === true, null, {
       timeout: 20_000,
@@ -109,6 +118,51 @@ async function main() {
     const enterId = await page.evaluate(() => window.__playtestQa.getInteriorId?.());
     if (enterId !== 'teresa') errors.push(`enter interior id ${enterId}`);
     await wait(600);
+
+    for (const [vw, vh] of [
+      [375, 667],
+      [390, 844],
+      [430, 932],
+    ]) {
+      await page.setViewportSize({ width: vw, height: vh });
+      await wait(250);
+      const layout = await page.evaluate(() => {
+        const sheet = document.querySelector(
+          '.building-panel--interior-entry.building-panel--peek .building-panel__sheet',
+        );
+        const vv = window.visualViewport;
+        const sheetR = sheet?.getBoundingClientRect();
+        const vvBottom = (vv?.offsetTop ?? 0) + (vv?.height ?? window.innerHeight);
+        return { sheetBottom: sheetR?.bottom ?? 0, vvBottom, sheetH: sheetR?.height ?? 0 };
+      });
+      if (Math.abs(layout.sheetBottom - layout.vvBottom) > 3) {
+        errors.push(
+          `interior peek not bottom-anchored @${vw}: bottom=${layout.sheetBottom.toFixed(1)} vv=${layout.vvBottom.toFixed(1)}`,
+        );
+      }
+      if (aboutPeekH > 40 && Math.abs(layout.sheetH - aboutPeekH) > 40) {
+        errors.push(
+          `interior peek height ${layout.sheetH.toFixed(0)}px vs about ${aboutPeekH.toFixed(0)}px @${vw}`,
+        );
+      }
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    await wait(200);
+
+    const peekLabels = await page.evaluate(() => {
+      const cta = document.querySelector('[data-exp-peek-expand-label]')?.textContent?.trim() ?? '';
+      const chromeTitle = document.querySelector('.exp-mobile-chrome__title')?.textContent?.trim() ?? '';
+      const stripTitle = document.querySelector('.interior-exp-peek__title');
+      const stripVisible =
+        !!stripTitle && stripTitle.checkVisibility?.() && getComputedStyle(stripTitle).display !== 'none';
+      return { cta, chromeTitle, stripVisible };
+    });
+    if (!/ver charlas|view talks/i.test(peekLabels.cta)) {
+      errors.push(`peek CTA expected Ver charlas / View talks, got "${peekLabels.cta}"`);
+    }
+    if (peekLabels.stripVisible) errors.push('duplicate title: interior-exp-peek__title visible on phone peek');
+
+    await page.screenshot({ path: '/opt/cursor/artifacts/interior-peek-390-r43.png' });
 
     const backBtn = page.locator('[data-exp-mobile-back]');
     if (await backBtn.isVisible()) {

@@ -149,6 +149,7 @@ export class BuildingPanel {
   private interiorExpPeekTitle: HTMLElement | null = null;
   private interiorExpPeekExcerpt: HTMLElement | null = null;
   private expReopenFab: HTMLElement | null = null;
+  private interiorVvListener: (() => void) | null = null;
 
   constructor(
     container: HTMLElement,
@@ -198,7 +199,7 @@ export class BuildingPanel {
           <h3 class="interior-exp-peek__title"></h3>
           <p class="interior-exp-peek__excerpt"></p>
           <button type="button" class="ui-btn ui-btn--primary interior-exp-peek__expand" data-exp-peek-expand hidden>
-            <span data-i18n="panel.expandSheet">Expandir</span>
+            <span data-exp-peek-expand-label></span>
           </button>
         </div>
         <div class="building-panel__bar">
@@ -614,6 +615,72 @@ export class BuildingPanel {
     void this.sheet.offsetHeight;
   }
 
+  private bindInteriorViewportSync(): void {
+    if (this.interiorVvListener) return;
+    const onVv = () => {
+      if (this.interiorExperienceEntry && this.isMobile() && this.isOpen()) {
+        this.syncInteriorPeekSheetMetrics();
+      }
+    };
+    window.visualViewport?.addEventListener('resize', onVv);
+    window.visualViewport?.addEventListener('scroll', onVv);
+    this.interiorVvListener = () => {
+      window.visualViewport?.removeEventListener('resize', onVv);
+      window.visualViewport?.removeEventListener('scroll', onVv);
+    };
+  }
+
+  private unbindInteriorViewportSync(): void {
+    this.interiorVvListener?.();
+    this.interiorVvListener = null;
+  }
+
+  private syncMobileSheetVisualViewport(): void {
+    const vv = window.visualViewport;
+    if (!vv) {
+      this.sheet.style.removeProperty('--vv-layout-bottom');
+      return;
+    }
+    const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    this.sheet.style.setProperty('--vv-layout-bottom', `${inset}px`);
+  }
+
+  private syncInteriorPeekSheetMetrics(): void {
+    if (
+      !this.interiorExperienceEntry ||
+      !this.isMobile() ||
+      !this.peekOnly ||
+      !this.isOpen() ||
+      this.experienceCardDismissed
+    ) {
+      this.sheet.style.removeProperty('--interior-peek-rise');
+      this.sheet.style.removeProperty('--vv-layout-bottom');
+      return;
+    }
+    this.syncMobileSheetVisualViewport();
+    const measure = () => {
+      if (!this.interiorExpPeek || this.interiorExpPeek.hidden) return;
+      const sheetStyle = getComputedStyle(this.sheet);
+      const padTop = parseFloat(sheetStyle.paddingTop) || 0;
+      const padBottom = parseFloat(sheetStyle.paddingBottom) || 0;
+      let content = 0;
+      for (const el of [this.expMobileChrome, this.interiorExpPeek]) {
+        if (!el || el.hidden) continue;
+        content += el.getBoundingClientRect().height;
+      }
+      const aboutRef =
+        document.querySelector('.chrome--intro-peek .chrome__intro')?.getBoundingClientRect()
+          .height ??
+        document.querySelector('.chrome__intro')?.getBoundingClientRect().height ??
+        0;
+      const natural = Math.ceil(content + padTop + padBottom);
+      const minRise = aboutRef > 100 ? aboutRef : 200;
+      const rise = Math.max(natural, minRise);
+      this.sheet.style.setProperty('--interior-peek-rise', `${rise}px`);
+    };
+    requestAnimationFrame(measure);
+  }
+
   private syncInteriorBackButtons(): void {
     if (!this.interiorExperienceEntry || !this.isOpen()) return;
     const showBack =
@@ -643,6 +710,11 @@ export class BuildingPanel {
     const showExpand = this.peekOnly;
     this.el.querySelectorAll('[data-exp-peek-expand]').forEach((btn) => {
       (btn as HTMLElement).hidden = !showExpand;
+      const label = btn.querySelector('[data-exp-peek-expand-label]');
+      if (label) {
+        label.textContent =
+          this.mode === 'talks' ? t('panel.reopenTalks') : t('panel.reopenWritings');
+      }
     });
     if (this.interiorExpPeekTitle) this.interiorExpPeekTitle.textContent = title;
     if (this.interiorExpPeekExcerpt) this.interiorExpPeekExcerpt.textContent = excerpt;
@@ -679,6 +751,7 @@ export class BuildingPanel {
     this.interiorExperienceEntry = true;
     this.experienceCardDismissed = false;
     this.el.classList.add('building-panel--interior-entry');
+    this.bindInteriorViewportSync();
     this.openExperience(mode, interiorId, { interiorEntry: true });
     this.syncInteriorExpPeek();
   }
@@ -696,6 +769,11 @@ export class BuildingPanel {
     const showPeek = this.interiorExperienceEntry && !this.experienceCardDismissed && this.peekOnly;
     this.el.querySelectorAll('[data-exp-peek-expand]').forEach((btn) => {
       (btn as HTMLElement).hidden = !showPeek;
+      const label = btn.querySelector('[data-exp-peek-expand-label]');
+      if (label) {
+        label.textContent =
+          this.mode === 'talks' ? t('panel.reopenTalks') : t('panel.reopenWritings');
+      }
     });
   const reopenBar = this.el.querySelector('[data-exp-reopen]') as HTMLElement | null;
     if (reopenBar) reopenBar.hidden = true;
@@ -718,6 +796,7 @@ export class BuildingPanel {
         mobile;
       this.interiorExpPeek.hidden = !showPeekStrip;
     }
+    this.syncInteriorPeekSheetMetrics();
     if (this.expMobileChrome) {
       this.expMobileChrome.hidden =
         this.experienceCardDismissed || !this.isMobile() || !this.isExperienceMode();
@@ -805,6 +884,7 @@ export class BuildingPanel {
   private clearExperiencePresentation(): void {
     this.interiorExperienceEntry = false;
     this.experienceCardDismissed = false;
+    this.unbindInteriorViewportSync();
     this.el.classList.remove('building-panel--interior-entry', 'building-panel--card-dismissed');
     if (this.expReopenFab) this.expReopenFab.hidden = true;
     if (this.interiorExpPeek) this.interiorExpPeek.hidden = true;
@@ -1124,6 +1204,7 @@ export class BuildingPanel {
     if (this.expMobileTitle) this.expMobileTitle.textContent = this.experienceDisplayTitle();
     if (this.interiorExperienceEntry) {
       this.syncInteriorBackButtons();
+      this.syncInteriorPeekSheetMetrics();
     }
     this.expMobileChrome.classList.remove(
       'exp-mobile-chrome--grab-wide',

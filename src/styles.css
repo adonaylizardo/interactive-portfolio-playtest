@@ -2296,11 +2296,21 @@ body:has(.building-panel--open) .chrome__lang {
   }
 
   .building-panel--interior-entry.building-panel--peek .building-panel__sheet {
-    transform: none !important;
-    max-height: min(48vh, 260px) !important;
-    min-height: 196px !important;
-    bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+    bottom: calc(var(--vv-layout-bottom, 0px) + env(safe-area-inset-bottom, 0px)) !important;
     top: auto !important;
+    transform: translateY(calc(100% - var(--interior-peek-rise, 168px))) !important;
+    max-height: var(--interior-peek-rise, 168px) !important;
+    min-height: var(--interior-peek-rise, 168px) !important;
+    overflow: hidden;
+  }
+
+  .building-panel--interior-entry.building-panel--peek .interior-exp-peek__title {
+    display: none;
+  }
+
+  .building-panel--interior-entry.building-panel--peek .interior-exp-peek {
+    padding: 0 0 4px;
+    gap: 6px;
   }
 
   .building-panel--interior-entry.building-panel--open:not(.building-panel--peek) .building-panel__sheet {
