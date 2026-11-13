@@ -35,10 +35,8 @@ function resolvePreviewBase() {
   } catch {
     /* dist not built yet */
   }
-  if (basePath === '/') {
-    const viteConfig = readFileSync(path.join(ROOT, 'vite.config.ts'), 'utf8');
-    const cfg = viteConfig.match(/base:\s*['"]([^'"]+)['"]/);
-    if (cfg?.[1]) basePath = cfg[1];
+  if (basePath === '/' || basePath === '/interactive-portfolio-playtest/') {
+    basePath = '/interactive-portfolio-playtest/preview-integracion/';
   }
   if (!basePath.endsWith('/')) basePath += '/';
   return `http://127.0.0.1:${PREVIEW_PORT}${basePath}`;
@@ -108,9 +106,12 @@ async function main() {
   }, GLOBAL_TIMEOUT_MS);
 
   const BASE = resolvePreviewBase();
-  const basePath = new URL(BASE).pathname;
-  const preview = startPreview(basePath);
-  await wait(1500);
+  let preview = null;
+  if (!process.env.QA_BASE_URL) {
+    const basePath = new URL(BASE).pathname;
+    preview = startPreview(basePath);
+    await wait(1500);
+  }
   const errors = [];
 
   const browser = await chromium.launch();

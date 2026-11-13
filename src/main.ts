@@ -714,6 +714,7 @@ async function main(): Promise<void> {
     return;
   }
   disarmBootAssetGuard();
+  studio.warmIntroVoiceBytes();
 
   chrome.bindScene({
     getCharTile: () => scene.getCharacterTile(),
@@ -1010,6 +1011,8 @@ async function main(): Promise<void> {
     voiceReadyIds: () => studio.qaVoiceReadyIds(),
     voiceAudible: () => studio.isVoiceAudible(),
     voiceContextRunning: () => studio.qaAudioContextRunning(),
+    ambienceRequested: () => studio.qaAmbienceFileRequested(),
+    ambienceStarted: () => studio.qaAmbienceSourceStarted(),
     playVoiceLine: (id: string) => studio.playLineForced(id),
     primeVoicePreload: () => studio.startVoicePreload(),
     releaseAudioBoot: () => studio.releaseBootHold(),

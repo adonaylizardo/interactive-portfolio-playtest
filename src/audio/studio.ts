@@ -68,8 +68,12 @@ export class StudioAudio {
   private voiceBufferNode: AudioBufferSourceNode | null = null;
   private readonly voiceBuffers = new Map<string, AudioBuffer>();
   private readonly voiceRaw = new Map<string, ArrayBuffer>();
+  private readonly voiceFetchInflight = new Map<string, Promise<ArrayBuffer | null>>();
   private readonly voiceObjectUrls = new Map<string, string>();
   private voicePreloadPromise: Promise<void> | null = null;
+  private voiceBytesPreloadPromise: Promise<void> | null = null;
+  private htmlAudioGesturePrimed = false;
+  private ambienceFileRequested = false;
   private activeLineId: string | null = null;
   private subtitleText = '';
   private subtitleLineId: string | null = null;
@@ -100,10 +104,10 @@ export class StudioAudio {
   private placeVoiceKey: string | null = null;
 
   constructor() {
-    const unlock = () => this.unlock();
-    window.addEventListener('pointerdown', unlock, { capture: true });
-    window.addEventListener('keydown', unlock, { capture: true });
-    window.addEventListener('touchend', unlock, { capture: true });
+    const unlockFromGesture = () => this.unlock();
+    window.addEventListener('pointerdown', unlockFromGesture, { capture: true });
+    window.addEventListener('keydown', unlockFromGesture, { capture: true });
+    window.addEventListener('touchend', unlockFromGesture, { capture: true });
     onLangChange(() => {
       if (!this.activeLineId) return;
       const line = VOICE_LINES[this.activeLineId];
@@ -153,6 +157,21 @@ export class StudioAudio {
     return this.ctx?.state === 'running';
   }
 
+  qaAmbienceFileRequested(): boolean {
+    return this.ambienceFileRequested;
+  }
+
+  qaAmbienceSourceStarted(): boolean {
+    return !!this.ambience;
+  }
+
+  /** Bytes only — safe during boot before any gesture (respects mute for full preload, not intro warm). */
+  warmIntroVoiceBytes(): void {
+    const line = VOICE_LINES['01-intro'];
+    if (!line) return;
+    void this.fetchVoiceRaw('01-intro', line);
+  }
+
   isVoiceLineReady(id: string): boolean {
     return this.voiceBuffers.has(id);
   }
@@ -166,7 +185,6 @@ export class StudioAudio {
   startVoicePreload(): void {
     if (automatedWebKitPhone() || this.muted) return;
     void this.ctx?.resume();
-    void this.prefetchVoiceBytes();
     if (!this.voicePreloadPromise) {
       this.voicePreloadPromise = this.decodePrefetchedVoices().catch((err) => {
         console.warn('[voice] preload failed', err);
@@ -307,7 +325,11 @@ export class StudioAudio {
       this.stopBark();
     } else {
       this.syncAmbience();
-      if (this.unlocked) this.startVoicePreload();
+      if (this.unlocked) {
+        this.startAmbience();
+        void this.loadBarks();
+        this.startVoicePreload();
+      }
     }
     this.emit();
   }
@@ -321,6 +343,7 @@ export class StudioAudio {
 
   unlock(): void {
     this.ensureAudioContextSync();
+    this.primeHtmlAudioInGesture();
     if (this.unlocked) {
       void this.ctx?.resume();
       if (!this.ctx && !this.bootHold) this.startGraphAndIntro();
@@ -405,6 +428,25 @@ export class StudioAudio {
     if (!this.muted) this.startVoicePreload();
   }
 
+  private ensureMasterGraph(): void {
+    if (automatedWebKitPhone()) return;
+    try {
+      const Ctx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Ctx) return;
+      if (!this.ctx) {
+        this.ctx = new Ctx();
+        this.master = this.ctx.createGain();
+        this.master.gain.value = this.muted ? 0 : 1;
+        this.master.connect(this.ctx.destination);
+      }
+      void this.ctx.resume();
+    } catch {
+      /* autoplay policy */
+    }
+  }
+
   private startGraphAndIntro(): void {
     if (this.bootHold) {
       this.graphPending = true;
@@ -423,20 +465,12 @@ export class StudioAudio {
       return;
     }
     try {
-      const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (Ctx && !this.ctx) {
-        this.ctx = new Ctx();
-        this.master = this.ctx.createGain();
-        this.master.gain.value = this.muted ? 0 : 1;
-        this.master.connect(this.ctx.destination);
-        void this.ctx.resume();
+      this.ensureMasterGraph();
+      if (!this.muted) {
         this.startAmbience();
         void this.loadBarks();
-        this.startVoicePreload();
-      } else {
-        void this.ctx?.resume();
-        this.startVoicePreload();
       }
+      if (!this.muted) this.startVoicePreload();
     } catch {
       /* autoplay / context limits: mute state still flips */
     }
@@ -675,8 +709,12 @@ export class StudioAudio {
       return;
     }
     await this.ensureVoiceBuffer(id, line);
-    const running = await this.ensureCtxRunning();
-    const decoded = this.voiceBuffers.get(id);
+    let running = await this.ensureCtxRunning();
+    let decoded = this.voiceBuffers.get(id);
+    if (running && !decoded && this.voicePreloadPromise) {
+      await this.voicePreloadPromise.catch(() => undefined);
+      decoded = this.voiceBuffers.get(id);
+    }
     if (running && decoded && this.ctx && this.master) {
       this.stopBufferVoice();
       const src = this.ctx.createBufferSource();
@@ -695,7 +733,11 @@ export class StudioAudio {
         this.voiceBufferNode = null;
       }
     }
-    await this.playLineWithCachedElement(id, line);
+    if (!running) {
+      await this.playLineWithCachedElement(id, line);
+      return;
+    }
+    this.finishVoice(false);
   }
 
   private async playLineWithCachedElement(id: string, line: VoiceLine): Promise<void> {
@@ -722,18 +764,27 @@ export class StudioAudio {
   }
 
   private async fetchVoiceRaw(id: string, line: VoiceLine): Promise<ArrayBuffer | null> {
-    if (this.voiceRaw.has(id)) return this.voiceRaw.get(id)!;
+    const cached = this.voiceRaw.get(id);
+    if (cached) return cached;
+    const inflight = this.voiceFetchInflight.get(id);
+    if (inflight) return inflight;
     this.preferOgg ??= canPlayOgg();
     const file = this.preferOgg ? line.files.ogg : line.files.mp3;
-    try {
-      const res = await fetch(`${VOICE_DIR}${file}`);
-      if (!res.ok) return null;
-      const raw = await res.arrayBuffer();
-      this.voiceRaw.set(id, raw);
-      return raw;
-    } catch {
-      return null;
-    }
+    const p = (async () => {
+      try {
+        const res = await fetch(`${VOICE_DIR}${file}`);
+        if (!res.ok) return null;
+        const raw = await res.arrayBuffer();
+        this.voiceRaw.set(id, raw);
+        return raw;
+      } catch {
+        return null;
+      } finally {
+        this.voiceFetchInflight.delete(id);
+      }
+    })();
+    this.voiceFetchInflight.set(id, p);
+    return p;
   }
 
   private async voiceObjectUrl(id: string, line: VoiceLine): Promise<string> {
@@ -766,13 +817,22 @@ export class StudioAudio {
 
   private async prefetchVoiceBytes(): Promise<void> {
     if (this.muted) return;
-    this.preferOgg ??= canPlayOgg();
-    await Promise.all(
-      Object.entries(VOICE_LINES).map(async ([id, line]) => {
-        if (this.voiceBuffers.has(id) || this.voiceRaw.has(id)) return;
-        await this.fetchVoiceRaw(id, line);
-      }),
-    );
+    if (this.voiceBytesPreloadPromise) {
+      await this.voiceBytesPreloadPromise;
+      return;
+    }
+    this.voiceBytesPreloadPromise = (async () => {
+      this.preferOgg ??= canPlayOgg();
+      await Promise.all(
+        Object.entries(VOICE_LINES).map(async ([id, line]) => {
+          if (this.voiceBuffers.has(id) || this.voiceRaw.has(id)) return;
+          await this.fetchVoiceRaw(id, line);
+        }),
+      );
+    })().finally(() => {
+      this.voiceBytesPreloadPromise = null;
+    });
+    await this.voiceBytesPreloadPromise;
   }
 
   private async decodePrefetchedVoices(): Promise<void> {
@@ -872,9 +932,37 @@ export class StudioAudio {
       });
   }
 
+  /** iOS: prime HTMLAudio in the same gesture as Web Audio unlock. */
+  private primeHtmlAudioInGesture(): void {
+    if (automatedWebKitPhone() || this.htmlAudioGesturePrimed) return;
+    this.htmlAudioGesturePrimed = true;
+    try {
+      const el = new Audio();
+      const line = VOICE_LINES['01-intro'];
+      if (line) {
+        this.preferOgg ??= canPlayOgg();
+        const file = this.preferOgg ? line.files.ogg : line.files.mp3;
+        el.src = this.voiceRaw.has('01-intro')
+          ? URL.createObjectURL(new Blob([this.voiceRaw.get('01-intro')!], { type: this.voiceMime() }))
+          : `${VOICE_DIR}${file}`;
+      } else {
+        el.src =
+          'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAACABAAZGF0YQAAAAA=';
+      }
+      el.muted = true;
+      el.volume = 0.001;
+      const p = el.play();
+      if (p) void p.then(() => el.pause()).catch(() => {});
+      else el.pause();
+    } catch {
+      /* gesture policy */
+    }
+  }
+
   private async loadAmbienceBuffer(ctx: AudioContext): Promise<AudioBuffer> {
     this.preferOgg ??= canPlayOgg();
     const file = this.preferOgg ? 'ambience-nature.ogg' : 'ambience-nature.mp3';
+    this.ambienceFileRequested = true;
     const res = await fetch(`${AMBIENCE_DIR}${file}`);
     if (!res.ok) throw new Error('ambience missing');
     const raw = await res.arrayBuffer();

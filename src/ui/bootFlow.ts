@@ -110,7 +110,7 @@ export class BootFlow {
     if (Math.abs(gap) < 0.35) {
       this.displayProgress = this.targetProgress;
     } else {
-      this.displayProgress += Math.max(0.35, gap * 0.12);
+      this.displayProgress += Math.max(0.55, gap * 0.2);
     }
     this.progress = Math.round(Math.min(100, this.displayProgress));
     if (this.barFill) this.barFill.style.width = `${this.progress}%`;

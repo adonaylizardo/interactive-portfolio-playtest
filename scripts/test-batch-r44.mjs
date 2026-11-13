@@ -204,6 +204,75 @@ async function rearPipAbsentInAllGears(page) {
   }
 }
 
+async function ambienceUnlock(page) {
+  const ambienceUrls = [];
+  page.on('request', (req) => {
+    const u = req.url();
+    if (/ambience-nature\.(mp3|ogg)/i.test(u)) ambienceUrls.push(u);
+  });
+  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 90_000 });
+  await waitForQa(page);
+  await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded, null, { timeout: 90_000 });
+  await page.evaluate(() => {
+    window.__playtestQa.setAudioMuted?.(true);
+    document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+    document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true }));
+    window.__playtestQa.releaseAudioBoot?.();
+  });
+  await wait(900);
+  const mutedSnap = await page.evaluate(() => ({
+    requested: window.__playtestQa.ambienceRequested?.(),
+    started: window.__playtestQa.ambienceStarted?.(),
+  }));
+  assert.equal(mutedSnap.requested, false, 'ambience fetch should not run while muted');
+  assert.equal(mutedSnap.started, false, 'ambience source should not start while muted');
+  assert.equal(ambienceUrls.length, 0, 'no ambience-nature request while muted');
+
+  await page.evaluate(() => {
+    window.__playtestQa.setAudioMuted?.(false);
+    document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+    document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true }));
+  });
+  await page.waitForFunction(
+    () =>
+      window.__playtestQa.ambienceRequested?.() &&
+      window.__playtestQa.ambienceStarted?.() &&
+      window.__playtestQa.voiceContextRunning?.(),
+    null,
+    { timeout: 20_000 },
+  );
+  assert.ok(ambienceUrls.length >= 1, 'ambience-nature should be requested after unmuted tap');
+}
+
+async function voiceSingleFetch(page) {
+  const voiceHits = new Map();
+  page.on('request', (req) => {
+    const u = req.url();
+    if (!/\/audio\/voice\//.test(u)) return;
+    const name = u.split('/').pop()?.split('?')[0] ?? u;
+    voiceHits.set(name, (voiceHits.get(name) ?? 0) + 1);
+  });
+  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 90_000 });
+  await waitForQa(page);
+  await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded, null, { timeout: 90_000 });
+  await page.evaluate(() => {
+    window.__playtestQa.setAudioMuted?.(false);
+    document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+    document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true }));
+    window.__playtestQa.releaseAudioBoot?.();
+    window.__playtestQa.primeVoicePreload?.();
+  });
+  await page.waitForFunction(
+    () => (window.__playtestQa.voiceReadyIds?.() ?? []).length >= 12,
+    null,
+    { timeout: 90_000 },
+  );
+  assert.ok(voiceHits.size >= 12, `expected voice files, got ${voiceHits.size}`);
+  for (const [file, n] of voiceHits) {
+    assert.equal(n, 1, `voice ${file} should be fetched once, got ${n}`);
+  }
+}
+
 async function main() {
   await withPage(
     { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3 },
@@ -214,6 +283,8 @@ async function main() {
   await withPage(devices['iPhone 13'], { touch: true }, voicePreloadAndLatency);
   await withPage(devices['iPhone 13'], { touch: true }, jacDriveAvatars);
   await withPage(devices['iPhone 13'], { touch: true }, rearPipAbsentInAllGears);
+  await withPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 }, {}, ambienceUnlock);
+  await withPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 }, {}, voiceSingleFetch);
   console.log('test-batch-r44: ok');
 }
 

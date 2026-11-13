@@ -572,10 +572,17 @@ export class IsoScene {
   async init(canvas: HTMLCanvasElement): Promise<void> {
     this.canvasEl = canvas;
     this.app = new Application();
+    let mapFirstFrameMarked = false;
     const reportLoad = (pct: number): void => {
       const rounded = Math.max(0, Math.min(100, Math.round(pct)));
       this.events.onLoadProgress?.(rounded);
-      if (rounded >= 20 && rounded < 100) this.refreshCanvasPresentation(true);
+      if (rounded >= 20 && rounded < 100) {
+        this.refreshCanvasPresentation(true);
+        if (!mapFirstFrameMarked) {
+          mapFirstFrameMarked = true;
+          markMapFirstFrame();
+        }
+      }
     };
     reportLoad(2);
 
@@ -684,7 +691,13 @@ export class IsoScene {
       await loadInteriorSprite(bootInterior);
       reportLoad(78);
     }
+    const sheetStart = performance.now();
+    const sheetTick = window.setInterval(() => {
+      const t = Math.min(1, (performance.now() - sheetStart) / 1200);
+      reportLoad(72 + t * 15);
+    }, 48);
     await playerSheets;
+    window.clearInterval(sheetTick);
     reportLoad(88);
     this.avatar = new PlayerAvatar(
       this.objectsLayer,
@@ -813,7 +826,6 @@ export class IsoScene {
     this.app.render();
     this.events.onFrame?.();
     reportLoad(100);
-    markMapFirstFrame();
     markTti();
     this.hydrateMap();
   }
