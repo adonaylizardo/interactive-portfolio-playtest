@@ -1,0 +1,521 @@
+{
+ "paquete": "primera-persona · propuesta",
+ "estado": "BORRADOR",
+ "fecha": "2026-10-17",
+ "viewport_ref_1x": [
+  1280,
+  720
+ ],
+ "horizonte_y": 360,
+ "focal_px_1x": 914,
+ "fov_h_grados": 70,
+ "camaras": {
+  "a-pie": {
+   "ojo_m": 1.78,
+   "x_m": 7.2,
+   "nota": "acera derecha"
+  },
+  "jac-t9": {
+   "ojo_m": 1.45,
+   "x_m": 2.23,
+   "nota": "carril derecho, puesto izquierdo (0,37 m del eje del carro)"
+  }
+ },
+ "proyeccion": "x_pantalla = 640 + (x − cam.x)·f/z ; y_pantalla = 360 − (y − ojo)·f/z",
+ "frames": {
+  "a": {
+   "png1x": "frames/frame-a-a-pie@1x.png",
+   "png2x": "frames/frame-a-a-pie@2x.png",
+   "ambar_pct": 0.25
+  },
+  "b": {
+   "png1x": "frames/frame-b-jac-t9@1x.png",
+   "png2x": "frames/frame-b-jac-t9@2x.png",
+   "ambar_pct": 0.23
+  }
+ },
+ "colocacion_en_frames": [
+  {
+   "id": "biblioteca-ingenieria",
+   "x": -21,
+   "z": 62
+  },
+  {
+   "id": "teresa-carreno",
+   "x": 14,
+   "z": 128
+  },
+  {
+   "id": "catedral-de-barquisimeto",
+   "x": 76,
+   "z": 150
+  }
+ ],
+ "regla_ambar": "r>90, r−b>55, g>b, r≥g sobre píxeles opacos · tope 5 %",
+ "piezas": [
+  {
+   "id": "cielo-noche",
+   "capa": 0,
+   "tipo": "tile horizontal",
+   "producido": true,
+   "archivos": {
+    "png1x": "piezas/cielo-noche__tile@1x.png",
+    "png2x": "piezas/cielo-noche__tile@2x.png"
+   },
+   "tamano_1x": [
+    2048,
+    400
+   ],
+   "tamano_2x": [
+    4096,
+    800
+   ],
+   "ancla": "fila y=360 = horizonte",
+   "parallax": {
+    "x": "solo con giro (yaw): 2048 px = 360°",
+    "y": 0
+   },
+   "notas": "degradado ui/bg→horizonte frío + estrellas tile-line/text-secondary/text; envuelve en x",
+   "ambar_pct": 0.0
+  },
+  {
+   "id": "cerros-avila",
+   "capa": 1,
+   "tipo": "tile horizontal",
+   "producido": false,
+   "tamano_1x": [
+    2048,
+    80
+   ],
+   "tamano_2x": [
+    4096,
+    160
+   ],
+   "ancla": "borde inferior en y=362 (2 px bajo el horizonte)",
+   "parallax": {
+    "x": "yaw ×1, sin traslación al caminar",
+    "y": 0
+   },
+   "notas": "silueta + luces frías de ranchos; en los frames va dibujada en código (función cerros)",
+   "ambar_pct": 0.0
+  },
+  {
+   "id": "suelo-avenida__fase-a",
+   "capa": 2,
+   "tipo": "franja de suelo (sección transversal)",
+   "producido": true,
+   "archivos": {
+    "png1x": "piezas/suelo-avenida__fase-a@1x.png",
+    "png2x": "piezas/suelo-avenida__fase-a@2x.png"
+   },
+   "tamano_1x": [
+    512,
+    8
+   ],
+   "tamano_2x": [
+    1024,
+    16
+   ],
+   "ancla": "x=256 = eje de la avenida; 16 px = 1 m (−16…+16 m)",
+   "uso": "por fila de pantalla y>360: z=f·ojo/(y−360); escala x = f/z; alterna fase a/b cada 3 m de z (efecto OutRun de velocidad)",
+   "notas": "verde · acera · brocal · asfalto · borde de carril · línea discontinua (fase a)",
+   "ambar_pct": 0.0
+  },
+  {
+   "id": "suelo-avenida__fase-b",
+   "capa": 2,
+   "tipo": "franja de suelo (sección transversal)",
+   "producido": true,
+   "archivos": {
+    "png1x": "piezas/suelo-avenida__fase-b@1x.png",
+    "png2x": "piezas/suelo-avenida__fase-b@2x.png"
+   },
+   "tamano_1x": [
+    512,
+    8
+   ],
+   "tamano_2x": [
+    1024,
+    16
+   ],
+   "ancla": "x=256 = eje de la avenida; 16 px = 1 m (−16…+16 m)",
+   "uso": "por fila de pantalla y>360: z=f·ojo/(y−360); escala x = f/z; alterna fase a/b cada 3 m de z (efecto OutRun de velocidad)",
+   "notas": "verde · acera · brocal · asfalto · borde de carril · línea discontinua (fase a)",
+   "ambar_pct": 0.0
+  },
+  {
+   "id": "suelo-cruce-y-plaza",
+   "capa": 2,
+   "tipo": "franjas de suelo",
+   "producido": false,
+   "tamano_1x": [
+    512,
+    8
+   ],
+   "notas": "calle transversal + paso peatonal + acera de enfrente + plaza; en los frames va en código (función suelo)"
+  },
+  {
+   "id": "fachada-teresa-carreno",
+   "capa": 3,
+   "tipo": "plano frontal (sprite con zIndex=−z)",
+   "producido": true,
+   "rol": "Talks",
+   "variantes": {
+    "luz-encendida": {
+     "png1x": "piezas/fachada-teresa-carreno__luz-encendida@1x.png",
+     "png2x": "piezas/fachada-teresa-carreno__luz-encendida@2x.png",
+     "ambar_pct": 2.87
+    },
+    "luz-apagada": {
+     "png1x": "piezas/fachada-teresa-carreno__luz-apagada@1x.png",
+     "png2x": "piezas/fachada-teresa-carreno__luz-apagada@2x.png",
+     "ambar_pct": 0.0
+    }
+   },
+   "densidad": "16 px/m @1x · 32 px/m @2x",
+   "tamano_1x": [
+    1040,
+    614
+   ],
+   "tamano_2x": [
+    2080,
+    1228
+   ],
+   "ancla": {
+    "x": 608,
+    "y": 613,
+    "nota": "centro del eje de la fachada sobre la línea de suelo (última fila)"
+   },
+   "linea_suelo_px_1x": 613,
+   "uso": "escala en pantalla = f/(z·16); y_suelo = 360 + f·ojo/z"
+  },
+  {
+   "id": "fachada-biblioteca-ingenieria",
+   "capa": 3,
+   "tipo": "plano frontal (sprite con zIndex=−z)",
+   "producido": true,
+   "rol": "Writings",
+   "variantes": {
+    "luz-encendida": {
+     "png1x": "piezas/fachada-biblioteca-ingenieria__luz-encendida@1x.png",
+     "png2x": "piezas/fachada-biblioteca-ingenieria__luz-encendida@2x.png",
+     "ambar_pct": 1.81
+    },
+    "luz-apagada": {
+     "png1x": "piezas/fachada-biblioteca-ingenieria__luz-apagada@1x.png",
+     "png2x": "piezas/fachada-biblioteca-ingenieria__luz-apagada@2x.png",
+     "ambar_pct": 0.03
+    }
+   },
+   "densidad": "16 px/m @1x · 32 px/m @2x",
+   "tamano_1x": [
+    468,
+    185
+   ],
+   "tamano_2x": [
+    936,
+    370
+   ],
+   "ancla": {
+    "x": 234,
+    "y": 184,
+    "nota": "centro del eje de la fachada sobre la línea de suelo (última fila)"
+   },
+   "linea_suelo_px_1x": 184,
+   "uso": "escala en pantalla = f/(z·16); y_suelo = 360 + f·ojo/z"
+  },
+  {
+   "id": "fachada-catedral-de-barquisimeto",
+   "capa": 3,
+   "tipo": "plano frontal (sprite con zIndex=−z)",
+   "producido": true,
+   "rol": "—",
+   "variantes": {
+    "luz-encendida": {
+     "png1x": "piezas/fachada-catedral-de-barquisimeto__luz-encendida@1x.png",
+     "png2x": "piezas/fachada-catedral-de-barquisimeto__luz-encendida@2x.png",
+     "ambar_pct": 1.76
+    },
+    "luz-apagada": {
+     "png1x": "piezas/fachada-catedral-de-barquisimeto__luz-apagada@1x.png",
+     "png2x": "piezas/fachada-catedral-de-barquisimeto__luz-apagada@2x.png",
+     "ambar_pct": 0.0
+    }
+   },
+   "densidad": "16 px/m @1x · 32 px/m @2x",
+   "tamano_1x": [
+    736,
+    588
+   ],
+   "tamano_2x": [
+    1472,
+    1176
+   ],
+   "ancla": {
+    "x": 368,
+    "y": 587,
+    "nota": "centro del eje de la fachada sobre la línea de suelo (última fila)"
+   },
+   "linea_suelo_px_1x": 587,
+   "uso": "escala en pantalla = f/(z·16); y_suelo = 360 + f·ojo/z"
+  },
+  {
+   "id": "fachada-flor-de-venezuela",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "producido": false,
+   "variantes": [
+    "luz-encendida",
+    "luz-apagada"
+   ],
+   "densidad": "16 px/m @1x",
+   "medidas_m_estimadas": [
+    44,
+    16
+   ],
+   "tamano_1x_estimado": [
+    704,
+    256
+   ],
+   "ancla": "centro-inferior"
+  },
+  {
+   "id": "fachada-sambil-barquisimeto",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "producido": false,
+   "variantes": [
+    "luz-encendida",
+    "luz-apagada"
+   ],
+   "densidad": "16 px/m @1x",
+   "medidas_m_estimadas": [
+    90,
+    18
+   ],
+   "tamano_1x_estimado": [
+    1440,
+    288
+   ],
+   "ancla": "centro-inferior"
+  },
+  {
+   "id": "fachada-estudio-6x6",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "producido": false,
+   "variantes": [
+    "luz-encendida",
+    "luz-apagada"
+   ],
+   "densidad": "16 px/m @1x",
+   "medidas_m_estimadas": [
+    18,
+    9
+   ],
+   "tamano_1x_estimado": [
+    288,
+    144
+   ],
+   "ancla": "centro-inferior"
+  },
+  {
+   "id": "fachada-casa-volaris",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "producido": false,
+   "variantes": [
+    "luz-encendida",
+    "luz-apagada"
+   ],
+   "densidad": "16 px/m @1x",
+   "medidas_m_estimadas": [
+    12,
+    8
+   ],
+   "tamano_1x_estimado": [
+    192,
+    128
+   ],
+   "ancla": "centro-inferior"
+  },
+  {
+   "id": "fachada-casa-bain",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "producido": false,
+   "variantes": [
+    "luz-encendida",
+    "luz-apagada"
+   ],
+   "densidad": "16 px/m @1x",
+   "medidas_m_estimadas": [
+    12,
+    8
+   ],
+   "tamano_1x_estimado": [
+    192,
+    128
+   ],
+   "ancla": "centro-inferior"
+  },
+  {
+   "id": "fachada-casa-mentoria",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "producido": false,
+   "variantes": [
+    "luz-encendida",
+    "luz-apagada"
+   ],
+   "densidad": "16 px/m @1x",
+   "medidas_m_estimadas": [
+    12,
+    8
+   ],
+   "tamano_1x_estimado": [
+    192,
+    128
+   ],
+   "ancla": "centro-inferior"
+  },
+  {
+   "id": "fachada-casa-finoa",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "producido": false,
+   "variantes": [
+    "luz-encendida",
+    "luz-apagada"
+   ],
+   "densidad": "16 px/m @1x",
+   "medidas_m_estimadas": [
+    12,
+    8
+   ],
+   "tamano_1x_estimado": [
+    192,
+    128
+   ],
+   "ancla": "centro-inferior"
+  },
+  {
+   "id": "fachada-casa-pg",
+   "capa": 3,
+   "tipo": "plano frontal",
+   "producido": false,
+   "variantes": [
+    "luz-encendida",
+    "luz-apagada"
+   ],
+   "densidad": "16 px/m @1x",
+   "medidas_m_estimadas": [
+    12,
+    8
+   ],
+   "tamano_1x_estimado": [
+    192,
+    128
+   ],
+   "ancla": "centro-inferior"
+  },
+  {
+   "id": "farol-frente",
+   "capa": 4,
+   "tipo": "billboard por distancia",
+   "producido": true,
+   "archivos": {
+    "png1x": "piezas/farol-frente__estado-encendido@1x.png",
+    "png2x": "piezas/farol-frente__estado-encendido@2x.png"
+   },
+   "tamano_1x": [
+    24,
+    76
+   ],
+   "tamano_2x": [
+    48,
+    152
+   ],
+   "ancla": {
+    "x": 6,
+    "y": 75,
+    "nota": "pie del poste"
+   },
+   "notas": "farol del kit (paisaje/farol-exterior · farol-noche) redibujado de frente; espejar con scale.x=−1 en la acera derecha. Halo (3 anillos al 10/16/26 %) y charco van como capa aparte en modo add",
+   "ambar_pct": 2.67
+  },
+  {
+   "id": "farol-frente-halo",
+   "capa": 4,
+   "tipo": "capa de luz",
+   "producido": false,
+   "notas": "en los frames se dibuja en código; exportar como sprite add para controlar la opacidad con la noche"
+  },
+  {
+   "id": "banco-frente / arbol-frente",
+   "capa": 4,
+   "tipo": "billboard",
+   "producido": false,
+   "notas": "en los frames son marcadores dibujados en código (madera charcoal / grass del kit), no arte final"
+  },
+  {
+   "id": "jac-t9-capo",
+   "capa": 5,
+   "tipo": "overlay fijo a la cámara",
+   "producido": true,
+   "archivos": {
+    "png1x": "piezas/jac-t9-capo@1x.png",
+    "png2x": "piezas/jac-t9-capo@2x.png"
+   },
+   "tamano_1x": [
+    1280,
+    720
+   ],
+   "tamano_2x": [
+    2560,
+    1440
+   ],
+   "ancla": "(0,0) del viewport; caja útil x 80–1280, y 439–628",
+   "notas": "Graphite Grey de noche: hombros, domo central, filo delantero; va debajo de la cabina"
+  },
+  {
+   "id": "jac-t9-cabina",
+   "capa": 6,
+   "tipo": "overlay fijo a la cámara",
+   "producido": true,
+   "archivos": {
+    "png1x": "piezas/jac-t9-cabina__luces-on@1x.png",
+    "png2x": "piezas/jac-t9-cabina__luces-on@2x.png"
+   },
+   "tamano_1x": [
+    1280,
+    720
+   ],
+   "tamano_2x": [
+    2560,
+    1440
+   ],
+   "ancla": "(0,0) del viewport",
+   "contiene": [
+    "techo + parasoles",
+    "pilares A (izq. grueso, der. fino)",
+    "vidrios laterales tintados al 75 %",
+    "espejo lateral izq.",
+    "plumillas",
+    "tablero + costura wood",
+    "cuadro (luz fría, 1 testigo ámbar)",
+    "pantalla central (mapa + punto ámbar)",
+    "volante con insignia JAC (solo texto)",
+    "retrovisor con barra del platón y cabeceras"
+   ],
+   "ambar_pct_opacos": 0.01
+  },
+  {
+   "id": "jac-t9-cabina partes sueltas",
+   "capa": 6,
+   "tipo": "sprites",
+   "producido": false,
+   "notas": "volante aparte (rota al doblar ±90°), variante luces-off, cabeceo de cámara ±2 px al frenar"
+  }
+ ]
+}

@@ -1,0 +1,41 @@
+/** Local Figma MCP exports (file D1Vq9b3rBzXquj0FjwSV2q). */
+const BASE = `${import.meta.env.BASE_URL}figma-specs`;
+
+export type FigmaFrame =
+  | 'talks-phone-map'
+  | 'talks-phone-list'
+  | 'talks-phone-player'
+  | 'talks-desktop-map'
+  | 'talks-desktop-list'
+  | 'talks-desktop-player'
+  | 'writings-phone-map'
+  | 'writings-phone-list'
+  | 'writings-phone-reading'
+  | 'writings-desktop-map'
+  | 'writings-desktop-list'
+  | 'writings-desktop-reading';
+
+export function figmaAsset(frame: FigmaFrame, file: string): string {
+  return `${BASE}/assets/${frame}/${file}`;
+}
+
+export function figmaFramePng(frame: FigmaFrame): string {
+  return `${BASE}/${frame}.png`;
+}
+
+/** Figma export of phone map checklist pill (237×52, EN 3/5). */
+export const CHECKLIST_PHONE_PILL = `${BASE}/assets/checklist-phone-pill.png`;
+export const CHECKLIST_PHONE_PILL_2X = `${BASE}/assets/checklist-phone-pill@2x.png`;
+
+/** Shared play glyph used on talk list thumbs. */
+export const FIGMA_PLAY = figmaAsset('talks-desktop-list', '6a8ac.svg');
+export const FIGMA_PAUSE = figmaAsset('talks-desktop-player', 'd0608.svg');
+export const FIGMA_STAGE = figmaAsset('talks-desktop-player', '0f6fa.png');
+/** Pagina glifo on list/reader cover placeholders (15×15). */
+export const FIGMA_DOC = figmaAsset('writings-desktop-list', 'aef4f.svg');
+export const FIGMA_DOC_RASTER = `${BASE}/assets/writings-desktop-list/aef4f-15.png`;
+export const FIGMA_DOC_2X = `${BASE}/assets/writings-desktop-list/aef4f@2x.png`;
+export const FIGMA_DOC_PHONE = figmaAsset('writings-phone-list', 'aef4f.svg');
+export const FIGMA_SUBSTACK_PHONE = figmaAsset('writings-phone-reading', 'c0026.svg');
+export const FIGMA_BACK_PHONE_READING = figmaAsset('writings-phone-reading', '9f9c4.svg');
+export const FIGMA_CLOSE_PHONE_READING = figmaAsset('writings-phone-reading', 'f1b3a.svg');
