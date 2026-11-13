@@ -120,6 +120,11 @@ async function measure(spec) {
   });
 
   await page.addInitScript(() => {
+    try {
+      sessionStorage.setItem('playtest-welcome-done', '1');
+    } catch {
+      /* private mode */
+    }
     const start = performance.now();
     window.__bootMetrics = { nav: start, tti: null };
     const tick = () => {
@@ -147,6 +152,11 @@ async function measure(spec) {
     const deadline = Date.now() + spec.timeout;
     let ttiSeen = false;
     let atTti = null;
+    await page
+      .waitForFunction(() => typeof window.__playtestQa?.playerAvatar === 'function', null, {
+        timeout: Math.min(spec.timeout, 120_000),
+      })
+      .catch(() => null);
     while (Date.now() < deadline) {
       const m = await page.evaluate(() => window.__bootMetrics).catch(() => null);
       if (m?.tti != null && !ttiSeen) {

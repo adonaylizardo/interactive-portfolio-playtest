@@ -1007,6 +1007,11 @@ async function main(): Promise<void> {
     audioMuted: () => studio.isMuted(),
     audioUnlocked: () => studio.isUnlocked(),
     setAudioMuted: (muted: boolean) => studio.setMuted(muted),
+    voiceLineReady: (id: string) => studio.isVoiceLineReady(id),
+    voiceReadyIds: () => studio.qaVoiceReadyIds(),
+    playVoiceLine: (id: string) => studio.playLineForced(id),
+    primeVoicePreload: () => studio.startVoicePreload(),
+    releaseAudioBoot: () => studio.releaseBootHold(),
     formatContentDate: (raw: string) => formatContentDate(raw),
     soundHint: () => {
       const el = document.querySelector('.chrome__sound') as HTMLElement | null;

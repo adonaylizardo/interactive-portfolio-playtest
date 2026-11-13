@@ -5,7 +5,6 @@ import {
   Point,
   Polygon,
   Rectangle,
-  RenderTexture,
   Sprite,
   Texture,
   TilingSprite,
@@ -442,16 +441,9 @@ export class IsoScene {
   qaPointerDriveAccepts = 0;
   private qaStick: { x: number; y: number } | null = null;
   private personaIdleSyncSkip = 0;
-  /** GPU rear crop. Shown as a stage sprite — never readPixels / drawImage of the game GL view. */
-  private rearRT: RenderTexture | null = null;
-  private rearSprite: Sprite | null = null;
-  private rearMask: Graphics | null = null;
+  /** Legacy PiP layer (DOM hud only; GPU mirror disabled). */
   private rearLayer: Container | null = null;
   private rearFade = 0;
-  private rearFadeFrom = 0;
-  private rearFadeTo = 0;
-  private rearFadeT0 = 0;
-  private static readonly REAR_FADE_MS = 120;
   private pendingJacExit = false;
   private suppressDriveTapUntil = 0;
   private events: SceneEvents;
@@ -681,6 +673,7 @@ export class IsoScene {
     const spriteSpan = 62;
     let spritesDone = 0;
     const spriteTotal = Math.max(1, paintKeys.length);
+    const playerSheets = loadPlayerSheets(1);
     await loadMapSprites(this.app.renderer.resolution, paintKeys, () => {
       spritesDone += 1;
       reportLoad(8 + (spritesDone / spriteTotal) * spriteSpan);
@@ -690,7 +683,7 @@ export class IsoScene {
       await loadInteriorSprite(bootInterior);
       reportLoad(78);
     }
-    await loadPlayerSheets(1);
+    await playerSheets;
     reportLoad(88);
     this.avatar = new PlayerAvatar(
       this.objectsLayer,
@@ -3501,7 +3494,7 @@ export class IsoScene {
   private collectBillboards(): Container[] {
     const out: Container[] = [];
     if (this.interiorActive) return out;
-    if (this.avatar) out.push(...this.avatar.spritesForBillboard());
+    if (this.avatar && !this.jac?.driving) out.push(...this.avatar.spritesForBillboard());
     if (this.noah) out.push(...this.noah.spritesForBillboard());
     if (this.npcs) out.push(...this.npcs.spritesForBillboard());
     if (this.fillActors) out.push(...this.fillActors.spritesForBillboard());
@@ -4717,7 +4710,9 @@ export class IsoScene {
     this.syncPerspective();
     this.syncPersona();
     this.applyBillboards();
-    if (!this.personaOn() && !this.qaIsolation) this.avatar.setVisible(!this.interiorActive);
+    if (!this.personaOn() && !this.qaIsolation) {
+      this.avatar.setVisible(!this.interiorActive && !this.jac?.driving);
+    }
   }
 
   /**
@@ -4726,24 +4721,8 @@ export class IsoScene {
    * PiP sprite). Never readPixels / drawImage the game WebGL view.
    */
   private composeRearPass(): void {
-    const want = this.jac?.rearCam ? 1 : 0;
-    if (want === 0) {
-      this.rearFade = 0;
-      this.rearFadeFrom = 0;
-      this.rearFadeTo = 0;
-    } else if (want !== this.rearFadeTo) {
-      this.rearFadeFrom = this.rearFade;
-      this.rearFadeTo = want;
-      this.rearFadeT0 = performance.now();
-    }
-    if (want === 1) {
-      const t = Math.min(1, (performance.now() - this.rearFadeT0) / IsoScene.REAR_FADE_MS);
-      this.rearFade = this.rearFadeFrom + (this.rearFadeTo - this.rearFadeFrom) * t;
-    }
-    const drewRear = !!this.jac?.rearCam;
-    if (drewRear) this.renderRearTexture();
-    this.layoutRearSprite();
-    if (drewRear) this.restoreMainTarget(true);
+    this.rearFade = 0;
+    if (this.rearLayer) this.rearLayer.visible = false;
   }
 
   private ensureMainRenderSurface(clearColor: boolean): void {
@@ -4783,102 +4762,6 @@ export class IsoScene {
   private opaqueBgRgba(): [number, number, number, number] {
     const bg = worldBackgroundColor();
     return [((bg >> 16) & 255) / 255, ((bg >> 8) & 255) / 255, (bg & 255) / 255, 1];
-  }
-
-  private ensureRearTexture(sw: number, sh: number): RenderTexture {
-    const w = Math.max(2, Math.ceil(sw));
-    const h = Math.max(2, Math.ceil(sh));
-    if (!this.rearRT || this.rearRT.width !== w || this.rearRT.height !== h) {
-      this.rearRT?.destroy(true);
-      this.rearRT = RenderTexture.create({ width: w, height: h });
-      if (!this.rearSprite) {
-        this.rearSprite = new Sprite(this.rearRT);
-        this.rearSprite.eventMode = 'none';
-        this.rearLayer?.addChildAt(this.rearSprite, 0);
-      } else {
-        this.rearSprite.texture = this.rearRT;
-      }
-      if (!this.rearMask) {
-        this.rearMask = new Graphics();
-        this.rearMask.eventMode = 'none';
-        this.rearLayer?.addChild(this.rearMask);
-        if (this.rearLayer) this.rearLayer.mask = this.rearMask;
-      }
-    }
-    return this.rearRT;
-  }
-
-  private renderRearTexture(): void {
-    if (!this.jac || !this.app) return;
-    const cw = this.app.screen.width || 1;
-    const ch = this.app.screen.height || 1;
-    const rt = this.ensureRearTexture(cw, ch);
-    const sprite = this.rearSprite;
-    if (sprite) sprite.visible = false;
-    try {
-      this.app.renderer.render({
-        container: this.camera,
-        target: rt,
-        clear: true,
-        clearColor: [0.063, 0.067, 0.078, 1],
-      });
-    } catch {
-      /* rear RT skip */
-    }
-    if (sprite) sprite.visible = true;
-  }
-
-  private layoutRearSprite(): void {
-    const sprite = this.rearSprite;
-    const layer = this.rearLayer;
-    const mask = this.rearMask;
-    const canvas = this.canvasEl;
-    if (!sprite || !layer || !canvas || !this.app) return;
-    if (this.rearFade < 0.01) {
-      layer.visible = false;
-      return;
-    }
-    layer.visible = true;
-    const cr = canvas.getBoundingClientRect();
-    const slot = document.querySelector('.jac-rear__view') as HTMLElement | null;
-    let left = 16;
-    let top = cr.width <= 767 ? 80 : 12;
-    let w = Math.min(420, Math.max(120, cr.width - 32));
-    let h = cr.width <= 767 ? 110 : 128;
-    if (slot) {
-      const sr = slot.getBoundingClientRect();
-      if (sr.width > 8 && sr.height > 8) {
-        left = sr.left - cr.left;
-        top = sr.top - cr.top;
-        w = sr.width;
-        h = sr.height;
-      } else {
-        left = (cr.width - w) / 2;
-      }
-    } else {
-      left = (cr.width - w) / 2;
-    }
-    const cw = this.app.screen.width || 1;
-    const ch = this.app.screen.height || 1;
-    const region = this.jac?.rearSource((x, y) => this.worldToScreen(x, y), cw, ch) ?? {
-      sx: 0,
-      sy: 0,
-      sw: w,
-      sh: h,
-    };
-    const scaleX = w / Math.max(1, region.sw);
-    const scaleY = h / Math.max(1, region.sh);
-    sprite.position.set(left - region.sx * scaleX, top - region.sy * scaleY);
-    sprite.width = cw * scaleX;
-    sprite.height = ch * scaleY;
-    const chrome = document.querySelector('.jac-rear') as HTMLElement | null;
-    const cssFade = chrome ? Number(getComputedStyle(chrome).opacity) : this.rearFade;
-    sprite.alpha = Number.isFinite(cssFade) ? cssFade : this.rearFade;
-    if (mask) {
-      mask.clear();
-      mask.rect(left, top, w, h);
-      mask.fill({ color: 0xffffff });
-    }
   }
 
   /** Re-bind the main canvas render target (full viewport). Clears only when asked. */

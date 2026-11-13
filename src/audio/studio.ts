@@ -50,6 +50,7 @@ function automatedWebKitPhone(): boolean {
   const ua = navigator.userAgent;
   // Playwright mobile Chromium is HeadlessChrome but often has no `window.chrome`.
   if (/Chrome|Chromium|HeadlessChrome|CriOS|EdgA|EdgiOS/i.test(ua)) return false;
+  if (navigator.vendor === 'Google Inc.') return false;
   return true;
 }
 
@@ -64,6 +65,10 @@ export class StudioAudio {
   private lastFootFrame = -1;
   private lastFootAt = 0;
   private voice: HTMLAudioElement | null = null;
+  private voiceBufferNode: AudioBufferSourceNode | null = null;
+  private readonly voiceBuffers = new Map<string, AudioBuffer>();
+  private readonly voiceRaw = new Map<string, ArrayBuffer>();
+  private voicePreloadPromise: Promise<void> | null = null;
   private activeLineId: string | null = null;
   private subtitleText = '';
   private subtitleLineId: string | null = null;
@@ -132,7 +137,29 @@ export class StudioAudio {
   }
 
   isVoicePlaying(): boolean {
-    return !!this.voice;
+    return !!this.voice || !!this.voiceBufferNode;
+  }
+
+  isVoiceLineReady(id: string): boolean {
+    return this.voiceBuffers.has(id);
+  }
+
+  /** QA: decoded lines ready for instant Web Audio playback. */
+  qaVoiceReadyIds(): string[] {
+    return [...this.voiceBuffers.keys()];
+  }
+
+  /** After the map is interactive: fetch then decode voice lines (does not block boot). */
+  startVoicePreload(): void {
+    if (automatedWebKitPhone()) return;
+    void this.ctx?.resume();
+    void this.prefetchVoiceBytes();
+    if (!this.voicePreloadPromise) {
+      this.voicePreloadPromise = this.decodePrefetchedVoices().catch((err) => {
+        console.warn('[voice] preload failed', err);
+        this.voicePreloadPromise = null;
+      });
+    }
   }
 
   hasIntroCompleted(): boolean {
@@ -279,6 +306,7 @@ export class StudioAudio {
   unlock(): void {
     if (this.unlocked) {
       void this.ctx?.resume();
+      if (!this.ctx && !this.bootHold) this.startGraphAndIntro();
       return;
     }
     this.unlocked = true;
@@ -307,9 +335,13 @@ export class StudioAudio {
   releaseBootHold(): void {
     if (!this.bootHold) return;
     this.bootHold = false;
-    if (!this.graphPending) return;
-    this.graphPending = false;
-    this.startGraphAndIntro();
+    if (this.graphPending) {
+      this.graphPending = false;
+      this.startGraphAndIntro();
+    } else if (this.unlocked) {
+      this.startGraphAndIntro();
+    }
+    this.startVoicePreload();
   }
 
   private startGraphAndIntro(): void {
@@ -339,8 +371,10 @@ export class StudioAudio {
         void this.ctx.resume();
         this.startAmbience();
         void this.loadBarks();
+        this.startVoicePreload();
       } else {
         void this.ctx?.resume();
+        this.startVoicePreload();
       }
     } catch {
       /* autoplay / context limits: mute state still flips */
@@ -557,7 +591,7 @@ export class StudioAudio {
       this.introLock = false;
       return;
     }
-    if (this.voice && id !== '01-intro' && !opts.force) {
+    if ((this.voice || this.voiceBufferNode) && id !== '01-intro' && !opts.force) {
       this.enqueueVoice(id);
       return;
     }
@@ -565,7 +599,7 @@ export class StudioAudio {
       this.enqueueVoice(id);
       return;
     }
-    if (this.voice && opts.force) this.stopVoice({ preserveQueue: true });
+    if ((this.voice || this.voiceBufferNode) && opts.force) this.stopVoice({ preserveQueue: true });
     else this.stopVoice();
     this.stopBark();
     if (id !== '01-intro') this.played.add(id);
@@ -575,6 +609,32 @@ export class StudioAudio {
       window.setTimeout(() => this.finishVoice(true), 80);
       return;
     }
+    const decoded = this.voiceBuffers.get(id);
+    if (decoded && this.ctx && this.master) {
+      this.stopBufferVoice();
+      const src = this.ctx.createBufferSource();
+      src.buffer = decoded;
+      src.connect(this.master);
+      src.onended = () => {
+        if (this.voiceBufferNode === src) this.finishVoice(true);
+      };
+      this.voiceBufferNode = src;
+      this.duckAmbience(true);
+      try {
+        src.start(0);
+      } catch {
+        this.voiceBufferNode = null;
+        this.playLineWithElement(id, line);
+        return;
+      }
+      this.emit();
+      return;
+    }
+    void this.decodeVoiceLine(id, line);
+    this.playLineWithElement(id, line);
+  }
+
+  private playLineWithElement(_id: string, line: VoiceLine): void {
     this.preferOgg ??= canPlayOgg();
     const file = this.preferOgg ? line.files.ogg : line.files.mp3;
     const el = new Audio(`${VOICE_DIR}${file}`);
@@ -592,6 +652,92 @@ export class StudioAudio {
     });
   }
 
+  private async prefetchVoiceBytes(): Promise<void> {
+    this.preferOgg ??= canPlayOgg();
+    await Promise.all(
+      Object.entries(VOICE_LINES).map(async ([id, line]) => {
+        if (this.voiceBuffers.has(id) || this.voiceRaw.has(id)) return;
+        const file = this.preferOgg ? line.files.ogg : line.files.mp3;
+        try {
+          const res = await fetch(`${VOICE_DIR}${file}`);
+          if (!res.ok) return;
+          this.voiceRaw.set(id, await res.arrayBuffer());
+        } catch {
+          /* single line */
+        }
+      }),
+    );
+  }
+
+  private async decodePrefetchedVoices(): Promise<void> {
+    await this.prefetchVoiceBytes();
+    for (let i = 0; i < 200; i++) {
+      if (this.ctx) break;
+      await new Promise<void>((r) => window.setTimeout(r, 50));
+    }
+    let ctx = this.ctx;
+    let temp: AudioContext | null = null;
+    if (!ctx) {
+      try {
+        const Ctx =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (Ctx) temp = ctx = new Ctx();
+      } catch {
+        return;
+      }
+    }
+    if (!ctx) return;
+    await Promise.all(
+      [...this.voiceRaw.entries()].map(async ([id, raw]) => {
+        if (this.voiceBuffers.has(id)) return;
+        try {
+          this.voiceBuffers.set(id, await ctx.decodeAudioData(raw.slice(0)));
+        } catch {
+          /* HTMLAudio fallback */
+        }
+      }),
+    );
+    this.voiceRaw.clear();
+    if (temp) void temp.close();
+  }
+
+  private async decodeVoiceLine(id: string, line: VoiceLine): Promise<void> {
+    if (this.voiceBuffers.has(id)) return;
+    const ctx = this.ctx;
+    if (!ctx) {
+      await this.prefetchVoiceBytes();
+      return;
+    }
+    this.preferOgg ??= canPlayOgg();
+    const file = this.preferOgg ? line.files.ogg : line.files.mp3;
+    const cached = this.voiceRaw.get(id);
+    const raw =
+      cached ??
+      (await (async () => {
+        const res = await fetch(`${VOICE_DIR}${file}`);
+        if (!res.ok) return null;
+        return res.arrayBuffer();
+      })());
+    if (!raw) return;
+    try {
+      this.voiceBuffers.set(id, await ctx.decodeAudioData(raw.slice(0)));
+    } catch {
+      /* fall back to HTMLAudio on play */
+    }
+  }
+
+  private stopBufferVoice(): void {
+    if (!this.voiceBufferNode) return;
+    try {
+      this.voiceBufferNode.onended = null;
+      this.voiceBufferNode.stop();
+    } catch {
+      /* already ended */
+    }
+    this.voiceBufferNode = null;
+  }
+
   private finishVoice(completed = true): void {
     if (completed && this.activeLineId === '01-intro') this.played.add('01-intro');
     if (!completed && this.activeLineId === '01-intro') this.introDeferred = true;
@@ -606,6 +752,7 @@ export class StudioAudio {
   private stopVoice(opts: { preserveQueue?: boolean; clearCaption?: boolean } = {}): void {
     const hadVoice = !!this.voice;
     const interruptedIntro = this.activeLineId === '01-intro';
+    this.stopBufferVoice();
     if (this.voice) {
       this.voice.pause();
       this.voice.src = '';
@@ -727,7 +874,7 @@ export class StudioAudio {
 
   private ambienceTarget(): number {
     if (this.muted || !this.unlocked) return 0;
-    if (this.voice) return this.interior ? 0.004 : 0.012;
+    if (this.voice || this.voiceBufferNode) return this.interior ? 0.004 : 0.012;
     return this.interior ? 0.012 : 0.04;
   }
 

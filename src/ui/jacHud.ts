@@ -61,9 +61,6 @@ export class JacHud {
   private lastActAt = 0;
   private hintUntil = 0;
   private rearFade = 0;
-  private rearFadeFrom = 0;
-  private rearFadeTo = 0;
-  private rearFadeT0 = 0;
 
   constructor(container: HTMLElement, callbacks: JacHudCallbacks) {
     this.callbacks = callbacks;
@@ -104,8 +101,6 @@ export class JacHud {
     this.lastHtml = '';
     this.snap = null;
     this.rearFade = 0;
-    this.rearFadeFrom = 0;
-    this.rearFadeTo = 0;
     this.rearEl.style.opacity = '0';
   }
 
@@ -135,8 +130,6 @@ export class JacHud {
     document.body.classList.toggle('jac-rearcam', snap.rearCam);
     if (!snap.rearCam) {
       this.rearFade = 0;
-      this.rearFadeFrom = 0;
-      this.rearFadeTo = 0;
       this.rearEl.classList.remove('is-on');
       this.rearEl.hidden = true;
       this.rearEl.style.opacity = '0';
@@ -412,14 +405,12 @@ export class JacHud {
   }
 
   private tickRearFade(on: boolean): void {
-    const want = on ? 1 : 0;
-    if (want !== this.rearFadeTo) {
-      this.rearFadeFrom = this.rearFade;
-      this.rearFadeTo = want;
-      this.rearFadeT0 = performance.now();
+    if (!on) {
+      this.rearFade = 0;
+      this.rearEl.style.opacity = '0';
+      return;
     }
-    const t = Math.min(1, (performance.now() - this.rearFadeT0) / 400);
-    this.rearFade = this.rearFadeFrom + (this.rearFadeTo - this.rearFadeFrom) * t;
+    this.rearFade = 1;
     this.rearEl.style.removeProperty('opacity');
     this.rearEl.style.removeProperty('transition');
   }

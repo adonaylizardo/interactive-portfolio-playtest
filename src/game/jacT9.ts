@@ -61,7 +61,7 @@ const BRAKE_TILES_S2 = 18;
 const EXIT_BRAKE_TILES_S2 = 220;
 const EXIT_MAX_TRAVEL = 0.35;
 const BUMP_AMP = 0.22;
-const FRICTION_TILES_S2 = 10;
+const FRICTION_TILES_S2 = 6.5;
 const TURN_RATE = 2.4;
 const IDLE_RPM = 700;
 const MOVE_RPM = 2250;
@@ -294,6 +294,10 @@ export class JacT9 {
   mph = 0;
   reversing = false;
   steering = 0;
+  /** Eased steering input; decays on stick release instead of snapping. */
+  private steerSmoothed = 0;
+  /** Keep driving on continuous heading until the van coasts to a stop (cenital joystick). */
+  private cenitalHeadingDrive = false;
   bubble = false;
   toggles: Record<JacToggleId, boolean> = {
     left: false,
@@ -444,6 +448,8 @@ export class JacT9 {
       this.gearReleased = true;
       this.bubble = false;
       this.rearHold = 0;
+      this.steerSmoothed = 0;
+      this.cenitalHeadingDrive = false;
       this.shiftDwell = 0;
       this.shiftArmedAt = 0;
       this.pendingExit = false;
@@ -468,6 +474,8 @@ export class JacT9 {
       this.reversing = false;
       this.steering = 0;
       this.rearHold = 0;
+      this.steerSmoothed = 0;
+      this.cenitalHeadingDrive = false;
       this.shiftDwell = 0;
       this.shiftArmedAt = 0;
       this.pendingExit = false;
@@ -1306,11 +1314,12 @@ export class JacT9 {
     let steer = 0;
     if (live && input.tileDir) {
       this.cenitalStickDrive = true;
+      this.cenitalHeadingDrive = true;
       const want = headingFromTileStick(dx, dy, this.dir);
       let err = want - this.heading;
       if (err > 2) err -= 4;
       if (err < -2) err += 4;
-      steer = Math.max(-1, Math.min(1, err * 3.4));
+      steer = Math.max(-1, Math.min(1, err * 2.1));
       throttle = stickMag;
       if (this.gear === 'R' && throttle > 0) this.gear = 'D';
       const face = dirFromHeading(this.heading);
@@ -1321,7 +1330,16 @@ export class JacT9 {
       throttle = fwd * stickMag;
       steer = dx;
     }
-    if (!live && !input.tileDir) this.cenitalStickDrive = false;
+    if (!live && !input.tileDir) {
+      if (Math.abs(this.vel) <= 0.08) {
+        this.cenitalStickDrive = false;
+        this.cenitalHeadingDrive = false;
+      } else if (this.cenitalHeadingDrive) {
+        this.cenitalStickDrive = true;
+      } else {
+        this.cenitalStickDrive = false;
+      }
+    }
     const following = !this.pendingExit && !live && (this.drivePath.length > 0 || !!this.driveGoal);
     if (following) {
       const cmd = this.pathFollowStick(dt);
@@ -1333,7 +1351,14 @@ export class JacT9 {
     if (!live && !following && this.qaSteer != null) steer = this.qaSteer;
     if (this.pendingExit) throttle = 0;
 
-    this.steering = Math.max(-1, Math.min(1, steer));
+    const steerTarget = Math.max(-1, Math.min(1, steer));
+    const steerAlpha = 1 - Math.exp(-dt * 9);
+    if (Math.abs(steerTarget) > 0.04) {
+      this.steerSmoothed += (steerTarget - this.steerSmoothed) * steerAlpha;
+    } else {
+      this.steerSmoothed *= 1 - Math.min(1, dt * 5.5);
+    }
+    this.steering = Math.max(-1, Math.min(1, this.steerSmoothed));
     this.applyThrottle(dt, throttle, input.autoShift !== false);
 
     const moving = Math.abs(this.vel) > 0.08;
@@ -1354,7 +1379,8 @@ export class JacT9 {
     if (moving) {
       let mx = fwd.x;
       let my = fwd.y;
-      if (this.cenitalStickDrive) {
+      const steerHeading = this.cenitalStickDrive || (input.tileDir && this.cenitalHeadingDrive);
+      if (steerHeading) {
         const a = this.heading * (Math.PI / 2);
         mx = Math.cos(a);
         my = Math.sin(a);
