@@ -167,6 +167,7 @@ export class StudioAudio {
 
   /** Bytes only — safe during boot before any gesture (respects mute for full preload, not intro warm). */
   warmIntroVoiceBytes(): void {
+    if (this.muted) return;
     const line = VOICE_LINES['01-intro'];
     if (!line) return;
     void this.fetchVoiceRaw('01-intro', line);
@@ -733,11 +734,7 @@ export class StudioAudio {
         this.voiceBufferNode = null;
       }
     }
-    if (!running) {
-      await this.playLineWithCachedElement(id, line);
-      return;
-    }
-    this.finishVoice(false);
+    await this.playLineWithCachedElement(id, line);
   }
 
   private async playLineWithCachedElement(id: string, line: VoiceLine): Promise<void> {
@@ -938,17 +935,8 @@ export class StudioAudio {
     this.htmlAudioGesturePrimed = true;
     try {
       const el = new Audio();
-      const line = VOICE_LINES['01-intro'];
-      if (line) {
-        this.preferOgg ??= canPlayOgg();
-        const file = this.preferOgg ? line.files.ogg : line.files.mp3;
-        el.src = this.voiceRaw.has('01-intro')
-          ? URL.createObjectURL(new Blob([this.voiceRaw.get('01-intro')!], { type: this.voiceMime() }))
-          : `${VOICE_DIR}${file}`;
-      } else {
-        el.src =
-          'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAACABAAZGF0YQAAAAA=';
-      }
+      el.src =
+        'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAACABAAZGF0YQAAAAA=';
       el.muted = true;
       el.volume = 0.001;
       const p = el.play();

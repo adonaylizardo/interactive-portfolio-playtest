@@ -3,12 +3,12 @@
  * Real-DOM QA: interior peek, list back, dismiss/reopen, pinch zoom, post-exit door grace.
  */
 import { mkdirSync, readFileSync } from 'node:fs';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { execPath } from 'node:process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, devices } from 'playwright';
-import { waitForQa } from './qa-ready.mjs';
+import { launchBrowser, waitForQa } from './qa-ready.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TEST_OUT = path.join(ROOT, 'test-output');
@@ -35,8 +35,14 @@ function resolvePreviewBase() {
   } catch {
     /* dist not built yet */
   }
-  if (basePath === '/' || basePath === '/interactive-portfolio-playtest/') {
-    basePath = '/interactive-portfolio-playtest/preview-integracion/';
+  if (basePath === '/') {
+    try {
+      const viteConfig = readFileSync(path.join(ROOT, 'vite.config.ts'), 'utf8');
+      const cfg = viteConfig.match(/base:\s*['"]([^'"]+)['"]/);
+      if (cfg?.[1]) basePath = cfg[1];
+    } catch {
+      /* ignore */
+    }
   }
   if (!basePath.endsWith('/')) basePath += '/';
   return `http://127.0.0.1:${PREVIEW_PORT}${basePath}`;
@@ -47,7 +53,7 @@ function startPreview(basePath) {
   const viteBin = path.join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js');
   return spawn(
     execPath,
-    [viteBin, 'preview', '--host', '127.0.0.1', `--port=${PREVIEW_PORT}`, '--base', base],
+    [viteBin, 'preview', '--host', '127.0.0.1', `--port=${PREVIEW_PORT}`, '--strictPort', '--base', base],
     { cwd: ROOT, stdio: 'ignore', detached: true },
   );
 }
@@ -100,21 +106,52 @@ async function assertInViewport(loc) {
 }
 
 async function main() {
-  const timeout = setTimeout(() => {
+  let preview = null;
+  let browser = null;
+  let timeoutRef = null;
+  let shuttingDown = false;
+  const shutdown = async (code) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    if (timeoutRef) clearTimeout(timeoutRef);
+    if (browser) {
+      try {
+        await browser.close();
+      } catch {
+        /* ignore */
+      }
+      browser = null;
+    }
+    await stopPreview(preview);
+    preview = null;
+    process.exit(code);
+  };
+
+  timeoutRef = setTimeout(() => {
     console.error(`test-interior-exp-peek: global timeout ${GLOBAL_TIMEOUT_MS}ms`);
-    process.exit(1);
+    void shutdown(1);
   }, GLOBAL_TIMEOUT_MS);
+  process.once('SIGINT', () => void shutdown(130));
+  process.once('SIGTERM', () => void shutdown(143));
 
   const BASE = resolvePreviewBase();
-  let preview = null;
   if (!process.env.QA_BASE_URL) {
+    spawnSync('fuser', ['-k', `${PREVIEW_PORT}/tcp`], { stdio: 'ignore' });
+    await wait(300);
     const basePath = new URL(BASE).pathname;
+    let previewExit = null;
     preview = startPreview(basePath);
+    preview.on('exit', (code) => {
+      previewExit = code;
+    });
     await wait(1500);
+    if (previewExit != null) {
+      throw new Error(`vite preview failed on port ${PREVIEW_PORT} (exit ${previewExit})`);
+    }
   }
   const errors = [];
 
-  const browser = await chromium.launch();
+  browser = await launchBrowser(chromium, {});
   const ctx = await browser.newContext({
     ...devices['iPhone 13'],
     viewport: { width: 390, height: 844 },
@@ -707,9 +744,17 @@ async function main() {
   } catch (e) {
     errors.push(e.message || String(e));
   } finally {
-    clearTimeout(timeout);
-    await browser.close();
+    if (timeoutRef) clearTimeout(timeoutRef);
+    if (browser) {
+      try {
+        await browser.close();
+      } catch {
+        /* ignore */
+      }
+      browser = null;
+    }
     await stopPreview(preview);
+    preview = null;
   }
 
   if (errors.length) {
