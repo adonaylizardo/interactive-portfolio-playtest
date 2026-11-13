@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 /**
- * Cold-load timings: time to first map frame, time to interactive, request count, transfer bytes.
+ * Cold-load timings: map visible + TTI from in-app performance marks; request count at TTI.
  * Usage: node scripts/measure-load.mjs [baseUrl] [--label before|after]
  */
 import { chromium, devices } from 'playwright';
 import { writeFileSync, mkdirSync } from 'node:fs';
-import { PNG } from 'pngjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,7 +12,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASE =
   process.argv.find((a) => /^https?:/.test(a)) ??
   process.env.QA_BASE_URL ??
-  'http://127.0.0.1:4196/interactive-portfolio-playtest/';
+  'http://127.0.0.1:4196/interactive-portfolio-playtest/preview-integracion/';
 const LABEL = (() => {
   const i = process.argv.indexOf('--label');
   return i >= 0 ? process.argv[i + 1] : 'run';
@@ -40,7 +39,6 @@ const SPECS = [
     deviceScaleFactor: 1,
     network: null,
     cpu: 1,
-    mapLeft: 496,
     timeout: 60_000,
   },
   {
@@ -48,7 +46,6 @@ const SPECS = [
     ...devices['iPhone 13'],
     network: FAST_4G,
     cpu: 4,
-    mapLeft: 0,
     timeout: 90_000,
   },
   {
@@ -56,7 +53,6 @@ const SPECS = [
     ...devices['iPhone 13'],
     network: FAST_3G,
     cpu: 4,
-    mapLeft: 0,
     timeout: 120_000,
   },
 ];
@@ -72,20 +68,20 @@ function classify(url) {
   return 'other';
 }
 
-function pngHasMapPixels(buf, mapLeftFrac) {
-  const img = PNG.sync.read(buf);
-  const BG = [11, 12, 14];
-  const far = (i) =>
-    Math.abs(img.data[i] - BG[0]) > 18 || Math.abs(img.data[i + 1] - BG[1]) > 18 || Math.abs(img.data[i + 2] - BG[2]) > 18;
-  const w = img.width;
-  const h = img.height;
-  const x0 = Math.floor(w * mapLeftFrac);
-  for (let y = Math.floor(h * 0.28); y < h * 0.78; y += 18) {
-    for (let x = x0 + Math.floor((w - x0) * 0.15); x < w - 8; x += 18) {
-      if (far((y * w + x) * 4)) return true;
-    }
-  }
-  return false;
+function readBootMarks() {
+  const nav = performance.getEntriesByType('navigation')[0]?.startTime ?? 0;
+  const pick = (name) => {
+    const e = performance.getEntriesByName(name)[0];
+    return e && typeof e.startTime === 'number' ? e.startTime - nav : null;
+  };
+  const mapVisible =
+    pick('playtest-map-visible') ??
+    pick('playtest-map-first-frame');
+  return {
+    mapVisibleMs: mapVisible,
+    mapFirstFrameMs: pick('playtest-map-first-frame'),
+    ttiMs: pick('playtest-tti'),
+  };
 }
 
 async function measure(spec) {
@@ -125,64 +121,38 @@ async function measure(spec) {
     } catch {
       /* private mode */
     }
-    const start = performance.now();
-    window.__bootMetrics = { nav: start, tti: null };
-    const tick = () => {
-      if (window.__bootMetrics.tti == null && window.__playtestQa?.playerAvatar) {
-        try {
-          if (window.__playtestQa.playerAvatar()?.loaded) {
-            window.__bootMetrics.tti = performance.now() - start;
-            return;
-          }
-        } catch {
-          /* not ready */
-        }
-      }
-      requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
   });
 
   const t0 = Date.now();
   let navError = null;
-  let ttfMs = null;
-  const mapLeftFrac = (spec.mapLeft || 0) / (spec.viewport?.width || spec.viewport?.width || 390);
+  let atTti = null;
   try {
     await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: spec.timeout });
-    const deadline = Date.now() + spec.timeout;
-    let ttiSeen = false;
-    let atTti = null;
-    await page
-      .waitForFunction(() => typeof window.__playtestQa?.playerAvatar === 'function', null, {
-        timeout: Math.min(spec.timeout, 120_000),
-      })
-      .catch(() => null);
-    while (Date.now() < deadline) {
-      const m = await page.evaluate(() => window.__bootMetrics).catch(() => null);
-      if (m?.tti != null && !ttiSeen) {
-        ttiSeen = true;
-        atTti = {
-          requests: reqs.length,
-          bytes: reqs.reduce((n, r) => n + (r.bytes || 0), 0),
-          spriteRequests: reqs.filter((r) => classify(r.url) === 'sprite').length,
-        };
-      }
-      if (ttfMs == null) {
-        const handle = await page.$('#game-canvas');
-        const buf = handle
-          ? await handle.screenshot({ type: 'png', animations: 'disabled' })
-          : await page.screenshot({ type: 'png', animations: 'disabled' });
-        if (pngHasMapPixels(buf, mapLeftFrac)) ttfMs = Date.now() - t0;
-      }
-      if (m?.tti != null && (ttfMs != null || Date.now() - t0 > m.tti + 800)) break;
-      await page.waitForTimeout(50);
+    await page.waitForFunction(
+      () => {
+        const q = window.__playtestQa;
+        if (!q?.playerAvatar?.()?.loaded) return false;
+        return typeof performance.getEntriesByName('playtest-tti')[0]?.startTime === 'number';
+      },
+      null,
+      { timeout: Math.min(spec.timeout, 120_000) },
+    );
+    const marks = await page.evaluate(readBootMarks);
+    const ttiSeen = marks.ttiMs != null;
+    if (ttiSeen) {
+      atTti = {
+        requests: reqs.length,
+        bytes: reqs.reduce((n, r) => n + (r.bytes || 0), 0),
+        spriteRequests: reqs.filter((r) => classify(r.url) === 'sprite').length,
+      };
     }
+    spec._marks = marks;
     spec._atTti = atTti;
   } catch (err) {
     navError = String(err);
+    spec._marks = await page.evaluate(readBootMarks).catch(() => null);
   }
   const wall = Date.now() - t0;
-  const metrics = await page.evaluate(() => window.__bootMetrics ?? null).catch(() => null);
   const resources = await page
     .evaluate(() =>
       performance.getEntriesByType('resource').map((e) => ({
@@ -211,6 +181,7 @@ async function measure(spec) {
   await page.screenshot({ path: shot, fullPage: false }).catch(() => {});
   await browser.close();
 
+  const marks = spec._marks ?? {};
   const rtBy = {};
   let rtEncoded = 0;
   let rtTransfer = 0;
@@ -230,8 +201,9 @@ async function measure(spec) {
     tag: spec.tag,
     network: spec.network ? (spec.network.latency === 562.5 ? 'Fast 3G' : 'Fast 4G') : 'unthrottled',
     cpu: spec.cpu,
-    ttfMs,
-    ttiMs: metrics?.tti ?? null,
+    mapVisibleMs: marks.mapVisibleMs ?? null,
+    mapFirstFrameMs: marks.mapFirstFrameMs ?? null,
+    ttiMs: marks.ttiMs ?? null,
     wallMs: wall,
     requests: reqs.length,
     encodedBytes: bytes,
@@ -258,10 +230,10 @@ for (const spec of SPECS) {
   results.push(r);
   const reqN = r.requestsAtTti ?? r.requests;
   const mb = ((r.bytesAtTti ?? r.encodedBytes) / 1024 / 1024).toFixed(2);
+  const mapS = r.mapVisibleMs == null ? '—' : `${(r.mapVisibleMs / 1000).toFixed(2)}s`;
+  const ttiS = r.ttiMs == null ? '—' : `${(r.ttiMs / 1000).toFixed(2)}s`;
   console.log(
-    `  TTF ${r.ttfMs == null ? '—' : `${(r.ttfMs / 1000).toFixed(2)}s`}  TTI ${
-      r.ttiMs == null ? '—' : `${(r.ttiMs / 1000).toFixed(2)}s`
-    }  req ${reqN}  ${mb} MB  sprites ${r.spriteRequests}${r.error ? `  ERR ${r.error}` : ''}${
+    `  map-visible ${mapS}  TTI ${ttiS}  req ${reqN}  ${mb} MB  sprites ${r.spriteRequests}${r.error ? `  ERR ${r.error}` : ''}${
       r.pageErrors?.length ? `  PAGE ${r.pageErrors[0]}` : ''
     }`,
   );

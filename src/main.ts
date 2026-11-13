@@ -354,7 +354,6 @@ async function main(): Promise<void> {
     onEngine: () => scene.jacSetEngine(),
     onView: (mode) => scene.setViewMode(mode),
     onRotate: () => scene.rotateView(),
-    onMapOverview: () => scene.toggleMapOverview(),
     getView: () => {
       const v = scene.getViewMode();
       return { mode: v.mode, overview: v.overview };
@@ -578,7 +577,7 @@ async function main(): Promise<void> {
       } else if (scene.jacHudActive() && !kitDriveMobile) {
         const snap = scene.jacSnapshot();
         const anchors = scene.jacHudAnchors();
-        jacHud.update(snap, anchors, anchors.rear);
+        jacHud.update(snap, anchors);
         if (!personaActive && !sheetOpen && !hidePills && !mapPillsObscured()) labels.setHidden(false);
       } else {
         jacHud.park();
@@ -1009,6 +1008,8 @@ async function main(): Promise<void> {
     setAudioMuted: (muted: boolean) => studio.setMuted(muted),
     voiceLineReady: (id: string) => studio.isVoiceLineReady(id),
     voiceReadyIds: () => studio.qaVoiceReadyIds(),
+    voiceAudible: () => studio.isVoiceAudible(),
+    voiceContextRunning: () => studio.qaAudioContextRunning(),
     playVoiceLine: (id: string) => studio.playLineForced(id),
     primeVoicePreload: () => studio.startVoicePreload(),
     releaseAudioBoot: () => studio.releaseBootHold(),

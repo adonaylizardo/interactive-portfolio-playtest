@@ -32,6 +32,10 @@ function isPhone(): boolean {
   return window.matchMedia('(max-width: 767px)').matches;
 }
 
+function talkThumbDisplayWidth(): number {
+  return isPhone() ? 192 : 256;
+}
+
 function talkRow(item: TalkItem, onOpen: () => void): HTMLElement {
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -41,7 +45,14 @@ function talkRow(item: TalkItem, onOpen: () => void): HTMLElement {
   thumb.setAttribute('aria-hidden', 'true');
   const img = document.createElement('img');
   img.className = 'experience__thumb-img';
-  img.src = talkThumbnailUrl(item) ?? '';
+  const src = talkThumbnailUrl(item, talkThumbDisplayWidth());
+  if (src) {
+    img.src = src;
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.width = isPhone() ? 96 : 128;
+    img.height = isPhone() ? 54 : 72;
+  }
   img.alt = '';
   thumb.append(img);
   const copy = document.createElement('span');
@@ -191,9 +202,54 @@ export function renderChromeExperienceSections(root: HTMLElement, handlers: Chro
   renderWritingsList(root, handlers);
 }
 
+const listMountState = new WeakMap<HTMLElement, { talks: boolean; writings: boolean }>();
+
+function syncExperienceHeads(root: HTMLElement): void {
+  syncSectionHead(root, 'charlas', TALKS_COMING_SOON ? 0 : searchableTalkCount());
+  syncSectionHead(root, 'articulos', writingItemCount());
+}
+
+function ensureLazyContentLists(root: HTMLElement, handlers: ChromeContentHandlers): void {
+  let state = listMountState.get(root);
+  if (!state) {
+    state = { talks: false, writings: false };
+    listMountState.set(root, state);
+  }
+  syncExperienceHeads(root);
+  const mountIfVisible = (listEl: Element, kind: 'talks' | 'writings') => {
+    if (state![kind]) return;
+    const section = listEl.closest('[data-chrome-section]') ?? listEl.parentElement;
+    if (!section) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          if (state![kind]) {
+            io.disconnect();
+            return;
+          }
+          state![kind] = true;
+          if (kind === 'talks') renderTalksList(root, handlers);
+          else renderWritingsList(root, handlers);
+          io.disconnect();
+        }
+      },
+      { root: null, rootMargin: '120px 0px', threshold: 0 },
+    );
+    io.observe(section);
+  };
+  root.querySelectorAll('[data-chrome-charlas-list]').forEach((el) => mountIfVisible(el, 'talks'));
+  root.querySelectorAll('[data-chrome-articulos-list]').forEach((el) => mountIfVisible(el, 'writings'));
+}
+
 export function mountChromeExperienceSections(root: HTMLElement, handlers: ChromeContentHandlers): void {
-  renderChromeExperienceSections(root, handlers);
-  onLangChange(() => renderChromeExperienceSections(root, handlers));
+  ensureLazyContentLists(root, handlers);
+  onLangChange(() => {
+    const state = listMountState.get(root);
+    if (state?.talks) renderTalksList(root, handlers);
+    if (state?.writings) renderWritingsList(root, handlers);
+    else syncExperienceHeads(root);
+  });
 }
 
 export function chromeSectionSelector(section: 'articulos' | 'charlas' | 'casos' | 'logros' | 'contact'): string {

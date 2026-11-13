@@ -17,7 +17,6 @@ export type JacHudCallbacks = {
   onEngine: () => void;
   onView?: (mode: Camera) => void;
   onRotate?: () => void;
-  onMapOverview?: () => void;
   getView?: () => { mode: Camera; overview: boolean };
 };
 
@@ -54,14 +53,11 @@ export class JacHud {
   private barEl: HTMLElement;
   private steerEl: HTMLElement;
   private bubbleEl: HTMLElement;
-  private rearEl: HTMLElement;
   private mini: HTMLCanvasElement;
   private hintEl: HTMLElement;
   private lastHtml = '';
   private lastActAt = 0;
   private hintUntil = 0;
-  private rearFade = 0;
-
   constructor(container: HTMLElement, callbacks: JacHudCallbacks) {
     this.callbacks = callbacks;
     this.root = document.createElement('div');
@@ -76,7 +72,6 @@ export class JacHud {
     this.barEl = this.root.querySelector('.jac-bar')!;
     this.steerEl = this.root.querySelector('.jac-steer')!;
     this.bubbleEl = this.root.querySelector('.jac-bubble')!;
-    this.rearEl = this.root.querySelector('.jac-rear')!;
     this.mini = this.root.querySelector('.jac-dock__mini')!;
     this.hintEl = this.root.querySelector('.jac-hint')!;
     this.applyLang();
@@ -94,14 +89,12 @@ export class JacHud {
     if (this.root.hidden && !document.body.classList.contains('jac-hud-open')) return;
     this.root.hidden = true;
     this.root.setAttribute('inert', '');
-    document.body.classList.remove('jac-info', 'jac-drive', 'jac-rearcam', 'jac-hud-open', 'jac-menu-open');
+    document.body.classList.remove('jac-info', 'jac-drive', 'jac-hud-open', 'jac-menu-open');
     this.bubbleEl.hidden = true;
     this.bubbleEl.style.transform = '';
     this.hintEl.hidden = true;
     this.lastHtml = '';
     this.snap = null;
-    this.rearFade = 0;
-    this.rearEl.style.opacity = '0';
   }
 
   update(
@@ -111,7 +104,6 @@ export class JacHud {
       bubble: { x: number; y: number } | null;
       follow: { x: number; y: number };
     },
-    rearBlit?: { canvas: HTMLCanvasElement; sx: number; sy: number; sw: number; sh: number } | null,
   ): void {
     const enteredDrive = snap?.mode === 'drive' && this.snap?.mode !== 'drive';
     this.snap = snap;
@@ -127,15 +119,6 @@ export class JacHud {
     document.body.classList.toggle('jac-menu-open', snap.mode === 'menu');
     document.body.classList.toggle('jac-info', snap.mode === 'info');
     document.body.classList.toggle('jac-drive', snap.mode === 'drive');
-    document.body.classList.toggle('jac-rearcam', snap.rearCam);
-    if (!snap.rearCam) {
-      this.rearFade = 0;
-      this.rearEl.classList.remove('is-on');
-      this.rearEl.hidden = true;
-      this.rearEl.style.opacity = '0';
-      this.rearEl.setAttribute('aria-hidden', 'true');
-    }
-    this.tickRearFade(snap.rearCam);
     this.render(snap);
     if (anchors.menu && snap.mode === 'menu') {
       const phone = this.mobile;
@@ -159,7 +142,6 @@ export class JacHud {
     const showHint = !this.mobile && snap.mode === 'drive' && performance.now() < this.hintUntil;
     this.hintEl.hidden = !showHint;
     if (!this.mobile && (snap.mode === 'drive' || snap.mode === 'info')) this.drawMini(anchors.follow);
-    void rearBlit;
   }
 
   qaRoot(): HTMLElement {
@@ -198,7 +180,6 @@ export class JacHud {
       else if (act === 'toggle') this.callbacks.onToggle(t.dataset.val as JacToggleId);
       else if (act === 'dial') this.cycleLights();
       else if (act === 'view') this.callbacks.onView?.(t.dataset.val as Camera);
-      else if (act === 'overview') this.callbacks.onMapOverview?.();
     };
     this.root.addEventListener('pointerup', (e) => {
       if ('button' in e && (e as PointerEvent).button !== 0) return;
@@ -239,14 +220,8 @@ export class JacHud {
     this.steerEl.hidden = true;
     this.bubbleEl.hidden = true;
     this.root.classList.toggle('jac-hud--drive', snap.mode === 'drive');
-    this.rearEl.hidden = !snap.rearCam;
-    this.rearEl.classList.toggle('is-on', snap.rearCam);
-    if (this.rearFade < 0.02) this.rearEl.setAttribute('aria-hidden', 'true');
-    else this.rearEl.removeAttribute('aria-hidden');
     this.barEl.classList.toggle('is-bump', snap.bump > 0.08);
     this.dockEl.classList.toggle('is-bump', snap.bump > 0.08);
-    this.rearEl.classList.toggle('jac-rear--phone', phone);
-    this.rearEl.classList.toggle('jac-rear--turn', Math.abs(snap.steering) > 0.25);
     this.steerEl.classList.toggle('is-live', snap.mph > 0);
     this.dockEl.dataset.mode = snap.mode;
     this.fillDash(snap, phone);
@@ -316,8 +291,6 @@ export class JacHud {
       const mode = (el as HTMLElement).dataset.val as Camera;
       el.classList.toggle('is-on', !view.overview && mode === view.mode);
     });
-    const ov = this.dockEl.querySelector('[data-jac="overview"]');
-    if (ov) ov.classList.toggle('is-on', view.overview);
   }
 
   private needleDeg(value: number, max: number, from: number, to: number): number {
@@ -404,17 +377,6 @@ export class JacHud {
     `;
   }
 
-  private tickRearFade(on: boolean): void {
-    if (!on) {
-      this.rearFade = 0;
-      this.rearEl.style.opacity = '0';
-      return;
-    }
-    this.rearFade = 1;
-    this.rearEl.style.removeProperty('opacity');
-    this.rearEl.style.removeProperty('transition');
-  }
-
   private drawMini(follow: { x: number; y: number }): void {
     const ctx = this.mini.getContext('2d');
     if (!ctx) return;
@@ -479,7 +441,6 @@ export class JacHud {
           <div class="jac-dock__views" role="group">
             <button type="button" class="jac-dock__view" data-jac="view" data-val="isometrica" aria-label="${t('chrome.isometric')}">${iconSvg('cube')}</button>
             <button type="button" class="jac-dock__view" data-jac="view" data-val="cenital" aria-label="${t('chrome.topdown')}">${iconSvg('grid')}</button>
-            <button type="button" class="jac-dock__view" data-jac="overview" aria-label="${t('chrome.map')}">${iconSvg('map')}</button>
           </div>
         </div>
       </section>
@@ -496,26 +457,6 @@ export class JacHud {
       <div class="jac-steer" hidden aria-hidden="true">${glyph('wheel')}</div>
       <div class="jac-bubble" hidden></div>
       <div class="jac-hint" hidden></div>
-      <div class="jac-rear" hidden>
-        <div class="jac-rear__tools">
-          <span class="jac-icon-btn" aria-hidden="true">${glyph('search')}</span>
-          <span class="jac-icon-btn" aria-hidden="true">${glyph('mute')}</span>
-        </div>
-        <canvas class="jac-rear__view" width="640" height="220" aria-hidden="true"></canvas>
-        <svg class="jac-rear__guides jac-rear__guides--straight" viewBox="0 0 320 110" aria-hidden="true">
-          <line x1="70" y1="18" x2="118" y2="78" stroke="#edeef0" stroke-width="1.5"/>
-          <line x1="250" y1="18" x2="202" y2="78" stroke="#edeef0" stroke-width="1.5"/>
-          <line x1="160" y1="12" x2="160" y2="78" stroke="#edeef0" stroke-width="1.2" stroke-dasharray="3 5"/>
-          <line x1="118" y1="78" x2="202" y2="78" stroke="#e23b3b" stroke-width="2"/>
-        </svg>
-        <svg class="jac-rear__guides jac-rear__guides--curve" viewBox="0 0 320 110" aria-hidden="true">
-          <path d="M70 18 C 90 40, 70 62, 118 78" fill="none" stroke="#edeef0" stroke-width="1.5" stroke-dasharray="2 4"/>
-          <path d="M160 12 C 132 40, 140 62, 160 78" fill="none" stroke="#edeef0" stroke-width="1.2" stroke-dasharray="3 5"/>
-          <line x1="250" y1="18" x2="202" y2="78" stroke="#edeef0" stroke-width="1.5"/>
-          <line x1="118" y1="78" x2="202" y2="78" stroke="#e23b3b" stroke-width="2"/>
-        </svg>
-        <span class="jac-rear__batt" aria-hidden="true">${glyph('battery')}</span>
-      </div>
     `;
   }
 }

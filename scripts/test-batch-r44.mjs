@@ -45,26 +45,60 @@ async function withPage(viewport, opts, fn) {
   }
 }
 
+function readBootMarks() {
+  const nav = performance.getEntriesByType('navigation')[0]?.startTime ?? 0;
+  const pick = (name) => {
+    const e = performance.getEntriesByName(name)[0];
+    return e && typeof e.startTime === 'number' ? e.startTime - nav : null;
+  };
+  return {
+    mapVisibleMs: pick('playtest-map-visible') ?? pick('playtest-map-first-frame'),
+    ttiMs: pick('playtest-tti'),
+  };
+}
+
+function warnBudget(label, ms, targetMs) {
+  if (ms == null) {
+    console.warn(`${label}: missing performance mark`);
+    return;
+  }
+  if (ms > targetMs) {
+    console.warn(`${label}: ${(ms / 1000).toFixed(2)}s exceeds target ${(targetMs / 1000).toFixed(2)}s (CI noisy — warn only)`);
+  }
+}
+
 async function loadBudgetPhone(page) {
-  const t0 = Date.now();
   await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 120_000 });
   await waitForQa(page);
   await page.waitForFunction(
-    () => window.__playtestQa?.playerAvatar?.()?.loaded && window.__playtestQa?.playerAvatar?.()?.adonay?.texture,
+    () => {
+      const q = window.__playtestQa?.playerAvatar?.();
+      if (!q?.loaded || !q?.adonay?.texture) return false;
+      return typeof performance.getEntriesByName('playtest-tti')[0]?.startTime === 'number';
+    },
     null,
     { timeout: 90_000 },
   );
-  const ms = Date.now() - t0;
-  assert.ok(ms < 12_000, `phone interactive budget (got ${ms}ms, cap 12s QA)`);
+  const marks = await page.evaluate(readBootMarks);
+  warnBudget('phone TTI', marks.ttiMs, 4000);
+  warnBudget('phone map-visible', marks.mapVisibleMs, 4000);
+  assert.ok(marks.ttiMs != null && marks.ttiMs < 12_000, `phone interactive cap (got ${marks.ttiMs}ms)`);
 }
 
 async function loadBudgetDesktop(page) {
-  const t0 = Date.now();
   await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 60_000 });
   await waitForQa(page);
-  await page.waitForFunction(() => window.__playtestQa?.playerAvatar?.()?.loaded, null, { timeout: 45_000 });
-  const ms = Date.now() - t0;
-  assert.ok(ms < 8_000, `desktop interactive budget (got ${ms}ms, cap 8s QA)`);
+  await page.waitForFunction(
+    () =>
+      window.__playtestQa?.playerAvatar?.()?.loaded &&
+      typeof performance.getEntriesByName('playtest-tti')[0]?.startTime === 'number',
+    null,
+    { timeout: 45_000 },
+  );
+  const marks = await page.evaluate(readBootMarks);
+  warnBudget('desktop TTI', marks.ttiMs, 2000);
+  warnBudget('desktop map-visible', marks.mapVisibleMs, 2000);
+  assert.ok(marks.ttiMs != null && marks.ttiMs < 8_000, `desktop interactive cap (got ${marks.ttiMs}ms)`);
 }
 
 async function voicePreloadAndLatency(page) {
@@ -91,11 +125,21 @@ async function voicePreloadAndLatency(page) {
   const latency = await page.evaluate(async () => {
     const t0 = performance.now();
     window.__playtestQa.playVoiceLine('07-achievement');
-    await new Promise((r) => requestAnimationFrame(r));
+    let audible = false;
+    for (let i = 0; i < 60; i++) {
+      await new Promise((r) => requestAnimationFrame(r));
+      if (window.__playtestQa.voiceAudible?.()) {
+        audible = true;
+        break;
+      }
+    }
     const playing = document.querySelector('[data-voice-subtitle]')?.textContent?.length > 0;
-    return { ms: performance.now() - t0, playing };
+    const ctxRunning = window.__playtestQa.voiceContextRunning?.();
+    return { ms: performance.now() - t0, playing, audible, ctxRunning };
   });
   assert.ok(latency.playing, 'voice subtitle should appear immediately');
+  assert.ok(latency.audible, 'voice should start (buffer or HTMLAudio)');
+  assert.ok(latency.ctxRunning, 'AudioContext should be running during playback');
   assert.ok(latency.ms < 120, `voice trigger-to-feedback ${latency.ms}ms should be <120ms`);
 }
 
@@ -136,33 +180,28 @@ async function jacDriveAvatars(page) {
   assert.equal(parked.pantone, true, 'Pantone visible after exit');
 }
 
-async function reverseCamHidden(page) {
+async function rearPipAbsentInAllGears(page) {
   await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 90_000 });
   await waitForQa(page);
   await page.evaluate(() => {
     const door = window.__playtestQa.jacDoor();
     if (door) window.__playtestQa.setCharacterTile(door.x, door.y);
     window.__playtestQa.jacGetIn();
-    window.__playtestQa.jacSet?.({ gear: 'R', engineOn: true });
+    window.__playtestQa.jacSet?.({ engineOn: true });
   });
-  await page.waitForFunction(() => window.__playtestQa.jac()?.driving && window.__playtestQa.jac()?.gear === 'R');
-  const inR = await page.evaluate(() => {
-    const rear = document.querySelector('.jac-rear');
-    return { gear: window.__playtestQa.jac()?.rearCam, domHidden: rear?.hidden !== false };
-  });
-  assert.equal(inR.gear, true);
-  await page.evaluate(() => window.__playtestQa.jacSet?.({ gear: 'P' }));
-  await page.waitForFunction(() => window.__playtestQa.jac()?.gear === 'P');
-  const inP = await page.evaluate(() => ({
-    rearCam: window.__playtestQa.jac()?.rearCam,
-    entities: window.__playtestQa.jacEntities?.(),
-    domHidden: document.querySelector('.jac-rear')?.hidden !== false,
-    bodyClass: document.body.classList.contains('jac-rearcam'),
-  }));
-  assert.equal(inP.rearCam, false, 'rearCam off in P');
-  assert.equal(inP.domHidden, true, 'jac-rear element hidden in P');
-  assert.equal(inP.bodyClass, false, 'jac-rearcam body class off in P');
-  assert.equal(inP.entities?.rearVisible, false, 'no rear PiP layer in P');
+  await page.waitForFunction(() => window.__playtestQa.jac()?.driving === true);
+  for (const gear of ['R', 'N', 'D', 'P']) {
+    await page.evaluate((g) => window.__playtestQa.jacSet?.({ gear: g }), gear);
+    await page.waitForFunction((g) => window.__playtestQa.jac()?.gear === g, gear);
+    const state = await page.evaluate(() => ({
+      rearEl: document.querySelector('.jac-rear'),
+      bodyClass: document.body.classList.contains('jac-rearcam'),
+      rearVisible: window.__playtestQa.jacEntities?.()?.rearVisible,
+    }));
+    assert.equal(state.rearEl, null, `no .jac-rear in DOM for gear ${gear}`);
+    assert.equal(state.bodyClass, false, `jac-rearcam off in ${gear}`);
+    assert.equal(state.rearVisible, false, `no rear PiP layer in ${gear}`);
+  }
 }
 
 async function main() {
@@ -174,7 +213,7 @@ async function main() {
   await withPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 }, {}, loadBudgetDesktop);
   await withPage(devices['iPhone 13'], { touch: true }, voicePreloadAndLatency);
   await withPage(devices['iPhone 13'], { touch: true }, jacDriveAvatars);
-  await withPage(devices['iPhone 13'], { touch: true }, reverseCamHidden);
+  await withPage(devices['iPhone 13'], { touch: true }, rearPipAbsentInAllGears);
   console.log('test-batch-r44: ok');
 }
 

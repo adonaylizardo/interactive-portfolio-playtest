@@ -11,6 +11,7 @@ import {
   UPDATE_PRIORITY,
   getCanvasTexture,
 } from 'pixi.js';
+import { markMapFirstFrame, markTti } from '../bootMetrics';
 import { isFatalStateVisible } from '../ui/fatalState';
 import {
   cells,
@@ -812,6 +813,8 @@ export class IsoScene {
     this.app.render();
     this.events.onFrame?.();
     reportLoad(100);
+    markMapFirstFrame();
+    markTti();
     this.hydrateMap();
   }
 

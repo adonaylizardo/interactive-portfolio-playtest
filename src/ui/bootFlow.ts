@@ -1,3 +1,4 @@
+import { markMapVisible } from '../bootMetrics';
 import { getLang, onLangChange, setLang, t } from './i18n';
 import { isReadingHash, navigateReading, parseReadingRoute } from './readingRoute';
 import { parseInteriorFromHash } from '../camera/hash';
@@ -37,6 +38,9 @@ export class BootFlow {
   private headlineEl: HTMLElement | null = null;
   private choiceResolve: ((c: WelcomeChoice) => void) | null = null;
   private progress = 0;
+  private targetProgress = 0;
+  private displayProgress = 0;
+  private progressRaf: number | null = null;
 
   mount(): void {
     const existing = document.getElementById('boot');
@@ -97,19 +101,41 @@ export class BootFlow {
   }
 
   setProgress(pct: number): void {
-    this.progress = Math.max(this.progress, Math.min(100, Math.round(pct)));
+    this.targetProgress = Math.max(this.targetProgress, Math.min(100, Math.round(pct)));
+    if (this.progressRaf == null) this.tickProgress();
+  }
+
+  private tickProgress(): void {
+    const gap = this.targetProgress - this.displayProgress;
+    if (Math.abs(gap) < 0.35) {
+      this.displayProgress = this.targetProgress;
+    } else {
+      this.displayProgress += Math.max(0.35, gap * 0.12);
+    }
+    this.progress = Math.round(Math.min(100, this.displayProgress));
     if (this.barFill) this.barFill.style.width = `${this.progress}%`;
     if (this.pctEl) this.pctEl.textContent = `${this.progress}%`;
     const track = this.root?.querySelector('.boot-flow__track');
     track?.setAttribute('aria-valuenow', String(this.progress));
+    if (this.displayProgress < this.targetProgress - 0.1) {
+      this.progressRaf = requestAnimationFrame(() => this.tickProgress());
+    } else {
+      this.progressRaf = null;
+    }
+  }
+
+  private hideLoadingScrim(): void {
+    markMapVisible();
+    this.loadingEl?.setAttribute('hidden', '');
+    document.body.classList.remove('boot-loading');
   }
 
   /** Loading hit 100% — show welcome or dismiss immediately. */
   async finishLoading(skipWelcome: boolean): Promise<WelcomeChoice | null> {
     this.setProgress(100);
     if (skipWelcome) {
-      this.loadingEl?.setAttribute('hidden', '');
-      document.body.classList.remove('boot-loading', 'boot-welcome');
+      this.hideLoadingScrim();
+      document.body.classList.remove('boot-welcome');
       this.root?.remove();
       this.root = null;
       return null;
@@ -117,8 +143,7 @@ export class BootFlow {
     await new Promise<void>((r) => window.requestAnimationFrame(() => r()));
     this.loadingEl?.classList.add('boot-flow__loading--out');
     await new Promise<void>((r) => window.setTimeout(r, 260));
-    this.loadingEl?.setAttribute('hidden', '');
-    document.body.classList.remove('boot-loading');
+    this.hideLoadingScrim();
     await new Promise<void>((r) => window.requestAnimationFrame(() => r()));
     this.scrimEl?.removeAttribute('hidden');
     this.welcomeEl?.removeAttribute('hidden');

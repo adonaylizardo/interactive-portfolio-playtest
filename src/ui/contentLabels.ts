@@ -201,9 +201,19 @@ export function talkYoutubeId(item: TalkItem): string | null {
   return fromUrl?.[1] ?? null;
 }
 
-/** Prefer YouTube hqdefault when a YouTube id exists; otherwise use data thumbnail. */
-export function talkThumbnailUrl(item: TalkItem): string | null {
+/** Talk row thumbnail (~2× chrome list thumb width). Substack originals go through substackcdn resize. */
+export function talkThumbnailUrl(item: TalkItem, displayW = 256): string | null {
   const yt = talkYoutubeId(item);
-  if (yt) return `https://i.ytimg.com/vi/${yt}/hqdefault.jpg`;
-  return item.thumbnail ?? null;
+  if (yt) {
+    return displayW <= 200
+      ? `https://i.ytimg.com/vi/${yt}/mqdefault.jpg`
+      : `https://i.ytimg.com/vi/${yt}/hqdefault.jpg`;
+  }
+  const thumb = item.thumbnail ?? null;
+  if (!thumb) return null;
+  if (/substack-post-media|substackcdn|substack\.com/i.test(thumb)) {
+    const w = Math.min(512, Math.max(96, displayW));
+    return `https://substackcdn.com/image/fetch/w_${w},c_limit,f_auto,q_auto:good/${encodeURIComponent(thumb)}`;
+  }
+  return thumb;
 }
