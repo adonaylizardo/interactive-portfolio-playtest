@@ -63,6 +63,8 @@ const EXIT_MAX_TRAVEL = 0.35;
 const BUMP_AMP = 0.22;
 const FRICTION_TILES_S2 = 6.5;
 const TURN_RATE = 2.4;
+/** Stick steering at full lock: tightest circle the van's centre can drive (tiles). */
+const MIN_TURN_RADIUS_TILES = 2;
 const IDLE_RPM = 700;
 const MOVE_RPM = 2250;
 const MOVE_MPH = 10;
@@ -438,6 +440,7 @@ export class JacT9 {
       this.exitFrom = null;
       this.clearDrivePath();
       this.applyParkedSolid(false);
+      this.ensureLegalDrivePose();
       this.precomputeDoorSits();
       this.schedulePathsFromHere();
     } else if (wasDrive) {
@@ -1334,10 +1337,8 @@ export class JacT9 {
     this.applyThrottle(dt, throttle);
 
     const moving = Math.abs(this.vel) > 0.08;
-    const canTurn = moving || live || following;
     const turningInPlace = following && Math.abs(this.steering) > 0.35 && Math.abs(this.vel) < 0.3;
-    const canSteer = following ? canTurn : moving;
-    if (canSteer && Math.abs(this.steering) > 0.08) {
+    if (following && Math.abs(this.steering) > 0.08) {
       const sign = Math.abs(this.vel) > 0.08 ? (this.vel >= 0 ? 1 : -1) : throttle >= 0 ? 1 : -1;
       this.applyHeading(this.heading + this.steering * TURN_RATE * sign * dt);
     }
@@ -1363,7 +1364,7 @@ export class JacT9 {
         const a = this.heading * (Math.PI / 2);
         const nx = Math.cos(a) * this.vel * dt;
         const ny = Math.sin(a) * this.vel * dt;
-        const adv = this.advanceAlongHeading(this.cx, this.cy, nx, ny);
+        const adv = this.advanceManual(this.cx, this.cy, nx, ny);
         next = { x: adv.x, y: adv.y };
         slid = adv.moved;
         wantStep = Math.hypot(nx, ny);
@@ -1412,13 +1413,17 @@ export class JacT9 {
         }
       }
       if (next.x !== this.cx || next.y !== this.cy) {
+        const before = following ? 0 : this.poseBlocked(ox, oy, this.dir);
+        const travel = (next.x - ox) * Math.cos(this.heading * (Math.PI / 2)) + (next.y - oy) * Math.sin(this.heading * (Math.PI / 2));
         this.cx = next.x;
         this.cy = next.y;
-        if (!following && this.footprintOverlapsBlocked()) {
+        if (!following && this.poseBlocked(this.cx, this.cy, this.dir) > before) {
           this.cx = ox;
           this.cy = oy;
           this.vel = 0;
           this.mph = 0;
+        } else if (!following) {
+          this.steerByTravel(travel);
         }
         this.occupy(this.driveCells());
         this.layout();
@@ -2115,21 +2120,131 @@ export class JacT9 {
     return true;
   }
 
+  /** Live 5×3 / 3×5 collision cells: always the drawn facing, never a rounded heading. */
   driveFootprintCells(): [number, number][] {
-    return this.parkCellsAt(this.cx, this.cy, dirFromHeading(this.heading));
+    return this.parkCellsAt(this.cx, this.cy, this.dir);
   }
 
   footprintOverlapsBlocked(): boolean {
-    for (const [x, y] of this.driveFootprintCells()) {
-      if (PROP_CELLS.has(k(x, y))) return true;
-      const b = getBuildingAt(x, y);
-      if (!b || b.id === JAC_ID) continue;
-      if (b.door && b.door.x === x && b.door.y === y) continue;
-      if (b.name === 'muro' || b.name === 'obelisco') continue;
-      const c = cells[y]?.[x];
-      if (c && (c.groundId.includes('building/footprint') || !c.walkable)) return true;
+    return this.poseBlocked(this.cx, this.cy, this.dir) > 0;
+  }
+
+  /** One cell of the manual-drive footprint: on the map, off props, kerbs and building mass. */
+  private driveCellOpen(x: number, y: number): boolean {
+    if (x < 0 || y < 0 || x >= MAP_WIDTH || y >= MAP_HEIGHT) return false;
+    const key = k(x, y);
+    if (PROP_CELLS.has(key)) return false;
+    const own = this.claimed.get(key);
+    if (own !== undefined) return own;
+    const c = cells[y]?.[x];
+    if (!c) return false;
+    if (c.groundId.includes('borde') || c.groundId.includes('building/footprint')) return false;
+    return c.walkable;
+  }
+
+  /** Blocked cells under the exact 5×3 / 3×5 at a pose (0 = legal). */
+  private poseBlocked(cx: number, cy: number, dir: FacingDir): number {
+    let n = 0;
+    for (const [x, y] of this.parkCellsAt(cx, cy, dir)) {
+      if (!this.driveCellOpen(x, y)) n += 1;
     }
-    return false;
+    return n;
+  }
+
+  /**
+   * Stick driving moves only along the heading in ≤0.14-tile hops. A hop is kept while the
+   * footprint stays legal; from an already-clipped pose it may move as long as it never
+   * covers more blocked cells, so a bad spawn can always drive out.
+   */
+  private advanceManual(
+    cx: number,
+    cy: number,
+    nx: number,
+    ny: number,
+  ): { x: number; y: number; moved: number; blocked: boolean } {
+    const mag = Math.hypot(nx, ny);
+    if (mag < 1e-6) return { x: cx, y: cy, moved: 0, blocked: false };
+    const allowed = this.poseBlocked(cx, cy, this.dir);
+    const steps = Math.max(1, Math.ceil(mag / 0.14));
+    const sx = nx / steps;
+    const sy = ny / steps;
+    let x = cx;
+    let y = cy;
+    let blocked = false;
+    for (let i = 0; i < steps; i++) {
+      if (this.poseBlocked(x + sx, y + sy, this.dir) > allowed) {
+        blocked = true;
+        break;
+      }
+      x += sx;
+      y += sy;
+    }
+    return { x, y, moved: Math.hypot(x - cx, y - cy), blocked };
+  }
+
+  /**
+   * Bicycle-style yaw: heading turns by arc length travelled, so a van that did not move
+   * cannot rotate. A facing swap (5×3 ↔ 3×5) is kept only if the new footprint fits.
+   */
+  private steerByTravel(travel: number): void {
+    if (Math.abs(this.steering) <= 0.08 || Math.abs(travel) < 1e-6) return;
+    const want = wrapHeading(this.heading + (this.steering * travel) / (MIN_TURN_RADIUS_TILES * (Math.PI / 2)));
+    const visual = this.facingWithHysteresis(want);
+    if (visual === this.dir) {
+      this.heading = want;
+      return;
+    }
+    if (this.poseBlocked(this.cx, this.cy, visual) === 0) {
+      this.heading = want;
+      this.dir = visual;
+      return;
+    }
+    const idx = dirIndex(this.dir);
+    const lim = 0.5 + DIR_HYSTERESIS - 1e-3;
+    this.heading = wrapHeading(idx + Math.max(-lim, Math.min(lim, headingDelta(idx, want))));
+  }
+
+  /** Straight-ahead travel (tiles, capped) before the footprint would clip something. */
+  private forwardRoom(cx: number, cy: number, dir: FacingDir, cap: number): number {
+    const v = DIR_VEC[dir];
+    let room = 0;
+    for (let d = 0.25; d <= cap; d += 0.25) {
+      if (this.poseBlocked(cx + v.x * d, cy + v.y * d, dir) > 0) break;
+      room = d;
+    }
+    return room;
+  }
+
+  /**
+   * Get in / spawn: if the 5×3 already clips something, move to the cheapest legal pose
+   * (distance, then keeping the facing, then having room to drive off) within 6 tiles.
+   */
+  ensureLegalDrivePose(): boolean {
+    if (this.poseBlocked(this.cx, this.cy, this.dir) === 0) return false;
+    let best: { x: number; y: number; dir: FacingDir; cost: number } | null = null;
+    for (let r = 0.25; r <= 6; r += 0.25) {
+      if (best && r > best.cost) break;
+      for (let i = 0; i < 24; i++) {
+        const a = (Math.PI * 2 * i) / 24;
+        const x = this.cx + Math.cos(a) * r;
+        const y = this.cy + Math.sin(a) * r;
+        for (const dir of DIRS) {
+          if (this.poseBlocked(x, y, dir) !== 0) continue;
+          const turn = dir === this.dir ? 0 : 1.5;
+          if (best && r + turn >= best.cost) continue;
+          const cost = r + turn + (this.forwardRoom(x, y, dir, 2) < 2 ? 4 : 0);
+          if (!best || cost < best.cost) best = { x, y, dir, cost };
+        }
+      }
+    }
+    if (!best) return false;
+    this.cx = best.x;
+    this.cy = best.y;
+    this.dir = best.dir;
+    this.heading = dirIndex(best.dir);
+    this.occupy(this.driveCells());
+    this.layout();
+    return true;
   }
 
   qaFootprintBlocked(): boolean {
@@ -2146,43 +2261,8 @@ export class JacT9 {
     return true;
   }
 
-  private advanceAlongHeading(
-    cx: number,
-    cy: number,
-    nx: number,
-    ny: number,
-  ): { x: number; y: number; moved: number; blocked: boolean } {
-    const mag = Math.hypot(nx, ny);
-    if (mag < 1e-6) return { x: cx, y: cy, moved: 0, blocked: false };
-    const steps = Math.max(1, Math.ceil(mag / 0.14));
-    let x = cx;
-    let y = cy;
-    const sx = nx / steps;
-    const sy = ny / steps;
-    let blocked = false;
-    for (let i = 0; i < steps; i++) {
-      const tx = x + sx;
-      const ty = y + sy;
-      if (this.canSit(tx, ty)) {
-        x = tx;
-        y = ty;
-      } else {
-        blocked = true;
-        break;
-      }
-    }
-    return { x, y, moved: Math.hypot(x - cx, y - cy), blocked };
-  }
-
-  /** Footprint facing while driving: stick uses heading; auto path uses committed dir. */
-  private driveFacingDir(): FacingDir {
-    const onPath = this.drivePath.length > 0 || !!this.driveGoal;
-    if (this.driving && !this.pendingExit && !onPath) return dirFromHeading(this.heading);
-    return this.dir;
-  }
-
   private canSit(cx: number, cy: number): boolean {
-    return this.sitWith(cx, cy, this.driveFacingDir());
+    return this.sitWith(cx, cy, this.dir);
   }
 
   /** Current pose with an explicit facing — used to reject a turn that would clip. */
