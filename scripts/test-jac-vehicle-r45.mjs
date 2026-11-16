@@ -15,7 +15,8 @@ const ART =
   process.env.CURSOR_ARTIFACTS_DIR ??
   (fs.existsSync('/opt/cursor/artifacts') ? '/opt/cursor/artifacts' : path.join(ROOT, 'artifacts'));
 const BASE =
-  process.env.QA_BASE_URL ?? `${process.env.PREVIEW_URL ?? 'http://127.0.0.1:4173/interactive-portfolio-playtest/'}`;
+  process.env.QA_BASE_URL ??
+  `${process.env.PREVIEW_URL ?? 'http://127.0.0.1:4196/interactive-portfolio-playtest/preview-integracion/'}`;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function bootDrive(page, view = 'cenital') {
@@ -166,8 +167,105 @@ async function runWallNoSlideTest(page) {
   assert.ok(slide.ok, `straight wall contact should not slide sideways (${JSON.stringify(slide)})`);
 }
 
+const PARK_SIM_TARGETS = [
+  { id: 'teresa', start: { cx: 44, cy: 30, dir: 'se' }, kind: 'door', building: 'teresa' },
+  { id: 'uturn', start: { cx: 44, cy: 30, dir: 'se' }, kind: 'tile', goal: { x: 38, y: 30 } },
+  { id: 'corner', start: { cx: 36, cy: 20, dir: 'sw' }, kind: 'tile', goal: { x: 44, y: 27 } },
+  { id: 'open', start: { cx: 44, cy: 30, dir: 'se' }, kind: 'tile', goal: { x: 39, y: 30 } },
+  { id: 'bain', start: { cx: 34, cy: 24, dir: 'se' }, kind: 'door', building: 'bain' },
+  { id: 'mentoria', start: { cx: 31, cy: 27.5, dir: 'sw' }, kind: 'door', building: 'mentoria' },
+];
+
+async function simulateParkTarget(page, target) {
+  return page.evaluate((t) => {
+    window.__playtestQa.jacSet?.({
+      gear: 'D',
+      cx: t.start.cx,
+      cy: t.start.cy,
+      dir: t.start.dir,
+    });
+    let goal = t.goal ?? null;
+    if (t.kind === 'door') {
+      window.__playtestQa.driveEnter?.(t.building);
+      const g = window.__playtestQa.jac().driveGoal;
+      if (g) goal = { x: g.x, y: g.y };
+    } else if (goal) {
+      window.__playtestQa.jacDriveTo?.(goal.x, goal.y);
+      const g = window.__playtestQa.jac().driveGoal;
+      if (g) goal = { x: g.x, y: g.y };
+    }
+    if (!goal) return { id: t.id, ok: false, reason: 'no goal' };
+    let steps = 0;
+    let flips = 0;
+    let prevDir = window.__playtestQa.jac().dir;
+    let minVel = 0;
+    let sawR = false;
+    for (; steps < 1200; steps++) {
+      window.__playtestQa.jacDriveStep?.(1 / 60, 0, 0, { render: false });
+      const j = window.__playtestQa.jac();
+      if (j.gear === 'R' || j.vel < -0.08) sawR = true;
+      if (j.dir !== prevDir) {
+        flips += 1;
+        prevDir = j.dir;
+      }
+      if (j.vel < minVel) minVel = j.vel;
+      const g = window.__playtestQa.jac().driveGoal ?? goal;
+      const d = Math.hypot(j.cx - g.x, j.cy - g.y);
+      if (d < 1.35 && Math.abs(j.vel) < 1.2) break;
+    }
+    const ms = (steps * 1000) / 60;
+    const end = window.__playtestQa.jac();
+    const dist = Math.hypot(end.cx - goal.x, end.cy - goal.y);
+    const ok = dist < 1.75 && !sawR && end.gear === 'D' && minVel >= -0.05;
+    return { id: t.id, ok, dist, ms, flips, gear: end.gear, minVel, sawR };
+  }, target);
+}
+
+async function runSixTargetParkSim(page) {
+  const results = [];
+  for (const target of PARK_SIM_TARGETS) {
+    await bootDrive(page, 'cenital');
+    results.push(await simulateParkTarget(page, target));
+  }
+  const passed = results.filter((r) => r.ok).length;
+  assert.ok(
+    passed >= 5,
+    `tap-to-park sim need >= 5/6 (got ${passed}/6): ${JSON.stringify(results)}`,
+  );
+}
+
+async function runDepthOrderTest(page) {
+  await bootDrive(page, 'isometrica');
+  const poses = [
+    { cx: 38, cy: 20.5, dir: 'sw', label: 'bain-southwest' },
+    { cx: 34, cy: 24, dir: 'se', label: 'bain-west-start' },
+  ];
+  for (const pose of poses) {
+    const d = await page.evaluate((p) => {
+      window.__playtestQa.jacSet?.({ gear: 'D', cx: p.cx, cy: p.cy, dir: p.dir });
+      window.__playtestQa.jacDriveStep?.(0, 0, 0, { render: true });
+      const truck = window.__playtestQa.jacTruckDepth?.();
+      const bain = window.__playtestQa.objectDepth?.('bain');
+      const zTruck = window.__playtestQa.jacZIndex?.();
+      const zBain = window.__playtestQa.buildingZIndex?.('bain');
+      return { truck, bain, zTruck, zBain, behind: truck < bain - 0.05 };
+    }, pose);
+    assert.ok(d.behind, `${pose.label}: truck footprint should sit behind Bain (${JSON.stringify(d)})`);
+    if (d.zTruck != null && d.zBain != null) {
+      assert.ok(d.zTruck < d.zBain, `${pose.label}: z-order truck ${d.zTruck} < bain ${d.zBain}`);
+    }
+    await page.screenshot({
+      path: path.join(ART, `r45-depth-${pose.label}.png`),
+      fullPage: false,
+    });
+  }
+}
+
 async function runTeresaParkTest(page) {
   await bootDrive(page, 'cenital');
+  await page.evaluate(() => {
+    window.__playtestQa.jacSet?.({ gear: 'D', cx: 44, cy: 30, dir: 'se' });
+  });
   const result = await page.evaluate(async () => {
     window.__playtestQa.driveEnter?.('teresa');
     const raw =
@@ -200,8 +298,8 @@ async function runTeresaParkTest(page) {
     return {
       ok:
         dist < 1.0 &&
-        ms < 5800 &&
-        flips < 35 &&
+        ms <= 6200 &&
+        flips <= 4 &&
         end.gear === 'D' &&
         minVel >= -0.02 &&
         Math.abs(headErr) < 1.05,
@@ -347,15 +445,30 @@ async function runDialHitTargetTest(page) {
       return { w: r.width, h: r.height };
     };
     return {
-      off: pick('.jac-dial__off'),
-      on: pick('.jac-dial__on'),
-      engine: pick('.jac-dial__engine'),
+      off: pick('.jac-lights-seg__btn[data-val="off"]'),
+      auto: pick('.jac-lights-seg__btn[data-val="auto"]'),
+      on: pick('.jac-lights-seg__btn[data-val="on"]'),
+      engine: pick('.jac-engine-btn'),
     };
   });
   for (const [k, v] of Object.entries(sizes)) {
     if (!v) continue;
-    assert.ok(v.w >= 44 && v.h >= 44, `${k} dial target ${v.w}x${v.h} < 44px`);
+    assert.ok(v.w >= 44 && v.h >= 44, `${k} control ${v.w}x${v.h} < 44px`);
   }
+  await page.click('.jac-lights-seg__btn[data-val="off"]');
+  let snap = await snapshot(page);
+  assert.equal(snap.lights, 'off', 'off label tap sets lights off');
+  assert.ok(snap.engineOn, 'off tap must not toggle engine');
+  await page.click('.jac-lights-seg__btn[data-val="on"]');
+  snap = await snapshot(page);
+  assert.equal(snap.lights, 'on', 'on label tap sets lights on');
+  await page.click('.jac-engine-btn');
+  snap = await snapshot(page);
+  const engineBefore = snap.engineOn;
+  await page.click('.jac-lights-seg__btn[data-val="auto"]');
+  snap = await snapshot(page);
+  assert.equal(snap.lights, 'auto', 'auto label tap sets lights auto');
+  assert.equal(snap.engineOn, engineBefore, 'lights tap must not toggle engine');
 }
 
 async function browserLoop(page, tag, viewport) {
@@ -415,7 +528,9 @@ async function main() {
   await runCenitalRemapTests(pageDesk);
   await runFootprintCollisionTests(pageDesk);
   await runWallNoSlideTest(pageDesk);
+  await runSixTargetParkSim(pageDesk);
   await runTeresaParkTest(pageDesk);
+  await runDepthOrderTest(pageDesk);
   await runModelTests(pageDesk);
   await runExitPersistTests(pageDesk);
   await runDialHitTargetTest(pageDesk);

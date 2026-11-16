@@ -214,7 +214,7 @@ export class JacHud {
   private render(snap: JacSnapshot): void {
     const phone = this.mobile;
     this.menuEl.hidden = snap.mode !== 'menu';
-    this.sheetEl.hidden = !(phone && snap.mode === 'info');
+    this.sheetEl.hidden = !(phone && (snap.mode === 'info' || snap.mode === 'menu'));
     this.dockEl.hidden = !(!phone && (snap.mode === 'info' || snap.mode === 'drive'));
     this.barEl.hidden = !(phone && snap.mode === 'drive');
     this.steerEl.hidden = true;
@@ -236,6 +236,7 @@ export class JacHud {
     }
     this.lastHtml = key;
     if (phone && snap.mode === 'info') this.sheetEl.innerHTML = this.sheetHtml(snap);
+    if (phone && snap.mode === 'menu') this.sheetEl.innerHTML = this.parkedSheetHtml(snap);
     if (!phone && (snap.mode === 'info' || snap.mode === 'drive')) {
       const body = this.dockEl.querySelector('.jac-dock__body');
       if (body) body.innerHTML = this.dockBody(snap);
@@ -261,7 +262,7 @@ export class JacHud {
       const id = (el as HTMLElement).dataset.val as JacToggleId;
       el.classList.toggle('is-on', !!snap.toggles[id]);
     });
-    this.root.querySelectorAll('.jac-dial').forEach((el) => {
+    this.root.querySelectorAll('.jac-lights-seg').forEach((el) => {
       (el as HTMLElement).dataset.pos = snap.lights;
     });
     this.root.querySelectorAll('[data-rpm]').forEach((el) => {
@@ -342,14 +343,28 @@ export class JacHud {
     `;
   }
 
+  private parkedSheetHtml(_snap: JacSnapshot): string {
+    return `
+      <div class="jac-sheet__handle" aria-hidden="true"></div>
+      <header class="jac-sheet__head">
+        <span class="jac-badge">JAC</span>
+        <h2>JAC T9</h2>
+        <button type="button" class="jac-btn jac-btn--primary" data-jac="in">${t('jac.getIn')}</button>
+        <button type="button" class="jac-icon-btn" data-jac="close" aria-label="${t('jac.close')}">${glyph('close')}</button>
+      </header>
+      <p class="jac-sheet__desc">${t('jac.desc')}</p>
+    `;
+  }
+
   private dialHtml(snap: JacSnapshot): string {
     return `
-      <div class="jac-dial" data-pos="${snap.lights}" data-jac="dial" role="slider" aria-label="${t('jac.lights')}">
-        <span class="jac-dial__auto">${t('jac.auto')}</span>
-        <button type="button" class="jac-dial__off" data-jac="lights" data-val="off">${t('jac.off')}</button>
-        <button type="button" class="jac-dial__on" data-jac="lights" data-val="on">${t('jac.on')}</button>
-        <span class="jac-dial__knob" aria-hidden="true"></span>
-        <button type="button" class="jac-dial__engine" data-jac="engine" aria-label="${t('jac.engine')}">${this.engineMark(snap)}</button>
+      <div class="jac-controls-row">
+        <div class="jac-lights-seg" data-pos="${snap.lights}" role="radiogroup" aria-label="${t('jac.lights')}">
+          <button type="button" class="jac-lights-seg__btn${snap.lights === 'off' ? ' is-on' : ''}" data-jac="lights" data-val="off">${t('jac.off')}</button>
+          <button type="button" class="jac-lights-seg__btn${snap.lights === 'auto' ? ' is-on' : ''}" data-jac="lights" data-val="auto">${t('jac.auto')}</button>
+          <button type="button" class="jac-lights-seg__btn${snap.lights === 'on' ? ' is-on' : ''}" data-jac="lights" data-val="on">${t('jac.on')}</button>
+        </div>
+        <button type="button" class="jac-engine-btn" data-jac="engine" aria-label="${t('jac.engine')}">${this.engineMark(snap)}</button>
       </div>
     `;
   }

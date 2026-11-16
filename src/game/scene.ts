@@ -6148,7 +6148,38 @@ export class IsoScene {
 
   tapJac(): void {
     if (!this.jac || this.interiorActive || this.jac.driving) return;
-    this.jacGetIn();
+    if (this.atJacDoor(1.6)) {
+      this.jacGetIn();
+      return;
+    }
+    this.path = [];
+    this.drawPathPreview();
+    this.pendingJacPanel = false;
+    this.jac.openMenu();
+    void this.jac.ensureLoaded();
+    this.events.chrome?.onJacHud?.();
+  }
+
+  qaJacTruckDepth(): number {
+    return this.jac?.qaTruckDepthKey() ?? 0;
+  }
+
+  qaObjectDepth(name: string): number | null {
+    const obj = objects.find((o) => o.name === name);
+    if (!obj) return null;
+    const fx = obj.footprintX ?? obj.x;
+    const fy = obj.footprintY ?? obj.y;
+    return fx + (obj.w ?? 1) - 1 + (fy + (obj.h ?? 1) - 1);
+  }
+
+  qaJacZIndex(): number {
+    return this.objectVisuals.get(JAC_ID)?.zIndex ?? 0;
+  }
+
+  qaBuildingZIndex(name: string): number | null {
+    const obj = objects.find((o) => o.name === name);
+    if (!obj) return null;
+    return this.objectVisuals.get(obj.id)?.zIndex ?? null;
   }
 
   private atJacDoor(maxDist: number): boolean {
