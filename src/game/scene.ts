@@ -2712,6 +2712,8 @@ export class IsoScene {
     if (this.jac?.driving) {
       if (this.jac.isExiting()) return;
       if (performance.now() < this.suppressDriveTapUntil) return;
+      // Another finger tapping the map must not take the drive away from the finger on the stick.
+      if (this.events.stickActive?.()) return;
       if (this.pickJacAtScreen(sx, sy)) return;
       const dragEnter = this.tapDriftPx > 10 || this.panMoved;
       if (

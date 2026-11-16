@@ -21,6 +21,8 @@ export class Joystick {
   private idle: HTMLElement;
   private knob: HTMLElement;
   private pointerId: number | null = null;
+  /** Touch.identifier of the finger that grabbed the stick; other fingers never move or release it. */
+  private touchId: number | null = null;
   private origin = { x: 0, y: 0 };
   private vec: StickVector = { x: 0, y: 0 };
   private touchSeen = false;
@@ -46,8 +48,12 @@ export class Joystick {
     this.root.addEventListener('pointerdown', (e) => this.beginPointer(e));
     window.addEventListener('pointermove', (e) => this.movePointer(e));
     window.addEventListener('pointerup', (e) => this.endPointer(e));
-    window.addEventListener('pointercancel', () => this.release());
-    this.root.addEventListener('lostpointercapture', () => this.release());
+    window.addEventListener('pointercancel', (e) => {
+      if (e.pointerId === this.pointerId) this.dropPointer();
+    });
+    this.root.addEventListener('lostpointercapture', (e) => {
+      if (e.pointerId === this.pointerId) this.dropPointer();
+    });
     window.addEventListener('blur', () => this.release());
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.release();
@@ -60,30 +66,9 @@ export class Joystick {
       },
       { passive: false },
     );
-    window.addEventListener(
-      'touchmove',
-      (e) => {
-        if (!this.touchActive && this.pointerId === null) return;
-        e.preventDefault();
-        this.moveTouch(e);
-      },
-      { passive: false },
-    );
-    window.addEventListener(
-      'touchend',
-      (e) => {
-        if (e.touches.length === 0 && (this.touchActive || this.pointerId !== null)) this.release();
-        else if (this.touchActive) this.endTouch(e);
-      },
-      { passive: false },
-    );
-    window.addEventListener(
-      'touchcancel',
-      () => {
-        if (this.touchActive || this.pointerId !== null) this.release();
-      },
-      { passive: false },
-    );
+    window.addEventListener('touchmove', (e) => this.moveTouch(e), { passive: false });
+    window.addEventListener('touchend', (e) => this.endTouch(e), { passive: false });
+    window.addEventListener('touchcancel', (e) => this.endTouch(e), { passive: false });
 
     window.addEventListener(
       'touchstart',
@@ -201,17 +186,30 @@ export class Joystick {
   }
 
   private endPointer(e: PointerEvent): void {
-    if (this.pointerId !== null && this.pointerId !== e.pointerId) return;
+    if (this.pointerId === null || this.pointerId !== e.pointerId) return;
     this.release();
+  }
+
+  /** The browser took the pointer away; keep steering from touch events if that finger is still down. */
+  private dropPointer(): void {
+    if (this.touchId === null) {
+      this.release();
+      return;
+    }
+    this.pointerId = null;
+    this.touchActive = true;
   }
 
   private beginTouch(e: TouchEvent): void {
     if (this.hidden || !this.wantsPad()) return;
-    if (this.touchActive || this.pointerId !== null) return;
+    if (this.touchActive || this.touchId !== null) return;
     const t = e.changedTouches[0];
     if (!t) return;
     e.preventDefault();
     e.stopPropagation();
+    this.touchId = t.identifier;
+    // Pointer events for this same finger may already own the stick.
+    if (this.pointerId !== null) return;
     this.touchActive = true;
     this.origin = this.padCenter();
     this.root.classList.add('is-dragging');
@@ -219,20 +217,23 @@ export class Joystick {
     this.onStart?.();
   }
 
+  private ownTouch(list: TouchList): Touch | null {
+    if (this.touchId === null) return null;
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].identifier === this.touchId) return list[i];
+    }
+    return null;
+  }
+
   private moveTouch(e: TouchEvent): void {
-    if (!this.touchActive && this.pointerId === null) return;
-    const t = e.touches[0] ?? e.changedTouches[0];
+    const t = this.ownTouch(e.changedTouches);
     if (!t) return;
-    this.applyFromClient(t.clientX, t.clientY);
+    e.preventDefault();
+    if (this.touchActive) this.applyFromClient(t.clientX, t.clientY);
   }
 
   private endTouch(e: TouchEvent): void {
-    if (!this.touchActive) return;
-    if (e.touches.length > 0) {
-      const t = e.touches[0];
-      this.applyFromClient(t.clientX, t.clientY);
-      return;
-    }
+    if (!this.ownTouch(e.changedTouches)) return;
     this.release();
   }
 
@@ -265,6 +266,7 @@ export class Joystick {
       }
     }
     this.pointerId = null;
+    this.touchId = null;
     this.touchActive = false;
     this.vec = { x: 0, y: 0 };
     this.root.classList.remove('is-dragging');
