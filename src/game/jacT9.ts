@@ -66,9 +66,6 @@ const TURN_RATE = 2.4;
 const IDLE_RPM = 700;
 const MOVE_RPM = 2250;
 const MOVE_MPH = 10;
-/** Hold at 0 for at least this long before auto-shifting D↔R (cold stop or brake). */
-const SHIFT_DWELL_S = 0.45;
-const STOPPED_SHIFT_S = 0.45;
 /** Pure-pursuit look-ahead along the remaining polyline (tiles). */
 const PATH_LOOKAHEAD = 1.45;
 const PATH_ARRIVE = 0.42;
@@ -91,7 +88,7 @@ export type JacVisual = {
   zIndex: number;
 };
 
-export type JacInput = { dx: number; dy: number; autoShift?: boolean; tileDir?: boolean };
+export type JacInput = { dx: number; dy: number; tileDir?: boolean };
 
 export type JacSnapshot = {
   mode: JacMode;
@@ -321,10 +318,6 @@ export class JacT9 {
   private wheelAcc = 0;
   private row: 'apagado' | 'luces' | 'freno' = 'apagado';
   private qaSteer: number | null = null;
-  /** True after the player taps D/R/P/N so auto-shift does not overwrite it. */
-  private gearHeld = false;
-  /** Stick was released after a gear-button press; next stick press may auto-shift. */
-  private gearReleased = true;
   private hazardT = 0;
   /** Continuous heading: 0=se, 1=sw, 2=nw, 3=ne. */
   private heading = 0;
@@ -332,8 +325,6 @@ export class JacT9 {
   private vel = 0;
   drivePath: { x: number; y: number }[] = [];
   driveGoal: { x: number; y: number } | null = null;
-  private shiftDwell = 0;
-  private shiftArmedAt = 0;
   private pendingExit = false;
   private exitHold = 0;
   private exitSit: { x: number; y: number } | null = null;
@@ -435,13 +426,9 @@ export class JacT9 {
       this.mph = 0;
       this.vel = 0;
       this.heading = dirIndex(this.dir);
-      this.gearHeld = false;
-      this.gearReleased = true;
       this.bubble = false;
       this.rearHold = 0;
       this.steerSmoothed = 0;
-      this.shiftDwell = 0;
-      this.shiftArmedAt = 0;
       this.pendingExit = false;
       this.exitHold = 0;
       this.exitSit = null;
@@ -456,8 +443,6 @@ export class JacT9 {
     } else if (wasDrive) {
       this.engineOn = false;
       this.gear = 'P';
-      this.gearHeld = false;
-      this.gearReleased = true;
       this.rpm = 0;
       this.mph = 0;
       this.vel = 0;
@@ -465,8 +450,6 @@ export class JacT9 {
       this.steering = 0;
       this.rearHold = 0;
       this.steerSmoothed = 0;
-      this.shiftDwell = 0;
-      this.shiftArmedAt = 0;
       this.pendingExit = false;
       this.exitHold = 0;
       this.stuckT = 0;
@@ -507,8 +490,6 @@ export class JacT9 {
 
   setGear(gear: JacGear): void {
     this.gear = gear;
-    this.gearHeld = true;
-    this.gearReleased = false;
     if (gear === 'P' || gear === 'N') {
       this.vel = 0;
       this.mph = 0;
@@ -580,8 +561,6 @@ export class JacT9 {
   setDrivePath(path: { x: number; y: number }[], goal: { x: number; y: number }, opts?: { loose?: boolean }): void {
     this.drivePath = path;
     this.driveGoal = goal;
-    this.gearHeld = false;
-    this.gearReleased = true;
     this.replanN = 0;
     this.stuckT = 0;
     this.unstickHold = 0;
@@ -661,11 +640,6 @@ export class JacT9 {
     if (z <= lo) z = lo + 0.12;
     if (z >= hi) z = lo < hi ? (lo + hi) / 2 : hi - 0.32;
     return z;
-  }
-
-  /** Freeze D/R so an unreachable tap cannot auto-shift. */
-  holdGear(): void {
-    this.gearHeld = true;
   }
 
   canDriveAt(cx: number, cy: number): boolean {
@@ -1357,7 +1331,7 @@ export class JacT9 {
       this.steerSmoothed *= 1 - Math.min(1, dt * 5.5);
     }
     this.steering = Math.max(-1, Math.min(1, this.steerSmoothed));
-    this.applyThrottle(dt, throttle, input.autoShift !== false);
+    this.applyThrottle(dt, throttle);
 
     const moving = Math.abs(this.vel) > 0.08;
     const canTurn = moving || live || following;
@@ -1472,94 +1446,55 @@ export class JacT9 {
     return Math.hypot(this.cx - ox, this.cy - oy);
   }
 
-  /** Stick / S / down: brake to 0, dwell, then shift. Never skip the stop. */
-  private applyThrottle(dt: number, throttle: number, autoShift: boolean): void {
+  /**
+   * The gear is only ever changed by the gear buttons (auto-drive pins D).
+   * D: stick up = gas forward. R: stick up = gas backward. Stick down brakes to 0 in
+   * either gear and holds there — it never shifts or drives the other way.
+   */
+  private applyThrottle(dt: number, throttle: number): void {
     const autoDrive = (this.drivePath.length > 0 || !!this.driveGoal) && !this.pendingExit;
     if (autoDrive) {
       this.gear = 'D';
       this.reversing = false;
-      autoShift = false;
       if (throttle < 0) throttle = 0;
       if (this.vel < 0) this.vel = 0;
     }
-    const want = throttle > 0.08 ? 1 : throttle < -0.08 ? -1 : 0;
-    /** Gas in R drives backward along heading. */
-    const moveWant = this.gear === 'R' && want > 0 ? -1 : want;
-    if (want === 0) this.gearReleased = true;
-    else if (this.gearReleased) {
-      this.gearHeld = false;
-      this.gearReleased = false;
-    }
 
-    if (this.pendingExit || (this.gearHeld && (this.gear === 'P' || this.gear === 'N') && want === 0)) {
-      this.brakeTowardZero(dt, this.pendingExit ? EXIT_BRAKE_TILES_S2 : BRAKE_TILES_S2);
+    if (this.pendingExit) {
+      this.brakeTowardZero(dt, EXIT_BRAKE_TILES_S2);
       if (Math.abs(this.vel) <= 0.08) {
         this.vel = 0;
-        if (this.pendingExit) {
-          if (!this.exitSit) {
-            this.exitSit = { x: this.cx, y: this.cy };
-            this.exitFacing = { dir: this.dir, heading: this.heading };
-            this.exitHold = 0.12;
-          } else {
-            this.exitHold = Math.max(0, this.exitHold - dt);
-          }
+        if (!this.exitSit) {
+          this.exitSit = { x: this.cx, y: this.cy };
+          this.exitFacing = { dir: this.dir, heading: this.heading };
+          this.exitHold = 0.12;
+        } else {
+          this.exitHold = Math.max(0, this.exitHold - dt);
         }
       }
       return;
     }
 
-    if (want === 0) {
+    const gas = throttle > 0.08 ? Math.min(1, throttle) : 0;
+    const brake = throttle < -0.08 ? Math.min(1, -throttle) : 0;
+    if (this.gear === 'P') {
+      this.brakeTowardZero(dt, BRAKE_TILES_S2);
+    } else if (this.gear === 'N' || (gas === 0 && brake === 0)) {
       this.brakeTowardZero(dt, FRICTION_TILES_S2);
-      if (Math.abs(this.vel) <= 0.08) {
-        this.vel = 0;
-        if (!this.shiftArmedAt) this.shiftArmedAt = performance.now();
-        if (this.shiftDwell <= 0) this.shiftDwell = SHIFT_DWELL_S;
-      }
-      return;
-    }
-
-    const velSign = this.vel > 0.08 ? 1 : this.vel < -0.08 ? -1 : 0;
-    if (velSign !== 0 && velSign !== moveWant) {
-      this.brakeTowardZero(dt);
-      if (Math.abs(this.vel) <= 0.08) {
-        this.vel = 0;
-        if (!this.shiftArmedAt) this.shiftArmedAt = performance.now();
-        this.shiftDwell = SHIFT_DWELL_S;
-      }
-      return;
-    }
-
-    if (Math.abs(this.vel) <= 0.08) {
-      this.vel = 0;
-      const need: JacGear = moveWant > 0 ? 'D' : 'R';
-      if (this.gearHeld && this.gear === 'D' && need === 'R') {
-        this.brakeTowardZero(dt);
+    } else if (brake > 0) {
+      this.brakeTowardZero(dt, BRAKE_TILES_S2);
+    } else {
+      const sign = this.gear === 'R' ? -1 : 1;
+      if (this.vel * sign < -0.08) {
+        this.brakeTowardZero(dt, BRAKE_TILES_S2);
+      } else {
+        if (Math.abs(this.vel) <= 0.08) this.vel = 0;
+        const v = this.vel + sign * ACCEL_TILES_S2 * gas * dt;
+        this.vel = sign > 0 ? Math.min(DRIVE_TILES_PER_S, v) : Math.max(-REVERSE_TILES_PER_S, v);
         return;
       }
-      if (autoShift && this.gear !== need) {
-        if (this.driveGoal) {
-          this.gear = need;
-        } else {
-          const dwell = Math.max(SHIFT_DWELL_S, STOPPED_SHIFT_S);
-          if (this.shiftDwell <= 0) this.shiftDwell = dwell;
-          this.shiftDwell = Math.max(0, this.shiftDwell - dt);
-          if (this.shiftDwell > 0) return;
-          this.gear = need;
-        }
-      } else if (autoShift && !this.gearHeld) {
-        this.gear = need;
-      }
-      this.shiftDwell = 0;
-      this.shiftArmedAt = 0;
-    } else if (autoShift && !this.gearHeld && this.unstickHold <= 0) {
-      this.gear = moveWant > 0 ? 'D' : 'R';
-      this.shiftDwell = 0;
-      this.shiftArmedAt = 0;
     }
-
-    const mag = Math.min(1, Math.abs(throttle));
-    if (moveWant > 0) this.vel = Math.min(DRIVE_TILES_PER_S, this.vel + ACCEL_TILES_S2 * mag * dt);
-    else if (moveWant < 0) this.vel = Math.max(-REVERSE_TILES_PER_S, this.vel - ACCEL_TILES_S2 * mag * dt);
+    if (Math.abs(this.vel) <= 0.08) this.vel = 0;
   }
 
   private brakeTowardZero(dt: number, rate = BRAKE_TILES_S2): void {
@@ -1583,7 +1518,6 @@ export class JacT9 {
     this.exitFacing = null;
     this.exitFrom = { x: this.cx, y: this.cy };
     this.clearDrivePath();
-    this.gearHeld = false;
     this.qaSteer = null;
     this.brakeTowardZero(1 / 20, EXIT_BRAKE_TILES_S2);
     if (Math.abs(this.vel) <= 0.35) this.vel = 0;
@@ -2114,7 +2048,6 @@ export class JacT9 {
     this.vel = 0;
     this.mph = 0;
     this.gear = driving ? 'D' : 'P';
-    this.gearHeld = false;
     this.clearDrivePath();
     this.resolveOverlap();
     if (driving) {

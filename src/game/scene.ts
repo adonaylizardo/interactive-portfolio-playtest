@@ -2871,7 +2871,6 @@ export class IsoScene {
   private toastDriveUnreachable(): void {
     this.pendingDriveEnter = null;
     this.jac?.clearDrivePath();
-    this.jac?.holdGear();
     this.suppressDriveTapUntil = performance.now() + 450;
     this.events.onUnreachable?.();
   }
@@ -5294,7 +5293,6 @@ export class IsoScene {
       this.jac.update(this.app.ticker.deltaMS / 1000, {
         dx,
         dy,
-        autoShift: true,
         tileDir: false,
       });
       this.charTx = this.jac.cx;
@@ -6566,7 +6564,7 @@ export class IsoScene {
   } | null {
     if (!this.jac?.driving) return null;
     const mapped = this.remapDriveStick(dx, dy);
-    this.jac.update(dt, { dx: mapped.x, dy: mapped.y, autoShift: true, tileDir: false });
+    this.jac.update(dt, { dx: mapped.x, dy: mapped.y, tileDir: false });
     this.charTx = this.jac.cx;
     this.charTy = this.jac.cy;
     this.startCameraFollow();
