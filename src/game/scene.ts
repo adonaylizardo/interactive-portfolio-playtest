@@ -3576,13 +3576,20 @@ export class IsoScene {
     return screenStickToTile(dx, dy, this.viewRot, this.viewSx, this.viewSy);
   }
 
+  /** Driving: screen X = steer, Y up = throttle / down = brake — never camera-rotated. */
   private remapDriveStick(dx: number, dy: number): { x: number; y: number } {
     if (dx === 0 && dy === 0) return { x: 0, y: 0 };
-    this.syncViewTransform();
-    if (this.cenitalOn()) {
-      return screenStickToDrive(dx, dy, this.viewRot, this.viewSx, this.viewSy);
-    }
     return { x: dx, y: dy };
+  }
+
+  qaRemapDriveStick(dx: number, dy: number): { x: number; y: number } {
+    return this.remapDriveStick(dx, dy);
+  }
+
+  qaSetMapYawQuarter(quarter: number): void {
+    this.yaw = ((Math.round(quarter) % 4) + 4) % 4;
+    this.syncViewTransform();
+    this.applyCamera(true);
   }
 
   private spriteHeadCanvas(sprite: Sprite): { x: number; y: number } {
@@ -6281,8 +6288,7 @@ export class IsoScene {
     const truckCx = this.jac.cx;
     const truckCy = this.jac.cy;
     this.jac.parkAtExitPose();
-    const doorSpot = this.jac.driverExitStandTile();
-    const spot = doorSpot ?? this.jac.driverDoorTile({ x: truckCx, y: truckCy }) ?? this.jac.exitTile();
+    const spot = this.jac.driverExitStandTile() ?? this.jac.driverDoorTile({ x: truckCx, y: truckCy }) ?? this.jac.exitTile();
     if (spot) {
       this.charTx = spot.x;
       this.charTy = spot.y;
@@ -6453,6 +6459,10 @@ export class IsoScene {
     return this.jac?.overlapsProp() ?? false;
   }
 
+  qaJacFootprintBlocked(): boolean {
+    return this.jac?.qaFootprintBlocked() ?? false;
+  }
+
   qaJacCanSit(cx: number, cy: number): boolean {
     return this.jac?.canDriveAt(cx, cy) ?? false;
   }
@@ -6517,7 +6527,8 @@ export class IsoScene {
     mph: number;
   } | null {
     if (!this.jac?.driving) return null;
-    this.jac.update(dt, { dx, dy, autoShift: true, tileDir: false });
+    const mapped = this.remapDriveStick(dx, dy);
+    this.jac.update(dt, { dx: mapped.x, dy: mapped.y, autoShift: true, tileDir: false });
     this.charTx = this.jac.cx;
     this.charTy = this.jac.cy;
     this.startCameraFollow();

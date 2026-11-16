@@ -4532,7 +4532,8 @@ body.jac-menu-open .checklist {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 36px;
+  min-height: 44px;
+  height: 44px;
   padding: 0 16px;
   border: 0;
   border-radius: 999px;
@@ -4658,12 +4659,17 @@ body.jac-menu-open .checklist {
   font-size: 8px;
   line-height: 1.15;
   max-width: 34px;
+  min-width: 44px;
+  min-height: 44px;
   color: #8a8f98;
   background: none;
   border: 0;
   padding: 0;
   cursor: pointer;
   text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .jac-dial__auto {
@@ -4717,16 +4723,22 @@ body.jac-menu-open .checklist {
   position: absolute;
   left: 50%;
   top: 58%;
-  width: 22px;
-  height: 22px;
-  margin-left: -11px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: -22px;
+  margin-top: -22px;
   border: 0;
-  border-radius: 11px;
+  border-radius: 22px;
   background: transparent;
   color: #8a8f98;
   font-size: 9px;
   font-weight: 700;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 body[data-chrome='phone'] .jac-dial__auto,

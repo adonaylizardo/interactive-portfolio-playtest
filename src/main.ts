@@ -1063,6 +1063,9 @@ async function main(): Promise<void> {
     jacDoor: (from?: { x: number; y: number }) => scene.qaJacDoor(from),
     jacApproach: () => scene.qaJacApproach(),
     jacOverlapsProp: () => scene.qaJacOverlapsProp(),
+    jacFootprintBlocked: () => scene.qaJacFootprintBlocked(),
+    remapDriveStick: (dx: number, dy: number) => scene.qaRemapDriveStick(dx, dy),
+    setMapYawQuarter: (quarter: number) => scene.qaSetMapYawQuarter(quarter),
     jacCanSit: (cx: number, cy: number) => scene.qaJacCanSit(cx, cy),
     parkForDoor: (x: number, y: number, buildingName?: string) =>
       scene.qaParkForDoor(x, y, buildingName),
