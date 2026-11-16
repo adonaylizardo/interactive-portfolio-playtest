@@ -4757,23 +4757,20 @@ body.jac-menu-open .checklist {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
 }
 
-@keyframes jac-bump-flash {
+@keyframes jac-bump-pulse {
   0% {
-    box-shadow: 0 0 0 10px #ffb547, 0 0 40px #ffb547;
-    background: #5a4020;
-    border-color: #ffd27a;
+    outline-color: #ffb547;
   }
   100% {
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+    outline-color: rgba(255, 181, 71, 0);
   }
 }
 
 .jac-bar.is-bump,
 .jac-dock.is-bump {
-  animation: jac-bump-flash 420ms ease-out;
-  box-shadow: 0 0 0 8px #ffb547, 0 0 28px #ffb547, 0 4px 20px rgba(0, 0, 0, 0.45);
-  border-color: #ffb547;
-  background: #4a3420;
+  outline: 2px solid rgba(255, 181, 71, 0);
+  outline-offset: -1px;
+  animation: jac-bump-pulse 250ms ease-out;
 }
 
 .jac-bar > span,
@@ -5028,6 +5025,7 @@ body.jac-menu-open .checklist {
   background: #edeef0;
   transform-origin: 0 50%;
   transform: rotate(-120deg);
+  transition: transform 120ms linear;
 }
 
 .jac-gauge__val {

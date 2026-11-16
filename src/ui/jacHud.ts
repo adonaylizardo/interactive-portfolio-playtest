@@ -20,6 +20,15 @@ export type JacHudCallbacks = {
   getView?: () => { mode: Camera; overview: boolean };
 };
 
+const RPM_GAUGE_MAX = 4000;
+const MPH_GAUGE_MAX = 12;
+const BUMP_PULSE_MS = 250;
+
+function rpmLabel(rpm: number): string {
+  const r = Math.round(rpm / 10) * 10;
+  return r > 0 ? r.toLocaleString('en-US') : '0';
+}
+
 const TOGGLES: { id: JacToggleId; labelKey: 'jac.hazards'; icon: string }[] = [
   { id: 'hazards', labelKey: 'jac.hazards', icon: 'hazards' },
 ];
@@ -58,6 +67,8 @@ export class JacHud {
   private lastHtml = '';
   private lastActAt = 0;
   private hintUntil = 0;
+  private lastBumpSeq: number | null = null;
+  private bumpTimer = 0;
   constructor(container: HTMLElement, callbacks: JacHudCallbacks) {
     this.callbacks = callbacks;
     this.root = document.createElement('div');
@@ -220,16 +231,36 @@ export class JacHud {
     this.steerEl.hidden = true;
     this.bubbleEl.hidden = true;
     this.root.classList.toggle('jac-hud--drive', snap.mode === 'drive');
-    this.barEl.classList.toggle('is-bump', snap.bump > 0.08);
-    this.dockEl.classList.toggle('is-bump', snap.bump > 0.08);
+    this.syncBump(snap);
     this.steerEl.classList.toggle('is-live', snap.mph > 0);
     this.dockEl.dataset.mode = snap.mode;
     this.fillDash(snap, phone);
   }
 
+  /** One short border pulse per impact; the van itself rate-limits impacts. */
+  private syncBump(snap: JacSnapshot): void {
+    const seq = snap.bumpSeq;
+    if (this.lastBumpSeq === null || seq < this.lastBumpSeq) {
+      this.lastBumpSeq = seq;
+      return;
+    }
+    if (seq === this.lastBumpSeq) return;
+    this.lastBumpSeq = seq;
+    const els = [this.barEl, this.dockEl];
+    for (const el of els) {
+      el.classList.remove('is-bump');
+      void el.offsetWidth;
+      el.classList.add('is-bump');
+    }
+    window.clearTimeout(this.bumpTimer);
+    this.bumpTimer = window.setTimeout(() => {
+      for (const el of els) el.classList.remove('is-bump');
+    }, BUMP_PULSE_MS);
+  }
+
   private fillDash(snap: JacSnapshot, phone: boolean): void {
     const view = this.callbacks.getView?.();
-    const key = `${getLang()}|${snap.mode}|${snap.lights}|${snap.gear}|${snap.rpm}|${snap.mph}|${snap.engineOn}|${JSON.stringify(snap.toggles)}|${phone}|${view?.mode ?? ''}|${view?.overview ? 1 : 0}`;
+    const key = `${getLang()}|${snap.mode}|${snap.lights}|${snap.engineOn}|${JSON.stringify(snap.toggles)}|${phone}|${view?.mode ?? ''}|${view?.overview ? 1 : 0}`;
     if (key === this.lastHtml && (snap.mode === 'drive' || snap.mode === 'info')) {
       this.syncLive(snap);
       return;
@@ -265,17 +296,19 @@ export class JacHud {
     this.root.querySelectorAll('.jac-lights-seg').forEach((el) => {
       (el as HTMLElement).dataset.pos = snap.lights;
     });
+    const rpmText = rpmLabel(snap.gaugeRpm);
     this.root.querySelectorAll('[data-rpm]').forEach((el) => {
-      el.textContent = snap.rpm ? snap.rpm.toLocaleString('en-US') : '0';
+      if (el.textContent !== rpmText) el.textContent = rpmText;
     });
+    const mphText = String(Math.round(snap.gaugeMph));
     this.root.querySelectorAll('[data-mph]').forEach((el) => {
-      el.textContent = String(snap.mph);
+      if (el.textContent !== mphText) el.textContent = mphText;
     });
     this.root.querySelectorAll('.jac-gauge--rpm .jac-gauge__needle').forEach((el) => {
-      (el as HTMLElement).style.transform = `rotate(${this.needleDeg(snap.rpm, 4000, -120, 120)}deg)`;
+      (el as HTMLElement).style.transform = `rotate(${this.needleDeg(snap.gaugeRpm, RPM_GAUGE_MAX, -120, 120)}deg)`;
     });
     this.root.querySelectorAll('.jac-gauge--mph .jac-gauge__needle').forEach((el) => {
-      (el as HTMLElement).style.transform = `rotate(${this.needleDeg(snap.mph, 20, -120, 120)}deg)`;
+      (el as HTMLElement).style.transform = `rotate(${this.needleDeg(snap.gaugeMph, MPH_GAUGE_MAX, -120, 120)}deg)`;
     });
     const inBtn = snap.mode === 'drive';
     this.root.querySelectorAll('[data-jac="in"], [data-jac="out"]').forEach((el) => {
@@ -326,8 +359,8 @@ export class JacHud {
       ? ''
       : `<div class="jac-length jac-dock__length"><span>${t('jac.length')}</span><span class="jac-length__dash">5.33 m</span></div>`;
     return `
-      ${this.gaugeHtml('rpm', snap.rpm, 'rpm')}
-      ${this.gaugeHtml('mph', snap.mph, 'mph')}
+      ${this.gaugeHtml('rpm', snap.gaugeRpm, 'rpm')}
+      ${this.gaugeHtml('mph', snap.gaugeMph, 'mph')}
       <div class="jac-gears" role="group" aria-label="${t('jac.gear')}">
         ${(['P', 'R', 'N', 'D'] as JacGear[]).map((g) => `<button type="button" class="jac-gear${snap.gear === g ? ' is-on' : ''}" data-jac="gear" data-val="${g}" aria-pressed="${snap.gear === g}">${g}</button>`).join('')}
       </div>
@@ -386,7 +419,7 @@ export class JacHud {
           <circle cx="56" cy="56" r="48" fill="none" stroke="#3a3d44" stroke-width="6" stroke-dasharray="2 10" stroke-linecap="butt"/>
         </svg>
         <span class="jac-gauge__needle"></span>
-        <span class="jac-gauge__val" data-${kind}>${kind === 'rpm' ? (value ? value.toLocaleString('en-US') : '0') : value}</span>
+        <span class="jac-gauge__val" data-${kind}>${kind === 'rpm' ? rpmLabel(value) : Math.round(value)}</span>
         <span class="jac-gauge__unit">${unit}</span>
       </div>
     `;
