@@ -4729,6 +4729,22 @@ body.jac-menu-open .checklist {
   cursor: pointer;
 }
 
+body[data-chrome='phone'] .jac-dial__auto,
+body[data-chrome='phone'] .jac-dial__off,
+body[data-chrome='phone'] .jac-dial__on,
+body[data-chrome='phone'] .jac-dial__engine {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body[data-chrome='phone'] .jac-dial {
+  min-width: 88px;
+  min-height: 88px;
+}
+
 .jac-toggles {
   display: grid;
   grid-template-columns: repeat(3, 44px);

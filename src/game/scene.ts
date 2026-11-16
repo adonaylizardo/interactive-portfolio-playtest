@@ -3577,9 +3577,12 @@ export class IsoScene {
   }
 
   private remapDriveStick(dx: number, dy: number): { x: number; y: number } {
-    if (!this.cenitalOn() || (dx === 0 && dy === 0)) return { x: dx, y: dy };
+    if (dx === 0 && dy === 0) return { x: 0, y: 0 };
     this.syncViewTransform();
-    return screenStickToTile(dx, dy, this.viewRot, this.viewSx, this.viewSy);
+    if (this.cenitalOn()) {
+      return screenStickToDrive(dx, dy, this.viewRot, this.viewSx, this.viewSy);
+    }
+    return { x: dx, y: dy };
   }
 
   private spriteHeadCanvas(sprite: Sprite): { x: number; y: number } {
@@ -5285,7 +5288,7 @@ export class IsoScene {
         dx,
         dy,
         autoShift: true,
-        tileDir: this.cenitalOn(),
+        tileDir: false,
       });
       this.charTx = this.jac.cx;
       this.charTy = this.jac.cy;
@@ -6275,13 +6278,19 @@ export class IsoScene {
       return;
     }
     this.pendingJacExit = false;
+    const truckCx = this.jac.cx;
+    const truckCy = this.jac.cy;
     this.jac.parkAtExitPose();
     const doorSpot = this.jac.driverExitStandTile();
-    const spot = doorSpot ?? this.jac.driverDoorTile({ x: this.jac.cx, y: this.jac.cy }) ?? this.jac.exitTile();
+    const spot = doorSpot ?? this.jac.driverDoorTile({ x: truckCx, y: truckCy }) ?? this.jac.exitTile();
     if (spot) {
       this.charTx = spot.x;
       this.charTy = spot.y;
       this.syncCharacterGraphic();
+      const foot = tileToWorld(spot.x, spot.y);
+      this.follow.prevX = foot.x;
+      this.follow.prevY = foot.y - CHAR_BODY_CENTRE_RISE;
+      this.follow.scope = 'map';
     }
     this.avatar.setVisible(true);
     this.jac.setBubble(false);
@@ -6508,7 +6517,7 @@ export class IsoScene {
     mph: number;
   } | null {
     if (!this.jac?.driving) return null;
-    this.jac.update(dt, { dx, dy, autoShift: true, tileDir: this.cenitalOn() });
+    this.jac.update(dt, { dx, dy, autoShift: true, tileDir: false });
     this.charTx = this.jac.cx;
     this.charTy = this.jac.cy;
     this.startCameraFollow();
