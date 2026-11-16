@@ -290,6 +290,7 @@ export type SceneEvents = {
   onExitInterior?: () => void;
   onInteriorIdChange?: (interiorId: string | null) => void;
   onUnreachable?: () => void;
+  onJacHint?: (key: 'jac.needD') => void;
   onGetOutToEnter?: () => void;
   onUnknownRoute?: () => void;
   onMoveCommand?: () => void;
@@ -6110,6 +6111,7 @@ export class IsoScene {
         if (this.pendingDriveEnter) this.retryDriveEnterOrGetOut();
         else this.events.onUnreachable?.();
       },
+      onHint: (key) => this.events.onJacHint?.(key),
     });
     g.label = JAC_ID;
   }
@@ -6816,7 +6818,7 @@ export class IsoScene {
   }
 
   /**
-   * Parked JAC T9: footprint origin (23,16) 5×3, centre (25, 17), approach tile (27, 18).
+   * Parked JAC T9: footprint origin (18,5) 5×3, centre (20, 6), front tile (22, 7).
    * `?focus=jac` frames this. Debug-free for QA.
    */
   focusJac(): boolean {

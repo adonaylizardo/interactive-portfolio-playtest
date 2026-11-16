@@ -635,6 +635,7 @@ async function main(): Promise<void> {
       syncInteriorPanel(id);
     },
     onUnreachable: () => showToast(t('toast.unreachable')),
+    onJacHint: (key) => showToast(t(key)),
     onGetOutToEnter: () => showToast(t('toast.getOutToEnter')),
     onUnknownRoute: () => showToast(t('toast.unknownRoute')),
     buildingPanel: {

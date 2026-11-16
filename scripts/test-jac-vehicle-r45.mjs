@@ -611,10 +611,10 @@ async function runDriveOffSpawnTests(page, { touch, view, tag }) {
   await freshGetIn(page, view);
   const spawn = await snapshot(page);
   assert.ok(
-    Math.hypot(spawn.cx - 25, spawn.cy - 17) < 0.01 && spawn.dir === 'se',
-    `${tag}: fresh Get in should seat at spawn (25,17) SE, got ${JSON.stringify([spawn.cx, spawn.cy, spawn.dir])}`,
+    Math.hypot(spawn.cx - 20, spawn.cy - 6) < 0.01 && spawn.dir === 'se',
+    `${tag}: fresh Get in should seat at spawn (20,6) SE, got ${JSON.stringify([spawn.cx, spawn.cy, spawn.dir])}`,
   );
-  assert.equal(spawn.gear, 'P', `${tag}: Get in starts in P`);
+  assert.equal(spawn.gear, 'D', `${tag}: Get in starts in D`);
   assert.equal(await page.evaluate(() => window.__playtestQa.jacFootprintBlocked()), false, `${tag}: spawn pose is legal`);
   await tapGear(page, touch, 'D');
   const fwd = await holdInput(page, touch, ['up'], 2200);
@@ -627,8 +627,9 @@ async function runDriveOffSpawnTests(page, { touch, view, tag }) {
   await page.screenshot({ path: path.join(ART, `r45d-${tag}-spawn-drive.png`) });
 
   for (const p of [
-    { cx: 30, cy: 40, dir: 'se' },
-    { cx: 12, cy: 20, dir: 'se' },
+    { cx: 30, cy: 40, dir: 'se', run: 5 },
+    // The post at (20,20) leaves exactly 5 tiles; the edge footprint stops at contact just short.
+    { cx: 12, cy: 20, dir: 'se', run: 4.9 },
   ]) {
     const seat = await page.evaluate((q) => window.__playtestQa.jacSpawnDrive(q.cx, q.cy, q.dir), p);
     const legal = await page.evaluate(() => !window.__playtestQa.jacFootprintBlocked());
@@ -636,8 +637,8 @@ async function runDriveOffSpawnTests(page, { touch, view, tag }) {
     await tapGear(page, touch, 'D');
     const run = await holdInput(page, touch, ['up'], 2200);
     assert.ok(
-      run.along >= 5,
-      `${tag}: drive forward from ${JSON.stringify(p)} (seated ${seat.cx.toFixed(2)},${seat.cy.toFixed(2)} ${seat.dir}) ≥5 tiles, got ${run.along.toFixed(2)}`,
+      run.along >= p.run,
+      `${tag}: drive forward from ${JSON.stringify(p)} (seated ${seat.cx.toFixed(2)},${seat.cy.toFixed(2)} ${seat.dir}) ≥${p.run} tiles, got ${run.along.toFixed(2)}`,
     );
     assert.ok(run.turned < 0.02, `${tag}: no turning on straight stick from ${JSON.stringify(p)}`);
   }
@@ -645,9 +646,14 @@ async function runDriveOffSpawnTests(page, { touch, view, tag }) {
 
 async function runNoInPlaceRotationTests(page, { touch, view, tag }) {
   await freshGetIn(page, view);
-  const inP = await holdInput(page, touch, ['up', 'left'], 1200);
-  assert.ok(inP.dist < 0.01 && inP.turned < 1e-6, `${tag}: P + gas + steer must not move or rotate (${inP.dist}, ${inP.turned})`);
+  await tapGear(page, touch, 'P');
+  const inP = await holdInput(page, touch, ['up'], 1200);
+  assert.ok(
+    inP.dist > 0.5 && inP.gears.includes('D') && !inP.gears.includes('R'),
+    `${tag}: gas in P at rest must shift to D and drive (dist=${inP.dist.toFixed(2)}, gears=${inP.gears})`,
+  );
 
+  await freshGetIn(page, view);
   await tapGear(page, touch, 'D');
   const arc = await holdInput(page, touch, ['up', 'left'], 2200);
   assert.ok(arc.dist > 2, `${tag}: up+left from spawn must drive, not pivot (dist=${arc.dist.toFixed(2)})`);
@@ -667,10 +673,10 @@ async function runNoInPlaceRotationTests(page, { touch, view, tag }) {
   for (const steer of ['left', 'right']) {
     const push = await holdInput(page, touch, ['up', steer], 1500);
     assert.ok(
-      push.turned < 1e-6 && push.dist < 0.02,
-      `${tag}: gas+${steer} against an obstacle at speed 0 must not rotate (turned=${push.turned}, dist=${push.dist}, from ${pinned.cx.toFixed(2)},${pinned.cy.toFixed(2)})`,
+      push.turned > 0.1 || push.dist >= 0.02,
+      `${tag}: gas+${steer} against an obstacle must creep-turn or move (turned=${push.turned}, dist=${push.dist}, from ${pinned.cx.toFixed(2)},${pinned.cy.toFixed(2)})`,
     );
-    assert.ok(Math.max(...push.samples.map((s) => s.mph)) === 0, `${tag}: speedometer stays 0 when pinned`);
+    assert.ok(!push.gears.includes('R'), `${tag}: creep turn never shifts to R`);
   }
   await wait(600);
   const coast = await holdInput(page, touch, ['left'], 1000);
@@ -782,7 +788,8 @@ async function runRenderedOcclusionTests(page, { touch, tag }) {
     occ: window.__playtestQa.jacOcclusion('bain'),
     blocked: window.__playtestQa.jacFootprintBlocked(),
   }));
-  assert.ok(Math.abs(bainStop.j.cx - 38) < 0.01 && bainStop.j.cy > 20.3 && bainStop.j.cy < 20.55, `${tag}: Bain SW approach stops at ~(38,20.5) (${bainStop.j.cx},${bainStop.j.cy})`);
+  // Edge footprint: the 5-long box touches Bain's first row (23) once its front passes 22.55.
+  assert.ok(Math.abs(bainStop.j.cx - 38) < 0.01 && bainStop.j.cy > 19.95 && bainStop.j.cy < 20.55, `${tag}: Bain SW approach stops at Bain's edge (${bainStop.j.cx},${bainStop.j.cy})`);
   assert.ok(!bainStop.blocked, `${tag}: Bain stop footprint is legal`);
   assert.ok(bainStop.order.sameLayer, `${tag}: truck and Bain share the sorted objects layer`);
   assert.ok(
