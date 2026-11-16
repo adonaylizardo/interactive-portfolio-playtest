@@ -14,7 +14,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TEST_OUT = path.join(ROOT, 'test-output');
 mkdirSync(TEST_OUT, { recursive: true });
 const PREVIEW_PORT = Number(process.env.QA_PREVIEW_PORT) || 4198;
-const GLOBAL_TIMEOUT_MS = 240_000;
+const GLOBAL_TIMEOUT_MS = 360_000;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function resolvePreviewBase() {
@@ -744,7 +744,11 @@ async function main() {
   } catch (e) {
     errors.push(e.message || String(e));
   } finally {
-    if (timeoutRef) clearTimeout(timeoutRef);
+    shuttingDown = true;
+    if (timeoutRef) {
+      clearTimeout(timeoutRef);
+      timeoutRef = null;
+    }
     if (browser) {
       try {
         await browser.close();

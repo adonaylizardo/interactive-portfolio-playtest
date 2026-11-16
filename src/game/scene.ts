@@ -6454,6 +6454,12 @@ export class IsoScene {
     return this.driveToTile(tx, ty, false);
   }
 
+  /** QA: cancel tap-to-park / auto-route so stick and R gear tests are not clamped to D. */
+  qaJacCancelRoute(): void {
+    this.jac?.clearDrivePath();
+    this.pendingDriveEnter = null;
+  }
+
   qaFindDrivePath(tx: number, ty: number): { x: number; y: number }[] | null {
     return this.jac?.findDrivePath(tx, ty) ?? null;
   }
@@ -6919,6 +6925,20 @@ export class IsoScene {
     if (!obj?.door || !obj.panelTitle) return false;
     this.suppressDriveTapUntil = 0;
     return this.requestDriveToEnter({ panelTitle: obj.panelTitle, door: obj.door });
+  }
+
+  /** QA: route to a door park sit without arming building entry (stays in drive / gear D). */
+  qaDriveParkBuilding(name: string): boolean {
+    const obj = objects.find((o) => o.type === 'building' && o.name === name);
+    if (!obj?.door || !this.jac?.driving || this.jac.isExiting()) return false;
+    this.suppressDriveTapUntil = 0;
+    const prefer = buildingParkPrefer(obj.name);
+    const sit = this.jac.parkForDoor(obj.door.x, obj.door.y, prefer ?? undefined);
+    if (!sit) return false;
+    const path = sit.path.length > 0 ? sit.path : this.jac.findDrivePath(sit.x, sit.y);
+    if (!path || path.length === 0) return false;
+    this.jac.setDrivePath(path, { x: sit.x, y: sit.y }, { loose: true });
+    return true;
   }
 
   /** QA: pan so the character and target door are both on screen before a real pointer tap. */

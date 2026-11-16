@@ -1412,6 +1412,12 @@ export class JacT9 {
       if (next.x !== this.cx || next.y !== this.cy) {
         this.cx = next.x;
         this.cy = next.y;
+        if (!following && this.footprintOverlapsBlocked()) {
+          this.cx = ox;
+          this.cy = oy;
+          this.vel = 0;
+          this.mph = 0;
+        }
         this.occupy(this.driveCells());
         this.layout();
       }
@@ -1449,6 +1455,8 @@ export class JacT9 {
       if (this.vel < 0) this.vel = 0;
     }
     const want = throttle > 0.08 ? 1 : throttle < -0.08 ? -1 : 0;
+    /** Gas in R drives backward along heading. */
+    const moveWant = this.gear === 'R' && want > 0 ? -1 : want;
     if (want === 0) this.gearReleased = true;
     else if (this.gearReleased) {
       this.gearHeld = false;
@@ -1483,7 +1491,7 @@ export class JacT9 {
     }
 
     const velSign = this.vel > 0.08 ? 1 : this.vel < -0.08 ? -1 : 0;
-    if (velSign !== 0 && velSign !== want) {
+    if (velSign !== 0 && velSign !== moveWant) {
       this.brakeTowardZero(dt);
       if (Math.abs(this.vel) <= 0.08) {
         this.vel = 0;
@@ -1495,8 +1503,8 @@ export class JacT9 {
 
     if (Math.abs(this.vel) <= 0.08) {
       this.vel = 0;
-      const need: JacGear = want > 0 ? 'D' : 'R';
-      if (this.gearHeld && (this.gear === 'D' || this.gear === 'R') && this.gear !== need) {
+      const need: JacGear = moveWant > 0 ? 'D' : 'R';
+      if (this.gearHeld && this.gear === 'D' && need === 'R') {
         this.brakeTowardZero(dt);
         return;
       }
@@ -1516,14 +1524,14 @@ export class JacT9 {
       this.shiftDwell = 0;
       this.shiftArmedAt = 0;
     } else if (autoShift && !this.gearHeld && this.unstickHold <= 0) {
-      this.gear = want > 0 ? 'D' : 'R';
+      this.gear = moveWant > 0 ? 'D' : 'R';
       this.shiftDwell = 0;
       this.shiftArmedAt = 0;
     }
 
     const mag = Math.min(1, Math.abs(throttle));
-    if (want > 0) this.vel = Math.min(DRIVE_TILES_PER_S, this.vel + ACCEL_TILES_S2 * mag * dt);
-    else this.vel = Math.max(-REVERSE_TILES_PER_S, this.vel - ACCEL_TILES_S2 * mag * dt);
+    if (moveWant > 0) this.vel = Math.min(DRIVE_TILES_PER_S, this.vel + ACCEL_TILES_S2 * mag * dt);
+    else if (moveWant < 0) this.vel = Math.max(-REVERSE_TILES_PER_S, this.vel - ACCEL_TILES_S2 * mag * dt);
   }
 
   private brakeTowardZero(dt: number, rate = BRAKE_TILES_S2): void {
@@ -2205,8 +2213,15 @@ export class JacT9 {
     return { x, y, moved: Math.hypot(x - cx, y - cy), blocked };
   }
 
+  /** Footprint facing while driving: stick uses heading; auto path uses committed dir. */
+  private driveFacingDir(): FacingDir {
+    const onPath = this.drivePath.length > 0 || !!this.driveGoal;
+    if (this.driving && !this.pendingExit && !onPath) return dirFromHeading(this.heading);
+    return this.dir;
+  }
+
   private canSit(cx: number, cy: number): boolean {
-    return this.sitWith(cx, cy, this.dir);
+    return this.sitWith(cx, cy, this.driveFacingDir());
   }
 
   /** Current pose with an explicit facing — used to reject a turn that would clip. */
