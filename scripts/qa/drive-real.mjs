@@ -406,28 +406,6 @@ async function driveTo(page, input, waypoints, { timeoutMs = 20_000, arrive = 0.
 }
 
 /** Gas straight ahead until the truck has been at rest for 400 ms (it hit something) or `ms` passes. */
-async function pushInto(page, input, ms) {
-  const touch = input.touch;
-  const pad = touch ? await stickPad(page) : null;
-  if (touch) {
-    await input.touchEv('touchStart', [{ x: pad.x, y: pad.y, id: 1 }]);
-    await input.touchEv('touchMove', [{ x: pad.x, y: pad.y - 44, id: 1 }]);
-  } else await page.keyboard.down('w');
-  const t0 = Date.now();
-  let restSince = null;
-  while (Date.now() - t0 < ms) {
-    await wait(60);
-    if (touch) await input.touchEv('touchMove', [{ x: pad.x, y: pad.y - 44, id: 1 }]);
-    const j = await page.evaluate(() => window.__playtestQa.jac());
-    if (Math.abs(j.vel) < 0.3 && Date.now() - t0 > 500) {
-      restSince ??= Date.now();
-      if (Date.now() - restSince > 400) break;
-    } else restSince = null;
-  }
-  if (touch) await input.touchEv('touchEnd', []);
-  else await page.keyboard.up('w');
-}
-
 async function startSampling(page) {
   await page.evaluate(() => window.__gate.start());
 }
@@ -693,7 +671,8 @@ async function runViewport(browser, kind) {
       { x: 31, y: 17.5 },
       { x: 34.5, y: 17.5 },
     ]);
-    await pushInto(s.page, s.input, 4000);
+    // Steer at the one-cell tree until the nose stops on it; plain gas can glance past it.
+    await driveTo(s.page, s.input, [{ x: 40, y: 17.8 }], { timeoutMs: 6000, stopOnStall: true });
     const atTree = await s.page.evaluate(() => window.__playtestQa.jac());
     await shot(s.page, `${tag}-05-tree`);
     if (touch) {
