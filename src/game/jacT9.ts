@@ -2069,6 +2069,28 @@ export class JacT9 {
     this.hooks.onChange?.();
   }
 
+  /** QA: while driving, re-seat at a pose exactly like Get in does (P, nudged clear if it clips). */
+  qaSpawnDrive(cx: number, cy: number, dir: FacingDir): void {
+    if (!this.driving) return;
+    this.dir = dir;
+    this.heading = dirIndex(dir);
+    this.cx = cx;
+    this.cy = cy;
+    this.vel = 0;
+    this.mph = 0;
+    this.gear = 'P';
+    this.reversing = false;
+    this.steerSmoothed = 0;
+    this.steering = 0;
+    this.clearDrivePath();
+    this.ensureLegalDrivePose();
+    this.occupy(this.driveCells());
+    this.ensurePathsFromHere();
+    this.layout();
+    this.applySprite();
+    this.hooks.onChange?.();
+  }
+
   private south(): { x: number; y: number } {
     // Always the parked AABB so Get in / Get out never jumps the sprite.
     const size = parkSize(this.dir);

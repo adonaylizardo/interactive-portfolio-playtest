@@ -6181,6 +6181,118 @@ export class IsoScene {
     return this.objectVisuals.get(obj.id)?.zIndex ?? null;
   }
 
+  /** QA: objects-layer display list after a real render (Pixi sorts sortableChildren in place). */
+  qaJacRenderOrder(name: string): {
+    truckIndex: number;
+    buildingIndex: number;
+    truckZ: number;
+    buildingZ: number;
+    sameLayer: boolean;
+    jacAbove: string[];
+    footprint: { x: number; y: number; w: number; h: number };
+    boundsOverlap: number;
+  } | null {
+    const obj = objects.find((o) => o.name === name);
+    const truck = this.objectGraphics.get(JAC_ID);
+    const building = obj ? this.objectGraphics.get(obj.id) : undefined;
+    if (!obj || !truck || !building) return null;
+    this.app.render();
+    const kids = this.objectsLayer.children;
+    const bi = kids.indexOf(building);
+    const jacAbove = kids
+      .slice(bi + 1)
+      .filter((c) => c.visible && (c === truck || /jac/i.test(c.label ?? '')))
+      .map((c) => c.label ?? '?');
+    const tb = truck.getBounds();
+    const bb = building.getBounds();
+    const ix = Math.max(0, Math.min(tb.maxX, bb.maxX) - Math.max(tb.minX, bb.minX));
+    const iy = Math.max(0, Math.min(tb.maxY, bb.maxY) - Math.max(tb.minY, bb.minY));
+    return {
+      truckIndex: kids.indexOf(truck),
+      buildingIndex: bi,
+      truckZ: truck.zIndex,
+      buildingZ: building.zIndex,
+      sameLayer: truck.parent === building.parent,
+      jacAbove,
+      footprint: { x: obj.footprintX ?? obj.x, y: obj.footprintY ?? obj.y, w: obj.w ?? 1, h: obj.h ?? 1 },
+      boundsOverlap: ix * iy,
+    };
+  }
+
+  /**
+   * QA: rendered-pixel occlusion. Renders the stage with/without every JAC node and with/without
+   * the building; `leak` counts interior building pixels the van visibly changes (must be 0 when
+   * the building is in front).
+   */
+  qaJacOcclusion(name: string): {
+    leak: number;
+    edge: number;
+    overlap: number;
+    truckPx: number;
+    shownPx: number;
+    buildingPx: number;
+  } | null {
+    const obj = objects.find((o) => o.name === name);
+    const building = obj ? this.objectGraphics.get(obj.id) : undefined;
+    const truck = this.objectGraphics.get(JAC_ID);
+    if (!building || !truck) return null;
+    const jacNodes = this.objectsLayer.children.filter((c) => c === truck || /jac/i.test(c.label ?? ''));
+    const jacPrev = jacNodes.map((n) => n.visible);
+    const buildingPrev = building.visible;
+    const frame = new Rectangle(0, 0, this.app.screen.width, this.app.screen.height);
+    const grab = (jacOn: boolean, buildingOn: boolean) => {
+      jacNodes.forEach((n, i) => (n.visible = jacOn && jacPrev[i]));
+      building.visible = buildingOn && buildingPrev;
+      return this.app.renderer.extract.pixels({ target: this.app.stage, frame, resolution: 1 }).pixels;
+    };
+    const all = grab(true, true);
+    const noJac = grab(false, true);
+    const bare = grab(false, false);
+    const noBuilding = grab(true, false);
+    jacNodes.forEach((n, i) => (n.visible = jacPrev[i]));
+    building.visible = buildingPrev;
+    this.app.render();
+    const diff = (a: Uint8ClampedArray, b: Uint8ClampedArray, i: number) =>
+      Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]));
+    const w = frame.width;
+    const h = frame.height;
+    const mask = new Uint8Array(w * h);
+    for (let p = 0; p < mask.length; p++) mask[p] = diff(noJac, bare, p * 4) > 40 ? 1 : 0;
+    let leak = 0;
+    let edge = 0;
+    let overlap = 0;
+    let truckPx = 0;
+    let shownPx = 0;
+    let buildingPx = 0;
+    for (let p = 0; p < mask.length; p++) {
+      const i = p * 4;
+      const isTruck = diff(noBuilding, bare, i) > 40;
+      const shown = diff(all, noJac, i) > 24;
+      if (isTruck) truckPx += 1;
+      if (shown) shownPx += 1;
+      if (!mask[p]) continue;
+      buildingPx += 1;
+      if (isTruck) overlap += 1;
+      if (!shown) continue;
+      const x = p % w;
+      const y = (p - x) / w;
+      // Anti-aliased silhouette pixels let a hidden truck tint through; only the eroded interior counts.
+      let interior = x > 0 && y > 0 && x < w - 1 && y < h - 1;
+      for (let dy = -1; interior && dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!mask[p + dy * w + dx]) {
+            interior = false;
+            break;
+          }
+        }
+      }
+      if (interior) leak += 1;
+      else edge += 1;
+    }
+    return { leak, edge, overlap, truckPx, shownPx, buildingPx };
+  }
+
+
   private atJacDoor(maxDist: number): boolean {
     if (!this.jac) return false;
     const door = this.jac.driverDoorTile({ x: this.charTx, y: this.charTy });
@@ -6454,6 +6566,18 @@ export class IsoScene {
   }
 
   /** QA: cancel tap-to-park / auto-route so stick and R gear tests are not clamped to D. */
+  qaJacSpawnDrive(cx: number, cy: number, dir: 'se' | 'sw' | 'ne' | 'nw'): JacSnapshot | null {
+    if (!this.jac?.driving) return null;
+    this.pendingDriveEnter = null;
+    this.jac.qaSpawnDrive(cx, cy, dir);
+    this.charTx = this.jac.cx;
+    this.charTy = this.jac.cy;
+    this.startCameraFollow();
+    this.updateCameraFollow();
+    this.app?.render();
+    return this.jac.snapshot();
+  }
+
   qaJacCancelRoute(): void {
     this.jac?.clearDrivePath();
     this.pendingDriveEnter = null;
