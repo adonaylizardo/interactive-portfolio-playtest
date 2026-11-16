@@ -6107,6 +6107,7 @@ export class IsoScene {
       container: g,
       visual: v,
       tapBox: this.objectTapBoxes,
+      objectVisual: (id) => this.objectVisuals.get(id),
       onStuck: () => {
         if (this.pendingDriveEnter) this.retryDriveEnterOrGetOut();
         else this.events.onUnreachable?.();

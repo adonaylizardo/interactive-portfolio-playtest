@@ -16,7 +16,7 @@ import {
 import { muroWallTiles } from '../data/world';
 import { tileFootWorld, tileToWorld } from '../iso/math';
 import { findPathWith } from '../iso/pathfinding';
-import { objectOccluder, objectSpriteScale, playerBehind, type OccluderBox } from './mapSprites';
+import { objectOccluder, objectSpriteScale, type OccluderBox } from './mapSprites';
 import { spriteOpaqueTopWorld } from './spriteTop';
 import { spriteResolution } from './sprites';
 import { WALK_TILES_PER_S, type FacingDir } from './player';
@@ -133,6 +133,8 @@ type JacHooks = {
   container: Container;
   visual: JacVisual;
   tapBox: Map<string, Rectangle>;
+  /** Render zIndex and world-space sprite box the scene actually sorts and culls by. */
+  objectVisual?: (id: string) => { zIndex: number; cull: { x0: number; y0: number; x1: number; y1: number } } | undefined;
   onChange?: () => void;
   onStuck?: () => void;
 };
@@ -279,8 +281,6 @@ export class JacT9 {
   private body!: Sprite;
   private cone = new Sprite();
   private haze = new Sprite();
-  private ghost = new Sprite();
-  private ghostOnLayer = false;
   private loaded = false;
   private loading: Promise<void> | null = null;
   private textures = new Map<string, Texture>();
@@ -381,17 +381,11 @@ export class JacT9 {
     };
     this.cone.visible = false;
     this.haze.visible = false;
-    this.ghost.visible = false;
-    this.ghost.label = 'jac-ghost';
     this.cone.eventMode = 'none';
     this.haze.eventMode = 'none';
-    this.ghost.eventMode = 'none';
-    this.ghost.alpha = 0.62;
-    this.ghost.tint = 0xf4f6f8;
     hooks.container.addChildAt(this.cone, 0);
     hooks.container.addChild(this.haze);
     this.snapshotClaimFromGrid();
-    this.attachGhost();
     this.precomputeDoorSits();
   }
 
@@ -611,27 +605,61 @@ export class JacT9 {
    * its footprint). Only draw in front once the sit is past both the east and south faces.
    */
   private truckDepthKey(): number {
-    const face = this.driving && !this.pendingExit ? dirFromHeading(this.heading) : this.dir;
     let depth = this.cx + this.cy;
-    for (const [x, y] of this.parkCellsAt(this.cx, this.cy, face)) {
+    for (const [x, y] of this.parkCellsAt(this.cx, this.cy, this.dir)) {
       depth = Math.max(depth, x + y);
     }
     return depth;
   }
 
+  /**
+   * zIndex inside the objects layer. Every building whose sprite can overlap the van on
+   * screen is ordered by a separating axis between footprints (edge coords) and compared
+   * against that building's live render zIndex, so a roof in front always covers the van.
+   */
   private sortDepth(): number {
-    let z = this.truckDepthKey() + 0.12;
     const truckKey = this.truckDepthKey();
+    const cells = this.parkCellsAt(this.cx, this.cy, this.dir);
+    let tx0 = Infinity;
+    let ty0 = Infinity;
+    let tx1 = -Infinity;
+    let ty1 = -Infinity;
+    for (const [x, y] of cells) {
+      tx0 = Math.min(tx0, x - 0.5);
+      ty0 = Math.min(ty0, y - 0.5);
+      tx1 = Math.max(tx1, x + 0.5);
+      ty1 = Math.max(ty1, y + 0.5);
+    }
+    const cull = this.hooks.visual.cull;
+    let hi = Infinity;
+    let lo = -Infinity;
     for (const o of objects) {
-      if (o.type !== 'building' || o.flat) continue;
+      if (o.type !== 'building' || o.flat || o.name === 'redoma' || o.id === JAC_ID) continue;
       const fx = o.footprintX ?? o.x;
       const fy = o.footprintY ?? o.y;
       const w = o.w ?? 1;
       const h = o.h ?? 1;
-      const bFront = fx + (w - 1) + (fy + (h - 1));
-      if (this.cx > fx + w + 6 || this.cy > fy + h + 6 || this.cx < fx - 6 || this.cy < fy - 6) continue;
-      if (truckKey <= bFront - 0.08) z = Math.min(z, bFront - 0.32);
+      const live = this.hooks.objectVisual?.(o.id);
+      const bz = live?.zIndex ?? fx + w - 1 + (fy + h - 1);
+      if (live) {
+        const c = live.cull;
+        if (c.x1 <= cull.x0 || c.x0 >= cull.x1 || c.y1 <= cull.y0 || c.y0 >= cull.y1) continue;
+      }
+      const bx0 = fx - 0.5;
+      const by0 = fy - 0.5;
+      const bx1 = fx + w - 0.5;
+      const by1 = fy + h - 0.5;
+      let behind = tx1 <= bx0 + 1e-6 || ty1 <= by0 + 1e-6;
+      const front = tx0 >= bx1 - 1e-6 || ty0 >= by1 - 1e-6;
+      if (behind && front) continue;
+      if (!behind && !front) behind = truckKey <= fx + w - 1 + (fy + h - 1) - 0.08;
+      if (behind) hi = Math.min(hi, bz);
+      else lo = Math.max(lo, bz);
     }
+    let z = truckKey + 0.12;
+    if (z >= hi) z = hi - 0.32;
+    if (z <= lo) z = lo + 0.12;
+    if (z >= hi) z = lo < hi ? (lo + hi) / 2 : hi - 0.32;
     return z;
   }
 
@@ -2592,49 +2620,11 @@ export class JacT9 {
     };
     v.zIndex = this.sortDepth();
     this.hooks.container.zIndex = v.zIndex;
-    this.layoutGhost(foot.x + lx, foot.y + ly, sc, v.zIndex);
     const pad = this.driving ? 0 : 8 * sc;
     const box = new Rectangle(lx + 40 * sc - pad, ly + 8 * sc - pad, 200 * sc + pad * 2, 120 * sc + pad * 2);
     this.hooks.tapBox.set(this.obj.id, box);
     this.hooks.container.hitArea = box;
     this.hooks.container.eventMode = 'static';
-  }
-
-  private vanBehindBuilding(): boolean {
-    for (const o of objects) {
-      if (o.type !== 'building' || o.flat) continue;
-      const box = objectOccluder(o);
-      if (box && playerBehind(box, this.cx, this.cy)) return true;
-    }
-    return false;
-  }
-
-  private attachGhost(): void {
-    if (this.ghostOnLayer) return;
-    const layer = this.hooks.container.parent;
-    if (!layer) return;
-    layer.addChild(this.ghost);
-    this.ghostOnLayer = true;
-  }
-
-  /** Silhouette in front of a roof that is currently hiding the van body. */
-  private layoutGhost(wx: number, wy: number, sc: number, vanZ: number): void {
-    if (!this.body.visible) {
-      this.ghost.visible = false;
-      return;
-    }
-    this.attachGhost();
-    if (!this.ghostOnLayer) return;
-    const occluded = vanZ < this.cx + this.cy + 0.05 || this.vanBehindBuilding();
-    const tex = this.body.texture;
-    const ready = !!tex && tex.frame.width > 8 && tex.frame.height > 8;
-    this.ghost.position.set(wx, wy);
-    this.ghost.scale.set(sc);
-    this.ghost.zIndex = 1_000_000;
-    const stray = Math.hypot(wx - (this.hooks.container.x + this.body.x), wy - (this.hooks.container.y + this.body.y)) > 48;
-    this.ghost.visible = occluded && ready && !stray;
-    if (!this.ghost.visible) return;
-    this.ghost.texture = tex;
   }
 
   /** Skip empty / off-sheet frames so a bad wheel cell never blanks the van. */
