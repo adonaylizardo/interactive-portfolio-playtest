@@ -4618,9 +4618,29 @@ body.jac-menu-open .checklist {
 
 .jac-sheet__grid {
   display: grid;
-  grid-template-columns: 96px 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   align-items: center;
+}
+
+.jac-sheet__grid > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.jac-sheet .jac-controls-row {
+  flex-wrap: nowrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.jac-sheet .jac-lights-seg {
+  flex: 0 0 auto;
+  max-width: calc(100% - 54px);
+}
+
+.jac-sheet .jac-toggles {
+  justify-content: end;
 }
 
 .jac-sheet__in {

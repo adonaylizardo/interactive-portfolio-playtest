@@ -8,13 +8,17 @@
  *
  * Gates (each viewport):
  *   G1 gas right after a real Get in moves the truck ≥ 1 tile in 1.5 s
- *   G2 from spawn, no 1.5 s window with gas + steer held and zero motion; pushed into the cactus
- *      (26,20) and the tree (40,18), steer + gas / stick circle frees the truck without R
+ *   G2 anywhere, no 1.5 s window with gas + steer held and < 0.02 tiles of travel; the nose
+ *      must actually touch the cactus (26,20) and the tree (40,18), then steer + gas frees it
  *   G3 motion direction never more than 35° off the drawn sprite
  *   G4 desktop dock stable while driving: gear buttons keep DOM identity, no needle jump > 40° per
  *      60 fps frame, no full-dock colour flash
  *   G5 phone: the stick stays visible for the whole drive and tracks its own finger
  *   G6 zero console errors / page errors
+ *   G7 per-frame displacement ≤ max(0.35, 1.6·|v|·dt + 0.08)
+ *   G8 no sprite rotation of 90° or more with < 0.3 tiles of travel since the previous facing
+ *
+ * The approach to a prop reads the pose to steer. Every steer change is appended to `reroutes`.
  *
  * Usage:
  *   npm run build:preview-integracion
@@ -199,9 +203,9 @@ function makeInput(page, cdp, touch) {
     touchEv,
     async tap(x, y) {
       if (touch) {
-        await touchEv('touchStart', [{ x, y, id: 1 }]);
-        await wait(60);
-        await touchEv('touchEnd', []);
+        // Playwright's touchscreen tap carries real input timestamps. A raw CDP
+        // touchEnd does not, and the map rejects that as a long-press.
+        await page.touchscreen.tap(Math.round(x), Math.round(y));
       } else {
         await page.mouse.move(x, y);
         await page.mouse.down();
@@ -264,11 +268,14 @@ async function realGetIn(page, input, aim) {
     await wait(450);
   }
   const s = await truckScreen(page);
-  await input.tap(s.x, s.y);
   let tappedIn = false;
-  for (let i = 0; i < 40 && !tappedIn; i++) {
-    await wait(150);
-    tappedIn = await realTapSelector(page, input, '.jac-menu [data-jac="in"], .jac-sheet [data-jac="in"], .jac-dock [data-jac="in"]');
+  for (const oy of [0, -20]) {
+    await input.tap(s.x, s.y + oy);
+    for (let i = 0; i < 12 && !tappedIn; i++) {
+      await wait(150);
+      tappedIn = await realTapSelector(page, input, '.jac-menu [data-jac="in"], .jac-sheet [data-jac="in"], .jac-dock [data-jac="in"]');
+    }
+    if (tappedIn) break;
   }
   if (!tappedIn) throw new Error(`Súbete never appeared after tapping the truck at ${JSON.stringify(s)}`);
   await page.waitForFunction(() => window.__playtestQa.jac()?.driving === true, null, { timeout: 40_000 });
@@ -331,11 +338,34 @@ async function keyCircle(page, ms, turns, sign = 1) {
   for (let i = 0; i < 8 * turns; i++) await holdKeys(page, seq[i % 8], per);
 }
 
+const NOSE = { se: [1, 0], sw: [0, 1], nw: [-1, 0], ne: [0, -1] };
+
+/** Front of the 5-tile body. Snapshot w/h is the 2×2 drive box while driving, so dir decides. */
+function nosePoint(pose) {
+  const v = NOSE[pose.dir] || [1, 0];
+  return { x: pose.cx + v[0] * 2.5, y: pose.cy + v[1] * 2.5 };
+}
+
+/** Distance from a point to the unit cell rectangle [cellX, cellX+1] × [cellY, cellY+1]. */
+function distToCell(px, py, cellX, cellY) {
+  const dx = Math.max(cellX - px, 0, px - (cellX + 1));
+  const dy = Math.max(cellY - py, 0, py - (cellY + 1));
+  return Math.hypot(dx, dy);
+}
+
+function noseDist(pose, cellX, cellY) {
+  if (!pose) return Infinity;
+  const n = nosePoint(pose);
+  return distToCell(n.x, n.y, cellX, cellY);
+}
+
 /**
- * Closed-loop driver: reads the pose (observation only) and steers with real input — W + A/D on
- * desktop, one finger on the stick on phone. Never reverses and never touches the gear buttons.
+ * Closed-loop driver: reads the pose and steers with real input — W + A/D on desktop, one finger
+ * on the stick on phone. Never reverses and never touches the gear buttons.
+ * Every change of steer command is pushed to `reroutes` (open-loop holds do not come through here).
+ * `contact` keeps steering at that prop cell until the nose is within 0.3 tiles of it.
  */
-async function driveTo(page, input, waypoints, { timeoutMs = 20_000, arrive = 0.7, stopOnStall = false } = {}) {
+async function driveTo(page, input, waypoints, { timeoutMs = 20_000, arrive = 0.7, stopOnStall = false, contact = null } = {}) {
   const touch = input.touch;
   const pad = touch ? await stickPad(page) : null;
   const R = 44;
@@ -355,38 +385,75 @@ async function driveTo(page, input, waypoints, { timeoutMs = 20_000, arrive = 0.
   let i = 0;
   let pose = null;
   const trace = [];
+  const reroutes = [];
+  let lastCmd = '';
   let restSince = null;
   let stalled = false;
-  while (i < waypoints.length && Date.now() - t0 < timeoutMs) {
+  let contactDist = contact ? Infinity : null;
+  while (Date.now() - t0 < timeoutMs) {
     pose = await page.evaluate(() => window.__playtestQa.jac());
+    if (contact) {
+      contactDist = noseDist(pose, contact.x, contact.y);
+      if (contactDist <= 0.3) break;
+    }
     if (Date.now() - t0 > 600) {
       if (Math.abs(pose.vel) < 0.3) restSince ??= Date.now();
       else restSince = null;
-      if (stopOnStall && restSince && Date.now() - restSince > 400) {
+      if (stopOnStall && !contact && restSince && Date.now() - restSince > 400) {
         stalled = true;
         break;
       }
     }
+    const wp = i < waypoints.length ? waypoints[i] : contact ? { x: contact.x + 0.5, y: contact.y + 0.5 } : null;
+    if (!wp) break;
     // Nosed into something with the target dead ahead: steer (like a driver would) instead of
     // holding plain gas against it.
     const pinned = !!restSince && Date.now() - restSince > 500;
     if (trace.length === 0 || Date.now() - trace.at(-1)[0] > 400) {
       trace.push([Date.now(), +pose.cx.toFixed(2), +pose.cy.toFixed(2), +pose.heading.toFixed(2), pose.dir, i]);
     }
-    const wp = waypoints[i];
-    const dx = wp.x - pose.cx;
-    const dy = wp.y - pose.cy;
+    const aimFrom = contact && i >= waypoints.length ? nosePoint(pose) : pose;
+    const dx = wp.x - aimFrom.x;
+    const dy = wp.y - aimFrom.y;
     const dist = Math.hypot(dx, dy);
     let e = Math.atan2(dy, dx) / (Math.PI / 2) - pose.heading;
     e = ((((e + 2) % 4) + 4) % 4) - 2;
     // Arrived, or already alongside / past it (the van cannot turn tighter than ~2 tiles).
-    if (dist < arrive || (dist < 1.6 && Math.abs(e) > 0.8)) {
+    // The contact chase ignores that shortcut and stops only when the nose touches the cell.
+    // A contact chase has to actually reach the approach point. The "already
+    // alongside" shortcut leaves the nose a tile off a one-cell prop.
+    if (i < waypoints.length && (dist < arrive || (!contact && dist < 1.6 && Math.abs(e) > 0.8))) {
       i++;
       continue;
     }
-    const side = pinned ? (e < -0.06 ? -1 : 1) : Math.abs(e) > 0.06 ? Math.sign(e) : 0;
+    // A full-lock key (or a stick that just left a turn) leaves smoothed steer and the
+    // heading a few degrees past the sprite. Held like that, the nose walks off a
+    // one-cell prop. While the aim error is already small, counter-steer until the
+    // heading sits on the sprite, then go straight.
+    let off = pose.heading - Math.round(pose.heading);
+    off = ((((off + 2) % 4) + 4) % 4) - 2;
+    const settle = !pinned && Math.abs(e) <= 0.18 && (Math.abs(off) > 0.02 || Math.abs(pose.steering) > 0.05);
+    let side;
+    if (pinned) side = e < -0.06 ? -1 : 1;
+    else if (settle) side = off > 0.02 ? -1 : off < -0.02 ? 1 : -Math.sign(pose.steering || 1);
+    else side = Math.abs(e) > 0.06 ? Math.sign(e) : 0;
+    const cmd = side > 0 ? 'right' : side < 0 ? 'left' : 'straight';
+    if (cmd !== lastCmd) {
+      if (lastCmd) {
+        reroutes.push({
+          t: Date.now() - t0,
+          from: lastCmd,
+          to: cmd,
+          pinned,
+          cx: +pose.cx.toFixed(2),
+          cy: +pose.cy.toFixed(2),
+          dir: pose.dir,
+        });
+      }
+      lastCmd = cmd;
+    }
     if (touch) {
-      const sx = pinned ? side * 0.75 : Math.max(-1, Math.min(1, e * 3));
+      const sx = pinned ? side * 0.75 : settle ? side * 0.55 : Math.abs(e) <= 0.18 ? 0 : Math.max(-1, Math.min(1, e * 3));
       const gy = pinned ? 0.66 : Math.abs(e) > 0.5 ? 0.55 : 0.9;
       await input.touchEv('touchMove', [{ x: pad.x + sx * R, y: pad.y - gy * R, id: 1 }]);
     } else {
@@ -394,11 +461,27 @@ async function driveTo(page, input, waypoints, { timeoutMs = 20_000, arrive = 0.
     }
     await wait(60);
   }
+    // Brake on the contact pose. Releasing gas lets the truck coast off a one-cell prop
+    // before the gate reads the nose.
+    if (contact && contactDist != null && contactDist <= 0.3) {
+      const tBrake = Date.now();
+      while (Date.now() - tBrake < 600) {
+        pose = await page.evaluate(() => window.__playtestQa.jac());
+        const nd = noseDist(pose, contact.x, contact.y);
+        if (nd < contactDist) contactDist = nd;
+        if (Math.abs(pose.vel) < 0.12) break;
+        if (touch) await input.touchEv('touchMove', [{ x: pad.x, y: pad.y + R, id: 1 }]);
+        else await setKeys(['down']);
+        await wait(40);
+      }
+    }
   if (touch) await input.touchEv('touchEnd', []);
   else await setKeys([]);
-  const reached = i >= waypoints.length;
+  const reached = i >= waypoints.length && (!contact || (contactDist != null && contactDist <= 0.3));
   return {
     reached,
+    reroutes,
+    ...(contact ? { contactDist: contactDist == null ? null : +contactDist.toFixed(3) } : {}),
     ...(stopOnStall ? { stalled } : {}),
     at: pose ? [+pose.cx.toFixed(2), +pose.cy.toFixed(2), pose.dir] : null,
     ...(reached ? {} : { trace: trace.map(([t, ...r]) => [t - t0, ...r]) }),
@@ -470,6 +553,8 @@ function spriteMismatch(samples) {
   for (let i = 1; i < samples.length; i++) {
     const a = samples[i - 1];
     const b = samples[i];
+    const dtMs = b.t - a.t;
+    if (!(dtMs > 0 && dtMs <= 400)) continue;
     const dx = b.cx - a.cx;
     const dy = b.cy - a.cy;
     const d = Math.hypot(dx, dy);
@@ -506,6 +591,68 @@ function dockStability(samples, dockMutations, gearReplaced) {
     if (b.dockShadow && /255,\s*181,\s*71/.test(b.dockShadow)) orange++;
   }
   return { maxNeedleJumpDeg: +maxJump.toFixed(1), where, dockBackgrounds: [...bgs], orangeFrames: orange, dockMutations, gearReplaced };
+}
+
+const G7_FLOOR = 0.35;
+const FACING_STEP = { se: 0, sw: 1, nw: 2, ne: 3 };
+
+/** G7: one animation frame must not jump farther than the speed budget. */
+function teleports(samples) {
+  const bad = [];
+  for (let i = 1; i < samples.length; i++) {
+    const a = samples[i - 1];
+    const b = samples[i];
+    const d = Math.hypot(b.cx - a.cx, b.cy - a.cy);
+    const dtMs = b.t - a.t;
+    // A gap or a backwards clock is a missed frame or a new session, not one step.
+    if (!(dtMs > 0 && dtMs <= 400)) continue;
+    const dt = dtMs / 1000;
+    const lim = Math.max(G7_FLOOR, 1.6 * Math.abs(b.vel) * dt + 0.08);
+    if (d > lim + 1e-3) {
+      bad.push({
+        d: +d.toFixed(3),
+        lim: +lim.toFixed(3),
+        dtMs: Math.round(b.t - a.t),
+        vel: +b.vel.toFixed(2),
+        at: [+b.cx.toFixed(2), +b.cy.toFixed(2)],
+      });
+    }
+  }
+  return bad;
+}
+
+function facingSteps(from, to) {
+  const d = Math.abs((FACING_STEP[from] ?? 0) - (FACING_STEP[to] ?? 0)) % 4;
+  return Math.min(d, 4 - d);
+}
+
+/** G8: a sprite step is 90°. It needs ≥ 0.3 tiles since the previous facing. */
+function spins(samples) {
+  const bad = [];
+  if (samples.length < 2) return bad;
+  let travel = 0;
+  let dir = samples[0].dir;
+  for (let i = 1; i < samples.length; i++) {
+    const dtMs = samples[i].t - samples[i - 1].t;
+    if (!(dtMs > 0 && dtMs <= 400)) {
+      dir = samples[i].dir;
+      travel = 0;
+      continue;
+    }
+    travel += Math.hypot(samples[i].cx - samples[i - 1].cx, samples[i].cy - samples[i - 1].cy);
+    if (samples[i].dir === dir) continue;
+    if (facingSteps(dir, samples[i].dir) >= 1 && travel < 0.3) {
+      bad.push({
+        from: dir,
+        to: samples[i].dir,
+        travel: +travel.toFixed(3),
+        at: [+samples[i].cx.toFixed(2), +samples[i].cy.toFixed(2)],
+      });
+    }
+    dir = samples[i].dir;
+    travel = 0;
+  }
+  return bad;
 }
 
 function fpsOf(samples) {
@@ -624,13 +771,36 @@ async function runViewport(browser, kind) {
     const s = await newSession(browser, kind);
     await realGetIn(s.page, s.input, s.aim);
     await startSampling(s.page);
-    const route = await driveTo(s.page, s.input, [
-      { x: 22.5, y: 10.5 },
-      { x: 23.5, y: 13 },
-      { x: 24.5, y: 15.5 },
-      { x: 26.8, y: 17.4 },
-    ]);
+    // Come in from the east. A north approach leaves the 5-long nose a full tile east of
+    // the one-cell cactus, and straight creep cannot shift sideways onto it.
+    // Keys take the east line that clears the cactus. The stick follows the same
+    // corridor as the tree run (that one reaches every time), then drops south
+    // and comes back west along y≈20.4.
+    const route = await driveTo(
+      s.page,
+      s.input,
+      touch
+        ? [
+            { x: 22.5, y: 10.5 },
+            { x: 23.5, y: 13 },
+            { x: 24.5, y: 15.5 },
+            { x: 27, y: 17.4 },
+            { x: 31, y: 17.5 },
+            { x: 34.5, y: 17.5 },
+            { x: 34.5, y: 20.4 },
+            { x: 29.4, y: 20.4 },
+          ]
+        : [
+            { x: 22.5, y: 10.5 },
+            { x: 23.5, y: 13 },
+            { x: 24.5, y: 15.5 },
+            { x: 34, y: 17.5 },
+            { x: 34, y: 20.4 },
+          ],
+    );
+    const chase = await driveTo(s.page, s.input, [{ x: 29.4, y: 20.4 }], { contact: { x: 26, y: 20 }, timeoutMs: 20_000 });
     const atCactus = await s.page.evaluate(() => window.__playtestQa.jac());
+    const cactusNose = Math.min(noseDist(atCactus, 26, 20), chase.contactDist ?? Infinity);
     await shot(s.page, `${tag}-04a-cactus`);
     const right = touch ? { x: 0.75, y: -0.66 } : ['up', 'right'];
     const left = touch ? { x: -0.75, y: -0.66 } : ['up', 'left'];
@@ -645,8 +815,11 @@ async function runViewport(browser, kind) {
     const end = await s.page.evaluate(() => window.__playtestQa.jac());
     res.runs.cactus = {
       route,
+      chase,
+      reroutes: [...route.reroutes, ...chase.reroutes],
       atCactus: [+atCactus.cx.toFixed(2), +atCactus.cy.toFixed(2), atCactus.dir],
-      nearCactus: Math.hypot(atCactus.cx - 26, atCactus.cy - 20) < 3.5,
+      noseDist: +cactusNose.toFixed(3),
+      nearCactus: cactusNose <= 0.3,
       travel: +travelOf(r2.samples).toFixed(2),
       end: [+end.cx.toFixed(2), +end.cy.toFixed(2), end.dir],
       freed: Math.hypot(end.cx - atCactus.cx, end.cy - atCactus.cy) > 1,
@@ -671,9 +844,10 @@ async function runViewport(browser, kind) {
       { x: 31, y: 17.5 },
       { x: 34.5, y: 17.5 },
     ]);
-    // Steer at the one-cell tree until the nose stops on it; plain gas can glance past it.
-    await driveTo(s.page, s.input, [{ x: 40, y: 17.8 }], { timeoutMs: 6000, stopOnStall: true });
+    // Keep steering at the tree cell until the nose is within 0.3 tiles of it.
+    const chase = await driveTo(s.page, s.input, [{ x: 40, y: 17.8 }], { contact: { x: 40, y: 18 }, timeoutMs: 20_000 });
     const atTree = await s.page.evaluate(() => window.__playtestQa.jac());
+    const treeNose = Math.min(noseDist(atTree, 40, 18), chase.contactDist ?? Infinity);
     await shot(s.page, `${tag}-05-tree`);
     if (touch) {
       await holdStick(s.page, s.input, { x: 0.75, y: -0.66 }, 1500);
@@ -688,8 +862,11 @@ async function runViewport(browser, kind) {
     const gearsUsed = [...new Set(r3.samples.map((x) => x.gear))];
     res.runs.tree = {
       route,
+      chase,
+      reroutes: [...route.reroutes, ...chase.reroutes],
       atTree: [+atTree.cx.toFixed(2), +atTree.cy.toFixed(2), atTree.dir],
-      touchingTree: Math.abs(atTree.cy - 18) < 2.2 && atTree.cx > 35 && atTree.cx < 39,
+      noseDist: +treeNose.toFixed(3),
+      touchingTree: treeNose <= 0.3,
       end: [+end.cx.toFixed(2), +end.cy.toFixed(2), end.dir],
       freed: Math.hypot(end.cx - atTree.cx, end.cy - atTree.cy) > 1,
       gearsUsed,
@@ -727,26 +904,29 @@ async function runViewport(browser, kind) {
   }
 
   const samples = all.flat();
-  const spawnDl = spawnSeq.flatMap((x) => deadlocks(x, touch));
-  const dl = [...spawnDl, ...all.filter((x) => !spawnSeq.includes(x)).flatMap((x) => deadlocks(x, touch))];
+  const dl = all.flatMap((x) => deadlocks(x, touch));
   if (process.env.QA_DUMP_SAMPLES) {
     const near = (d) => samples.filter((x) => Math.abs(x.t - d.t) < 2500);
     res.deadlockSamples = dl.map((d) => ({ ...d, samples: near(d) }));
   }
   const g3 = all.map(spriteMismatch).reduce((a, b) => (b.deg > a.deg ? { ...b, frames: a.frames + b.frames } : { ...a, frames: a.frames + b.frames }));
+  const g7 = all.flatMap((x) => teleports(x));
+  const g8 = all.flatMap((x) => spins(x));
   const stickHidden = touch ? samples.filter((x) => x.driving && !x.stickVisible).length : 0;
   const freedOk = (r, touching) => touching && r.freed && !r.gearsUsed.includes('R');
   const treeOk = freedOk(res.runs.tree, res.runs.tree.touchingTree);
   const cactusOk = freedOk(res.runs.cactus, res.runs.cactus.nearCactus);
+  const rerouteN = (res.runs.cactus.reroutes?.length ?? 0) + (res.runs.tree.reroutes?.length ?? 0);
 
   res.gates = {
     G1: { pass: res.runs.g1.dist >= 1, detail: `seat ${JSON.stringify(res.runs.g1.seat)} → moved ${res.runs.g1.dist} tiles in 1.5 s (gear ${res.runs.g1.end.gear})` },
     G2: {
-      pass: spawnDl.length === 0 && treeOk && cactusOk,
+      pass: dl.length === 0 && treeOk && cactusOk,
       detail:
-        `from spawn: ${spawnDl.length} gas+steer windows with <${G2_MIN_TRAVEL} tile travel ${JSON.stringify(spawnDl.slice(0, 4))}; ` +
-        `cactus freed without R=${cactusOk}; tree freed without R=${treeOk}; ` +
-        `info: ${dl.length - spawnDl.length} stalls elsewhere (pockets that need R) ${JSON.stringify(dl.filter((d) => !spawnDl.includes(d)).slice(0, 4))}`,
+        `gas+steer windows with <${G2_MIN_TRAVEL} tile travel: ${dl.length} ${JSON.stringify(dl.slice(0, 4))}; ` +
+        `cactus nose ${res.runs.cactus.noseDist} freed without R=${cactusOk}; ` +
+        `tree nose ${res.runs.tree.noseDist} freed without R=${treeOk}; ` +
+        `closed-loop reroutes logged: ${rerouteN}`,
     },
     G3: { pass: g3.deg <= G3_MAX_DEG, detail: `worst ${g3.deg}° over ${g3.frames} moving frames ${JSON.stringify(g3)}` },
     G4: touch
@@ -763,6 +943,14 @@ async function runViewport(browser, kind) {
       ? { pass: stickHidden === 0 && !!stickTrack?.ok, detail: `stick hidden in ${stickHidden} driving frames; multi-touch ${JSON.stringify(stickTrack)}` }
       : { pass: true, detail: 'n/a (desktop has no stick)' },
     G6: { pass: errors.length === 0, detail: errors.length ? errors.slice(0, 5).join(' | ') : '0 console errors' },
+    G7: {
+      pass: g7.length === 0,
+      detail: g7.length ? `${g7.length} frames over the step cap ${JSON.stringify(g7.slice(0, 3))}` : 'no per-frame teleport',
+    },
+    G8: {
+      pass: g8.length === 0,
+      detail: g8.length ? `${g8.length} sprite spins ${JSON.stringify(g8.slice(0, 3))}` : 'no 90° sprite step under 0.3 tiles',
+    },
   };
   return res;
 }
@@ -787,7 +975,7 @@ async function main() {
   fs.writeFileSync(path.join(OUT, 'drive-real.json'), JSON.stringify(results, null, 2));
   let ok = true;
   console.log('\nGate | ' + results.map((r) => r.viewport).join(' | '));
-  for (const g of ['G1', 'G2', 'G3', 'G4', 'G5', 'G6']) {
+  for (const g of ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8']) {
     console.log(`${g}   | ${results.map((r) => (r.gates[g].pass ? 'PASS' : 'FAIL')).join(' | ')}`);
     for (const r of results) {
       if (!r.gates[g].pass) ok = false;
