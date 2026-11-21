@@ -1,0 +1,5 @@
+15477c15477,15478
+<     if (gas && steerHard && (this.gear === "D" || this.gear === "R") && pinnedNow || straight) {
+---
+>     if (straight && !this.escapeLatch) { this.noteBump(Math.abs(this.vel)); this.vel = 0; return; }
+>     if (gas && steerHard && (this.gear === "D" || this.gear === "R") && pinnedNow) {
