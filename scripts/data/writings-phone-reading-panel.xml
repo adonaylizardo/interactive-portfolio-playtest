@@ -1,0 +1,21 @@
+<!-- Figma get_metadata excerpt: hoja-writings under 199:2095 -->
+<frame id="199:2206" name="hoja-writings" x="0" y="0" width="375" height="740">
+  <frame id="199:2207" name="agarre" x="16" y="1" width="343" height="16">
+    <frame id="199:2208" name="barra" x="151.5" y="10" width="40" height="4" />
+  </frame>
+  <frame id="199:2209" name="encabezado" x="16" y="29" width="343" height="44">
+    <instance id="199:2210" name="atras" x="0" y="0" width="44" height="44" />
+    <text id="199:2213" name="titulo" x="48" y="10" width="247" height="24" />
+    <instance id="199:2214" name="cerrar" x="299" y="0" width="44" height="44" />
+  </frame>
+  <frame id="199:2217" name="portada (placeholder)" x="16" y="85" width="343" height="193">
+    <instance id="199:2218" name="ui/icono" x="164" y="89" width="15" height="15" />
+  </frame>
+  <text id="199:2220" name="etiqueta" x="16" y="290" width="154" height="14" />
+  <text id="199:2221" name="titulo" x="16" y="316" width="343" height="28" />
+  <text id="199:2222" name="meta" x="16" y="356" width="164" height="16" />
+  <text id="199:2223" name="cuerpo" x="16" y="384" width="343" height="72" />
+  <text id="199:2224" name="cuerpo" x="16" y="468" width="343" height="72" />
+  <text id="199:2225" name="cuerpo" x="16" y="552" width="343" height="72" />
+  <instance id="199:2226" name="ui/boton" x="16" y="636" width="165" height="44" />
+</frame>

@@ -1,0 +1,148 @@
+{
+ "asset": "teresa-carreno",
+ "titulo": "Teatro Teresa Carreño (Caracas) · edificio Talks",
+ "tipo": "edificio (exterior)",
+ "estado": "APROBADO",
+ "aprobado_para_mapa": false,
+ "colocacion": {
+  "activa": false,
+  "instrucciones": "Colocación: sea S el punto del mundo en pantalla (edificios: vértice frontal de la huella; tiles: vértice inferior del rombo de la casilla; muebles: su punto de piso). Dibuja el frame con la esquina superior izquierda en (S.x − ancla.x, S.y − ancla.y − offset_y). Con offset_y = 0 el ancla cae justo en S; con offset_y = −24 (tiles de borde) el ancla queda 24 px por debajo de S, así el rombo calza con la grilla y la losa cuelga 24 px. En @2x multiplica todo por 2."
+ },
+ "huella": {
+  "x": 10,
+  "y": 7
+ },
+ "origen": {
+  "tipo": "programático PIL (sin Figma, sin SVG)",
+  "script": "/workspace/portfolio/qa/edificios/teresa-carreno-src/build_teresa_v2.py",
+  "fecha": "2026-10-16",
+  "referencias": "/workspace/portfolio/personaje-refs/teresa-carreno/refs.md",
+  "v1": "/workspace/portfolio/qa/edificios/teresa-carreno-src/build_teresa_v1.py (5×4… 7×5, reemplazado)",
+  "v2a": "/workspace/portfolio/qa/edificios/teresa-carreno-src/build_teresa_v2a_hormigon.py (hormigón claro, descartado)"
+ },
+ "unidades": "px @1x (multiplica por 2 para @2x)",
+ "nota": "Huella 10×7 tiles (128×64 @2x). Ancla = centro inferior del frame (288,462) @1x. OJO: el vértice frontal del suelo cae en (336,462), +48 px en x respecto del ancla. Vértice trasero [240.0, 190.0]; esquinas laterales [16.0, 302.0] y [560.0, 350.0]. Exterior e interior comparten frame y ancla.",
+ "variantes": [
+  {
+   "nombre": "estado=default, luz=encendida, zoom=cerca",
+   "nodo": null,
+   "archivos": {
+    "png1x": "teresa-carreno__estado-default_luz-encendida_zoom-cerca@1x.png",
+    "png2x": "teresa-carreno__estado-default_luz-encendida_zoom-cerca@2x.png"
+   },
+   "tamano": {
+    "w": 576,
+    "h": 462
+   },
+   "ancla": {
+    "x": 288,
+    "y": 462
+   },
+   "offset_y": 0,
+   "vertice_frontal_suelo": {
+    "x": 336.0,
+    "y": 462.0
+   }
+  },
+  {
+   "nombre": "estado=default, luz=apagada, zoom=cerca",
+   "nodo": null,
+   "archivos": {
+    "png1x": "teresa-carreno__estado-default_luz-apagada_zoom-cerca@1x.png",
+    "png2x": "teresa-carreno__estado-default_luz-apagada_zoom-cerca@2x.png"
+   },
+   "tamano": {
+    "w": 576,
+    "h": 462
+   },
+   "ancla": {
+    "x": 288,
+    "y": 462
+   },
+   "offset_y": 0,
+   "vertice_frontal_suelo": {
+    "x": 336.0,
+    "y": 462.0
+   }
+  },
+  {
+   "nombre": "estado=hover, luz=encendida, zoom=cerca",
+   "nodo": null,
+   "archivos": {
+    "png1x": "teresa-carreno__estado-hover_luz-encendida_zoom-cerca@1x.png",
+    "png2x": "teresa-carreno__estado-hover_luz-encendida_zoom-cerca@2x.png"
+   },
+   "tamano": {
+    "w": 576,
+    "h": 462
+   },
+   "ancla": {
+    "x": 288,
+    "y": 462
+   },
+   "offset_y": 0,
+   "vertice_frontal_suelo": {
+    "x": 336.0,
+    "y": 462.0
+   }
+  },
+  {
+   "nombre": "estado=resaltado, luz=encendida, zoom=cerca",
+   "nodo": null,
+   "archivos": {
+    "png1x": "teresa-carreno__estado-resaltado_luz-encendida_zoom-cerca@1x.png",
+    "png2x": "teresa-carreno__estado-resaltado_luz-encendida_zoom-cerca@2x.png"
+   },
+   "tamano": {
+    "w": 576,
+    "h": 462
+   },
+   "ancla": {
+    "x": 288,
+    "y": 462
+   },
+   "offset_y": 0,
+   "vertice_frontal_suelo": {
+    "x": 336.0,
+    "y": 462.0
+   }
+  },
+  {
+   "nombre": "estado=default, zoom=lejos",
+   "nodo": null,
+   "archivos": {
+    "png1x": "teresa-carreno__estado-default_zoom-lejos@1x.png",
+    "png2x": "teresa-carreno__estado-default_zoom-lejos@2x.png"
+   },
+   "tamano": {
+    "w": 576,
+    "h": 462
+   },
+   "ancla": {
+    "x": 288,
+    "y": 462
+   },
+   "offset_y": 0,
+   "vertice_frontal_suelo": {
+    "x": 336.0,
+    "y": 462.0
+   }
+  }
+ ],
+ "letrero": {
+  "texto": "TALKS",
+  "donde": "franja de vidrio oscuro vertical de la torre, cara +y; letras 5×7 en world/glow; luz=apagada las deja en gris"
+ },
+ "ambar_medido_1x": {
+  "encendida": "0,99 %",
+  "apagada": "0,04 %",
+  "hover": "0,99 %",
+  "resaltado": "1,75 %",
+  "lejos": "0,07 %"
+ },
+ "muebles_compartidos": [
+  "muebles/farol (5 en la plaza)"
+ ],
+ "version": "v2b",
+ "paleta": "la del kit (tokens.ts), igual que Catedral y Sambil: techo prop-face, +x tile-top, +y tile-side, contorno prop-line; ámbar world/glow solo como luz"
+}

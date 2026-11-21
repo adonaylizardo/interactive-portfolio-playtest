@@ -1,0 +1,9 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="257" height="240.5" viewBox="0 0 257 240.5" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="edificio/estudio">
+<path id="muro-izq" d="M0.5 80L128.5 144V240L0.5 176V80Z" fill="#24262B" stroke-linecap="round" stroke-linejoin="round" stroke="#5A5E66"/>
+<path id="muro-der" d="M128.5 144L256.5 80V176L128.5 240V144Z" fill="#121316" stroke-linecap="round" stroke-linejoin="round" stroke="#5A5E66"/>
+<path id="techo" d="M128.5 16L256.5 80L128.5 144L0.5 80L128.5 16Z" fill="#1A1C20" stroke-linecap="round" stroke-linejoin="round" stroke="#5A5E66"/>
+<path id="ventana" d="M168.5 148L208.5 128V152L168.5 172V148Z" fill="#1A1C20" stroke-linecap="round" stroke-linejoin="round" stroke="#5A5E66"/>
+<path id="puerta" d="M76.5 214L100.5 226V186L76.5 174V214Z" fill="#121316" stroke-linecap="round" stroke-linejoin="round" stroke="#5A5E66"/>
+</g>
+</svg>

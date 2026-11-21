@@ -1,0 +1,75 @@
+{
+ "nota": "Solo referencia visual. No se usan píxeles de estas fotos en ninguna pieza ni frame; solo aparecen (con crédito) en la hoja de comparación de QA.",
+ "fotos": [
+  {
+   "archivo": "refs/catedral-frente_jesus-david-rios.jpg",
+   "titulo": "File:Catedral Metropolitana de Barquisimeto.jpg",
+   "pagina": "https://commons.wikimedia.org/wiki/File:Catedral_Metropolitana_de_Barquisimeto.jpg",
+   "original": "https://upload.wikimedia.org/wikipedia/commons/6/6a/Catedral_Metropolitana_de_Barquisimeto.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "autor": "Flickr user Jesús David Ríos",
+   "licencia": "CC BY-SA 2.0",
+   "licencia_url": "https://creativecommons.org/licenses/by-sa/2.0",
+   "tamano_descargado": [
+    1280,
+    950
+   ],
+   "uso": "guía principal del alzado de la Catedral (frente simétrico: torre-linterna, falda, pórtico, alas)"
+  },
+  {
+   "archivo": "refs/catedral-alas_reindertot.jpg",
+   "titulo": "File:Catedral de Barquisimeto.jpg",
+   "pagina": "https://commons.wikimedia.org/wiki/File:Catedral_de_Barquisimeto.jpg",
+   "original": "https://upload.wikimedia.org/wikipedia/commons/7/7f/Catedral_de_Barquisimeto.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "autor": "reindertot",
+   "licencia": "CC BY 2.0",
+   "licencia_url": "https://creativecommons.org/licenses/by/2.0",
+   "tamano_descargado": [
+    1280,
+    720
+   ],
+   "uso": "puntas de las alas que suben (silla del paraboloide) y ancho relativo de las alas"
+  },
+  {
+   "archivo": "refs/catedral-campanario_loganpaelias.jpg",
+   "titulo": "File:Vista de la Catedral de Barquisimeto y su campanario.jpg",
+   "pagina": "https://commons.wikimedia.org/wiki/File:Vista_de_la_Catedral_de_Barquisimeto_y_su_campanario.jpg",
+   "original": "https://upload.wikimedia.org/wikipedia/commons/3/3a/Vista_de_la_Catedral_de_Barquisimeto_y_su_campanario.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "autor": "LoganPaelias",
+   "licencia": "CC BY-SA 4.0",
+   "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+   "tamano_descargado": [
+    1280,
+    960
+   ],
+   "uso": "confirma que el campanario está separado del templo (no se incluye en la fachada)"
+  },
+  {
+   "archivo": "refs/flor-frontal_miguel-ahiezer-salcedo.jpg",
+   "titulo": "File:Flor de Venezuela (Barquisimeto), vista frontal.jpg",
+   "pagina": "https://commons.wikimedia.org/wiki/File:Flor_de_Venezuela_(Barquisimeto),_vista_frontal.jpg",
+   "original": "https://upload.wikimedia.org/wikipedia/commons/d/df/Flor_de_Venezuela_%28Barquisimeto%29%2C_vista_frontal.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "autor": "Miguel Ahiezer Salcedo",
+   "licencia": "CC BY-SA 3.0",
+   "licencia_url": "https://creativecommons.org/licenses/by-sa/3.0",
+   "tamano_descargado": [
+    1280,
+    853
+   ],
+   "uso": "guía principal de la Flor (pétalos abiertos, tallo, tambor, rampa, marquesina, jardineras)"
+  },
+  {
+   "archivo": "refs/flor-noche_beachpow.jpg",
+   "titulo": "File:Flor de venezuela barquisimeto lara 3.jpg",
+   "pagina": "https://commons.wikimedia.org/wiki/File:Flor_de_venezuela_barquisimeto_lara_3.jpg",
+   "original": "https://upload.wikimedia.org/wikipedia/commons/2/27/Flor_de_venezuela_barquisimeto_lara_3.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "autor": "beachpow",
+   "licencia": "CC BY-SA 4.0",
+   "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+   "tamano_descargado": [
+    1024,
+    577
+   ],
+   "uso": "vista frontal nocturna: abanico de pétalos convexos/cóncavos intercalados y tambor iluminado"
+  }
+ ]
+}
