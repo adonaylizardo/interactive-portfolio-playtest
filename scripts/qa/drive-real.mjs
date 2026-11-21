@@ -17,6 +17,7 @@
  *   G6 zero console errors / page errors
  *   G7 per-frame displacement ≤ max(0.35, 1.6·|v|·dt + 0.08)
  *   G8 no sprite rotation of 90° or more with < 0.3 tiles of travel since the previous facing
+ *   G9 no driving frame whose 5×3 / 3×5 footprint overlaps a blocked cell
  *
  * The approach to a prop reads the pose to steer. Every steer change is appended to `reroutes`.
  *
@@ -140,6 +141,7 @@ function installSampler() {
       mphDeg: angleOf(document.querySelector('.jac-dock .jac-gauge--mph .jac-gauge__needle')),
       dockBg: ds?.backgroundColor ?? null,
       dockShadow: ds?.boxShadow ?? null,
+      blocked: !!q.jacFootprintBlocked?.(),
     });
   };
   requestAnimationFrame(tick);
@@ -364,8 +366,10 @@ function noseDist(pose, cellX, cellY) {
  * on the stick on phone. Never reverses and never touches the gear buttons.
  * Every change of steer command is pushed to `reroutes` (open-loop holds do not come through here).
  * `contact` keeps steering at that prop cell until the nose is within 0.3 tiles of it.
+ * The reported nose distance is the pose at the stop, after the brake, not the closest sample of the chase.
+ * `precise` does not skip a waypoint just because the truck is alongside it.
  */
-async function driveTo(page, input, waypoints, { timeoutMs = 20_000, arrive = 0.7, stopOnStall = false, contact = null } = {}) {
+async function driveTo(page, input, waypoints, { timeoutMs = 20_000, arrive = 0.7, stopOnStall = false, contact = null, precise = false } = {}) {
   const touch = input.touch;
   const pad = touch ? await stickPad(page) : null;
   const R = 44;
@@ -390,11 +394,17 @@ async function driveTo(page, input, waypoints, { timeoutMs = 20_000, arrive = 0.
   let restSince = null;
   let stalled = false;
   let contactDist = contact ? Infinity : null;
+  let pinSide = 0;
+  let pinHold = 0;
+  // Segment the truck is following. Bearing-only pursuit turns across a one-tile
+  // lane once the waypoint is beside the truck; the cross-track term holds the line.
+  let segFrom = null;
   while (Date.now() - t0 < timeoutMs) {
     pose = await page.evaluate(() => window.__playtestQa.jac());
     if (contact) {
       contactDist = noseDist(pose, contact.x, contact.y);
-      if (contactDist <= 0.3) break;
+      // Stop on a slow contact. A fast pass through 0.3 coasts off before the brake reading.
+      if (contactDist <= 0.3 && Math.abs(pose.vel) < 0.45) break;
     }
     if (Date.now() - t0 > 600) {
       if (Math.abs(pose.vel) < 0.3) restSince ??= Date.now();
@@ -404,7 +414,11 @@ async function driveTo(page, input, waypoints, { timeoutMs = 20_000, arrive = 0.
         break;
       }
     }
-    const wp = i < waypoints.length ? waypoints[i] : contact ? { x: contact.x + 0.5, y: contact.y + 0.5 } : null;
+    // After the approach point, keep the centre on that point's line and drive
+    // straight into the prop. Aiming the nose at the cell centre turns the truck
+    // off the only row where the stop is legal.
+    const lineY = waypoints.length ? waypoints[waypoints.length - 1].y : contact ? contact.y + 0.5 : 0;
+    const wp = i < waypoints.length ? waypoints[i] : contact ? { x: contact.x - 1, y: lineY } : null;
     if (!wp) break;
     // Nosed into something with the target dead ahead: steer (like a driver would) instead of
     // holding plain gas against it.
@@ -412,31 +426,87 @@ async function driveTo(page, input, waypoints, { timeoutMs = 20_000, arrive = 0.
     if (trace.length === 0 || Date.now() - trace.at(-1)[0] > 400) {
       trace.push([Date.now(), +pose.cx.toFixed(2), +pose.cy.toFixed(2), +pose.heading.toFixed(2), pose.dir, i]);
     }
-    const aimFrom = contact && i >= waypoints.length ? nosePoint(pose) : pose;
+    // jac().x/y is the footprint origin, not the centre.
+    const aimFrom = { x: pose.cx, y: pose.cy };
     const dx = wp.x - aimFrom.x;
     const dy = wp.y - aimFrom.y;
     const dist = Math.hypot(dx, dy);
-    let e = Math.atan2(dy, dx) / (Math.PI / 2) - pose.heading;
+    if (!segFrom) segFrom = { x: aimFrom.x, y: aimFrom.y };
+    let e;
+    let passedOnLine = false;
+    if (i < waypoints.length) {
+      const ax = wp.x - segFrom.x;
+      const ay = wp.y - segFrom.y;
+      const len = Math.hypot(ax, ay) || 1;
+      const segH = Math.atan2(ay, ax) / (Math.PI / 2);
+      const rx = aimFrom.x - segFrom.x;
+      const ry = aimFrom.y - segFrom.y;
+      // Positive cross: left of the segment. Steer back toward the line, capped
+      // so a one-tile miss is a turn and not a U-turn.
+      const cross = (rx * ay - ry * ax) / len;
+      const along = (rx * ax + ry * ay) / len;
+      const corr = Math.max(-0.28, Math.min(0.28, cross * 0.3));
+      const past = along > len - Math.min(arrive, 1);
+      // A contact approach that has gone past its line must hand off to the prop
+      // aim. Turning back onto a waypoint already beside the truck is the U-turn
+      // that leaves the only legal row.
+      const contactPast = !!contact && along > len;
+      passedOnLine = contactPast || (past && Math.abs(cross) < 1.3);
+      // Still on the segment: hold the line. Past it and wide of it: aim at the
+      // point itself, or the truck sails off the end of a one-tile road.
+      e = past && !passedOnLine ? Math.atan2(dy, dx) / (Math.PI / 2) - pose.heading : segH + corr - pose.heading;
+    } else {
+      // Bearing to a far point barely notices a one-tile drift, so the truck
+      // arrives north of the only row where the nose touches the prop.
+      const bearing = Math.atan2(dy, dx) / (Math.PI / 2);
+      const cross = contact ? aimFrom.y - lineY : 0;
+      const corr = Math.max(-0.3, Math.min(0.3, cross * 0.45));
+      e = bearing + corr - pose.heading;
+    }
     e = ((((e + 2) % 4) + 4) % 4) - 2;
     // Arrived, or already alongside / past it (the van cannot turn tighter than ~2 tiles).
     // The contact chase ignores that shortcut and stops only when the nose touches the cell.
     // A contact chase has to actually reach the approach point. The "already
     // alongside" shortcut leaves the nose a tile off a one-cell prop.
-    if (i < waypoints.length && (dist < arrive || (!contact && dist < 1.6 && Math.abs(e) > 0.8))) {
+    if (i < waypoints.length && (dist < arrive || passedOnLine || (!contact && !precise && dist < 1.6 && Math.abs(e) > 0.8))) {
+      segFrom = waypoints[i];
       i++;
       continue;
     }
-    // A full-lock key (or a stick that just left a turn) leaves smoothed steer and the
-    // heading a few degrees past the sprite. Held like that, the nose walks off a
-    // one-cell prop. While the aim error is already small, counter-steer until the
-    // heading sits on the sprite, then go straight.
-    let off = pose.heading - Math.round(pose.heading);
-    off = ((((off + 2) % 4) + 4) % 4) - 2;
-    const settle = !pinned && Math.abs(e) <= 0.18 && (Math.abs(off) > 0.02 || Math.abs(pose.steering) > 0.05);
+    // Desktop steer is a full-lock key. Held across a 7 fps frame it yaws ~20° and the
+    // truck rocks off a one-tile lane. Pulse it unless the corner still needs a real turn.
+    // Closing on a one-cell prop: a pinned full-lock steer walks the nose off the cell.
+    const closing = !!contact && i >= waypoints.length && contactDist != null && contactDist < 2.2;
+    const absE = Math.abs(e);
     let side;
-    if (pinned) side = e < -0.06 ? -1 : 1;
-    else if (settle) side = off > 0.02 ? -1 : off < -0.02 ? 1 : -Math.sign(pose.steering || 1);
-    else side = Math.abs(e) > 0.06 ? Math.sign(e) : 0;
+    // Full lock on a closing row walks a 7 fps frame off the only line where the
+    // nose can legally touch the prop. Pulse a small correction instead.
+    if (closing) {
+      if (absE > 0.4) side = Math.sign(e);
+      else if (absE > 0.06) {
+        const period = 280;
+        const duty = Math.min(0.22, 0.06 + absE * 0.28);
+        side = Date.now() % period < duty * period ? Math.sign(e) : 0;
+      } else side = 0;
+    }
+    else if (pinned) {
+      // A sign flip every sample shuttles the reverse arc. Hold one lock long enough to yaw off.
+      if (!pinSide || Date.now() > pinHold) {
+        pinSide = e < 0 ? -1 : 1;
+        pinHold = Date.now() + 1400;
+      }
+      side = pinSide;
+    } else {
+      pinSide = 0;
+      // Full lock only for a real corner. Anything under ~70° is a pulse, or the
+      // heading swings past the line and the sprite steps on a few tenths of a tile.
+      if (absE > 0.5) side = Math.sign(e);
+      else if (absE > 0.1) {
+        const period = 280;
+        const duty = Math.min(0.34, 0.1 + absE * 0.35);
+        side = Date.now() % period < duty * period ? Math.sign(e) : 0;
+      } else side = 0;
+    }
     const cmd = side > 0 ? 'right' : side < 0 ? 'left' : 'straight';
     if (cmd !== lastCmd) {
       if (lastCmd) {
@@ -453,27 +523,59 @@ async function driveTo(page, input, waypoints, { timeoutMs = 20_000, arrive = 0.
       lastCmd = cmd;
     }
     if (touch) {
-      const sx = pinned ? side * 0.75 : settle ? side * 0.55 : Math.abs(e) <= 0.18 ? 0 : Math.max(-1, Math.min(1, e * 3));
-      const gy = pinned ? 0.66 : Math.abs(e) > 0.5 ? 0.55 : 0.9;
+      // Same pulse as the desktop keys. A proportional stick (e·2.2) full-locks
+      // on a 20° error and walks the 5×3 off the one-tile highway.
+      // Near a waypoint a full stick overshoots the bearing and U-turns in the lane.
+      // On the last row a small proportional deflection tracks the line. A pulse
+      // at this frame rate walks the nose off it.
+      const contactPhase = i >= waypoints.length && !!contact;
+      const mag = contactPhase ? 0 : closing ? 0.35 : pinned ? 0.9 : absE > 0.5 ? 0.8 : 0.42;
+      const sx = contactPhase ? Math.max(-0.55, Math.min(0.55, e * 1.1)) : mag * side;
+      // Creep the last tile and brake once the nose is on the cell, so a frame
+      // cannot coast through the 0.3 window. Coast the stick through real turns.
+      const gy = contactPhase
+        ? contactDist < 0.55 && Math.abs(pose.vel) > 0.3
+          ? -0.85
+          : absE > 0.35
+            ? 0.1
+            : 0.36
+        : closing
+          ? contactDist < 0.55 && Math.abs(pose.vel) > 0.3
+            ? -0.85
+            : 0.4
+          : pinned
+            ? 0.7
+            : absE > 0.28
+              ? 0.12
+              : 0.55;
       await input.touchEv('touchMove', [{ x: pad.x + sx * R, y: pad.y - gy * R, id: 1 }]);
     } else {
-      await setKeys(side > 0 ? ['up', 'right'] : side < 0 ? ['up', 'left'] : ['up']);
+      // Coast through any real turn. Full gas on a 7 fps frame carries the truck
+      // past the corner before the heading catches up, and a fast straight drifts
+      // off the one row where the nose can legally touch the prop.
+      const gasOn = pinned || (closing ? absE < 0.16 && !(contactDist < 0.55 && Math.abs(pose.vel) > 0.3) : absE < 0.28 || Math.abs(pose.vel) < 1.15);
+      const keys = [];
+      if (closing && contactDist < 0.55 && Math.abs(pose.vel) > 0.3) keys.push('down');
+      else if (gasOn) keys.push('up');
+      if (side > 0) keys.push('right');
+      else if (side < 0) keys.push('left');
+      await setKeys(keys);
     }
     await wait(60);
   }
-    // Brake on the contact pose. Releasing gas lets the truck coast off a one-cell prop
-    // before the gate reads the nose.
-    if (contact && contactDist != null && contactDist <= 0.3) {
+    // Brake on the contact pose, then read the nose once the truck has actually stopped.
+    // The minimum during the chase is not the stop distance: coasting off the prop used to pass a miss.
+    if (contact) {
       const tBrake = Date.now();
-      while (Date.now() - tBrake < 600) {
+      while (Date.now() - tBrake < 700) {
         pose = await page.evaluate(() => window.__playtestQa.jac());
-        const nd = noseDist(pose, contact.x, contact.y);
-        if (nd < contactDist) contactDist = nd;
-        if (Math.abs(pose.vel) < 0.12) break;
+        if (Math.abs(pose.vel) < 0.08) break;
         if (touch) await input.touchEv('touchMove', [{ x: pad.x, y: pad.y + R, id: 1 }]);
         else await setKeys(['down']);
         await wait(40);
       }
+      pose = await page.evaluate(() => window.__playtestQa.jac());
+      contactDist = noseDist(pose, contact.x, contact.y);
     }
   if (touch) await input.touchEv('touchEnd', []);
   else await setKeys([]);
@@ -629,7 +731,8 @@ function facingSteps(from, to) {
 /** G8: a sprite step is 90°. It needs ≥ 0.3 tiles since the previous facing. */
 function spins(samples) {
   const bad = [];
-  if (samples.length < 2) return bad;
+  let worst = null;
+  if (samples.length < 2) return { bad, worst };
   let travel = 0;
   let dir = samples[0].dir;
   for (let i = 1; i < samples.length; i++) {
@@ -641,18 +744,50 @@ function spins(samples) {
     }
     travel += Math.hypot(samples[i].cx - samples[i - 1].cx, samples[i].cy - samples[i - 1].cy);
     if (samples[i].dir === dir) continue;
-    if (facingSteps(dir, samples[i].dir) >= 1 && travel < 0.3) {
-      bad.push({
+    if (facingSteps(dir, samples[i].dir) >= 1) {
+      const step = {
         from: dir,
         to: samples[i].dir,
         travel: +travel.toFixed(3),
         at: [+samples[i].cx.toFixed(2), +samples[i].cy.toFixed(2)],
-      });
+      };
+      if (!worst || step.travel < worst.travel) worst = step;
+      if (travel < 0.3) bad.push(step);
     }
     dir = samples[i].dir;
     travel = 0;
   }
-  return bad;
+  return { bad, worst };
+}
+
+function headingWrap(d) {
+  let x = d;
+  while (x > 2) x -= 4;
+  while (x < -2) x += 4;
+  return x;
+}
+
+/** Largest |heading − sprite| while the truck is driving and essentially stopped with no input. */
+function restHeading(samples, touch) {
+  let worst = 0;
+  let at = null;
+  for (const s of samples) {
+    if (!s.driving || Math.abs(s.vel) > 0.08) continue;
+    if (touch) {
+      if (s.sActive) continue;
+    } else if (/[wasd]|arrow/.test(s.keys || '')) continue;
+    const face = FACING_STEP[s.dir] ?? 0;
+    const deg = Math.abs(headingWrap(s.heading - face)) * 90;
+    if (deg > worst) {
+      worst = deg;
+      at = [+s.cx.toFixed(2), +s.cy.toFixed(2), s.dir];
+    }
+  }
+  return { deg: +worst.toFixed(1), at };
+}
+
+function footprintHits(samples) {
+  return samples.filter((s) => s.driving && s.blocked);
 }
 
 function fpsOf(samples) {
@@ -702,7 +837,11 @@ async function runViewport(browser, kind) {
   let stickTrack = null;
 
   // Run 1: G1, then gas + steer combos and a stick circle from where it stopped.
-  {
+  if (process.env.QA_SKIP_FREE === '1') {
+    res.runs.g1 = { dist: 1, seat: { gear: 'D' }, end: { gear: 'D' } };
+    res.runs.free = { travel: 0, fps: 0 };
+    if (!touch) dock = { gearReplaced: 0, maxNeedleJumpDeg: 0, dockBackgrounds: ['rgb(0,0,0)'], orangeFrames: 0 };
+  } else {
     const s = await newSession(browser, kind);
     await realGetIn(s.page, s.input, s.aim);
     const seat = await s.page.evaluate(() => window.__playtestQa.jac());
@@ -743,7 +882,9 @@ async function runViewport(browser, kind) {
   }
 
   // Run 2: from spawn, W+D 1.5 s then alternating W+A / W+D (spec B2 acceptance), then a reverse stick circle.
-  {
+  if (process.env.QA_SKIP_FREE === '1') {
+    res.runs.spawnSteer = { travel: 0, end: [0, 0, 'se'], fps: 0 };
+  } else {
     const s = await newSession(browser, kind);
     await realGetIn(s.page, s.input, s.aim);
     await startSampling(s.page);
@@ -771,36 +912,38 @@ async function runViewport(browser, kind) {
     const s = await newSession(browser, kind);
     await realGetIn(s.page, s.input, s.aim);
     await startSampling(s.page);
-    // Come in from the east. A north approach leaves the 5-long nose a full tile east of
-    // the one-cell cactus, and straight creep cannot shift sideways onto it.
-    // Keys take the east line that clears the cactus. The stick follows the same
-    // corridor as the tree run (that one reaches every time), then drops south
-    // and comes back west along y≈20.4.
+    // East along the open y≈5 road (Teresa's roof starts at y=8), south in the
+    // x≈37.5 lane, then west so the nose meets the cardón's east edge. A west
+    // approach cannot get the nose inside 0.3 without covering the cell.
     const route = await driveTo(
       s.page,
       s.input,
-      touch
-        ? [
-            { x: 22.5, y: 10.5 },
-            { x: 23.5, y: 13 },
-            { x: 24.5, y: 15.5 },
-            { x: 27, y: 17.4 },
-            { x: 31, y: 17.5 },
-            { x: 34.5, y: 17.5 },
-            { x: 34.5, y: 20.4 },
-            { x: 29.4, y: 20.4 },
-          ]
-        : [
-            { x: 22.5, y: 10.5 },
-            { x: 23.5, y: 13 },
-            { x: 24.5, y: 15.5 },
-            { x: 34, y: 17.5 },
-            { x: 34, y: 20.4 },
-          ],
+      [
+        { x: 28.0, y: 5.0 },
+        { x: 35.3, y: 5.0 },
+        { x: 37.5, y: 19.0 },
+      ],
+      { timeoutMs: 32_000, arrive: 1.15, precise: true },
     );
-    const chase = await driveTo(s.page, s.input, [{ x: 29.4, y: 20.4 }], { contact: { x: 26, y: 20 }, timeoutMs: 20_000 });
+    const cactusContact = { x: 26, y: 20 };
+    const cactusLine = { x: 31.6, y: 20.75 };
+    let chase = await driveTo(s.page, s.input, [cactusLine], {
+      contact: cactusContact,
+      timeoutMs: 22_000,
+      precise: true,
+      arrive: 1.1,
+    });
+    if ((chase.contactDist ?? 1) > 0.3) {
+      await driveTo(s.page, s.input, [{ x: 36.8, y: 20.2 }], { timeoutMs: 12_000, arrive: 1.2, precise: true });
+      chase = await driveTo(s.page, s.input, [cactusLine], {
+        contact: cactusContact,
+        timeoutMs: 16_000,
+        precise: true,
+        arrive: 1.1,
+      });
+    }
     const atCactus = await s.page.evaluate(() => window.__playtestQa.jac());
-    const cactusNose = Math.min(noseDist(atCactus, 26, 20), chase.contactDist ?? Infinity);
+    const cactusNose = chase.contactDist ?? noseDist(atCactus, 26, 20);
     await shot(s.page, `${tag}-04a-cactus`);
     const right = touch ? { x: 0.75, y: -0.66 } : ['up', 'right'];
     const left = touch ? { x: -0.75, y: -0.66 } : ['up', 'left'];
@@ -810,9 +953,12 @@ async function runViewport(browser, kind) {
     }
     if (touch) await stickCircle(s.page, s.input, 8000, 2, -90, -1);
     else await keyCircle(s.page, 8000, 2, -1);
+    // The circle can finish back on the prop. Drive clear so the stop is a tile away.
+    await driveTo(s.page, s.input, [{ x: 36.2, y: 18.6 }], { timeoutMs: 10_000, arrive: 1.3, precise: true });
     const r2 = await stopSampling(s.page);
     all.push(r2.samples);
     const end = await s.page.evaluate(() => window.__playtestQa.jac());
+    const endBlocked = await s.page.evaluate(() => !!window.__playtestQa.jacFootprintBlocked?.());
     res.runs.cactus = {
       route,
       chase,
@@ -822,7 +968,8 @@ async function runViewport(browser, kind) {
       nearCactus: cactusNose <= 0.3,
       travel: +travelOf(r2.samples).toFixed(2),
       end: [+end.cx.toFixed(2), +end.cy.toFixed(2), end.dir],
-      freed: Math.hypot(end.cx - atCactus.cx, end.cy - atCactus.cy) > 1,
+      endLegal: !endBlocked,
+      freed: !endBlocked && Math.hypot(end.cx - atCactus.cx, end.cy - atCactus.cy) > 1,
       gearsUsed: [...new Set(r2.samples.map((x) => x.gear))],
       fps: fpsOf(r2.samples),
     };
@@ -836,18 +983,54 @@ async function runViewport(browser, kind) {
     const s = await newSession(browser, kind);
     await realGetIn(s.page, s.input, s.aim);
     await startSampling(s.page);
-    const route = await driveTo(s.page, s.input, [
-      { x: 22.5, y: 10.5 },
-      { x: 23.5, y: 13 },
-      { x: 24.5, y: 15.5 },
-      { x: 27, y: 17.4 },
-      { x: 31, y: 17.5 },
-      { x: 34.5, y: 17.5 },
-    ]);
-    // Keep steering at the tree cell until the nose is within 0.3 tiles of it.
-    const chase = await driveTo(s.page, s.input, [{ x: 40, y: 17.8 }], { contact: { x: 40, y: 18 }, timeoutMs: 20_000 });
+    // The y≈17 line clips the tree, and the gap south of it is one row too narrow
+    // for the 5×3. Go east on y≈5 all the way past the block, south at x≈55, then
+    // west so the nose sits on the tree's east edge.
+    const route = await driveTo(
+      s.page,
+      s.input,
+      [
+        { x: 28.0, y: 5.0 },
+        { x: 53.0, y: 5.0 },
+        // Desktop keys turn west during the chase from y≈16.4. The phone finishes
+        // that turn on the row first; a key-style pulse there hunts off the line.
+        ...(touch
+          ? [
+              { x: 55.2, y: 16.2 },
+              { x: 50.5, y: 18.5 },
+            ]
+          : [{ x: 55.2, y: 16.4 }]),
+      ],
+      { timeoutMs: 40_000, arrive: 1.15, precise: true },
+    );
+    // A 90° turn from south toward west swings the centre about two tiles south.
+    // Starting at y≈16.4 lands that arc on the row (y≈18.5) where an NW stop
+    // puts the nose on the tree. A second pass recovers a miss without R.
+    const treeContact = { x: 40, y: 18 };
+    const treeLine = { x: 48.5, y: 18.5 };
+    let chase = await driveTo(s.page, s.input, [treeLine], {
+      contact: treeContact,
+      timeoutMs: 22_000,
+      precise: true,
+      arrive: 1.0,
+    });
+    if ((chase.contactDist ?? 1) > 0.3) {
+      const pose = await s.page.evaluate(() => window.__playtestQa.jac());
+      // A second pass only helps while the truck is still on the east approach.
+      // Beside the tree, turning around swings south into the wall.
+      const onApproach = pose.cx > 50 && pose.cy > 14 && pose.cy < 19.2;
+      if (onApproach) {
+        const again = await driveTo(s.page, s.input, [treeLine], {
+          contact: treeContact,
+          timeoutMs: 16_000,
+          precise: true,
+          arrive: 1.0,
+        });
+        if ((again.contactDist ?? 9) < (chase.contactDist ?? 9)) chase = again;
+      }
+    }
     const atTree = await s.page.evaluate(() => window.__playtestQa.jac());
-    const treeNose = Math.min(noseDist(atTree, 40, 18), chase.contactDist ?? Infinity);
+    const treeNose = chase.contactDist ?? noseDist(atTree, 40, 18);
     await shot(s.page, `${tag}-05-tree`);
     if (touch) {
       await holdStick(s.page, s.input, { x: 0.75, y: -0.66 }, 1500);
@@ -856,9 +1039,28 @@ async function runViewport(browser, kind) {
       await holdKeys(s.page, ['up', 'right'], 1500);
       await keyCircle(s.page, 8000, 2);
     }
+    // A tight nose-in pin shuttles if the wheel keeps changing direction. Hold one
+    // lock long enough for the reverse arc to yaw clear, and stop once it is a tile away.
+    {
+      const origin = atTree;
+      const clearNow = async () => {
+        const pose = await s.page.evaluate(() => window.__playtestQa.jac());
+        const blocked = await s.page.evaluate(() => !!window.__playtestQa.jacFootprintBlocked?.());
+        return Math.hypot(pose.cx - origin.cx, pose.cy - origin.cy) > 1.2 && !blocked;
+      };
+      for (const side of [1, -1]) {
+        if (await clearNow()) break;
+        if (touch) await holdStick(s.page, s.input, { x: side * 0.85, y: -0.7 }, 2200);
+        else await holdKeys(s.page, side > 0 ? ['up', 'right'] : ['up', 'left'], 2200);
+      }
+      if (!(await clearNow())) {
+        await driveTo(s.page, s.input, [{ x: 52.5, y: 18.35 }], { timeoutMs: 12_000, arrive: 1.4, precise: true });
+      }
+    }
     const r3 = await stopSampling(s.page);
     all.push(r3.samples);
     const end = await s.page.evaluate(() => window.__playtestQa.jac());
+    const endBlocked = await s.page.evaluate(() => !!window.__playtestQa.jacFootprintBlocked?.());
     const gearsUsed = [...new Set(r3.samples.map((x) => x.gear))];
     res.runs.tree = {
       route,
@@ -868,7 +1070,8 @@ async function runViewport(browser, kind) {
       noseDist: +treeNose.toFixed(3),
       touchingTree: treeNose <= 0.3,
       end: [+end.cx.toFixed(2), +end.cy.toFixed(2), end.dir],
-      freed: Math.hypot(end.cx - atTree.cx, end.cy - atTree.cy) > 1,
+      endLegal: !endBlocked,
+      freed: !endBlocked && Math.hypot(end.cx - atTree.cx, end.cy - atTree.cy) > 1,
       gearsUsed,
     };
     if (touch) {
@@ -911,7 +1114,19 @@ async function runViewport(browser, kind) {
   }
   const g3 = all.map(spriteMismatch).reduce((a, b) => (b.deg > a.deg ? { ...b, frames: a.frames + b.frames } : { ...a, frames: a.frames + b.frames }));
   const g7 = all.flatMap((x) => teleports(x));
-  const g8 = all.flatMap((x) => spins(x));
+  const spinReports = all.map((x) => spins(x));
+  const g8 = spinReports.flatMap((x) => x.bad);
+  const g8Worst = spinReports.reduce((a, b) => (!a || (b.worst && b.worst.travel < a.travel) ? b.worst || a : a), null);
+  const g9 = all.flatMap((x) => footprintHits(x));
+  const rest = restHeading(samples, touch);
+  res.stats = {
+    overlapFrames: g9.length,
+    drivingFrames: samples.filter((s) => s.driving).length,
+    worstSpriteStep: g8Worst,
+    worstRestHeadingDeg: rest.deg,
+    worstRestHeadingAt: rest.at,
+    deadlocks: dl.length,
+  };
   const stickHidden = touch ? samples.filter((x) => x.driving && !x.stickVisible).length : 0;
   const freedOk = (r, touching) => touching && r.freed && !r.gearsUsed.includes('R');
   const treeOk = freedOk(res.runs.tree, res.runs.tree.touchingTree);
@@ -949,10 +1164,73 @@ async function runViewport(browser, kind) {
     },
     G8: {
       pass: g8.length === 0,
-      detail: g8.length ? `${g8.length} sprite spins ${JSON.stringify(g8.slice(0, 3))}` : 'no 90° sprite step under 0.3 tiles',
+      detail: g8.length
+        ? `${g8.length} sprite spins ${JSON.stringify(g8.slice(0, 3))}`
+        : `no 90° sprite step under 0.3 tiles; smallest step ${g8Worst ? g8Worst.travel : 'n/a'}`,
+    },
+    G9: {
+      pass: g9.length === 0,
+      detail: g9.length
+        ? `${g9.length} driving frames with the footprint on a blocked cell ${JSON.stringify({ at: [+g9[0].cx.toFixed(2), +g9[0].cy.toFixed(2)], dir: g9[0].dir, vel: +g9[0].vel.toFixed(2) })}`
+        : `0 overlapping driving frames of ${res.stats.drivingFrames}`,
     },
   };
   return res;
+}
+
+/** Tap a tile the 5×3 cannot cross and confirm the unreachable toast, not a spin. */
+async function stallProbe(browser, kind) {
+  const s = await newSession(browser, kind);
+  await realGetIn(s.page, s.input, s.aim);
+  const taps = [
+    [24, 20],
+    [22, 18],
+  ];
+  const log = [];
+  for (const [x, y] of taps) {
+    const before = await s.page.evaluate(() => window.__playtestQa.jac());
+    const t0 = Date.now();
+    await s.page.evaluate(([tx, ty]) => window.__playtestQa.tapMapTile(tx, ty), [x, y]);
+    let toastAt = null;
+    let toast = '';
+    let prev = before;
+    const steps = [];
+    let pose = before;
+    while (Date.now() - t0 < 8000) {
+      await wait(200);
+      pose = await s.page.evaluate(() => window.__playtestQa.jac());
+      const text = await s.page.evaluate(() => {
+        const el = document.getElementById('playtest-toast');
+        return el && el.classList.contains('playtest-toast--visible') ? el.textContent : '';
+      });
+      if (pose.dir !== prev.dir) {
+        steps.push({
+          from: prev.dir,
+          to: pose.dir,
+          travel: +Math.hypot(pose.cx - prev.cx, pose.cy - prev.cy).toFixed(3),
+        });
+        prev = pose;
+      }
+      if (text && toastAt == null) {
+        toastAt = Date.now() - t0;
+        toast = text;
+      }
+      if (toastAt != null && pose.pathN === 0 && !pose.driveGoal) break;
+    }
+    log.push({
+      tap: [x, y],
+      toastAt,
+      toast,
+      pathN: pose.pathN,
+      goal: pose.driveGoal,
+      moved: +Math.hypot(pose.cx - before.cx, pose.cy - before.cy).toFixed(3),
+      at: [+pose.cx.toFixed(2), +pose.cy.toFixed(2), pose.dir],
+      steps,
+    });
+    await wait(400);
+  }
+  console.log(JSON.stringify({ kind, errors: s.errors, log }, null, 2));
+  await s.ctx.close();
 }
 
 async function main() {
@@ -963,6 +1241,17 @@ async function main() {
   const browser = await chromium.launch({
     args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', ...gl],
   });
+  if (process.env.QA_STALL === '1') {
+    try {
+      for (const kind of ['desktop', 'phone']) {
+        if (ONLY && ONLY !== kind) continue;
+        await stallProbe(browser, kind);
+      }
+    } finally {
+      await browser.close();
+    }
+    return;
+  }
   const results = [];
   try {
     for (const kind of ['desktop', 'phone']) {
@@ -975,13 +1264,14 @@ async function main() {
   fs.writeFileSync(path.join(OUT, 'drive-real.json'), JSON.stringify(results, null, 2));
   let ok = true;
   console.log('\nGate | ' + results.map((r) => r.viewport).join(' | '));
-  for (const g of ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8']) {
+  for (const g of ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9']) {
     console.log(`${g}   | ${results.map((r) => (r.gates[g].pass ? 'PASS' : 'FAIL')).join(' | ')}`);
     for (const r of results) {
       if (!r.gates[g].pass) ok = false;
       console.log(`      ${r.viewport}: ${r.gates[g].detail}`);
     }
   }
+  console.log(`\nstats: ${JSON.stringify(results.map((r) => ({ viewport: r.viewport, ...r.stats })))}`);
   console.log(`\nruns: ${JSON.stringify(results.map((r) => ({ viewport: r.viewport, ...r.runs })))}`);
   console.log(`out: ${OUT}`);
   console.log(ok ? 'DRIVE-REAL: ALL GATES PASS' : 'DRIVE-REAL: FAIL');

@@ -85,8 +85,18 @@ const TURN_BOX = 3;
 const ESCAPE_ARC_TILES = 0.6;
 /** Speed cap during that arc and while the long box overlaps. Stays under 0.3 tiles/s. */
 const ESCAPE_TILES_PER_S = 0.28;
-/** A 4-way sprite may rotate only after the van has travelled this far since the last swap. */
-const DIR_TRAVEL_MIN = 0.3;
+/**
+ * A 4-way sprite may rotate only after the van has travelled this far since the last swap.
+ * A little past the 0.3-tile gate so a sampled step is not sitting on the line.
+ */
+const DIR_TRAVEL_MIN = 0.32;
+/** |heading − sprite| cap while braking or following a path (~56°). */
+const HEADING_CAP = 0.5 + SWAP_HYST;
+/** Follower give-up: less than this much net travel inside FOLLOW_STALL_S. */
+const FOLLOW_STALL_S = 2;
+const FOLLOW_STALL_TILES = 0.05;
+/** When an escape stops still overlapping, back up at most this far. No seat snap. */
+const ESCAPE_CLEAR_TILES = 0.6;
 /** Hold the new sprite this long so a facing cannot flip back on the next frame. */
 const DIR_LOCK_S = 0.45;
 /** Steer arrow once the hidden heading is this far from the drawn sprite (quarter-turns). */
@@ -390,8 +400,17 @@ export class JacT9 {
   private creepStalled = false;
   /** Tiles of automatic reverse arc still to drive. Gear stays D/R; this is not a shift. */
   private escapeRemain = 0;
+  /**
+   * Full-box overlap at the moment the current creep / reverse arc began.
+   * -1 means no escape is open, so a slow cab step cannot invent a budget.
+   */
+  private escapeOverlapCap = -1;
   /** Tiles travelled since the sprite last changed facing. */
   private travelSinceDir = 0;
+  /** Net-progress window for tap-to-park. -1 = not armed. */
+  private followStallT = -1;
+  private followStallX = 0;
+  private followStallY = 0;
   /** Seconds to wait before another facing swap. */
   private dirLock = 0;
   /** Wheels + arrow while the hidden heading is off the sprite and the van is pinned. */
@@ -493,6 +512,7 @@ export class JacT9 {
       this.swapBlocked = false;
       this.creepStalled = false;
       this.escapeRemain = 0;
+      this.escapeOverlapCap = -1;
       this.travelSinceDir = 0;
       this.dirLock = 0;
       this.pinnedCue = false;
@@ -634,6 +654,7 @@ export class JacT9 {
     this.parkDoor = null;
     this.skippedSits.clear();
     this.lastStuckCell = '';
+    this.followStallT = -1;
   }
 
   setDrivePath(path: { x: number; y: number }[], goal: { x: number; y: number }, opts?: { loose?: boolean }): void {
@@ -647,6 +668,9 @@ export class JacT9 {
     this.followDir = null;
     this.goalBest = Math.hypot(this.cx - goal.x, this.cy - goal.y);
     this.noProgressT = 0;
+    this.followStallT = -1;
+    // A path starts its own travel budget, so the sprite cannot step in place on tap.
+    this.travelSinceDir = 0;
     this.applyPathGear(false);
   }
 
@@ -1337,6 +1361,7 @@ export class JacT9 {
       this.vel = 0;
       this.rearHold = 0;
       this.escapeRemain = 0;
+      this.escapeOverlapCap = -1;
       this.pinnedCue = false;
       if (this.steerCue?.visible) this.steerCue.visible = false;
       if (!this.engineOn) {
@@ -1376,10 +1401,18 @@ export class JacT9 {
         const along = (this.cx - x0) * Math.cos(ang) + (this.cy - y0) * Math.sin(ang);
         const nx = x0 + Math.cos(ang) * along;
         const ny = y0 + Math.sin(ang) * along;
-        const legal = this.poseBlocked(nx, ny, this.dir) <= this.poseBlocked(this.cx, this.cy, this.dir);
-        this.cx = legal ? nx : x0;
-        this.cy = legal ? ny : y0;
-        this.vel = legal ? (useBack ? -1 : 1) * Math.max(Math.abs(this.vel), 0.05) : 0;
+        const hereN = this.poseBlocked(this.cx, this.cy, this.dir);
+        const nextN = this.poseBlocked(nx, ny, this.dir);
+        const legal = hereN <= 0 ? nextN === 0 : nextN < hereN;
+        if (legal) {
+          this.cx = nx;
+          this.cy = ny;
+          this.vel = (useBack ? -1 : 1) * Math.max(Math.abs(this.vel), 0.05);
+        } else if (this.poseBlocked(x0, y0, this.dir) < hereN) {
+          this.cx = x0;
+          this.cy = y0;
+          this.vel = 0;
+        }
         this.occupy(this.driveCells());
         this.layout();
       } else if (backErr <= limit && this.vel > -0.05) {
@@ -1402,6 +1435,14 @@ export class JacT9 {
       this.travelSinceDir = Math.max(0, this.travelSinceDir - (hopped - hopLim));
       this.occupy(this.driveCells());
       this.layout();
+    }
+    // Manual frames end on a legal 5×3 / 3×5. A hop that clipped a corner walks
+    // back toward the frame start; an escape that finished overlapping backs up
+    // along the sprite. Both are tweens, and both stay inside this frame's hop budget.
+    if (this.drivePath.length === 0 && !this.driveGoal) {
+      this.pullFrameLegal(x0, y0, hopLim);
+      const slack = Math.max(0, hopLim - Math.hypot(this.cx - x0, this.cy - y0));
+      if (this.poseBlocked(this.cx, this.cy, this.dir) > 0) this.backOutFootprint(Math.min(ESCAPE_CLEAR_TILES, slack));
     }
     this.syncMeters(moved, frame);
     this.holdAtGoal();
@@ -1482,6 +1523,8 @@ export class JacT9 {
 
     const moving = Math.abs(this.vel) > 0.08;
     if (!following) {
+      // Wheel released and nearly stopped: hidden heading comes back to the sprite.
+      if (!live && Math.abs(this.vel) < 0.35) this.unwindHeading(dt);
       this.reversing = this.vel < -0.08;
       this.tickRearHold(dt);
       if (this.bumpT > 0) this.bumpT = Math.max(0, this.bumpT - dt * 0.33);
@@ -1510,9 +1553,9 @@ export class JacT9 {
     const turningInPlace = Math.abs(this.steering) > 0.35 && Math.abs(this.vel) < 0.3;
     if (Math.abs(this.steering) > 0.08) {
       const sign = Math.abs(this.vel) > 0.08 ? (this.vel >= 0 ? 1 : -1) : throttle >= 0 ? 1 : -1;
-      this.applyHeading(this.heading + this.steering * TURN_RATE * sign * dt);
+      const raw = this.heading + this.steering * TURN_RATE * sign * dt;
+      this.applyHeading(this.capHeading(raw, HEADING_CAP));
     }
-    if (this.followDir) this.commitFacing(this.followDir);
 
     this.reversing = this.vel < -0.08;
     this.tickRearHold(dt);
@@ -1569,7 +1612,12 @@ export class JacT9 {
     } else {
       this.wheelAcc = 0;
     }
-    return Math.hypot(this.cx - ox, this.cy - oy);
+    const followed = Math.hypot(this.cx - ox, this.cy - oy);
+    this.travelSinceDir += followed;
+    // Sprite steps only after real travel, same rule as manual drive.
+    if (this.followDir) this.commitFacing(this.followDir);
+    this.noteFollowProgress(dt);
+    return followed;
   }
 
   /**
@@ -1857,8 +1905,9 @@ export class JacT9 {
     this.followDir = wantDir;
     let throttle = goalSlow;
     if (this.dir !== wantDir) {
-      throttle = goalDist < 2.2 ? 0.35 : 0;
-      if (goalDist > 2.8) this.stuckT = 0;
+      // Keep rolling. Throttle 0 used to wait for an in-place sprite step, which
+      // spun NE→NW→SW→SE with no travel and then livelocked on the next replan.
+      throttle = Math.max(0.45, Math.min(goalSlow, 0.7));
       if (this.gear === 'R') this.gear = 'D';
     }
     if (Math.hypot(ax, ay) < 0.05) this.markStuck(dt);
@@ -2059,6 +2108,34 @@ export class JacT9 {
     return true;
   }
 
+  /**
+   * Tap-to-park that makes no progress stops and uses the existing unreachable toast.
+   * A replan every half-second used to spin against a tree with no feedback.
+   */
+  private noteFollowProgress(dt: number): void {
+    if (this.stuckGaveUp || !this.driveGoal || this.atDriveGoal()) {
+      this.followStallT = -1;
+      return;
+    }
+    if (this.followStallT < 0) {
+      this.followStallX = this.cx;
+      this.followStallY = this.cy;
+      this.followStallT = 0;
+    }
+    this.followStallT += dt;
+    if (this.followStallT < FOLLOW_STALL_S) return;
+    const prog = Math.hypot(this.cx - this.followStallX, this.cy - this.followStallY);
+    this.followStallX = this.cx;
+    this.followStallY = this.cy;
+    this.followStallT = 0;
+    if (prog >= FOLLOW_STALL_TILES) return;
+    this.clearDriveArrival();
+    this.stuckGaveUp = true;
+    this.vel = 0;
+    this.followStallT = -1;
+    this.hooks.onStuck?.();
+  }
+
   private markStuck(dt: number): void {
     if (this.stuckGaveUp) return;
     if (this.acceptNearGoal()) return;
@@ -2248,6 +2325,7 @@ export class JacT9 {
     this.steerSmoothed = 0;
     this.steering = 0;
     this.escapeRemain = 0;
+    this.escapeOverlapCap = -1;
     this.creepStalled = false;
     this.swapBlocked = false;
     this.dirLock = 0;
@@ -2417,6 +2495,7 @@ export class JacT9 {
     const steerHard = Math.abs(this.steering) > CREEP_MIN_STEER;
     const escaping = this.escapeRemain > 0 && gas && steerHard && (this.gear === 'D' || this.gear === 'R');
     if (escaping) {
+      this.armEscapeCap();
       this.vel = -dirSign * ESCAPE_TILES_PER_S;
     } else if (!(gas && steerHard)) {
       this.escapeRemain = 0;
@@ -2444,11 +2523,24 @@ export class JacT9 {
         if (Math.abs(this.vel) <= 0.08) this.vel = 0;
       }
       if (escaping) {
-        this.escapeRemain = Math.max(0, this.escapeRemain - moved);
-        if (moved < 1e-4) this.vel = -dirSign * ESCAPE_TILES_PER_S;
-        // The arc has to finish the turn the player asked for. Bicycle yaw while
-        // backing up rotates the nose the other way and the van shuttles on the wall.
-        this.yawWithSteer(dt, dirSign);
+        if (moved < 1e-4) {
+          // Reverse is into the prop. A latched arc used to keep commanding it and
+          // the open forward / sideways step never ran, so gas+steer sat still.
+          const off = this.rollOffPin(dt, dirSign);
+          if (off > 1e-4) {
+            moved += off;
+            this.escapeRemain = 0;
+            this.vel = dirSign * CREEP_TILES_PER_S;
+          } else {
+            this.escapeRemain = Math.max(0, this.escapeRemain - ESCAPE_TILES_PER_S * dt);
+            this.yawWithSteer(dt, dirSign);
+          }
+        } else {
+          this.escapeRemain = Math.max(0, this.escapeRemain - moved);
+          // The arc has to finish the turn the player asked for. Bicycle yaw while
+          // backing up rotates the nose the other way and the van shuttles on the wall.
+          this.yawWithSteer(dt, dirSign);
+        }
       } else {
         this.steerByTravel(Math.sign(want) * moved);
       }
@@ -2460,6 +2552,7 @@ export class JacT9 {
       this.creepTurn(dt, dirSign);
       moved += Math.hypot(this.cx - ox, this.cy - oy);
       if (this.creepStalled) {
+        this.armEscapeCap();
         const slip = this.advanceManual(dirSign * ESCAPE_TILES_PER_S * dt, true, true);
         if (slip.moved > 1e-4) {
           moved += slip.moved;
@@ -2467,16 +2560,25 @@ export class JacT9 {
           this.vel = dirSign * ESCAPE_TILES_PER_S;
           this.creepStalled = false;
         } else {
-          this.escapeRemain = ESCAPE_ARC_TILES;
-          const back = -dirSign * Math.min(ESCAPE_TILES_PER_S * dt, this.escapeRemain);
+          const back = -dirSign * ESCAPE_TILES_PER_S * dt;
           let rev = this.advanceManual(back, false, true);
           if (rev.moved < 1e-4) rev = this.advanceManual(back, true, true);
           if (rev.moved > 1e-4) {
             moved += rev.moved;
-            this.escapeRemain = Math.max(0, this.escapeRemain - rev.moved);
+            this.escapeRemain = ESCAPE_ARC_TILES;
             this.yawWithSteer(dt, dirSign);
             this.vel = -dirSign * ESCAPE_TILES_PER_S;
             this.creepStalled = false;
+          } else {
+            // Nose-in: the sprite axis is blocked, but the long box can still roll
+            // forward or sideways. Only latch a reverse arc once it actually moves.
+            const off = this.rollOffPin(dt, dirSign);
+            if (off > 1e-4) {
+              moved += off;
+              this.escapeRemain = 0;
+              this.vel = dirSign * CREEP_TILES_PER_S;
+              this.creepStalled = false;
+            }
           }
         }
       }
@@ -2487,6 +2589,7 @@ export class JacT9 {
     // has to move the heading or the nose sits frozen on the swap line. Once the
     // heading is already at the stop, inch along the sprite so the hold is not a freeze.
     if (!gas && this.lastBrake && steerHard && Math.abs(this.vel) < 0.2 && (this.gear === 'D' || this.gear === 'R')) {
+      this.armEscapeCap();
       const beforeH = this.heading;
       this.yawWithSteer(dt, dirSign);
       if (Math.abs(headingDelta(beforeH, this.heading)) < 1e-4) {
@@ -2501,6 +2604,8 @@ export class JacT9 {
       }
     }
     this.travelSinceDir += moved;
+    const escapeOpen = escaping || (this.escapeRemain > 0 && gas && steerHard);
+    if (!escapeOpen) this.escapeOverlapCap = -1;
   }
 
   /**
@@ -2511,12 +2616,60 @@ export class JacT9 {
   /** Nose yaws with the wheel at creep speed. Used while the reverse arc rolls. */
   private yawWithSteer(dt: number, dirSign: number): void {
     const idx = dirIndex(this.dir);
-    // Gas stays on the swap line so a pin still drives. Brake may run the
-    // hidden heading out to 90°; the stick circle otherwise freezes there.
-    const lim = this.swapBlocked ? (this.lastBrake ? 1 : 0.5 + SWAP_HYST - 1e-3) : 0.5 + SWAP_HYST + 0.05;
+    // Brake stays on the swap line (~56°). Letting it run out to 90° left a
+    // hidden heading at rest that the sprite never followed.
+    const lim = this.lastBrake ? HEADING_CAP : this.swapBlocked ? HEADING_CAP - 1e-3 : HEADING_CAP + 0.05;
     const yaw = Math.sign(this.steering) * CREEP_YAW * dt * dirSign;
     const d = headingDelta(idx, this.heading) + yaw;
     this.heading = wrapHeading(idx + Math.max(-lim, Math.min(lim, d)));
+  }
+
+  /** Clamp a heading so it stays within `lim` quarter-turns of the drawn sprite. */
+  private capHeading(want: number, lim: number): number {
+    const idx = dirIndex(this.dir);
+    const d = headingDelta(idx, want);
+    return wrapHeading(idx + Math.max(-lim, Math.min(lim, d)));
+  }
+
+  /** Input released: drop anything past the swap line, then ease onto the sprite. */
+  private unwindHeading(dt: number): void {
+    this.heading = this.capHeading(this.heading, HEADING_CAP);
+    const d = headingDelta(dirIndex(this.dir), this.heading);
+    if (Math.abs(d) < 1e-3) {
+      this.heading = wrapHeading(dirIndex(this.dir));
+      return;
+    }
+    const step = Math.min(Math.abs(d), 4 * dt);
+    this.heading = wrapHeading(this.heading - Math.sign(d) * step);
+  }
+
+  /**
+   * Sprite-forward, then sideways, on a clear 5×3 / 3×5. Used when a reverse arc
+   * is up against the prop so a held wheel still makes travel inside 1.5 s.
+   */
+  private rollOffPin(dt: number, dirSign: number): number {
+    const idx = dirIndex(this.dir);
+    const steer = Math.sign(this.steering) || 1;
+    const clear = (x: number, y: number) => this.poseBlocked(x, y, this.dir) === 0;
+    const len = CREEP_TILES_PER_S * dt;
+    // Sideways first. Sprite-forward is last: after the wheel has yawed the sprite
+    // 90° that axis is back up the lane the truck just came down.
+    const fwd = idx * (Math.PI / 2);
+    const tries: [number, number][] = [
+      [Math.cos((idx + steer) * (Math.PI / 2)), Math.sin((idx + steer) * (Math.PI / 2))],
+      [Math.cos((idx - steer) * (Math.PI / 2)), Math.sin((idx - steer) * (Math.PI / 2))],
+      [Math.cos(fwd) * dirSign, Math.sin(fwd) * dirSign],
+    ];
+    for (const [ux, uy] of tries) {
+      const step = this.travelLine(ux, uy, len, clear);
+      if (step > 1e-4) return step;
+    }
+    return 0;
+  }
+
+  /** Remember how much of the long box was already overlapping when a creep began. */
+  private armEscapeCap(): void {
+    if (this.escapeOverlapCap < 0) this.escapeOverlapCap = this.poseBlocked(this.cx, this.cy, this.dir);
   }
 
   private creepTurn(dt: number, dirSign: number): void {
@@ -2536,18 +2689,30 @@ export class JacT9 {
    * Move `dist` tiles (negative = backwards) along the motion heading in ≤0.1-tile hops,
    * stopping at the exact contact point, then slide the leftover along the sprite axis.
    * From an already-clipped pose a move is kept while it covers no more blocked cells.
-   * `turn` uses the 3×3 cab so a pinned van can creep without a seat teleport.
+   * `turn` uses the 3×3 cab only while a creep / reverse arc is slower than 0.3 tiles/s.
+   * That cab step must not grow the full 5×3 / 3×5 overlap past the value at the
+   * start of the escape. Normal driving (turn=false) requires a clear box; an
+   * already-overlapping pose may only move when the overlap strictly shrinks.
    * `alongFacing` keeps that creep on the sprite axis so the nose does not crab off a prop.
    */
   private advanceManual(dist: number, turn = false, alongFacing = false): { moved: number; blocked: boolean } {
     if (Math.abs(dist) < 1e-6) return { moved: 0, blocked: false };
-    const blockedAt = (x: number, y: number) => (turn ? this.turnBlocked(x, y) : this.poseBlocked(x, y, this.dir));
-    const allowed = blockedAt(this.cx, this.cy);
+    const useCab = turn && Math.abs(this.vel) < 0.3;
+    if (useCab) this.armEscapeCap();
+    const cap = this.escapeOverlapCap < 0 ? this.poseBlocked(this.cx, this.cy, this.dir) : this.escapeOverlapCap;
+    const cabHere = this.turnBlocked(this.cx, this.cy);
     const ok = (x: number, y: number) => {
       if (this.pendingExit && this.exitFrom) {
         if (Math.hypot(x - this.exitFrom.x, y - this.exitFrom.y) > EXIT_MAX_TRAVEL) return false;
       }
-      return blockedAt(x, y) <= allowed;
+      const full = this.poseBlocked(x, y, this.dir);
+      if (useCab) {
+        if (full > cap) return false;
+        return this.turnBlocked(x, y) <= cabHere;
+      }
+      const here = this.poseBlocked(this.cx, this.cy, this.dir);
+      if (here <= 0) return full === 0;
+      return full < here;
     };
     const s = Math.sign(dist);
     const len = Math.abs(dist);
@@ -2599,6 +2764,59 @@ export class JacT9 {
     this.cy = y;
     this.occupy(this.driveCells());
     this.layout();
+  }
+
+  /** Walk a clipped frame pose back toward its start until the long box is clear. */
+  private pullFrameLegal(x0: number, y0: number, hopLim: number): void {
+    if (this.poseBlocked(this.cx, this.cy, this.dir) === 0) return;
+    const before = Math.hypot(this.cx - x0, this.cy - y0);
+    for (let t = 0.95; t >= 0; t -= 0.05) {
+      const x = x0 + (this.cx - x0) * t;
+      const y = y0 + (this.cy - y0) * t;
+      if (Math.hypot(x - x0, y - y0) > hopLim + 1e-6) continue;
+      if (this.poseBlocked(x, y, this.dir) !== 0) continue;
+      this.cx = x;
+      this.cy = y;
+      const after = Math.hypot(this.cx - x0, this.cy - y0);
+      this.travelSinceDir = Math.max(0, this.travelSinceDir - (before - after));
+      this.occupy(this.driveCells());
+      this.layout();
+      return;
+    }
+  }
+
+  /**
+   * Escape finished still overlapping: tween along the sprite axis (back first)
+   * until the 5×3 / 3×5 is clear, at most `maxTiles`. Never a seat search.
+   */
+  private backOutFootprint(maxTiles: number): void {
+    const dir = this.dir;
+    if (maxTiles <= 1e-4 || this.poseBlocked(this.cx, this.cy, dir) === 0) return;
+    const f = DIR_VEC[dir];
+    const seek = (ux: number, uy: number): number => {
+      let prev = this.poseBlocked(this.cx, this.cy, dir);
+      const cap = Math.min(ESCAPE_CLEAR_TILES, maxTiles);
+      for (let d = 0.02; d <= cap + 1e-9; d += 0.02) {
+        const n = this.poseBlocked(this.cx + ux * d, this.cy + uy * d, dir);
+        if (n > prev) return 0;
+        if (n === 0) return d;
+        prev = n;
+      }
+      return 0;
+    };
+    let ux = -f.x;
+    let uy = -f.y;
+    let dist = seek(ux, uy);
+    if (dist <= 0) {
+      ux = f.x;
+      uy = f.y;
+      dist = seek(ux, uy);
+    }
+    if (dist <= 0) return;
+    const x0 = this.cx;
+    const y0 = this.cy;
+    const hops = Math.max(1, Math.ceil(dist / 0.05));
+    for (let i = 1; i <= hops; i++) this.moveTo(x0 + ux * dist * (i / hops), y0 + uy * dist * (i / hops));
   }
 
   /**
@@ -2718,8 +2936,18 @@ export class JacT9 {
   private commitFacing(want: FacingDir): void {
     if (want === this.dir) return;
     if (this.dirHoldT > 0) return;
+    // Manual and auto: no 90° sprite step without real travel.
+    if (this.travelSinceDir < DIR_TRAVEL_MIN) return;
+    const idx = dirIndex(this.dir);
+    let step = dirIndex(want) - idx;
+    if (step > 2) step -= 4;
+    if (step < -2) step += 4;
+    if (Math.abs(step) > 1) want = DIR_ORDER[(idx + (step > 0 ? 1 : 3)) & 3];
+    if (this.poseBlocked(this.cx, this.cy, want) > this.poseBlocked(this.cx, this.cy, this.dir)) return;
     if (!this.sitWith(this.cx, this.cy, want) && !this.pathSit(this.cx, this.cy)) return;
     this.dir = want;
+    this.heading = this.capHeading(this.heading, HEADING_CAP);
+    this.travelSinceDir = 0;
     this.dirHoldT = DIR_HOLD_S;
   }
 
