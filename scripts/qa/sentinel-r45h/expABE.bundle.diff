@@ -1,0 +1,20 @@
+14244a14245
+>     let legal = this.poseBlocked(this.cx, this.cy, this.dir) === 0 ? { x: this.cx, y: this.cy, dir: this.dir, h: this.heading } : null;
+14247a14249,14250
+>       if (this.dir !== dir0) { if (this.poseBlocked(this.cx, this.cy, this.dir) === 0) legal = { x: this.cx, y: this.cy, dir: this.dir, h: this.heading }; break; }
+>       if (this.poseBlocked(this.cx, this.cy, this.dir) === 0) legal = { x: this.cx, y: this.cy, dir: this.dir, h: this.heading };
+14315a14319
+>     if (legal && this.poseBlocked(this.cx, this.cy, this.dir) > 0) { this.cx = legal.x; this.cy = legal.y; this.dir = legal.dir; this.heading = legal.h; this.vel = 0; this.occupy(this.driveCells()); this.layout(); }
+14874c14878
+<     if (Math.abs(along) > 0.18) return;
+---
+>     if (Math.abs(along) > 0.04) return;
+15477c15481,15482
+<     if (gas && steerHard && (this.gear === "D" || this.gear === "R") && pinnedNow || straight) {
+---
+>     if (straight && !this.escapeLatch) { this.noteBump(Math.abs(this.vel)); this.vel = 0; return; }
+>     if (gas && steerHard && (this.gear === "D" || this.gear === "R") && pinnedNow) {
+16094c16099
+<       if (!turn || turn.dist > 0.18 || turn.dir !== want) return;
+---
+>       if (!turn || turn.dist > 0.04 || turn.dir !== want) return;

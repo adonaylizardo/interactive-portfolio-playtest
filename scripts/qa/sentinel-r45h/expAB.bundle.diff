@@ -1,0 +1,13 @@
+14874c14874
+<     if (Math.abs(along) > 0.18) return;
+---
+>     if (Math.abs(along) > 0.04) return;
+15477c15477,15478
+<     if (gas && steerHard && (this.gear === "D" || this.gear === "R") && pinnedNow || straight) {
+---
+>     if (straight && !this.escapeLatch) { this.noteBump(Math.abs(this.vel)); this.vel = 0; return; }
+>     if (gas && steerHard && (this.gear === "D" || this.gear === "R") && pinnedNow) {
+16094c16095
+<       if (!turn || turn.dist > 0.18 || turn.dir !== want) return;
+---
+>       if (!turn || turn.dist > 0.04 || turn.dir !== want) return;
