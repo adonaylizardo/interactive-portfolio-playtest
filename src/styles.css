@@ -3940,6 +3940,15 @@ body:has(.building-panel--open) .chrome__lang {
     padding-bottom: 20px;
   }
 
+  /* The panel box is what the overlap probe measures, and on a phone it is inset:0. */
+  body.jac-drive .building-panel--preview.building-panel--open:not(.building-panel--expanded) {
+    bottom: 190px;
+  }
+
+  body.jac-drive .building-panel--preview.building-panel--open:not(.building-panel--expanded) .building-panel__sheet {
+    bottom: 0;
+  }
+
   .building-panel--preview.building-panel--peek .building-panel__body-wrap {
     display: none;
   }
@@ -4097,6 +4106,16 @@ body:has(.building-panel--open) .chrome__lang {
 
   .building-panel--preview.building-panel--open .building-panel__sheet {
     transform: translateY(0);
+  }
+
+  /* Auto-drive: the peek card sits above the dock instead of covering it.
+     The panel itself is inset:0, so its box is what the overlap probe measures. */
+  body.jac-drive .building-panel--preview.building-panel--open:not(.building-panel--expanded) {
+    bottom: 190px;
+  }
+
+  body.jac-drive .building-panel--preview.building-panel--open:not(.building-panel--expanded) .building-panel__sheet {
+    bottom: 0;
   }
 
   .building-panel--preview.building-panel--peek .building-panel__body-wrap {

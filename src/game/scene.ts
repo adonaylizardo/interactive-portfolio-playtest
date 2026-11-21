@@ -6110,6 +6110,13 @@ export class IsoScene {
       tapBox: this.objectTapBoxes,
       objectVisual: (id) => this.objectVisuals.get(id),
       onStuck: () => {
+        // A stall give-up has to surface the toast. Retrying the same door path
+        // cleared the timer and the van sat on a 100-node route with no message.
+        if (this.jac?.gaveUpRoute()) {
+          this.pendingDriveEnter = null;
+          this.events.onUnreachable?.();
+          return;
+        }
         if (this.pendingDriveEnter) this.retryDriveEnterOrGetOut();
         else this.events.onUnreachable?.();
       },
