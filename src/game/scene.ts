@@ -2878,6 +2878,20 @@ export class IsoScene {
     this.events.onUnreachable?.();
   }
 
+  /**
+   * A door with no reachable park sit. Get out only when the truck is already
+   * beside the door. From a spawn far away, say so and stay in the seat.
+   */
+  private exitOrToastPark(entry: { panelTitle: string; door: { x: number; y: number } }): void {
+    const dist = this.jac ? Math.hypot(this.jac.cx - entry.door.x, this.jac.cy - entry.door.y) : Infinity;
+    if (dist <= 6) {
+      this.pendingDriveEnter = entry;
+      this.jacGetOut({ thenEnter: true });
+      return;
+    }
+    this.toastDriveUnreachable();
+  }
+
   private vanWalkBlock(): Set<string> {
     if (this.qaIgnoreVanBlock || !this.jac || this.jac.driving) return new Set();
     return this.jac.parkedFootprintKeys();
@@ -2895,14 +2909,12 @@ export class IsoScene {
     }
     const sit = this.jac.parkForDoor(entry.door.x, entry.door.y, prefer ?? undefined);
     if (!sit) {
-      this.pendingDriveEnter = entry;
-      this.jacGetOut({ thenEnter: true });
+      this.exitOrToastPark(entry);
       return true;
     }
     const path = sit.path.length > 0 ? sit.path : this.jac.findDrivePath(sit.x, sit.y);
     if (!path) {
-      this.pendingDriveEnter = entry;
-      this.jacGetOut({ thenEnter: true });
+      this.exitOrToastPark(entry);
       return true;
     }
     this.events.stickCancel?.();
@@ -6512,12 +6524,12 @@ export class IsoScene {
     }
     const sit = this.jac.parkForDoor(entry.door.x, entry.door.y);
     if (!sit) {
-      this.jacGetOut({ thenEnter: true });
+      this.exitOrToastPark(entry);
       return;
     }
     const path = sit.path.length > 0 ? sit.path : this.jac.findDrivePath(sit.x, sit.y);
     if (!path || path.length === 0) {
-      this.jacGetOut({ thenEnter: true });
+      this.exitOrToastPark(entry);
       return;
     }
     this.pendingDriveEnterAt = performance.now();

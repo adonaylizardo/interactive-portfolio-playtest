@@ -43,6 +43,7 @@
     "test:batch-r42": "npx --yes tsx scripts/test-mobile-sheet-idle.mjs && npx --yes tsx scripts/test-exit-spawn-grace.mjs && npx --yes tsx scripts/test-experience-title-lang.mjs && node scripts/test-interior-two-finger.mjs && node scripts/test-interior-exp-peek.mjs",
     "test:batch-r44": "node scripts/test-batch-r44.mjs",
     "test:jac-vehicle-r45": "node scripts/test-jac-vehicle-r45.mjs",
+    "test:jac-r45i": "node scripts/qa/sentinel-r45h/r45i-gate.mjs",
     "qa:batch-r42": "npm run build && npm run test:batch-r42",
     "qa:batch-r44": "npm run build:preview-integracion && npm run typecheck && npm run test:batch-r42 && npm run test:batch-r44",
     "deploy:gh-pages": "node scripts/deploy-gh-pages.mjs",

@@ -5,6 +5,7 @@ import { chromium } from 'playwright';
 const vp = process.argv[2], BASE = process.argv[3], OUT = process.argv[4]; const phone = vp !== '1440';
 const ctxOpt = phone ? { viewport: { width: 375, height: 812 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } };
 const W = (ms) => new Promise((r) => setTimeout(r, ms));
+for (const d of ['logs', 'shots', 'video']) fs.mkdirSync(`${OUT}/${d}`, { recursive: true });
 const b = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const ctx = await b.newContext({ ...ctxOpt, }); const p = await ctx.newPage();
 const R = { vp, ce: [], tests: [] }; p.on('console', (m) => { if (m.type() === 'error') R.ce.push(m.text().slice(0, 200)); }); p.on('pageerror', (e) => R.ce.push(String(e).slice(0, 200)));

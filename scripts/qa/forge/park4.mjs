@@ -1,11 +1,12 @@
 // r45h tap-to-park harness (fixed): fresh page per trial, retrying get-in, zoom-out until the door/tile is on screen, null-safe.
 // usage: node park4.mjs <vp> <url> <out> [trials csv]
 import fs from 'node:fs';
-import { chromium } from '/workspace/qa/pw/node_modules/playwright/index.mjs';
+import { chromium } from 'playwright';
 const vp = process.argv[2], BASE = process.argv[3], OUT = process.argv[4]; const phone = vp !== '1440';
 const only = process.argv[5] ? process.argv[5].split(',') : null;
 const ctxOpt = phone ? { viewport: { width: 375, height: 812 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } };
 const W = (ms) => new Promise((r) => setTimeout(r, ms));
+for (const d of ['logs', 'shots', 'video']) fs.mkdirSync(`${OUT}/${d}`, { recursive: true });
 const b = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const R = { vp, trials: [] }; const save = () => fs.writeFileSync(`${OUT}/logs/park4-${vp}.json`, JSON.stringify(R));
 const A = { estudio: [31, 36], volaris: [39, 36], bain: [39, 26], mentoria: [32, 26], finoa: [24, 24], pg: [24, 31], sambil: [47, 16], catedral: [14, 17], teresa: [34, 14], biblioteca: [6, 30] };
