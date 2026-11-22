@@ -21,11 +21,12 @@ for (let y = 4; y < 60; y += 6) {
         while (t < 2) {
           const px = jac.cx;
           const py = jac.cy;
-          const dir = jac.dir;
           jac.update(dt, { dx: s, dy: -1 });
           t += dt;
           frames++;
-          const v = V[dir];
+          // The frame draws the sprite it finished on. A swap frame has already
+          // yawed onto that facing and moved with it.
+          const v = V[jac.dir];
           const along = ((jac.cx - px) * v[0] + (jac.cy - py) * v[1]) / dt;
           const err = Math.abs(jac.vel - along);
           maxErr = Math.max(maxErr, err);
@@ -34,7 +35,7 @@ for (let y = 4; y < 60; y += 6) {
           const disp = Math.hypot(jac.cx - px, jac.cy - py);
           if (disp >= 0.15) {
             const ang = Math.atan2(jac.cy - py, jac.cx - px) / (Math.PI / 2);
-            const sprite = { se: 0, sw: 1, nw: 2, ne: 3 }[dir];
+            const sprite = { se: 0, sw: 1, nw: 2, ne: 3 }[jac.dir];
             let dlt = ang - sprite;
             while (dlt > 2) dlt -= 4;
             while (dlt < -2) dlt += 4;

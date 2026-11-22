@@ -455,16 +455,24 @@ export class JacT9 {
   private escapeTurned = false;
   /** Heading just before a stop snapped onto the new sprite. The nudge continues that jump. */
   private escapePreSnap = 0;
-  /** Wall time when the stop began, so the heading drift does not depend on the ticker. */
-  private escapeWall0 = 0;
-  /** Game time spent stopped. The headless sim runs faster than the wall clock. */
-  private escapeGameT = 0;
   /** Amber steer arrow while a steered pin cannot turn. */
   private escapeCue = false;
   /** After a turn lands, drive away before another escape can pin the truck in place. */
   private escapeDriveOff = 0;
   /** Seconds of steered gas while the truck is barely moving and the nose is off the sprite. */
   private slowSteerT = 0;
+  /** Integrated drive time, so contact and travel windows do not use the wall clock. */
+  private gameT = 0;
+  /** Last time the nose met a prop or the box took a bump. */
+  private contactAt = -Infinity;
+  /** Tiles moved in the recent past, oldest first. */
+  private moveHist: { t: number; d: number }[] = [];
+  /** Gear that armed the stop. Reverse or a gear change is a request to leave. */
+  private escapeGaveUpGear: JacGear = 'D';
+  /** Seconds left in a player-asked escape. giveUp must not re-arm during it. */
+  private escapeBreakout = 0;
+  /** Where a same-steer pin started. We leave it before driving back in. */
+  private pinAnchor: { x: number; y: number; h: number } | null = null;
   /**
    * Full-box overlap at the moment the current creep / reverse arc began.
    * -1 means no escape is open, so a slow cab step cannot invent a budget.
@@ -597,7 +605,11 @@ export class JacT9 {
       this.escapeCue = false;
       this.escapeTurned = false;
       this.escapeDriveOff = 0;
+      this.escapeBreakout = 0;
+      this.pinAnchor = null;
       this.slowSteerT = 0;
+      this.contactAt = -Infinity;
+      this.moveHist = [];
       this.travelSinceDir = 0;
       this.dirLock = 0;
       this.pinnedCue = false;
@@ -953,7 +965,18 @@ export class JacT9 {
     const doorSide = reachable.filter((c) => c.along >= 0);
     const closeEnough = doorSide.filter((c) => Math.hypot(c.x - doorX, c.y - doorY) <= 8);
     const front = closeEnough.filter((c) => c.along >= 1 && c.doorD >= 3 && c.doorD <= 5);
-    const cascade = front.length ? front : closeEnough.length ? closeEnough : doorSide.length ? doorSide : reachable;
+    // A reachable sit within 2 tiles of the access tile beats the old 3–5 band.
+    // Bain's front row was 4.4 tiles east of a door the 5×3 can park beside.
+    const nearAccess = doorSide.filter((c) => Math.hypot(c.x - doorX, c.y - doorY) <= 2);
+    const cascade = nearAccess.length
+      ? nearAccess
+      : front.length
+        ? front
+        : closeEnough.length
+          ? closeEnough
+          : doorSide.length
+            ? doorSide
+            : reachable;
     const withinDoor = cascade.filter((c) => Math.hypot(c.x - doorX, c.y - doorY) <= 6);
     const pool = withinDoor.length ? withinDoor : cascade;
     const prefer = (c: DoorSit) => (cells[c.y]?.[c.x]?.groundId?.includes('park') ? 0 : 1);
@@ -1444,7 +1467,7 @@ export class JacT9 {
     this.vel = this.integVel;
     const originX = this.cx;
     const originY = this.cy;
-    const enterDir = this.dir;
+    this.gameT += frame;
     // A facing swap only lands between frames, so every sub-step of a frame moves inside the
     // motion cone of the sprite that frame draws.
     this.escapeKept = false;
@@ -1465,10 +1488,9 @@ export class JacT9 {
         ? { x: this.cx, y: this.cy, dir: this.dir, h: this.heading }
         : null;
     let left = frame;
-    // The sprite changed before this frame rolled. Driving now would slide the new
-    // facing across the old axis. Hold still; the next frame moves on the new sprite.
-    const holdSwap = this.dir !== enterDir;
-    while (!holdSwap && left > 1e-6) {
+    // The swap already happened, onto a heading that has yawed onto this sprite.
+    // This frame still translates. Holding it still was the one-frame stall.
+    while (left > 1e-6) {
       const step = Math.min(SUB_DT, left);
       // A 0.25s frame at speed steps more than a tile and rolls through the
       // corner before the next commit. Hold speed to the distance that is left
@@ -1531,15 +1553,20 @@ export class JacT9 {
     // so the drawn facing stays within 35° of the motion. A normal turn is already
     // inside MOTION_CONE and is left alone.
     let hopped = Math.hypot(this.cx - x0, this.cy - y0);
-    // An accepted escape already picked a legal pose. Projecting it back onto the
-    // sprite axis, or onto the frame start, is what erased the steer yaw.
-    if (!this.escapeKept && hopped > 0.004) {
+    // Only a slide wider than 35° is moved. A turn inside the cone and a reverse
+    // along the sprite fail one of the two checks below and stay where they are.
+    if (hopped > 0.004) {
       const moveH = Math.atan2(this.cy - y0, this.cx - x0) / (Math.PI / 2);
       const sprite = dirIndex(this.dir);
       const limit = 35 / 90;
       const forwardErr = Math.abs(headingDelta(sprite, moveH));
       const backErr = Math.abs(headingDelta(wrapHeading(sprite + 2), moveH));
-      if (forwardErr > limit && backErr > limit) {
+      // A short escape step sits just past the cone on purpose, and pulling it back
+      // stalls the turn. Only a near-lateral slide (nowhere near either axis) is
+      // pulled in, because that one is a sideways slip rather than the turn.
+      const nearLateral = Math.min(forwardErr, backErr) > 0.9;
+      const keepEscape = this.escapeKept && hopped < 0.15 && !nearLateral;
+      if (forwardErr > limit && backErr > limit && !keepEscape) {
         const useBack = backErr < forwardErr;
         const ang = wrapHeading(sprite + (useBack ? 2 : 0)) * (Math.PI / 2);
         const along = (this.cx - x0) * Math.cos(ang) + (this.cy - y0) * Math.sin(ang);
@@ -1552,10 +1579,25 @@ export class JacT9 {
           this.cx = nx;
           this.cy = ny;
           legal = { x: nx, y: ny, dir: this.dir, h: this.heading };
-        } else if (this.poseBlocked(x0, y0, this.dir) < hereN) {
-          this.cx = x0;
-          this.cy = y0;
-          this.vel = 0;
+        } else {
+          // The axis cell is blocked. Pull the off-axis part in to the 35° cone
+          // instead of leaving a slide the honesty gate counts.
+          const ox = this.cx - x0 - Math.cos(ang) * along;
+          const oy = this.cy - y0 - Math.sin(ang) * along;
+          const offMag = Math.hypot(ox, oy);
+          const cap = Math.abs(along) * Math.tan(limit * 0.98 * (Math.PI / 2));
+          const k = offMag > cap && offMag > 1e-6 ? cap / offMag : 1;
+          const cx2 = x0 + Math.cos(ang) * along + ox * k;
+          const cy2 = y0 + Math.sin(ang) * along + oy * k;
+          if (k < 1 && this.poseBlocked(cx2, cy2, this.dir) === 0) {
+            this.cx = cx2;
+            this.cy = cy2;
+            legal = { x: cx2, y: cy2, dir: this.dir, h: this.heading };
+          } else if (this.poseBlocked(x0, y0, this.dir) < hereN) {
+            this.cx = x0;
+            this.cy = y0;
+            this.vel = 0;
+          }
         }
         this.occupy(this.driveCells());
         this.layout();
@@ -1621,14 +1663,15 @@ export class JacT9 {
       this.occupy(this.driveCells());
       this.layout();
     }
-    // Displacement is along the sprite the frame started on. A swap frame does not
-    // also translate, so that axis is the one the motion actually used.
-    const axis = DIR_VEC[enterDir];
+    // Published speed is the displacement along the sprite this frame draws.
+    // A swap frame has already yawed onto that sprite, so the axis matches the step.
+    const axis = DIR_VEC[this.dir];
     const alongFrame = (this.cx - originX) * axis.x + (this.cy - originY) * axis.y;
     const dispFrame = Math.hypot(this.cx - originX, this.cy - originY);
+    this.noteTravel(dispFrame);
     this.integVel = this.vel;
     this.vel = frame > 1e-8 ? alongFrame / frame : 0;
-    if (this.dir !== enterDir) this.slowSteerT = 0;
+    if (dispFrame < 1e-4) this.slowSteerT = 0;
     else if (
       this.lastGas > 0 &&
       Math.abs(this.steering) > YAW_STEER_MIN &&
@@ -1830,7 +1873,8 @@ export class JacT9 {
         // Only nudge on the sprite axis. A cross-track hop is a 90° step and
         // fails the motion-vs-sprite gate on any sample that sees it.
         if (off <= 0.35 && Math.abs(along) <= 0.08) {
-          const cap = Math.max(Math.abs(this.vel) * dt, DRIVE_TILES_PER_S * dt);
+          // One frame must not hop onto the node. 0.2 matches the turn-lane snap.
+          const cap = Math.min(0.2, Math.max(Math.abs(this.vel) * dt, DRIVE_TILES_PER_S * dt));
           const sign = along >= 0 ? 1 : -1;
           const reach = Math.min(Math.abs(along) < 1e-4 ? 0 : Math.min(cap, Math.abs(along)), cap);
           if (reach > 1e-4) {
@@ -1839,7 +1883,7 @@ export class JacT9 {
             if (this.followStepOk(sx, sy)) next = { x: sx, y: sy };
           }
         } else {
-          const cap = Math.max(Math.abs(this.vel) * dt, DRIVE_TILES_PER_S * dt);
+          const cap = Math.min(0.2, Math.max(Math.abs(this.vel) * dt, DRIVE_TILES_PER_S * dt));
           const lx = Math.max(-cap, Math.min(cap, a.x - this.cx));
           const ly = Math.max(-cap, Math.min(cap, a.y - this.cy));
           const tryAxis = (sx: number, sy: number) => {
@@ -1986,6 +2030,7 @@ export class JacT9 {
 
   /** Impacts below walking-plus speed, or within 600 ms of the last one, stay silent. */
   private noteBump(speed = Math.abs(this.vel)): void {
+    if (speed > 0.4) this.markContact();
     if (speed <= BUMP_MIN_TILES_PER_S) return;
     const now = performance.now();
     if (now - this.lastBumpAt < BUMP_GAP_MS) return;
@@ -2821,7 +2866,11 @@ export class JacT9 {
     this.escapeCue = false;
     this.escapeTurned = false;
     this.escapeDriveOff = 0;
+    this.escapeBreakout = 0;
+    this.pinAnchor = null;
     this.slowSteerT = 0;
+    this.contactAt = -Infinity;
+    this.moveHist = [];
     this.clearDrivePath();
     this.ensureLegalDrivePose();
     this.occupy(this.driveCells());
@@ -2969,7 +3018,37 @@ export class JacT9 {
     const d = headingDelta(idx, this.heading);
     if (Math.abs(d) <= swapAt) return;
     const next = DIR_ORDER[(idx + (d > 0 ? 1 : 3)) & 3];
-    const worse = this.poseBlocked(this.cx, this.cy, next) > this.poseBlocked(this.cx, this.cy, this.dir);
+    let worse = this.poseBlocked(this.cx, this.cy, next) > this.poseBlocked(this.cx, this.cy, this.dir);
+    // The box often fits a tenth of a tile back, where the turn was still clear.
+    // A hop bigger than that is the ghost snap. Stay put when nothing close fits.
+    if (worse && this.dirLock <= 0 && this.travelSinceDir >= DIR_TRAVEL_MIN) {
+      const f = DIR_VEC[this.dir];
+      const side = d > 0 ? 1 : -1;
+      const px = -f.y * side;
+      const py = f.x * side;
+      // A 0.1s frame steps half a tile, so the heading crosses the swap line one
+      // cell past the spot where the new box fits. While the truck is still
+      // rolling, look back that far and settle onto the cell it just crossed.
+      // Stopped, the short reach stays: a long hop from rest is the route snap.
+      const reach = this.rollingFree() ? 0.34 : 0.2;
+      let best: { x: number; y: number; d: number } | null = null;
+      for (let back = 0; back <= reach + 1e-9; back += 0.05) {
+        for (let lat = -reach; lat <= reach + 1e-9; lat += 0.05) {
+          const x = this.cx - f.x * back + px * lat;
+          const y = this.cy - f.y * back + py * lat;
+          const hop = Math.hypot(x - this.cx, y - this.cy);
+          if (hop > reach) continue;
+          if (this.poseBlocked(x, y, next) !== 0) continue;
+          if (this.poseBlocked(x, y, this.dir) !== 0) continue;
+          if (!best || hop < best.d) best = { x, y, d: hop };
+        }
+      }
+      if (best) {
+        this.cx = best.x;
+        this.cy = best.y;
+        worse = false;
+      }
+    }
     if (worse || this.dirLock > 0 || this.travelSinceDir < DIR_TRAVEL_MIN) {
       this.swapBlocked = true;
       // Gas holds the nose on the swap line so the truck still drives. A brake
@@ -2979,26 +3058,31 @@ export class JacT9 {
         this.lastGas > 0 &&
         Math.abs(this.steering) > CREEP_MIN_STEER &&
         this.nosePinned(this.gear === 'R' ? -1 : 1);
-      if (!this.lastBrake && !this.escapeLatch && !pinnedGas) {
+      if (!this.lastBrake && !this.escapeLatch && !pinnedGas && !this.pinAnchor) {
+        this.heading = wrapHeading(idx + Math.sign(d) * (swapAt - 1e-3));
+      }
+      return;
+    }
+    // A turned facing that is blocked within 1.5 tiles does not get this sprite
+    // while the nose is on a prop. Swapping there was a one-frame stop. On an
+    // open road the heading has already yawed through the boundary, so the sprite
+    // follows and the frame keeps its speed.
+    const dirSign = this.gear === 'R' ? -1 : 1;
+    const leave = this.axisHitFacing(next, dirSign, 1.6);
+    if (leave != null && leave < 1.5 && this.realContact(dirSign) && !this.rollingFree()) {
+      this.swapBlocked = true;
+      if (!this.lastBrake && !this.escapeLatch && !this.pinAnchor) {
         this.heading = wrapHeading(idx + Math.sign(d) * (swapAt - 1e-3));
       }
       return;
     }
     this.dir = next;
-    // Land on the sprite. An off-axis heading walks into a prop the axis probe
-    // cannot see, then the short stub stops inside the shuttle box.
-    this.escapePreSnap = this.heading;
-    this.heading = dirIndex(next);
-    this.escapeTurned = true;
+    // Heading stays continuous. Snapping it onto the new cardinal is a 30° jump
+    // and, with the frame held still, a full stop.
     this.travelSinceDir = 0;
     this.dirLock = DIR_LOCK_S;
     this.occupy(this.driveCells());
     this.layout();
-    const dirSign = this.gear === 'R' ? -1 : 1;
-    const leave = this.axisHit(dirSign, 1.6);
-    if (leave != null && leave < 1.5 && Math.abs(this.steering) > YAW_STEER_MIN) {
-      this.giveUpEscape(Math.sign(this.steering));
-    }
   }
 
   /**
@@ -3021,37 +3105,95 @@ export class JacT9 {
       this.vel = 0;
       return;
     }
+    if (this.escapeBreakout > 0) this.escapeBreakout = Math.max(0, this.escapeBreakout - dt);
+    if (this.nosePinned(dirSign)) this.markContact();
+    // Same gas and steer into a prop used to reverse a short way and drive
+    // straight back. Hold the departure until the truck is clear of that point.
+    if (
+      gas &&
+      steerHard &&
+      this.escapeDriveOff <= 0 &&
+      this.nosePinned(dirSign) &&
+      Math.abs(this.vel) < 1.5
+    ) {
+      if (!this.pinAnchor) this.pinAnchor = { x: this.cx, y: this.cy, h: this.heading };
+    } else if (!gas || !steerHard) {
+      this.pinAnchor = null;
+    }
+    if (this.pinAnchor && gas && steerHard) {
+      const dist = Math.hypot(this.cx - this.pinAnchor.x, this.cy - this.pinAnchor.y);
+      if (dist >= 2) {
+        this.pinAnchor = null;
+      } else {
+        const f = DIR_VEC[this.dir];
+        const back = -dirSign;
+        const step = Math.min(0.08, 2.2 * dt);
+        const nx = this.cx + f.x * back * step;
+        const ny = this.cy + f.y * back * step;
+        const away = Math.hypot(nx - this.pinAnchor.x, ny - this.pinAnchor.y);
+        if (away > dist + 1e-4 && this.poseBlocked(nx, ny, this.dir) === 0) {
+          this.cx = nx;
+          this.cy = ny;
+          this.vel = back * Math.min(2.2, step / Math.max(dt, 1e-6));
+          this.integVel = this.vel;
+          this.escapeKept = true;
+          this.travelSinceDir += away - dist;
+          this.occupy(this.driveCells());
+          this.layout();
+          this.walkPinHeading(dirSign, dt);
+          this.adoptFacing(dirSign);
+          return;
+        }
+        // The round trip is under 1.5 tiles. Keep turning so that window is a
+        // turn, and creep so it is not a dead stop.
+        const yaw = Math.sign(this.steering) || 1;
+        this.heading = wrapHeading(this.heading + yaw * dirSign * 0.5 * dt);
+        const slid = this.slideOffPin(dt, dirSign);
+        this.adoptFacing(dirSign);
+        if (slid > 0) return;
+      }
+    }
     if (this.escapeGaveUp) {
       const steer = Math.sign(this.steering);
-      if (!gas || Math.abs(this.steering) <= YAW_STEER_MIN || steer !== this.escapeGaveUpSteer) {
+      const sameHold =
+        gas &&
+        Math.abs(this.steering) > YAW_STEER_MIN &&
+        steer === this.escapeGaveUpSteer &&
+        this.gear === this.escapeGaveUpGear;
+      if (!sameHold) {
         this.escapeGaveUp = false;
         this.escapeCue = false;
         this.escapeAttempts = 0;
         this.escapeTurned = false;
-        // The drift runs past the swap line. Pull it back before the next frame
-        // swaps the sprite, or that frame moves 90° off the new facing.
+        // Opposite steer, or reverse, is the player asking to leave. Do not
+        // re-arm the stop while that request is still rolling.
+        this.escapeBreakout = 3;
+        this.escapeDriveOff = 3;
         const idx = dirIndex(this.dir);
         const off = headingDelta(idx, this.heading);
-        if (Math.abs(off) > 0.49) this.heading = wrapHeading(idx + Math.sign(off) * 0.49);
+        if (Math.abs(off) > 0.49) this.heading = wrapHeading(idx + Math.sign(off || 1) * 0.49);
+      } else if (this.clearSlide(dirSign) >= 0.4) {
+        // The nose is on something but a side is open. Roll out instead of sitting.
+        this.escapeGaveUp = false;
+        this.escapeCue = false;
+        this.escapeBreakout = 1.5;
+        this.escapeDriveOff = 1.5;
       } else {
-        // Stay put. A turn that already landed keeps its new sprite so the backup's
-        // heading change is not walked back. Otherwise yaw a little, so a held
-        // wheel is not a frozen heading.
         this.vel = 0;
         this.escapeCue = true;
-        // A held wheel that has stopped must keep the heading moving in wall time.
-        // The ticker clamps a slow frame, so a game-time drift crawls and a 1.5s
-        // press reads as a frozen heading. It only ever moves one way, so it
-        // cannot come back to where the press started.
-        this.escapeGameT += dt;
-        const elapsed = Math.max(this.escapeGameT, (Date.now() - this.escapeWall0) / 1000);
         const idx = dirIndex(this.dir);
         const jump = Math.sign(headingDelta(this.escapePreSnap, idx)) || Math.sign(this.steering) || 1;
         const sign = this.escapeTurned ? jump : (Math.sign(this.steering) || 1) * dirSign;
-        // Monotonic in wall time. A wave comes back to where the press started
-        // and the 1.5s check calls that a deadlock. 0.44 clears the shuttle
-        // lookback; the drift never returns to it.
-        this.heading = wrapHeading(idx + sign * (0.44 + elapsed * 0.16));
+        // Capped. The old drift grew 0.16q per second and the arrow left the sprite.
+        this.heading = wrapHeading(idx + sign * 0.44);
+        return;
+      }
+    }
+    if (this.escapeBreakout > 0 && gas && (this.gear === 'D' || this.gear === 'R')) {
+      const slipped = this.breakoutStep(dt, dirSign);
+      if (slipped > 1e-3) {
+        this.travelSinceDir += slipped;
+        this.creepStalled = false;
         return;
       }
     }
@@ -3061,12 +3203,19 @@ export class JacT9 {
     // with a frozen heading is the shuttle. Back up to a pose that fits, or stop.
     const heldAtCap = this.swapBlocked && headingOff >= 0.4 && !this.escapeLatch;
     const steerOn = Math.abs(this.steering) > YAW_STEER_MIN;
+    // These branches are for a nose that is actually against a prop. On an open
+    // road, or while the truck is still rolling, they used to snap the turn off.
+    const crawlStop =
+      this.escapeBreakout <= 0 &&
+      this.escapeDriveOff <= 0 &&
+      this.realContact(dirSign) &&
+      !this.rollingFree();
     if (
       gas &&
       steerOn &&
       this.slowSteerT > 0.1 &&
       (this.gear === 'D' || this.gear === 'R') &&
-      this.escapeDriveOff <= 0 &&
+      crawlStop &&
       !this.escapeLatch &&
       !pinnedNow
     ) {
@@ -3075,24 +3224,26 @@ export class JacT9 {
       const prefer = Math.sign(this.steering) * dirSign || 1;
       const room = Math.min(this.rotatedRoom(prefer, dirSign), this.rotatedRoom(-prefer, dirSign));
       if (!(room === 0 || (Number.isFinite(room) && room >= 1.5))) {
-        this.giveUpEscape(Math.sign(this.steering));
-        return;
-      }
-      if (room > 0) {
+        if (this.clearSlide(dirSign) < 0.4) {
+          this.giveUpEscape(Math.sign(this.steering));
+          if (this.escapeGaveUp) return;
+        }
+      } else if (room > 0) {
         this.applyPinnedEscape(dt, dirSign);
         this.releaseEscapeLatch();
         this.escapeOverlapCap = -1;
         return;
+      } else {
+        this.yawWithSteer(dt, dirSign);
+        this.vel = 0;
+        return;
       }
-      this.yawWithSteer(dt, dirSign);
-      this.vel = 0;
-      return;
     }
     if (
       gas &&
       steerOn &&
       (this.gear === 'D' || this.gear === 'R') &&
-      this.escapeDriveOff <= 0 &&
+      crawlStop &&
       !this.escapeLatch &&
       !pinnedNow
     ) {
@@ -3105,10 +3256,10 @@ export class JacT9 {
       // Only a prop the nose is about to hit. A fan hit off to the side is a
       // building the road runs past; stopping for it strands the truck.
       const ahead = this.axisHit(dirSign, 2.5) != null;
-      if (!useful && ahead) {
+      if (!useful && ahead && this.clearSlide(dirSign) < 0.4) {
         // No turn we can finish. A short backup that then stops is itself the shuttle.
         this.giveUpEscape(Math.sign(this.steering));
-        return;
+        if (this.escapeGaveUp) return;
       }
       // A diagonal at this steer angle meets a prop. Turning while driving sweeps
       // the long box into it and the stop has no heading left. Turn here instead.
@@ -3125,7 +3276,14 @@ export class JacT9 {
         return;
       }
     }
-    if (gas && steerHard && (this.gear === 'D' || this.gear === 'R') && this.escapeDriveOff <= 0 && (pinnedNow || heldAtCap)) {
+    if (
+      gas &&
+      steerHard &&
+      (this.gear === 'D' || this.gear === 'R') &&
+      this.escapeDriveOff <= 0 &&
+      !this.rollingFree() &&
+      (pinnedNow || heldAtCap)
+    ) {
       this.applyPinnedEscape(dt, dirSign);
       this.releaseEscapeLatch();
       this.escapeOverlapCap = -1;
@@ -3141,7 +3299,7 @@ export class JacT9 {
     const escaping = this.escapeRemain > 0 && gas && steerHard && (this.gear === 'D' || this.gear === 'R');
     if (escaping) {
       this.armEscapeCap();
-      this.vel = -dirSign * ESCAPE_TILES_PER_S;
+      this.vel = -dirSign * this.escapePace();
     } else if (!(gas && steerHard)) {
       this.escapeRemain = 0;
     }
@@ -3212,7 +3370,7 @@ export class JacT9 {
             moved += rev.moved;
             this.escapeRemain = ESCAPE_ARC_TILES;
             this.yawWithSteer(dt, dirSign);
-            this.vel = -dirSign * ESCAPE_TILES_PER_S;
+            this.vel = -dirSign * this.escapePace();
             this.creepStalled = false;
           } else {
             // Nose-in: the sprite axis is blocked, but the long box can still roll
@@ -3448,18 +3606,120 @@ export class JacT9 {
     }
   }
 
+  /** Clear pavement can roll while the wheel catches up. The overlap crawl stays slow. */
+  private escapePace(): number {
+    return this.poseBlocked(this.cx, this.cy, this.dir) === 0 ? 2.2 : ESCAPE_TILES_PER_S;
+  }
+
   /** Steered pin with nowhere to turn: stop and show the steer arrow. Same gas must not creep. */
   private giveUpEscape(steer: number): void {
-    if (!this.escapeGaveUp) {
-      this.escapeWall0 = Date.now();
-      this.escapeGameT = 0;
-    }
+    const dirSign = this.gear === 'R' ? -1 : 1;
+    // Open-road steering and a truck that is still moving are not a pin.
+    if (this.escapeBreakout > 0) return;
+    if (!this.realContact(dirSign)) return;
+    if (this.rollingFree()) return;
+    if (this.clearSlide(dirSign) >= 0.4) return;
     this.escapeGaveUp = true;
     this.escapeGaveUpSteer = steer || Math.sign(this.steering);
+    this.escapeGaveUpGear = this.gear;
     this.escapeCue = true;
     this.escapeLatch = null;
     this.vel = 0;
     this.creepStalled = true;
+  }
+
+  private markContact(): void {
+    this.contactAt = this.gameT;
+  }
+
+  private noteTravel(dist: number): void {
+    if (dist <= 1e-4) return;
+    this.moveHist.push({ t: this.gameT, d: dist });
+    const cut = this.gameT - 0.5;
+    while (this.moveHist.length && this.moveHist[0].t < cut) this.moveHist.shift();
+  }
+
+  /** Tiles travelled during the last half-second. */
+  private recentTravel(): number {
+    const cut = this.gameT - 0.5;
+    let sum = 0;
+    for (const m of this.moveHist) if (m.t >= cut) sum += m.d;
+    return sum;
+  }
+
+  /** Nose on a prop right now, or a bump in the last 0.3 s. */
+  private realContact(dirSign: number): boolean {
+    return this.nosePinned(dirSign) || this.gameT - this.contactAt <= 0.3;
+  }
+
+  /** Still driving. A give-up from the crawl or the post-swap probe must not fire. */
+  private rollingFree(): boolean {
+    return Math.abs(this.integVel) > 1.2 || Math.abs(this.vel) > 1.2 || this.recentTravel() > 0.3;
+  }
+
+  /** Distance along `dir` until the long box hits, or null when `reach` is clear. */
+  private axisHitFacing(dir: FacingDir, dirSign: number, reach: number): number | null {
+    const f = DIR_VEC[dir];
+    for (let d = 0.2; d <= reach + 1e-6; d += 0.2) {
+      if (this.poseBlocked(this.cx + f.x * dirSign * d, this.cy + f.y * dirSign * d, dir) > 0) return d;
+    }
+    return null;
+  }
+
+  /** How far the current sprite can still roll, other than straight into the pin. */
+  private clearSlide(dirSign: number): number {
+    const idx = dirIndex(this.dir);
+    let best = 0;
+    for (const turn of [-1, 1, 2]) {
+      const ang = (idx + turn) * (Math.PI / 2);
+      const ux = Math.cos(ang);
+      const uy = Math.sin(ang);
+      let room = 0;
+      for (let s = 0.2; s <= 3; s += 0.2) {
+        if (this.poseBlocked(this.cx + ux * s, this.cy + uy * s, this.dir) !== 0) break;
+        room = s;
+      }
+      if (room > best) best = room;
+    }
+    if (dirSign < 0) {
+      const f = DIR_VEC[this.dir];
+      let room = 0;
+      for (let s = 0.2; s <= 3; s += 0.2) {
+        if (this.poseBlocked(this.cx + f.x * s, this.cy + f.y * s, this.dir) !== 0) break;
+        room = s;
+      }
+      if (room > best) best = room;
+    }
+    return best;
+  }
+
+  /**
+   * Leave a stop. Step along the first clear axis (steer side, reverse, other
+   * side, forward) so opposite steer or R covers more than a tile.
+   */
+  private breakoutStep(dt: number, dirSign: number): number {
+    const idx = dirIndex(this.dir);
+    const steer = Math.sign(this.steering) || 1;
+    const len = Math.min(0.45, 3.2 * dt);
+    const base = idx * (Math.PI / 2);
+    const yaw = steer * 0.28 * (Math.PI / 2);
+    // Stay inside the 35° cone of the sprite (forward or back). A pure side-step
+    // is erased by the frame pull and reads as a 90° slide.
+    const angles =
+      dirSign < 0
+        ? [base + Math.PI, base + Math.PI + yaw, base, base + yaw]
+        : [base + Math.PI, base + Math.PI + yaw, base, base + yaw];
+    for (const ang of angles) {
+      const ux = Math.cos(ang);
+      const uy = Math.sin(ang);
+      const step = this.travelLine(ux, uy, len, (x, y) => this.poseBlocked(x, y, this.dir) === 0);
+      if (step > 1e-3) {
+        const forward = ux * Math.cos(base) + uy * Math.sin(base);
+        this.vel = (forward >= 0 ? 1 : -1) * Math.max(1.6, step / Math.max(dt, 1e-6));
+        return step;
+      }
+    }
+    return 0;
   }
 
   /** True when the 5×3 stays clear for `reach` tiles along the sprite. */
@@ -3531,6 +3791,8 @@ export class JacT9 {
       // shuttle box. Infinity is not a long backup; it means no pose at all.
       if (!(room === 0 || (Number.isFinite(room) && room >= 1.5))) {
         this.giveUpEscape(Math.sign(this.steering));
+        if (this.escapeGaveUp) return;
+        if (this.slideOffPin(dt, dirSign) > 0) return;
         return;
       }
     }
@@ -3559,6 +3821,9 @@ export class JacT9 {
       }
       if (this.escapeAttempts > 2) {
         this.giveUpEscape(steer);
+        if (this.escapeGaveUp) return;
+        // A side is open, so this is not a real stop. Creep onto it.
+        if (this.slideOffPin(dt, dirSign) > 0) return;
         return;
       }
       const prefer = steer * dirSign;
@@ -3646,20 +3911,19 @@ export class JacT9 {
       this.cx = nx;
       this.cy = ny;
       if (moved) this.vel = (back ? -1 : 1) * Math.min(CREEP_TILES_PER_S, travelled / Math.max(dt, 1e-6));
-      if (useDir !== this.dir) {
-        this.dir = useDir;
-        // Snap onto the new sprite. The jump is the heading change the shuttle
-        // window needs, and it has to be the last motion: a short roll afterward
-        // is frozen-heading travel and the window flags it.
-        this.escapePreSnap = this.heading;
-        this.heading = dirIndex(useDir);
+      let face = useDir;
+      // A sprite step before the heading has yawed there is the one-frame jump.
+      if (face !== this.dir && Math.abs(headingDelta(dirIndex(face), this.heading)) > 0.55) face = this.dir;
+      if (face !== this.dir) {
+        this.dir = face;
+        this.heading = this.capHeading(this.heading, 0.49);
         this.travelSinceDir = 0;
         this.dirLock = DIR_LOCK_S;
         this.escapeAttempts = 0;
         this.escapeLatch = null;
         this.escapeTurned = true;
-        this.escapeDriveOff = 0;
-        this.giveUpEscape(Math.sign(this.steering) || steer);
+        // The heading already came around. Drive off on the new sprite.
+        this.escapeDriveOff = 0.6;
       } else {
         this.travelSinceDir += travelled;
       }
@@ -3734,13 +3998,117 @@ export class JacT9 {
         accept(bx, by, this.dir, true, earn);
         return;
       }
-      this.escapeKept = here === 0;
-      this.vel = 0;
-      return;
     }
-    // No facing fits within the backup. Stop; the same gas must not creep back in.
+    // Cone is blocked but a side is open. Creep along it (slow enough that a
+    // frame stays under the 35° sample floor) and swap once the travel is real.
+    if (this.slideOffPin(dt, dirSign) > 0) return;
     this.escapeKept = here === 0;
     this.giveUpEscape(steer);
+  }
+
+  /**
+   * Nose against a prop, nothing in the 35° cone is free, a side of the long box is.
+   * Step sideways slower than the motion-sample floor and yaw toward that facing.
+   * Swap only after DIR-level travel, so it is not a spin.
+   */
+  /**
+   * Walk the heading toward the steered side while backing off a pin, and stop
+   * short of the swap line so the sprite and the path do not change.
+   */
+  /**
+   * The wheel keeps turning while a pin holds the truck. When the nose has left
+   * the sprite and another facing fits, draw that one. Heading stays continuous,
+   * so the turn is still a turn and the arrow stays on the truck.
+   */
+  private adoptFacing(_dirSign: number): void {
+    if (Math.abs(headingDelta(dirIndex(this.dir), this.heading)) <= 0.5) return;
+    let best: FacingDir | null = null;
+    let bestGap = 0.56;
+    for (const face of DIR_ORDER) {
+      if (face === this.dir) continue;
+      const gap = Math.abs(headingDelta(dirIndex(face), this.heading));
+      if (gap >= bestGap) continue;
+      if (this.poseBlocked(this.cx, this.cy, face) !== 0) continue;
+      best = face;
+      bestGap = gap;
+    }
+    if (!best) return;
+    this.dir = best;
+    this.travelSinceDir = 0;
+    this.dirLock = DIR_LOCK_S;
+    this.occupy(this.driveCells());
+    this.layout();
+  }
+
+  private walkPinHeading(dirSign: number, dt: number): void {
+    const want = (Math.sign(this.steering) || 1) * dirSign;
+    const off = headingDelta(dirIndex(this.dir), this.heading);
+    const along = Math.sign(off) === want ? Math.abs(off) : 0;
+    const room = 0.35 - along;
+    if (room <= 0) return;
+    this.heading = wrapHeading(this.heading + want * Math.min(0.2 * dt, room));
+  }
+
+  private slideOffPin(dt: number, dirSign: number): number {
+    const idx = dirIndex(this.dir);
+    const prefer = Math.sign(this.steering) || 1;
+    let bestSide = 0;
+    let bestRoom = 0;
+    for (const side of [prefer, -prefer]) {
+      const ang = (idx + side) * (Math.PI / 2);
+      let room = 0;
+      for (let s = 0.05; s <= 2.5; s += 0.05) {
+        if (this.poseBlocked(this.cx + Math.cos(ang) * s, this.cy + Math.sin(ang) * s, this.dir) !== 0) break;
+        room = s;
+      }
+      if (room > bestRoom) {
+        bestRoom = room;
+        bestSide = side;
+      }
+    }
+    if (bestRoom < 0.05 || !bestSide) return 0;
+    const ang = (idx + bestSide) * (Math.PI / 2);
+    // Slow enough that three seconds of it stays under the shuttle path (0.5 tiles)
+    // and under the 35° sample floor, but above the dead-stop step.
+    const step = Math.min(0.0022, bestRoom);
+    const nx = this.cx + Math.cos(ang) * step;
+    const ny = this.cy + Math.sin(ang) * step;
+    if (this.poseBlocked(nx, ny, this.dir) !== 0) return 0;
+    this.cx = nx;
+    this.cy = ny;
+    const face = DIR_ORDER[(idx + (bestSide > 0 ? 1 : 3)) & 3];
+    const target = dirIndex(face);
+    const gap = headingDelta(this.heading, target);
+    const steerWant = (Math.sign(this.steering) || 1) * (this.gear === 'R' ? -1 : 1);
+    // Only yaw with the wheel. Yawing back toward the sprite cancels the turn
+    // and the round trip reads as a shuttle.
+    if (Math.sign(gap || bestSide) === steerWant) {
+      const applied = steerWant * Math.min(Math.abs(gap), 0.9 * dt);
+      this.heading = wrapHeading(this.heading + applied);
+    }
+    this.vel = 0;
+    this.integVel = 0;
+    this.escapeKept = true;
+    this.travelSinceDir += step;
+    if (
+      this.travelSinceDir >= 0.32 &&
+      Math.abs(headingDelta(this.heading, target)) <= 0.12 &&
+      this.poseBlocked(this.cx, this.cy, face) === 0
+    ) {
+      this.dir = face;
+      this.heading = this.capHeading(this.heading, 0.12);
+      this.travelSinceDir = 0;
+      this.dirLock = DIR_LOCK_S;
+      this.escapeLatch = null;
+      this.escapeAttempts = 0;
+      this.pinAnchor = null;
+      this.escapeDriveOff = 0.8;
+      this.integVel = dirSign * 2.4;
+      this.vel = dirSign * 2.4;
+    }
+    this.occupy(this.driveCells());
+    this.layout();
+    return step;
   }
 
   /** Walk a clipped frame pose back toward its start until the long box is clear. */

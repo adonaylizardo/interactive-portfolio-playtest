@@ -18,6 +18,9 @@
  *   G7 per-frame displacement ≤ max(0.35, 1.6·|v|·dt + 0.08)
  *   G8 no sprite rotation of 90° or more with < 0.3 tiles of travel since the previous facing
  *   G9 no driving frame whose 5×3 / 3×5 footprint overlaps a blocked cell
+ *   G10 from spawn, 0.5 s straight then full steer: a 90° turn completes with no stop
+ *      longer than 0.5 s, and no frame yaws more than 0.3 quarter-turns. Both steer
+ *      sides are tried; at least 75% must finish.
  *
  * The approach to a prop reads the pose to steer. Every steer change is appended to `reroutes`.
  *
@@ -790,6 +793,69 @@ function footprintHits(samples) {
   return samples.filter((s) => s.driving && s.blocked);
 }
 
+/** Longest gas+steer stretch that barely moves, and the biggest one-frame heading step. */
+function turnAtSpeed(samples) {
+  let worstStop = 0;
+  let stopAt = null;
+  let runT = 0;
+  let runD = 0;
+  let runAt = null;
+  let maxDh = 0;
+  let dhAt = null;
+  const face = { se: 0, sw: 1, nw: 2, ne: 3 };
+  for (let i = 1; i < samples.length; i++) {
+    const a = samples[i - 1];
+    const b = samples[i];
+    const dtMs = b.t - a.t;
+    if (!(dtMs > 0 && dtMs <= 400)) {
+      runT = 0;
+      runD = 0;
+      continue;
+    }
+    let dh = b.heading - a.heading;
+    while (dh > 2) dh -= 4;
+    while (dh < -2) dh += 4;
+    if (Math.abs(dh) > maxDh) {
+      maxDh = Math.abs(dh);
+      dhAt = [+b.cx.toFixed(2), +b.cy.toFixed(2), b.dir];
+    }
+    const movingInput = b.driving && (b.sActive ? b.sy < -0.3 : /w|arrowup/.test(b.keys || ''));
+    const steered = b.sActive ? Math.abs(b.sx) > 0.3 : /a|d|arrowleft|arrowright/.test(b.keys || '');
+    const d = Math.hypot(b.cx - a.cx, b.cy - a.cy);
+    if (movingInput && steered && d < 0.04 && Math.abs(b.vel) < 0.25) {
+      if (runT === 0) runAt = [+b.cx.toFixed(2), +b.cy.toFixed(2)];
+      runT += dtMs;
+      runD += d;
+      if (runT >= 500 && runD < 0.15 && runT > worstStop) {
+        worstStop = runT;
+        stopAt = runAt;
+      }
+    } else {
+      runT = 0;
+      runD = 0;
+    }
+  }
+  let h0 = samples[0]?.heading ?? 0;
+  let h1 = h0;
+  for (const s of samples) {
+    if (s.driving) {
+      h1 = s.heading;
+    }
+  }
+  let turned = h1 - h0;
+  while (turned > 2) turned -= 4;
+  while (turned < -2) turned += 4;
+  return {
+    turned: +Math.abs(turned).toFixed(3),
+    stopMs: Math.round(worstStop),
+    stopAt,
+    maxDh: +maxDh.toFixed(3),
+    dhAt,
+    endDir: samples.at(-1)?.dir,
+    startFace: face[samples[0]?.dir] ?? 0,
+  };
+}
+
 function fpsOf(samples) {
   if (samples.length < 2) return 0;
   return +(((samples.length - 1) * 1000) / (samples.at(-1).t - samples[0].t)).toFixed(1);
@@ -904,6 +970,32 @@ async function runViewport(browser, kind) {
     await shot(s.page, `${tag}-04-spawn-steer`);
     errors.push(...s.errors);
     await s.ctx.close();
+  }
+
+  // G10: spawn, 0.5 s straight, then full steer. Both sides. A finished 90° turn
+  // does not stop, and the sprite does not yaw a third of a turn in one frame.
+  {
+    const attempts = [];
+    for (const side of ['right', 'left']) {
+      const s = await newSession(browser, kind);
+      await realGetIn(s.page, s.input, s.aim);
+      await startSampling(s.page);
+      if (touch) await holdStick(s.page, s.input, { x: 0, y: -1 }, 500);
+      else await holdKeys(s.page, ['up'], 500);
+      const steer = side === 'right' ? { x: 1, y: -1 } : { x: -1, y: -1 };
+      if (touch) await holdStick(s.page, s.input, steer, 2800);
+      else await holdKeys(s.page, side === 'right' ? ['up', 'right'] : ['up', 'left'], 2800);
+      const r = await stopSampling(s.page);
+      all.push(r.samples);
+      spawnSeq.push(r.samples);
+      const rep = turnAtSpeed(r.samples);
+      attempts.push({ side, ...rep, ok: rep.turned >= 0.9 && rep.stopMs < 500 && rep.maxDh <= 0.3 });
+      await shot(s.page, `${tag}-g10-${side}`);
+      errors.push(...s.errors);
+      await s.ctx.close();
+    }
+    const done = attempts.filter((a) => a.ok).length;
+    res.runs.g10 = { attempts, done, of: attempts.length };
   }
 
   // Run 3: drive (real input) next to the cardón cactus at (26,20) — the old (27.15,18.50) /
@@ -1174,6 +1266,10 @@ async function runViewport(browser, kind) {
         ? `${g9.length} driving frames with the footprint on a blocked cell ${JSON.stringify({ at: [+g9[0].cx.toFixed(2), +g9[0].cy.toFixed(2)], dir: g9[0].dir, vel: +g9[0].vel.toFixed(2) })}`
         : `0 overlapping driving frames of ${res.stats.drivingFrames}`,
     },
+    G10: {
+      pass: (res.runs.g10?.of ?? 0) > 0 && res.runs.g10.done / res.runs.g10.of >= 0.75,
+      detail: `turn-at-speed ${res.runs.g10?.done ?? 0}/${res.runs.g10?.of ?? 0} ${JSON.stringify(res.runs.g10?.attempts ?? [])}`,
+    },
   };
   return res;
 }
@@ -1264,7 +1360,7 @@ async function main() {
   fs.writeFileSync(path.join(OUT, 'drive-real.json'), JSON.stringify(results, null, 2));
   let ok = true;
   console.log('\nGate | ' + results.map((r) => r.viewport).join(' | '));
-  for (const g of ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9']) {
+  for (const g of ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9', 'G10']) {
     console.log(`${g}   | ${results.map((r) => (r.gates[g].pass ? 'PASS' : 'FAIL')).join(' | ')}`);
     for (const r of results) {
       if (!r.gates[g].pass) ok = false;
