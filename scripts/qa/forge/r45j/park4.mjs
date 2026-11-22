@@ -48,7 +48,7 @@ async function trial(label, kind, arg, maxMs) {
     // MutationObserver callback that touches #playtest-toast while it has text. The opacity/rAF time stays info only.
     await p.evaluate(() => { const T = (window.__T = { up: null, toast: null, text: null, preText: document.getElementById('playtest-toast')?.textContent.trim() || '' });
       window.addEventListener('pointerup', () => { if (T.up == null) T.up = performance.now(); }, { capture: true });
-      const mo = new MutationObserver((recs) => { if (T.toast != null) return; // armed just before the tap: the product may set the text on pointerdown, before pointerup (delta <= 0) const el = document.getElementById('playtest-toast'); const tx = el?.textContent.trim();
+      const mo = new MutationObserver((recs) => { if (T.toast != null) return; /* armed just before the tap: the product may set the text on pointerdown, before pointerup (delta <= 0) */ const el = document.getElementById('playtest-toast'); const tx = el?.textContent.trim();
         if (!el || !tx) return; if (!recs.some((r) => el === r.target || el.contains(r.target) || [...r.addedNodes].some((n) => n === el || n.contains?.(el)))) return; T.toast = performance.now(); T.text = tx; });
       mo.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true }); });
     const t0 = await p.evaluate(() => performance.now()); await tap(pt.x, pt.y); const w0 = Date.now();
