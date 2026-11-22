@@ -1,5 +1,5 @@
 import { load } from './common.mjs';
-const { T, jac } = await load();
+const { T, jac } = await load(process.env.BUNDLE);
 const b = T.getEnterableBuildings().find(b => b.name === 'volaris');
 const sit = jac.parkForDoor(b.door.x, b.door.y);
 const path = sit.path;

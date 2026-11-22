@@ -1,6 +1,6 @@
 # Forge r45j probes (QA of cursor/integracion 5a265621)
 
-The cumulative gate is `../run-all.mjs` (r45h Sentinel + r45i + r45j checks, dt 1/60, 0.1, 0.25, one exit code).
+The cumulative gate is `../run-all.mjs` (r45h Sentinel + r45i + r45j + r45k-review checks, dt 1/60, 0.1, 0.25 + variable dt, independent collision oracle, one exit code). See `../README.md`.
 These files are the single-purpose probes it was distilled from, kept for repro and debugging.
 
 Headless (real JacT9 bundle; `BUNDLE=/tmp/x.mjs node <probe> [dt]`, bundle built with `npx esbuild scripts/qa/sentinel-r45h/entry.ts --bundle --format=esm --platform=node --outfile=/tmp/x.mjs --alias:pixi.js=$PWD/scripts/qa/sentinel-r45h/pixi-stub.mjs '--define:import.meta.env.BASE_URL="/"'`):
@@ -17,3 +17,6 @@ Browser (real input; `node <probe> <1440|375> <url> <outdir>`, playwright):
 - `park4.mjs`: tap-to-park (23,7), (22,18), Bain, Volaris with 120 s budgets.
 - `backD.py '<outdir>/logs/hostile-*.json'`: backward travel in D with gas held, from hostile/turnprobe frame logs.
 - `tp_an.py`, `an2.py`: turnprobe / hostile frame analysis.
+
+G10 browser site (r45k, fixed by Forge in `../../drive-real.mjs`): get in, tap R, hold gas 1.0 s (backs to x≈15–17 on the y≈6 street), tap D, then 0.5 s straight + 2.8 s steer per side; start pose must be cx 14.5–18.6, cy 5.5–6.6, se, D. Headless-verified on r45j; not yet browser-verified by Forge.
+`park4.mjs` (22,18): the `toasts` entry is ms from tap to the first toast; the r45k gate requires ≤500 ms at 1440 and 375.

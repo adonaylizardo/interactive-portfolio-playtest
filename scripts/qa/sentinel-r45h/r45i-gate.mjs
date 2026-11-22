@@ -1,7 +1,9 @@
-// Permanent r45i gate. Fails the process when a headless check regresses.
+// Permanent drive gate. Fails the process when a headless check regresses.
 //   low-FPS overlap     ov.mjs at dt 1/60, 0.1, 0.25
 //   no-steer facing     h1.mjs at the same steps
 //   velocity honesty    honest.mjs (also repeats overlap and the 35° slide)
+//   turn at speed       g10.mjs at dt 1/60 and 0.1 (>=75% clean 90° turns)
+//   prop shuttle        h3b.mjs at dt 1/60 (a dead stop is a failure)
 import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
@@ -66,6 +68,9 @@ for (const dt of dts) {
   }
   run('honest.mjs', dt);
 }
+
+for (const dt of [1 / 60, 0.1]) run('g10.mjs', dt);
+run('h3b.mjs', 1 / 60);
 
 if (failed) {
   console.log('r45i gate: FAIL');
