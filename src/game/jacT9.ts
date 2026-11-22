@@ -172,6 +172,7 @@ export type JacSnapshot = {
   w: number;
   h: number;
   toggles: Record<JacToggleId, boolean>;
+  reverseCue: boolean;
 };
 
 type JacHooks = {
@@ -2708,6 +2709,7 @@ export class JacT9 {
       w: size.w,
       h: size.h,
       toggles: { ...this.toggles },
+      reverseCue: this.reverseCueOn,
     };
   }
 
