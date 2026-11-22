@@ -58,7 +58,9 @@ export const THRESH = {
   inPlaceBad: 0, // in-place sprite change (<0.02 t moved) where the rotated box overlaps, <0.1 t since the last change, or <1 t free ahead
   overlapFrames: 0, // frames ending with the footprint overlapping (oracle)
   shuttle3: 0, // ≥2 D velocity reversals and ≥6 s inside a 3-tile box during 12 s gas+steer into a prop or edge
-  escNeedRPct: 25, escRCuePct: 100, escTrapped: 0, // stuck cases steering cannot free / of those showing the R cue / not freed at all
+  escNeedRPct: 25, escRCuePct: 100, escTrapped: 0, // needs-R share is INFORMATIONAL since G-C (r45k ruling); needRUnjustified must be 0, R cue 100 %, trapped 0
+  d1AheadT: 1.0, // D1: in-place sprite change needs >=1 t free ahead; used to judge whether an R cue / needs-R is justified (G-A, G-C)
+  h3bStillNoCueS: 1.5, // G-A: still with no R cue for >=1.5 s is a dead stop even while the heading yaws in place (0.5 s if not yawing)
   partialSymPts: 3, // turn completion with +s vs −s on symmetric-clearance poses may differ ≤3 points
   partialSymMin: 0.5, // symmetry enforced for |steer| ≥0.5; ±0.25 turns on a ~4× wider arc the full-lock clearance test does not cover → info only
   vardtBoxed: 0,
@@ -202,6 +204,12 @@ function turnRun(jac, mon, dt, x, y, d, s, lim = 3) {
   return { t90b: ok, g10: (ok || okG10) && maxStop <= 0.5, gu, snapGU, hardGU };
 }
 
+// r45k G-A/G-C (Sentinel ruling, applied by Forge): the R cue / needs-R is justified only if the in-place swap is illegal under D1
+// (oracle box fits, >=1.0 t free ahead per D1 §3, >=0.1 t since a real sprite change; getting in / spawn is not a change).
+// Forge review: Sentinel proposed 1.5 t ahead; D1 and the build's SWAP_AHEAD_TILES say 1.0 t, so the gate uses 1.0 t.
+const sideDir = (d, s) => DIRS[(DIRS.indexOf(d) + (s > 0 ? 1 : 3)) & 3];
+const legalSwap = (x, y, nd, sign, gtrav) => gtrav >= 0.1 && OR.blocked(x, y, nd) === 0 && freeAlong(x, y, nd, sign, THRESH.d1AheadT);
+const cueJustBad = (x, y, d, s, sign, gtrav) => legalSwap(x, y, sideDir(d, s), sign, gtrav);
 const CHECKS = {
   // ---- frozen-map guard: src/data (map, props, kerbs, building mass) must be exactly what the oracle was frozen from
   oracle(jac, T) {
@@ -238,23 +246,32 @@ const CHECKS = {
   h3b(jac, T, dt) {
     const m = {}, f = [];
     for (const [pn, q] of Object.entries(PROPS)) {
-      let runs = 0, sh = 0, dead = 0, hudBad = 0, velBadPre = 0, frames = 0, shEx = '', deadEx = '';
+      let runs = 0, sh = 0, dead = 0, hudBad = 0, velBadPre = 0, frames = 0, shEx = '', deadEx = '', cueUnj = 0, cueEx = '';
       for (const [x, y, d, s] of propPoses(jac, q, -99)) {
-        runs++; let t = 0, H = [], hc = 0, ph = jac.heading, best = 0, still = 0, deadThis = 0;
-        while (t < 12) { const px = jac.cx, py = jac.cy, vv = V[jac.dir]; jac.update(dt, { dx: s, dy: -1 }); t += dt; frames++;
+        runs++; let t = 0, H = [], hc = 0, ph = jac.heading, best = 0, still = 0, deadThis = 0, gtrav = Infinity, cueBad = 0, stillAny = 0, cueRun = 0;
+        while (t < 12) { const px = jac.cx, py = jac.cy, vv = V[jac.dir], pdir = jac.dir, phd = jac.heading; jac.update(dt, { dx: s, dy: -1 }); t += dt; frames++;
           const disp = Math.hypot(jac.cx - px, jac.cy - py);
           if (Math.abs(jac.vel - ((jac.cx - px) * vv[0] + (jac.cy - py) * vv[1]) / dt) > 0.5) velBadPre++;
           if (!hudOk(jac, disp, dt)) hudBad++;
-          if (disp < 0.08 * dt && Math.abs(jac.vel) < 0.2) still += dt; else still = 0; if (still >= 0.5) deadThis = still;
+          if (jac.dir !== pdir) gtrav = 0; else gtrav += disp;
+          // r45k G-A: in-place yaw is motion; a stop that shows a JUSTIFIED R cue is the D1 outcome, not a dead stop
+          const cueOn = jac.reverseCue === true; if (cueOn && cueJustBad(jac.cx, jac.cy, jac.dir, s, jac.gear === 'R' ? -1 : 1, gtrav)) cueRun += dt; else cueRun = 0; if (cueRun >= 0.3 - 1e-9) cueBad++; // a 1-frame flash before the swap lands next frame is tolerated; >=0.3 s is not
+          const stillF = disp < 0.08 * dt && Math.abs(jac.vel) < 0.2;
+          if (stillF && Math.abs(wrap(jac.heading - phd)) < 0.1 * dt && !cueOn) still += dt; else still = 0; if (still >= 0.5) deadThis = Math.max(deadThis, still);
+          if (stillF && !cueOn) stillAny += dt; else stillAny = 0; if (stillAny >= THRESH.h3bStillNoCueS) deadThis = Math.max(deadThis, stillAny); // in-place yaw to the cap takes 0.62/0.667 = 0.93 s; >=1.5 s still without a cue is dead even while the heading moves
           hc += wrap(jac.heading - ph); ph = jac.heading; H.push([t, jac.cx, jac.cy, hc]);
           let j = H.length - 1; while (j > 0 && t - H[j][0] < 3) j--; if (t - H[j][0] < 3) continue;
           let mnx = 1e9, mxx = -1e9, mny = 1e9, mxy = -1e9, pl = 0;
           for (let k = j; k < H.length; k++) { mnx = Math.min(mnx, H[k][1]); mxx = Math.max(mxx, H[k][1]); mny = Math.min(mny, H[k][2]); mxy = Math.max(mxy, H[k][2]); if (k > j) pl += Math.hypot(H[k][1] - H[k - 1][1], H[k][2] - H[k - 1][2]); }
-          if (Math.max(mxx - mnx, mxy - mny) < 1.5 && Math.abs(hc - H[j][3]) < 0.33 && pl > 0.5) best += dt; }
+          const net = Math.hypot(H[H.length - 1][1] - H[j][1], H[H.length - 1][2] - H[j][2]);
+          // r45k G-B: a shuttle goes back and forth: path must exceed net displacement by >=0.5 t
+          if (Math.max(mxx - mnx, mxy - mny) < 1.5 && Math.abs(hc - H[j][3]) < 0.33 && pl > 0.5 && pl - net >= 0.5) best += dt; }
+        if (cueBad) { cueUnj++; if (!cueEx) cueEx = `(${x},${y},${d}) s=${s} at (${jac.cx.toFixed(2)},${jac.cy.toFixed(2)},${jac.dir})`; }
         if (best > 0) { sh++; if (!shEx) shEx = `(${x},${y},${d}) s=${s} ${best.toFixed(1)}s`; }
         if (deadThis >= 0.5) { dead++; if (!deadEx) deadEx = `(${x},${y},${d}) s=${s} ${deadThis.toFixed(1)}s at (${jac.cx.toFixed(2)},${jac.cy.toFixed(2)})`; }
       }
-      m[pn] = { runs, shuttle15: sh, dead, hudBad, info_velBadPreFrame: `${velBadPre}/${frames}` };
+      m[pn] = { runs, shuttle15: sh, dead, cueUnjustifiedRuns: cueUnj, hudBad, info_velBadPreFrame: `${velBadPre}/${frames}` };
+      if (cueUnj) f.push(`${pn} R cue shown while a legal in-place swap to the steering side exists: ${cueUnj}/${runs} runs ${cueEx}`);
       if (sh > THRESH.h3bShuttle) f.push(`${pn} shuttle(1.5 box) ${sh}/${runs} ${shEx}`);
       if (dead > THRESH.h3bDead) f.push(`${pn} dead stops ${dead}/${runs} ${deadEx}`);
       if (hudBad > THRESH.h3bHudBad) f.push(`${pn} HUD mph off the real displacement in ${hudBad}/${frames} frames`);
@@ -374,37 +391,37 @@ const CHECKS = {
     const mon = monitor(jac, dt); const SEEDS = 60;
     let seed = 1; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
     const acts = [['D', 0, -1], ['D', -1, -1], ['D', 1, -1], ['D', 0, -1], ['D', -1, -1], ['D', 1, -1], ['R', 0, -1], ['R', -1, -1], ['R', 1, -1], [null, 0, 0], ['D', 0, 1]];
-    let traps = 0, gu = 0, total = 0, snaps = 0; const ex = [];
+    let traps = 0, gu = 0, total = 0, snaps = 0, infoBoxedFreed = 0; const ex = [];
     for (let k = 1; k <= SEEDS; k++) { seed = k * 7919; jac.qaSpawnDrive(20, 6, 'se'); jac.setGear('D'); mon.reset(); let t = 0; const H = [];
       while (t < 120) { const a = acts[Math.floor(rnd() * acts.length)]; const sec = 0.3 + rnd() * 1.5; if (a[0] && a[0] !== jac.gear) jac.setGear(a[0]); let u = 0;
         while (u < sec) { const ph = jac.heading, pd = jac.dir; mon.step({ dx: a[1], dy: a[2] }, `seed${k}`); u += dt; t += dt; if (jac.escapeGaveUp) gu += dt; if (pd !== jac.dir && Math.abs(wrap(jac.heading - ph)) > 0.6) snaps++; }
         H.push([t, jac.cx, jac.cy]); }
       total += t;
       for (let i = 0; i < H.length; i++) { let j = i, a = 1e9, b = -1e9, c = 1e9, e = -1e9; while (j < H.length && H[j][0] - H[i][0] < 30) { a = Math.min(a, H[j][1]); b = Math.max(b, H[j][1]); c = Math.min(c, H[j][2]); e = Math.max(e, H[j][2]); j++; }
-        if (j < H.length && Math.max(b - a, e - c) < 1.5) { traps++; if (ex.length < 3) ex.push(`seed${k} t=${H[i][0].toFixed(0)} at (${a.toFixed(1)},${c.toFixed(1)})`); break; } }
+        if (j < H.length && Math.max(b - a, e - c) < 1.5) { const bt = boxBattery(jac, 'monkey', k, dt, H[j - 1][0]); if (bt < 1.5) { traps++; if (ex.length < 3) ex.push(`seed${k} t=${H[i][0].toFixed(0)} at (${a.toFixed(1)},${c.toFixed(1)}) battery ${bt.toFixed(2)}t`); } else infoBoxedFreed++; break; } }
     }
     const guPct = (100 * gu) / total; const f = [];
-    if (traps > THRESH.monkeyTrap30) f.push(`seeds boxed 30 s (<1.5t) ${traps}/${SEEDS} ${ex.join(' ')}`);
+    if (traps > THRESH.monkeyTrap30) f.push(`seeds boxed 30 s (<1.5t) AND R battery fails ${traps}/${SEEDS} ${ex.join(' ')}`);
     if (guPct > THRESH.monkeyGUPct) f.push(`escapeGaveUp share ${guPct.toFixed(1)}%`);
     if (snaps > THRESH.monkeySnap06) f.push(`1-frame sprite turns >0.6q ${snaps}`);
     monFails(mon.M, f);
-    return { m: { seeds: SEEDS, boxed30s: traps, guPct: +guPct.toFixed(1), snap06: snaps, ...monSummary(mon.M) }, f };
+    return { m: { seeds: SEEDS, boxed30s: traps, info_boxedButBatteryFrees: infoBoxedFreed, guPct: +guPct.toFixed(1), snap06: snaps, ...monSummary(mon.M) }, f };
   },
   // ---- Sentinel r45k: variable frame time (seeded 16/33/250 ms) catches timers a fixed dt hides
   vardt(jac, T) {
     const mon = monitor(jac, 1 / 60); const SEEDS = 30;
     let seed = 1; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
     const acts = [['D', 0, -1], ['D', -1, -1], ['D', 1, -1], ['D', 0, -1], ['D', -0.5, -1], ['D', 0.707, -1], ['R', 0, -1], ['R', -1, -1], ['R', 1, -1], [null, 0, 0], ['D', 1, 1]];
-    const dts = [1 / 60, 1 / 60, 1 / 30, 0.25]; let boxed = 0; const ex = [];
+    const dts = [1 / 60, 1 / 60, 1 / 30, 0.25]; let boxed = 0, infoBoxedFreed = 0; const ex = [];
     for (let k = 1; k <= SEEDS; k++) { seed = k * 104729; jac.qaSpawnDrive(20, 6, 'se'); jac.setGear('D'); mon.reset(); let t = 0; const H = [];
       while (t < 90) { const a = acts[Math.floor(rnd() * acts.length)]; const sec = 0.3 + rnd() * 1.5; if (a[0] && a[0] !== jac.gear) jac.setGear(a[0]); let u = 0;
         while (u < sec) { const dt = dts[Math.floor(rnd() * dts.length)]; mon.step({ dx: a[1], dy: a[2] }, `vseed${k}`, dt); u += dt; t += dt; }
         H.push([t, jac.cx, jac.cy]); }
       for (let i = 0; i < H.length; i++) { let j = i, a = 1e9, b = -1e9, c = 1e9, e = -1e9; while (j < H.length && H[j][0] - H[i][0] < 30) { a = Math.min(a, H[j][1]); b = Math.max(b, H[j][1]); c = Math.min(c, H[j][2]); e = Math.max(e, H[j][2]); j++; }
-        if (j < H.length && Math.max(b - a, e - c) < 1.5) { boxed++; if (ex.length < 3) ex.push(`vseed${k} t=${H[i][0].toFixed(0)} at (${a.toFixed(1)},${c.toFixed(1)})`); break; } } }
+        if (j < H.length && Math.max(b - a, e - c) < 1.5) { const bt = boxBattery(jac, 'vardt', k, 0, H[j - 1][0]); if (bt < 1.5) { boxed++; if (ex.length < 3) ex.push(`vseed${k} t=${H[i][0].toFixed(0)} at (${a.toFixed(1)},${c.toFixed(1)}) battery ${bt.toFixed(2)}t`); } else infoBoxedFreed++; break; } } }
     const f = []; if (boxed > THRESH.vardtBoxed) f.push(`seeds boxed 30 s ${boxed}/${SEEDS} ${ex.join(' ')}`);
     monFails(mon.M, f);
-    return { m: { seeds: SEEDS, boxed30s: boxed, ...monSummary(mon.M) }, f };
+    return { m: { seeds: SEEDS, boxed30s: boxed, info_boxedButBatteryFrees: infoBoxedFreed, ...monSummary(mon.M) }, f };
   },
   // ---- r45i esc2.mjs (GU-based, kept for history; trivially 0 when GU never arms)
   esc2(jac, T, dt) {
@@ -426,23 +443,25 @@ const CHECKS = {
   // stands still showing the R cue (jac.reverseCue === true). Never backward in D; in-place sprite change only when legal.
   escsteer(jac, T, dt) {
     const mon = monitor(jac, dt); const m = {}, f = []; let allStuck = 0, allNeedR = 0, allRCue = 0;
-    for (const [pn, q] of Object.entries(PROPS)) { let runs = 0, stuck = 0, steerOnly = 0, needR = 0, rcue = 0, trapped = 0; const ex = [], rex = [];
+    for (const [pn, q] of Object.entries(PROPS)) { let runs = 0, stuck = 0, steerOnly = 0, needR = 0, rcue = 0, trapped = 0, unjust = 0; const ex = [], rex = [], uex = [];
       for (const [x, y, d, s] of propPoses(jac, q, -99)) { if (inPocket(x, y)) continue; runs++;
-        const recreate = (watch) => { jac.qaSpawnDrive(x, y, d); jac.setGear('D'); mon.reset(); const H = []; let t = 0; while (t < 6) { if (watch) mon.step({ dx: s, dy: -1 }, `${pn}(${x},${y},${d},${s})`); else jac.update(dt, { dx: s, dy: -1 }); t += dt; H.push([t, jac.cx, jac.cy]); } return H; };
+        let gtrav = Infinity; const recreate = (watch) => { jac.qaSpawnDrive(x, y, d); jac.setGear('D'); mon.reset(); gtrav = Infinity; const H = []; let t = 0; while (t < 6) { const px = jac.cx, py = jac.cy, pd = jac.dir; if (watch) mon.step({ dx: s, dy: -1 }, `${pn}(${x},${y},${d},${s})`); else jac.update(dt, { dx: s, dy: -1 }); if (jac.dir !== pd) gtrav = 0; else gtrav += Math.hypot(jac.cx - px, jac.cy - py); t += dt; H.push([t, jac.cx, jac.cy]); } return H; };
         const H = recreate(true); const k = H.findIndex((h) => h[0] >= 3); const sp = [jac.cx, jac.cy];
         let mv = 0; for (let i = k; i < H.length; i++) mv = Math.max(mv, Math.hypot(H[i][1] - sp[0], H[i][2] - sp[1]));
-        if (mv >= 0.5) continue; stuck++; const cue = jac.reverseCue === true;
+        if (mv >= 0.5) continue; stuck++; const cue = jac.reverseCue === true; const stDir = jac.dir, stTrav = gtrav;
+        const unj = legalSwap(sp[0], sp[1], sideDir(stDir, s), 1, stTrav) || legalSwap(sp[0], sp[1], sideDir(stDir, -s), 1, stTrav);
         const tryIt = (seq) => { recreate(false); let mx = 0; for (const [sec, g, dx, dy] of seq) { if (g && g !== jac.gear) jac.setGear(g); let t = 0; while (t < sec) { mon.step({ dx, dy }, `${pn}-esc`); t += dt; mx = Math.max(mx, Math.hypot(jac.cx - sp[0], jac.cy - sp[1])); } } return mx; };
         const steer = Math.max(tryIt([[0.3, null, 0, 0], [3, 'D', -s, -1]]), tryIt([[0.3, null, 0, 0], [3, 'D', 0, -1]]), tryIt([[0.3, null, 0, 0], [1.5, 'D', -s, -1], [1.5, 'D', s, -1]]));
         if (steer >= 1.5) { steerOnly++; continue; }
-        needR++; if (cue) rcue++; if (rex.length < 3) rex.push(`(${x},${y},${d}) s=${s} stuck@(${sp[0].toFixed(2)},${sp[1].toFixed(2)}) steer-only ${steer.toFixed(2)}t Rcue=${cue}`);
+        needR++; if (cue) rcue++; if (unj) { unjust++; if (uex.length < 3) uex.push(`(${x},${y},${d}) s=${s} stuck@(${sp[0].toFixed(2)},${sp[1].toFixed(2)},${stDir}) travelSinceChange=${stTrav === Infinity ? 'spawn' : stTrav.toFixed(2)}`); } if (rex.length < 3) rex.push(`(${x},${y},${d}) s=${s} stuck@(${sp[0].toFixed(2)},${sp[1].toFixed(2)}) steer-only ${steer.toFixed(2)}t Rcue=${cue}`);
         const withR = Math.max(tryIt([[0.3, null, 0, 0], [2, 'R', 0, -1], [0.3, null, 0, 0], [3, 'D', -s, -1]]), tryIt([[0.3, null, 0, 0], [2, 'R', -s, -1], [0.3, null, 0, 0], [3, 'D', 0, -1]]), tryIt([[0.3, null, 0, 0], [2, 'R', s, -1], [0.3, null, 0, 0], [3, 'D', -s, -1]]));
         if (withR < 1.5) { trapped++; if (ex.length < 3) ex.push(`(${x},${y},${d}) s=${s}`); } }
-      m[pn] = { runs, stuck, freedBySteerOnly: steerOnly, neededR: needR, rCueShown: rcue, trapped }; allStuck += stuck; allNeedR += needR; allRCue += rcue;
+      m[pn] = { runs, stuck, freedBySteerOnly: steerOnly, neededR: needR, needRUnjustified: unjust, rCueShown: rcue, trapped }; allStuck += stuck; allNeedR += needR; allRCue += rcue;
+      if (unjust) f.push(`${pn} needs-R where D1 allows an in-place swap (oracle): ${unjust} ${uex.join(' ')}`);
       if (trapped > THRESH.escTrapped) f.push(`${pn} TRAPPED (R battery too) ${trapped} ${ex.join(' ')}`);
       if (needR) m[pn].needREx = rex; }
     const pct = allStuck ? (100 * allNeedR) / allStuck : 0, cuePct = allNeedR ? (100 * allRCue) / allNeedR : 100; m.needRPct = +pct.toFixed(1); m.rCuePct = +cuePct.toFixed(1);
-    if (pct > THRESH.escNeedRPct) f.push(`steering out (no R) fails in ${allNeedR}/${allStuck} stuck cases = ${pct.toFixed(0)}% > ${THRESH.escNeedRPct}%`);
+    if (false) f.push(`(G-C: informational) steering out (no R) fails in ${allNeedR}/${allStuck} stuck cases = ${pct.toFixed(0)}% > ${THRESH.escNeedRPct}%`);
     if (cuePct < THRESH.escRCuePct) f.push(`R cue (jac.reverseCue) shown in ${allRCue}/${allNeedR} needs-R cases = ${cuePct.toFixed(0)}% < ${THRESH.escRCuePct}%`);
     monFails(mon.M, f, ['snapX', 'flips', 'backD', 'behind', 'jumps', 'off', 'inPlace', 'overlap']);
     return { m: { ...m, ...monSummary(mon.M) }, f };
@@ -521,6 +540,20 @@ const CHECKS = {
     return { m: { runs, info_maxMovedT: +moved.toFixed(2), ...monSummary(mon.M) }, f };
   },
 };
+// r45k G-D: replay a monkey/vardt seed to tEnd (no monitor; same inputs) and run the trap battery there
+function boxBattery(jac, mode, k, DT, tEnd) {
+  let seed = 1; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const acts = mode === 'monkey' ? [['D', 0, -1], ['D', -1, -1], ['D', 1, -1], ['D', 0, -1], ['D', -1, -1], ['D', 1, -1], ['R', 0, -1], ['R', -1, -1], ['R', 1, -1], [null, 0, 0], ['D', 0, 1]]
+    : [['D', 0, -1], ['D', -1, -1], ['D', 1, -1], ['D', 0, -1], ['D', -0.5, -1], ['D', 0.707, -1], ['R', 0, -1], ['R', -1, -1], ['R', 1, -1], [null, 0, 0], ['D', 1, 1]];
+  const dts = [1 / 60, 1 / 60, 1 / 30, 0.25];
+  seed = k * (mode === 'monkey' ? 7919 : 104729); jac.qaSpawnDrive(20, 6, 'se'); jac.setGear('D'); let t = 0;
+  while (t < tEnd - 1e-9) { const a = acts[Math.floor(rnd() * acts.length)]; const sec = 0.3 + rnd() * 1.5; if (a[0] && a[0] !== jac.gear) jac.setGear(a[0]); let u = 0;
+    while (u < sec) { const dt = mode === 'monkey' ? DT : dts[Math.floor(rnd() * dts.length)]; jac.update(dt, { dx: a[1], dy: a[2] }); u += dt; t += dt; } }
+  const bdt = mode === 'monkey' ? DT : 1 / 60; const sp = [jac.cx, jac.cy]; let best = 0;
+  const go = (sec, inp, g) => { if (g) jac.setGear(g); let q = 0; while (q < sec) { jac.update(bdt, inp); q += bdt; best = Math.max(best, Math.hypot(jac.cx - sp[0], jac.cy - sp[1])); } };
+  for (const s of [1, -1]) for (const [sec, g, dx, dy] of [[0.3, null, 0, 0], [2, 'R', 0, -1], [2, 'R', -s, -1], [2, 'R', s, -1], [0.3, null, 0, 0], [3, 'D', -s, -1], [3, 'D', 0, -1], [3, 'D', s, -1]]) go(sec, { dx, dy }, g);
+  return best;
+}
 const ONCE = { oracle: 'once', vardt: 'var' }; // checks that do not take the --dt list
 
 async function worker(name, dt, bundle) {

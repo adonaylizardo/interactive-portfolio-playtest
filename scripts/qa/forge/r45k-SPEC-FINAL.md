@@ -2,7 +2,7 @@
 
 **Repo** `adonaylizardo/interactive-portfolio-playtest`, PR #20.
 **Start from** `cursor/integracion` @ `5a265621` (r45j). Work and push **only** on `cursor/integracion`.
-**Gate branch** `qa/forge-gates-r45j` @ `a5d4cfcf5` (Forge; reviewed by Sentinel, CAMBIOS applied).
+**Gate branch** `qa/forge-gates-r45j` (Forge; Sentinel CAMBIOS applied, then the r45k ruling amendments G-A..G-D — see §6).
 
 ## 0. Rules (non-negotiable)
 - Commits are authored `Adonay Lizardo <adolizardo@gmail.com>` (`git -c user.name="Adonay Lizardo" -c user.email="adolizardo@gmail.com" commit …`).
@@ -90,7 +90,7 @@ These rules are what the gate enforces. Each line names the check.
 > - If it does not fit: vel 0, no translation, and the **"R" cue** is shown next to the steering cue (`reverseCue === true`). Never any backward movement in D (≤0.1 t settle, never behind the frame start). No automatic manoeuvre.
 > - In R the player reverses freely. Back in D the same rule applies.
 
-Gate `escsteer`: stuck cases (6 s gas+steer into porch/cactus, <0.5 t in the last 3 s) → steer the other way/straight in D; needs-R ≤25 % (geometric floor is 20–21 %), R cue in **100 %** of needs-R cases, trapped 0 (the battery includes R).
+Gate `escsteer` (amended G-C, see §6): stuck cases (6 s gas+steer into porch/cactus, <0.5 t in the last 3 s) → steer the other way/straight in D. **needs-R is justified only where D1 forbids every in-place swap** (`needRUnjustified` 0: no neighbour facet that fits with ≥1 t free and ≥0.1 t since the last real sprite change); R cue in **100 %** of needs-R cases; trapped 0 (the battery includes R). The needs-R share is information only.
 
 **Movement rules (all checks, every dt; monitor = turn, partial, monkey, vardt, esc*, trap, shuttle, edge, borders, rmirror, brakesteer):**
 1. No backward motion in D with gas: longest backward run ≤0.1 t, and no frame ends >0.05 t behind its start against the gear (`backDMaxRun`, `behind`). No vel flip >+1 → <−0.5 (`flips` 0). R is the exact mirror (`rmirror`: no forward run with R gas, `rFlips` 0).
@@ -100,7 +100,7 @@ Gate `escsteer`: stuck cases (6 s gas+steer into porch/cactus, <0.5 t in the las
 5. Frame displacement ≤1.1·TOP·dt + 0.05 t (`jumps` 0). No lateral relocation on swap (`h1 swapLat` ≤0.05).
 6. Never overlap a blocked cell or prop at the end of a frame (oracle; `ov`, `honest`, all monitors).
 7. HUD mph equals the mph of the real displacement (±1) in ≥99 % of frames (`honest`, `h3b`, park routes). No motion >35° off **both** the pre-frame and end-of-frame sprite (`honest` wide35Both 0).
-8. Shuttles: 0 runs boxed in 1.5 t for 3 s while gas is held (`h3b`, `shuttle`); 0 dead stops ≥0.5 s (`h3b`).
+8. Shuttles (amended G-B): 0 runs boxed in 1.5 t for 3 s that go back and forth (path − net ≥0.5 t) while gas is held (`h3b`, `shuttle`). Dead stops (amended G-A): 0 stretches ≥0.5 s still, not yawing and without the R cue, and 0 stretches ≥1.5 s still without the R cue even while yawing; R cue never shown ≥0.3 s where D1 allows the in-place swap to the steering side (`cueUnjustified` 0) (`h3b`).
 9. Turn at speed: G10 and turn90b **≥98 % on the 6393 arc-legal poses at every dt** (all-pose figures are information). 0 snaps at give-up, 0 hard stops (`turn`).
 10. Partial steering ±0.25/0.5/0.707/0.9 on arc-legal poses: same monitor rules; left/right turn completion symmetric within 3 points for |steer| ≥0.5 (`partial`).
 11. Brake+steer at rest (D and R): heading stays within 0.62 q of the sprite and every monitor rule holds (`brakesteer`).
@@ -173,3 +173,24 @@ Build: `npm ci && npm run build:preview-integracion && npx vite preview --port 8
 7. 0 console errors in all browser runs.
 
 **Commit message** lists the run-all summary line, the G1–G10 line at both sizes and the (22,18) toast ms at both sizes.
+
+## 6. r45k fix pass (after Sentinel's ruling on 8bfa629: MIXTO, NOT APPROVED)
+8bfa629 (net −1091 lines in `jacT9.ts`, frozen diffs empty, `reverseCue` present) failed 13/53. Sentinel and Forge both re-ran it and found part of that was the gate, and part is still implementation. The gate is amended (below, Forge commit on `qa/forge-gates-r45j`); **the rest is yours. Start from 8bfa629, keep everything in §0–§5, and fix exactly these:**
+
+| ID | Sev | Gap (measured) | Required behaviour | Gates it clears |
+|---|---|---|---|---|
+| **I-1** | HIGH | `qaSpawnDrive` and getting in (`setMode('drive')`) leave `travelSinceDir = 0`, and the swap rule (`SWAP_TRAVEL_MIN`) treats that as a sprite change. With the nose against a prop on entry, a legal in-place swap (steering-side facet fits, ≥3 t free) is refused and the R cue shows: 34 unjustified needs-R in `escsteer` at every dt, 24 `h3b` runs with an unjustified cue. | D1's "≥0.1 t since the last sprite change" only applies once a sprite change has happened since getting in. Use an internal "no change since entry" flag inside the swap rule. **Do not change what the QA hooks do.** | `escsteer` needRUnjustified, `h3b` cueUnjustified |
+| **I-2** | MED | `update()` swaps at the **start** of the frame and keeps sub-stepping with the new facet (contradicts §4.2 step 4). At 60 fps the swap is decided at the previous pose and the same frame drifts 0.003 t across the footprint rounding → in-place swaps with <1 t free (turn ×8, partial ×3, escsteer ×5, rmirror ×3, shuttle ×3, vardt). At dt 0.25 the swap frame travels up to 1.29 t on the new facet → swaps after <0.1 t (monkey 0.1/0.25, vardt). A second swap path (`dir` changing inside `stepDrive`, `heldDir` null) also bypasses the in-place guard. | Swap at the **end** of the frame, after the last sub-step, with all three D1 conditions evaluated at the **final** pose. One swap path for manual driving. | `turn`, `partial`, `rmirror`, `shuttle`, `escsteer` inPlace at 1/60; `monkey` shortSwap/inPlace; `vardt` |
+| **I-3** | HIGH | Trap at (17.8, 19.0) (monkey dt 0.25 seed17; R battery frees only 0.10 t): a 0.02–0.1 t lateral slide puts `cx < 17.95`, the sw box grows from x 17..19 to x 16..19 and wedges between (16,16) and (16,22). Same spot as r45j's low-FPS trap. | A slide may not end in a pose from which reversing along its own axis is blocked when it was not blocked before the slide (reject or shorten that slide). | `monkey` boxed (G-D), `trap` |
+| **I-4** | LOW | The R cue flashes for one frame before a rolling swap lands (3/28/15 runs by dt). | Compute the cue after the frame's swap decision (falls out of I-2). | cosmetic; `cueUnjustified` tolerates <0.3 s |
+
+**Recommended (not a gate):** in-place yaw at `CREEP_YAW` = 0.667 q/s takes 0.93 s to reach the 0.62 q cap, so the truck sits up to 1.1–1.25 s with no motion and no cue. Forge measured that `CREEP_YAW = TURN_RATE` (2.4 q/s) brings the longest still-without-cue stretch to 0.33 s on the same population. The gate accepts up to 1.5 s (G-A), but the faster yaw feels better and Forge may tighten that bar to ≤1.0 s in a later round.
+
+**Amended gates (Forge, from Sentinel's ruling; already in `run-all.mjs`):**
+- **G-A `h3b` dead stop:** counts only stretches ≥0.5 s still (disp < 0.08·dt, |vel| < 0.2), not yawing (|Δheading| < 0.1·dt q) and with no R cue, or ≥1.5 s still with no R cue even while yawing. New `cueUnjustified` = 0: the R cue shown ≥0.3 s while the oracle says D1 allows the in-place swap to the steering side (box fits, ≥1.0 t free, ≥0.1 t since a real sprite change; entry is not a change). A build that shows R everywhere fails this.
+- **G-B `h3b` shuttle:** inside the 3 s / 1.5 t window, path − net displacement ≥0.5 t (a real back-and-forth). Arrive-and-stop no longer counts.
+- **G-C `escsteer`:** the 25 % needs-R bar is replaced by `needRUnjustified` = 0 (needs-R where a neighbour facet on either side fits with ≥1.0 t free and ≥0.1 t since a real change). R cue 100 % of needs-R and trapped 0 are kept. With I-1 fixed, ≈91–92 % of stuck states are genuine dead ends (nose flat against the obstacle, only the 180° facing free) — that is D1 working, not a failure.
+- **G-D `monkey`/`vardt` boxed 30 s:** counts only if the `trap` battery (R and D with ±steer) from the end of the boxed window also fails to move the truck ≥1.5 t.
+- Unchanged: `inPlaceBad`, `shortSwap` and every other threshold — they are I-2.
+
+Expected after I-1..I-3: `run-all` exit 0 (53/53). §5 (browser gates) unchanged.
