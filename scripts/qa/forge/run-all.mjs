@@ -60,7 +60,7 @@ export const THRESH = {
   shuttle3: 0, // ≥2 D velocity reversals and ≥6 s inside a 3-tile box during 12 s gas+steer into a prop or edge
   escNeedRPct: 25, escRCuePct: 100, escTrapped: 0, // needs-R share is INFORMATIONAL since G-C (r45k ruling); needRUnjustified must be 0, R cue 100 %, trapped 0
   d1AheadT: 1.0, // D1: in-place sprite change needs >=1 t free ahead; used to judge whether an R cue / needs-R is justified (G-A, G-C)
-  h3bStillNoCueS: 1.5, // G-A: still with no R cue for >=1.5 s is a dead stop even while the heading yaws in place (0.5 s if not yawing)
+  h3bStillNoCueS: 1.0, // G-A (QA1 ruling: 1.5 -> 1.0 s; also used by drive-real G-E): still with no R cue for >=1.0 s is a dead stop even while the heading yaws in place (0.5 s if not yawing)
   partialSymPts: 3, // turn completion with +s vs −s on symmetric-clearance poses may differ ≤3 points
   partialSymMin: 0.5, // symmetry enforced for |steer| ≥0.5; ±0.25 turns on a ~4× wider arc the full-lock clearance test does not cover → info only
   vardtBoxed: 0,
@@ -258,7 +258,7 @@ const CHECKS = {
           const cueOn = jac.reverseCue === true; if (cueOn && cueJustBad(jac.cx, jac.cy, jac.dir, s, jac.gear === 'R' ? -1 : 1, gtrav)) cueRun += dt; else cueRun = 0; if (cueRun >= 0.3 - 1e-9) cueBad++; // a 1-frame flash before the swap lands next frame is tolerated; >=0.3 s is not
           const stillF = disp < 0.08 * dt && Math.abs(jac.vel) < 0.2;
           if (stillF && Math.abs(wrap(jac.heading - phd)) < 0.1 * dt && !cueOn) still += dt; else still = 0; if (still >= 0.5) deadThis = Math.max(deadThis, still);
-          if (stillF && !cueOn) stillAny += dt; else stillAny = 0; if (stillAny >= THRESH.h3bStillNoCueS) deadThis = Math.max(deadThis, stillAny); // in-place yaw to the cap takes 0.62/0.667 = 0.93 s; >=1.5 s still without a cue is dead even while the heading moves
+          if (stillF && !cueOn) stillAny += dt; else stillAny = 0; if (stillAny >= THRESH.h3bStillNoCueS) deadThis = Math.max(deadThis, stillAny); // in-place yaw to the cap takes 0.62/0.667 = 0.93 s; >=1.0 s (h3bStillNoCueS) still without a cue is dead even while the heading moves
           hc += wrap(jac.heading - ph); ph = jac.heading; H.push([t, jac.cx, jac.cy, hc]);
           let j = H.length - 1; while (j > 0 && t - H[j][0] < 3) j--; if (t - H[j][0] < 3) continue;
           let mnx = 1e9, mxx = -1e9, mny = 1e9, mxy = -1e9, pl = 0;

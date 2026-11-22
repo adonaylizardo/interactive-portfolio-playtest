@@ -1,0 +1,314 @@
+# Forge run-all (r45k rev.) — repo /workspace/qa/integracion/2026-11-22/qa-r45j-branch @ ff45cab85 — dt 0.0166667, 0.1, 0.25 — 19 checks — 2026-11-22T18:41:55.156Z
+FAIL  turn       dt=0.1       {"arcPop":6393,"g10ArcPct":99.5,"turn90bArcPct":68.9,"info_allPoses":12084,"info_g10AllPct":93.7,"GU":7118,"snapGU":5747,"hardGU":3890,"snap04":4449,"snapX":4414,"flips":491,"backDMaxRun":2.7,"backDTotal":1128,"behind":9459,"rFwdMaxRun":0,"rFlips":0,"jumps":0,"jumpMax":0,"offMaxDeg":63,"restOffMaxDeg":41,"shortSwap":0,"inPlaceBad":884,"overlap":0} (52s)
+      ✗ turn90b on arc-legal poses 4406/6393 = 68.9% < 98% e.g. (7,1,nw,-1) (8,1,nw,-1) (9,1,nw,-1) (53,1,se,1)
+      ✗ snap at give-up onset 5747
+      ✗ give-up stop from >3 t/s 3890
+      ✗ sprite snap >0.4q beyond wheel yaw: 4449 (turn(2,2,se,-1) (3.67,2.00) se->ne -90deg v5.18->0.00)
+      ✗ sprite jump >0.5q beyond plain yaw: 4414 (turn(2,2,se,-1) (3.67,2.00) se->ne -90deg v5.18->0.00)
+      ✗ fwd->reverse flips in D+gas: 491 (turn(24,4,sw,1) (23.64,7.36,sw) v2.75->-1.20)
+      ✗ backward in D+gas run 2.70t > 0.1 (total 1128.0t; turn(4,58,ne,-1) to (3.47,56.97,ne) run 2.70t)
+      ✗ frames ending behind their start (>0.05t against the gear): 9459 (turn(24,4,sw,1) (23.64,7.48,sw)->(23.64,7.36,sw) -0.120t)
+      ✗ heading off sprite 63deg > 56 (turn(10,1,nw,-1) (5.04,2.30,nw) h1.30)
+      ✗ illegal in-place sprite changes: 884 (turn(2,2,se,-1) (3.67,2.00) se->ne: <1 t free ahead)
+FAIL  turn       dt=0.0166667 {"arcPop":6393,"g10ArcPct":99.5,"turn90bArcPct":68.4,"info_allPoses":12084,"info_g10AllPct":93.7,"GU":7152,"snapGU":5747,"hardGU":6035,"snap04":5690,"snapX":5178,"flips":605,"backDMaxRun":2.78,"backDTotal":1154.2,"behind":0,"rFwdMaxRun":0,"rFlips":0,"jumps":0,"jumpMax":0,"offMaxDeg":57,"restOffMaxDeg":56,"shortSwap":0,"inPlaceBad":918,"overlap":0} (53s)
+      ✗ turn90b on arc-legal poses 4375/6393 = 68.4% < 98% e.g. (7,1,nw,-1) (8,1,nw,-1) (9,1,nw,-1) (53,1,se,1)
+      ✗ snap at give-up onset 5747
+      ✗ give-up stop from >3 t/s 6035
+      ✗ sprite snap >0.4q beyond wheel yaw: 5690 (turn(2,2,se,-1) (3.67,2.00) se->ne -90deg v5.17->0.00)
+      ✗ sprite jump >0.5q beyond plain yaw: 5178 (turn(2,2,se,-1) (3.67,2.00) se->ne -90deg v5.17->0.00)
+      ✗ fwd->reverse flips in D+gas: 605 (turn(24,4,sw,1) (23.64,7.50,sw) v4.64->-1.20)
+      ✗ backward in D+gas run 2.78t > 0.1 (total 1154.2t; turn(4,58,ne,-1) to (3.47,56.97,ne) run 2.78t)
+      ✗ heading off sprite 57deg > 56 (turn(10,1,nw,-1) (5.26,2.16,nw) h1.36)
+      ✗ illegal in-place sprite changes: 918 (turn(2,2,se,-1) (3.67,2.00) se->ne: <1 t free ahead)
+FAIL  partial    dt=0.0166667 {"poses":448,"steer0.25":{"right":32.8,"left":35.7},"steer0.5":{"right":56.3,"left":54.9},"steer0.707":{"right":58.7,"left":58.3},"steer0.9":{"right":64.7,"left":64.5},"snap04":1624,"snapX":1480,"flips":0,"backDMaxRun":0,"backDTotal":0,"behind":0,"rFwdMaxRun":0,"rFlips":0,"jumps":0,"jumpMax":0,"offMaxDeg":58,"restOffMaxDeg":0,"shortSwap":0,"inPlaceBad":40,"overlap":0} (16s)
+      ✗ sprite snap >0.4q beyond wheel yaw: 1624 (turn(6,2,sw,0.25) (3.45,10.55) sw->nw 42deg v4.29->0.00)
+      ✗ sprite jump >0.5q beyond plain yaw: 1480 (turn(6,2,sw,0.25) (3.45,10.55) sw->nw 42deg v4.29->0.00)
+      ✗ heading off sprite 58deg > 56 (turn(2,6,se,0.9) (6.90,7.23,se) h0.64)
+      ✗ illegal in-place sprite changes: 40 (turn(49,19,se,0.25) (50.85,19.00) se->sw: <1 t free ahead)
+FAIL  partial    dt=0.1       {"poses":448,"steer0.25":{"right":32.8,"left":35.7},"steer0.5":{"right":51.8,"left":51.1},"steer0.707":{"right":58.7,"left":58.3},"steer0.9":{"right":65,"left":64.7},"snap04":1467,"snapX":1224,"flips":0,"backDMaxRun":0,"backDTotal":0,"behind":0,"rFwdMaxRun":0,"rFlips":0,"jumps":0,"jumpMax":0,"offMaxDeg":60,"restOffMaxDeg":0,"shortSwap":0,"inPlaceBad":38,"overlap":0} (16s)
+      ✗ sprite snap >0.4q beyond wheel yaw: 1467 (turn(6,2,sw,0.25) (3.45,10.55) sw->nw 42deg v2.15->0.00)
+      ✗ sprite jump >0.5q beyond plain yaw: 1224 (turn(6,2,sw,0.25) (3.45,10.55) sw->nw 42deg v2.15->0.00)
+      ✗ heading off sprite 60deg > 56 (turn(12,6,nw,0.707) (6.57,4.52,nw) h2.66)
+      ✗ illegal in-place sprite changes: 38 (turn(49,19,se,0.25) (50.85,19.00) se->sw: <1 t free ahead)
+FAIL  partial    dt=0.25      {"poses":448,"steer0.25":{"right":64.1,"left":62.3},"steer0.5":{"right":76.6,"left":76.8},"steer0.707":{"right":65.6,"left":66.3},"steer0.9":{"right":74.6,"left":74.3},"snap04":697,"snapX":657,"flips":0,"backDMaxRun":0,"backDTotal":0,"behind":0,"rFwdMaxRun":0,"rFlips":0,"jumps":0,"jumpMax":0,"offMaxDeg":74,"restOffMaxDeg":61,"shortSwap":0,"inPlaceBad":38,"overlap":0} (15s)
+      ✗ sprite snap >0.4q beyond wheel yaw: 697 (turn(14,2,sw,0.25) (13.68,6.07) sw->nw 70deg v1.31->0.09)
+      ✗ sprite jump >0.5q beyond plain yaw: 657 (turn(14,2,sw,0.25) (13.68,6.07) sw->nw 70deg v1.31->0.09)
+      ✗ heading off sprite 74deg > 56 (turn(6,2,sw,0.707) (3.94,8.29,sw) h1.82)
+      ✗ illegal in-place sprite changes: 38 (turn(49,19,se,0.25) (50.85,19.00) se->sw: <1 t free ahead)
+FAIL  turn       dt=0.25      {"arcPop":6393,"g10ArcPct":85.2,"turn90bArcPct":76.9,"info_allPoses":12084,"info_g10AllPct":84.1,"GU":6440,"snapGU":4978,"hardGU":3745,"snap04":0,"snapX":0,"flips":593,"backDMaxRun":2.64,"backDTotal":1075.6,"behind":3822,"rFwdMaxRun":0,"rFlips":0,"jumps":0,"jumpMax":0,"offMaxDeg":68,"restOffMaxDeg":61,"shortSwap":0,"inPlaceBad":877,"overlap":0} (52s)
+      ✗ G10 on arc-legal poses 5444/6393 = 85.2% < 98%
+      ✗ turn90b on arc-legal poses 4918/6393 = 76.9% < 98% e.g. (7,1,nw,-1) (8,1,nw,-1) (9,1,nw,-1) (10,1,nw,-1)
+      ✗ snap at give-up onset 4978
+      ✗ give-up stop from >3 t/s 3745
+      ✗ fwd->reverse flips in D+gas: 593 (turn(24,4,sw,1) (23.64,7.06,sw) v1.60->-1.20)
+      ✗ backward in D+gas run 2.64t > 0.1 (total 1075.6t; turn(36,6,nw,-1) to (36.97,6.00,nw) run 2.64t)
+      ✗ frames ending behind their start (>0.05t against the gear): 3822 (turn(24,4,sw,1) (23.64,7.36,sw)->(23.64,7.06,sw) -0.300t)
+      ✗ heading off sprite 68deg > 56 (turn(11,1,nw,-1) (5.83,2.45,nw) h1.25)
+      ✗ illegal in-place sprite changes: 877 (turn(2,2,se,-1) (3.67,2.00) se->ne: <1 t free ahead)
+FAIL  esc2       dt=0.0166667 {"porch":{"guStopped":110,"trapped":30},"cactus":{"guStopped":105,"trapped":24}} (91s)
+      ✗ porch GU-stop TRAPPED 30 (26,17,se) s=-1 (26,17,se) s=1 (27,17,se) s=-1
+      ✗ cactus GU-stop TRAPPED 24 (30,16,nw) s=-1 (28,18,nw) s=1 (29,18,nw) s=1
+FAIL  esc2       dt=0.1       {"porch":{"guStopped":81,"trapped":49},"cactus":{"guStopped":74,"trapped":33}} (160s)
+      ✗ porch GU-stop TRAPPED 49 (26,16,se) s=1 (32,17,nw) s=1 (33,17,nw) s=1
+      ✗ cactus GU-stop TRAPPED 33 (24,12,sw) s=-1 (24,13,sw) s=-1 (21,14,se) s=-1
+FAIL  esc2       dt=0.25      {"porch":{"guStopped":63,"trapped":39},"cactus":{"guStopped":63,"trapped":30}} (270s)
+      ✗ porch GU-stop TRAPPED 39 (26,16,se) s=1 (32,17,nw) s=1 (33,17,sw) s=-1
+      ✗ cactus GU-stop TRAPPED 30 (24,12,sw) s=-1 (24,13,sw) s=-1 (21,14,se) s=-1
+FAIL  escsteer   dt=0.0166667 {"porch":{"runs":146,"stuck":146,"freedBySteerOnly":94,"neededR":52,"needRUnjustified":11,"rCueShown":0,"trapped":14,"needREx":["(26,16,se) s=1 stuck@(24.05,16.00) steer-only 0.06t Rcue=false","(25,17,sw) s=-1 stuck@(25.00,16.96) steer-only 0.04t Rcue=false","(25,17,sw) s=1 stuck@(25.00,16.96) steer-only 0.04t Rcue=false"]},"cactus":{"runs":128,"stuck":128,"freedBySteerOnly":64,"neededR":64,"needRUnjustified":16,"rCueShown":0,"trapped":7,"needREx":["(23,12,se) s=-1 stuck@(22.58,12.00) steer-only 0.02t Rcue=false","(23,12,se) s=1 stuck@(22.58,12.00) steer-only 0.02t Rcue=false","(23,12,sw) s=-1 stuck@(23.00,11.55) steer-only 0.42t Rcue=false"]},"needRPct":42.3,"rCuePct":0,"snap04":164,"snapX":160,"flips":76,"backDMaxRun":2.955,"backDTotal":249.4,"behind":0,"rFwdMaxRun":1.955,"rFlips":181,"jumps":0,"jumpMax":0,"offMaxDeg":126,"restOffMaxDeg":126,"shortSwap":0,"inPlaceBad":86,"overlap":0} (212s)
+      ✗ porch needs-R where D1 allows an in-place swap (oracle): 11 (25,17,sw) s=-1 stuck@(25.00,16.96,sw) travelSinceChange=spawn (25,17,sw) s=1 stuck@(25.00,16.96,sw) travelSinceChange=spawn (26,17,sw) s=-1 stuck@(26.00,16.96,sw) travelSinceChange=spawn
+      ✗ porch TRAPPED (R battery too) 14 (25,17,sw) s=-1 (25,17,sw) s=1 (26,17,se) s=-1
+      ✗ cactus needs-R where D1 allows an in-place swap (oracle): 16 (23,12,se) s=-1 stuck@(22.58,12.00,se) travelSinceChange=spawn (23,12,se) s=1 stuck@(22.58,12.00,se) travelSinceChange=spawn (23,13,se) s=-1 stuck@(22.58,13.00,se) travelSinceChange=spawn
+      ✗ cactus TRAPPED (R battery too) 7 (30,16,nw) s=-1 (25,17,sw) s=-1 (25,17,sw) s=1
+      ✗ R cue (jac.reverseCue) shown in 0/116 needs-R cases = 0% < 100%
+      ✗ sprite jump >0.5q beyond plain yaw: 160 (porch-esc (30.48,17.84) sw->nw 74deg v4.00->0.00)
+      ✗ fwd->reverse flips in D+gas: 76 (porch(25,16,se,-1) (25.56,15.96,se) v3.26->-1.20)
+      ✗ backward in D+gas run 2.95t > 0.1 (total 249.4t; porch(34,16,nw,1) to (36.95,16.00,nw) run 2.95t)
+      ✗ heading off sprite 126deg > 56 (porch(30,21,nw,-1) (30.00,21.00,nw) h0.60)
+      ✗ illegal in-place sprite changes: 86 (porch(26,16,se,1) (24.05,16.00) se->sw: <1 t free ahead)
+FAIL  escsteer   dt=0.25      {"porch":{"runs":146,"stuck":146,"freedBySteerOnly":100,"neededR":46,"needRUnjustified":16,"rCueShown":0,"trapped":11,"needREx":["(26,16,se) s=1 stuck@(24.04,16.00) steer-only 0.07t Rcue=false","(25,17,sw) s=-1 stuck@(25.00,16.96) steer-only 0.00t Rcue=false","(25,17,sw) s=1 stuck@(25.00,16.96) steer-only 0.00t Rcue=false"]},"cactus":{"runs":128,"stuck":128,"freedBySteerOnly":77,"neededR":51,"needRUnjustified":24,"rCueShown":0,"trapped":7,"needREx":["(23,12,se) s=-1 stuck@(22.55,12.00) steer-only 0.38t Rcue=false","(23,12,se) s=1 stuck@(22.55,12.00) steer-only 0.38t Rcue=false","(22,13,se) s=-1 stuck@(21.55,13.00) steer-only 1.40t Rcue=false"]},"needRPct":35.4,"rCuePct":0,"snap04":0,"snapX":0,"flips":5,"backDMaxRun":2.96,"backDTotal":210.3,"behind":1087,"rFwdMaxRun":2.1,"rFlips":0,"jumps":0,"jumpMax":0,"offMaxDeg":126,"restOffMaxDeg":126,"shortSwap":0,"inPlaceBad":91,"overlap":0} (111s)
+      ✗ porch needs-R where D1 allows an in-place swap (oracle): 16 (25,17,sw) s=-1 stuck@(25.00,16.96,sw) travelSinceChange=spawn (25,17,sw) s=1 stuck@(25.00,16.96,sw) travelSinceChange=spawn (26,17,sw) s=-1 stuck@(26.00,16.96,sw) travelSinceChange=spawn
+      ✗ porch TRAPPED (R battery too) 11 (25,17,sw) s=-1 (25,17,sw) s=1 (26,17,sw) s=-1
+      ✗ cactus needs-R where D1 allows an in-place swap (oracle): 24 (23,12,se) s=-1 stuck@(22.55,12.00,se) travelSinceChange=spawn (23,12,se) s=1 stuck@(22.55,12.00,se) travelSinceChange=spawn (22,13,se) s=-1 stuck@(21.55,13.00,se) travelSinceChange=spawn
+      ✗ cactus TRAPPED (R battery too) 7 (30,16,nw) s=-1 (25,17,sw) s=-1 (25,17,sw) s=1
+      ✗ R cue (jac.reverseCue) shown in 0/97 needs-R cases = 0% < 100%
+      ✗ fwd->reverse flips in D+gas: 5 (porch(29,22,ne,-1) (28.04,19.86,ne) v4.40->-0.83)
+      ✗ backward in D+gas run 2.96t > 0.1 (total 210.3t; porch(34,16,nw,1) to (36.96,16.00,nw) run 2.96t)
+      ✗ frames ending behind their start (>0.05t against the gear): 1087 (porch(25,16,se,-1) (25.38,15.96,se)->(25.08,15.96,se) -0.300t)
+      ✗ heading off sprite 126deg > 56 (porch(30,21,nw,-1) (30.00,21.00,nw) h0.60)
+      ✗ illegal in-place sprite changes: 91 (porch(26,16,se,1) (24.04,16.00) se->sw: <1 t free ahead)
+FAIL  park       dt=0.0166667 {"nearestReachable":{"bain":{"dist":3.16,"from":"forge ref (42,25,sw)","limit":3.66},"volaris":{"dist":1.96,"from":"forge ref (39,37.96,ne)","limit":2.46}},"spawn->23,7":{"arrived":1.4,"end":[23,6.58,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":0},"spawn->bain":{"arrived":13.25,"end":[43.38,26,"se"],"overlapFrames":0,"hudPct":100,"maxStillS":0,"endToDoor":4.38},"spawn->volaris":{"arrived":23.53,"end":[39,40.34,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":0,"endToDoor":4.34},"spawn->22,18":{"arrived":null,"end":[24,15.62,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":56.7},"west->bain":{"arrived":20.73,"end":[43.38,26,"se"],"overlapFrames":0,"hudPct":100,"maxStillS":0,"endToDoor":4.38},"west->volaris":{"arrived":31.02,"end":[39,40.34,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":0,"endToDoor":4.34},"southeast->bain":{"arrived":12.45,"end":[43.36,26,"se"],"overlapFrames":0,"hudPct":100,"maxStillS":0,"endToDoor":4.36},"southeast->volaris":{"arrived":5.52,"end":[39,40.34,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":0,"endToDoor":4.34},"northeast->bain":{"arrived":5.43,"end":[43.38,26,"se"],"overlapFrames":0,"hudPct":100,"maxStillS":0,"endToDoor":4.38},"northeast->volaris":{"arrived":16.72,"end":[39,40.34,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":0,"endToDoor":4.34},"manual->bain":{"arrived":11.6,"end":[43.38,26,"se"],"overlapFrames":0,"hudPct":100,"maxStillS":0.5,"endToDoor":4.38},"manual->volaris":{"arrived":21.93,"end":[39,40.34,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":0.5,"endToDoor":4.34}} (1s)
+      ✗ spawn->bain parked 4.38t from the door > nearest reachable 3.16 (forge ref (42,25,sw)) + 0.5 (cap 6)
+      ✗ spawn->volaris parked 4.34t from the door > nearest reachable 1.96 (forge ref (39,37.96,ne)) + 0.5 (cap 6)
+      ✗ west->bain parked 4.38t from the door > nearest reachable 3.16 (forge ref (42,25,sw)) + 0.5 (cap 6)
+      ✗ west->volaris parked 4.34t from the door > nearest reachable 1.96 (forge ref (39,37.96,ne)) + 0.5 (cap 6)
+      ✗ southeast->bain parked 4.36t from the door > nearest reachable 3.16 (forge ref (42,25,sw)) + 0.5 (cap 6)
+      ✗ southeast->volaris parked 4.34t from the door > nearest reachable 1.96 (forge ref (39,37.96,ne)) + 0.5 (cap 6)
+      ✗ northeast->bain parked 4.38t from the door > nearest reachable 3.16 (forge ref (42,25,sw)) + 0.5 (cap 6)
+      ✗ northeast->volaris parked 4.34t from the door > nearest reachable 1.96 (forge ref (39,37.96,ne)) + 0.5 (cap 6)
+      ✗ manual->bain parked 4.38t from the door > nearest reachable 3.16 (forge ref (42,25,sw)) + 0.5 (cap 6)
+      ✗ manual->volaris parked 4.34t from the door > nearest reachable 1.96 (forge ref (39,37.96,ne)) + 0.5 (cap 6)
+FAIL  park       dt=0.1       {"nearestReachable":{"bain":{"dist":3.16,"from":"forge ref (42,25,sw)","limit":3.66},"volaris":{"dist":1.96,"from":"forge ref (39,37.96,ne)","limit":2.46}},"spawn->23,7":{"arrived":1.5,"end":[23,6.58,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":0},"spawn->bain":{"arrived":13.8,"end":[43.39,26,"se"],"overlapFrames":0,"hudPct":100,"maxStillS":0.1,"endToDoor":4.39},"spawn->volaris":{"arrived":24.9,"end":[39,40.36,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":0.1,"endToDoor":4.36},"spawn->22,18":{"arrived":null,"end":[24,15.61,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":56.4},"west->bain":{"arrived":22,"end":[43.39,26,"se"],"overlapFrames":0,"hudPct":100,"maxStillS":0.1,"endToDoor":4.39},"west->volaris":{"arrived":32.8,"end":[39,40.36,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":0.1,"endToDoor":4.36},"southeast->bain":{"arrived":13.8,"end":[43.37,26,"se"],"overlapFrames":0,"hudPct":100,"maxStillS":0.1,"endToDoor":4.37},"southeast->volaris":{"arrived":6.2,"end":[39,40.36,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":0.1,"endToDoor":4.36},"northeast->bain":{"arrived":5.8,"end":[43.39,26,"se"],"overlapFrames":0,"hudPct":100,"maxStillS":0.1,"endToDoor":4.39},"northeast->volaris":{"arrived":18.1,"end":[39,40.36,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":0.1,"endToDoor":4.36},"manual->bain":{"arrived":12,"end":[43.39,26,"se"],"overlapFrames":0,"hudPct":100,"maxStillS":0.6,"endToDoor":4.39},"manual->volaris":{"arrived":23.2,"end":[39,40.36,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":0.6,"endToDoor":4.36}} (1s)
+      ✗ spawn->bain parked 4.39t from the door > nearest reachable 3.16 (forge ref (42,25,sw)) + 0.5 (cap 6)
+      ✗ spawn->volaris parked 4.36t from the door > nearest reachable 1.96 (forge ref (39,37.96,ne)) + 0.5 (cap 6)
+      ✗ west->bain parked 4.39t from the door > nearest reachable 3.16 (forge ref (42,25,sw)) + 0.5 (cap 6)
+      ✗ west->volaris parked 4.36t from the door > nearest reachable 1.96 (forge ref (39,37.96,ne)) + 0.5 (cap 6)
+      ✗ southeast->bain parked 4.37t from the door > nearest reachable 3.16 (forge ref (42,25,sw)) + 0.5 (cap 6)
+      ✗ southeast->volaris parked 4.36t from the door > nearest reachable 1.96 (forge ref (39,37.96,ne)) + 0.5 (cap 6)
+      ✗ northeast->bain parked 4.39t from the door > nearest reachable 3.16 (forge ref (42,25,sw)) + 0.5 (cap 6)
+      ✗ northeast->volaris parked 4.36t from the door > nearest reachable 1.96 (forge ref (39,37.96,ne)) + 0.5 (cap 6)
+      ✗ manual->bain parked 4.39t from the door > nearest reachable 3.16 (forge ref (42,25,sw)) + 0.5 (cap 6)
+      ✗ manual->volaris parked 4.36t from the door > nearest reachable 1.96 (forge ref (39,37.96,ne)) + 0.5 (cap 6)
+FAIL  park       dt=0.25      {"nearestReachable":{"bain":{"dist":3.16,"from":"forge ref (42,25,sw)","limit":3.66},"volaris":{"dist":1.96,"from":"forge ref (39,37.96,ne)","limit":2.46}},"spawn->23,7":{"arrived":2.25,"end":[23,6.56,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":0.3},"spawn->bain":{"arrived":14.25,"end":[43.4,26,"se"],"overlapFrames":0,"hudPct":100,"maxStillS":0.3,"endToDoor":4.4},"spawn->volaris":{"arrived":26,"end":[39,40.39,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":0.3,"endToDoor":4.39},"spawn->22,18":{"arrived":null,"end":[24,15.6,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":56},"west->bain":{"arrived":23.5,"end":[43.4,26,"se"],"overlapFrames":0,"hudPct":100,"maxStillS":0.3,"endToDoor":4.4},"west->volaris":{"arrived":35,"end":[39,40.39,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":0.3,"endToDoor":4.39},"southeast->bain":{"arrived":null,"end":[45,26.02,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":1.3,"endToDoor":6},"southeast->volaris":{"arrived":6.75,"end":[39,40.39,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":0.3,"endToDoor":4.39},"northeast->bain":{"arrived":6,"end":[43.4,26,"se"],"overlapFrames":0,"hudPct":100,"maxStillS":0.3,"endToDoor":4.4},"northeast->volaris":{"arrived":19.5,"end":[39,40.39,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":0.3,"endToDoor":4.39},"manual->bain":{"arrived":12.5,"end":[43.4,26,"se"],"overlapFrames":0,"hudPct":100,"maxStillS":0.8,"endToDoor":4.4},"manual->volaris":{"arrived":24.25,"end":[39,40.39,"sw"],"overlapFrames":0,"hudPct":100,"maxStillS":1,"endToDoor":4.39}} (1s)
+      ✗ spawn->23,7 arrival 2.25s > 2.1s (end 23,6.56,sw)
+      ✗ spawn->bain parked 4.4t from the door > nearest reachable 3.16 (forge ref (42,25,sw)) + 0.5 (cap 6)
+      ✗ spawn->volaris parked 4.39t from the door > nearest reachable 1.96 (forge ref (39,37.96,ne)) + 0.5 (cap 6)
+      ✗ west->bain parked 4.4t from the door > nearest reachable 3.16 (forge ref (42,25,sw)) + 0.5 (cap 6)
+      ✗ west->volaris parked 4.39t from the door > nearest reachable 1.96 (forge ref (39,37.96,ne)) + 0.5 (cap 6)
+      ✗ southeast->bain arrival NO > 45s (end 45,26.02,sw)
+      ✗ southeast->bain parked 6t from the door > nearest reachable 3.16 (forge ref (42,25,sw)) + 0.5 (cap 6)
+      ✗ southeast->volaris parked 4.39t from the door > nearest reachable 1.96 (forge ref (39,37.96,ne)) + 0.5 (cap 6)
+      ✗ northeast->bain parked 4.4t from the door > nearest reachable 3.16 (forge ref (42,25,sw)) + 0.5 (cap 6)
+      ✗ northeast->volaris parked 4.39t from the door > nearest reachable 1.96 (forge ref (39,37.96,ne)) + 0.5 (cap 6)
+      ✗ manual->bain parked 4.4t from the door > nearest reachable 3.16 (forge ref (42,25,sw)) + 0.5 (cap 6)
+      ✗ manual->volaris parked 4.39t from the door > nearest reachable 1.96 (forge ref (39,37.96,ne)) + 0.5 (cap 6)
+FAIL  escsteer   dt=0.1       {"porch":{"runs":146,"stuck":146,"freedBySteerOnly":40,"neededR":106,"needRUnjustified":43,"rCueShown":0,"trapped":76,"needREx":["(25,16,se) s=-1 stuck@(24.04,15.96) steer-only 0.08t Rcue=false","(25,16,se) s=1 stuck@(24.04,16.04) steer-only 0.01t Rcue=false","(26,16,se) s=-1 stuck@(24.04,16.00) steer-only 0.04t Rcue=false"]},"cactus":{"runs":128,"stuck":128,"freedBySteerOnly":29,"neededR":99,"needRUnjustified":53,"rCueShown":0,"trapped":66,"needREx":["(23,12,se) s=-1 stuck@(22.55,12.00) steer-only 0.01t Rcue=false","(23,12,se) s=1 stuck@(22.55,12.00) steer-only 0.01t Rcue=false","(23,12,sw) s=-1 stuck@(23.00,11.55) steer-only 0.01t Rcue=false"]},"needRPct":74.8,"rCuePct":0,"snap04":321,"snapX":317,"flips":16,"backDMaxRun":2.96,"backDTotal":259.8,"behind":3176,"rFwdMaxRun":2.38,"rFlips":2,"jumps":0,"jumpMax":0,"offMaxDeg":127,"restOffMaxDeg":127,"shortSwap":0,"inPlaceBad":105,"overlap":0} (140s)
+      ✗ porch needs-R where D1 allows an in-place swap (oracle): 43 (25,17,sw) s=-1 stuck@(25.00,16.96,sw) travelSinceChange=spawn (25,17,sw) s=1 stuck@(25.00,16.96,sw) travelSinceChange=spawn (26,17,sw) s=-1 stuck@(26.00,16.96,sw) travelSinceChange=spawn
+      ✗ porch TRAPPED (R battery too) 76 (26,16,se) s=1 (25,17,se) s=-1 (25,17,se) s=1
+      ✗ cactus needs-R where D1 allows an in-place swap (oracle): 53 (23,12,se) s=-1 stuck@(22.55,12.00,se) travelSinceChange=spawn (23,12,se) s=1 stuck@(22.55,12.00,se) travelSinceChange=spawn (23,12,sw) s=-1 stuck@(23.00,11.55,sw) travelSinceChange=spawn
+      ✗ cactus TRAPPED (R battery too) 66 (23,12,se) s=-1 (23,12,se) s=1 (23,12,sw) s=-1
+      ✗ R cue (jac.reverseCue) shown in 0/205 needs-R cases = 0% < 100%
+      ✗ sprite jump >0.5q beyond plain yaw: 317 (porch-esc (30.48,17.84) sw->nw 74deg v0.67->0.00)
+      ✗ fwd->reverse flips in D+gas: 16 (porch-esc (24.05,14.51,ne) v3.18->-0.56)
+      ✗ backward in D+gas run 2.96t > 0.1 (total 259.8t; porch(34,16,nw,1) to (36.96,16.00,nw) run 2.96t)
+      ✗ frames ending behind their start (>0.05t against the gear): 3176 (porch(25,16,se,-1) (25.50,15.96,se)->(25.38,15.96,se) -0.120t)
+      ✗ heading off sprite 127deg > 56 (porch(30,21,nw,-1) (30.00,21.00,nw) h0.59)
+      ✗ illegal in-place sprite changes: 105 (porch(26,16,se,1) (24.04,16.00) se->sw: <1 t free ahead)
+PASS  ov         dt=0.0166667 {"overlapRuns":0} (58s)
+PASS  ov         dt=0.1       {"overlapRuns":0} (65s)
+PASS  oracle     dt=once      {"frozenFrom":"cursor/integracion 5a265621 (src/data identical in 6450f1f and d2bd630)","gridDiff":0,"poseDisagree":0,"posesSampled":102144} (0s)
+FAIL  vardt      dt=var       {"seeds":30,"boxed30s":0,"info_boxedButBatteryFrees":0,"snap04":167,"snapX":139,"flips":17,"backDMaxRun":2.946,"backDTotal":65.3,"behind":296,"rFwdMaxRun":2.3,"rFlips":11,"jumps":0,"jumpMax":0,"offMaxDeg":136,"restOffMaxDeg":136,"shortSwap":0,"inPlaceBad":47,"overlap":0} (8s)
+      ✗ sprite snap >0.4q beyond wheel yaw: 167 (vseed1 (33.31,4.17) se->sw 41deg v-3.17->0.00)
+      ✗ sprite jump >0.5q beyond plain yaw: 139 (vseed1 (33.31,4.17) se->sw 41deg v-3.17->0.00)
+      ✗ fwd->reverse flips in D+gas: 17 (vseed3 (10.62,2.60,ne) v2.11->-1.20)
+      ✗ backward in D+gas run 2.95t > 0.1 (total 65.3t; vseed17 to (18.16,10.05,sw) run 2.95t)
+      ✗ frames ending behind their start (>0.05t against the gear): 296 (vseed1 (22.63,4.92,ne)->(22.63,5.22,ne) -0.300t)
+      ✗ R mirror: forward run with R gas 2.30t, flips 11 (vseed24 to (17.95,10.04,ne) run 2.30t)
+      ✗ heading off sprite 136deg > 56 (vseed12 (10.16,2.39,nw) h0.49)
+      ✗ at-rest heading off sprite 136deg (vseed12 (10.16,2.39,nw) h0.49)
+      ✗ illegal in-place sprite changes: 47 (vseed1 (33.31,4.17) se->sw: <1 t free ahead)
+PASS  h1         dt=0.0166667 {"runs":816,"autoTurn":0,"swapLat":0} (4s)
+FAIL  h3b        dt=0.0166667 {"porch":{"runs":148,"shuttle15":0,"dead":148,"cueUnjustifiedRuns":0,"hudBad":0,"info_velBadPreFrame":"0/106560"},"cactus":{"runs":132,"shuttle15":0,"dead":132,"cueUnjustifiedRuns":0,"hudBad":0,"info_velBadPreFrame":"0/95040"}} (18s)
+      ✗ porch dead stops 148/148 (25,16,se) s=-1 10.4s at (24.04,15.96)
+      ✗ cactus dead stops 132/132 (23,12,se) s=-1 11.6s at (22.58,12.00)
+PASS  honest     dt=0.0166667 {"frames":84960,"hudPct":100,"overlap":0,"wide35Both":0,"info_wide35Pre":0,"info_velHonestPre":100,"info_velHonestPost":100} (8s)
+FAIL  swapq      dt=0.0166667 {"D1":{"swaps":7,"swapFrameQ":0.371,"plainYawQ":0.019,"excessQ":0.351,"speedRatio":[0,0]},"D-1":{"swaps":7,"swapFrameQ":0.371,"plainYawQ":0.019,"excessQ":0.351,"speedRatio":[0,0]},"R1":{"swaps":6,"swapFrameQ":0.368,"plainYawQ":0.014,"excessQ":0.354,"speedRatio":[0,0]},"R-1":{"swaps":6,"swapFrameQ":0.368,"plainYawQ":0.014,"excessQ":0.354,"speedRatio":[0,0]}} (0s)
+      ✗ D1 swap heading jump 0.37q = 0.35q beyond plain yaw > 0.1
+      ✗ D1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+      ✗ D-1 swap heading jump 0.37q = 0.35q beyond plain yaw > 0.1
+      ✗ D-1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+      ✗ R1 swap heading jump 0.37q = 0.35q beyond plain yaw > 0.1
+      ✗ R1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+      ✗ R-1 swap heading jump 0.37q = 0.35q beyond plain yaw > 0.1
+      ✗ R-1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+PASS  ov         dt=0.25      {"overlapRuns":0} (81s)
+FAIL  monkey     dt=0.0166667 {"seeds":60,"boxed30s":0,"info_boxedButBatteryFrees":7,"guPct":29.4,"snap06":466,"snap04":616,"snapX":498,"flips":76,"backDMaxRun":2.745,"backDTotal":145.3,"behind":0,"rFwdMaxRun":2.02,"rFlips":87,"jumps":0,"jumpMax":0,"offMaxDeg":174,"restOffMaxDeg":174,"shortSwap":0,"inPlaceBad":125,"overlap":0} (23s)
+      ✗ escapeGaveUp share 29.4%
+      ✗ 1-frame sprite turns >0.6q 466
+      ✗ sprite snap >0.4q beyond wheel yaw: 616 (seed1 (22.99,6.07) se->ne -82deg v0.49->0.00)
+      ✗ sprite jump >0.5q beyond plain yaw: 498 (seed1 (22.99,6.07) se->ne -82deg v0.49->0.00)
+      ✗ fwd->reverse flips in D+gas: 76 (seed1 (23.29,7.05,ne) v1.20->-1.04)
+      ✗ backward in D+gas run 2.74t > 0.1 (total 145.3t; seed48 to (17.95,9.74,nw) run 2.74t)
+      ✗ R mirror: forward run with R gas 2.02t, flips 87 (seed26 to (17.06,9.38,se) run 2.02t)
+      ✗ heading off sprite 174deg > 56 (seed28 (25.60,4.99,se) h2.06)
+      ✗ at-rest heading off sprite 174deg (seed28 (25.60,4.99,se) h2.06)
+      ✗ illegal in-place sprite changes: 125 (seed1 (18.80,2.30) se->ne: <1 t free ahead)
+PASS  trap       dt=0.0166667 {"natural":6,"naturalTrapped":0,"monkeyStates":6,"monkeyTrapped":0} (2s)
+FAIL  edge       dt=0.0166667 {"runs":109,"snap04":23,"snapX":22,"flips":4,"backDMaxRun":2.155,"backDTotal":32.2,"behind":0,"rFwdMaxRun":0,"rFlips":0,"jumps":0,"jumpMax":0,"offMaxDeg":83,"restOffMaxDeg":83,"shortSwap":0,"inPlaceBad":0,"overlap":0,"ends":{"spawnW-x24-steer-1":[27.07,5.04,"ne"],"spawnW-x30-steer-1":[33.11,5.04,"ne"],"spawnW-x30-steer1":[32.44,6.05,"se"],"spawnW-x22-steer1":[22.02,6,"sw"],"spawnW-x22-steer-1":[25.09,5.04,"ne"]}} (2s)
+      ✗ sprite snap >0.4q beyond wheel yaw: 23 (spawnW-x22-steer1 (22.02,6.00) se->sw 90deg v5.17->0.00)
+      ✗ sprite jump >0.5q beyond plain yaw: 22 (spawnW-x22-steer1 (22.02,6.00) se->sw 90deg v5.17->0.00)
+      ✗ fwd->reverse flips in D+gas: 4 (y6(22,se)1 (25.45,6.05,se) v5.00->-1.20)
+      ✗ backward in D+gas run 2.15t > 0.1 (total 32.2t; y6(24,se)1 to (24.04,6.00,se) run 2.15t)
+      ✗ heading off sprite 83deg > 56 (y6(6,nw)1 (3.81,6.00,ne) h3.92)
+FAIL  borders    dt=0.0166667 {"runs":535,"snap04":0,"snapX":0,"flips":0,"backDMaxRun":3.956,"backDTotal":114.9,"behind":0,"rFwdMaxRun":0,"rFlips":0,"jumps":0,"jumpMax":0,"offMaxDeg":126,"restOffMaxDeg":126,"shortSwap":0,"inPlaceBad":1,"overlap":0} (15s)
+      ✗ backward in D+gas run 3.96t > 0.1 (total 114.9t; border(4,57,nw,-1) to (7.96,57.52,nw) run 3.96t)
+      ✗ heading off sprite 126deg > 56 (border(4,31,nw,-1) (4.00,31.00,nw) h0.60)
+      ✗ illegal in-place sprite changes: 1 (border(59,47,se,1) (58.55,47.00) se->sw: <1 t free ahead)
+FAIL  shuttle    dt=0.0166667 {"porch":{"runs":148,"shuttle3":0,"worstS":0},"cactus":{"runs":132,"shuttle3":0,"worstS":0},"edge":{"runs":178,"shuttle3":0,"worstS":0},"snap04":47,"snapX":46,"flips":55,"backDMaxRun":2.955,"backDTotal":174.6,"behind":0,"rFwdMaxRun":0,"rFlips":0,"jumps":0,"jumpMax":0,"offMaxDeg":180,"restOffMaxDeg":180,"shortSwap":0,"inPlaceBad":57,"overlap":0} (37s)
+      ✗ sprite jump >0.5q beyond plain yaw: 46 (porch(31,17,sw,1) (30.85,18.02) sw->nw 71deg v4.25->0.00)
+      ✗ fwd->reverse flips in D+gas: 55 (porch(25,16,se,-1) (25.56,15.96,se) v3.26->-1.20)
+      ✗ backward in D+gas run 2.95t > 0.1 (total 174.6t; porch(34,16,nw,1) to (36.95,16.00,nw) run 2.95t)
+      ✗ heading off sprite 180deg > 56 (porch(25,16,se,-1) (24.04,15.96,ne) h1.00)
+      ✗ illegal in-place sprite changes: 57 (porch(26,16,se,1) (24.05,16.00) se->sw: <1 t free ahead)
+PASS  brakesteer dt=0.0166667 {"runs":944,"info_maxMovedT":0.56,"snap04":0,"snapX":0,"flips":0,"backDMaxRun":0,"backDTotal":0,"behind":0,"rFwdMaxRun":0,"rFlips":0,"jumps":0,"jumpMax":0,"offMaxDeg":56,"restOffMaxDeg":56,"shortSwap":0,"inPlaceBad":0,"overlap":0} (4s)
+FAIL  rmirror    dt=0.0166667 {"runs":445,"snap04":94,"snapX":94,"flips":0,"backDMaxRun":0,"backDTotal":0,"behind":0,"rFwdMaxRun":2.955,"rFlips":163,"jumps":0,"jumpMax":0,"offMaxDeg":155,"restOffMaxDeg":155,"shortSwap":0,"inPlaceBad":25,"overlap":0} (24s)
+      ✗ sprite jump >0.5q beyond plain yaw: 94 (R-porch(26,18,nw,1) (27.95,17.35) nw->sw -50deg v-3.17->0.00)
+      ✗ R mirror: forward run with R gas 2.95t, flips 163 (R-porch(34,16,se,1) to (36.95,16.00,se) run 2.95t)
+      ✗ heading off sprite 155deg > 56 (R-porch(30,21,se,1) (30.00,21.00,se) h2.28)
+      ✗ illegal in-place sprite changes: 25 (R-porch(25,16,nw,-1) (24.04,16.04) nw->ne: <1 t free ahead)
+PASS  h1         dt=0.1       {"runs":816,"autoTurn":0,"swapLat":0} (2s)
+PASS  honest     dt=0.1       {"frames":14160,"hudPct":100,"overlap":0,"wide35Both":0,"info_wide35Pre":0,"info_velHonestPre":100,"info_velHonestPost":99.98} (6s)
+FAIL  swapq      dt=0.1       {"D1":{"swaps":6,"swapFrameQ":0.33,"plainYawQ":0.116,"excessQ":0.213,"speedRatio":[0,0]},"D-1":{"swaps":6,"swapFrameQ":0.33,"plainYawQ":0.116,"excessQ":0.213,"speedRatio":[0,0]},"R1":{"swaps":6,"swapFrameQ":0.351,"plainYawQ":0.086,"excessQ":0.265,"speedRatio":[0,0]},"R-1":{"swaps":6,"swapFrameQ":0.351,"plainYawQ":0.086,"excessQ":0.265,"speedRatio":[0,0]}} (0s)
+      ✗ D1 swap heading jump 0.33q = 0.21q beyond plain yaw > 0.1
+      ✗ D1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+      ✗ D-1 swap heading jump 0.33q = 0.21q beyond plain yaw > 0.1
+      ✗ D-1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+      ✗ R1 swap heading jump 0.35q = 0.26q beyond plain yaw > 0.1
+      ✗ R1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+      ✗ R-1 swap heading jump 0.35q = 0.26q beyond plain yaw > 0.1
+      ✗ R-1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+FAIL  monkey     dt=0.1       {"seeds":60,"boxed30s":1,"info_boxedButBatteryFrees":4,"guPct":27.4,"snap06":443,"snap04":434,"snapX":393,"flips":29,"backDMaxRun":2.485,"backDTotal":139.1,"behind":1657,"rFwdMaxRun":1.92,"rFlips":13,"jumps":0,"jumpMax":0,"offMaxDeg":165,"restOffMaxDeg":165,"shortSwap":0,"inPlaceBad":105,"overlap":0} (20s)
+      ✗ seeds boxed 30 s (<1.5t) AND R battery fails 1/60 seed52 t=65 at (17.9,18.0) battery 0.10t
+      ✗ escapeGaveUp share 27.4%
+      ✗ 1-frame sprite turns >0.6q 443
+      ✗ sprite snap >0.4q beyond wheel yaw: 434 (seed1 (22.93,6.07) se->ne -83deg v0.00->0.16)
+      ✗ sprite jump >0.5q beyond plain yaw: 393 (seed1 (22.93,6.07) se->ne -83deg v0.00->0.16)
+      ✗ fwd->reverse flips in D+gas: 29 (seed3 (20.43,3.46,nw) v1.20->-0.90)
+      ✗ backward in D+gas run 2.48t > 0.1 (total 139.1t; seed48 to (24.04,15.95,se) run 2.48t)
+      ✗ frames ending behind their start (>0.05t against the gear): 1657 (seed1 R (25.31,4.93,sw)->(25.31,5.03,sw) +0.098t)
+      ✗ R mirror: forward run with R gas 1.92t, flips 13 (seed25 to (24.05,6.13,ne) run 1.92t)
+      ✗ heading off sprite 165deg > 56 (seed28 (41.10,0.95,se) h1.83)
+      ✗ at-rest heading off sprite 165deg (seed28 (41.10,0.95,se) h1.83)
+      ✗ illegal in-place sprite changes: 105 (seed1 (19.85,1.95) se->ne: <1 t free ahead)
+PASS  trap       dt=0.1       {"natural":6,"naturalTrapped":0,"monkeyStates":6,"monkeyTrapped":0} (2s)
+FAIL  h3b        dt=0.1       {"porch":{"runs":148,"shuttle15":0,"dead":148,"cueUnjustifiedRuns":0,"hudBad":0,"info_velBadPreFrame":"0/17908"},"cactus":{"runs":132,"shuttle15":0,"dead":132,"cueUnjustifiedRuns":0,"hudBad":0,"info_velBadPreFrame":"0/15972"}} (31s)
+      ✗ porch dead stops 148/148 (25,16,se) s=-1 10.4s at (24.04,15.96)
+      ✗ cactus dead stops 132/132 (23,12,se) s=-1 11.6s at (22.55,12.00)
+FAIL  edge       dt=0.1       {"runs":109,"snap04":17,"snapX":16,"flips":3,"backDMaxRun":2.16,"backDTotal":35.3,"behind":311,"rFwdMaxRun":0,"rFlips":0,"jumps":0,"jumpMax":0,"offMaxDeg":81,"restOffMaxDeg":81,"shortSwap":0,"inPlaceBad":0,"overlap":0,"ends":{"spawnW-x24-steer-1":[27.55,5.04,"ne"],"spawnW-x30-steer-1":[33.76,5.04,"ne"],"spawnW-x30-steer1":[32.98,6.05,"se"],"spawnW-x22-steer1":[22.19,6,"sw"],"spawnW-x22-steer-1":[25.48,5.04,"ne"]}} (4s)
+      ✗ sprite snap >0.4q beyond wheel yaw: 17 (spawnW-x22-steer1 (22.19,6.00) se->sw 90deg v5.17->0.00)
+      ✗ sprite jump >0.5q beyond plain yaw: 16 (spawnW-x22-steer1 (22.19,6.00) se->sw 90deg v5.17->0.00)
+      ✗ fwd->reverse flips in D+gas: 3 (y6(22,se)1 (25.29,6.05,se) v1.92->-1.20)
+      ✗ backward in D+gas run 2.16t > 0.1 (total 35.3t; y6(24,se)1 to (24.03,6.00,se) run 2.16t)
+      ✗ frames ending behind their start (>0.05t against the gear): 311 (spawnW-x24-steer-1 (27.55,4.70,ne)->(27.55,4.82,ne) -0.120t)
+      ✗ heading off sprite 81deg > 56 (y6(6,nw)-1 (3.81,6.00,sw) h0.10)
+FAIL  borders    dt=0.1       {"runs":535,"snap04":0,"snapX":0,"flips":0,"backDMaxRun":3.961,"backDTotal":200.7,"behind":1782,"rFwdMaxRun":0,"rFlips":0,"jumps":0,"jumpMax":0,"offMaxDeg":127,"restOffMaxDeg":127,"shortSwap":0,"inPlaceBad":3,"overlap":0} (17s)
+      ✗ backward in D+gas run 3.96t > 0.1 (total 200.7t; border(4,57,nw,-1) to (7.96,57.52,nw) run 3.96t)
+      ✗ frames ending behind their start (>0.05t against the gear): 1782 (border(3,4,ne,-1) (3.00,4.00,ne)->(3.00,4.08,ne) -0.080t)
+      ✗ heading off sprite 127deg > 56 (border(4,31,nw,-1) (4.00,31.00,nw) h0.59)
+      ✗ illegal in-place sprite changes: 3 (border(4,19,nw,-1) (4.45,19.00) nw->sw: <1 t free ahead)
+FAIL  rmirror    dt=0.1       {"runs":445,"snap04":53,"snapX":52,"flips":0,"backDMaxRun":0,"backDTotal":0,"behind":1090,"rFwdMaxRun":2.96,"rFlips":9,"jumps":0,"jumpMax":0,"offMaxDeg":156,"restOffMaxDeg":156,"shortSwap":0,"inPlaceBad":25,"overlap":0} (21s)
+      ✗ sprite jump >0.5q beyond plain yaw: 52 (R-porch(27,18,nw,-1) (28.00,18.05) nw->ne 72deg v-1.84->0.00)
+      ✗ frames ending behind their start (>0.05t against the gear): 1090 (R-porch(25,16,nw,-1) R (25.50,16.04,nw)->(25.38,16.04,nw) +0.120t)
+      ✗ R mirror: forward run with R gas 2.96t, flips 9 (R-porch(34,16,se,1) to (36.96,16.00,se) run 2.96t)
+      ✗ heading off sprite 156deg > 56 (R-cactus(24,14,ne,-1) (24.00,14.00,ne) h0.73)
+      ✗ illegal in-place sprite changes: 25 (R-porch(25,16,nw,-1) (24.04,16.04) nw->ne: <1 t free ahead)
+PASS  brakesteer dt=0.1       {"runs":944,"info_maxMovedT":0.56,"snap04":0,"snapX":0,"flips":0,"backDMaxRun":0,"backDTotal":0,"behind":0,"rFwdMaxRun":0,"rFlips":0,"jumps":0,"jumpMax":0,"offMaxDeg":56,"restOffMaxDeg":56,"shortSwap":0,"inPlaceBad":0,"overlap":0} (2s)
+PASS  h1         dt=0.25      {"runs":816,"autoTurn":0,"swapLat":0} (2s)
+FAIL  shuttle    dt=0.1       {"porch":{"runs":148,"shuttle3":0,"worstS":0},"cactus":{"runs":132,"shuttle3":0,"worstS":0},"edge":{"runs":178,"shuttle3":0,"worstS":0},"snap04":17,"snapX":15,"flips":8,"backDMaxRun":2.96,"backDTotal":176.6,"behind":1512,"rFwdMaxRun":0,"rFlips":0,"jumps":0,"jumpMax":0,"offMaxDeg":180,"restOffMaxDeg":180,"shortSwap":0,"inPlaceBad":28,"overlap":0} (52s)
+      ✗ sprite jump >0.5q beyond plain yaw: 15 (porch(31,17,sw,1) (30.85,18.02) sw->nw 71deg v2.06->0.00)
+      ✗ fwd->reverse flips in D+gas: 8 (porch(28,19,sw,-1) (28.03,19.35,sw) v2.55->-1.20)
+      ✗ backward in D+gas run 2.96t > 0.1 (total 176.6t; porch(34,16,nw,1) to (36.96,16.00,nw) run 2.96t)
+      ✗ frames ending behind their start (>0.05t against the gear): 1512 (porch(25,16,se,-1) (25.50,15.96,se)->(25.38,15.96,se) -0.120t)
+      ✗ heading off sprite 180deg > 56 (porch(36,21,nw,-1) (36.32,20.85,nw) h4.00)
+      ✗ illegal in-place sprite changes: 28 (porch(26,16,se,1) (24.04,16.00) se->sw: <1 t free ahead)
+PASS  honest     dt=0.25      {"frames":5664,"hudPct":100,"overlap":0,"wide35Both":0,"info_wide35Pre":0,"info_velHonestPre":100,"info_velHonestPost":100} (7s)
+FAIL  swapq      dt=0.25      {"D1":{"swaps":4,"swapFrameQ":0.178,"plainYawQ":0.291,"excessQ":0,"speedRatio":[0,0]},"D-1":{"swaps":4,"swapFrameQ":0.178,"plainYawQ":0.291,"excessQ":0,"speedRatio":[0,0]},"R1":{"swaps":4,"swapFrameQ":0.325,"plainYawQ":0.215,"excessQ":0.11,"speedRatio":[0,0]},"R-1":{"swaps":4,"swapFrameQ":0.325,"plainYawQ":0.215,"excessQ":0.11,"speedRatio":[0,0]}} (0s)
+      ✗ D1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+      ✗ D-1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+      ✗ R1 swap heading jump 0.32q = 0.11q beyond plain yaw > 0.1
+      ✗ R1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+      ✗ R-1 swap heading jump 0.32q = 0.11q beyond plain yaw > 0.1
+      ✗ R-1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+FAIL  h3b        dt=0.25      {"porch":{"runs":148,"shuttle15":0,"dead":148,"cueUnjustifiedRuns":0,"hudBad":0,"info_velBadPreFrame":"0/7104"},"cactus":{"runs":132,"shuttle15":0,"dead":132,"cueUnjustifiedRuns":0,"hudBad":0,"info_velBadPreFrame":"0/6336"}} (39s)
+      ✗ porch dead stops 148/148 (25,16,se) s=-1 10.3s at (24.04,15.96)
+      ✗ cactus dead stops 132/132 (23,12,se) s=-1 11.5s at (22.55,12.00)
+FAIL  monkey     dt=0.25      {"seeds":60,"boxed30s":0,"info_boxedButBatteryFrees":6,"guPct":23.2,"snap06":329,"snap04":147,"snapX":116,"flips":28,"backDMaxRun":5.891,"backDTotal":157.9,"behind":998,"rFwdMaxRun":2.904,"rFlips":23,"jumps":0,"jumpMax":0,"offMaxDeg":173,"restOffMaxDeg":173,"shortSwap":0,"inPlaceBad":91,"overlap":0} (29s)
+      ✗ escapeGaveUp share 23.2%
+      ✗ 1-frame sprite turns >0.6q 329
+      ✗ sprite snap >0.4q beyond wheel yaw: 147 (seed2 (22.18,2.11) nw->ne 142deg v-3.18->0.00)
+      ✗ sprite jump >0.5q beyond plain yaw: 116 (seed2 (22.18,2.11) nw->ne 142deg v-3.18->0.00)
+      ✗ fwd->reverse flips in D+gas: 28 (seed1 (21.84,13.97,se) v1.20->-0.55)
+      ✗ backward in D+gas run 5.89t > 0.1 (total 157.9t; seed54 to (37.44,18.78,sw) run 5.89t)
+      ✗ frames ending behind their start (>0.05t against the gear): 998 (seed1 (31.00,4.41,ne)->(31.00,4.71,ne) -0.300t)
+      ✗ R mirror: forward run with R gas 2.90t, flips 23 (seed36 to (18.54,10.04,ne) run 2.90t)
+      ✗ heading off sprite 173deg > 56 (seed28 (30.17,0.95,se) h1.92)
+      ✗ at-rest heading off sprite 173deg (seed28 (30.17,0.95,se) h1.92)
+      ✗ illegal in-place sprite changes: 91 (seed1 (17.95,24.97) sw->se: <1 t free ahead)
+PASS  trap       dt=0.25      {"natural":6,"naturalTrapped":0,"monkeyStates":6,"monkeyTrapped":0} (3s)
+FAIL  edge       dt=0.25      {"runs":109,"snap04":0,"snapX":0,"flips":3,"backDMaxRun":2.92,"backDTotal":39.3,"behind":169,"rFwdMaxRun":0,"rFlips":0,"jumps":0,"jumpMax":0,"offMaxDeg":79,"restOffMaxDeg":79,"shortSwap":0,"inPlaceBad":0,"overlap":0,"ends":{"spawnW-x24-steer-1":[27.76,5,"ne"],"spawnW-x30-steer-1":[34.23,5,"ne"],"spawnW-x30-steer1":[33.13,6.05,"se"],"spawnW-x22-steer1":[22.97,6,"sw"],"spawnW-x22-steer-1":[26.47,5,"ne"]}} (4s)
+      ✗ fwd->reverse flips in D+gas: 3 (y6(22,se)1 (25.00,6.01,se) v1.35->-1.20)
+      ✗ backward in D+gas run 2.92t > 0.1 (total 39.3t; y6(24,se)1 to (24.05,6.00,se) run 2.92t)
+      ✗ frames ending behind their start (>0.05t against the gear): 169 (spawnW-x24-steer-1 (27.76,4.55,ne)->(27.76,4.85,ne) -0.300t)
+      ✗ heading off sprite 79deg > 56 (spawnW-x22-steer1 (22.97,6.00,sw) h1.88)
+FAIL  borders    dt=0.25      {"runs":535,"snap04":0,"snapX":0,"flips":0,"backDMaxRun":3.961,"backDTotal":200.7,"behind":880,"rFwdMaxRun":0,"rFlips":0,"jumps":0,"jumpMax":0,"offMaxDeg":126,"restOffMaxDeg":126,"shortSwap":0,"inPlaceBad":2,"overlap":0} (28s)
+      ✗ backward in D+gas run 3.96t > 0.1 (total 200.7t; border(4,57,nw,-1) to (7.96,57.52,nw) run 3.96t)
+      ✗ frames ending behind their start (>0.05t against the gear): 880 (border(3,4,ne,-1) (3.00,4.00,ne)->(3.00,4.26,ne) -0.260t)
+      ✗ heading off sprite 126deg > 56 (border(4,31,nw,-1) (4.00,31.00,nw) h0.60)
+      ✗ illegal in-place sprite changes: 2 (border(59,47,se,0.5) (58.55,47.00) se->sw: <1 t free ahead)
+FAIL  rmirror    dt=0.25      {"runs":445,"snap04":0,"snapX":0,"flips":0,"backDMaxRun":0,"backDTotal":0,"behind":573,"rFwdMaxRun":2.96,"rFlips":5,"jumps":0,"jumpMax":0,"offMaxDeg":155,"restOffMaxDeg":155,"shortSwap":0,"inPlaceBad":23,"overlap":0} (24s)
+      ✗ frames ending behind their start (>0.05t against the gear): 573 (R-porch(25,16,nw,-1) R (25.38,16.04,nw)->(25.08,16.04,nw) +0.300t)
+      ✗ R mirror: forward run with R gas 2.96t, flips 5 (R-porch(34,16,se,1) to (36.96,16.00,se) run 2.96t)
+      ✗ heading off sprite 155deg > 56 (R-porch(30,21,se,1) (30.00,21.00,se) h2.28)
+      ✗ illegal in-place sprite changes: 23 (R-porch(25,16,nw,-1) (24.04,16.04) nw->ne: <1 t free ahead)
+PASS  brakesteer dt=0.25      {"runs":944,"info_maxMovedT":0.56,"snap04":0,"snapX":0,"flips":0,"backDMaxRun":0,"backDTotal":0,"behind":0,"rFwdMaxRun":0,"rFlips":0,"jumps":0,"jumpMax":0,"offMaxDeg":56,"restOffMaxDeg":42,"shortSwap":0,"inPlaceBad":0,"overlap":0} (2s)
+FAIL  shuttle    dt=0.25      {"porch":{"runs":148,"shuttle3":0,"worstS":0},"cactus":{"runs":132,"shuttle3":0,"worstS":0},"edge":{"runs":178,"shuttle3":0,"worstS":0},"snap04":0,"snapX":0,"flips":3,"backDMaxRun":2.96,"backDTotal":194.8,"behind":807,"rFwdMaxRun":0,"rFlips":0,"jumps":0,"jumpMax":0,"offMaxDeg":180,"restOffMaxDeg":180,"shortSwap":0,"inPlaceBad":26,"overlap":0} (63s)
+      ✗ fwd->reverse flips in D+gas: 3 (porch(29,22,ne,-1) (28.04,19.86,ne) v4.40->-0.83)
+      ✗ backward in D+gas run 2.96t > 0.1 (total 194.8t; porch(34,16,nw,1) to (36.96,16.00,nw) run 2.96t)
+      ✗ frames ending behind their start (>0.05t against the gear): 807 (porch(25,16,se,-1) (25.38,15.96,se)->(25.08,15.96,se) -0.300t)
+      ✗ heading off sprite 180deg > 56 (porch(25,16,se,-1) (24.04,15.96,ne) h1.00)
+      ✗ illegal in-place sprite changes: 26 (porch(26,16,se,1) (24.04,16.00) se->sw: <1 t free ahead)
+
+## Summary (check × dt)
+| check | dt 0.0166667 | dt 0.1 | dt 0.25 | once | var |
+|---|---|---|---|---|---|
+| oracle | - | - | - | PASS | - |
+| ov | PASS | PASS | PASS | - | - |
+| h1 | PASS | PASS | PASS | - | - |
+| h3b | FAIL(2) | FAIL(2) | FAIL(2) | - | - |
+| honest | PASS | PASS | PASS | - | - |
+| park | FAIL(10) | FAIL(10) | FAIL(12) | - | - |
+| turn | FAIL(9) | FAIL(10) | FAIL(9) | - | - |
+| partial | FAIL(4) | FAIL(4) | FAIL(4) | - | - |
+| swapq | FAIL(8) | FAIL(8) | FAIL(6) | - | - |
+| monkey | FAIL(10) | FAIL(12) | FAIL(11) | - | - |
+| vardt | - | - | - | - | FAIL(9) |
+| esc2 | FAIL(2) | FAIL(2) | FAIL(2) | - | - |
+| escsteer | FAIL(10) | FAIL(11) | FAIL(10) | - | - |
+| trap | PASS | PASS | PASS | - | - |
+| shuttle | FAIL(5) | FAIL(6) | FAIL(5) | - | - |
+| edge | FAIL(5) | FAIL(6) | FAIL(4) | - | - |
+| borders | FAIL(3) | FAIL(4) | FAIL(4) | - | - |
+| rmirror | FAIL(4) | FAIL(5) | FAIL(4) | - | - |
+| brakesteer | PASS | PASS | PASS | - | - |
+
+RESULT: FAIL — 37/53 cells fail
+EXIT 1
