@@ -1,0 +1,162 @@
+# Forge run-all — repo /workspace/qa/integracion/2026-11-22/qa-r45j-branch @ da1e9c294 — dt 0.0166667, 0.1, 0.25 — 13 checks — 2026-11-22T14:11:22.379Z
+PASS  h1        dt=0.0166667 {"runs":816,"autoTurn":0,"swapLat":0} (4s)
+PASS  honest    dt=0.0166667 {"frames":84960,"honestPct":100,"maxErr":0,"overlap":0,"wide35":0} (8s)
+PASS  park      dt=0.0166667 {"23,7":{"arrived":1.4,"end":[23,6.58],"maxOverlap":0},"bain":{"arrived":13.3,"end":[43.38,26],"maxOverlap":0,"parkToDoor":4},"volaris":{"arrived":23.5,"end":[39,40.34],"maxOverlap":0,"parkToDoor":4},"22,18":{"arrived":null,"end":[24,15.62],"maxOverlap":0}} (0s)
+FAIL  h3b       dt=0.0166667 {"porch":{"runs":148,"shuttle15":0,"dead":148,"velBad":0},"cactus":{"runs":132,"shuttle15":0,"dead":132,"velBad":0}} (20s)
+      ✗ porch dead stops 148/148 (25,16,se) s=-1 10.4s at (24.04,15.96)
+      ✗ cactus dead stops 132/132 (23,12,se) s=-1 11.6s at (22.58,12.00)
+FAIL  swapq     dt=0.0166667 {"D1":{"swaps":7,"swapFrameQ":0.371,"plainYawQ":0.019,"excessQ":0.351,"speedRatio":[0,0]},"D-1":{"swaps":7,"swapFrameQ":0.371,"plainYawQ":0.019,"excessQ":0.351,"speedRatio":[0,0]},"R1":{"swaps":6,"swapFrameQ":0.368,"plainYawQ":0.014,"excessQ":0.354,"speedRatio":[0,0]},"R-1":{"swaps":6,"swapFrameQ":0.368,"plainYawQ":0.014,"excessQ":0.354,"speedRatio":[0,0]}} (0s)
+      ✗ D1 swap heading jump 0.37q = 0.35q beyond plain yaw > 0.1
+      ✗ D1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+      ✗ D-1 swap heading jump 0.37q = 0.35q beyond plain yaw > 0.1
+      ✗ D-1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+      ✗ R1 swap heading jump 0.37q = 0.35q beyond plain yaw > 0.1
+      ✗ R1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+      ✗ R-1 swap heading jump 0.37q = 0.35q beyond plain yaw > 0.1
+      ✗ R-1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+FAIL  monkey    dt=0.0166667 {"seeds":60,"boxed30s":7,"guPct":29.4,"snap06":466,"snap04":616,"flips":76,"backDMaxRun":2.745,"backDTotal":214.9,"jumps":0,"jumpMax":0,"offMaxDeg":174,"restOffMaxDeg":174,"shortSwap":0} (22s)
+      ✗ seeds boxed 30 s (<1.5t) 7/60 seed1 t=89 at (22.7,11.2) seed4 t=78 at (38.0,14.6) seed16 t=63 at (1.0,2.0)
+      ✗ escapeGaveUp share 29.4%
+      ✗ 1-frame sprite turns >0.6q 466
+      ✗ 1-frame snap >0.4q: 616 (seed1 (22.99,6.07) se->ne -82deg v0.49->0.00)
+      ✗ fwd->reverse flips in D+gas: 76 (seed1 (23.29,7.05,ne) v1.20->-1.04)
+      ✗ backward in D+gas run 2.74t > 0.25 (total 214.9t; seed48 to (17.95,9.74,nw) run 2.74t)
+      ✗ heading off sprite 174deg > 60
+      ✗ at-rest heading off sprite 174deg (seed28 (25.60,4.99,se) h2.06)
+PASS  ov        dt=0.0166667 {"overlapRuns":0} (63s)
+FAIL  turn      dt=0.0166667 {"runs":12084,"g10Clean":11322,"g10Pct":93.7,"interior":"1859/2134","turn90bDone":4932,"turnPct":40.8,"GU":7152,"snapGU":5747,"hardGU":6035,"snap04":5690,"flips":605,"backDMaxRun":2.78,"backDTotal":1154.2,"jumps":0,"jumpMax":0,"offMaxDeg":57,"restOffMaxDeg":56,"shortSwap":0} (55s)
+      ✗ turn90b completed 40.8% < 80%
+      ✗ snap at GU onset 5747
+      ✗ GU stop from >3 t/s 6035
+      ✗ 1-frame snap >0.4q: 5690 (turn(2,2,se,-1) (3.67,2.00) se->ne -90deg v5.17->0.00)
+      ✗ fwd->reverse flips in D+gas: 605 (turn(24,4,sw,1) (23.64,7.50,sw) v4.64->-1.20)
+      ✗ backward in D+gas run 2.78t > 0.25 (total 1154.2t; turn(4,58,ne,-1) to (3.47,56.97,ne) run 2.78t)
+PASS  trap      dt=0.0166667 {"natural":6,"naturalTrapped":0,"monkeyStates":6,"monkeyTrapped":0} (2s)
+FAIL  shuttle   dt=0.0166667 {"porch":{"runs":148,"shuttle3":0,"worstS":0},"cactus":{"runs":132,"shuttle3":0,"worstS":0},"edge":{"runs":178,"shuttle3":0,"worstS":0},"snap04":47,"flips":55,"backDMaxRun":2.955,"backDTotal":174.6,"jumps":0,"jumpMax":0,"offMaxDeg":180,"restOffMaxDeg":180,"shortSwap":0} (41s)
+      ✗ fwd->reverse flips in D+gas: 55 (porch(25,16,se,-1) (25.56,15.96,se) v3.26->-1.20)
+      ✗ backward in D+gas run 2.95t > 0.25 (total 174.6t; porch(34,16,nw,1) to (36.95,16.00,nw) run 2.95t)
+      ✗ heading off sprite 180deg > 60
+FAIL  edge      dt=0.0166667 {"runs":109,"snap04":23,"flips":4,"backDMaxRun":2.155,"backDTotal":32.2,"jumps":0,"jumpMax":0,"offMaxDeg":83,"restOffMaxDeg":83,"shortSwap":0,"ends":{"spawnW-x24-steer-1":[27.07,5.04,"ne"],"spawnW-x30-steer-1":[33.11,5.04,"ne"],"spawnW-x30-steer1":[32.44,6.05,"se"],"spawnW-x22-steer1":[22.02,6,"sw"],"spawnW-x22-steer-1":[25.09,5.04,"ne"]}} (2s)
+      ✗ 1-frame snap >0.4q: 23 (spawnW-x22-steer1 (22.02,6.00) se->sw 90deg v5.17->0.00)
+      ✗ fwd->reverse flips in D+gas: 4 (y6(22,se)1 (25.45,6.05,se) v5.00->-1.20)
+      ✗ backward in D+gas run 2.15t > 0.25 (total 32.2t; y6(24,se)1 to (24.04,6.00,se) run 2.15t)
+FAIL  esc2      dt=0.0166667 {"porch":{"guStopped":110,"trapped":30},"cactus":{"guStopped":105,"trapped":24}} (90s)
+      ✗ porch GU-stop TRAPPED 30 (26,17,se) s=-1 (26,17,se) s=1 (27,17,se) s=-1
+      ✗ cactus GU-stop TRAPPED 24 (30,16,nw) s=-1 (28,18,nw) s=1 (29,18,nw) s=1
+PASS  h1        dt=0.1       {"runs":816,"autoTurn":0,"swapLat":0} (2s)
+FAIL  escsteer  dt=0.0166667 {"porch":{"runs":146,"stuck":146,"freedBySteerOnly":94,"neededR":52,"trapped":14,"needREx":["(26,16,se) s=1 stuck@(24.05,16.00) steer-only 0.06t","(25,17,sw) s=-1 stuck@(25.00,16.96) steer-only 0.04t","(25,17,sw) s=1 stuck@(25.00,16.96) steer-only 0.04t"]},"cactus":{"runs":128,"stuck":128,"freedBySteerOnly":64,"neededR":64,"trapped":7,"needREx":["(23,12,se) s=-1 stuck@(22.58,12.00) steer-only 0.02t","(23,12,se) s=1 stuck@(22.58,12.00) steer-only 0.02t","(23,12,sw) s=-1 stuck@(23.00,11.55) steer-only 0.42t"]},"needRPct":42.3} (74s)
+      ✗ porch TRAPPED (R battery too) 14 (25,17,sw) s=-1 (25,17,sw) s=1 (26,17,se) s=-1
+      ✗ cactus TRAPPED (R battery too) 7 (30,16,nw) s=-1 (25,17,sw) s=-1 (25,17,sw) s=1
+      ✗ steering out (no R) fails in 116/274 stuck cases = 42% > 10%
+PASS  honest    dt=0.1       {"frames":14160,"honestPct":99.98,"maxErr":0.148,"overlap":0,"wide35":0} (6s)
+PASS  park      dt=0.1       {"23,7":{"arrived":1.5,"end":[23,6.58],"maxOverlap":0},"bain":{"arrived":13.8,"end":[43.39,26],"maxOverlap":0,"parkToDoor":4},"volaris":{"arrived":24.9,"end":[39,40.36],"maxOverlap":0,"parkToDoor":4},"22,18":{"arrived":null,"end":[24,15.61],"maxOverlap":0}} (0s)
+FAIL  h3b       dt=0.1       {"porch":{"runs":148,"shuttle15":0,"dead":148,"velBad":0},"cactus":{"runs":132,"shuttle15":0,"dead":132,"velBad":0}} (29s)
+      ✗ porch dead stops 148/148 (25,16,se) s=-1 10.4s at (24.04,15.96)
+      ✗ cactus dead stops 132/132 (23,12,se) s=-1 11.6s at (22.55,12.00)
+FAIL  swapq     dt=0.1       {"D1":{"swaps":6,"swapFrameQ":0.33,"plainYawQ":0.116,"excessQ":0.213,"speedRatio":[0,0]},"D-1":{"swaps":6,"swapFrameQ":0.33,"plainYawQ":0.116,"excessQ":0.213,"speedRatio":[0,0]},"R1":{"swaps":6,"swapFrameQ":0.351,"plainYawQ":0.086,"excessQ":0.265,"speedRatio":[0,0]},"R-1":{"swaps":6,"swapFrameQ":0.351,"plainYawQ":0.086,"excessQ":0.265,"speedRatio":[0,0]}} (0s)
+      ✗ D1 swap heading jump 0.33q = 0.21q beyond plain yaw > 0.1
+      ✗ D1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+      ✗ D-1 swap heading jump 0.33q = 0.21q beyond plain yaw > 0.1
+      ✗ D-1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+      ✗ R1 swap heading jump 0.35q = 0.26q beyond plain yaw > 0.1
+      ✗ R1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+      ✗ R-1 swap heading jump 0.35q = 0.26q beyond plain yaw > 0.1
+      ✗ R-1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+PASS  ov        dt=0.1       {"overlapRuns":0} (66s)
+FAIL  monkey    dt=0.1       {"seeds":60,"boxed30s":5,"guPct":27.4,"snap06":443,"snap04":434,"flips":29,"backDMaxRun":2.485,"backDTotal":204.2,"jumps":0,"jumpMax":0,"offMaxDeg":165,"restOffMaxDeg":165,"shortSwap":0} (18s)
+      ✗ seeds boxed 30 s (<1.5t) 5/60 seed39 t=5 at (24.3,4.1) seed47 t=56 at (2.0,18.7) seed52 t=65 at (17.9,18.0)
+      ✗ escapeGaveUp share 27.4%
+      ✗ 1-frame sprite turns >0.6q 443
+      ✗ 1-frame snap >0.4q: 434 (seed1 (22.93,6.07) se->ne -83deg v0.00->0.16)
+      ✗ fwd->reverse flips in D+gas: 29 (seed3 (20.43,3.46,nw) v1.20->-0.90)
+      ✗ backward in D+gas run 2.48t > 0.25 (total 204.2t; seed48 to (24.04,15.95,se) run 2.48t)
+      ✗ heading off sprite 165deg > 60
+      ✗ at-rest heading off sprite 165deg (seed28 (41.10,0.95,se) h1.83)
+FAIL  turn      dt=0.1       {"runs":12084,"g10Clean":11320,"g10Pct":93.7,"interior":"1857/2134","turn90bDone":4966,"turnPct":41.1,"GU":7118,"snapGU":5747,"hardGU":3890,"snap04":4449,"flips":491,"backDMaxRun":2.7,"backDTotal":1128,"jumps":0,"jumpMax":0,"offMaxDeg":63,"restOffMaxDeg":41,"shortSwap":0} (48s)
+      ✗ turn90b completed 41.1% < 80%
+      ✗ snap at GU onset 5747
+      ✗ GU stop from >3 t/s 3890
+      ✗ 1-frame snap >0.4q: 4449 (turn(2,2,se,-1) (3.67,2.00) se->ne -90deg v5.18->0.00)
+      ✗ fwd->reverse flips in D+gas: 491 (turn(24,4,sw,1) (23.64,7.36,sw) v2.75->-1.20)
+      ✗ backward in D+gas run 2.70t > 0.25 (total 1128.0t; turn(4,58,ne,-1) to (3.47,56.97,ne) run 2.70t)
+PASS  trap      dt=0.1       {"natural":6,"naturalTrapped":0,"monkeyStates":6,"monkeyTrapped":0} (2s)
+FAIL  shuttle   dt=0.1       {"porch":{"runs":148,"shuttle3":0,"worstS":0},"cactus":{"runs":132,"shuttle3":0,"worstS":0},"edge":{"runs":178,"shuttle3":0,"worstS":0},"snap04":17,"flips":8,"backDMaxRun":2.96,"backDTotal":176.6,"jumps":0,"jumpMax":0,"offMaxDeg":180,"restOffMaxDeg":180,"shortSwap":0} (44s)
+      ✗ fwd->reverse flips in D+gas: 8 (porch(28,19,sw,-1) (28.03,19.35,sw) v2.55->-1.20)
+      ✗ backward in D+gas run 2.96t > 0.25 (total 176.6t; porch(34,16,nw,1) to (36.96,16.00,nw) run 2.96t)
+      ✗ heading off sprite 180deg > 60
+FAIL  edge      dt=0.1       {"runs":109,"snap04":17,"flips":3,"backDMaxRun":2.16,"backDTotal":35.3,"jumps":0,"jumpMax":0,"offMaxDeg":81,"restOffMaxDeg":81,"shortSwap":0,"ends":{"spawnW-x24-steer-1":[27.55,5.04,"ne"],"spawnW-x30-steer-1":[33.76,5.04,"ne"],"spawnW-x30-steer1":[32.98,6.05,"se"],"spawnW-x22-steer1":[22.19,6,"sw"],"spawnW-x22-steer-1":[25.48,5.04,"ne"]}} (4s)
+      ✗ 1-frame snap >0.4q: 17 (spawnW-x22-steer1 (22.19,6.00) se->sw 90deg v5.17->0.00)
+      ✗ fwd->reverse flips in D+gas: 3 (y6(22,se)1 (25.29,6.05,se) v1.92->-1.20)
+      ✗ backward in D+gas run 2.16t > 0.25 (total 35.3t; y6(24,se)1 to (24.03,6.00,se) run 2.16t)
+FAIL  escsteer  dt=0.1       {"porch":{"runs":146,"stuck":146,"freedBySteerOnly":40,"neededR":106,"trapped":76,"needREx":["(25,16,se) s=-1 stuck@(24.04,15.96) steer-only 0.08t","(25,16,se) s=1 stuck@(24.04,16.04) steer-only 0.01t","(26,16,se) s=-1 stuck@(24.04,16.00) steer-only 0.04t"]},"cactus":{"runs":128,"stuck":128,"freedBySteerOnly":29,"neededR":99,"trapped":66,"needREx":["(23,12,se) s=-1 stuck@(22.55,12.00) steer-only 0.01t","(23,12,se) s=1 stuck@(22.55,12.00) steer-only 0.01t","(23,12,sw) s=-1 stuck@(23.00,11.55) steer-only 0.01t"]},"needRPct":74.8} (134s)
+      ✗ porch TRAPPED (R battery too) 76 (26,16,se) s=1 (25,17,se) s=-1 (25,17,se) s=1
+      ✗ cactus TRAPPED (R battery too) 66 (23,12,se) s=-1 (23,12,se) s=1 (23,12,sw) s=-1
+      ✗ steering out (no R) fails in 205/274 stuck cases = 75% > 10%
+PASS  ov        dt=0.25      {"overlapRuns":0} (75s)
+PASS  h1        dt=0.25      {"runs":816,"autoTurn":0,"swapLat":0} (2s)
+PASS  honest    dt=0.25      {"frames":5664,"honestPct":100,"maxErr":0,"overlap":0,"wide35":0} (7s)
+FAIL  park      dt=0.25      {"23,7":{"arrived":2.3,"end":[23,6.56],"maxOverlap":0},"bain":{"arrived":14.3,"end":[43.4,26],"maxOverlap":0,"parkToDoor":4},"volaris":{"arrived":26,"end":[39,40.39],"maxOverlap":0,"parkToDoor":4},"22,18":{"arrived":null,"end":[24,15.6],"maxOverlap":0}} (0s)
+      ✗ 23,7 arrival 2.3s > 2s (end 23,6.56)
+FAIL  esc2      dt=0.1       {"porch":{"guStopped":81,"trapped":49},"cactus":{"guStopped":74,"trapped":33}} (152s)
+      ✗ porch GU-stop TRAPPED 49 (26,16,se) s=1 (32,17,nw) s=1 (33,17,nw) s=1
+      ✗ cactus GU-stop TRAPPED 33 (24,12,sw) s=-1 (24,13,sw) s=-1 (21,14,se) s=-1
+FAIL  swapq     dt=0.25      {"D1":{"swaps":4,"swapFrameQ":0.178,"plainYawQ":0.291,"excessQ":0,"speedRatio":[0,0]},"D-1":{"swaps":4,"swapFrameQ":0.178,"plainYawQ":0.291,"excessQ":0,"speedRatio":[0,0]},"R1":{"swaps":4,"swapFrameQ":0.325,"plainYawQ":0.215,"excessQ":0.11,"speedRatio":[0,0]},"R-1":{"swaps":4,"swapFrameQ":0.325,"plainYawQ":0.215,"excessQ":0.11,"speedRatio":[0,0]}} (0s)
+      ✗ D1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+      ✗ D-1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+      ✗ R1 swap heading jump 0.32q = 0.11q beyond plain yaw > 0.1
+      ✗ R1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+      ✗ R-1 swap heading jump 0.32q = 0.11q beyond plain yaw > 0.1
+      ✗ R-1 swap speed ratio 0.00..0.00 outside 0.85..1.2
+FAIL  h3b       dt=0.25      {"porch":{"runs":148,"shuttle15":0,"dead":148,"velBad":0},"cactus":{"runs":132,"shuttle15":0,"dead":132,"velBad":0}} (38s)
+      ✗ porch dead stops 148/148 (25,16,se) s=-1 10.3s at (24.04,15.96)
+      ✗ cactus dead stops 132/132 (23,12,se) s=-1 11.5s at (22.55,12.00)
+FAIL  monkey    dt=0.25      {"seeds":60,"boxed30s":6,"guPct":23.2,"snap06":329,"snap04":147,"flips":28,"backDMaxRun":5.891,"backDTotal":215.4,"jumps":0,"jumpMax":0,"offMaxDeg":173,"restOffMaxDeg":173,"shortSwap":0} (27s)
+      ✗ seeds boxed 30 s (<1.5t) 6/60 seed11 t=57 at (9.1,16.4) seed16 t=64 at (23.0,13.8) seed40 t=33 at (24.0,14.7)
+      ✗ escapeGaveUp share 23.2%
+      ✗ 1-frame sprite turns >0.6q 329
+      ✗ 1-frame snap >0.4q: 147 (seed2 (22.18,2.11) nw->ne 142deg v-3.18->0.00)
+      ✗ fwd->reverse flips in D+gas: 28 (seed1 (21.84,13.97,se) v1.20->-0.55)
+      ✗ backward in D+gas run 5.89t > 0.25 (total 215.4t; seed54 to (37.44,18.78,sw) run 5.89t)
+      ✗ heading off sprite 173deg > 60
+      ✗ at-rest heading off sprite 173deg (seed28 (30.17,0.95,se) h1.92)
+FAIL  turn      dt=0.25      {"runs":12084,"g10Clean":10168,"g10Pct":84.1,"interior":"1702/2134","turn90bDone":5644,"turnPct":46.7,"GU":6440,"snapGU":4978,"hardGU":3745,"snap04":0,"flips":593,"backDMaxRun":2.64,"backDTotal":1075.6,"jumps":0,"jumpMax":0,"offMaxDeg":68,"restOffMaxDeg":61,"shortSwap":0} (52s)
+      ✗ turn90b completed 46.7% < 80%
+      ✗ snap at GU onset 4978
+      ✗ GU stop from >3 t/s 3745
+      ✗ fwd->reverse flips in D+gas: 593 (turn(24,4,sw,1) (23.64,7.06,sw) v1.60->-1.20)
+      ✗ backward in D+gas run 2.64t > 0.25 (total 1075.6t; turn(36,6,nw,-1) to (36.97,6.00,nw) run 2.64t)
+PASS  trap      dt=0.25      {"natural":6,"naturalTrapped":0,"monkeyStates":6,"monkeyTrapped":0} (2s)
+FAIL  shuttle   dt=0.25      {"porch":{"runs":148,"shuttle3":0,"worstS":0},"cactus":{"runs":132,"shuttle3":0,"worstS":0},"edge":{"runs":178,"shuttle3":0,"worstS":0},"snap04":0,"flips":3,"backDMaxRun":2.96,"backDTotal":194.8,"jumps":0,"jumpMax":0,"offMaxDeg":180,"restOffMaxDeg":180,"shortSwap":0} (99s)
+      ✗ fwd->reverse flips in D+gas: 3 (porch(29,22,ne,-1) (28.04,19.86,ne) v4.40->-0.83)
+      ✗ backward in D+gas run 2.96t > 0.25 (total 194.8t; porch(34,16,nw,1) to (36.96,16.00,nw) run 2.96t)
+      ✗ heading off sprite 180deg > 60
+FAIL  edge      dt=0.25      {"runs":109,"snap04":0,"flips":3,"backDMaxRun":2.92,"backDTotal":39.3,"jumps":0,"jumpMax":0,"offMaxDeg":79,"restOffMaxDeg":79,"shortSwap":0,"ends":{"spawnW-x24-steer-1":[27.76,5,"ne"],"spawnW-x30-steer-1":[34.23,5,"ne"],"spawnW-x30-steer1":[33.13,6.05,"se"],"spawnW-x22-steer1":[22.97,6,"sw"],"spawnW-x22-steer-1":[26.47,5,"ne"]}} (4s)
+      ✗ fwd->reverse flips in D+gas: 3 (y6(22,se)1 (25.00,6.01,se) v1.35->-1.20)
+      ✗ backward in D+gas run 2.92t > 0.25 (total 39.3t; y6(24,se)1 to (24.05,6.00,se) run 2.92t)
+FAIL  escsteer  dt=0.25      {"porch":{"runs":146,"stuck":146,"freedBySteerOnly":100,"neededR":46,"trapped":11,"needREx":["(26,16,se) s=1 stuck@(24.04,16.00) steer-only 0.07t","(25,17,sw) s=-1 stuck@(25.00,16.96) steer-only 0.00t","(25,17,sw) s=1 stuck@(25.00,16.96) steer-only 0.00t"]},"cactus":{"runs":128,"stuck":128,"freedBySteerOnly":77,"neededR":51,"trapped":7,"needREx":["(23,12,se) s=-1 stuck@(22.55,12.00) steer-only 0.38t","(23,12,se) s=1 stuck@(22.55,12.00) steer-only 0.38t","(22,13,se) s=-1 stuck@(21.55,13.00) steer-only 1.40t"]},"needRPct":35.4} (159s)
+      ✗ porch TRAPPED (R battery too) 11 (25,17,sw) s=-1 (25,17,sw) s=1 (26,17,sw) s=-1
+      ✗ cactus TRAPPED (R battery too) 7 (30,16,nw) s=-1 (25,17,sw) s=-1 (25,17,sw) s=1
+      ✗ steering out (no R) fails in 97/274 stuck cases = 35% > 10%
+FAIL  esc2      dt=0.25      {"porch":{"guStopped":63,"trapped":39},"cactus":{"guStopped":63,"trapped":30}} (184s)
+      ✗ porch GU-stop TRAPPED 39 (26,16,se) s=1 (32,17,nw) s=1 (33,17,sw) s=-1
+      ✗ cactus GU-stop TRAPPED 30 (24,12,sw) s=-1 (24,13,sw) s=-1 (21,14,se) s=-1
+
+## Summary (check × dt)
+| check | dt 0.0166667 | dt 0.1 | dt 0.25 |
+|---|---|---|---|
+| ov | PASS | PASS | PASS |
+| h1 | PASS | PASS | PASS |
+| h3b | FAIL(2) | FAIL(2) | FAIL(2) |
+| honest | PASS | PASS | PASS |
+| park | PASS | PASS | FAIL(1) |
+| turn | FAIL(6) | FAIL(6) | FAIL(5) |
+| swapq | FAIL(8) | FAIL(8) | FAIL(6) |
+| monkey | FAIL(8) | FAIL(8) | FAIL(8) |
+| esc2 | FAIL(2) | FAIL(2) | FAIL(2) |
+| escsteer | FAIL(3) | FAIL(3) | FAIL(3) |
+| trap | PASS | PASS | PASS |
+| shuttle | FAIL(3) | FAIL(3) | FAIL(3) |
+| edge | FAIL(3) | FAIL(3) | FAIL(2) |
+
+RESULT: FAIL — 25/39 check×dt cells fail
+exit 1

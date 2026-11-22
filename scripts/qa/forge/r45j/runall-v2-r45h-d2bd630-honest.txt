@@ -1,0 +1,46 @@
+fatal: not a git repository (or any of the parent directories): .git
+# Forge run-all (r45k rev.) — repo /tmp/sent-r45k/src-d2bd630 @ ? — dt 0.0166667, 0.1, 0.25 — 2 checks — 2026-11-22T14:47:49.889Z
+FAIL  honest     dt=0.1       {"frames":14160,"hudPct":96.68,"overlap":0,"wide35Both":6,"info_wide35Pre":682,"info_velHonestPre":33.26,"info_velHonestPost":31.78} (4s)
+      ✗ HUD mph within ±1 of real displacement in only 96.68% of frames
+      ✗ motion >35deg off both pre- and end-of-frame sprite: 6 frames (26.30,22.47,nw)->(26.04,22.69,nw) 0.329t
+FAIL  honest     dt=0.0166667 {"frames":84960,"hudPct":97.43,"overlap":0,"wide35Both":0,"info_wide35Pre":0,"info_velHonestPre":61.95,"info_velHonestPost":61.95} (5s)
+      ✗ HUD mph within ±1 of real displacement in only 97.43% of frames
+FAIL  honest     dt=0.25      {"frames":5664,"hudPct":62.5,"overlap":32,"wide35Both":13,"info_wide35Pre":623,"info_velHonestPre":28.95,"info_velHonestPost":29.94} (5s)
+      ✗ HUD mph within ±1 of real displacement in only 62.5% of frames
+      ✗ overlap frames (oracle) 32
+      ✗ motion >35deg off both pre- and end-of-frame sprite: 13 frames (10.00,16.85,sw)->(9.86,16.69,sw) 0.210t
+FAIL  h3b        dt=0.1       {"porch":{"runs":148,"shuttle15":59,"dead":4,"hudBad":1483,"info_velBadPreFrame":"6365/17908"},"cactus":{"runs":132,"shuttle15":59,"dead":6,"hudBad":1507,"info_velBadPreFrame":"5090/15972"}} (14s)
+      ✗ porch shuttle(1.5 box) 59/148 (25,16,se) s=1 7.4s
+      ✗ porch dead stops 4/148 (28,22,se) s=-1 12.0s at (27.97,22.04)
+      ✗ porch HUD mph off the real displacement in 1483/17908 frames
+      ✗ cactus shuttle(1.5 box) 59/132 (23,12,sw) s=-1 8.4s
+      ✗ cactus dead stops 6/132 (24,16,sw) s=-1 12.0s at (24.00,15.96)
+      ✗ cactus HUD mph off the real displacement in 1507/15972 frames
+FAIL  h3b        dt=0.0166667 {"porch":{"runs":148,"shuttle15":58,"dead":4,"hudBad":10899,"info_velBadPreFrame":"27543/106560"},"cactus":{"runs":132,"shuttle15":59,"dead":6,"hudBad":10667,"info_velBadPreFrame":"23232/95040"}} (17s)
+      ✗ porch shuttle(1.5 box) 58/148 (25,16,se) s=1 7.5s
+      ✗ porch dead stops 4/148 (28,22,se) s=-1 12.0s at (27.97,22.04)
+      ✗ porch HUD mph off the real displacement in 10899/106560 frames
+      ✗ cactus shuttle(1.5 box) 59/132 (23,12,sw) s=-1 8.2s
+      ✗ cactus dead stops 6/132 (24,16,sw) s=-1 12.0s at (24.00,15.96)
+      ✗ cactus HUD mph off the real displacement in 10667/95040 frames
+FAIL  h3b        dt=0.25      {"porch":{"runs":148,"shuttle15":56,"dead":8,"hudBad":2450,"info_velBadPreFrame":"4025/7104"},"cactus":{"runs":132,"shuttle15":62,"dead":12,"hudBad":1978,"info_velBadPreFrame":"3152/6336"}} (14s)
+      ✗ porch shuttle(1.5 box) 56/148 (25,16,se) s=1 7.5s
+      ✗ porch dead stops 8/148 (33,19,nw) s=-1 10.8s at (29.30,20.82)
+      ✗ porch HUD mph off the real displacement in 2450/7104 frames
+      ✗ cactus shuttle(1.5 box) 62/132 (23,12,sw) s=-1 8.3s
+      ✗ cactus dead stops 12/132 (21,14,se) s=-1 11.3s at (22.54,13.59)
+      ✗ cactus HUD mph off the real displacement in 1978/6336 frames
+
+## Summary (check × dt)
+| check | dt 0.0166667 | dt 0.1 | dt 0.25 | once | var |
+|---|---|---|---|---|---|
+| h3b | FAIL(6) | FAIL(6) | FAIL(6) | - | - |
+| honest | FAIL(1) | FAIL(2) | FAIL(3) | - | - |
+
+RESULT: FAIL — 6/6 cells fail
+dt=0.0166667 frames=84960 hudHonest=97.43% overlap=0 wide35Both=0 | info: velHonestPreFrame=61.95% maxErrPre=2.413 wide35Pre=0
+exit 1
+dt=0.1 frames=14160 hudHonest=96.68% overlap=0 wide35Both=6 | info: velHonestPreFrame=33.26% maxErrPre=4.013 wide35Pre=682
+exit 1
+dt=0.25 frames=5664 hudHonest=62.50% overlap=32 wide35Both=13 | info: velHonestPreFrame=28.95% maxErrPre=4.838 wide35Pre=623
+exit 1

@@ -18,9 +18,11 @@
  *   G7 per-frame displacement ≤ max(0.35, 1.6·|v|·dt + 0.08)
  *   G8 no sprite rotation of 90° or more with < 0.3 tiles of travel since the previous facing
  *   G9 no driving frame whose 5×3 / 3×5 footprint overlaps a blocked cell
- *   G10 from spawn, 0.5 s straight then full steer: a 90° turn completes with no stop
- *      longer than 0.5 s, and no frame yaws more than 0.3 quarter-turns. Both steer
- *      sides are tried; at least 75% must finish.
+ *   G10 turn at speed from a site fixed by Forge (r45k): get in at spawn, tap R and hold gas 1.0 s
+ *      (backs to x≈15.4–16.6 on the y≈6 street, where both quarter arcs are clear on the frozen map),
+ *      tap D, then 0.5 s straight and full steer. A 90° turn completes with no stop longer than 0.5 s
+ *      and no frame yaws more than 0.3 quarter-turns. BOTH sides must pass. The start pose must be
+ *      inside x 14.5–18.6, y 5.5–6.6, facing se, or the attempt fails.
  *
  * The approach to a prop reads the pose to steer. Every steer change is appended to `reroutes`.
  *
@@ -972,13 +974,24 @@ async function runViewport(browser, kind) {
     await s.ctx.close();
   }
 
-  // G10: spawn, 0.5 s straight, then full steer. Both sides. A finished 90° turn
-  // does not stop, and the sprite does not yaw a third of a turn in one frame.
+  // G10 (site fixed by Forge for r45k, not chosen by the fix agent): back up from spawn to the open
+  // stretch x≈16 of the y≈6 street (both quarter arcs clear on the frozen map at x 15–18), then
+  // 0.5 s straight and full steer. Both sides must finish a 90° turn with no stop and no frame
+  // yawing a third of a turn. At the old site (from spawn) the right arc hits the walled kerb.
   {
     const attempts = [];
     for (const side of ['right', 'left']) {
       const s = await newSession(browser, kind);
       await realGetIn(s.page, s.input, s.aim);
+      await realTapSelector(s.page, s.input, '[data-jac="gear"][data-val="R"]');
+      await s.page.waitForTimeout(350);
+      if (touch) await holdStick(s.page, s.input, { x: 0, y: -1 }, 1000);
+      else await holdKeys(s.page, ['up'], 1000);
+      await s.page.waitForTimeout(300);
+      await realTapSelector(s.page, s.input, '[data-jac="gear"][data-val="D"]');
+      await s.page.waitForTimeout(350);
+      const start = await s.page.evaluate(() => window.__playtestQa.jac());
+      const startOk = start.cx >= 14.5 && start.cx <= 18.6 && start.cy >= 5.5 && start.cy <= 6.6 && start.dir === 'se' && start.gear === 'D';
       await startSampling(s.page);
       if (touch) await holdStick(s.page, s.input, { x: 0, y: -1 }, 500);
       else await holdKeys(s.page, ['up'], 500);
@@ -989,7 +1002,7 @@ async function runViewport(browser, kind) {
       all.push(r.samples);
       spawnSeq.push(r.samples);
       const rep = turnAtSpeed(r.samples);
-      attempts.push({ side, ...rep, ok: rep.turned >= 0.9 && rep.stopMs < 500 && rep.maxDh <= 0.3 });
+      attempts.push({ side, start: [+start.cx.toFixed(2), +start.cy.toFixed(2), start.dir, start.gear], startOk, ...rep, ok: startOk && rep.turned >= 0.9 && rep.stopMs < 500 && rep.maxDh <= 0.3 });
       await shot(s.page, `${tag}-g10-${side}`);
       errors.push(...s.errors);
       await s.ctx.close();
@@ -1267,7 +1280,7 @@ async function runViewport(browser, kind) {
         : `0 overlapping driving frames of ${res.stats.drivingFrames}`,
     },
     G10: {
-      pass: (res.runs.g10?.of ?? 0) > 0 && res.runs.g10.done / res.runs.g10.of >= 0.75,
+      pass: (res.runs.g10?.of ?? 0) === 2 && res.runs.g10.done === 2,
       detail: `turn-at-speed ${res.runs.g10?.done ?? 0}/${res.runs.g10?.of ?? 0} ${JSON.stringify(res.runs.g10?.attempts ?? [])}`,
     },
   };
