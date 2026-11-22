@@ -10,9 +10,9 @@
 - Never commit screenshots, videos, `dist/` or QA output. Keep them in `/tmp`.
 - **Frozen paths. Your final diff against `5a265621` must be empty for:**
   - `src/data/**` (map, props, cells, doors, park sites);
-  - the QA hooks `qaSpawnDrive`, `qaPlace`, `snapshot` and `window.__playtestQa` (signatures and behaviour);
+  - the QA hooks `qaSpawnDrive`, `qaPlace`, `snapshot` and `window.__playtestQa` (signatures and behaviour). **One allowed exception: H-1 in §6** (`reverseCue` in `snapshot()`), which you must make;
   - `scripts/qa/**` **except** the exact contents brought in from `origin/qa/forge-gates-r45j` in §1. After your last commit, `git diff origin/qa/forge-gates-r45j -- scripts/qa` must be empty and `git diff 5a265621 -- src/data` must be empty. Forge checks both.
-- **Gates are Forge's.** You do not edit any gate: no thresholds, metrics, sampling, axes, inputs or test coordinates. That includes G10: its site is already fixed by Forge in `scripts/qa/drive-real.mjs` (reverse 1 s back to x≈15–17 on the y≈6 street, then straight + steer). If you believe a gate is wrong, stop and say so in the PR body with numbers. Do not change it.
+- **Gates are Forge's.** You do not edit any gate: no thresholds, metrics, sampling, axes, inputs or test coordinates. That includes G10: its site is already fixed by Forge in `scripts/qa/drive-real.mjs` (reverse in closed loop until cx ≤ 16.3 on the y≈6 street, then 0.5 s straight + 2.8 s full steer; judged by G-E, §6). If you believe a gate is wrong, stop and say so in the PR body with numbers. Do not change it.
   - Note: the r45j fix agent edited `scripts/qa/sentinel-r45h/honest.mjs` and `h3b.mjs` (moved the axis to the end-of-frame sprite, which made the velocity check tautological). That edit is **reverted** on the gate branch. Doing anything like it again fails the round.
 - Collision in the gates is judged by an **independent oracle** (`scripts/qa/forge/oracle.mjs` + `frozen-drive-grid.json`, frozen from `5a265621` `src/data`), not by `poseBlocked`. The `oracle` check also fails if the build's walkable grid or `poseBlocked` disagree with it.
 - Do not force the reported `vel` or the HUD to satisfy a gate. The HUD is checked against the truck's **real** frame displacement.
@@ -100,7 +100,7 @@ Gate `escsteer` (amended G-C, see §6): stuck cases (6 s gas+steer into porch/ca
 5. Frame displacement ≤1.1·TOP·dt + 0.05 t (`jumps` 0). No lateral relocation on swap (`h1 swapLat` ≤0.05).
 6. Never overlap a blocked cell or prop at the end of a frame (oracle; `ov`, `honest`, all monitors).
 7. HUD mph equals the mph of the real displacement (±1) in ≥99 % of frames (`honest`, `h3b`, park routes). No motion >35° off **both** the pre-frame and end-of-frame sprite (`honest` wide35Both 0).
-8. Shuttles (amended G-B): 0 runs boxed in 1.5 t for 3 s that go back and forth (path − net ≥0.5 t) while gas is held (`h3b`, `shuttle`). Dead stops (amended G-A): 0 stretches ≥0.5 s still, not yawing and without the R cue, and 0 stretches ≥1.5 s still without the R cue even while yawing; R cue never shown ≥0.3 s where D1 allows the in-place swap to the steering side (`cueUnjustified` 0) (`h3b`).
+8. Shuttles (amended G-B): 0 runs boxed in 1.5 t for 3 s that go back and forth (path − net ≥0.5 t) while gas is held (`h3b`, `shuttle`). Dead stops (amended G-A): 0 stretches ≥0.5 s still, not yawing and without the R cue, and 0 stretches ≥1.0 s still without the R cue even while yawing; R cue never shown ≥0.3 s where D1 allows the in-place swap to the steering side (`cueUnjustified` 0) (`h3b`).
 9. Turn at speed: G10 and turn90b **≥98 % on the 6393 arc-legal poses at every dt** (all-pose figures are information). 0 snaps at give-up, 0 hard stops (`turn`).
 10. Partial steering ±0.25/0.5/0.707/0.9 on arc-legal poses: same monitor rules; left/right turn completion symmetric within 3 points for |steer| ≥0.5 (`partial`).
 11. Brake+steer at rest (D and R): heading stays within 0.62 q of the sprite and every monitor rule holds (`brakesteer`).
@@ -160,7 +160,7 @@ Forge/Sentinel re-run all of it on your pushed commit; their run is the verdict.
 Build: `npm ci && npm run build:preview-integracion && npx vite preview --port 8747 --strictPort &`. URL: `http://127.0.0.1:8747/interactive-portfolio-playtest/preview-integracion/`. Use swiftshader GL.
 1. `node scripts/qa/forge/run-all.mjs --jobs 6 --json /tmp/runall.json`: **exit 0**, all 53 cells PASS. Paste the whole stdout including the summary table.
 2. `git diff origin/qa/forge-gates-r45j -- scripts/qa` and `git diff 5a265621 -- src/data`: both empty (paste the commands and their empty output).
-3. `QA_GL=swiftshader QA_BASE_URL=<url> QA_OUT_DIR=/tmp/dr node scripts/qa/drive-real.mjs`: **G1–G10 PASS at 1440 and 375** (G10 at the Forge-fixed site; do not edit it).
+3. `QA_GL=swiftshader QA_BASE_URL=<url> QA_OUT_DIR=/tmp/dr node scripts/qa/drive-real.mjs`: **G1–G10 PASS at 1440 and 375** (G2 with G-F, G10 with G-E; `cueHook=true` must appear in the G2 line; do not edit the gate).
 4. `node scripts/qa/forge/forge-drive-real.mjs 1440 <url> /tmp/fdr` and `… 375 …`: PASS/PASS.
 5. Browser HIGH-1/2 repro, both sizes:
    - `for s in A B F G H D E; do SC=$s node scripts/qa/forge/r45j/turnprobe.mjs <vp> <url> /tmp/tp; done`
@@ -168,7 +168,7 @@ Build: `npm ci && npm run build:preview-integracion && npx vite preview --port 8
    - Required: longest backward run in D with gas held ≤0.1 t in every scenario; H never flips the vel sign. Paste the per-file lines.
 6. `node scripts/qa/forge/r45j/park4.mjs <vp> <url> /tmp/p4` at 1440 and 375:
    - (23,7) 5/5;
-   - (22,18): first toast at **≤500 ms** (the `toasts` entry) and the truck does not move;
+   - (22,18): `toastGate.pass` true: pointerup → toast text ≤500 ms (MutationObserver), text "No se puede llegar", the truck does not move, the toast becomes visible (the `toasts` opacity time is info only);
    - Bain and Volaris cards open.
 7. 0 console errors in all browser runs.
 
@@ -184,13 +184,17 @@ Build: `npm ci && npm run build:preview-integracion && npx vite preview --port 8
 | **I-3** | HIGH | Trap at (17.8, 19.0) (monkey dt 0.25 seed17; R battery frees only 0.10 t): a 0.02–0.1 t lateral slide puts `cx < 17.95`, the sw box grows from x 17..19 to x 16..19 and wedges between (16,16) and (16,22). Same spot as r45j's low-FPS trap. | A slide may not end in a pose from which reversing along its own axis is blocked when it was not blocked before the slide (reject or shorten that slide). | `monkey` boxed (G-D), `trap` |
 | **I-4** | LOW | The R cue flashes for one frame before a rolling swap lands (3/28/15 runs by dt). | Compute the cue after the frame's swap decision (falls out of I-2). | cosmetic; `cueUnjustified` tolerates <0.3 s |
 
-**Recommended (not a gate):** in-place yaw at `CREEP_YAW` = 0.667 q/s takes 0.93 s to reach the 0.62 q cap, so the truck sits up to 1.1–1.25 s with no motion and no cue. Forge measured that `CREEP_YAW = TURN_RATE` (2.4 q/s) brings the longest still-without-cue stretch to 0.33 s on the same population. The gate accepts up to 1.5 s (G-A), but the faster yaw feels better and Forge may tighten that bar to ≤1.0 s in a later round.
+| **I-5** | MED | In-place yaw at `CREEP_YAW` = 0.667 q/s takes 0.93 s to reach the 0.62 q cap, so the truck sits 1.0–1.25 s with no motion and no R cue (h3b dead stops 26/12, 22/10, 31/37 by dt with the 1.0 s fallback; G10-left browser stop at (20.3,1.95); G2 window at (48.32,1.95) and the stop at (18.95,12.23,nw), neither a dead end). | `CREEP_YAW = TURN_RATE` (2.4 q/s): Forge and Sentinel measured 0 dead stops even with a 0.5 s fallback (longest still-without-cue 0.33 s). | `h3b` dead (G-A 1.0 s), drive-real G10 (G-E), G2 |
+| **H-1** | required | The browser gates G-E/G-F must see the R cue; `jacSnapshot()` does not expose it. | **Allowed QA-hook exception (the only one):** in `src/game/jacT9.ts` add `reverseCue: boolean;` to `type JacSnapshot` and `reverseCue: this.reverseCueOn,` to the object returned by `snapshot()` (after `toggles`). Nothing else in the hooks changes. | drive-real G2/G10 (`cueHook=true`) |
 
 **Amended gates (Forge, from Sentinel's ruling; already in `run-all.mjs`):**
-- **G-A `h3b` dead stop:** counts only stretches ≥0.5 s still (disp < 0.08·dt, |vel| < 0.2), not yawing (|Δheading| < 0.1·dt q) and with no R cue, or ≥1.5 s still with no R cue even while yawing. New `cueUnjustified` = 0: the R cue shown ≥0.3 s while the oracle says D1 allows the in-place swap to the steering side (box fits, ≥1.0 t free, ≥0.1 t since a real sprite change; entry is not a change). A build that shows R everywhere fails this.
+- **G-A `h3b` dead stop:** counts only stretches ≥0.5 s still (disp < 0.08·dt, |vel| < 0.2), not yawing (|Δheading| < 0.1·dt q) and with no R cue, or ≥**1.0 s** still with no R cue even while yawing (`THRESH.h3bStillNoCueS`; was 1.5 s, tightened by Sentinel's QA1 ruling). New `cueUnjustified` = 0: the R cue shown ≥0.3 s while the oracle says D1 allows the in-place swap to the steering side (box fits, ≥1.0 t free, ≥0.1 t since a real sprite change; entry is not a change). A build that shows R everywhere fails this.
 - **G-B `h3b` shuttle:** inside the 3 s / 1.5 t window, path − net displacement ≥0.5 t (a real back-and-forth). Arrive-and-stop no longer counts.
 - **G-C `escsteer`:** the 25 % needs-R bar is replaced by `needRUnjustified` = 0 (needs-R where a neighbour facet on either side fits with ≥1.0 t free and ≥0.1 t since a real change). R cue 100 % of needs-R and trapped 0 are kept. With I-1 fixed, ≈91–92 % of stuck states are genuine dead ends (nose flat against the obstacle, only the 180° facing free) — that is D1 working, not a failure.
 - **G-D `monkey`/`vardt` boxed 30 s:** counts only if the `trap` battery (R and D with ±steer) from the end of the boxed window also fails to move the truck ≥1.5 t.
+- **G-E drive-real G10 (QA1 ruling):** positioning in closed loop (R + gas until cx ≤ 16.3, cap 3 s); the 2.8 s steer is never cut. ≥0.9 q within 2.0 s of steer onset; before that crossing no gas+steer stop ≥500 ms; after it, full G-A (dead stop 0.5 s not yawing / 1.0 s still without cue; unjustified cue ≥0.3 s = 0); every sample |Δh| ≤ 2.4·min(dt,0.25)+0.05 q.
+- **G-F drive-real G2 (QA1 ruling):** a stuck 1.5 s window is excluded only if at its final pose the oracle says the nose is pinned, there is no legal swap toward the held-steer side, and the R cue was on ≥1.0 s of the window. Tree/cactus: if the contact pose is a true dead end, the R cue must show ≤0.5 s after contact and R may free it; otherwise "freed without R" stands. Excluded windows are listed in the G2 line.
+- **park4 (22,18) (QA1 ruling):** pointerup (window capture) → toast text (MutationObserver) ≤500 ms, text "No se puede llegar", no movement, toast visible at some point.
 - Unchanged: `inPlaceBad`, `shortSwap` and every other threshold — they are I-2.
 
-Expected after I-1..I-3: `run-all` exit 0 (53/53). §5 (browser gates) unchanged.
+Expected after I-1..I-3 + I-5 + H-1: `run-all` exit 0 (53/53) and §5 browser gates PASS at both sizes.

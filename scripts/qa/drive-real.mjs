@@ -18,11 +18,24 @@
  *   G7 per-frame displacement ≤ max(0.35, 1.6·|v|·dt + 0.08)
  *   G8 no sprite rotation of 90° or more with < 0.3 tiles of travel since the previous facing
  *   G9 no driving frame whose 5×3 / 3×5 footprint overlaps a blocked cell
- *   G10 turn at speed from a site fixed by Forge (r45k): get in at spawn, tap R and hold gas 1.0 s
- *      (backs to x≈15.4–16.6 on the y≈6 street, where both quarter arcs are clear on the frozen map),
- *      tap D, then 0.5 s straight and full steer. A 90° turn completes with no stop longer than 0.5 s
- *      and no frame yaws more than 0.3 quarter-turns. BOTH sides must pass. The start pose must be
- *      inside x 14.5–18.6, y 5.5–6.6, facing se, or the attempt fails.
+ *   G10 turn at speed from a site fixed by Forge (r45k), amended by G-E (Sentinel QA1 ruling): get in at
+ *      spawn, tap R and hold gas until cx ≤ 16.3 (closed loop, polled, cap 3 s), release, tap D, then
+ *      0.5 s straight and 2.8 s full steer (never cut short). Per side:
+ *        - start pose inside x 14.5–18.6, y 5.5–6.6, facing se, gear D;
+ *        - turned = |wrap(h − h_steerOnset)| first reaches ≥0.9 q within 2.0 s of steer onset;
+ *        - before that crossing: no gas+steer stop ≥500 ms (the pre-r45k rule);
+ *        - after it (to the end of the 2.8 s): full G-A semantics — no dead stop (still, not yawing, no R cue
+ *          ≥0.5 s; or still with no R cue ≥1.0 s) and no unjustified R cue (cue ≥0.3 s while the oracle says
+ *          the swap toward the held-steer side is legal, D1 1.0 t ahead);
+ *        - every sample in the window: |Δh| ≤ 2.4·min(dt, 0.25) + 0.05 q (gaps > 400 ms skipped).
+ *      BOTH sides must pass.
+ *   G2 (amended by G-F, Sentinel QA1 ruling): a stuck window is excluded only if, at its final pose, (a) the nose is
+ *      pinned by the oracle (no 0.25 t free along the sprite), (b) no legal swap toward the held-steer side (D1 1.0 t,
+ *      ≥0.1 t since a real sprite change), and (c) the R cue was on for ≥1.0 s of the 1.5 s window. Tree/cactus: if the
+ *      contact pose is a true dead end (pinned, no legal swap on either side), the R cue must appear ≤0.5 s after
+ *      the stop and R may be used to free it; otherwise "freed without R" still applies.
+ *   G-E/G-F read the R cue from `__playtestQa.jac().reverseCue` (jacSnapshot()). Without it, nothing is excluded and
+ *      every cue check fails closed (cueHook=false in the report).
  *
  * The approach to a prop reads the pose to steer. Every steer change is appended to `reroutes`.
  *
@@ -37,6 +50,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { chromium, devices } from 'playwright';
+import * as OR from './forge/oracle.mjs';
 
 const BASE =
   process.env.QA_BASE_URL ?? 'http://127.0.0.1:4196/interactive-portfolio-playtest/preview-integracion/';
@@ -147,6 +161,7 @@ function installSampler() {
       dockBg: ds?.backgroundColor ?? null,
       dockShadow: ds?.boxShadow ?? null,
       blocked: !!q.jacFootprintBlocked?.(),
+      cue: typeof j.reverseCue === 'boolean' ? j.reverseCue : null,
     });
   };
   requestAnimationFrame(tick);
@@ -319,6 +334,54 @@ async function holdStick(page, input, vec, ms, id = 1) {
     await input.touchEv('touchMove', [{ x: pad.x + vec.x * R, y: pad.y + vec.y * R, id }]);
   }
   await input.touchEv('touchEnd', []);
+}
+
+/** G-F: is the prop-contact pose a true dead end (oracle)? Reads the samples so far for the sprite-change travel. */
+async function contactDeadEnd(page) {
+  const S = await page.evaluate(() => window.__gate.samples.map((x) => ({ t: x.t, cx: x.cx, cy: x.cy, dir: x.dir, gear: x.gear })));
+  const g = gtravOf(S);
+  const e = S.at(-1);
+  const tNow = await page.evaluate(() => performance.now());
+  if (!e) return { deadEnd: false, tContact: tNow };
+  return { deadEnd: deadEndAt(e.cx, e.cy, e.dir, gearSign(e), g.at(-1)), pose: [+e.cx.toFixed(2), +e.cy.toFixed(2), e.dir], gtrav: Number.isFinite(g.at(-1)) ? +g.at(-1).toFixed(2) : 'none', tContact: tNow };
+}
+/** Dead-end escape allowed by G-F: tap R, hold gas 1.5 s, tap D. */
+async function reverseOut(s, touch) {
+  await realTapSelector(s.page, s.input, '[data-jac="gear"][data-val="R"]');
+  await s.page.waitForTimeout(300);
+  if (touch) await holdStick(s.page, s.input, { x: 0, y: -1 }, 1500);
+  else await holdKeys(s.page, ['up'], 1500);
+  await s.page.waitForTimeout(250);
+  await realTapSelector(s.page, s.input, '[data-jac="gear"][data-val="D"]');
+  await s.page.waitForTimeout(300);
+}
+/** ms from contact to the first R cue sample (0 if already on), null if never. */
+function cueDelayMs(samples, tContact) {
+  const c = samples.find((x) => x.t >= tContact - 500 && x.cue === true);
+  return c ? Math.max(0, Math.round(c.t - tContact)) : null;
+}
+
+/** Hold gas (keys or stick straight up) until the truck's cx <= maxCx, polled in-page every animation frame
+ * (no per-poll CDP round trip); cap `capMs`. Real input only. */
+async function holdUntilCx(page, input, touch, maxCx, capMs) {
+  const t0 = Date.now();
+  const reached = () => page.waitForFunction((m) => window.__playtestQa.jac().cx <= m, maxCx, { polling: 'raf', timeout: capMs }).catch(() => null);
+  if (touch) {
+    const pad = await stickPad(page);
+    const R = 44;
+    await input.touchEv('touchStart', [{ x: pad.x, y: pad.y, id: 1 }]);
+    for (let i = 1; i <= 6; i++) {
+      await input.touchEv('touchMove', [{ x: pad.x, y: pad.y - R * (i / 6), id: 1 }]);
+      await wait(16);
+    }
+    await reached();
+    await input.touchEv('touchEnd', []);
+  } else {
+    await page.keyboard.down(KEY.up);
+    await reached();
+    await page.keyboard.up(KEY.up);
+  }
+  return Date.now() - t0;
 }
 
 /** Full-deflection stick circle: the finger sweeps the ring `turns` times. */
@@ -618,6 +681,7 @@ function gasSteer(s, touch) {
 /** G2: longest continuous gas+steer stretch with < G2_MIN_TRAVEL travel inside any 1.5 s window. */
 function deadlocks(samples, touch) {
   const bad = [];
+  const gtrav = gtravOf(samples);
   let i = 0;
   while (i < samples.length) {
     if (!gasSteer(samples[i], touch)) {
@@ -635,7 +699,7 @@ function deadlocks(samples, touch) {
         a++;
       }
       if (samples[b].t - samples[a].t >= G2_WINDOW_MS - 40 && travel < G2_MIN_TRAVEL) {
-        bad.push({ at: [+samples[b].cx.toFixed(2), +samples[b].cy.toFixed(2)], dir: samples[b].dir, gear: samples[b].gear, t: Math.round(samples[b].t) });
+        bad.push({ at: [+samples[b].cx.toFixed(2), +samples[b].cy.toFixed(2)], dir: samples[b].dir, gear: samples[b].gear, t: Math.round(samples[b].t), gF: g2Exclusion(samples, a, b, touch, gtrav) });
         while (b <= j && samples[b].t - samples[a].t < G2_WINDOW_MS * 2) b++;
         break;
       }
@@ -643,6 +707,46 @@ function deadlocks(samples, touch) {
     i = j + 1;
   }
   return bad;
+}
+
+// ---- r45k QA1 ruling (G-E / G-F): oracle helpers, same rules as run-all.mjs (THRESH.d1AheadT, h3bStillNoCueS)
+const D1_AHEAD_T = 1.0;
+const STILL_NO_CUE_S = 1.0;
+const ODIRS = ['se', 'sw', 'nw', 'ne'];
+const OV = { se: [1, 0], nw: [-1, 0], sw: [0, 1], ne: [0, -1] };
+const wrapQ = (d) => { while (d > 2) d -= 4; while (d < -2) d += 4; return d; };
+const freeAlong = (x, y, d, sign, r) => { for (let k = 0; k <= r + 1e-9; k += 0.25) if (OR.blocked(x + OV[d][0] * k * sign, y + OV[d][1] * k * sign, d) !== 0) return false; return true; };
+const sideDir = (d, sd) => ODIRS[(ODIRS.indexOf(d) + (sd > 0 ? 1 : 3)) & 3];
+const legalSwap = (x, y, nd, sign, gtrav) => gtrav >= 0.1 && OR.blocked(x, y, nd) === 0 && freeAlong(x, y, nd, sign, D1_AHEAD_T);
+const gearSign = (s) => (s.gear === 'R' ? -1 : 1);
+/** Held steer side at a sample: +1 right (D / stick x>0.3), −1 left, 0 none. */
+function steerSide(s, touch) {
+  if (touch) return s.sActive && Math.abs(s.sx) > 0.3 ? Math.sign(s.sx) : 0;
+  const r = /d|arrowright/.test(s.keys || ''), l = /a|arrowleft/.test(s.keys || '');
+  return r && !l ? 1 : l && !r ? -1 : 0;
+}
+/** Metres since the last real sprite change, per sample (Infinity until one is seen: getting in is not a change). */
+function gtravOf(samples) {
+  const g = new Array(samples.length).fill(Infinity);
+  for (let i = 1; i < samples.length; i++) g[i] = samples[i].dir !== samples[i - 1].dir ? 0 : g[i - 1] + Math.hypot(samples[i].cx - samples[i - 1].cx, samples[i].cy - samples[i - 1].cy);
+  return g;
+}
+const cueHookOf = (samples) => samples.some((s) => typeof s.cue === 'boolean');
+/** True dead end at a pose: nose pinned and no legal swap on either side. */
+function deadEndAt(x, y, dir, sign, gtrav) {
+  return !freeAlong(x, y, dir, sign, 0.25) && !legalSwap(x, y, sideDir(dir, 1), sign, gtrav) && !legalSwap(x, y, sideDir(dir, -1), sign, gtrav);
+}
+/** G-F: classify one G2 window [a..b] of `samples`. */
+function g2Exclusion(samples, a, b, touch, gtrav) {
+  const e = samples[b];
+  const sign = gearSign(e);
+  const side = steerSide(e, touch);
+  const pinned = !freeAlong(e.cx, e.cy, e.dir, sign, 0.25);
+  const noSwap = side !== 0 && !legalSwap(e.cx, e.cy, sideDir(e.dir, side), sign, gtrav[b]);
+  let cueMs = 0;
+  for (let k = a + 1; k <= b; k++) if (samples[k].cue === true) cueMs += samples[k].t - samples[k - 1].t;
+  const cueOk = cueMs >= 1000;
+  return { excluded: pinned && noSwap && cueOk, pinned, noSwapToSteerSide: noSwap, side, cueMs: Math.round(cueMs), gtrav: Number.isFinite(gtrav[b]) ? +gtrav[b].toFixed(2) : 'none' };
 }
 
 const FACING_DEG = { se: 0, sw: 90, nw: 180, ne: 270 };
@@ -858,6 +962,56 @@ function turnAtSpeed(samples) {
   };
 }
 
+/** r45k G-E (Sentinel QA1 ruling): G10 judged up to the 90° crossing with the old stop rule, after it with G-A. */
+function g10Eval(samples, touch, sd) {
+  const hook = cueHookOf(samples);
+  const gtrav = gtravOf(samples);
+  const i0 = samples.findIndex((x) => x.driving && steerSide(x, touch) === sd);
+  if (i0 < 0) return { ok: false, why: 'steer never seen', cueHook: hook };
+  const h0 = samples[i0].heading;
+  let i90 = -1;
+  for (let i = i0; i < samples.length; i++) if (Math.abs(wrapQ(samples[i].heading - h0)) >= 0.9) { i90 = i; break; }
+  const t90 = i90 < 0 ? null : +((samples[i90].t - samples[i0].t) / 1000).toFixed(2);
+  const pre = turnAtSpeed(samples.slice(0, i90 < 0 ? samples.length : i90 + 1));
+  // dh normalisation over the whole window
+  let dhBad = 0, dhWorst = -9, dhAt = null;
+  for (let i = 1; i < samples.length; i++) {
+    const dtMs = samples[i].t - samples[i - 1].t;
+    if (!(dtMs > 0 && dtMs <= 400)) continue;
+    const dt = dtMs / 1000;
+    const ex = Math.abs(wrapQ(samples[i].heading - samples[i - 1].heading)) - (2.4 * Math.min(dt, 0.25) + 0.05);
+    if (ex > dhWorst) { dhWorst = ex; dhAt = [+samples[i].cx.toFixed(2), +samples[i].cy.toFixed(2), samples[i].dir, Math.round(dtMs)]; }
+    if (ex > 0) dhBad++;
+  }
+  // G-A after the 90° crossing
+  let dead = 0, deadAt = null, cueBad = 0, cueAt = null;
+  if (i90 >= 0) {
+    let still = 0, stillAny = 0, cueRun = 0;
+    for (let i = i90 + 1; i < samples.length; i++) {
+      const a = samples[i - 1], b = samples[i];
+      const dtMs = b.t - a.t;
+      if (!(dtMs > 0 && dtMs <= 400)) { still = stillAny = cueRun = 0; continue; }
+      const dt = dtMs / 1000;
+      const disp = Math.hypot(b.cx - a.cx, b.cy - a.cy);
+      const cueOn = b.cue === true;
+      const side = steerSide(b, touch) || sd;
+      if (cueOn && legalSwap(b.cx, b.cy, sideDir(b.dir, side), gearSign(b), gtrav[i])) cueRun += dt; else cueRun = 0;
+      if (cueRun >= 0.3 - 1e-9) { cueBad++; cueAt ??= [+b.cx.toFixed(2), +b.cy.toFixed(2), b.dir]; }
+      const stillF = disp < 0.08 * dt && Math.abs(b.vel) < 0.2;
+      if (stillF && Math.abs(wrapQ(b.heading - a.heading)) < 0.1 * dt && !cueOn) still += dt; else still = 0;
+      if (stillF && !cueOn) stillAny += dt; else stillAny = 0;
+      const d = Math.max(still >= 0.5 ? still : 0, stillAny >= STILL_NO_CUE_S ? stillAny : 0);
+      if (d > dead) { dead = d; deadAt = [+b.cx.toFixed(2), +b.cy.toFixed(2), b.dir]; }
+    }
+  }
+  const ok = t90 != null && t90 <= 2.0 && pre.stopMs < 500 && dead === 0 && cueBad === 0 && dhBad === 0;
+  return {
+    ok, cueHook: hook, t90, preStopMs: pre.stopMs, preStopAt: pre.stopAt,
+    postDeadS: +dead.toFixed(2), postDeadAt: deadAt, postCueUnjustifiedFrames: cueBad, postCueAt: cueAt,
+    dhOverFrames: dhBad, dhWorstExcess: +dhWorst.toFixed(3), dhWorstAt: dhAt, info_turnedPre90: pre.turned,
+  };
+}
+
 function fpsOf(samples) {
   if (samples.length < 2) return 0;
   return +(((samples.length - 1) * 1000) / (samples.at(-1).t - samples[0].t)).toFixed(1);
@@ -985,8 +1139,8 @@ async function runViewport(browser, kind) {
       await realGetIn(s.page, s.input, s.aim);
       await realTapSelector(s.page, s.input, '[data-jac="gear"][data-val="R"]');
       await s.page.waitForTimeout(350);
-      if (touch) await holdStick(s.page, s.input, { x: 0, y: -1 }, 1000);
-      else await holdKeys(s.page, ['up'], 1000);
+      // G-E: closed-loop positioning (reverse until cx <= 16.3), not a timed hold
+      const backMs = await holdUntilCx(s.page, s.input, touch, 16.3, 3000);
       await s.page.waitForTimeout(300);
       await realTapSelector(s.page, s.input, '[data-jac="gear"][data-val="D"]');
       await s.page.waitForTimeout(350);
@@ -1001,8 +1155,8 @@ async function runViewport(browser, kind) {
       const r = await stopSampling(s.page);
       all.push(r.samples);
       spawnSeq.push(r.samples);
-      const rep = turnAtSpeed(r.samples);
-      attempts.push({ side, start: [+start.cx.toFixed(2), +start.cy.toFixed(2), start.dir, start.gear], startOk, ...rep, ok: startOk && rep.turned >= 0.9 && rep.stopMs < 500 && rep.maxDh <= 0.3 });
+      const rep = g10Eval(r.samples, touch, side === 'right' ? 1 : -1);
+      attempts.push({ side, backMs, start: [+start.cx.toFixed(2), +start.cy.toFixed(2), start.dir, start.gear], startOk, ...rep, ok: startOk && rep.ok });
       await shot(s.page, `${tag}-g10-${side}`);
       errors.push(...s.errors);
       await s.ctx.close();
@@ -1050,14 +1204,22 @@ async function runViewport(browser, kind) {
     const atCactus = await s.page.evaluate(() => window.__playtestQa.jac());
     const cactusNose = chase.contactDist ?? noseDist(atCactus, 26, 20);
     await shot(s.page, `${tag}-04a-cactus`);
+    const cDE = await contactDeadEnd(s.page);
     const right = touch ? { x: 0.75, y: -0.66 } : ['up', 'right'];
     const left = touch ? { x: -0.75, y: -0.66 } : ['up', 'left'];
-    for (const c of [right, left, right, left]) {
-      if (touch) await holdStick(s.page, s.input, c, 1500);
-      else await holdKeys(s.page, c, 1500);
+    if (cDE.deadEnd && cactusNose <= 0.3) {
+      // G-F: a true dead end must show the R cue (<=0.5 s) and is left with R
+      if (touch) await holdStick(s.page, s.input, right, 1500);
+      else await holdKeys(s.page, right, 1500);
+      await reverseOut(s, touch);
+    } else {
+      for (const c of [right, left, right, left]) {
+        if (touch) await holdStick(s.page, s.input, c, 1500);
+        else await holdKeys(s.page, c, 1500);
+      }
+      if (touch) await stickCircle(s.page, s.input, 8000, 2, -90, -1);
+      else await keyCircle(s.page, 8000, 2, -1);
     }
-    if (touch) await stickCircle(s.page, s.input, 8000, 2, -90, -1);
-    else await keyCircle(s.page, 8000, 2, -1);
     // The circle can finish back on the prop. Drive clear so the stop is a tile away.
     await driveTo(s.page, s.input, [{ x: 36.2, y: 18.6 }], { timeoutMs: 10_000, arrive: 1.3, precise: true });
     const r2 = await stopSampling(s.page);
@@ -1076,6 +1238,9 @@ async function runViewport(browser, kind) {
       endLegal: !endBlocked,
       freed: !endBlocked && Math.hypot(end.cx - atCactus.cx, end.cy - atCactus.cy) > 1,
       gearsUsed: [...new Set(r2.samples.map((x) => x.gear))],
+      deadEnd: cDE.deadEnd,
+      contact: cDE,
+      cueDelayMs: cueDelayMs(r2.samples, cDE.tContact),
       fps: fpsOf(r2.samples),
     };
     await shot(s.page, `${tag}-04b-cactus-free`);
@@ -1137,13 +1302,12 @@ async function runViewport(browser, kind) {
     const atTree = await s.page.evaluate(() => window.__playtestQa.jac());
     const treeNose = chase.contactDist ?? noseDist(atTree, 40, 18);
     await shot(s.page, `${tag}-05-tree`);
-    if (touch) {
-      await holdStick(s.page, s.input, { x: 0.75, y: -0.66 }, 1500);
-      await stickCircle(s.page, s.input, 8000, 2);
-    } else {
-      await holdKeys(s.page, ['up', 'right'], 1500);
-      await keyCircle(s.page, 8000, 2);
-    }
+    const tDE = await contactDeadEnd(s.page);
+    if (touch) await holdStick(s.page, s.input, { x: 0.75, y: -0.66 }, 1500);
+    else await holdKeys(s.page, ['up', 'right'], 1500);
+    if (tDE.deadEnd && treeNose <= 0.3) await reverseOut(s, touch); // G-F: true dead end, R allowed
+    else if (touch) await stickCircle(s.page, s.input, 8000, 2);
+    else await keyCircle(s.page, 8000, 2);
     // A tight nose-in pin shuttles if the wheel keeps changing direction. Hold one
     // lock long enough for the reverse arc to yaw clear, and stop once it is a tile away.
     {
@@ -1178,6 +1342,9 @@ async function runViewport(browser, kind) {
       endLegal: !endBlocked,
       freed: !endBlocked && Math.hypot(end.cx - atTree.cx, end.cy - atTree.cy) > 1,
       gearsUsed,
+      deadEnd: tDE.deadEnd,
+      contact: tDE,
+      cueDelayMs: cueDelayMs(r3.samples, tDE.tContact),
     };
     if (touch) {
       // B6: a second finger on the map must not steal or release the stick. (CDP touchEnd lists
@@ -1233,7 +1400,11 @@ async function runViewport(browser, kind) {
     deadlocks: dl.length,
   };
   const stickHidden = touch ? samples.filter((x) => x.driving && !x.stickVisible).length : 0;
-  const freedOk = (r, touching) => touching && r.freed && !r.gearsUsed.includes('R');
+  // G-F: in a true dead end the R cue must show within 0.5 s and R may free it; elsewhere it must be freed without R
+  const freedOk = (r, touching) => touching && r.freed && (r.deadEnd ? r.cueDelayMs != null && r.cueDelayMs <= 500 : !r.gearsUsed.includes('R'));
+  const dlCount = dl.filter((d) => !d.gF.excluded);
+  const dlExcl = dl.filter((d) => d.gF.excluded);
+  const cueHook = all.some((x) => cueHookOf(x));
   const treeOk = freedOk(res.runs.tree, res.runs.tree.touchingTree);
   const cactusOk = freedOk(res.runs.cactus, res.runs.cactus.nearCactus);
   const rerouteN = (res.runs.cactus.reroutes?.length ?? 0) + (res.runs.tree.reroutes?.length ?? 0);
@@ -1241,11 +1412,12 @@ async function runViewport(browser, kind) {
   res.gates = {
     G1: { pass: res.runs.g1.dist >= 1, detail: `seat ${JSON.stringify(res.runs.g1.seat)} → moved ${res.runs.g1.dist} tiles in 1.5 s (gear ${res.runs.g1.end.gear})` },
     G2: {
-      pass: dl.length === 0 && treeOk && cactusOk,
+      pass: dlCount.length === 0 && treeOk && cactusOk,
       detail:
-        `gas+steer windows with <${G2_MIN_TRAVEL} tile travel: ${dl.length} ${JSON.stringify(dl.slice(0, 4))}; ` +
-        `cactus nose ${res.runs.cactus.noseDist} freed without R=${cactusOk}; ` +
-        `tree nose ${res.runs.tree.noseDist} freed without R=${treeOk}; ` +
+        `cueHook=${cueHook}; gas+steer windows with <${G2_MIN_TRAVEL} tile travel: ${dl.length}, excluded by G-F ${dlExcl.length}, counted ${dlCount.length} ${JSON.stringify(dlCount.slice(0, 4))}; ` +
+        `excluded ${JSON.stringify(dlExcl.slice(0, 4))}; ` +
+        `cactus nose ${res.runs.cactus.noseDist} deadEnd=${res.runs.cactus.deadEnd} cueDelay=${res.runs.cactus.cueDelayMs} gears=${res.runs.cactus.gearsUsed} ok=${cactusOk}; ` +
+        `tree nose ${res.runs.tree.noseDist} deadEnd=${res.runs.tree.deadEnd} cueDelay=${res.runs.tree.cueDelayMs} gears=${res.runs.tree.gearsUsed} ok=${treeOk}; ` +
         `closed-loop reroutes logged: ${rerouteN}`,
     },
     G3: { pass: g3.deg <= G3_MAX_DEG, detail: `worst ${g3.deg}° over ${g3.frames} moving frames ${JSON.stringify(g3)}` },

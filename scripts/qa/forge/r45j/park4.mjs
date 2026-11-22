@@ -1,5 +1,6 @@
 // r45h tap-to-park harness (fixed): fresh page per trial, retrying get-in, zoom-out until the door/tile is on screen, null-safe.
 // usage: node park4.mjs <vp> <url> <out> [trials csv]
+// r45k QA1 ruling: the (22,18) gate is `toastGate` (pointerup -> toast text via MutationObserver <=500 ms); opacity time is info only.
 import fs from 'node:fs';
 import { chromium } from 'playwright';
 const vp = process.argv[2], BASE = process.argv[3], OUT = process.argv[4]; const phone = vp !== '1440';
@@ -43,6 +44,13 @@ async function trial(label, kind, arg, maxMs) {
     let pt = await target(), zooms = 0; while (!(await onScreen(pt)) && zooms < 8) { await zoomOut(); zooms++; pt = await target(); }
     out.zooms = zooms; out.pt = pt; if (!(await onScreen(pt))) { await shot('offscreen'); throw new Error('target off-screen after zoom ' + JSON.stringify(pt)); }
     const j0 = await jac(); out.pre = [+j0.cx.toFixed(2), +j0.cy.toFixed(2), j0.dir];
+    // r45k QA1 ruling (park4 toast timing): t_up = first pointerup after arming (window capture listener); t_toast = first
+    // MutationObserver callback that touches #playtest-toast while it has text. The opacity/rAF time stays info only.
+    await p.evaluate(() => { const T = (window.__T = { up: null, toast: null, text: null, preText: document.getElementById('playtest-toast')?.textContent.trim() || '' });
+      window.addEventListener('pointerup', () => { if (T.up == null) T.up = performance.now(); }, { capture: true });
+      const mo = new MutationObserver((recs) => { if (T.toast != null) return; // armed just before the tap: the product may set the text on pointerdown, before pointerup (delta <= 0) const el = document.getElementById('playtest-toast'); const tx = el?.textContent.trim();
+        if (!el || !tx) return; if (!recs.some((r) => el === r.target || el.contains(r.target) || [...r.addedNodes].some((n) => n === el || n.contains?.(el)))) return; T.toast = performance.now(); T.text = tx; });
+      mo.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true }); });
     const t0 = await p.evaluate(() => performance.now()); await tap(pt.x, pt.y); const w0 = Date.now();
     let j, idleSince = null; await W(600); let mid = false;
     for (;;) { j = await jac(); const el = Date.now() - w0; if (!mid && el > 3000) { await shot('3s'); mid = true; }
@@ -63,6 +71,12 @@ async function trial(label, kind, arg, maxMs) {
     out.arrived = !!dest && Math.hypot(j.cx - dest.x, j.cy - dest.y) < 1.5 && (j.pathN ?? 0) === 0;
     out.endDistToDest = dest ? +Math.hypot(j.cx - dest.x, j.cy - dest.y).toFixed(2) : null;
     let path = 0; for (let k = 1; k < P.length; k++) path += Math.hypot(P[k][1] - P[k - 1][1], P[k][2] - P[k - 1][2]);
+    const T = await p.evaluate(() => window.__T); let rafMax = 0; for (let k = 1; k < P.length; k++) rafMax = Math.max(rafMax, P[k][0] - P[k - 1][0]);
+    const visMs = toasts.size ? [...toasts.values()][0] : null; const moved = Math.max(0, ...P.map((r) => Math.hypot(r[1] - j0.cx, r[2] - j0.cy)));
+    out.toastTiming = { cdpToUpMs: T.up != null ? Math.round(T.up - t0) : null, upToToastMs: T.up != null && T.toast != null ? +(T.toast - T.up).toFixed(1) : null, info_toastBeforeUp: T.up != null && T.toast != null && T.toast < T.up, text: T.text, preText: T.preText,
+      info_visibleMsFromDispatch: visMs != null ? Math.round(visMs) : null, info_rafMaxMs: rafMax, info_rafStallFlag: rafMax > 250, movedTiles: +moved.toFixed(3) };
+    if (label.startsWith('unreach')) { const tt = out.toastTiming;
+      out.toastGate = { pass: tt.upToToastMs != null && tt.upToToastMs <= 500 && tt.text === 'No se puede llegar' && moved < 0.05 && visMs != null, rule: 'pointerup->toast text <=500 ms, text "No se puede llegar", truck moved <0.05 t, toast visible (opacity>0.1) at some point' }; }
     Object.assign(out, { pathLen: +path.toFixed(2), spins, livelockMs: worst, velReversals: revs, toasts: [...toasts.entries()], card, cardDockOverlapPx2: cardOv, sheetDockOverlapPx2: sheetOv, fbFrames: fb, fbMovingFrames: fbMoving, fbFirst, maxFrameDisp: +maxd.toFixed(3), frames: P.length, track: P.filter((_, i) => i % 6 === 0).map((r) => [r[1], r[2], r[3], r[6], r[12]]), ce });
   } catch (e) { out.err = String(e).slice(0, 300); out.ce = ce; }
   console.log(JSON.stringify({ ...out, track: undefined })); R.trials.push(out); save(); await ctx.close();
