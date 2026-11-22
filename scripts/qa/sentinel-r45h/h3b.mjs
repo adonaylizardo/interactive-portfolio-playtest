@@ -1,6 +1,8 @@
 // Sentinel r45h HIGH-3 shuttle check (porch + cactus, gas+steer 12 s from poses whose nose points at the prop).
 // r45k (Forge, per Sentinel's plan review): the r45j agent's axis edit is reverted to Sentinel's original
-// pre-frame measurement (now printed as information). Kept from r45j: dead stops ≥0.5 s fail. Speed honesty is
+// pre-frame measurement (now printed as information).
+// NOTE (r45k ruling): the authoritative h3b is `run-all.mjs` check `h3b`, which also applies G-A (dead stop exempt under a
+// justified R cue; cueUnjustified) and G-B (shuttle needs path − net ≥0.5 t). This standalone script keeps the pre-ruling bars. Kept from r45j: dead stops ≥0.5 s fail. Speed honesty is
 // judged as the HUD mph vs the frame's REAL displacement (±1 mph). Same logic as run-all.mjs check `h3b`.
 import { load } from './common.mjs';
 import { blocked } from '../forge/oracle.mjs';
