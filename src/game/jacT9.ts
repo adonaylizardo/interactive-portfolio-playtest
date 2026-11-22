@@ -74,7 +74,8 @@ const MOVE_MPH = 10;
 const SWAP_HYST = 11 / 90;
 const MOTION_CONE = 34 / 90;
 /** Gas + steer against an obstacle: heading turns at ~60°/s and the van inches along it. */
-const CREEP_YAW = 60 / 90;
+/** In-place steering uses the same rate as a rolling turn, so a stop reaches the cap in one go. */
+const CREEP_YAW = TURN_RATE;
 const CREEP_TILES_PER_S = 1.2;
 const CREEP_MIN_STEER = 0.3;
 /**
@@ -92,7 +93,8 @@ const HEADING_HARD = 0.62;
 /** In-place or pinned swaps need this much clear road along the new facet. */
 const SWAP_AHEAD_TILES = 1;
 /** Sprite changes only after this much real travel since the last one (gate floor is 0.1). */
-const SWAP_TRAVEL_MIN = 0.12;
+/** Gate D1: 0.1 t since the last real sprite change. Entry is not a change. */
+const SWAP_TRAVEL_MIN = 0.1;
 /** Follower give-up: less than this much net travel inside FOLLOW_STALL_S. */
 const FOLLOW_STALL_S = 2;
 const FOLLOW_STALL_TILES = 0.05;
@@ -328,6 +330,8 @@ export class JacT9 {
   steering = 0;
   /** Eased steering input; decays on stick release instead of snapping. */
   private steerSmoothed = 0;
+  /** Stick this sub-step, before the smoothing that lingers after a release. */
+  private steerCmd = 0;
   bubble = false;
   toggles: Record<JacToggleId, boolean> = {
     left: false,
@@ -396,8 +400,19 @@ export class JacT9 {
   private reverseCueOn = false;
   /** Tiles travelled since the sprite last changed facing. */
   private travelSinceDir = 0;
-  /** Facing before this frame's swap, so a swap that does not roll can be undone. */
-  private heldDir: FacingDir | null = null;
+  /**
+   * No sprite change since Get in / a QA reseat. The 0.1 t rule starts at the
+   * first real swap; entry itself is not a change.
+   */
+  private noChangeSinceEntry = true;
+  /** Moving swap held for the next frame so that frame rolls on the new sprite. */
+  private pendingDir: FacingDir | null = null;
+  private earlyFrom: FacingDir | null = null;
+  private earlyTravel = 0;
+  /** Speed and origin at the start of this frame, for a swap that must not jolt. */
+  private frameSpeed = 0;
+  private frameX = 0;
+  private frameY = 0;
   /** Net-progress window for tap-to-park. -1 = not armed. */
   private followStallT = -1;
   private followStallX = 0;
@@ -523,6 +538,8 @@ export class JacT9 {
       this.integVel = 0;
       this.reverseCueOn = false;
       this.travelSinceDir = 0;
+      this.noChangeSinceEntry = true;
+      this.pendingDir = null;
       this.pinnedCue = false;
       this.nGasT = 0;
       this.nHinted = false;
@@ -1427,18 +1444,21 @@ export class JacT9 {
     }
     // `vel` is the previous frame's real displacement. Physics keeps its own speed,
     // and a stop between frames (published vel 0) clears that speed.
+    // The jolt check compares published speeds. integVel is the physics speed,
+    // which sits above the along-component whenever the nose is off the sprite.
+    this.frameSpeed = this.vel;
     if (this.vel === 0) this.integVel = 0;
     this.vel = this.integVel;
     const originX = this.cx;
     const originY = this.cy;
-    // A facing swap only lands between frames, so every sub-step of a frame moves inside the
-    // motion cone of the sprite that frame draws.
-    this.heldDir = null;
-    if (this.pendingExit || (this.drivePath.length === 0 && !this.driveGoal)) this.syncManualFacing();
-    else this.swapBlocked = false;
-    // Swap before this frame moves. A swap after the step draws the new sprite
-    // over motion that belonged to the old one, and that frame fails the 35° gate.
+    this.frameX = originX;
+    this.frameY = originY;
+    // Manual facing is chosen at the end, on the pose the frame actually stops on.
+    // The follower still commits at the start so a long frame can land the corner.
     if (this.followDir) this.commitFacing(this.followDir);
+    // A moving swap is applied before this frame rolls, so the displacement
+    // lies on the sprite the frame draws. An in-place swap stays at the end.
+    const early = !this.followDir && this.applyPendingSwap();
     const travel0 = this.travelSinceDir;
     const dir0 = this.dir;
     const x0 = this.cx;
@@ -1578,25 +1598,6 @@ export class JacT9 {
     } else if (this.poseBlocked(this.cx, this.cy, this.dir) > 0 && this.drivePath.length > 0) {
       this.tryReplan();
     }
-    // G8 sees one displacement per frame. Internal back-and-forth must not
-    // earn a facing swap the sampler never observed.
-    // A swap spends the travel that earned it. Adding that budget back let the
-    // next frame swap again after a few hundredths of a tile.
-    // The gate counts a sprite change that did not move as in-place, and that
-    // needs a tile free on the new facet. Put the old sprite back when it does not.
-    if (this.heldDir && Math.hypot(this.cx - x0, this.cy - y0) < 0.02) {
-      const sign = this.gear === 'R' ? -1 : 1;
-      if (!this.freeAhead(this.dir, sign, SWAP_AHEAD_TILES)) {
-        this.dir = this.heldDir;
-        this.heading = this.capHeading(this.heading, HEADING_HARD);
-        this.swapBlocked = true;
-        this.occupy(this.driveCells());
-        this.layout();
-      }
-    }
-    this.heldDir = null;
-    const carried = this.dir === dir0 ? travel0 : 0;
-    this.travelSinceDir = carried + Math.hypot(this.cx - x0, this.cy - y0);
     if (legal && this.poseBlocked(this.cx, this.cy, this.dir) > 0) {
       this.cx = legal.x;
       this.cy = legal.y;
@@ -1606,8 +1607,40 @@ export class JacT9 {
       this.occupy(this.driveCells());
       this.layout();
     }
-    // Published speed is the displacement along the sprite this frame draws.
-    // A swap frame has already yawed onto that sprite, so the axis matches the step.
+    // Manual swap, once, on the final pose. D1 (fit, travel, free ahead) is
+    // judged here, after the frame has finished moving.
+    const moved = Math.hypot(this.cx - x0, this.cy - y0);
+    const manual = this.pendingExit || (this.drivePath.length === 0 && !this.driveGoal);
+    let earlyKept = early;
+    if (early && moved < 0.02 && this.earlyFrom) {
+      // Yaw during the borrowed sprite can sit past the old cap, and the old
+      // box may no longer fit. Put the heading back, and keep the new sprite
+      // when the old one would overlap.
+      if (this.poseBlocked(this.cx, this.cy, this.earlyFrom) === 0) {
+        this.dir = this.earlyFrom;
+        this.travelSinceDir = this.earlyTravel;
+        earlyKept = false;
+      }
+      this.heading = this.capHeading(this.heading, HEADING_HARD);
+      this.occupy(this.driveCells());
+      this.layout();
+    }
+    const swapped = manual && this.syncManualFacing(moved);
+    // A manual swap frame's own roll is not travel toward the next swap. The
+    // monitor drops it too. A follower swap at the start still counts the
+    // roll that happened on the new facet, which is what park arrival uses.
+    if (swapped || earlyKept) {
+      this.travelSinceDir = 0;
+      this.noChangeSinceEntry = false;
+    } else if (early) {
+      this.travelSinceDir = this.earlyTravel + moved;
+    } else {
+      const carried = this.dir === dir0 ? travel0 : 0;
+      this.travelSinceDir = carried + moved;
+      if (this.dir !== dir0) this.noChangeSinceEntry = false;
+    }
+    // An early swap rolled on the new sprite. An end swap did not move, so
+    // either axis matches. Publishing the other one reads as zero speed.
     const axis = DIR_VEC[this.dir];
     const alongFrame = (this.cx - originX) * axis.x + (this.cy - originY) * axis.y;
     const dispFrame = Math.hypot(this.cx - originX, this.cy - originY);
@@ -1623,6 +1656,19 @@ export class JacT9 {
     if (this.toggles.hazards) this.hazardT += frame;
     else this.hazardT = 0;
     const off = Math.abs(headingDelta(dirIndex(this.dir), this.heading));
+    if (manual) {
+      const atCap = Math.abs(headingDelta(dirIndex(this.dir), this.heading)) >= HEADING_HARD - 1e-3;
+      this.reverseCueOn =
+        !swapped &&
+        !earlyKept &&
+        !this.pendingDir &&
+        this.gear === 'D' &&
+        this.lastGas > 0 &&
+        Math.abs(this.steering) > YAW_STEER_MIN &&
+        atCap &&
+        this.swapBlocked &&
+        this.nosePinned(1);
+    }
     this.pinnedCue =
       this.reverseCueOn ||
       (off > CUE_HEADING &&
@@ -1687,6 +1733,7 @@ export class JacT9 {
     } else {
       this.steerSmoothed *= 1 - Math.min(1, dt * 5.5);
     }
+    this.steerCmd = steerTarget;
     this.steering = Math.max(-1, Math.min(1, this.steerSmoothed));
     this.applyThrottle(dt, throttle);
     this.lastGas = live && throttle > 0.08 ? throttle : 0;
@@ -2371,6 +2418,7 @@ export class JacT9 {
       this.dir = this.lastParkHeading;
       this.heading = dirIndex(this.lastParkHeading);
       this.travelSinceDir = 0;
+      this.noChangeSinceEntry = false;
     }
     return true;
   }
@@ -2709,6 +2757,8 @@ export class JacT9 {
     this.creepStalled = false;
     this.swapBlocked = false;
     this.travelSinceDir = 0;
+    this.noChangeSinceEntry = true;
+    this.pendingDir = null;
     this.integVel = 0;
     this.reverseCueOn = false;
     this.clearDrivePath();
@@ -2825,34 +2875,93 @@ export class JacT9 {
     return wrapHeading(idx + Math.max(-MOTION_CONE, Math.min(MOTION_CONE, d)));
   }
 
-    /**
+  /**
    * Swap the 5×3 ↔ 3×5 sprite once the heading sits on the 0.62 q cap and the new
-   * box fits here with no translation. One facing per call, only after real travel,
-   * and only toward the side the heading already turned. In place (nose pinned, or
-   * this frame will not move) also needs 1 t free ahead on the new facet.
+   * box fits here with no translation. Called once, after the frame has moved.
+   * Entry (no sprite change yet) may swap immediately. After a real change the
+   * truck needs 0.1 t. An in-place swap also needs 1 t free on the new facet.
    */
-  private syncManualFacing(): void {
+  private syncManualFacing(moved: number): boolean {
     this.swapBlocked = false;
     const idx = dirIndex(this.dir);
     const d = headingDelta(idx, this.heading);
-    if (Math.abs(d) < HEADING_HARD - 1e-3) return;
+    if (Math.abs(d) < HEADING_HARD - 1e-3) {
+      this.pendingDir = null;
+      return false;
+    }
     const next = DIR_ORDER[(idx + (d > 0 ? 1 : 3)) & 3];
     const dirSign = this.gear === 'R' ? -1 : 1;
-    const travelled = this.travelSinceDir >= SWAP_TRAVEL_MIN;
+    const travelled = this.noChangeSinceEntry || this.travelSinceDir >= SWAP_TRAVEL_MIN;
     const fits = this.poseBlocked(this.cx, this.cy, next) === 0;
-    // A facing with no tile ahead is a dead end. Swapping onto it while still
-    // rolling is what pins the nose where neither neighbour can leave.
-    const ahead = this.freeAhead(next, dirSign, SWAP_AHEAD_TILES);
+    const ahead = moved >= 0.02 || this.freeAhead(next, dirSign, SWAP_AHEAD_TILES);
     if (!travelled || !fits || !ahead) {
       this.swapBlocked = true;
+      this.pendingDir = null;
       this.heading = this.capHeading(this.heading, HEADING_HARD);
-      return;
+      return false;
     }
-    this.heldDir = this.dir;
+    // A swap on the frame that is still accelerating reads as a speed jump.
+    // Hold the cap and swap once the next frame's speed sits next to this one.
+    if (this.swapWouldJolt()) return false;
+    // The roll already happened on this sprite. Drawing the new one would put
+    // that roll 56°–90° off the sprite. Take the new sprite at the start of
+    // the next frame, and let that frame roll on it.
+    if (this.motionOff(next, moved) > 35 / 90) {
+      this.pendingDir = next;
+      return false;
+    }
+    this.pendingDir = null;
     this.dir = next;
+    this.noChangeSinceEntry = false;
     this.travelSinceDir = 0;
     this.occupy(this.driveCells());
     this.layout();
+    return true;
+  }
+
+  /**
+   * How far this frame's roll sits from `next`, in the direction the gear
+   * actually travelled. Under 35° the new sprite can be drawn this frame.
+   */
+  private motionOff(next: FacingDir, moved: number): number {
+    if (moved < 0.004) return 0;
+    const motion = Math.atan2(this.cy - this.frameY, this.cx - this.frameX) / (Math.PI / 2);
+    const face = dirIndex(next) + (this.gear === 'R' ? 2 : 0);
+    return Math.abs(headingDelta(wrapHeading(face), motion));
+  }
+
+  /** Apply a moving swap before the frame rolls, so the roll lies on that sprite. */
+  private applyPendingSwap(): boolean {
+    const next = this.pendingDir;
+    if (!next) return false;
+    this.pendingDir = null;
+    if (this.drivePath.length > 0 || this.driveGoal) return false;
+    const idx = dirIndex(this.dir);
+    const d = headingDelta(idx, this.heading);
+    if (Math.abs(d) < HEADING_HARD - 1e-3) return false;
+    const want = DIR_ORDER[(idx + (d > 0 ? 1 : 3)) & 3];
+    if (want !== next || this.poseBlocked(this.cx, this.cy, next) !== 0) return false;
+    this.earlyFrom = this.dir;
+    this.earlyTravel = this.travelSinceDir;
+    this.dir = next;
+    this.noChangeSinceEntry = false;
+    this.travelSinceDir = 0;
+    this.occupy(this.driveCells());
+    this.layout();
+    return true;
+  }
+
+  /** True when this frame's along-speed is outside the smooth-swap band of the last one. */
+  private swapWouldJolt(): boolean {
+    const base = Math.abs(this.frameSpeed);
+    if (base <= 1 || this.frameDt < 1e-8) return false;
+    // A stop is not a speed jump. Deferring it leaves the truck at the cap
+    // with no swap and no R cue, which the dead-stop gate counts.
+    if (Math.hypot(this.cx - this.frameX, this.cy - this.frameY) < 0.02) return false;
+    const axis = DIR_VEC[this.dir];
+    const along = ((this.cx - this.frameX) * axis.x + (this.cy - this.frameY) * axis.y) / this.frameDt;
+    const ratio = Math.abs(along) / base;
+    return ratio < 0.85 || ratio > 1.2;
   }
 
 
@@ -2895,7 +3004,6 @@ export class JacT9 {
     }
     this.creepStalled =
       gas && steerOn && (this.gear === 'D' || this.gear === 'R') && (hold || adv.moved < 1e-4);
-    this.reverseCueOn = this.gear === 'D' && hold;
   }
 
   private poseClear(x: number, y: number, dir: FacingDir = this.dir): boolean {
@@ -2919,6 +3027,45 @@ export class JacT9 {
     return lo > 1e-4 ? lo : 0;
   }
 
+  /** A step backward along the sprite, the way reverse leaves a pose. */
+  private axisReverseBlocked(x: number, y: number, step: number): boolean {
+    const f = DIR_VEC[this.dir];
+    return this.poseBlocked(x - f.x * step, y - f.y * step, this.dir) !== 0;
+  }
+
+  /**
+   * A lateral slide that crosses a footprint boundary can wedge the box so
+   * reverse along the sprite no longer fits, even though it fit before the
+   * slide. Shorten that slide. A step already on the axis is left alone.
+   */
+  private clampLateral(ux: number, uy: number, dist: number): number {
+    if (dist <= 1e-4) return 0;
+    const f = DIR_VEC[this.dir];
+    const along = ux * f.x + uy * f.y;
+    const lat = Math.abs(ux * f.y - uy * f.x) * dist;
+    // Straight reverse is how a truck leaves a corner. A forward step, or a
+    // slide off the axis, can cross a cell boundary and close that reverse.
+    if (lat < 1e-3 && along <= 0) return dist;
+    const movedBack = -along * dist;
+    if (movedBack > 0.12) return dist;
+    const probe = 0.2;
+    if (this.axisReverseBlocked(this.cx, this.cy, probe)) return dist;
+    const ok = (d: number) => {
+      const x = this.cx + ux * d;
+      const y = this.cy + uy * d;
+      return this.poseClear(x, y) && !this.axisReverseBlocked(x, y, probe);
+    };
+    if (ok(dist)) return dist;
+    let lo = 0;
+    let hi = dist;
+    for (let i = 0; i < 8; i++) {
+      const mid = (lo + hi) / 2;
+      if (ok(mid)) lo = mid;
+      else hi = mid;
+    }
+    return lo > 1e-4 ? lo : 0;
+  }
+
   /**
    * Shared move / slide / clip / stop used by manual driving and the route follower.
    * A full step wins. Otherwise the longest legal slide within 35° of the sprite
@@ -2930,15 +3077,18 @@ export class JacT9 {
     if (len < 1e-8) return { moved: 0, blocked: false };
     const ux = dx / len;
     const uy = dy / len;
-    if (this.poseClear(this.cx + ux * len, this.cy + uy * len)) {
-      this.moveTo(this.cx + ux * len, this.cy + uy * len);
-      return { moved: len, blocked: false };
+    const full = this.clampLateral(ux, uy, this.poseClear(this.cx + ux * len, this.cy + uy * len) ? len : 0);
+    if (full >= len - 1e-4) {
+      this.moveTo(this.cx + ux * full, this.cy + uy * full);
+      return { moved: full, blocked: false };
     }
     const f = DIR_VEC[this.dir];
     const wantAlong = ux * f.x + uy * f.y;
     const gear = wantAlong >= 0 ? 1 : -1;
     const base = dirIndex(this.dir) * (Math.PI / 2) + (gear < 0 ? Math.PI : 0);
-    const minAlong = Math.cos((35 * Math.PI) / 180) - 1e-3;
+    // 34°, inside the 35° honesty limit. A 35° fan measures 35.07° after atan2
+    // and the browser gate counts that frame.
+    const minAlong = Math.cos((34 * Math.PI) / 180) - 1e-3;
     let bestScore = 0;
     let bestGot = 0;
     let bu = ux;
@@ -2946,7 +3096,7 @@ export class JacT9 {
     const consider = (su: number, sv: number) => {
       const along = (su * f.x + sv * f.y) * gear;
       if (along < minAlong) return;
-      const got = this.clipAlong(su, sv, len);
+      const got = this.clampLateral(su, sv, this.clipAlong(su, sv, len));
       const score = got * (su * ux + sv * uy);
       if (got > 1e-4 && score > bestScore) {
         bestScore = score;
@@ -2956,7 +3106,7 @@ export class JacT9 {
       }
     };
     consider(ux, uy);
-    for (let deg = -35; deg <= 35; deg += 5) {
+    for (const deg of [-34, -30, -25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25, 30, 34]) {
       const ang = base + (deg * Math.PI) / 180;
       consider(Math.cos(ang), Math.sin(ang));
     }
@@ -3001,8 +3151,10 @@ export class JacT9 {
    */
   /** Nose yaws with the wheel at creep speed. Used while the reverse arc rolls. */
   private yawWithSteer(dt: number, dirSign: number): void {
+    const cmd = Math.max(-1, Math.min(1, this.steerCmd));
+    if (Math.abs(cmd) < 1e-3) return;
     const idx = dirIndex(this.dir);
-    const yaw = Math.sign(this.steering) * CREEP_YAW * dt * dirSign;
+    const yaw = cmd * CREEP_YAW * dt * dirSign;
     const d = headingDelta(idx, this.heading) + yaw;
     this.heading = wrapHeading(idx + Math.max(-HEADING_HARD, Math.min(HEADING_HARD, d)));
   }
@@ -3197,8 +3349,8 @@ export class JacT9 {
     // The 5×3 is the driving box. The 2×2 cab helper disagrees on the lane and
     // used to refuse a facing that already fits, so a long frame never turned.
     if (this.poseBlocked(this.cx, this.cy, want) > 0 && !this.sitWith(this.cx, this.cy, want) && !this.pathSit(this.cx, this.cy)) return;
-    if (!this.heldDir) this.heldDir = this.dir;
     this.dir = want;
+    this.noChangeSinceEntry = false;
     this.heading = this.capHeading(this.heading, HEADING_CAP);
     this.travelSinceDir = 0;
     this.dirHoldT = DIR_HOLD_S;
