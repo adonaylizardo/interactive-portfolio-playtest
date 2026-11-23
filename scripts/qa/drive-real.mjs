@@ -29,7 +29,9 @@
  *          ≥0.5 s; or still with no R cue ≥1.0 s) and no unjustified R cue (cue ≥0.3 s while the oracle says
  *          the swap toward the held-steer side is legal, D1 1.0 t ahead);
  *        - every sample pair in the window (Sentinel QA3, option A): |Δh| ≤ 2.4·min(Δt_game, 0.25) + 0.05 q, where
- *          Δt_game comes from `gameTimeMs` (hook H-2) in the SAME jacSnapshot as heading. QA3b: > 2 % pairs with
+ *          Δt_game comes from `gameTimeMs` (hook H-2) in the SAME jacSnapshot as heading. QA3c: exact duplicate
+ *          reads (same frameId + gameTimeMs + heading) are dropped first (count logged); < 10 distinct frames, > 50 %
+ *          duplicates, or a duplicate run > 250 ms wall (frozen ticker) ⇒ INCONCLUSO. QA3b: > 2 % pairs with
  *          frameId not strictly increasing or Δt_game ≤ 0 (3a), or > 2 % with Δt_game > 0.25 s (3b) ⇒ that side is
  *          INCONCLUSO. |Δt_game − Δt_wall| > max(50 ms, 1.5·frameMed) and wall dh are info only. No gameTimeMs or no
  *          frameId ⇒ G10 FAIL (fail-closed, no wall-time fallback).
@@ -1014,11 +1016,27 @@ function turnAtSpeed(samples) {
 }
 
 /** r45k G-E (Sentinel QA1 ruling): G10 judged up to the 90° crossing with the old stop rule, after it with G-A. */
-function g10Eval(samples, touch, sd) {
+function g10Eval(raw, touch, sd) {
+  // Sentinel QA3c: exact duplicate reads (same frameId + gameTimeMs + heading: a late harness read of the previous frame,
+  // atomic) are dropped BEFORE judging; count logged. A duplicate run lasting > 250 ms of wall time = frozen ticker.
+  // Torn snapshots (same frameId, different heading/gameTimeMs; frameId going backwards) are NOT dropped and stay 3a.
+  const fieldsOk = raw.every((x) => x.gt != null && x.fid != null);
+  const isDup = (x, p) => fieldsOk && x.fid === p.fid && x.gt === p.gt && x.heading === p.heading;
+  const samples = [], frozenRuns = [];
+  let dupCount = 0, runStart = null;
+  for (let i = 0; i < raw.length; i++) {
+    if (i > 0 && isDup(raw[i], raw[i - 1])) { dupCount++; runStart ??= raw[i - 1]; continue; }
+    if (runStart && raw[i - 1].t - runStart.t > 250) frozenRuns.push({ wallMs: Math.round(raw[i - 1].t - runStart.t), fid: runStart.fid, at: [+runStart.cx.toFixed(2), +runStart.cy.toFixed(2), runStart.dir] });
+    runStart = null; samples.push(raw[i]);
+  }
+  if (runStart && raw[raw.length - 1].t - runStart.t > 250) frozenRuns.push({ wallMs: Math.round(raw[raw.length - 1].t - runStart.t), fid: runStart.fid, at: [+runStart.cx.toFixed(2), +runStart.cy.toFixed(2), runStart.dir] });
+  const distinct = samples.length, dupFrac = raw.length ? dupCount / raw.length : 0;
+  const dedup = { rawSamples: raw.length, duplicatesDropped: dupCount, duplicatePct: +(100 * dupFrac).toFixed(2), distinctFrames: distinct, frozenTickerRuns: frozenRuns };
+  const dedupInconclusive = distinct < 10 || dupFrac > 0.5 || frozenRuns.length > 0;
   const hook = cueHookOf(samples);
   const gtrav = gtravOf(samples);
   const i0 = samples.findIndex((x) => x.driving && steerSide(x, touch) === sd);
-  if (i0 < 0) return { ok: false, why: 'steer never seen', cueHook: hook };
+  if (i0 < 0) return { ok: false, status: !fieldsOk ? 'FAIL' : dedupInconclusive ? 'INCONCLUSO' : 'FAIL', why: 'steer never seen', cueHook: hook, gtMissing: raw.some((x) => x.gt == null), fidMissing: raw.some((x) => x.fid == null), dedup };
   const h0 = samples[i0].heading;
   let i90 = -1;
   for (let i = i0; i < samples.length; i++) if (Math.abs(wrapQ(samples[i].heading - h0)) >= 0.9) { i90 = i; break; }
@@ -1031,6 +1049,7 @@ function g10Eval(samples, touch, sd) {
   //  3b: a pair with Δt_game at the 0.25 s cap (≥ 250 ms; one capped frame gives exactly 250) is flagged; > 2 % ⇒ INCONCLUSO.
   //  info: |Δt_game − Δt_wall| > max(50 ms, 1.5·frameMed) is logged only (frameMed = median positive Δt_wall); no verdict.
   //  4: no gameTimeMs or no frameId in any sample ⇒ FAIL (fail-closed, no wall-time fallback).
+  //  QA3c: runs on the de-duplicated samples (see the top of g10Eval); 3a still catches torn snapshots there.
   const gtMissing = samples.some((x) => x.gt == null);
   const fidMissing = samples.some((x) => x.fid == null);
   let dhBad = 0, dhWorst = -9, dhAt = null, pairs = 0, nonAtomic = 0, naAt = null, capHit = 0, capAt = null, clockInfo = 0, clockAt = null, dhWallWorst = -9, dhWallAt = null;
@@ -1074,9 +1093,9 @@ function g10Eval(samples, touch, sd) {
     }
   }
   const ok = !gtMissing && !fidMissing && t90 != null && t90 <= 2.0 && pre.stopMs < 500 && dead === 0 && cueBad === 0 && dhBad === 0;
-  const status = gtMissing || fidMissing ? 'FAIL' : naFrac > 0.02 || capFrac > 0.02 ? 'INCONCLUSO' : ok ? 'PASS' : 'FAIL';
+  const status = gtMissing || fidMissing ? 'FAIL' : dedupInconclusive || naFrac > 0.02 || capFrac > 0.02 ? 'INCONCLUSO' : ok ? 'PASS' : 'FAIL';
   return {
-    ok, status, gtMissing, fidMissing, dhClock: 'game', pairs,
+    ok, status, gtMissing, fidMissing, dhClock: 'game', dedup, pairs,
     nonAtomic, nonAtomicPct: +(100 * naFrac).toFixed(2), nonAtomicFirst: naAt, capHit, capHitPct: +(100 * capFrac).toFixed(2), capHitFirst: capAt,
     info_clockGap: { thrMs: Math.round(clockThr), frameMedMs: Math.round(frameMed), flagged: clockInfo, first: clockAt },
     info_dhWallWorstExcess: +dhWallWorst.toFixed(3), info_dhWallWorstAt: dhWallAt, cueHook: hook, t90, preStopMs: pre.stopMs, preStopAt: pre.stopAt,

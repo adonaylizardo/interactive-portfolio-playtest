@@ -217,12 +217,17 @@ Implemented in `scripts/qa/drive-real.mjs` (from Sentinel's `drive-real.sent.mjs
   - `frameId` is the ticker frame counter.
   - Both come back in the same snapshot object as `heading`, from the same frame, so drive-real reads them atomically.
   - The cloud agent adds them together with the G3 fix. Until that SHA lands, G10 fails closed on every build.
-- **G10 dh criterion (QA3 option A, condition 3 replaced by QA3b):**
+- **G10 dh criterion (QA3 option A; condition 3 replaced by QA3b; de-duplication from QA3c):**
   1. Per consecutive sample pair: |Δh| ≤ 2.4·min(Δt_game, 0.25) + 0.05 q, with Δt_game = Δ`gameTimeMs`.
   2. 3a: a pair whose `frameId` is not strictly increasing, or whose Δt_game ≤ 0, is non-atomic. More than 2 % of a turn's pairs ⇒ **INCONCLUSO**.
-  3. 3b: a pair whose Δt_game is at the 0.25 s cap (≥ 250 ms; one capped frame gives exactly 250 ms) is flagged. More than 2 % ⇒ **INCONCLUSO**.
+  3. 3b (≥ 250 ms approved in QA3c): a pair whose Δt_game is at the 0.25 s cap (≥ 250 ms; one capped frame gives exactly 250 ms) is flagged. More than 2 % ⇒ **INCONCLUSO**.
   4. Info only, not part of the verdict: Δt_wall, the wall-clock dh, and pairs with |Δt_game − Δt_wall| > max(50 ms, 1.5·frameMed), where frameMed is the median positive Δt_wall (`info_clockGap`).
   5. If any sample lacks `gameTimeMs` or `frameId`, G10 = **FAIL**. There is no fallback to wall time.
+  6. QA3c, de-duplication **before** judging (applies to all of `g10Eval`):
+     - An exact duplicate read (same `frameId` + `gameTimeMs` + `heading` as the previous sample) is dropped. This is a late harness read of the previous frame, and it is atomic. The count per turn is logged in `dedup` (`duplicatesDropped`, `duplicatePct`, `distinctFrames`).
+     - The turn is **INCONCLUSO** if it has fewer than 10 distinct frames after the drop, or if duplicates are more than 50 % of its raw samples.
+     - A run of duplicates lasting more than 250 ms of wall time means the ticker froze. It is logged in `frozenTickerRuns`, and the turn is **INCONCLUSO**. The turn here is the whole G10 sample window of that side.
+     - Not dropped, and still non-atomic under 3a: the same `frameId` with a different `heading` or `gameTimeMs`, or a `frameId` that goes backwards.
   - G10 combines the two sides: any FAIL ⇒ FAIL, otherwise any INCONCLUSO ⇒ INCONCLUSO.
   - Closing G10 requires PASS at 1440 and at 375 in 2 consecutive runs, on the SHA with the G3 fix and H-2.
 - **park4 freeze / stale reading:**
