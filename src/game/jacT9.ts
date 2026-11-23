@@ -2937,7 +2937,11 @@ export class JacT9 {
     const dirSign = this.gear === 'R' ? -1 : 1;
     const travelled = this.noChangeSinceEntry || this.travelSinceDir >= SWAP_TRAVEL_MIN;
     const fits = this.poseBlocked(this.cx, this.cy, next) === 0;
-    const ahead = moved >= 0.02 || this.freeAhead(next, dirSign, SWAP_AHEAD_TILES);
+    // Free ahead on every accepted swap, including ones made while moving.
+    // Skipping it when moved >= 0.02 accepted a sw→nw swap at ~4.3 t/s straight
+    // into a wall: vel went to 0 in that frame with 0 t since the change, and
+    // D1 then refused both side swaps.
+    const ahead = this.freeAhead(next, dirSign, SWAP_AHEAD_TILES);
     if (!travelled || !fits || !ahead) {
       this.swapBlocked = true;
       this.pendingDir = null;
@@ -2984,7 +2988,9 @@ export class JacT9 {
     const d = headingDelta(idx, this.heading);
     if (Math.abs(d) < HEADING_HARD - 1e-3) return false;
     const want = DIR_ORDER[(idx + (d > 0 ? 1 : 3)) & 3];
+    const dirSign = this.gear === 'R' ? -1 : 1;
     if (want !== next || this.poseBlocked(this.cx, this.cy, next) !== 0) return false;
+    if (!this.freeAhead(next, dirSign, SWAP_AHEAD_TILES)) return false;
     this.earlyFrom = this.dir;
     this.earlyTravel = this.travelSinceDir;
     this.dir = next;
