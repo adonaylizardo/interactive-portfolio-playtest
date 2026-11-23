@@ -241,3 +241,32 @@ Implemented in `scripts/qa/drive-real.mjs` (from Sentinel's `drive-real.sent.mjs
   - INCONCLUSO trials are retried up to 3 times, each in a fresh context.
   - Exit codes: 0 if all PASS, 1 if any FAIL, 2 if any INCONCLUSO.
   - An arrival PASS needs `arrived`, plus a card for doors, a card–dock overlap of 0, and 0 moving frames over a blocked footprint.
+
+### 7.2 QA4 ruling (Sentinel REVIEW-QA3 §QA4)
+- **E1 approved: the tree/cactus dead-end R-cue delay is measured in game time** (`drive-real.mjs` `cueDelayGame`).
+  - Start: the first sample at or after the hold dispatch where the game's own input state shows the steer, i.e. `side·steering > 0.01`. `steering` already exists in `jacSnapshot()`: it is the clamped `steerSmoothed`, the game's own input state, so **no H-3 hook is needed**. If a build drops it, the result is null with "needs H-3", and G2 fails closed.
+  - End: the first sample with `reverseCue` on.
+  - Delay = Δ`gameTimeMs`, and it must be ≤ **500 ms** (threshold unchanged). Missing `gameTimeMs` (H-2) ⇒ null ⇒ fail.
+  - Logged as info: the wall-clock delay from contact (`info_cueDelayWallFromContactMs`), and the input lag from dispatch to registration (`inputLagGameMs`, `inputLagWallMs`).
+  - An input lag over 100 ms of game time is reported as **PRODUCT LATENCY** in the G2 detail. It is not excluded.
+  - Headless check (8536dba4, `r45k/qa4/qa4b-check.txt`): 351 ms at 1/60 s frames, 335 ms at 67 ms frames, 402 ms at 0.7 steer.
+- **E2 rejected.** fdr G2 keeps its rule. The at-speed swap into a wall is a product defect that the fix must remove.
+- **G-F nuance:** a G2 window is **not** excluded when the pin was caused by a sprite swap accepted in the 2 frames before the pin began (`swapCausedPin`). The count uses `frameId`; it falls back to sample steps if `frameId` is missing. The cue/A4 conditions are unchanged otherwise.
+- **G-G / D1 undo exception:** going straight back to the previous facet is legal without the 0.1 t / 1 t rules when all of these hold:
+  - it happens ≤ 1 frame after the swap that left that facet;
+  - the previous facet's box fits (oracle `blocked = 0`);
+  - the truck is pinned on the current facet.
+  It is logged as `undoSwap`. D1 is otherwise kept: undo in place is allowed only when the box fits. Headless check: undo after 1 frame is legal; after 3 frames it is flagged.
+- **swaplock headless check (must be 0/180 after the fix).** Reference: `r45k/qa4/swaplock.mjs`.
+  - The grid has 180 cases: dt ∈ {1/60, 0.1, 0.12} × x0 ∈ {38.9, 39.0, 39.1, 39.2, 39.3} × y0 ∈ {6.5, 7, 7.5, 8} × ramp ∈ {1.2, 1.6, 2.0} s.
+  - Each case:
+    - `qaSpawnDrive(x0, y0, 'sw')`, gear D;
+    - 0.3 s straight gas (dx 0, dy −1);
+    - then the stick sweeps a = (0.32 + 0.4·u)·π/2, with u = clamp((t − 0.3)/ramp), dx = sin a, dy = −cos a;
+    - 6 s in total.
+  - A **swap-lock** is counted when all of these hold:
+    - a sprite change is accepted;
+    - within ≤ 2 frames, the nose is oracle-pinned on the new sprite (no 0.25 t free) with < 0.02 t travelled since the change;
+    - 1.5 s later, with the same input, the truck is still pinned and |vel| < 0.01.
+  - Result on 53cf2dd0 and 8536dba4: **12/180**, identical, all sw→nw at x 37.95, y 10.6–12.4.
+  - The fix must give **0/180** on the same grid.

@@ -17,7 +17,9 @@
  *   G6 zero console errors / page errors
  *   G7 per-frame displacement ≤ max(0.35, 1.6·|v|·dt + 0.08)
  *   G8 (G-G, aligned with D1) a 90° sprite step needs >= 0.1 t of travel since the previous facing, or an
- *      in-place swap whose rotated box is free with >= 1 t clear ahead (oracle)
+ *      in-place swap whose rotated box is free with >= 1 t clear ahead (oracle). QA4 undo exception: going straight
+ *      back to the previous facet ≤ 1 frame after the swap that left it is legal when that facet's box fits (oracle
+ *      blocked = 0) and the truck is pinned on the current facet (logged as step.undoSwap).
  *   G9 no driving frame whose 5×3 / 3×5 footprint overlaps a blocked cell
  *   G10 turn at speed from a site fixed by Forge (r45k), amended by G-E (Sentinel QA1 ruling): get in at
  *      spawn, tap R and hold gas until cx ≤ 16.3 (closed loop, polled, cap 3 s), release, tap D, then
@@ -41,6 +43,12 @@
  *      ≥0.1 t since a real sprite change), and (c) the R cue was on for ≥1.0 s of the 1.5 s window. Tree/cactus: if the
  *      contact pose is a true dead end (pinned, no legal swap on either side), the R cue must appear ≤0.5 s after
  *      the stop and R may be used to free it; otherwise "freed without R" still applies.
+ *      QA4 E1: that cue delay is in GAME time: start = first sample at/after the hold dispatch whose `steering`
+ *      (jacSnapshot, the game's smoothed steer input) has side·steering > 0.01; end = first sample with the R cue on;
+ *      gameMs = Δ`gameTimeMs` ≤ 500. Info: wall delay from contact, input lag dispatch→registration (game + wall);
+ *      input lag > 100 ms game is reported as PRODUCT LATENCY (not excluded). No `steering` ⇒ null (needs H-3), fail.
+ *      QA4 G-F nuance: no exclusion when the pin was caused by a sprite swap accepted ≤ 2 frames before the pin
+ *      began (swapCausedPin, by frameId). QA4 E2 rejected: fdr G2 keeps its rule.
  *   G-E/G-F read the R cue from `__playtestQa.jac().reverseCue` (jacSnapshot()). Without it, nothing is excluded and
  *      every cue check fails closed (cueHook=false in the report).
  *
@@ -156,6 +164,7 @@ function installSampler() {
       // Sentinel QA3 option A / hook H-2: game time read from the SAME snapshot as heading (atomic pair).
       gt: typeof j.gameTimeMs === 'number' && Number.isFinite(j.gameTimeMs) ? j.gameTimeMs : null,
       fid: typeof j.frameId === 'number' && Number.isFinite(j.frameId) ? j.frameId : null, // QA3b 3a: ticker frame counter, same snapshot
+      steer: typeof j.steering === 'number' && Number.isFinite(j.steering) ? j.steering : null, // QA4 E1: the game's own (smoothed) steer input state
       vel: j.vel,
       gear: j.gear,
       mph: j.mph,
@@ -388,7 +397,34 @@ async function reverseOut(s, touch) {
   await realTapSelector(s.page, s.input, '[data-jac="gear"][data-val="D"]');
   await s.page.waitForTimeout(300);
 }
-/** ms from contact to the first R cue sample (0 if already on), null if never. */
+/**
+ * Sentinel QA4 E1: R-cue delay in GAME time. Start = first sample at/after the hold dispatch (tHold, page clock) where the
+ * game's own steer state (`steering` in jacSnapshot) registers the held side (side·steering > STEER_REG); end = first
+ * sample at/after the start with reverseCue on. Both read as gameTimeMs. null (⇒ FAIL) when either is never seen or the
+ * snapshot has no gameTimeMs/steering. Info: input lag = game time from the first sample after dispatch to the start;
+ * > 100 ms is reported as product latency (not excluded).
+ */
+const STEER_REG = 0.01;
+function cueDelayGame(samples, tHold, side) {
+  const S = samples.filter((x) => x.t >= tHold);
+  if (!S.length) return { gameMs: null, why: 'no samples after the hold' };
+  if (S.some((x) => x.gt == null)) return { gameMs: null, why: 'no gameTimeMs in jacSnapshot (H-2)' };
+  if (S.some((x) => x.steer == null)) return { gameMs: null, why: 'no steering in jacSnapshot (needs H-3)' };
+  const is = S.findIndex((x) => side * x.steer > STEER_REG);
+  if (is < 0) return { gameMs: null, why: 'steer never registered by the game', dispatchGt: S[0].gt };
+  const ie = S.findIndex((x, k) => k >= is && x.cue === true);
+  const lag = S[is].gt - S[0].gt;
+  return {
+    gameMs: ie < 0 ? null : Math.round(S[ie].gt - S[is].gt),
+    why: ie < 0 ? 'cue never on' : null,
+    startAt: [+S[is].cx.toFixed(2), +S[is].cy.toFixed(2), S[is].dir, +S[is].steer.toFixed(3)],
+    registeredOnFirstSample: is === 0,
+    inputLagGameMs: Math.round(lag),
+    inputLagWallMs: Math.round(S[is].t - tHold),
+    productLatency: lag > 100,
+  };
+}
+/** Info only since QA4 E1: wall ms from contact to the first R cue sample (0 if already on), null if never. */
 function cueDelayMs(samples, tContact) {
   const c = samples.find((x) => x.t >= tContact - 500 && x.cue === true);
   return c ? Math.max(0, Math.round(c.t - tContact)) : null;
@@ -767,6 +803,17 @@ const cueHookOf = (samples) => samples.some((s) => typeof s.cue === 'boolean');
 function deadEndAt(x, y, dir, sign, gtrav) {
   return !freeAlong(x, y, dir, sign, 0.25) && !legalSwap(x, y, sideDir(dir, 1), sign, gtrav) && !legalSwap(x, y, sideDir(dir, -1), sign, gtrav);
 }
+/** QA4: was the pin at samples[b] caused by a sprite swap accepted ≤ 2 frames before the pin began? */
+function swapCausedPin(samples, b, sign) {
+  let c = -1; for (let k = b; k > 0; k--) if (samples[k].dir !== samples[k - 1].dir) { c = k; break; }
+  if (c < 0) return { caused: false };
+  let p = -1; for (let k = c; k <= b; k++) if (!freeAlong(samples[k].cx, samples[k].cy, samples[k].dir, sign, 0.25)) { p = k; break; }
+  if (p < 0) return { caused: false };
+  for (let k = p; k <= b; k++) if (freeAlong(samples[k].cx, samples[k].cy, samples[k].dir, sign, 0.25)) return { caused: false }; // un-pinned since
+  const hasFid = samples[c - 1].fid != null && samples[p].fid != null;
+  const frames = hasFid ? samples[p].fid - samples[c - 1].fid : p - (c - 1);
+  return { caused: frames <= 2, frames, by: hasFid ? 'frameId' : 'samples', swap: [samples[c - 1].dir, samples[c].dir], at: [+samples[c].cx.toFixed(2), +samples[c].cy.toFixed(2)] };
+}
 /** G-F: classify one G2 window [a..b] of `samples`. */
 function g2Exclusion(samples, a, b, touch, gtrav) {
   const e = samples[b];
@@ -794,7 +841,10 @@ function g2Exclusion(samples, a, b, touch, gtrav) {
     if (just && toward) { run.push(dtMs); runT += dt; } else { if (run.length) flush(false); uncovMs += dtMs; } }
   if (run.length) flush(true);
   const a4Ok = pinned && cueMs >= 400 && uncovMs <= 250;
-  return { excluded: pinned && noSwap && (cueOk || a4Ok), a4: { deadEndBoth: de, yawCoveredMs: Math.round(covMs), uncoveredMs: Math.round(uncovMs), ok: a4Ok }, pinned, noSwapToSteerSide: noSwap, side, cueMs: Math.round(cueMs), gtrav: Number.isFinite(gtrav[b]) ? +gtrav[b].toFixed(2) : 'none' };
+  // Sentinel QA4: no exclusion when the pin was CAUSED by an accepted sprite swap in the 2 frames before it (the product
+  // drove the new facet into the wall with 0 t travelled). Frames = frameId when present, else sample steps.
+  const swapPin = swapCausedPin(samples, b, sign);
+  return { excluded: pinned && noSwap && (cueOk || a4Ok) && !swapPin.caused, swapPin, a4: { deadEndBoth: de, yawCoveredMs: Math.round(covMs), uncoveredMs: Math.round(uncovMs), ok: a4Ok }, pinned, noSwapToSteerSide: noSwap, side, cueMs: Math.round(cueMs), gtrav: Number.isFinite(gtrav[b]) ? +gtrav[b].toFixed(2) : 'none' };
 }
 
 const FACING_DEG = { se: 0, sw: 90, nw: 180, ne: 270 };
@@ -893,11 +943,13 @@ function spins(samples) {
   if (samples.length < 2) return { bad, worst };
   let travel = 0;
   let dir = samples[0].dir;
+  let prevDir = null, lastChange = -1; // QA4 G-G undo exception bookkeeping
   for (let i = 1; i < samples.length; i++) {
     const dtMs = samples[i].t - samples[i - 1].t;
     if (!(dtMs > 0 && dtMs <= 400)) {
       dir = samples[i].dir;
       travel = 0;
+      prevDir = null; lastChange = -1;
       continue;
     }
     travel += Math.hypot(samples[i].cx - samples[i - 1].cx, samples[i].cy - samples[i - 1].cy);
@@ -914,8 +966,14 @@ function spins(samples) {
       const q = samples[i - 1];
       const inPlaceOk = OR.blocked(q.cx, q.cy, samples[i].dir) === 0 && freeAlong(q.cx, q.cy, samples[i].dir, gearSign(samples[i]), D1_AHEAD_T);
       step.inPlaceOk = inPlaceOk;
-      if (travel < 0.1 && !inPlaceOk) bad.push(step);
+      // G-G undo exception (Sentinel QA4): going straight back to the previous facet, ≤ 1 frame after the swap that
+      // pinned the truck, is legal without 0.1 t if the old box fits in place (D1 fit kept).
+      const fr = lastChange >= 0 ? (samples[i].fid != null && samples[lastChange].fid != null ? samples[i].fid - samples[lastChange].fid : i - lastChange) : Infinity;
+      const undoOk = samples[i].dir === prevDir && fr <= 1 && OR.blocked(q.cx, q.cy, samples[i].dir) === 0 && !freeAlong(q.cx, q.cy, dir, gearSign(samples[i]), 0.25);
+      if (undoOk) step.undoSwap = { frames: fr };
+      if (travel < 0.1 && !inPlaceOk && !undoOk) bad.push(step);
     }
+    prevDir = dir; lastChange = i;
     dir = samples[i].dir;
     travel = 0;
   }
@@ -1362,7 +1420,8 @@ async function runViewport(browser, kind) {
       gearsUsed: [...new Set(r2.samples.map((x) => x.gear))],
       deadEnd: cDE.deadEnd,
       contact: cDE,
-      cueDelayMs: cueDelayMs(r2.samples, cDE.tContact),
+      cueTiming: cueDelayGame(r2.samples, tHold, 1), // QA4 E1: first hold is right (+1)
+      info_cueDelayWallFromContactMs: cueDelayMs(r2.samples, cDE.tContact),
       fps: fpsOf(r2.samples),
     };
     await shot(s.page, `${tag}-04b-cactus-free`);
@@ -1500,7 +1559,8 @@ async function runViewport(browser, kind) {
       gearsUsed,
       deadEnd: tDE.deadEnd,
       contact: tDE,
-      cueDelayMs: cueDelayMs(r3.samples, tDE.tContact),
+      cueTiming: cueDelayGame(r3.samples, tHold, 1), // QA4 E1: first hold is right (+1)
+      info_cueDelayWallFromContactMs: cueDelayMs(r3.samples, tDE.tContact),
       routeRecoveries,
       attempt: att,
     };
@@ -1561,7 +1621,10 @@ async function runViewport(browser, kind) {
   };
   const stickHidden = touch ? samples.filter((x) => x.driving && !x.stickVisible).length : 0;
   // G-F: in a true dead end the R cue must show within 0.5 s and R may free it; elsewhere it must be freed without R
+  // QA4 E1: the dead-end cue delay is judged in GAME time (cueTiming.gameMs, steer registered → cue on), threshold 500 ms.
+  for (const r of [res.runs.cactus, res.runs.tree]) if (r) r.cueDelayMs = r.cueTiming?.gameMs ?? null;
   const freedOk = (r, touching) => touching && r.freed && (r.deadEnd ? r.cueDelayMs != null && r.cueDelayMs <= 500 : !r.gearsUsed.includes('R'));
+  const latNote = [res.runs.cactus, res.runs.tree].filter((r) => r?.cueTiming?.productLatency).map((r) => r.cueTiming.inputLagGameMs);
   const dlCount = dl.filter((d) => !d.gF.excluded);
   const dlExcl = dl.filter((d) => d.gF.excluded);
   const cueHook = all.some((x) => cueHookOf(x));
@@ -1578,9 +1641,10 @@ async function runViewport(browser, kind) {
         `attempts cactus=${res.runs.cactus.attempt} tree=${res.runs.tree.attempt}; contact cactus=${JSON.stringify(res.runs.cactus.contact)} tree=${JSON.stringify(res.runs.tree.contact)}; holds=${JSON.stringify(HOLDLOG.slice(-6))}; ` +
         `cueHook=${cueHook}; gas+steer windows with <${G2_MIN_TRAVEL} tile travel: ${dl.length}, excluded by G-F ${dlExcl.length}, counted ${dlCount.length} ${JSON.stringify(dlCount.slice(0, 4))}; ` +
         `excluded ${JSON.stringify(dlExcl.slice(0, 4))}; ` +
-        `cactus nose ${res.runs.cactus.noseDist} deadEnd=${res.runs.cactus.deadEnd} cueDelay=${res.runs.cactus.cueDelayMs} gears=${res.runs.cactus.gearsUsed} ok=${cactusOk}; ` +
-        `tree nose ${res.runs.tree.noseDist} deadEnd=${res.runs.tree.deadEnd} cueDelay=${res.runs.tree.cueDelayMs} gears=${res.runs.tree.gearsUsed} ok=${treeOk}; ` +
-        `closed-loop reroutes logged: ${rerouteN}`,
+        `cactus nose ${res.runs.cactus.noseDist} deadEnd=${res.runs.cactus.deadEnd} cueDelay(game)=${res.runs.cactus.cueDelayMs} ${JSON.stringify(res.runs.cactus.cueTiming)} wallFromContact=${res.runs.cactus.info_cueDelayWallFromContactMs} gears=${res.runs.cactus.gearsUsed} ok=${cactusOk}; ` +
+        `tree nose ${res.runs.tree.noseDist} deadEnd=${res.runs.tree.deadEnd} cueDelay(game)=${res.runs.tree.cueDelayMs} ${JSON.stringify(res.runs.tree.cueTiming)} wallFromContact=${res.runs.tree.info_cueDelayWallFromContactMs} gears=${res.runs.tree.gearsUsed} ok=${treeOk}; ` +
+        `closed-loop reroutes logged: ${rerouteN}` +
+        (latNote.length ? `; PRODUCT LATENCY: steer registered ${latNote.join('/')} ms of game time after dispatch (> 100 ms, reported, not excluded)` : ''),
     },
     G3: { pass: g3.deg <= G3_MAX_DEG, detail: `worst ${g3.deg}° over ${g3.frames} moving frames ${JSON.stringify(g3)}` },
     G4: touch
