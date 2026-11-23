@@ -212,13 +212,19 @@ Implemented in `scripts/qa/drive-real.mjs` (from Sentinel's `drive-real.sent.mjs
 - **park4:** viewports 1440, 1280, 375 and 390 (390×844 DPR 3 touch). A target is tappable when it is inside the viewport and `elementFromPoint` there is the map canvas; up to 14 zoom-outs. A drag cannot pan while driving (the camera follows the truck, `scene.updateCameraFollow`), so doors are reached by zoom, not pan.
 
 ### 7.1 QA3 ruling (Sentinel REVIEW-QA3, G10 option A approved)
-- **Hook H-2 (product, QA only): `gameTimeMs`** in `jacSnapshot()` (`__playtestQa.jac()`). It is a monotonic counter of accumulated game time in ms, using the same `dt` the truck integrates (ticker elapsed, capped at 0.25 s). It must be returned in the same snapshot object as `heading`, so that drive-real reads the pair atomically, from one frame. The cloud agent adds it together with the G3 fix. Until that SHA lands, G10 fails closed on every build.
-- **G10 dh criterion:** for each consecutive pair of samples, |Δh| ≤ 2.4·min(Δt_game, 0.25) + 0.05 q, with Δt_game = Δ`gameTimeMs`. Δt_wall and the wall-clock dh are logged as info only (`info_dhWallWorst*`).
-  - A pair with |Δt_game − Δt_wall| > 50 ms, or a non-monotonic game clock, is flagged.
-  - If more than 2 % of a turn's pairs are flagged, that turn is **INCONCLUSO**, never PASS.
-  - If `gameTimeMs` is missing from any sample, G10 = **FAIL**. There is no fallback to wall time.
+- **Hook H-2 (product, QA only): `gameTimeMs` + `frameId`** in `jacSnapshot()` (`__playtestQa.jac()`):
+  - `gameTimeMs` is a monotonic count of accumulated game time in ms, using the same `dt` the truck integrates (ticker elapsed, capped at 0.25 s).
+  - `frameId` is the ticker frame counter.
+  - Both come back in the same snapshot object as `heading`, from the same frame, so drive-real reads them atomically.
+  - The cloud agent adds them together with the G3 fix. Until that SHA lands, G10 fails closed on every build.
+- **G10 dh criterion (QA3 option A, condition 3 replaced by QA3b):**
+  1. Per consecutive sample pair: |Δh| ≤ 2.4·min(Δt_game, 0.25) + 0.05 q, with Δt_game = Δ`gameTimeMs`.
+  2. 3a: a pair whose `frameId` is not strictly increasing, or whose Δt_game ≤ 0, is non-atomic. More than 2 % of a turn's pairs ⇒ **INCONCLUSO**.
+  3. 3b: a pair whose Δt_game is at the 0.25 s cap (≥ 250 ms; one capped frame gives exactly 250 ms) is flagged. More than 2 % ⇒ **INCONCLUSO**.
+  4. Info only, not part of the verdict: Δt_wall, the wall-clock dh, and pairs with |Δt_game − Δt_wall| > max(50 ms, 1.5·frameMed), where frameMed is the median positive Δt_wall (`info_clockGap`).
+  5. If any sample lacks `gameTimeMs` or `frameId`, G10 = **FAIL**. There is no fallback to wall time.
   - G10 combines the two sides: any FAIL ⇒ FAIL, otherwise any INCONCLUSO ⇒ INCONCLUSO.
-  - Closing G10 requires PASS at 1440 and at 375 in 2 consecutive runs, on the SHA that carries the G3 fix.
+  - Closing G10 requires PASS at 1440 and at 375 in 2 consecutive runs, on the SHA with the G3 fix and H-2.
 - **park4 freeze / stale reading:**
   - A trial is **INCONCLUSO** in any of these cases:
     - a rAF gap ≥ 2000 ms;
