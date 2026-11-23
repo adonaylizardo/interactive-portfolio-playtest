@@ -16,7 +16,8 @@
  *   G5 phone: the stick stays visible for the whole drive and tracks its own finger
  *   G6 zero console errors / page errors
  *   G7 per-frame displacement ≤ max(0.35, 1.6·|v|·dt + 0.08)
- *   G8 no sprite rotation of 90° or more with < 0.3 tiles of travel since the previous facing
+ *   G8 (G-G, aligned with D1) a 90° sprite step needs >= 0.1 t of travel since the previous facing, or an
+ *      in-place swap whose rotated box is free with >= 1 t clear ahead (oracle)
  *   G9 no driving frame whose 5×3 / 3×5 footprint overlaps a blocked cell
  *   G10 turn at speed from a site fixed by Forge (r45k), amended by G-E (Sentinel QA1 ruling): get in at
  *      spawn, tap R and hold gas until cx ≤ 16.3 (closed loop, polled, cap 3 s), release, tap D, then
@@ -322,19 +323,19 @@ async function stickPad(page) {
 async function holdStick(page, input, vec, ms, id = 1) {
   const pad = await stickPad(page);
   const R = 44;
+  // Sentinel A1: timer starts at the touchStart dispatch; one move to the target (no ramp); re-sends stop early by the
+  // last measured CDP ack so the page-side hold lands on ~ms. Each hold is logged (requested vs wall vs ack).
   await input.touchEv('touchStart', [{ x: pad.x, y: pad.y, id }]);
-  const steps = 6;
-  for (let i = 1; i <= steps; i++) {
-    await input.touchEv('touchMove', [{ x: pad.x + vec.x * R * (i / steps), y: pad.y + vec.y * R * (i / steps), id }]);
-    await wait(16);
-  }
-  const t0 = Date.now();
-  while (Date.now() - t0 < ms) {
-    await wait(100);
-    await input.touchEv('touchMove', [{ x: pad.x + vec.x * R, y: pad.y + vec.y * R, id }]);
-  }
+  let a = Date.now();
+  await input.touchEv('touchMove', [{ x: pad.x + vec.x * R, y: pad.y + vec.y * R, id }]);
+  let ack = Date.now() - a;
+  const T0 = Date.now(); // the CDP ack returns once the page has handled the move: deflection starts here
+  // No re-sends (each costs a frame of CDP latency); the touchEnd is sent one ack early so the page sees ~ms of deflection.
+  await wait(Math.max(0, ms - ack - (Date.now() - T0)));
   await input.touchEv('touchEnd', []);
+  HOLDLOG.push({ ms, wallMs: Date.now() - T0, lastAckMs: ack });
 }
+const HOLDLOG = [];
 
 /** G-F: is the prop-contact pose a true dead end (oracle)? Reads the samples so far for the sprite-change travel. */
 async function contactDeadEnd(page) {
@@ -344,6 +345,29 @@ async function contactDeadEnd(page) {
   const tNow = await page.evaluate(() => performance.now());
   if (!e) return { deadEnd: false, tContact: tNow };
   return { deadEnd: deadEndAt(e.cx, e.cy, e.dir, gearSign(e), g.at(-1)), pose: [+e.cx.toFixed(2), +e.cy.toFixed(2), e.dir], gtrav: Number.isFinite(g.at(-1)) ? +g.at(-1).toFixed(2) : 'none', tContact: tNow };
+}
+/** Sentinel A3: classify once, at the pin. contact = last sample before the hold; stop = first run of >=250 ms with
+ * per-frame displacement <0.002 t after the hold starts. If the truck moved <0.10 t from contact to stop, the contact
+ * pose is classified (a creep cannot restart the classification); else the stop pose, provided it is <=1.0 t from
+ * the contact and the nose is still <=0.3 t from the prop (else INCONCLUSIVE). Cue delay is measured from the stop. */
+async function contactAtPin(page, tHold, prop) {
+  const S = await page.evaluate(() => window.__gate.samples.map((x) => ({ t: x.t, cx: x.cx, cy: x.cy, dir: x.dir, gear: x.gear, cue: x.cue })));
+  const g = gtravOf(S);
+  let ic = -1; for (let i = 0; i < S.length; i++) if (S[i].t < tHold) ic = i;
+  if (ic < 0) return { deadEnd: false, why: 'no contact sample', inconclusive: true, tContact: tHold };
+  let stop = -1, runStart = -1;
+  for (let i = ic + 1; i < S.length; i++) { const d = Math.hypot(S[i].cx - S[i - 1].cx, S[i].cy - S[i - 1].cy);
+    if (d < 0.002) { if (runStart < 0) runStart = i - 1; if (S[i].t - S[runStart].t >= 250) { stop = runStart; break; } } else runStart = -1; }
+  const c = S[ic];
+  if (stop < 0) return { deadEnd: false, why: 'never stopped during the hold', pose: [+c.cx.toFixed(2), +c.cy.toFixed(2), c.dir], tContact: c.t };
+  const e = S[stop];
+  const moved = Math.hypot(e.cx - c.cx, e.cy - c.cy);
+  const useStop = moved >= 0.10;
+  const k = useStop ? stop : ic, q = S[k];
+  const nose = noseDist({ cx: q.cx, cy: q.cy, dir: q.dir }, prop.x, prop.y);
+  const inconclusive = useStop && (moved > 1.0 || nose > 0.3);
+  return { deadEnd: !inconclusive && deadEndAt(q.cx, q.cy, q.dir, gearSign(q), g[k]), classifiedAt: useStop ? 'stop' : 'contact', movedToStop: +moved.toFixed(3),
+    pose: [+q.cx.toFixed(2), +q.cy.toFixed(2), q.dir], noseAtPose: +nose.toFixed(3), gtrav: Number.isFinite(g[k]) ? +g[k].toFixed(2) : 'none', tContact: e.t, inconclusive };
 }
 /** Dead-end escape allowed by G-F: tap R, hold gas 1.5 s, tap D. */
 async function reverseOut(s, touch) {
@@ -370,10 +394,7 @@ async function holdUntilCx(page, input, touch, maxCx, capMs) {
     const pad = await stickPad(page);
     const R = 44;
     await input.touchEv('touchStart', [{ x: pad.x, y: pad.y, id: 1 }]);
-    for (let i = 1; i <= 6; i++) {
-      await input.touchEv('touchMove', [{ x: pad.x, y: pad.y - R * (i / 6), id: 1 }]);
-      await wait(16);
-    }
+    await input.touchEv('touchMove', [{ x: pad.x, y: pad.y - R, id: 1 }]); // Sentinel A1: no ramp
     await reached();
     await input.touchEv('touchEnd', []);
   } else {
@@ -650,6 +671,7 @@ async function driveTo(page, input, waypoints, { timeoutMs = 20_000, arrive = 0.
   const reached = i >= waypoints.length && (!contact || (contactDist != null && contactDist <= 0.3));
   return {
     reached,
+    wp: i,
     reroutes,
     ...(contact ? { contactDist: contactDist == null ? null : +contactDist.toFixed(3) } : {}),
     ...(stopOnStall ? { stalled } : {}),
@@ -746,7 +768,24 @@ function g2Exclusion(samples, a, b, touch, gtrav) {
   let cueMs = 0;
   for (let k = a + 1; k <= b; k++) if (samples[k].cue === true) cueMs += samples[k].t - samples[k - 1].t;
   const cueOk = cueMs >= 1000;
-  return { excluded: pinned && noSwap && cueOk, pinned, noSwapToSteerSide: noSwap, side, cueMs: Math.round(cueMs), gtrav: Number.isFinite(gtrav[b]) ? +gtrav[b].toFixed(2) : 'none' };
+  // Sentinel A4: in-place yaw counts as cue-covered only when (i) the pose is an oracle dead end (pinned, no legal swap
+  // on EITHER side, so the cue is justified at the cap), (ii) the yaw goes toward the held side at >=1.0 q/s (rolling
+  // turn rate), (iii) each such run lasts <=1.0 s (G-A fallback). Uncovered still time (cue off, not covered) <=250 ms
+  // per window and the cue itself >=400 ms (a build without a cue can never be excluded).
+  // per sample: held side of THAT sample; covered = cue off, pinned, no legal swap toward that side (cue justified at the
+  // cap), yaw toward it >=1.0 q/s, run <=1.0 s, and the run ends with the cue ON (or at the window end).
+  let covMs = 0, uncovMs = 0, run = [], runT = 0;
+  const de = deadEndAt(e.cx, e.cy, e.dir, sign, gtrav[b]);
+  const flush = (endsInCue) => { if (endsInCue && runT <= 1.0 + 1e-9) covMs += run.reduce((x, y) => x + y, 0); else uncovMs += run.reduce((x, y) => x + y, 0); run = []; runT = 0; };
+  for (let k = a + 1; k <= b; k++) { const p = samples[k - 1], q = samples[k]; const dtMs = q.t - p.t; if (!(dtMs > 0 && dtMs <= 400)) continue; const dt = dtMs / 1000;
+    const sk = steerSide(q, touch); const yaw = wrapQ(q.heading - p.heading);
+    const just = sk !== 0 && !freeAlong(q.cx, q.cy, q.dir, sign, 0.25) && !legalSwap(q.cx, q.cy, sideDir(q.dir, sk), sign, gtrav[k]);
+    const toward = sk !== 0 && Math.sign(yaw) === sk * sign && Math.abs(yaw) / dt >= 1.0;
+    if (q.cue === true) { if (run.length) flush(true); continue; }
+    if (just && toward) { run.push(dtMs); runT += dt; } else { if (run.length) flush(false); uncovMs += dtMs; } }
+  if (run.length) flush(true);
+  const a4Ok = pinned && cueMs >= 400 && uncovMs <= 250;
+  return { excluded: pinned && noSwap && (cueOk || a4Ok), a4: { deadEndBoth: de, yawCoveredMs: Math.round(covMs), uncoveredMs: Math.round(uncovMs), ok: a4Ok }, pinned, noSwapToSteerSide: noSwap, side, cueMs: Math.round(cueMs), gtrav: Number.isFinite(gtrav[b]) ? +gtrav[b].toFixed(2) : 'none' };
 }
 
 const FACING_DEG = { se: 0, sw: 90, nw: 180, ne: 270 };
@@ -775,7 +814,8 @@ function spriteMismatch(samples) {
     const back = b.vel < -0.05 || (Math.abs(b.vel) <= 0.05 && a.vel < -0.05);
     const face = FACING_DEG[b.dir] + (back ? 180 : 0);
     const deg = angleDiff(motion, face);
-    if (deg > worst.deg) worst = { deg: +deg.toFixed(1), at: [+b.cx.toFixed(2), +b.cy.toFixed(2)], dir: b.dir, prevDir: a.dir, heading: +b.heading.toFixed(3), vel: +b.vel.toFixed(2) };
+    if (deg > worst.deg) worst = { deg: +deg.toFixed(1), at: [+b.cx.toFixed(2), +b.cy.toFixed(2)], dir: b.dir, prevDir: a.dir, heading: +b.heading.toFixed(3), vel: +b.vel.toFixed(2),
+      ctx: samples.slice(Math.max(0, i - 4), i + 3).map((x) => [Math.round(x.t), +x.cx.toFixed(3), +x.cy.toFixed(3), x.dir, x.gear, +x.vel.toFixed(2), +x.heading.toFixed(3), x.keys, +(+x.sx || 0).toFixed(2), +(+x.sy || 0).toFixed(2), x.sActive, x.cue]) };
   }
   return { ...worst, frames };
 }
@@ -837,7 +877,7 @@ function facingSteps(from, to) {
   return Math.min(d, 4 - d);
 }
 
-/** G8: a sprite step is 90°. It needs ≥ 0.3 tiles since the previous facing. */
+/** G8 (G-G = D1): a 90° sprite step needs ≥ 0.1 t since the previous facing, or (in place) a free rotated box with ≥ 1 t clear ahead. */
 function spins(samples) {
   const bad = [];
   let worst = null;
@@ -861,7 +901,11 @@ function spins(samples) {
         at: [+samples[i].cx.toFixed(2), +samples[i].cy.toFixed(2)],
       };
       if (!worst || step.travel < worst.travel) worst = step;
-      if (travel < 0.3) bad.push(step);
+      // G-G: D1 legality, same rule as run-all (SWAP_TRAVEL_MIN 0.1, D1_AHEAD_T)
+      const q = samples[i - 1];
+      const inPlaceOk = OR.blocked(q.cx, q.cy, samples[i].dir) === 0 && freeAlong(q.cx, q.cy, samples[i].dir, gearSign(samples[i]), D1_AHEAD_T);
+      step.inPlaceOk = inPlaceOk;
+      if (travel < 0.1 && !inPlaceOk) bad.push(step);
     }
     dir = samples[i].dir;
     travel = 0;
@@ -1140,23 +1184,48 @@ async function runViewport(browser, kind) {
       await realTapSelector(s.page, s.input, '[data-jac="gear"][data-val="R"]');
       await s.page.waitForTimeout(350);
       // G-E: closed-loop positioning (reverse until cx <= 16.3), not a timed hold
+      // Sentinel A2: reverse is sampled; release at cx <= 17.3 (product coast ~1.1 t => stop ~16.2)
+      await startSampling(s.page);
       const backMs = await holdUntilCx(s.page, s.input, touch, 16.3, 3000);
       await s.page.waitForTimeout(300);
       await realTapSelector(s.page, s.input, '[data-jac="gear"][data-val="D"]');
       await s.page.waitForTimeout(350);
+      const rev = await stopSampling(s.page);
+      const RS = rev.samples.filter((x) => x.gear === 'R');
+      const active = (x) => (touch ? x.sActive && x.sy < -0.3 : /w|arrowup/.test(x.keys || ''));
+      const iOn = RS.findIndex(active);
+      const iRel = iOn < 0 ? -1 : RS.findIndex((x, k) => k > iOn && !active(x));
+      const minCx = RS.length ? Math.min(...RS.map((x) => x.cx)) : null;
+      const revCoast = iRel >= 0 ? +(RS[iRel].cx - minCx).toFixed(2) : null;
+      const revInfo = { releaseObservedCx: iRel >= 0 ? +RS[iRel].cx.toFixed(2) : null, minCx: minCx == null ? null : +minCx.toFixed(2), revCoast, coastOk: revCoast != null && revCoast <= 1.5 };
       const start = await s.page.evaluate(() => window.__playtestQa.jac());
-      const startOk = start.cx >= 14.5 && start.cx <= 18.6 && start.cy >= 5.5 && start.cy <= 6.6 && start.dir === 'se' && start.gear === 'D';
       await startSampling(s.page);
-      if (touch) await holdStick(s.page, s.input, { x: 0, y: -1 }, 500);
-      else await holdKeys(s.page, ['up'], 500);
+      // Sentinel A2: straight gas until cx >= 17.5 (polled per rAF, cap 2.5 s), then full steer 2.8 s on the same input
       const steer = side === 'right' ? { x: 1, y: -1 } : { x: -1, y: -1 };
-      if (touch) await holdStick(s.page, s.input, steer, 2800);
-      else await holdKeys(s.page, side === 'right' ? ['up', 'right'] : ['up', 'left'], 2800);
+      const trig = touch ? 16.8 : 17.5; // touch: the steer move lands ~1 CDP frame later (~0.7-1 t at speed)
+      const reach = () => s.page.waitForFunction((m) => window.__playtestQa.jac().cx >= m, trig, { polling: 'raf', timeout: 2500 }).catch(() => null);
+      if (touch) {
+        const pad = await stickPad(s.page); const R = 44;
+        await s.input.touchEv('touchStart', [{ x: pad.x, y: pad.y, id: 1 }]);
+        await s.input.touchEv('touchMove', [{ x: pad.x, y: pad.y - R, id: 1 }]);
+        await reach();
+        const a0 = Date.now(); await s.input.touchEv('touchMove', [{ x: pad.x + steer.x * R * 0.7071, y: pad.y + steer.y * R * 0.7071, id: 1 }]); const ack = Date.now() - a0;
+        await wait(Math.max(0, 2800 - ack)); await s.input.touchEv('touchEnd', []);
+      } else {
+        await s.page.keyboard.down(KEY.up); await reach();
+        const k = side === 'right' ? KEY.right : KEY.left; await s.page.keyboard.down(k); await wait(2800); await s.page.keyboard.up(k); await s.page.keyboard.up(KEY.up);
+      }
       const r = await stopSampling(s.page);
       all.push(r.samples);
       spawnSeq.push(r.samples);
       const rep = g10Eval(r.samples, touch, side === 'right' ? 1 : -1);
-      attempts.push({ side, backMs, start: [+start.cx.toFixed(2), +start.cy.toFixed(2), start.dir, start.gear], startOk, ...rep, ok: startOk && rep.ok });
+      const sd = side === 'right' ? 1 : -1;
+      const on = r.samples.find((x) => x.driving && steerSide(x, touch) === sd);
+      const onset = on ? [+on.cx.toFixed(2), +on.cy.toFixed(2), on.dir, on.gear, +Math.abs(wrapQ(on.heading - 0)).toFixed(3)] : null;
+      const startOk = !!on && on.cx >= 15.0 && on.cx <= (touch ? 19.4 : 18.6) && on.cy >= 5.5 && on.cy <= 6.6 && on.dir === 'se' && on.gear === 'D' && Math.abs(wrapQ(on.heading - 0)) <= 0.1;
+      const firstActive = r.samples.find((x) => (touch ? x.sActive && x.sy < -0.3 : /w|arrowup/.test(x.keys || '')));
+      const straightMs = on && firstActive ? Math.round(on.t - firstActive.t) : null;
+      attempts.push({ side, backMs, rev: revInfo, settled: [+start.cx.toFixed(2), +start.cy.toFixed(2), start.dir, start.gear], onset, straightMs, startOk, ...rep, ok: startOk && revInfo.coastOk && rep.ok });
       await shot(s.page, `${tag}-g10-${side}`);
       errors.push(...s.errors);
       await s.ctx.close();
@@ -1165,6 +1234,7 @@ async function runViewport(browser, kind) {
     res.runs.g10 = { attempts, done, of: attempts.length };
   }
 
+  for (let att = 1; att <= 3; att++) { // Sentinel H-2: up to 3 attempts (fresh session), then INCONCLUSIVE
   // Run 3: drive (real input) next to the cardón cactus at (26,20) — the old (27.15,18.50) /
   // (27.93,18.50) stop area — then W+D / W+A holds toward it and a reverse-direction stick circle.
   {
@@ -1204,16 +1274,17 @@ async function runViewport(browser, kind) {
     const atCactus = await s.page.evaluate(() => window.__playtestQa.jac());
     const cactusNose = chase.contactDist ?? noseDist(atCactus, 26, 20);
     await shot(s.page, `${tag}-04a-cactus`);
-    const cDE = await contactDeadEnd(s.page);
     const right = touch ? { x: 0.75, y: -0.66 } : ['up', 'right'];
     const left = touch ? { x: -0.75, y: -0.66 } : ['up', 'left'];
+    const tHold = await s.page.evaluate(() => performance.now());
+    if (touch) await holdStick(s.page, s.input, right, 1500);
+    else await holdKeys(s.page, right, 1500);
+    const cDE = cactusNose <= 0.3 ? await contactAtPin(s.page, tHold, cactusContact) : { deadEnd: false, why: 'not at the prop', tContact: tHold };
     if (cDE.deadEnd && cactusNose <= 0.3) {
       // G-F: a true dead end must show the R cue (<=0.5 s) and is left with R
-      if (touch) await holdStick(s.page, s.input, right, 1500);
-      else await holdKeys(s.page, right, 1500);
       await reverseOut(s, touch);
     } else {
-      for (const c of [right, left, right, left]) {
+      for (const c of [left, right, left]) {
         if (touch) await holdStick(s.page, s.input, c, 1500);
         else await holdKeys(s.page, c, 1500);
       }
@@ -1247,7 +1318,9 @@ async function runViewport(browser, kind) {
     errors.push(...s.errors);
     await s.ctx.close();
   }
+  res.runs.cactus.attempt = att; if (res.runs.cactus.nearCactus && !res.runs.cactus.contact?.inconclusive) break; }
 
+  for (let att = 1; att <= 3; att++) { // Sentinel H-2
   // Run 4: drive (real input) along y≈17.5 into the tree at (40,18), then steer + gas / stick circle to get free without R.
   {
     const s = await newSession(browser, kind);
@@ -1256,9 +1329,7 @@ async function runViewport(browser, kind) {
     // The y≈17 line clips the tree, and the gap south of it is one row too narrow
     // for the 5×3. Go east on y≈5 all the way past the block, south at x≈55, then
     // west so the nose sits on the tree's east edge.
-    const route = await driveTo(
-      s.page,
-      s.input,
+    const treeWps = (
       [
         { x: 28.0, y: 5.0 },
         { x: 53.0, y: 5.0 },
@@ -1266,13 +1337,34 @@ async function runViewport(browser, kind) {
         // that turn on the row first; a key-style pulse there hunts off the line.
         ...(touch
           ? [
+              // QA3 tree-route fix (375): hold the x≈55.2 lane straight south before the turn,
+              // then ease onto the y≈18.6 row so the arc cannot swing into (50.95,27.05) / (46.05,23.03).
+              { x: 55.2, y: 12.0 },
               { x: 55.2, y: 16.2 },
-              { x: 50.5, y: 18.5 },
+              { x: 53.2, y: 18.6 },
+              { x: 50.5, y: 18.6 },
             ]
           : [{ x: 55.2, y: 16.4 }]),
-      ],
-      { timeoutMs: 40_000, arrive: 1.15, precise: true },
+      ]
     );
+    // QA3 tree-route fix: a route leg that ends pinned in a D1 dead end (R cue on, or an oracle dead end)
+    // backs out with R (reverseOut) and resumes from the waypoint it was on. Up to 2 recoveries, logged.
+    const routeRecoveries = [];
+    const stuckHere = async () => {
+      const q = await s.page.evaluate(() => window.__playtestQa.jac());
+      const de = deadEndAt(q.cx, q.cy, q.dir, gearSign(q), Infinity);
+      return { at: [+q.cx.toFixed(2), +q.cy.toFixed(2), q.dir], cue: q.reverseCue === true, deadEnd: de, stuck: q.reverseCue === true || de };
+    };
+    let route = await driveTo(s.page, s.input, treeWps, { timeoutMs: 40_000, arrive: 1.15, precise: true });
+    for (let k = 0, from = 0; k < 2 && !route.reached; k++) {
+      const st = await stuckHere();
+      routeRecoveries.push({ leg: 'route', ...st });
+      if (!st.stuck) break;
+      await reverseOut(s, touch);
+      from += route.wp ?? 0;
+      const again = await driveTo(s.page, s.input, treeWps.slice(from), { timeoutMs: 30_000, arrive: 1.15, precise: true });
+      route = { ...again, reroutes: [...route.reroutes, ...again.reroutes] };
+    }
     // A 90° turn from south toward west swings the centre about two tiles south.
     // Starting at y≈16.4 lands that arc on the row (y≈18.5) where an NW stop
     // puts the nose on the tree. A second pass recovers a miss without R.
@@ -1299,12 +1391,25 @@ async function runViewport(browser, kind) {
         if ((again.contactDist ?? 9) < (chase.contactDist ?? 9)) chase = again;
       }
     }
+    // QA3 tree-route fix: if the route or the chase stops in an oracle dead end on the way
+    // ((25.95,17.97), (50.95,27.05), (46.05,23.03) ...), back out with R (reverseOut) and re-approach
+    // on the y≈18.6 row. Up to 2 recoveries; logged. Only for the route, never at the tree itself.
+    for (let k = 0; k < 2 && (chase.contactDist ?? 9) > 0.3; k++) {
+      const st = await stuckHere();
+      routeRecoveries.push({ leg: 'chase', ...st });
+      if (!st.stuck) break;
+      await reverseOut(s, touch);
+      await driveTo(s.page, s.input, [{ x: 53.2, y: 18.6 }, { x: 50.5, y: 18.6 }], { timeoutMs: 25_000, arrive: 1.15, precise: true });
+      const again = await driveTo(s.page, s.input, [treeLine], { contact: treeContact, timeoutMs: 16_000, precise: true, arrive: 1.0 });
+      if ((again.contactDist ?? 9) < (chase.contactDist ?? 9)) chase = again;
+    }
     const atTree = await s.page.evaluate(() => window.__playtestQa.jac());
     const treeNose = chase.contactDist ?? noseDist(atTree, 40, 18);
     await shot(s.page, `${tag}-05-tree`);
-    const tDE = await contactDeadEnd(s.page);
+    const tHold = await s.page.evaluate(() => performance.now());
     if (touch) await holdStick(s.page, s.input, { x: 0.75, y: -0.66 }, 1500);
     else await holdKeys(s.page, ['up', 'right'], 1500);
+    const tDE = treeNose <= 0.3 ? await contactAtPin(s.page, tHold, treeContact) : { deadEnd: false, why: 'not at the prop', tContact: tHold };
     if (tDE.deadEnd && treeNose <= 0.3) await reverseOut(s, touch); // G-F: true dead end, R allowed
     else if (touch) await stickCircle(s.page, s.input, 8000, 2);
     else await keyCircle(s.page, 8000, 2);
@@ -1330,7 +1435,7 @@ async function runViewport(browser, kind) {
     all.push(r3.samples);
     const end = await s.page.evaluate(() => window.__playtestQa.jac());
     const endBlocked = await s.page.evaluate(() => !!window.__playtestQa.jacFootprintBlocked?.());
-    const gearsUsed = [...new Set(r3.samples.map((x) => x.gear))];
+    const gearsUsed = [...new Set(r3.samples.filter((x) => x.t >= tHold).map((x) => x.gear))]; // QA3: gears from the tree hold on (route recoveries may use R)
     res.runs.tree = {
       route,
       chase,
@@ -1345,7 +1450,10 @@ async function runViewport(browser, kind) {
       deadEnd: tDE.deadEnd,
       contact: tDE,
       cueDelayMs: cueDelayMs(r3.samples, tDE.tContact),
+      routeRecoveries,
+      attempt: att,
     };
+    if (!(res.runs.tree.touchingTree && !tDE.inconclusive) && att < 3) { errors.push(...s.errors); await s.ctx.close(); continue; }
     if (touch) {
       // B6: a second finger on the map must not steal or release the stick. (CDP touchEnd lists
       // the points that lift.)
@@ -1376,6 +1484,7 @@ async function runViewport(browser, kind) {
     }
     errors.push(...s.errors);
     await s.ctx.close();
+  break; }
   }
 
   const samples = all.flat();
@@ -1413,7 +1522,9 @@ async function runViewport(browser, kind) {
     G1: { pass: res.runs.g1.dist >= 1, detail: `seat ${JSON.stringify(res.runs.g1.seat)} → moved ${res.runs.g1.dist} tiles in 1.5 s (gear ${res.runs.g1.end.gear})` },
     G2: {
       pass: dlCount.length === 0 && treeOk && cactusOk,
+      inconclusive: dlCount.length === 0 && (!res.runs.tree.touchingTree || !!res.runs.tree.contact?.inconclusive || !res.runs.cactus.nearCactus || !!res.runs.cactus.contact?.inconclusive),
       detail:
+        `attempts cactus=${res.runs.cactus.attempt} tree=${res.runs.tree.attempt}; contact cactus=${JSON.stringify(res.runs.cactus.contact)} tree=${JSON.stringify(res.runs.tree.contact)}; holds=${JSON.stringify(HOLDLOG.slice(-6))}; ` +
         `cueHook=${cueHook}; gas+steer windows with <${G2_MIN_TRAVEL} tile travel: ${dl.length}, excluded by G-F ${dlExcl.length}, counted ${dlCount.length} ${JSON.stringify(dlCount.slice(0, 4))}; ` +
         `excluded ${JSON.stringify(dlExcl.slice(0, 4))}; ` +
         `cactus nose ${res.runs.cactus.noseDist} deadEnd=${res.runs.cactus.deadEnd} cueDelay=${res.runs.cactus.cueDelayMs} gears=${res.runs.cactus.gearsUsed} ok=${cactusOk}; ` +
@@ -1443,7 +1554,7 @@ async function runViewport(browser, kind) {
       pass: g8.length === 0,
       detail: g8.length
         ? `${g8.length} sprite spins ${JSON.stringify(g8.slice(0, 3))}`
-        : `no 90° sprite step under 0.3 tiles; smallest step ${g8Worst ? g8Worst.travel : 'n/a'}`,
+        : `no D1-illegal 90° sprite step (G-G: <0.1 t and not a legal in-place swap); smallest step ${g8Worst ? g8Worst.travel : "n/a"}${g8Worst && g8Worst.travel < 0.3 ? " inPlaceOk=" + g8Worst.inPlaceOk : ""}`,
     },
     G9: {
       pass: g9.length === 0,
@@ -1514,6 +1625,42 @@ async function stallProbe(browser, kind) {
   await s.ctx.close();
 }
 
+async function latProbe(browser, kind) {
+  const touch = kind === 'phone';
+  const s = await newSession(browser, kind);
+  await realGetIn(s.page, s.input, s.aim);
+  await wait(800);
+  await s.page.evaluate(() => { const L = (window.__L = { ev: [], fr: [] });
+    for (const ty of ['touchstart', 'touchmove', 'touchend', 'keydown']) window.addEventListener(ty, (e) => L.ev.push([ty, Date.now(), performance.now()]), { capture: true, passive: true });
+    const f = () => { const j = window.__playtestQa.jac(); L.fr.push([Date.now(), performance.now(), j.steering]); requestAnimationFrame(f); }; requestAnimationFrame(f); });
+  const pad = touch ? await stickPad(s.page) : null;
+  const med = (a) => { const v = a.filter((x) => x != null).sort((x, y) => x - y); return v.length ? +v[v.length >> 1].toFixed(1) : null; };
+  const reps = [];
+  for (let r = 0; r < 6; r++) {
+    if (touch) { await s.input.touchEv('touchStart', [{ x: pad.x, y: pad.y, id: 1 }]); await wait(500); }
+    await s.page.evaluate(() => { window.__L.ev = []; window.__L.fr = []; });
+    const send = Date.now();
+    if (touch) await s.input.touchEv('touchMove', [{ x: pad.x + 44, y: pad.y, id: 1 }]); else await s.page.keyboard.down('d');
+    const ack = Date.now() - send;
+    await wait(1200);
+    const L = await s.page.evaluate(() => window.__L);
+    if (touch) await s.input.touchEv('touchEnd', []); else await s.page.keyboard.up('d');
+    await wait(900);
+    const ev = L.ev.find((e) => e[0] === (touch ? 'touchmove' : 'keydown'));
+    const fsI = L.fr.findIndex((f) => Math.abs(f[2]) > 0.05);
+    const gaps = L.fr.slice(1).map((f, i) => f[1] - L.fr[i][1]);
+    reps.push({ sendToHandler: ev ? ev[1] - send : null, ackMs: ack, handlerToFirstSteerFrame: ev && fsI >= 0 ? +(L.fr[fsI][1] - ev[2]).toFixed(1) : null, framesBetween: ev && fsI >= 0 ? L.fr.filter((f) => f[1] > ev[2] && f[1] <= L.fr[fsI][1]).length : null, frameMedMs: med(gaps) });
+  }
+  // holdStick(500) as the gate (A1 version) does it, measured page-side
+  let hold = null;
+  if (touch) { await s.page.evaluate(() => { window.__L.ev = []; }); const w0 = Date.now(); await holdStick(s.page, s.input, { x: 0, y: -1 }, 500); const wall = Date.now() - w0; await wait(500);
+    const E = await s.page.evaluate(() => window.__L.ev); const st = E.find((e) => e[0] === 'touchstart'), en = E.find((e) => e[0] === 'touchend'), mv = E.find((e) => e[0] === 'touchmove');
+    hold = { requestedMs: 500, wallMs: wall, pageTouchstartToEnd: st && en ? Math.round(en[2] - st[2]) : null, pageFirstMoveToEnd: mv && en ? Math.round(en[2] - mv[2]) : null }; }
+  const k = (n) => med(reps.map((r) => r[n]));
+  await s.ctx.close();
+  return { kind, gl: process.env.QA_GL || 'vulkan', reps, summary: { sendToHandler: k('sendToHandler'), ackMs: k('ackMs'), handlerToFirstSteerFrame: k('handlerToFirstSteerFrame'), framesBetween: k('framesBetween'), frameMedMs: k('frameMedMs') }, hold };
+}
+
 async function main() {
   fs.mkdirSync(OUT, { recursive: true });
   // Headless VMs: Vulkan through Mesa llvmpipe runs ~4× faster than SwiftShader (QA_GL=swiftshader to opt out).
@@ -1522,6 +1669,10 @@ async function main() {
   const browser = await chromium.launch({
     args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', ...gl],
   });
+  if (process.env.QA_LAT === '1') { // Sentinel independent latency probe (CDP send -> page handler -> steering frame)
+    try { for (const kind of ['phone', 'desktop']) { if (ONLY && ONLY !== kind) continue; const o = await latProbe(browser, kind); console.log('LAT ' + JSON.stringify(o)); } } finally { await browser.close(); }
+    return;
+  }
   if (process.env.QA_STALL === '1') {
     try {
       for (const kind of ['desktop', 'phone']) {
@@ -1546,7 +1697,7 @@ async function main() {
   let ok = true;
   console.log('\nGate | ' + results.map((r) => r.viewport).join(' | '));
   for (const g of ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9', 'G10']) {
-    console.log(`${g}   | ${results.map((r) => (r.gates[g].pass ? 'PASS' : 'FAIL')).join(' | ')}`);
+    console.log(`${g}   | ${results.map((r) => (r.gates[g].pass ? 'PASS' : r.gates[g].inconclusive ? 'INCONCLUSO' : 'FAIL')).join(' | ')}`);
     for (const r of results) {
       if (!r.gates[g].pass) ok = false;
       console.log(`      ${r.viewport}: ${r.gates[g].detail}`);

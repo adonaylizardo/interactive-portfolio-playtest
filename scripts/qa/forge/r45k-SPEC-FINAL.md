@@ -166,7 +166,7 @@ Build: `npm ci && npm run build:preview-integracion && npx vite preview --port 8
    - `for s in A B F G H D E; do SC=$s node scripts/qa/forge/r45j/turnprobe.mjs <vp> <url> /tmp/tp; done`
    - `python3 scripts/qa/forge/r45j/backD.py '/tmp/tp/logs/turnprobe-*.json'`
    - Required: longest backward run in D with gas held ≤0.1 t in every scenario; H never flips the vel sign. Paste the per-file lines.
-6. `node scripts/qa/forge/r45j/park4.mjs <vp> <url> /tmp/p4` at 1440 and 375:
+6. `node scripts/qa/forge/r45j/park4.mjs <vp> <url> /tmp/p4` at 1440 and 375 (and 1280 / 390 for the UX pass, §7):
    - (23,7) 5/5;
    - (22,18): `toastGate.pass` true: pointerup → toast text ≤500 ms (MutationObserver), text "No se puede llegar", the truck does not move, the toast becomes visible (the `toasts` opacity time is info only);
    - Bain and Volaris cards open.
@@ -198,3 +198,15 @@ Build: `npm ci && npm run build:preview-integracion && npx vite preview --port 8
 - Unchanged: `inPlaceBad`, `shortSwap` and every other threshold — they are I-2.
 
 Expected after I-1..I-3 + I-5 + H-1: `run-all` exit 0 (53/53) and §5 browser gates PASS at both sizes.
+
+## 7. QA3 gate amendments (Sentinel REVIEW-QA2: CAMBIOS; Forge commit on `qa/forge-gates-r45j`)
+Implemented in `scripts/qa/drive-real.mjs` (from Sentinel's `drive-real.sent.mjs`) and `scripts/qa/forge/r45j/park4.mjs`. Product untouched.
+- **A1 `holdStick`:** touchStart, one touchMove to the target (ack timed), then wait `ms − ack` and touchEnd. No ramp, no re-sends. Each hold is logged in HOLDLOG `{ms, wallMs, lastAckMs}`.
+- **A2 G10:** closed-loop reverse (release at observed cx ≤ 16.3), `revCoast = releaseObservedCx − minCx ≤ 1.5 t` (more is a product FAIL); straight gas in closed loop until cx ≥ 17.5 (touch trigger 16.8), then 2.8 s steer on the same input; `startOk` is judged at the steer-onset sample: cx ∈ [15.0, 18.6], cy ∈ [5.5, 6.6], se, D, |heading| ≤ 0.1; `g10Eval` unchanged.
+- **A2′ (touch):** the steer-onset window is cx ∈ [15.0, **19.4**] in touch (CDP touch lands about one frame late at 6–7 t/s); cy/dir/gear/heading unchanged. Desktop stays [15.0, 18.6].
+- **A3 G2 contact:** contact = last sample before the hold; stop = first ≥250 ms run with per-frame displacement < 0.002 t. Moved < 0.10 t → classify at the contact; otherwise classify at the stop only if it is ≤ 1.0 t from the contact and the nose is ≤ 0.3 t from the prop, else INCONCLUSIVE. Classified once with the oracle `deadEndAt`. Dead end → R cue ≤ 0.5 s after the stop, then R allowed; otherwise leave in D.
+- **A4 G-F exclusion:** a cue-off sample is covered only if pinned, no legal swap toward the side held in that sample, yaw toward that side ≥ 1.0 q/s, run ≤ 1.0 s, ending with the cue on or at the window end. `a4Ok = pinned ∧ cueMs ≥ 400 ∧ uncovMs ≤ 250`; `excluded = pinned ∧ noSwapToSide ∧ (cueMs ≥ 1000 ∨ a4Ok)`.
+- **H-2 route retries:** up to 3 attempts per prop route, each a fresh session; all 3 failing = G2 **INCONCLUSIVE**, which is not PASS (exit ≠ 0).
+- **G-G G8 = D1:** a 90° sprite step needs ≥ 0.1 t since the previous facing, or must be a legal in-place swap (rotated box free with ≥ 1 t clear ahead, oracle). Same rule as run-all.
+- **Tree route (harness):** at 375 the route holds the x≈55.2 lane south (55.2,12) → (55.2,16.2) → (53.2,18.6) → (50.5,18.6). If a route leg or the chase ends pinned with the R cue on or in an oracle dead end (e.g. (25.95,17.97), (50.95,27.05), (46.05,23.03), (30.94,5.05)), it backs out with `reverseOut` and resumes from the waypoint it was on (≤ 2 recoveries, logged as `routeRecoveries`). The tree's `gearsUsed` counts only from the tree hold on.
+- **park4:** viewports 1440, 1280, 375 and 390 (390×844 DPR 3 touch). A target is tappable when it is inside the viewport and `elementFromPoint` there is the map canvas; up to 14 zoom-outs. A drag cannot pan while driving (the camera follows the truck, `scene.updateCameraFollow`), so doors are reached by zoom, not pan.

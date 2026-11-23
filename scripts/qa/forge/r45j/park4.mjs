@@ -1,11 +1,15 @@
 // r45h tap-to-park harness (fixed): fresh page per trial, retrying get-in, zoom-out until the door/tile is on screen, null-safe.
-// usage: node park4.mjs <vp> <url> <out> [trials csv]
+// usage: node park4.mjs <vp 1440|1280|375|390> <url> <out> [trials csv]
+// r45k QA3: 1280 (1280x800) and 390 (iPhone 390x844 DPR3 touch) added; doors are brought on screen by zoom-out until the
+// point is not covered by the HUD (elementFromPoint = canvas). Drag-pan is not possible while driving (camera follows the truck).
 // r45k QA1 ruling: the (22,18) gate is `toastGate` (pointerup -> toast text via MutationObserver <=500 ms); opacity time is info only.
 import fs from 'node:fs';
 import { chromium } from 'playwright';
-const vp = process.argv[2], BASE = process.argv[3], OUT = process.argv[4]; const phone = vp !== '1440';
+const vp = process.argv[2], BASE = process.argv[3], OUT = process.argv[4]; const VPS = { 1440: { viewport: { width: 1440, height: 900 } }, 1280: { viewport: { width: 1280, height: 800 } }, 375: { viewport: { width: 375, height: 812 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }, 390: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true } };
+if (!VPS[vp]) throw new Error('vp must be one of ' + Object.keys(VPS));
+const phone = !!VPS[vp].hasTouch;
 const only = process.argv[5] ? process.argv[5].split(',') : null;
-const ctxOpt = phone ? { viewport: { width: 375, height: 812 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } };
+const ctxOpt = VPS[vp];
 const W = (ms) => new Promise((r) => setTimeout(r, ms));
 for (const d of ['logs', 'shots', 'video']) fs.mkdirSync(`${OUT}/${d}`, { recursive: true });
 const b = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -33,15 +37,20 @@ async function trial(label, kind, arg, maxMs) {
       const sh = vis('.building-panel__sheet, .place-card'); let ov2 = 0; if (sh && dock) { const a = sh.getBoundingClientRect(), c = dock.getBoundingClientRect(); ov2 = Math.max(0, Math.min(a.right, c.right) - Math.max(a.left, c.left)) * Math.max(0, Math.min(a.bottom, c.bottom) - Math.max(a.top, c.top)); }
       window.__P.push([Math.round(performance.now()), +j.cx.toFixed(3), +j.cy.toFixed(3), j.dir, +j.vel.toFixed(2), j.mode, j.pathN ?? 0, +j.heading.toFixed(3), j.driving ? 1 : 0, tOn ? tst.textContent.trim().slice(0, 50) : null, card ? 1 : 0, Math.round(ov), q.jacFootprintBlocked() ? 1 : 0, Math.round(ov2)]); requestAnimationFrame(f); }; requestAnimationFrame(f); });
     const hudTop = () => p.evaluate(() => Math.min(innerHeight, ...[...document.querySelectorAll('.jac-dock, .jac-bar, .joystick, .place-card, .building-panel')].filter((e) => e.getClientRects().length && !e.closest('[hidden]')).map((e) => e.getBoundingClientRect().top)));
-    const onScreen = async (pt) => !!pt && Number.isFinite(pt.x) && pt.x > 50 && pt.x < ctxOpt.viewport.width - 15 && pt.y > 70 && pt.y < (await hudTop()) - 15;
+    // QA3: a point counts as tappable when it is inside the viewport margins and the topmost element there is the map
+    // canvas (no HUD, stick, dock or card over it). While driving the camera follows the truck, so a drag cannot pan;
+    // doors are brought on screen by zooming out (up to 14 wheel steps) instead.
+    const onScreen = async (pt) => !!pt && Number.isFinite(pt.x) && pt.x > 15 && pt.x < ctxOpt.viewport.width - 15 && pt.y > 70 && pt.y < ctxOpt.viewport.height - 15 &&
+      (await p.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); const c = document.getElementById('game-canvas'); return !!e && !!c && (e === c || c.contains(e)); }, [pt.x, pt.y]));
     const tileScreen = (tx, ty) => p.evaluate(([tx, ty, A]) => { const q = window.__playtestQa; const tw = (x, y) => ({ x: (x - y) * 64, y: (x + y) * 32 });
       const pts = Object.entries(A).map(([n, t]) => ({ s: q.doorScreenPoint(n), w: tw(t[0], t[1]) })).filter((o) => o.s && Number.isFinite(o.s.x)); if (pts.length < 2) return null;
       const mw = { x: 0, y: 0 }, ms = { x: 0, y: 0 }; pts.forEach((o) => { mw.x += o.w.x / pts.length; mw.y += o.w.y / pts.length; ms.x += o.s.x / pts.length; ms.y += o.s.y / pts.length; });
       let num = 0, den = 0; pts.forEach((o) => { num += (o.w.x - mw.x) * (o.s.x - ms.x) + (o.w.y - mw.y) * (o.s.y - ms.y); den += (o.w.x - mw.x) ** 2 + (o.w.y - mw.y) ** 2; });
       const z = num / den; const c = { x: ms.x - z * mw.x, y: ms.y - z * mw.y }; const w = tw(tx + 0.5, ty + 0.5); return { x: c.x + z * w.x, y: c.y + z * w.y, z }; }, [tx, ty, A]);
-    const zoomOut = async () => { if (phone) { const cx = 187, cy = 330; await p.mouse.move(cx, cy); await p.mouse.wheel(0, 400); } else { await p.mouse.move(720, 300); await p.mouse.wheel(0, 400); } await W(900); };
+    const VW = ctxOpt.viewport.width, VH = ctxOpt.viewport.height;
+    const zoomOut = async () => { await p.mouse.move(Math.round(VW / 2), Math.round(VH * 0.38)); await p.mouse.wheel(0, 400); await W(900); };
     const target = async () => (kind === 'door' ? p.evaluate((n) => window.__playtestQa.doorScreenPoint(n), arg) : tileScreen(arg[0], arg[1]));
-    let pt = await target(), zooms = 0; while (!(await onScreen(pt)) && zooms < 8) { await zoomOut(); zooms++; pt = await target(); }
+    let pt = await target(), zooms = 0; while (!(await onScreen(pt)) && zooms < 14) { await zoomOut(); zooms++; pt = await target(); }
     out.zooms = zooms; out.pt = pt; if (!(await onScreen(pt))) { await shot('offscreen'); throw new Error('target off-screen after zoom ' + JSON.stringify(pt)); }
     const j0 = await jac(); out.pre = [+j0.cx.toFixed(2), +j0.cy.toFixed(2), j0.dir];
     // r45k QA1 ruling (park4 toast timing): t_up = first pointerup after arming (window capture listener); t_toast = first
