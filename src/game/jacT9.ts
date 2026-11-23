@@ -145,6 +145,8 @@ export type JacSnapshot = {
   heading: number;
   /** QA clock: sum of the frame dt (ms) that update accepted. Only increases. */
   gameTimeMs: number;
+  /** QA clock: number of update calls. Only increases. */
+  frameId: number;
   vel: number;
   rpm: number;
   mph: number;
@@ -365,6 +367,8 @@ export class JacT9 {
   private heading = 0;
   /** Milliseconds of ticker time update has consumed. Never reset, never decreased. */
   private gameTimeMs = 0;
+  /** Update calls so far. Never reset, never decreased. */
+  private frameId = 0;
   /** Signed tiles/s: +forward along heading, −reverse. */
   private vel = 0;
   drivePath: { x: number; y: number }[] = [];
@@ -1430,8 +1434,9 @@ export class JacT9 {
   update(dt: number, input: JacInput): void {
     const frame = Math.min(MAX_FRAME_DT, Math.max(0, dt));
     this.frameDt = frame;
-    // QA clock only. `frame` is the ticker slice this call accepted (0..250 ms).
+    // QA clocks only. `frame` is the ticker slice this call accepted (0..250 ms).
     this.gameTimeMs += frame * 1000;
+    this.frameId += 1;
     if (!this.driving) {
       this.steering = 0;
       this.reversing = false;
@@ -2702,6 +2707,7 @@ export class JacT9 {
       dir: this.dir,
       heading: this.heading,
       gameTimeMs: this.gameTimeMs,
+      frameId: this.frameId,
       vel: this.vel,
       rpm: Math.round(this.rpm),
       mph: Math.round(this.mph),
