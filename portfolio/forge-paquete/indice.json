@@ -1,0 +1,517 @@
+{
+  "paquete": "Portfolio interactivo · paquete Forge",
+  "fecha": "2026-10-09",
+  "archivo_figma": "D1Vq9b3rBzXquj0FjwSV2q",
+  "assets": [
+    {
+      "carpeta": "exteriores/flor-de-venezuela",
+      "asset": "flor-de-venezuela",
+      "nodo_set": "60:15",
+      "variantes": 6
+    },
+    {
+      "carpeta": "interiores/flor-de-venezuela",
+      "asset": "flor-de-venezuela-interior",
+      "nodo_set": "60:15",
+      "variantes": 2
+    },
+    {
+      "carpeta": "exteriores/catedral-de-barquisimeto",
+      "asset": "catedral-de-barquisimeto",
+      "nodo_set": "46:23",
+      "variantes": 6
+    },
+    {
+      "carpeta": "interiores/catedral-de-barquisimeto",
+      "asset": "catedral-de-barquisimeto-interior",
+      "nodo_set": "46:23",
+      "variantes": 2
+    },
+    {
+      "carpeta": "exteriores/sambil-barquisimeto",
+      "asset": "sambil-barquisimeto",
+      "nodo_set": "56:23",
+      "variantes": 6
+    },
+    {
+      "carpeta": "interiores/sambil-barquisimeto",
+      "asset": "sambil-barquisimeto-interior",
+      "nodo_set": "56:23",
+      "variantes": 2
+    },
+    {
+      "carpeta": "muebles/grada",
+      "asset": "grada",
+      "nodo_set": "71:326",
+      "variantes": 20
+    },
+    {
+      "carpeta": "muebles/pasarela",
+      "asset": "pasarela",
+      "nodo_set": "71:325",
+      "variantes": 5
+    },
+    {
+      "carpeta": "muebles/banco",
+      "asset": "banco",
+      "nodo_set": "71:322",
+      "variantes": 20
+    },
+    {
+      "carpeta": "muebles/butaca",
+      "asset": "butaca",
+      "nodo_set": "71:323",
+      "variantes": 4
+    },
+    {
+      "carpeta": "muebles/baranda",
+      "asset": "baranda",
+      "nodo_set": "71:324",
+      "variantes": 18
+    },
+    {
+      "carpeta": "muebles/mesa",
+      "asset": "mesa",
+      "nodo_set": "71:186",
+      "variantes": 1
+    },
+    {
+      "carpeta": "muebles/planta",
+      "asset": "planta",
+      "nodo_set": "71:193",
+      "variantes": 1
+    },
+    {
+      "carpeta": "muebles/farol",
+      "asset": "farol",
+      "nodo_set": "71:198",
+      "variantes": 1
+    },
+    {
+      "carpeta": "tiles/suelo",
+      "asset": "tile-suelo",
+      "nodo_set": "1:6",
+      "variantes": 5
+    },
+    {
+      "carpeta": "paisaje/muro-escalada",
+      "asset": "muro-escalada",
+      "nodo_set": "95:941",
+      "variantes": 2
+    },
+    {
+      "carpeta": "exteriores/estudio",
+      "asset": "estudio",
+      "nodo_set": "7:1002",
+      "variantes": 6,
+      "agregado": "2026-10-11 auditoría"
+    },
+    {
+      "carpeta": "interiores/estudio",
+      "asset": "estudio-interior",
+      "nodo_set": "7:1002",
+      "variantes": 3,
+      "agregado": "2026-10-11 auditoría"
+    },
+    {
+      "carpeta": "muebles/escritorio",
+      "asset": "escritorio",
+      "nodo_set": "1:20",
+      "variantes": 4,
+      "agregado": "2026-10-11 auditoría"
+    },
+    {
+      "carpeta": "tiles/calle",
+      "asset": "tile-calle",
+      "nodo_set": "113:124",
+      "variantes": 15,
+      "agregado": "2026-10-11 bloque 1 (mapa exterior)"
+    },
+    {
+      "carpeta": "tiles/parque",
+      "asset": "tile-parque",
+      "nodo_set": "114:53",
+      "variantes": 7,
+      "agregado": "2026-10-11 bloque 1 (mapa exterior)"
+    },
+    {
+      "carpeta": "paisaje/arbol",
+      "asset": "arbol",
+      "nodo_set": "115:73",
+      "variantes": 6,
+      "agregado": "2026-10-11 bloque 1 (mapa exterior)",
+      "corregido": "2026-10-11 bloque2-fix"
+    },
+    {
+      "carpeta": "paisaje/banco-exterior",
+      "asset": "banco-exterior",
+      "nodo_set": "118:55",
+      "variantes": 4,
+      "agregado": "2026-10-11 bloque 1 (mapa exterior)",
+      "corregido": "2026-10-11 bloque2-fix"
+    },
+    {
+      "carpeta": "paisaje/farol-exterior",
+      "asset": "farol-exterior",
+      "nodo_set": "118:94",
+      "variantes": 4,
+      "agregado": "2026-10-11 bloque 1 (mapa exterior)",
+      "corregido": "2026-10-11 bloque2-fix"
+    },
+    {
+      "carpeta": "exteriores/estudio-6x6",
+      "asset": "estudio-6x6",
+      "nodo_set": "119:198",
+      "variantes": 6,
+      "agregado": "2026-10-11 bloque 1 (mapa exterior)",
+      "corregido": "2026-10-11 bloque2-fix"
+    },
+    {
+      "carpeta": "exteriores/casas-caso/volaris",
+      "asset": "casa-volaris",
+      "nodo_set": "128:2267",
+      "variantes": 6,
+      "agregado": "2026-10-11 bloque 2 (casas de caso y paisaje)",
+      "corregido": "2026-10-11 bloque2-fix"
+    },
+    {
+      "carpeta": "exteriores/casas-caso/bain",
+      "asset": "casa-bain",
+      "nodo_set": "128:2267",
+      "variantes": 6,
+      "agregado": "2026-10-11 bloque 2 (casas de caso y paisaje)",
+      "corregido": "2026-10-11 bloque2-fix"
+    },
+    {
+      "carpeta": "exteriores/casas-caso/mentoria",
+      "asset": "casa-mentoria",
+      "nodo_set": "128:2267",
+      "variantes": 6,
+      "agregado": "2026-10-11 bloque 2 (casas de caso y paisaje)",
+      "corregido": "2026-10-11 bloque2-fix"
+    },
+    {
+      "carpeta": "exteriores/casas-caso/finoa",
+      "asset": "casa-finoa",
+      "nodo_set": "128:2267",
+      "variantes": 6,
+      "agregado": "2026-10-11 bloque 2 (casas de caso y paisaje)",
+      "corregido": "2026-10-11 bloque2-fix"
+    },
+    {
+      "carpeta": "exteriores/casas-caso/pg",
+      "asset": "casa-pg",
+      "nodo_set": "128:2267",
+      "variantes": 6,
+      "agregado": "2026-10-11 bloque 2 (casas de caso y paisaje)",
+      "corregido": "2026-10-11 bloque2-fix"
+    },
+    {
+      "carpeta": "paisaje/obelisco",
+      "asset": "obelisco",
+      "nodo_set": "128:2315",
+      "variantes": 2,
+      "agregado": "2026-10-11 bloque 2 (casas de caso y paisaje)",
+      "corregido": "2026-10-12 obelisco-fix 3 (arco movido a la cara trasera −x, pie en (14, 36), que pasa a sólida; frente sin cambios)"
+    },
+    {
+      "carpeta": "paisaje/redoma",
+      "asset": "redoma",
+      "nodo_set": "129:885",
+      "variantes": 2,
+      "agregado": "2026-10-11 bloque 2 (casas de caso y paisaje)",
+      "corregido": "2026-10-11 bloque2-fix"
+    },
+    {
+      "carpeta": "interiores/casas-caso/volaris",
+      "asset": "interior-volaris",
+      "nodo_set": "141:910",
+      "variantes": 2,
+      "agregado": "2026-10-11 bloque 3 (interiores de casas de caso)"
+    },
+    {
+      "carpeta": "interiores/casas-caso/bain",
+      "asset": "interior-bain",
+      "nodo_set": "141:910",
+      "variantes": 2,
+      "agregado": "2026-10-11 bloque 3 (interiores de casas de caso)"
+    },
+    {
+      "carpeta": "interiores/casas-caso/mentoria",
+      "asset": "interior-mentoria",
+      "nodo_set": "141:910",
+      "variantes": 2,
+      "agregado": "2026-10-11 bloque 3 (interiores de casas de caso)"
+    },
+    {
+      "carpeta": "interiores/casas-caso/finoa",
+      "asset": "interior-finoa",
+      "nodo_set": "141:910",
+      "variantes": 2,
+      "agregado": "2026-10-11 bloque 3 (interiores de casas de caso)"
+    },
+    {
+      "carpeta": "interiores/casas-caso/pg",
+      "asset": "interior-pg",
+      "nodo_set": "141:910",
+      "variantes": 2,
+      "agregado": "2026-10-11 bloque 3 (interiores de casas de caso)"
+    },
+    {
+      "carpeta": "relleno/cuji",
+      "asset": "cuji",
+      "nodo_set": null,
+      "variantes": 2,
+      "agregado": "2026-10-14 relleno lote 1 (programático, sin publicar)",
+      "actualizado": "2026-10-14 estilo C (natural detallado) elegido por Adonay"
+    },
+    {
+      "carpeta": "relleno/araguaney-florecido",
+      "asset": "araguaney-florecido",
+      "nodo_set": null,
+      "variantes": 4,
+      "agregado": "2026-10-14 relleno lote 1 (programático, sin publicar)",
+      "actualizado": "2026-10-14 estilo C (natural detallado) elegido por Adonay; + variante flor=bloom-pendiente"
+    },
+    {
+      "carpeta": "relleno/cardon",
+      "asset": "cardon",
+      "nodo_set": null,
+      "variantes": 2,
+      "agregado": "2026-10-14 relleno lote 1 (programático, sin publicar)",
+      "actualizado": "2026-10-14 estilo C (natural detallado) elegido por Adonay"
+    },
+    {
+      "carpeta": "relleno/fuente",
+      "asset": "fuente",
+      "nodo_set": null,
+      "variantes": 2,
+      "agregado": "2026-10-14 relleno lote 1 (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/banco-con-gente",
+      "asset": "banco-con-gente",
+      "nodo_set": null,
+      "variantes": 8,
+      "agregado": "2026-10-14 relleno lote 1 (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/bicis-estacionadas",
+      "asset": "bicis-estacionadas",
+      "nodo_set": null,
+      "variantes": 4,
+      "agregado": "2026-10-14 relleno lote 1 (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/parada-bus",
+      "asset": "parada-bus",
+      "nodo_set": null,
+      "variantes": 4,
+      "agregado": "2026-10-14 relleno lote 1 (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/carrito-cachapas",
+      "asset": "carrito-cachapas",
+      "nodo_set": null,
+      "variantes": 4,
+      "agregado": "2026-10-14 relleno lote 1 (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/puesto-jugos",
+      "asset": "puesto-jugos",
+      "nodo_set": null,
+      "variantes": 4,
+      "agregado": "2026-10-14 relleno lote 1 (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/carrito-cepillados",
+      "asset": "carrito-cepillados",
+      "nodo_set": null,
+      "variantes": 4,
+      "agregado": "2026-10-14 relleno lote 1 (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/cafe-fachada",
+      "asset": "cafe-fachada",
+      "nodo_set": null,
+      "variantes": 4,
+      "agregado": "2026-10-14 relleno lote 2B (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/disqueria-fachada",
+      "asset": "disqueria-fachada",
+      "nodo_set": null,
+      "variantes": 4,
+      "agregado": "2026-10-14 relleno lote 2B (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/cancha-basket",
+      "asset": "cancha-basket",
+      "nodo_set": null,
+      "variantes": 2,
+      "agregado": "2026-10-14 relleno lote 2B (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/parque-perros",
+      "asset": "parque-perros",
+      "nodo_set": null,
+      "variantes": 2,
+      "agregado": "2026-10-14 relleno lote 2B (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/rincon-meditacion",
+      "asset": "rincon-meditacion",
+      "nodo_set": null,
+      "variantes": 2,
+      "agregado": "2026-10-14 lote 3: cojín de meditación junto al Estudio (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/mirador",
+      "asset": "mirador",
+      "nodo_set": null,
+      "variantes": 7,
+      "agregado": "2026-10-14 lote 3: mirador con telescopios y cielo nocturno (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/mural-logo",
+      "asset": "mural-logo",
+      "nodo_set": null,
+      "variantes": 6,
+      "agregado": "2026-10-14 relleno lote 2A (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/palomas",
+      "asset": "palomas",
+      "nodo_set": null,
+      "variantes": 8,
+      "agregado": "2026-10-14 relleno lote 2A (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/gatos",
+      "asset": "gatos",
+      "nodo_set": null,
+      "variantes": 8,
+      "agregado": "2026-10-14 relleno lote 2A (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/camionetica",
+      "asset": "camionetica",
+      "nodo_set": null,
+      "variantes": 8,
+      "agregado": "2026-10-14 relleno lote 2A (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/farol-noche",
+      "asset": "farol-noche",
+      "nodo_set": null,
+      "variantes": 8,
+      "agregado": "2026-10-14 relleno lote 2A (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/golf",
+      "asset": "golf",
+      "nodo_set": null,
+      "variantes": 6,
+      "agregado": "2026-10-14 zona de golf: green con hoyo, bunker, golfista con putt y tapete de práctica (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/bots",
+      "asset": "bots",
+      "nodo_set": null,
+      "variantes": 8,
+      "agregado": "2026-10-14 Grok Bots v3 aprobados (Forge, The Architect, TARS, JCVD) junto al Estudio (programático, sin publicar)"
+    },
+    {
+      "carpeta": "relleno/jac-t9",
+      "asset": "jac-t9",
+      "nodo_set": null,
+      "variantes": 44,
+      "agregado": "2026-10-15 JAC T9 v3 APROBADO desde 4 renders aprobados (forma/4 dirs OK; mapa NO aprobado). v2 superseded.",
+      "manifest": "relleno/jac-t9/manifest.v3.json",
+      "version": "v3",
+      "estado": "BORRADOR",
+      "aprobado_para_mapa": false,
+      "colocacion_activa": false,
+      "huella": {
+        "x": 4,
+        "y": 2
+      }
+    },
+    {
+      "carpeta": "exteriores/teresa-carreno",
+      "asset": "teresa-carreno",
+      "nodo_set": null,
+      "variantes": 5,
+      "agregado": "2026-10-16 Teatro Teresa Carreño = edificio Talks v2b (10×7, paleta del kit, cuerpo trasero integrado, interior caminable). Programático, sin publicar.",
+      "manifest": "exteriores/teresa-carreno/manifest.json",
+      "estado": "APROBADO",
+      "aprobado_para_mapa": false,
+      "colocacion_activa": false,
+      "colocacion": {
+        "activa": false
+      },
+      "huella": {
+        "x": 10,
+        "y": 7
+      },
+      "version": "v2b"
+    },
+    {
+      "carpeta": "interiores/teresa-carreno",
+      "asset": "teresa-carreno-interior",
+      "nodo_set": null,
+      "variantes": 2,
+      "agregado": "2026-10-16 Teatro Teresa Carreño = edificio Talks v2b (10×7, paleta del kit, cuerpo trasero integrado, interior caminable). Programático, sin publicar.",
+      "manifest": "interiores/teresa-carreno/manifest.json",
+      "estado": "APROBADO",
+      "aprobado_para_mapa": false,
+      "colocacion_activa": false,
+      "colocacion": {
+        "activa": false
+      },
+      "huella": {
+        "x": 10,
+        "y": 7
+      },
+      "version": "v2b"
+    },
+    {
+      "carpeta": "exteriores/biblioteca-ingenieria",
+      "asset": "biblioteca-ingenieria",
+      "nodo_set": null,
+      "variantes": 5,
+      "agregado": "2026-10-16 Biblioteca de la Facultad de Ingeniería UCV = edificio Writings (artículos). Programático, sin publicar. v3 2026-10-16: pulido (interior cálido, bóvedas con volumen, ventanal único).",
+      "manifest": "exteriores/biblioteca-ingenieria/manifest.json",
+      "version": "v3",
+      "estado": "APROBADO",
+      "aprobado_para_mapa": false,
+      "colocacion_activa": false,
+      "colocacion": {
+        "activa": false
+      },
+      "huella": {
+        "x": 10,
+        "y": 8
+      }
+    },
+    {
+      "carpeta": "interiores/biblioteca-ingenieria",
+      "asset": "biblioteca-ingenieria-interior",
+      "nodo_set": null,
+      "variantes": 2,
+      "agregado": "2026-10-16 Biblioteca de la Facultad de Ingeniería UCV = edificio Writings (artículos). Programático, sin publicar. v2 2026-10-16: una sola planta (sin entrepiso/escalera), muro de artículos ampliado. v3 2026-10-16: pulido (interior cálido, bóvedas con volumen, ventanal único).",
+      "manifest": "interiores/biblioteca-ingenieria/manifest.json",
+      "version": "v3",
+      "estado": "APROBADO",
+      "aprobado_para_mapa": false,
+      "colocacion_activa": false,
+      "colocacion": {
+        "activa": false
+      },
+      "huella": {
+        "x": 10,
+        "y": 8
+      }
+    }
+  ]
+}

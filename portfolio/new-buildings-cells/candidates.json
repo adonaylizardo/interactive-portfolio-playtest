@@ -1,0 +1,312 @@
+[
+ {
+  "id": "T1",
+  "title": "Teatro - north centre",
+  "fp": [
+   26,
+   8,
+   10,
+   7
+  ],
+  "door": [
+   34,
+   15
+  ],
+  "park": [
+   34,
+   18
+  ],
+  "dir": "se",
+  "park_rect": [
+   32,
+   17,
+   5,
+   3
+  ],
+  "anchor": [
+   31,
+   14
+  ],
+  "color": [
+   230,
+   140,
+   40
+  ],
+  "dashed": false,
+  "pick": true,
+  "gaps": [
+   [
+    8,
+    "bain"
+   ],
+   [
+    8,
+    "finoa"
+   ],
+   [
+    8,
+    "mentoria"
+   ]
+  ],
+  "walk": 25,
+  "street": [
+   11,
+   [
+    34,
+    26
+   ]
+  ],
+  "behind": [],
+  "van_path": 10,
+  "code_pick": [
+   3,
+   8,
+   [
+    31,
+    15
+   ],
+   "sw",
+   true
+  ],
+  "lines": [
+   "footprint x 26-35, y 8-14  (10x7)",
+   "anchor (31, 14)  door (34, 15) (+y face)",
+   "van sit (34, 18) facing se; body x 32-36, y 17-19",
+   "gap 8 to bain; walk 25 steps from spawn",
+   "nearest street 11 tiles at (34, 26)"
+  ]
+ },
+ {
+  "id": "T2",
+  "title": "Teatro - south plaza",
+  "fp": [
+   16,
+   46,
+   10,
+   7
+  ],
+  "door": [
+   24,
+   53
+  ],
+  "park": [
+   27,
+   53
+  ],
+  "dir": "sw",
+  "park_rect": [
+   26,
+   51,
+   3,
+   5
+  ],
+  "anchor": [
+   21,
+   52
+  ],
+  "color": [
+   230,
+   140,
+   40
+  ],
+  "dashed": true,
+  "pick": false,
+  "gaps": [
+   [
+    6,
+    "muro"
+   ],
+   [
+    8,
+    "obelisco"
+   ],
+   [
+    10,
+    "estudio"
+   ]
+  ],
+  "walk": 27,
+  "street": [
+   17,
+   [
+    24,
+    36
+   ]
+  ],
+  "behind": [],
+  "van_path": 68,
+  "code_pick": [
+   3,
+   62,
+   [
+    21,
+    53
+   ],
+   "sw",
+   true
+  ],
+  "lines": [
+   "footprint x 16-25, y 46-52  (10x7)",
+   "anchor (21, 52)  door (24, 53) (+y face)",
+   "van sit (27, 53) facing sw; body x 26-28, y 51-55",
+   "gap 6 to muro; walk 27 steps from spawn",
+   "nearest street 17 tiles at (24, 36)"
+  ]
+ },
+ {
+  "id": "B1",
+  "title": "Biblioteca - west",
+  "fp": [
+   1,
+   22,
+   10,
+   8
+  ],
+  "door": [
+   6,
+   30
+  ],
+  "park": [
+   6,
+   33
+  ],
+  "dir": "se",
+  "park_rect": [
+   4,
+   32,
+   5,
+   3
+  ],
+  "anchor": [
+   6,
+   29
+  ],
+  "color": [
+   70,
+   160,
+   240
+  ],
+  "dashed": false,
+  "pick": true,
+  "gaps": [
+   [
+    5,
+    "catedral"
+   ],
+   [
+    5,
+    "obelisco"
+   ],
+   [
+    10,
+    "finoa"
+   ]
+  ],
+  "walk": 32,
+  "street": [
+   18,
+   [
+    18,
+    36
+   ]
+  ],
+  "behind": [],
+  "van_path": 37,
+  "code_pick": [
+   3,
+   37,
+   [
+    6,
+    33
+   ],
+   "se",
+   false
+  ],
+  "lines": [
+   "footprint x 1-10, y 22-29  (10x8)",
+   "anchor (6, 29)  door (6, 30) (+y face)",
+   "van sit (6, 33) facing se; body x 4-8, y 32-34",
+   "gap 5 to catedral; walk 32 steps from spawn",
+   "nearest street 18 tiles at (18, 36)"
+  ]
+ },
+ {
+  "id": "B2",
+  "title": "Biblioteca - east",
+  "fp": [
+   53,
+   21,
+   10,
+   8
+  ],
+  "door": [
+   58,
+   29
+  ],
+  "park": [
+   58,
+   32
+  ],
+  "dir": "se",
+  "park_rect": [
+   56,
+   31,
+   5,
+   3
+  ],
+  "anchor": [
+   58,
+   28
+  ],
+  "color": [
+   70,
+   160,
+   240
+  ],
+  "dashed": true,
+  "pick": false,
+  "gaps": [
+   [
+    5,
+    "sambil"
+   ],
+   [
+    6,
+    "redoma"
+   ],
+   [
+    12,
+    "bain"
+   ]
+  ],
+  "walk": 35,
+  "street": [
+   12,
+   [
+    46,
+    29
+   ]
+  ],
+  "behind": [
+   "50,22:tree"
+  ],
+  "van_path": 48,
+  "code_pick": [
+   3,
+   46,
+   [
+    55,
+    29
+   ],
+   "sw",
+   true
+  ],
+  "lines": [
+   "footprint x 53-62, y 21-28  (10x8)",
+   "anchor (58, 28)  door (58, 29) (+y face)",
+   "van sit (58, 32) facing se; body x 56-60, y 31-33",
+   "gap 5 to sambil; walk 35 steps from spawn",
+   "nearest street 12 tiles at (46, 29)"
+  ]
+ }
+]

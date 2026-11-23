@@ -1,0 +1,151 @@
+{
+ "asset": "biblioteca-ingenieria",
+ "titulo": "Biblioteca de la Facultad de Ingeniería UCV · edificio Writings",
+ "tipo": "edificio (exterior)",
+ "version": "v3",
+ "estado": "APROBADO",
+ "aprobado_para_mapa": false,
+ "colocacion": {
+  "activa": false,
+  "instrucciones": "Colocación: sea S el punto del mundo en pantalla (edificios: vértice frontal de la huella; tiles: vértice inferior del rombo de la casilla; muebles: su punto de piso). Dibuja el frame con la esquina superior izquierda en (S.x − ancla.x, S.y − ancla.y − offset_y). Con offset_y = 0 el ancla cae justo en S; con offset_y = −24 (tiles de borde) el ancla queda 24 px por debajo de S, así el rombo calza con la grilla y la losa cuelga 24 px. En @2x multiplica todo por 2."
+ },
+ "huella": {
+  "x": 10,
+  "y": 8
+ },
+ "origen": {
+  "tipo": "programático PIL (sin Figma, sin SVG)",
+  "script": "/workspace/portfolio/qa/edificios/biblioteca-ingenieria-src/build_biblioteca.py",
+  "fecha": "2026-10-16",
+  "referencias": "/workspace/portfolio/personaje-refs/biblioteca-ingenieria-ucv/refs.md"
+ },
+ "paleta": "la del kit (tokens.ts), igual que Catedral, Sambil y Teresa Carreño. Acentos Villanueva apagados (naranja #5C3828, amarillo #5E5432, gris claro = tile-line) solo como paneles chicos; borde de la cáscara y parteluces #787C84 (entre prop-line y ui/text).",
+ "unidades": "px @1x (multiplica por 2 para @2x)",
+ "nota": "Huella 10×8 tiles (128×64 @2x): bóvedas en x 1..9, y 1..7; los puntales llegan a y≈0,15 y y≈7,9. Ancla = centro inferior del frame (304,438) @1x. OJO: el vértice frontal del suelo cae en (336,438), +32 px en x respecto del ancla. Vértice trasero [272.0, 150.0]; esquinas laterales [16.0, 278.0] y [592.0, 310.0]. Exterior e interior comparten frame y ancla.",
+ "variantes": [
+  {
+   "nombre": "estado=default, luz=encendida, zoom=cerca",
+   "nodo": null,
+   "archivos": {
+    "png1x": "biblioteca-ingenieria__estado-default_luz-encendida_zoom-cerca@1x.png",
+    "png2x": "biblioteca-ingenieria__estado-default_luz-encendida_zoom-cerca@2x.png"
+   },
+   "tamano": {
+    "w": 608,
+    "h": 438
+   },
+   "ancla": {
+    "x": 304,
+    "y": 438
+   },
+   "offset_y": 0,
+   "vertice_frontal_suelo": {
+    "x": 336.0,
+    "y": 438.0
+   }
+  },
+  {
+   "nombre": "estado=default, luz=apagada, zoom=cerca",
+   "nodo": null,
+   "archivos": {
+    "png1x": "biblioteca-ingenieria__estado-default_luz-apagada_zoom-cerca@1x.png",
+    "png2x": "biblioteca-ingenieria__estado-default_luz-apagada_zoom-cerca@2x.png"
+   },
+   "tamano": {
+    "w": 608,
+    "h": 438
+   },
+   "ancla": {
+    "x": 304,
+    "y": 438
+   },
+   "offset_y": 0,
+   "vertice_frontal_suelo": {
+    "x": 336.0,
+    "y": 438.0
+   }
+  },
+  {
+   "nombre": "estado=hover, luz=encendida, zoom=cerca",
+   "nodo": null,
+   "archivos": {
+    "png1x": "biblioteca-ingenieria__estado-hover_luz-encendida_zoom-cerca@1x.png",
+    "png2x": "biblioteca-ingenieria__estado-hover_luz-encendida_zoom-cerca@2x.png"
+   },
+   "tamano": {
+    "w": 608,
+    "h": 438
+   },
+   "ancla": {
+    "x": 304,
+    "y": 438
+   },
+   "offset_y": 0,
+   "vertice_frontal_suelo": {
+    "x": 336.0,
+    "y": 438.0
+   }
+  },
+  {
+   "nombre": "estado=resaltado, luz=encendida, zoom=cerca",
+   "nodo": null,
+   "archivos": {
+    "png1x": "biblioteca-ingenieria__estado-resaltado_luz-encendida_zoom-cerca@1x.png",
+    "png2x": "biblioteca-ingenieria__estado-resaltado_luz-encendida_zoom-cerca@2x.png"
+   },
+   "tamano": {
+    "w": 608,
+    "h": 438
+   },
+   "ancla": {
+    "x": 304,
+    "y": 438
+   },
+   "offset_y": 0,
+   "vertice_frontal_suelo": {
+    "x": 336.0,
+    "y": 438.0
+   }
+  },
+  {
+   "nombre": "estado=default, zoom=lejos",
+   "nodo": null,
+   "archivos": {
+    "png1x": "biblioteca-ingenieria__estado-default_zoom-lejos@1x.png",
+    "png2x": "biblioteca-ingenieria__estado-default_zoom-lejos@2x.png"
+   },
+   "tamano": {
+    "w": 608,
+    "h": 438
+   },
+   "ancla": {
+    "x": 304,
+    "y": 438
+   },
+   "offset_y": 0,
+   "vertice_frontal_suelo": {
+    "x": 336.0,
+    "y": 438.0
+   }
+  }
+ ],
+ "ambar_medido_1x": {
+  "encendida": "0,03 %",
+  "apagada": "0,03 %",
+  "hover": "0,03 %",
+  "resaltado": "1,65 %",
+  "lejos": "0,10 %"
+ },
+ "puerta": {
+  "cara": "+y",
+  "x": [
+   5.0,
+   6.0
+  ],
+  "nota": "coincide con la entrada del interior (casilla 5,6)"
+ },
+ "muebles_compartidos": [
+  "muebles/farol (3)"
+ ],
+ "cambios_v3": "Bóvedas con volumen (degradado por pendiente, brillo de cresta, nervios transversales, borde claro más grueso, valle oscuro), puntales con canto claro y zapata, ventanal de testero como UN solo vidrio alto con degradado continuo (sin bandas de pisos)."
+}
