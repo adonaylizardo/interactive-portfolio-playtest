@@ -28,7 +28,10 @@
  *        - after it (to the end of the 2.8 s): full G-A semantics — no dead stop (still, not yawing, no R cue
  *          ≥0.5 s; or still with no R cue ≥1.0 s) and no unjustified R cue (cue ≥0.3 s while the oracle says
  *          the swap toward the held-steer side is legal, D1 1.0 t ahead);
- *        - every sample in the window: |Δh| ≤ 2.4·min(dt, 0.25) + 0.05 q (gaps > 400 ms skipped).
+ *        - every sample pair in the window (Sentinel QA3, option A): |Δh| ≤ 2.4·min(Δt_game, 0.25) + 0.05 q, where
+ *          Δt_game comes from `gameTimeMs` (hook H-2) in the SAME jacSnapshot as heading. Wall-time Δt and dh are
+ *          logged as info only. A pair with |Δt_game − Δt_wall| > 50 ms is flagged; > 2 % flagged ⇒ that side is
+ *          INCONCLUSO. No gameTimeMs ⇒ G10 FAIL (fail-closed, no wall-time fallback).
  *      BOTH sides must pass.
  *   G2 (amended by G-F, Sentinel QA1 ruling): a stuck window is excluded only if, at its final pose, (a) the nose is
  *      pinned by the oracle (no 0.25 t free along the sprite), (b) no legal swap toward the held-steer side (D1 1.0 t,
@@ -147,6 +150,8 @@ function installSampler() {
       cy: j.cy,
       dir: j.dir,
       heading: j.heading,
+      // Sentinel QA3 option A / hook H-2: game time read from the SAME snapshot as heading (atomic pair).
+      gt: typeof j.gameTimeMs === 'number' && Number.isFinite(j.gameTimeMs) ? j.gameTimeMs : null,
       vel: j.vel,
       gear: j.gear,
       mph: j.mph,
@@ -1017,16 +1022,25 @@ function g10Eval(samples, touch, sd) {
   for (let i = i0; i < samples.length; i++) if (Math.abs(wrapQ(samples[i].heading - h0)) >= 0.9) { i90 = i; break; }
   const t90 = i90 < 0 ? null : +((samples[i90].t - samples[i0].t) / 1000).toFixed(2);
   const pre = turnAtSpeed(samples.slice(0, i90 < 0 ? samples.length : i90 + 1));
-  // dh normalisation over the whole window
-  let dhBad = 0, dhWorst = -9, dhAt = null;
-  for (let i = 1; i < samples.length; i++) {
-    const dtMs = samples[i].t - samples[i - 1].t;
-    if (!(dtMs > 0 && dtMs <= 400)) continue;
-    const dt = dtMs / 1000;
-    const ex = Math.abs(wrapQ(samples[i].heading - samples[i - 1].heading)) - (2.4 * Math.min(dt, 0.25) + 0.05);
-    if (ex > dhWorst) { dhWorst = ex; dhAt = [+samples[i].cx.toFixed(2), +samples[i].cy.toFixed(2), samples[i].dir, Math.round(dtMs)]; }
+  // Sentinel QA3 ruling, option A: dh is judged against GAME time read from the same snapshot as heading:
+  // |Δh| ≤ 2.4·min(Δt_game, 0.25) + 0.05. Wall time is info only (dhWall*). A pair whose |Δt_game − Δt_wall| > 50 ms
+  // is flagged; > 2 % flagged pairs in the turn ⇒ INCONCLUSO. No gameTimeMs in the snapshot ⇒ FAIL (fail-closed, no
+  // fallback to wall time).
+  const gtMissing = samples.some((x) => x.gt == null);
+  let dhBad = 0, dhWorst = -9, dhAt = null, pairs = 0, flagged = 0, flagAt = null, dhWallWorst = -9, dhWallAt = null;
+  if (!gtMissing) for (let i = 1; i < samples.length; i++) {
+    const a = samples[i - 1], b = samples[i];
+    const dGms = b.gt - a.gt, dWms = b.t - a.t;
+    const dh = Math.abs(wrapQ(b.heading - a.heading));
+    pairs++;
+    if (!(dGms >= 0) || Math.abs(dGms - dWms) > 50) { flagged++; flagAt ??= [+b.cx.toFixed(2), +b.cy.toFixed(2), b.dir, Math.round(dGms), Math.round(dWms)]; }
+    if (dWms > 0) { const exW = dh - (2.4 * Math.min(dWms / 1000, 0.25) + 0.05); if (exW > dhWallWorst) { dhWallWorst = exW; dhWallAt = [+b.cx.toFixed(2), +b.cy.toFixed(2), b.dir, Math.round(dWms), Math.round(dGms)]; } }
+    if (!(dGms >= 0)) continue; // non-monotonic game clock: flagged above, not judged
+    const ex = dh - (2.4 * Math.min(dGms / 1000, 0.25) + 0.05);
+    if (ex > dhWorst) { dhWorst = ex; dhAt = [+b.cx.toFixed(2), +b.cy.toFixed(2), b.dir, Math.round(dGms), Math.round(dWms)]; }
     if (ex > 0) dhBad++;
   }
+  const flaggedFrac = pairs ? flagged / pairs : 0;
   // G-A after the 90° crossing
   let dead = 0, deadAt = null, cueBad = 0, cueAt = null;
   if (i90 >= 0) {
@@ -1048,9 +1062,11 @@ function g10Eval(samples, touch, sd) {
       if (d > dead) { dead = d; deadAt = [+b.cx.toFixed(2), +b.cy.toFixed(2), b.dir]; }
     }
   }
-  const ok = t90 != null && t90 <= 2.0 && pre.stopMs < 500 && dead === 0 && cueBad === 0 && dhBad === 0;
+  const ok = !gtMissing && t90 != null && t90 <= 2.0 && pre.stopMs < 500 && dead === 0 && cueBad === 0 && dhBad === 0;
+  const status = gtMissing ? 'FAIL' : flaggedFrac > 0.02 ? 'INCONCLUSO' : ok ? 'PASS' : 'FAIL';
   return {
-    ok, cueHook: hook, t90, preStopMs: pre.stopMs, preStopAt: pre.stopAt,
+    ok, status, gtMissing, dhClock: 'game', clockFlagged: flagged, clockPairs: pairs, clockFlaggedPct: +(100 * flaggedFrac).toFixed(2), clockFlagFirst: flagAt,
+    info_dhWallWorstExcess: +dhWallWorst.toFixed(3), info_dhWallWorstAt: dhWallAt, cueHook: hook, t90, preStopMs: pre.stopMs, preStopAt: pre.stopAt,
     postDeadS: +dead.toFixed(2), postDeadAt: deadAt, postCueUnjustifiedFrames: cueBad, postCueAt: cueAt,
     dhOverFrames: dhBad, dhWorstExcess: +dhWorst.toFixed(3), dhWorstAt: dhAt, info_turnedPre90: pre.turned,
   };
@@ -1225,7 +1241,10 @@ async function runViewport(browser, kind) {
       const startOk = !!on && on.cx >= 15.0 && on.cx <= (touch ? 19.4 : 18.6) && on.cy >= 5.5 && on.cy <= 6.6 && on.dir === 'se' && on.gear === 'D' && Math.abs(wrapQ(on.heading - 0)) <= 0.1;
       const firstActive = r.samples.find((x) => (touch ? x.sActive && x.sy < -0.3 : /w|arrowup/.test(x.keys || '')));
       const straightMs = on && firstActive ? Math.round(on.t - firstActive.t) : null;
-      attempts.push({ side, backMs, rev: revInfo, settled: [+start.cx.toFixed(2), +start.cy.toFixed(2), start.dir, start.gear], onset, straightMs, startOk, ...rep, ok: startOk && revInfo.coastOk && rep.ok });
+      const aOk = startOk && revInfo.coastOk && rep.ok;
+      // Sentinel QA3: missing gameTimeMs ⇒ FAIL; > 2 % clock-flagged pairs ⇒ INCONCLUSO (not PASS); otherwise PASS/FAIL.
+      const aStatus = rep.gtMissing ? 'FAIL' : rep.status === 'INCONCLUSO' ? 'INCONCLUSO' : aOk ? 'PASS' : 'FAIL';
+      attempts.push({ side, backMs, rev: revInfo, settled: [+start.cx.toFixed(2), +start.cy.toFixed(2), start.dir, start.gear], onset, straightMs, startOk, ...rep, ok: aOk && aStatus === 'PASS', status: aStatus });
       await shot(s.page, `${tag}-g10-${side}`);
       errors.push(...s.errors);
       await s.ctx.close();
@@ -1564,7 +1583,9 @@ async function runViewport(browser, kind) {
     },
     G10: {
       pass: (res.runs.g10?.of ?? 0) === 2 && res.runs.g10.done === 2,
-      detail: `turn-at-speed ${res.runs.g10?.done ?? 0}/${res.runs.g10?.of ?? 0} ${JSON.stringify(res.runs.g10?.attempts ?? [])}`,
+      // Sentinel QA3: any FAIL (incl. missing gameTimeMs) ⇒ FAIL; otherwise any INCONCLUSO ⇒ INCONCLUSO.
+      inconclusive: (res.runs.g10?.of ?? 0) === 2 && res.runs.g10.attempts.every((a) => a.status !== 'FAIL') && res.runs.g10.attempts.some((a) => a.status === 'INCONCLUSO'),
+      detail: `turn-at-speed ${res.runs.g10?.done ?? 0}/${res.runs.g10?.of ?? 0} (dh on game time; statuses ${(res.runs.g10?.attempts ?? []).map((a) => a.status).join(',')}${(res.runs.g10?.attempts ?? []).some((a) => a.gtMissing) ? '; NO gameTimeMs in jacSnapshot (H-2) ⇒ FAIL' : ''}) ${JSON.stringify(res.runs.g10?.attempts ?? [])}`,
     },
   };
   return res;

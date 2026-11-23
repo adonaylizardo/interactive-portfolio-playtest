@@ -210,3 +210,23 @@ Implemented in `scripts/qa/drive-real.mjs` (from Sentinel's `drive-real.sent.mjs
 - **G-G G8 = D1:** a 90° sprite step needs ≥ 0.1 t since the previous facing, or must be a legal in-place swap (rotated box free with ≥ 1 t clear ahead, oracle). Same rule as run-all.
 - **Tree route (harness):** at 375 the route holds the x≈55.2 lane south (55.2,12) → (55.2,16.2) → (53.2,18.6) → (50.5,18.6). If a route leg or the chase ends pinned with the R cue on or in an oracle dead end (e.g. (25.95,17.97), (50.95,27.05), (46.05,23.03), (30.94,5.05)), it backs out with `reverseOut` and resumes from the waypoint it was on (≤ 2 recoveries, logged as `routeRecoveries`). The tree's `gearsUsed` counts only from the tree hold on.
 - **park4:** viewports 1440, 1280, 375 and 390 (390×844 DPR 3 touch). A target is tappable when it is inside the viewport and `elementFromPoint` there is the map canvas; up to 14 zoom-outs. A drag cannot pan while driving (the camera follows the truck, `scene.updateCameraFollow`), so doors are reached by zoom, not pan.
+
+### 7.1 QA3 ruling (Sentinel REVIEW-QA3, G10 option A approved)
+- **Hook H-2 (product, QA only): `gameTimeMs`** in `jacSnapshot()` (`__playtestQa.jac()`). It is a monotonic counter of accumulated game time in ms, using the same `dt` the truck integrates (ticker elapsed, capped at 0.25 s). It must be returned in the same snapshot object as `heading`, so that drive-real reads the pair atomically, from one frame. The cloud agent adds it together with the G3 fix. Until that SHA lands, G10 fails closed on every build.
+- **G10 dh criterion:** for each consecutive pair of samples, |Δh| ≤ 2.4·min(Δt_game, 0.25) + 0.05 q, with Δt_game = Δ`gameTimeMs`. Δt_wall and the wall-clock dh are logged as info only (`info_dhWallWorst*`).
+  - A pair with |Δt_game − Δt_wall| > 50 ms, or a non-monotonic game clock, is flagged.
+  - If more than 2 % of a turn's pairs are flagged, that turn is **INCONCLUSO**, never PASS.
+  - If `gameTimeMs` is missing from any sample, G10 = **FAIL**. There is no fallback to wall time.
+  - G10 combines the two sides: any FAIL ⇒ FAIL, otherwise any INCONCLUSO ⇒ INCONCLUSO.
+  - Closing G10 requires PASS at 1440 and at 375 in 2 consecutive runs, on the SHA that carries the G3 fix.
+- **park4 freeze / stale reading:**
+  - A trial is **INCONCLUSO** in any of these cases:
+    - a rAF gap ≥ 2000 ms;
+    - wall time > budget + 5 s;
+    - the fresh end snapshot is > 0.5 t from the last rAF sample;
+    - the last sample is > 2000 ms old;
+    - a harness error.
+  - Arrival is judged on a fresh snapshot.
+  - INCONCLUSO trials are retried up to 3 times, each in a fresh context.
+  - Exit codes: 0 if all PASS, 1 if any FAIL, 2 if any INCONCLUSO.
+  - An arrival PASS needs `arrived`, plus a card for doors, a card–dock overlap of 0, and 0 moving frames over a blocked footprint.

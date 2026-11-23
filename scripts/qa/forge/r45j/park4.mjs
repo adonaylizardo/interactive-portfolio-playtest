@@ -2,6 +2,10 @@
 // usage: node park4.mjs <vp 1440|1280|375|390> <url> <out> [trials csv]
 // r45k QA3: 1280 (1280x800) and 390 (iPhone 390x844 DPR3 touch) added; doors are brought on screen by zoom-out until the
 // point is not covered by the HUD (elementFromPoint = canvas). Drag-pan is not possible while driving (camera follows the truck).
+// r45k QA3 ruling (Sentinel): every trial gets a status PASS / FAIL / INCONCLUSO. A freeze (rAF gap ≥ FREEZE_MS, or
+// wall time past the budget) or a stale end reading (fresh snapshot ≠ last rAF sample, or rAF not ticking) makes the
+// trial INCONCLUSO, never PASS. Arrival trials are retried up to 3 times, each in a fresh browser context. Exit code:
+// 0 all PASS, 1 any FAIL, 2 otherwise (INCONCLUSO).
 // r45k QA1 ruling: the (22,18) gate is `toastGate` (pointerup -> toast text via MutationObserver <=500 ms); opacity time is info only.
 import fs from 'node:fs';
 import { chromium } from 'playwright';
@@ -10,12 +14,13 @@ if (!VPS[vp]) throw new Error('vp must be one of ' + Object.keys(VPS));
 const phone = !!VPS[vp].hasTouch;
 const only = process.argv[5] ? process.argv[5].split(',') : null;
 const ctxOpt = VPS[vp];
+const FREEZE_MS = 2000, STALE_T = 0.5, STALE_MS = 2000, MAX_ATTEMPTS = 3;
 const W = (ms) => new Promise((r) => setTimeout(r, ms));
 for (const d of ['logs', 'shots', 'video']) fs.mkdirSync(`${OUT}/${d}`, { recursive: true });
 const b = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const R = { vp, trials: [] }; const save = () => fs.writeFileSync(`${OUT}/logs/park4-${vp}.json`, JSON.stringify(R));
 const A = { estudio: [31, 36], volaris: [39, 36], bain: [39, 26], mentoria: [32, 26], finoa: [24, 24], pg: [24, 31], sambil: [47, 16], catedral: [14, 17], teresa: [34, 14], biblioteca: [6, 30] };
-async function trial(label, kind, arg, maxMs) {
+async function trial(label, kind, arg, maxMs, attempt = 1) {
   const ctx = await b.newContext(ctxOpt); const p = await ctx.newPage(); const ce = [];
   p.on('console', (m) => { if (m.type() === 'error') ce.push(m.text().slice(0, 200)); }); p.on('pageerror', (e) => ce.push(String(e).slice(0, 200)));
   const tap = (x, y) => (phone ? p.touchscreen.tap(Math.round(x), Math.round(y)) : p.mouse.click(Math.round(x), Math.round(y)));
@@ -23,7 +28,7 @@ async function trial(label, kind, arg, maxMs) {
   const jac = () => p.evaluate(() => window.__playtestQa.jac());
   const shot = (n) => p.screenshot({ path: `${OUT}/shots/${vp}-p4-${label}-${n}.png` }).catch(() => {});
   const truckXY = () => p.evaluate(() => { const e = window.__playtestQa.jacEntities(); const c = document.getElementById('game-canvas').getBoundingClientRect(); return [c.left + e.sx, c.top + e.sy - 20]; });
-  const out = { label, kind, arg };
+  const out = { label, kind, arg, attempt };
   try {
     await p.goto(BASE + '?qa=1&focus=jac'); await p.waitForSelector('[data-boot-start]', { state: 'visible', timeout: 90000 }); await W(1500);
     const bs = await rectOf('[data-boot-start]'); await tap(bs.x, bs.y); await W(2500);
@@ -64,7 +69,7 @@ async function trial(label, kind, arg, maxMs) {
     let j, idleSince = null; await W(600); let mid = false;
     for (;;) { j = await jac(); const el = Date.now() - w0; if (!mid && el > 3000) { await shot('3s'); mid = true; }
       const idle = (j.pathN ?? 0) === 0 && Math.abs(j.vel) < 0.05; idleSince = idle ? (idleSince ?? Date.now()) : null;
-      if (el > maxMs || (idleSince && Date.now() - idleSince > 1200) || !j.driving) break; await W(250); }
+      if (el > maxMs) { out.exit = 'budget'; break; } if (idleSince && Date.now() - idleSince > 1200) { out.exit = 'idle'; break; } if (!j.driving) { out.exit = 'notDriving'; break; } await W(250); }
     out.ms = Date.now() - w0; await W(500); await shot('end');
     out.dest = await p.evaluate(() => window.__playtestQa.lastDriveTap());
     const P = (await p.evaluate(() => window.__P)).filter((r) => r[0] >= t0);
@@ -76,6 +81,11 @@ async function trial(label, kind, arg, maxMs) {
       const sg = Math.sign(c[4]); if (sg && prevSign && sg !== prevSign) revs++; if (sg) prevSign = sg; }
     // livelock: longest window with path active and < 0.5 tile net displacement
     let worst = 0; for (let i = 0, k = 0; i < P.length; i++) { while (k < P.length && Math.hypot(P[k][1] - P[i][1], P[k][2] - P[i][2]) < 0.5 && P[k][6] > 0) k++; worst = Math.max(worst, (P[Math.max(i, k - 1)][0] - P[i][0])); }
+    // QA3: arrival is judged on a FRESH snapshot, cross-checked against the last rAF sample (stale reading ⇒ INCONCLUSO).
+    const F = await p.evaluate(() => ({ j: window.__playtestQa.jac(), now: performance.now(), last: window.__P[window.__P.length - 1] ?? null }));
+    out.info_loopEnd = [+j.cx.toFixed(2), +j.cy.toFixed(2), j.dir, j.pathN]; j = F.j;
+    const lastGapMs = F.last ? Math.round(F.now - F.last[0]) : null, lastDiffT = F.last ? +Math.hypot(F.last[1] - j.cx, F.last[2] - j.cy).toFixed(3) : null;
+    out.stale = { lastSampleAgeMs: lastGapMs, freshVsLastSampleT: lastDiffT, stale: !F.last || lastGapMs > STALE_MS || lastDiffT > STALE_T };
     const dest = out.dest; out.end = [+j.cx.toFixed(2), +j.cy.toFixed(2), j.dir, j.pathN, j.driving, +j.heading.toFixed(2)];
     out.arrived = !!dest && Math.hypot(j.cx - dest.x, j.cy - dest.y) < 1.5 && (j.pathN ?? 0) === 0;
     out.endDistToDest = dest ? +Math.hypot(j.cx - dest.x, j.cy - dest.y).toFixed(2) : null;
@@ -86,14 +96,36 @@ async function trial(label, kind, arg, maxMs) {
       info_visibleMsFromDispatch: visMs != null ? Math.round(visMs) : null, info_rafMaxMs: rafMax, info_rafStallFlag: rafMax > 250, movedTiles: +moved.toFixed(3) };
     if (label.startsWith('unreach')) { const tt = out.toastTiming;
       out.toastGate = { pass: tt.upToToastMs != null && tt.upToToastMs <= 500 && tt.text === 'No se puede llegar' && moved < 0.05 && visMs != null, rule: 'pointerup->toast text <=500 ms, text "No se puede llegar", truck moved <0.05 t, toast visible (opacity>0.1) at some point' }; }
+    out.freeze = { rafMaxMs: rafMax, overBudgetMs: Math.max(0, out.ms - maxMs), frozen: rafMax >= FREEZE_MS || out.ms > maxMs + 5000 };
     Object.assign(out, { pathLen: +path.toFixed(2), spins, livelockMs: worst, velReversals: revs, toasts: [...toasts.entries()], card, cardDockOverlapPx2: cardOv, sheetDockOverlapPx2: sheetOv, fbFrames: fb, fbMovingFrames: fbMoving, fbFirst, maxFrameDisp: +maxd.toFixed(3), frames: P.length, track: P.filter((_, i) => i % 6 === 0).map((r) => [r[1], r[2], r[3], r[6], r[12]]), ce });
   } catch (e) { out.err = String(e).slice(0, 300); out.ce = ce; }
+  out.status = statusOf(out);
   console.log(JSON.stringify({ ...out, track: undefined })); R.trials.push(out); save(); await ctx.close();
+  return out;
+}
+/** QA3: harness trouble (error, freeze, stale reading) ⇒ INCONCLUSO; otherwise the trial's own criterion. */
+function statusOf(o) {
+  if (o.err || o.freeze?.frozen || o.stale?.stale) return 'INCONCLUSO';
+  if (o.toastGate) return o.toastGate.pass ? 'PASS' : 'FAIL';
+  const ok = o.arrived && (o.kind !== 'door' || o.card === 1) && o.cardDockOverlapPx2 === 0 && (o.fbMovingFrames ?? 0) === 0;
+  return ok ? 'PASS' : 'FAIL';
 }
 const plan = [];
 for (let i = 1; i <= 5; i++) plan.push([`t23-7-${i}`, 'tile', [23, 7], 20000]);
 plan.push(['unreach-22-18', 'tile', [22, 18], 12000]);
 plan.push(['bain', 'door', 'bain', 120000]);
 plan.push(['volaris', 'door', 'volaris', 120000]);
-for (const t of plan) if (!only || only.some((o) => t[0].startsWith(o))) await trial(...t);
-await b.close(); console.log('DONE');
+const final = [];
+for (const t of plan) {
+  if (only && !only.some((o) => t[0].startsWith(o))) continue;
+  // QA3: up to 3 attempts (fresh context each) while the reading is INCONCLUSO; a clean FAIL is not retried.
+  let o; for (let a = 1; a <= MAX_ATTEMPTS; a++) { o = await trial(...t, a); if (o.status !== 'INCONCLUSO') break; }
+  final.push([t[0], o.status, o.attempt]);
+}
+R.final = final; save();
+await b.close();
+for (const [l, st, a] of final) console.log(`${l}: ${st} (attempt ${a})`);
+const anyFail = final.some((f) => f[1] === 'FAIL'), allPass = final.every((f) => f[1] === 'PASS');
+console.log('PARK4: ' + (allPass ? 'PASS' : anyFail ? 'FAIL' : 'INCONCLUSO'));
+console.log('DONE');
+process.exit(allPass ? 0 : anyFail ? 1 : 2);
