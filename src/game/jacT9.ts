@@ -1683,6 +1683,10 @@ export class JacT9 {
     const off = Math.abs(headingDelta(dirIndex(this.dir), this.heading));
     if (manual) {
       const atCap = Math.abs(headingDelta(dirIndex(this.dir), this.heading)) >= HEADING_HARD - 1e-3;
+      // Pinned nose: show R as soon as the yaw has a side (CUE_HEADING) and the swap
+      // toward it would be refused, instead of waiting for the 0.62 q cap (~0.37 s of
+      // full steer). Same D1 rule as syncManualFacing, so the cue is never early on a legal swap.
+      const refused = atCap ? this.swapBlocked : off >= CUE_HEADING && this.swapWouldBeRefused();
       this.reverseCueOn =
         !swapped &&
         !earlyKept &&
@@ -1690,8 +1694,7 @@ export class JacT9 {
         this.gear === 'D' &&
         this.lastGas > 0 &&
         Math.abs(this.steering) > YAW_STEER_MIN &&
-        atCap &&
-        this.swapBlocked &&
+        refused &&
         this.nosePinned(1);
     }
     this.pinnedCue =
@@ -2901,6 +2904,19 @@ export class JacT9 {
     const idx = dirIndex(this.dir);
     const d = headingDelta(idx, this.heading);
     return wrapHeading(idx + Math.max(-MOTION_CONE, Math.min(MOTION_CONE, d)));
+  }
+
+  /** D1 as syncManualFacing would judge it in place, for the side the heading leans to. */
+  private swapWouldBeRefused(): boolean {
+    const idx = dirIndex(this.dir);
+    const d = headingDelta(idx, this.heading);
+    if (Math.abs(d) < 1e-6) return false;
+    const next = DIR_ORDER[(idx + (d > 0 ? 1 : 3)) & 3];
+    const dirSign = this.gear === 'R' ? -1 : 1;
+    const travelled = this.noChangeSinceEntry || this.travelSinceDir >= SWAP_TRAVEL_MIN;
+    const fits = this.poseBlocked(this.cx, this.cy, next) === 0;
+    const ahead = this.freeAhead(next, dirSign, SWAP_AHEAD_TILES);
+    return !travelled || !fits || !ahead;
   }
 
   /**
