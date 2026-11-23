@@ -1610,14 +1610,27 @@ export class JacT9 {
     }
     // Manual swap, once, on the final pose. D1 (fit, travel, free ahead) is
     // judged here, after the frame has finished moving.
-    const moved = Math.hypot(this.cx - x0, this.cy - y0);
+    let moved = Math.hypot(this.cx - x0, this.cy - y0);
     const manual = this.pendingExit || (this.drivePath.length === 0 && !this.driveGoal);
     let earlyKept = early;
     if (early && moved < 0.02 && this.earlyFrom) {
       // Yaw during the borrowed sprite can sit past the old cap, and the old
       // box may no longer fit. Put the heading back, and keep the new sprite
       // when the old one would overlap.
-      if (this.poseBlocked(this.cx, this.cy, this.earlyFrom) === 0) {
+      // The short roll happened on the borrowed sprite, up to 90° off the old one
+      // (G3: 57° at 0.004 t). Undo the roll with the swap: the frame started legal
+      // at (x0, y0) on the old sprite. The swap is then judged in place (D1) below.
+      if (this.poseBlocked(x0, y0, this.earlyFrom) === 0) {
+        if (moved > 0) {
+          this.cx = x0;
+          this.cy = y0;
+          this.vel = 0;
+          moved = 0;
+        }
+        this.dir = this.earlyFrom;
+        this.travelSinceDir = this.earlyTravel;
+        earlyKept = false;
+      } else if (this.poseBlocked(this.cx, this.cy, this.earlyFrom) === 0) {
         this.dir = this.earlyFrom;
         this.travelSinceDir = this.earlyTravel;
         earlyKept = false;
@@ -2235,7 +2248,7 @@ export class JacT9 {
     if (this.travelSinceDir < DIR_TRAVEL_MIN) return;
     // Only the along-axis gap matters. A corner beside the sprite (the next leg
     // leaves sideways) still has a clear box here. The swap itself waits until
-    // pullFrameLegal, so a step that gets walked back cannot spend the travel.
+    // the next frame starts, so a step that gets walked back cannot spend the travel.
     // FOOT_EPS-sized: a 0.18 miss puts the 3-wide box on a fourth column.
     if (Math.abs(along) > 0.04) return;
     this.snapTurnLane(want, { x: targetX, y: targetY });
